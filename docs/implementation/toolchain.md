@@ -14,9 +14,11 @@ This is the version decision for [P0.01](https://github.com/chenghanlee/tips/iss
 
 Keep a single Phoenix application with PostgreSQL, Bandit, LiveView, Ecto, mailer and generated asset tooling. Retain integer primary keys. Run the generator outside this repository; do not commit generated application code in this task.
 
+No `postgres` role exists on this dev machine: P0.02 ([#23](https://github.com/chenghanlee/tips/issues/23)) must read DB credentials from the environment, and P0.03 ([#31](https://github.com/chenghanlee/tips/issues/31)) must use the containerized database.
+
 ## Application dependencies
 
-The matrix versions for generated dependencies come from the captured `mix.lock`, not the generator’s `~>` ranges. The committed lock enforces exact resolved versions, including transitive dependencies. “Pinned” means the selected version is exact; it does not mean all Tips behavior has passed. Use exact Mix requirements (for example `{:phoenix, "== 1.8.14"}`), commit the application's `mix.lock`, and pin downloaded asset binaries in config. Do not replace these with `latest`. The generated baseline's full lock is retained below so its transitive dependencies can be reproduced.
+The matrix versions for generated dependencies come from the captured `mix.lock`, not the generator’s `~>` ranges. The committed lock enforces exact resolved versions, including transitive dependencies. “Pinned” means the selected version is exact; it does not mean all Tips behavior has passed. Keep the generator’s `~>` requirements in `mix.exs` and commit the application’s `mix.lock`. P0.03 ([#31](https://github.com/chenghanlee/tips/issues/31)) adds `mix deps.get --check-locked` to CI so pending lock changes fail the build. Reviewed upgrades use `mix deps.update` within those ranges and commit the updated lock. Keep exact downloaded asset-binary versions in config. Do not replace these with `latest`. The generated baseline's full lock is retained below so its transitive dependencies can be reproduced.
 
 | Component | Exact selection and primary source | Status / evidence boundary |
 |---|---|---|
@@ -28,12 +30,14 @@ The matrix versions for generated dependencies come from the captured `mix.lock`
 | Jobs | [oban 2.24.1](https://hex.pm/packages/oban/2.24.1) | Pinned, open integration risk; not installed in the generated baseline; requires Ecto SQL `~> 3.10`, Elixir `~> 1.15` |
 | Tailwind | [tailwind 0.5.1](https://hex.pm/packages/tailwind/0.5.1) wrapper / [Tailwind CSS 4.3.0](https://github.com/tailwindlabs/tailwindcss/releases/tag/v4.3.0) binary | Pinned; generator config selects 4.3.0; full SaladUI styles remain P16.00 |
 | JavaScript builder | [esbuild 0.10.0](https://hex.pm/packages/esbuild/0.10.0) wrapper / [esbuild 0.25.4](https://github.com/evanw/esbuild/releases/tag/v0.25.4) binary | Pinned; generator defaults |
-| UI candidate | [salad_ui 1.0.0](https://hex.pm/packages/salad_ui/1.0.0) | Open-risk candidate; published requirement is LiveView `~> 1.2`. P16.00 must prove hooks, errors, keyboard focus, patches and reconnect on this Tailwind/Phoenix combination |
+| Generated component styles | [daisyui 5.5.20](https://github.com/saadeghi/daisyui/tree/v5.5.20), git `22ecff57f2c391b80a75617325748cf4d13fdf47`, sparse `packages/bundle` | Pinned in the captured lock. Keep through P0.02 because generated `core_components.ex` uses its classes and `app.css` loads its plugin; P16.00 removes it when SaladUI replaces core components |
+| Icons | [heroicons 2.2.0](https://github.com/tailwindlabs/heroicons/tree/v2.2.0), git `0435d4ca364a608cc75e2f8683d374e55abbae26`, sparse `optimized` | Pinned in the captured lock; keep through P0.02 and the SaladUI migration |
+| UI candidate | [salad_ui 1.0.0](https://hex.pm/packages/salad_ui/1.0.0) | Open-risk candidate; published requirements include LiveView `~> 1.2`, non-optional `igniter ~> 0.6`, `sourceror ~> 1.9` and `tw_merge ~> 0.1` (Elixir `~> 1.14`). P0.02/P16.00 must account for those installer and class-merging dependencies. P16.00 must prove hooks, errors, keyboard focus, patches and reconnect on this Tailwind/Phoenix combination |
 | Markdown renderer | [mdex 0.13.5](https://hex.pm/packages/mdex/0.13.5) | Pinned, open integration risk; native binary/platform availability and rendering fixtures still need proof |
-| HTML sanitizer | [html_sanitize_ex 1.5.5](https://hex.pm/packages/html_sanitize_ex/1.5.5) | Pinned, open integration risk; explicit final allowlist policy below |
-| Browser driver | [wallaby 0.31.0](https://hex.pm/packages/wallaby/0.31.0) with `Wallaby.Chrome` | Pinned, open runtime risk until browser setup task executes the smoke below |
+| HTML sanitizer | MDEx 0.13.5 built-in [`sanitize:` option](https://github.com/leandrocp/mdex/blob/v0.13.5/guides/safety.md), using Ammonia inside `mdex_native` | Selected with the renderer; no separate sanitizer package or custom scrubber. Local policy probe recorded below; full rendering fixtures and native platform support remain open integration risks |
+| Browser driver | [wallaby 0.31.0](https://hex.pm/packages/wallaby/0.31.0) with `Wallaby.Chrome` | Pinned, open runtime risk until P0.04 ([#36](https://github.com/chenghanlee/tips/issues/36)) executes the smoke below |
 
-The generator does not install Oban, SaladUI, MDEx, HtmlSanitizeEx or Wallaby. Their presence in this decision table is not a claim that this run compiled or exercised them together. No version combination is certified for Tips until the owning P16.00/P0.06 probes and feature checks pass.
+The generator does not install Oban, SaladUI, MDEx or Wallaby. Their presence in this decision table is not a claim that this run compiled or exercised them together. No version combination is certified for Tips until the owning P16.00/P0.06 probes and feature checks pass.
 
 ## Disposable generator evidence
 
@@ -89,6 +93,10 @@ Additional asset checks: `mix assets.setup` exited 0 (downloaded Tailwind 4.3.0 
 
 Cleanup: `dropdb -h localhost -U chenghanlee tips_22_probe_hv43ag_test` exited 0. `psql -h localhost -U chenghanlee -d postgres -Atc "select count(*) from pg_database where datname = 'tips_22_probe_hv43ag_test'"` exited 0 and returned `0`. The temporary source/build files and logs are retained outside the repo for reviewer inspection; no database, server or provider resources remain from the probe.
 
+During design repair, `mix deps.get --check-locked` ran in the retained disposable app with the isolated environment above: exit 0, `All dependencies have been fetched`; the lock SHA-256 stayed unchanged.
+
+During design repair, `mix deps.get --check-locked` ran in the retained disposable app with the isolated environment above: exit 0, `All dependencies have been fetched`; the lock SHA-256 stayed unchanged.
+
 No ExUnit test or application code was added to Tips for this documentation probe. Repository check: `python3 scripts/check_docs.py` (exit 0, `PASS: local documentation links valid`). SQL extension, SaladUI, provider and real-device checks were not run.
 
 ## Browser decision
@@ -104,6 +112,8 @@ System requirements: Chrome plus matching ChromeDriver on PATH; the Chrome binar
 | Pinned Chrome for Testing, Linux desktop, 1280×800 | Automated CI milestone path after browser setup; fresh and multiple sessions |
 | Same Chrome, 390×844 viewport | Automated responsive smoke; resizing is not a claim of touch/mobile engine coverage |
 | Safari on macOS and physical iOS Safari; Chrome on physical Android | Manual milestone checks for keyboard/focus, storage recovery, upload and private video playback; record exact OS/browser/device versions in gate evidence. Versions/access are open risks, not passed checks |
+
+The standalone `Mix.install` command below selects the exact driver for this disposable smoke; application dependencies still use `~>` plus their committed lock.
 
 Runnable standalone driver smoke after installing the pinned browser pair (outside the repo; set `TIPS_CHROME_BINARY` to the downloaded executable and put its ChromeDriver on PATH):
 
@@ -125,19 +135,29 @@ end
 '
 ```
 
-Expected exit 0. **Not executed here:** ChromeDriver is absent. This command proves driver startup and DOM access only; the application browser setup task must additionally exercise a connected LiveView. Use branded Google Chrome for real Stream playback: Cloudflare's [player documentation](https://developers.cloudflare.com/stream/viewing-videos/using-the-stream-player/) warns about H.264 support in Chromium.
+Expected exit 0. **Not executed here:** ChromeDriver is absent. This command proves driver startup and DOM access only; P0.04 ([#36](https://github.com/chenghanlee/tips/issues/36)) owns this smoke and must additionally exercise a connected LiveView. P0.04 tests drag reordering with dispatched events or the required button path, without relying on a native drag helper in the selected Wallaby setup. Use branded Google Chrome for real Stream playback: Cloudflare's [player documentation](https://developers.cloudflare.com/stream/viewing-videos/using-the-stream-player/) warns about H.264 support in Chromium.
 
 ## PostgreSQL image and extension contract
 
-Select a **custom combined build based on `postgres:18.6-trixie`**, with the following source pins. This is an open-risk build specification, not a published or verified Tips image. The base manifest digest, apt package snapshot and resulting combined image digest remain P0.06 deliverables. No existing image is assumed to contain both exact extensions.
+Select a **combined image using prebuilt extension packages on the digest-pinned official PostgreSQL image**. This is the primary recipe for P0.06 ([#30](https://github.com/chenghanlee/tips/issues/30)); the source build below is a fallback if the packages fail on the target platform. Package availability, base digest and release checksum were verified in the [whole-PR review](https://github.com/chenghanlee/tips/pull/140#issuecomment-5751936068); this is not a built or SQL-verified Tips image.
 
-| Input | Exact source pin | Status |
+| Input | Exact package or source pin | Status |
 |---|---|---|
-| PostgreSQL | 18.6, Debian trixie variant; [official image build](https://github.com/docker-library/postgres/tree/master/18/trixie) | Open image/digest risk; only local Homebrew PG18.6 tested here |
-| pg_textsearch | [v1.4.0](https://github.com/timescale/pg_textsearch/tree/v1.4.0), commit `7a932505b537d50ad8d2d068a053cd1dd7b646ea` | Pinned source, open PG18 combined-build and SQL risk |
-| pgvector | [v0.8.6](https://github.com/pgvector/pgvector/tree/v0.8.6), commit `8ee86c96f0fd72390f890aa8a336fda6d3ab4c6c` | Pinned source, open PG18 combined-build and SQL risk |
+| PostgreSQL | `postgres:18.6-trixie@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae`; [official tag](https://hub.docker.com/layers/library/postgres/18.6-trixie/images) | Base manifest pinned; the official image includes the PGDG apt repository. Combined image remains unbuilt |
+| pgvector | PGDG trixie amd64 `postgresql-18-pgvector=0.8.6-1.pgdg13+1`; [package index](https://apt.postgresql.org/pub/repos/apt/dists/trixie-pgdg/main/binary-amd64/Packages) | Exact package version selected; P0.06 verifies installation and extversion 0.8.6 |
+| pg_textsearch | [pg-textsearch-v1.4.0-pg18-amd64.zip](https://github.com/timescale/pg_textsearch/releases/download/v1.4.0/pg-textsearch-v1.4.0-pg18-amd64.zip), SHA-256 `c2ce0585a7f09ec7fc441f1fba11888d6ad3ab51b1851d4f24a7457905d0519f`, containing `pg-textsearch-postgresql-18_1.4.0-1_amd64.deb` | Release asset pinned; P0.06 verifies installation and extversion 1.4.0 |
 
-Build both into the same image against its PostgreSQL 18 `pg_config` and server development headers (Debian package `postgresql-server-dev-18`), using Git, CA certificates, a C compiler and GNU make. Install any LLVM/Clang tools required by that PGXS configuration. The source-build core is `make PG_CONFIG=/usr/lib/postgresql/18/bin/pg_config` then `make PG_CONFIG=/usr/lib/postgresql/18/bin/pg_config install` in each pinned checkout; for pgvector pass `OPTFLAGS=""` to avoid producing a build tied to the builder's CPU. These are instructions for P0.06, **not commands executed in this task**. Match the server patch version and architecture in build and runtime stages and retain runtime libraries required by the compiled extensions.
+P0.06 starts its Dockerfile with:
+
+```dockerfile
+FROM postgres:18.6-trixie@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
+```
+
+For linux/amd64, install `postgresql-18-pgvector=0.8.6-1.pgdg13+1` with `apt-get` from the image’s PGDG repository. Download the pinned pg_textsearch zip, verify its SHA-256 before extracting, then install `pg-textsearch-postgresql-18_1.4.0-1_amd64.deb` with `dpkg -i`. Set `shared_preload_libraries` as below. This path needs download/unzip tools but no compiler, server development headers or multi-stage source build. Confirm package installation preserves PostgreSQL 18.6. These are instructions, not commands executed in this task.
+
+For native arm64 development, the same release publishes [pg-textsearch-v1.4.0-pg18-arm64.zip](https://github.com/timescale/pg_textsearch/releases/download/v1.4.0/pg-textsearch-v1.4.0-pg18-arm64.zip), with API-reported SHA-256 `f65bc4f46393ca66c78e4da71ae8c54d0aef9975eaf3d5b6836d0f4570c68c64`. P0.06 must verify the downloaded archive and matching PGDG arm64 package before using it; do not install amd64 debs in an arm64 image. The trust inputs are PGDG’s signed package metadata and the checksummed Timescale release asset. P0.06 records the resolved package checksums/snapshot and the final combined-image digest.
+
+**Source fallback only:** pg_textsearch [v1.4.0](https://github.com/timescale/pg_textsearch/tree/v1.4.0), commit `7a932505b537d50ad8d2d068a053cd1dd7b646ea`, and pgvector [v0.8.6](https://github.com/pgvector/pgvector/tree/v0.8.6), commit `8ee86c96f0fd72390f890aa8a336fda6d3ab4c6c`. Build against the image’s PostgreSQL 18 `pg_config` and server development headers (`postgresql-server-dev-18`), with Git, CA certificates, a C compiler, GNU make and any LLVM/Clang tools required by that PGXS configuration. Run `make PG_CONFIG=/usr/lib/postgresql/18/bin/pg_config` then `make PG_CONFIG=/usr/lib/postgresql/18/bin/pg_config install` in each pinned checkout; for pgvector pass `OPTFLAGS=""` to avoid targeting only the builder’s CPU. Match the server patch version and architecture in build and runtime stages and retain runtime libraries required by the extensions. This fallback is also unexecuted.
 
 The [pg_textsearch 1.4.0 instructions](https://github.com/timescale/pg_textsearch/blob/v1.4.0/README.md#installation) require `shared_preload_libraries = 'pg_textsearch'` and a restart before `CREATE EXTENSION pg_textsearch`. Install pgvector with `CREATE EXTENSION vector`; its SQL extension name differs from its repository name. PG18's official container uses the versioned data directory and a volume at `/var/lib/postgresql`; do not inherit the old PG17 volume layout blindly.
 
@@ -145,7 +165,22 @@ P0.06 must build/run the image, record immutable base/final digests and package 
 
 ## Markdown, embeds and secure headers
 
-Render only tip/review authored Markdown through **MDEx 0.13.5**, explicitly with `render: [unsafe: false]` so author raw HTML is omitted. Then sanitize generated HTML with **HtmlSanitizeEx 1.5.5**, using a Tips allowlist scrubber. See [MDEx safety options](https://github.com/leandrocp/mdex/blob/v0.13.5/guides/safety.md) and [HtmlSanitizeEx scrubbers](https://hexdocs.pm/html_sanitize_ex/1.5.5/HtmlSanitizeEx.Scrubber.html). Only the sanitized result may be marked HTML-safe. Titles and metadata stay escaped text; prompt/result fields stay verbatim escaped text with copy preserving bytes.
+Render tip/review authored Markdown through **MDEx 0.13.5 with its built-in Ammonia sanitizer** (`mdex_native`). Use one options list, without HtmlSanitizeEx or a custom Scrubber module:
+
+```elixir
+render: [unsafe: false],
+sanitize: [
+  tags: ~w(p br hr h1 h2 h3 h4 h5 h6 blockquote ul ol li pre code em strong del a table thead tbody tr th td),
+  tag_attributes: %{"a" => ~w(href title)},
+  generic_attributes: [],
+  url_schemes: ~w(http https mailto),
+  link_rel: "nofollow noopener noreferrer"
+]
+```
+
+`unsafe: false` omits author raw HTML, but Markdown image syntax still produces an `img` tag. The sanitizer’s tag allowlist removes those images. Only the sanitized result may be marked HTML-safe. See [MDEx safety options](https://github.com/leandrocp/mdex/blob/v0.13.5/guides/safety.md). Titles and metadata stay escaped text; prompt/result fields stay verbatim escaped text with copy preserving bytes.
+
+Fable-Tech-Lead’s [local MDEx 0.13.5 probe](https://github.com/chenghanlee/tips/pull/140#issuecomment-5751936068) used this exact policy with raw HTML, Markdown images, javascript/HTTPS/relative/mailto links and a fenced Elixir code block. It omitted raw HTML, removed the image, emptied the javascript href, retained link titles and relative/mailto URLs, added the specified `rel`, and stripped `class="language-elixir"`. This is focused policy evidence from the reviewer, not the generated application suite or a complete rendering-security test. Ammonia uses html5ever inside the renderer’s existing native dependency; native-binary/platform proof remains required.
 
 Allowed output tags: `p`, `br`, `hr`, `h1`–`h6`, `blockquote`, `ul`, `ol`, `li`, `pre`, `code`, `em`, `strong`, `del`, `a`, `table`, `thead`, `tbody`, `tr`, `th`, `td`. Allow only validated `href` and `title` on links; URI schemes are HTTPS/HTTP/mailto plus relative URLs/fragments. Add application-controlled `rel="nofollow noopener noreferrer"`; do not accept author `target`, styles, event handlers, scripts, forms, SVG, images, video or iframe tags. Uploaded media is rendered separately through authorized components. Disable syntax highlighting initially so the allowlist needs no author-controlled style/class exceptions. The implementation task must test malformed HTML, encoded/script/data URLs, raw HTML omission and normal Markdown; this policy is not evidence that those fixtures already pass.
 
@@ -164,9 +199,9 @@ When adding a stricter CSP, preserve those default directives and allow `frame-s
 |---|---|
 | 1. Exact versions and primary sources | Runtime and application tables; each unproven input marked open-risk |
 | 2. Disposable generator, compiler and suite | Commands above: generator 0, final dependency fetch 0, compiler 0, suite 0 / five passing tests; initial cache failures retained |
-| 3. Browser driver, dependencies, matrix, smoke | Wallaby/Chrome decision and runnable standalone smoke; execution pending browser setup |
+| 3. Browser driver, dependencies, matrix, smoke | Wallaby/Chrome decision and runnable standalone smoke; execution owned by P0.04 ([#36](https://github.com/chenghanlee/tips/issues/36)) |
 | 4. PG18 image containing both extensions | Combined-build inputs and explicit P0.06 digest/build/SQL obligations |
-| 5. Markdown, sanitizer, hosts and headers | Explicit renderer/scrubber policy, empty author embed allowlist, application provider hosts and retained Phoenix defaults |
+| 5. Markdown, sanitizer, hosts and headers | Explicit MDEx sanitizer policy, empty author embed allowlist, application provider hosts and retained Phoenix defaults |
 
 ## Captured generator lock
 
