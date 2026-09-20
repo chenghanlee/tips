@@ -24,8 +24,6 @@ defmodule TipsWeb.Router do
   end
 
   scope "/", TipsWeb do
-    pipe_through :api
-
     get "/healthz", HealthController, :show
   end
 

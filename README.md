@@ -29,7 +29,6 @@ From a fresh checkout:
 
 ```sh
 mix local.hex 2.5.1 --force
-mix archive.install hex phx_new 1.8.14 --force
 cp .env.example .env
 ```
 
@@ -75,7 +74,7 @@ curl --include --fail http://localhost:4000/healthz
 
 `/healthz` returns exactly `{"status":"ok"}` with HTTP 200 when a read-only
 `SELECT 1` succeeds, or `{"status":"error"}` with HTTP 503 when it fails. The
-query timeout is one second; both responses use `cache-control: no-store` and
+entire probe has a one-second deadline; both responses use `cache-control: no-store` and
 contain no diagnostics. Production monitoring uses the public HTTPS hostname
 through the TLS-terminating proxy; release and proxy setup belong to P0.05.
 
