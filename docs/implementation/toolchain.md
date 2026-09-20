@@ -161,6 +161,82 @@ The [pg_textsearch 1.4.0 instructions](https://github.com/timescale/pg_textsearc
 
 P0.06 must build/run the image, record immutable base/final digests and package inputs, verify both `pg_extension.extversion` values, and execute the actual [hybrid SQL](../design/technical/data-model.md#search). Required risks to resolve: 1024-dimension HNSW/iterative scans; BM25 syntax, punctuation and zero-match behavior under index and sequential plans; visibility/filters and bounded ranking/pagination; keyword fallback and the two-second query timeout; migration/restart, backup/restore and extension persistence; memory/latency on the intended architecture. The local server has neither extension. Docker was not started and no container/image build or extension SQL was run. P0.06 must not silently replace hybrid search with keyword-only search.
 
+### P0.06 image implementation and evidence
+
+[PR #144](https://github.com/chenghanlee/tips/pull/144) implements the package
+recipe in [db/Dockerfile](../../db/Dockerfile). [Compose](../../compose.yaml),
+[the smoke script](../../scripts/db_smoke.sh) and
+[CI](../../.github/workflows/db-image.yml) select
+`ghcr.io/chenghanlee/tips-postgres:18.6-pgvector0.8.6-textsearch1.4.0` and build the
+same digest-pinned recipe natively. The image command preloads pg_textsearch on
+every start, including existing volumes. Compose uses local-only credentials
+`postgres`/`postgres`, binds `127.0.0.1:5433`, and mounts `/var/lib/postgresql`.
+The smoke container publishes no port and removes its anonymous volume on exit.
+
+On 2026-09-21, the native linux/arm64 build verified the release zip against the
+previously API-reported SHA-256 above. PGDG's signed metadata selected the exact
+pgvector package. The build prints both downloaded package checksums and stops
+if installation changes PostgreSQL's version. It uses the PGDG archive only if
+the exact pgvector version disappears from the live index, restricts that source
+to pgvector, and fails rather than changing versions or building from source.
+
+| Downloaded arm64 package | SHA-256 |
+|---|---|
+| `postgresql-18-pgvector_0.8.6-1.pgdg13+1_arm64.deb` | `e22d18cba71b5ae656a5f4b458cb59951866ef835e69e5ad1385777c91b1126b` |
+| `pg-textsearch-postgresql-18_1.4.0-1_arm64.deb` | `d4bb42c1a6b7e3d0169399fe37285a44ab6e5170cc95dc6dabadf857ddeca9bf` |
+
+`scripts/db_smoke.sh` passed locally on arm64: PostgreSQL 18.6, extension versions
+0.8.6 and 1.4.0, two negative-score BM25 matches, cosine neighbors `{1,2}` with
+1024 dimensions and relaxed iterative scanning, zero absent-token matches, and
+EXPLAIN ANALYZE plans naming both `smoke_bm25` and `smoke_hnsw`. Before the image
+existed, the same SQL failed on the pinned base with `extension "vector" is not
+available` (psql exit 3). The fixture is a regular table in a disposable database;
+it does not create the Tips search schema or certify the broader search risks
+listed above.
+
+The native amd64 PR workflow runs the same smoke before publication. On a
+matching push to main it pushes the verified image with the repository's
+`GITHUB_TOKEN` and `packages: write`; no personal push credential is needed. The
+OCI source label links the package to this repository. The first GHCR package
+is private by default; Fable-Tech-Lead must confirm visibility and authenticated
+pull after merge, copy the pushed manifest digest from the run log to #30 and
+append it here. The published image is amd64 only; local arm64 development builds
+from the same recipe. No multi-architecture manifest is published by this task.
+
+**Publication evidence pending merge:** no GHCR manifest digest or private pull
+is claimed yet. The local arm64 image ID is
+`sha256:f21588a97313d462cddffe037c523c0767357618b22757938b8ce97798c48073`;
+this is an image configuration digest, not a registry manifest digest. Deployment
+must select the published `ghcr.io/chenghanlee/tips-postgres@sha256:…` digest once
+recorded. VPS credentials and its authenticated pull are owned by P13a; use a
+registry credential with package read access on that host and pass it through
+`docker login --password-stdin`, never store it in Compose or this repository.
+
+Native linux/amd64 verification also passed on the
+[PR workflow run](https://github.com/chenghanlee/tips/actions/runs/35534482017)
+for commit `83957b8ad25da14464433b5f9bc5681818115d75`. The same extension versions,
+query assertions and both index plans passed; publication was correctly skipped
+on the PR event. The build verified the pinned amd64 ZIP checksum and logged:
+
+| Downloaded amd64 package | SHA-256 |
+|---|---|
+| `postgresql-18-pgvector_0.8.6-1.pgdg13+1_amd64.deb` | `89402614430b2a7e06345f0f69b441bb7ee93913a14729f10c421f40b06d9d95` |
+| `pg-textsearch-postgresql-18_1.4.0-1_amd64.deb` | `7fffdca1327b63245e72eec1d04fc1e45c73e447006131670eb721ab3bc08307` |
+
+Local Compose was also verified with a fresh named volume: both extensions
+created through host port 5433, survived restart with pg_textsearch preloaded,
+and coexisted with a successful smoke run. The scoped test volume was removed.
+An injected SQL exception made the smoke script exit 3 and remove its disposable
+container and volume; the unmodified fixture was restored before commit.
+
+Review follow-up (P2-3/P2-4): the PGDG archive fallback has not been executed;
+all recorded builds resolved pgvector from the live signed index. The final
+image now purges curl/unzip and their unused dependencies in the install layer;
+CA certificates remain. Native arm64 smoke passed again after that cleanup,
+and neither executable is present. Its updated local image configuration ID is
+`sha256:3409e546c7c1646ad211b30cba66070ce2d5c03fde8edcd1432f5dbc854516cd`.
+Registry publication and its manifest digest still await the main-branch run.
+
 ## Markdown, embeds and secure headers
 
 Render tip/review authored Markdown through **MDEx 0.13.5 with its built-in Ammonia sanitizer** (`mdex_native`). Use one options list, without HtmlSanitizeEx or a custom Scrubber module:
