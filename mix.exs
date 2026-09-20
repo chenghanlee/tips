@@ -88,7 +88,8 @@ defmodule Tips.MixProject do
     [
       setup: ["deps.get", "ecto.setup", "assets.setup", "assets.build"],
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
-      "ecto.reset": ["ecto.drop", "ecto.setup"],
+      "ecto.drop": [&guard_database_reset/1, "ecto.drop"],
+      "ecto.reset": [&guard_database_reset/1, "ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["compile", "tailwind tips", "esbuild tips"],
@@ -99,5 +100,11 @@ defmodule Tips.MixProject do
       ],
       precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
     ]
+  end
+
+  defp guard_database_reset(_args) do
+    if Mix.env() == :prod and System.get_env("TIPS_ALLOW_RESET") != "1" do
+      Mix.raise("Production database reset is disabled. Set TIPS_ALLOW_RESET=1 to allow it.")
+    end
   end
 end

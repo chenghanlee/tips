@@ -12,7 +12,8 @@ config :tips, Tips.Repo,
   username: System.get_env("PGUSER", "postgres"),
   password: System.get_env("PGPASSWORD", "postgres"),
   hostname: System.get_env("PGHOST", "localhost"),
-  database: "tips_test#{System.get_env("MIX_TEST_PARTITION")}",
+  port: String.to_integer(System.get_env("PGPORT", "5433")),
+  database: "tips_test#{System.get_env("TIPS_DB_SUFFIX")}#{System.get_env("MIX_TEST_PARTITION")}",
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: System.schedulers_online() * 2
 

@@ -24,6 +24,8 @@ config :tips,
   ecto_repos: [Tips.Repo],
   generators: [timestamp_type: :utc_datetime]
 
+config :tips, Tips.Repo, timeout: 2_000
+
 config :tips, Oban,
   repo: Tips.Repo,
   queues: [media: 1, embeddings: 1, maintenance: 1]
