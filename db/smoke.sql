@@ -1,3 +1,4 @@
+-- Run via scripts/db_smoke.sh in a fresh disposable database; setup is not idempotent.
 \set ON_ERROR_STOP on
 CREATE EXTENSION vector;
 CREATE EXTENSION pg_textsearch;
@@ -74,7 +75,7 @@ BEGIN
       RAISE NOTICE '%', plan_line;
       plan_text := plan_text || plan_line || E'\n';
     END LOOP;
-    IF position(index_name IN plan_text) = 0 THEN
+    IF position('Index Scan using ' || index_name || ' on smoke_documents' IN plan_text) = 0 THEN
       RAISE EXCEPTION 'Expected index % in plan: %', index_name, plan_text;
     END IF;
   END LOOP;
