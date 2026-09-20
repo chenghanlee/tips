@@ -135,7 +135,7 @@ Use Phoenix's generated conventions and built-in testing facilities as the start
 
 ## Deployment
 
-Keep one VPS with Docker Compose for the Phoenix release and a pinned Postgres image containing pg_textsearch and pgvector. Evaluate the hosted embedding candidate (Qwen3-Embedding-8B via OpenRouter, 1024 output dimensions) first at the existing search quality and latency gate; run a local inference container only if the hosted candidate fails or sending search text off-box is unacceptable. Select one production model/runtime. R2 stores images and database backups; email is delivered through a provider.
+Keep one VPS with Docker Compose for the Phoenix release and a pinned Postgres image containing pg_textsearch and pgvector. Evaluate the hosted embedding candidate (Qwen3-Embedding-8B via OpenRouter, reduced to 1024 dimensions) first at the existing search quality and latency gate; run a local inference container only if the hosted candidate fails or sending search text off-box is unacceptable. Select one production model/runtime. R2 stores images and database backups; email is delivered through a provider.
 
 Serve the application hostname through Cloudflare's proxy and restrict direct public access to the origin so edge protections cannot be bypassed. Keep Turnstile in the agreed signup flow and verify its result on the server. Use forwarded client addresses only when needed, and trust them only through the configured proxy path. Apply the same public path to uptime checks; do not confuse the application proxy with the separate media delivery domain.
 
