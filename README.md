@@ -81,3 +81,17 @@ through the TLS-terminating proxy; release and proxy setup belong to P0.05.
 If an agent sandbox cannot write the shared Hex/Mix caches, use the isolated
 cache environment in the [toolchain instructions](docs/implementation/toolchain.md#disposable-generator-evidence)
 before running Mix commands.
+
+### Extension-enabled database
+
+Run `docker compose up -d db` to build the shared PostgreSQL 18.6 image with
+pgvector 0.8.6 and pg_textsearch 1.4.0. [Compose](compose.yaml) serves it on
+`127.0.0.1:5433` with the local-only user/password `postgres`/`postgres` and
+persists data in a named volume. `docker compose down` preserves that data.
+Application configuration switches to this port in P0.03 (#31).
+
+Run `scripts/db_smoke.sh` to build the same recipe and verify real BM25 and
+1024-dimension vector queries in a disposable container. It publishes no port,
+so it can run while Compose is up, and removes its container and volume on exit.
+See the [database image contract](docs/implementation/toolchain.md#postgresql-image-and-extension-contract)
+for pins, package checksums, CI evidence and private-registry publication.
