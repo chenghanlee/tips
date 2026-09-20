@@ -5,6 +5,7 @@
 
 ## Software Design
 
+- Use Elixir and Phoenix Framework idioms, standards, and conventions.
 - Use proven architecture, standards, and conventions from widely used software similar to the
 project that the user is building.
 - Strive for simple working and elegant solutions. Elegant solutions make complex things seem easy
@@ -12,6 +13,11 @@ and obvious. Choose simplicity over elegance when they conflict.
 - Build an MVP for fast iteration and finding product-market fit. Avoid unnecessary enterprise complexity. No backwards compatibility.
 - Accept necessary complexity when it makes the user's experience simpler. Don't make the implementation look simple by pushing its complexity onto the user. Apply this principle across the software architecture, backend, data model, and frontend.
 - "Perfection is achieved, not when there is nothing more to add, but when there is nothing left to take away"
+
+## Testing
+
+- Follow the testing trophy, integration first. TDD means writing the failing ExUnit integration test for the acceptance scenario before the code.
+- Unit tests only for pure logic with wide blast radius. End-to-end tests only at milestone gates.
 
 ## Code Review and Software Architecture Review
 

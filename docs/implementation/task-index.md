@@ -131,4 +131,4 @@ P0.00 establishes this reviewed baseline. After it closes, P0.01 starts version 
 
 At N=2 or N=4, choose ready disjoint tasks from the actual dependency graph. Final integration remains serialized. The implementation plan has broader 1/2/4 examples; the issue graph governs readiness.
 
-Run `python3 scripts/check_planning.py` to validate the initial snapshot. This checks IDs, package coverage, dependencies, cycles and reading-section references; it does not prove implementation correctness or live GitHub state.
+Run `python3 scripts/check_docs.py` to check local documentation links. This does not validate task dependencies, implementation correctness or live GitHub state.

@@ -6,7 +6,7 @@ Date: 2026-09-20. Status: owner decisions agreed. Concrete tasks and execution p
 
 Deliver the full agreed MVP ready for public developer trials, including deployment, recovery, moderation and operational checks. Demonstrate runnable journeys throughout development. There is no hard launch date or fixed execution/provider budget yet; order work by dependencies and risk rather than inventing a calendar estimate.
 
-Support configurable **N implementation workers**, with schedules for 1, 2 and 4. Codex's engineering-manager/tech-lead role and Fable's technical-program-manager role are coordination responsibilities, separate from the requested worker count. The execution environment's total capacity still applies; N is a ceiling, not a requirement to keep every worker busy.
+Support configurable **N implementation workers**, with schedules for 1, 2 and 4. Fable-Tech-Lead's role and Fable-TPM's technical-program-manager role are coordination responsibilities, separate from the requested worker count. The execution environment's total capacity still applies; N is a ceiling, not a requirement to keep every worker busy.
 
 The owner selected **shadcn design language with native Phoenix components**, using **[SaladUI](https://github.com/bluzky/salad_ui) for now**. Visual design is assigned to **Fable or an Opus model**; Fable is the designated design owner. Retain Phoenix LiveView and HEEx. Design artifact work counts as a worker slot when it runs alongside implementation.
 
@@ -27,7 +27,7 @@ Start with a deployable skeleton and the risky end-to-end boundaries. Then expan
 
 Keep the application architecture independent of the agent count. Agents share ordinary Phoenix contracts; they do not need separate services, runtime APIs, duplicated contexts or a custom workflow engine. Add internal modules when cohesive implementation needs them, not to manufacture parallel tasks.
 
-Codex owns technical decisions, shared contracts, integration order and the integrated result. Fable owns dependency tracking, scope coverage, external prerequisites, demo evidence and release readiness. Neither role can call a feature done on the strength of an isolated agent's report. The owner supplies genuine seed experiences, recruits trial participants and makes material product, spending and public-launch decisions.
+Fable-Tech-Lead owns technical decisions, shared contracts, integration order and the integrated result. Fable-TPM owns dependency tracking, scope coverage, external prerequisites, demo evidence and release readiness. Neither role can call a feature done on the strength of an isolated agent's report. The owner supplies genuine seed experiences, recruits trial participants and makes material product, spending and public-launch decisions.
 
 ## Milestones
 
@@ -64,7 +64,7 @@ The table defines delivery packages, not equal-duration tasks. Split each packag
 | P12 | Account lifecycle and profiles — account owner | M1 | Email change/sudo, account deletion including banned accounts, retained-author presentation, mixed contribution profiles and current capabilities |
 | P13a | Early provider and runtime setup — operations owner | P0 | Secret loading, provider test configuration, production Compose baseline and provider access for the real early gates |
 | P13b | Operational completion — same operations owner | P5 | Proxy/origin controls, independent progress check, sanitized error reporting, backup/restore/repair, moderator bootstrap and selected-job retry runbooks |
-| P14 | Integrated adversarial acceptance — Codex plus feature owners | M1, P8, P9b, P10, P11, P12, P13b, P16 | Cross-feature races, browser failures, real providers, capacity fixtures, accessibility and complete developer journey on one integrated revision |
+| P14 | Integrated adversarial acceptance — Fable-Tech-Lead plus feature owners | M1, P8, P9b, P10, P11, P12, P13b, P16 | Cross-feature races, browser failures, real providers, capacity fixtures, accessibility and complete developer journey on one integrated revision |
 | P15 | Trial readiness and launch handoff — Fable plus owner | P14 | Deployment rehearsal, release checklist, genuine seed content, community guidance, operator ownership and developer-trial script |
 | P16 | Visual design and shared UI — Fable, within N worker slots | P0 for component implementation | Pinned SaladUI integration, shadcn visual direction in native Phoenix components, design tokens and shared controls; responsive reader/editor compositions and validation/recovery states; visual consistency across all six page areas; final review of implemented screens |
 
@@ -119,11 +119,11 @@ flowchart TD
 
 ## Parallel execution and ownership
 
-Use protected main and a separate branch/worktree per active bounded issue. Workers start from a known integrated commit. They do not edit each other's worktrees or merge each other's unfinished branches. Codex integrates one tested change at a time and resolves the final combined behavior. The owner selected the private chenghanlee/tips repository, GitHub Actions and the private Tips Project 15. Follow the agent workflow for independent commit/PR review and merge protection.
+Use protected main and a separate branch/worktree per active bounded issue. Workers start from a known integrated commit. They do not edit each other's worktrees or merge each other's unfinished branches. Fable-Tech-Lead integrates one tested change at a time and resolves the final combined behavior. The owner selected the private chenghanlee/tips repository, GitHub Actions and the private Tips Project 15. Follow the agent workflow for independent commit/PR review and merge protection.
 
 One worker owns a mutable file at a time. Package ownership includes its tests and fixtures. In particular:
 
-- Codex coordinates `mix.exs`, lockfiles, router, supervision/configuration, CI and migration ordering. Workers request small changes through their task handoff; Codex integrates them promptly rather than making the user copy patches.
+- Fable-Tech-Lead coordinates `mix.exs`, lockfiles, router, supervision/configuration, CI and migration ordering. Workers request small changes through their task handoff; Codex integrates them promptly rather than making the user copy patches.
 - One editor owner controls the editor LiveViews, upload configuration, shared draft hook and draft record format through P3/P6/P7/P8. Media workers supply the tested Media operations and adapters; they do not concurrently rewrite editor state. Preview, reorder, tus and Copy hooks may be delegated as bounded tasks with agreed DOM/event interfaces and distinct files. The editor owner integrates and browser-tests their combined behavior; these helpers count toward N.
 - Search owns retrieval and embedding code. All publication/edit/retag callers use the single search-text write helper; changes to that contract require updating its callers and tests together.
 - Accounts owns admission and session semantics. Content packages use the shared boundary rather than adding local token queries or inconsistent ban guards.
@@ -133,7 +133,7 @@ P1 owns the initial schema. Later migrations have a named owner, a unique order 
 
 Every worktree has isolated build/dependency output where required, an isolated test database and a unique development port. Never run reset/drop tasks against another worker's DB. Tests that need independently committed concurrent transactions use dedicated fixtures/connections and explicit synchronization; ordinary sandboxed tests do not prove those schedules. Real-provider fixtures use distinct asset prefixes/identifiers and tracked cleanup.
 
-GitHub issues hold current requirements, dependencies and evidence; the Tips project holds scheduling state. Use Backlog, Ready, Active, In review, Blocked and Done. Fable maintains task readiness and dispatch comments with owner/session, base commit, owned paths, isolation and evidence. Local task catalogues are publication snapshots, not a second live tracker. Do not build a scheduling service.
+GitHub issues hold current requirements, dependencies and evidence; the Tips project holds scheduling state. Use Backlog, Ready, Active, In review, Blocked and Done. Fable maintains task readiness and dispatch comments with owner/session, base commit, owned paths, isolation and evidence. The local task index links to the originally published issues; use GitHub for current task details. Do not build a scheduling service.
 
 Dispatch at most `min(N, available worker slots, independent ready tasks)` workers. A ready task has merged prerequisites, stable contracts, no conflicting file owner and the required environment. When those conditions fail, prefer finishing/reviewing a critical-path task to launching speculative work. Increasing N cannot remove serialized migrations, shared editor integration or release checks.
 
@@ -192,11 +192,11 @@ Use the [agent workflow](agent-workflow.md) for readiness, review evidence, git 
 
 Give each worker this compact brief:
 
-> Implement bounded issue [ID] from integrated commit [SHA]. Read AGENTS.md and the linked owning design sections. Own [paths]; coordinate [shared paths] through Codex. Prerequisites: [passed gates]. Deliver [user-visible behavior] and preserve [critical invariants]. Verify [specific tests/failure schedules]. Return commit(s), changed contract(s), evidence and unresolved blockers. Do not expand product scope or modify another worker's files.
+> Implement bounded issue [ID] from integrated commit [SHA]. Read AGENTS.md and the linked owning design sections. Own [paths]; coordinate [shared paths] through Fable-Tech-Lead. Prerequisites: [passed gates]. Deliver [user-visible behavior] and preserve [critical invariants]. Verify [specific tests/failure schedules]. Return commit(s), changed contract(s), evidence and unresolved blockers. Do not expand product scope or modify another worker's files.
 
-A package is integrated only when its behavior works against the current combined application, its relevant tests pass, direct/downstream effects are reviewed and its linked acceptance items have evidence. Codex merges and reruns checks affected by the combined change. Fable records the evidence and next dependency, rather than asking the user to reconcile agent outputs.
+A package is integrated only when its behavior works against the current combined application, its relevant tests pass, direct/downstream effects are reviewed and its linked acceptance items have evidence. Fable-Tech-Lead merges and reruns checks affected by the combined change. Fable records the evidence and next dependency, rather than asking the user to reconcile agent outputs.
 
-If a contract must change, Codex traces the affected database, context, browser and operational paths before integration. Update the authoritative design and all affected callers/tests in the same reviewed change. Escalate material product or cost choices to the owner; resolve routine reversible coding details within the agreed design.
+If a contract must change, Fable-Tech-Lead traces the affected database, context, browser and operational paths before integration. Update the authoritative design and all affected callers/tests in the same reviewed change. Escalate material product or cost choices to the owner; resolve routine reversible coding details within the agreed design.
 
 ## Planning review
 

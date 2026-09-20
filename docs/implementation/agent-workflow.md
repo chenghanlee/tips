@@ -1,77 +1,85 @@
-# Implementing Tips with parallel agents
+# Implementing Tips with agents
 
-This is the operating agreement for Codex (engineering manager/tech lead), Fable (TPM and visual-design owner), implementers and independent reviewers. Product requirements remain in the technical designs. [GitHub issues](https://github.com/chenghanlee/tips/issues) hold current task requirements and evidence; the [Tips project](https://github.com/users/chenghanlee/projects/15) holds scheduling state. Local task JSON files are the initial publication snapshot, not a second live tracker. Freeze them after publication; refine current issues in GitHub. When a contract changes, Codex links that decision from every affected Backlog issue so readiness refinement sees it.
+This is the operating agreement for the four agents that build Tips. Product requirements remain in the technical designs. Engineering guidance is in `AGENTS.md`. Runtime wiring for the current run (pane names, loop, communication files) is in [goal-prompt.md](goal-prompt.md). [GitHub issues](https://github.com/chenghanlee/tips/issues) hold current task requirements and evidence; the [Tips project](https://github.com/users/chenghanlee/projects/15) holds scheduling state. Refine current issues in GitHub. When a contract changes, Fable-Tech-Lead links that decision from every affected Backlog issue so readiness refinement sees it.
 
-## Responsibilities and capacity
+## Roles
 
-Codex resolves technical contracts, reserves shared files/migrations, checks downstream effects and merges. Fable maintains dependencies, readiness, scope coverage, blockers and milestone evidence. The user decides material product changes, purchases and public launch. Agents handle routine implementation choices and handoffs themselves.
+| Role | Agent | Owns |
+|---|---|---|
+| Fable-TPM | Claude | Task selection, readiness refinement, dispatch, Project status and Agent field, blocker tracking, milestone evidence, status reporting to the user. |
+| Astra | Codex | Implementation of one task at a time with integration-first TDD, its branch, worktree and PR. |
+| Opus | Claude | Adversarial per-commit correctness review of Astra's pushed commits. |
+| Fable-Tech-Lead | Claude | Technical contracts, shared-file reservations, path narrowing during readiness, whole-PR adversarial design review, the `tips/independent-review` status, merges, visual-design direction. |
 
-N is the maximum simultaneous implementation workers, including Fable when designing or writing code. Reviewers and coordinators also consume the environment's actual agent capacity. Never exceed either cap. With one available session, implement, stop, then review in an independent session. A coordinator who authored a change cannot independently approve it. Reviewers receive the issue, code and evidence, not the implementer's conversation as their source of truth.
+The user decides material product changes, purchases, provider credentials, hosting and public launch. Agents handle routine implementation choices and handoffs themselves.
 
-Before dispatch, Fable selects ready work on the critical path and Codex confirms disjoint ownership. Use spare capacity for ready supporting work or review; do not manufacture new services or speculative changes to occupy workers. Keep at most one active coding issue per implementation worker. When review backlog blocks integration, prioritize reviewers over new starts.
+Work is strictly serial: one task in implementation at a time, N = 1. Astra may keep working on the same task while Opus reviews an earlier commit. Astra does not start the next task until the current PR is merged. Nobody reviews or merges their own change. Reviewers work from the issue, code and evidence, not from the implementer's conversation.
 
 ## Task readiness
 
-For a fresh TPM session: read this workflow and the milestone table, then inspect open PRs, failed checks, active/blocked issues and their latest handoffs in GitHub. Reconcile actual branch/head and ownership before dispatch. Confirm configured N and available sessions, prioritize repairs/reviews that unblock integration, then choose ready disjoint work. Report the current milestone, blockers needing owner action and the next dispatch; do not ask the user to reconstruct project history. Never infer that a closed issue's dependent gate passed without its evidence.
+At the start of each iteration, Fable-TPM reads this workflow and the milestone table, then inspects open PRs, failed checks, Active and Blocked issues and their latest handoffs in GitHub. It reconciles actual branch, head and ownership before dispatch, prioritizes repairs and reviews that unblock integration, then selects the next task on the critical path (P0, then P1, then P2, and so on). It never infers that a closed issue's dependent gate passed without its evidence.
 
-Packages are parent issues, not coding assignments. Each coding issue is one bounded change that a fresh agent can understand, implement, test and repair in a session. This is a sizing target, not a guarantee about unknown defects. A user story may need several such issues; internal contracts and operational checks need not pretend to be user stories.
+Packages are parent issues, not coding assignments. Each coding issue is one bounded change that a fresh agent can understand, implement, test and repair in one session. A user story may need several such issues; internal contracts and operational checks need not pretend to be user stories.
 
-Fable moves an issue from Backlog to Ready only when all these are true:
+Fable-TPM drafts the readiness refinement. Fable-Tech-Lead confirms it with a one-line "ready" comment on the issue. Fable-TPM then moves the issue from Backlog to Ready. All of these must be true:
 
-- Prerequisites are integrated and their required checks passed. A contract/probe result resolves any open technical choice needed by this task.
-- The issue states one outcome, explicit exclusions, exact owning design sections, acceptance scenarios and relevant failure/race cases.
-- Code now exists for any referenced entry points. Codex has narrowed anticipated module areas to actual files, signatures, fixtures and runnable verification commands. Future issues may have anticipated paths while in Backlog; agents must not guess them during dispatch.
-- The scope fits a fresh session, including reading, testing and repair headroom. Split discovery from implementation when uncertainty dominates. Split by behavior or invariant, never an arbitrary line count.
-- Required test environment/provider access is available, or the issue explicitly delivers only a local contract and its real-provider gate is a separate blocked issue.
-- There is one named owner, an available slot and no overlapping mutable files, fixtures, migration reservation or real-provider asset namespace.
+- Prerequisites are integrated and their required checks passed. A contract or probe result resolves any open technical choice needed by this task.
+- The issue states one outcome, explicit exclusions, exact owning design sections, acceptance scenarios and relevant failure and race cases.
+- Code exists for any referenced entry points. Fable-Tech-Lead has narrowed anticipated module areas to actual files, signatures, fixtures and runnable verification commands. Agents must not guess paths during dispatch.
+- The scope fits a fresh session, including reading, testing and repair headroom. Split discovery from implementation when uncertainty dominates. Split by behavior or invariant, never by line count.
+- Required test environment or provider access is available, or the issue explicitly delivers only a local contract and its real-provider gate is a separate Blocked issue.
 
-Do not make every worker reread all design/review history. Supply the task's owning sections and a short list of cross-cutting invariants (admission, visibility, lock order and transactional effects) that actually apply. Start with generous context headroom; calibrate after the first few issues using observed context occupancy and repair needs. Do not use cumulative billed tokens as a context meter or invent a fixed universal token limit.
+Do not make Astra reread all design and review history. Supply the task's owning sections and a short list of cross-cutting invariants (admission, visibility, lock order, transactional effects) that actually apply.
+
+Fable-TPM may create child issues when a task must be split. The goal covers every issue in the project, including children created during the run.
 
 ## Issue and project state
 
-Use one Project Status field: **Backlog → Ready → Active → In review → Done**, with **Blocked** available from any unfinished state. Failed review returns to Active for repair. Blocked issues name the missing prerequisite, responsible role and next concrete action; dependency waiting in Backlog is normal, not an incident. Issue comments record dispatch, handoff, review and evidence. The project Agent field identifies the tool, session ID/link and dispatch date; GitHub assignees identify accountable humans, not fabricated agent accounts.
+Use one Project Status field: **Backlog → Ready → Active → In review → Done**, with **Blocked** available from any unfinished state. Failed review returns to Active for repair. Blocked issues name the missing prerequisite, the responsible role and the next concrete action. Waiting on a dependency in Backlog is normal, not an incident. Issue comments record dispatch, handoff, review and evidence. The Project Agent field holds the Herdr agent name of the current owner. GitHub assignees identify accountable humans, never fabricated agent accounts.
 
-An issue closes only after its required result is integrated and verified. Closing a parent requires all mandatory children and package acceptance evidence. A milestone gate closes only against one integrated revision, with its E2E evidence; sums of isolated task reports do not pass a gate. Failed or unavailable checks are failures or blockers, never passes. The acting coordinator updates issue/project state when merging or handing off; Fable reconciles the queue each dispatch cycle, without requiring a separate session for each transition.
+An issue closes only after its required result is integrated and verified. Closing a parent requires all mandatory children and package acceptance evidence. A milestone gate closes only against one integrated revision with its E2E evidence; sums of isolated task reports do not pass a gate. Failed or unavailable checks are failures or blockers, never passes. Fable-TPM updates issue and project state at dispatch, handoff and merge.
 
-## Git and shared ownership
+## Git
 
-Use protected `main`, short-lived `task/<issue>-<slug>` branches and a separate worktree per active coding issue. Start from a fetched, known `origin/main` SHA. Use a draft PR early and one PR per bounded change. Link its issue with `Closes #number` only when that PR completes the issue. Partial work uses `Refs #number`.
+Use protected `main`, short-lived `task/<issue>-<slug>` branches and one worktree per active coding issue under `.worktrees/`. Start from a fetched, known `origin/main` SHA. Open a draft PR early and one PR per bounded change. Link its issue with `Closes #number` only when that PR completes the issue. Partial work uses `Refs #number`.
 
-Codex serializes changes to shared files (dependency manifests, router, supervision/config, CI and migrations) through explicit reservations in dispatch comments. A task can own a small shared-file change; coordination does not require Codex to write every edit. Do not edit another agent's worktree. Each worktree has its own development port, test database and build output where isolation requires it. Record these in dispatch. Provider tests get unique prefixes/assets and explicit cleanup. Never run reset/drop against another worker's database.
+Astra owns its worktree. Opus and Fable-Tech-Lead read the PR head in their own read-only worktrees. Nobody edits another agent's worktree. Fable-Tech-Lead reserves changes to shared files (dependency manifests, router, supervision and config, CI, migrations) in the dispatch comment; a task can own a small shared-file change.
 
-Commit cohesive changes and run appropriate checks. Unreviewed local commits may be organized before first push; never rewrite an already reviewed commit. Every commit submitted for integration receives a verdict, so avoid publishing disposable WIP commits. Preserve reviewed commit identities: use merge commits for PRs; disable squash/rebase merging. Do not rewrite published or already reviewed commits. Once pushed, a SHA is fixed even before a checkpoint review is requested. Bring new main changes into the task branch with an ordinary merge; independently review that merge and conflict resolution, then rerun affected checks. An update invalidates final PR approval. No force pushes, direct implementation pushes to main, or routine admin bypasses.
+Commit cohesive changes and run the relevant checks before pushing. Unreviewed local commits may be reorganized before first push. Once pushed, a SHA is fixed: never rewrite a published commit, never force-push, never push implementation directly to `main`. Every pushed commit receives a verdict, so do not push disposable WIP commits. Merge PRs with merge commits; squash and rebase merging are disabled. Bring new `main` changes into the task branch with an ordinary merge; that merge and its conflict resolution are reviewed like any other commit. Any new head invalidates prior final approval.
 
-The empty repository needs a root commit before GitHub can accept a PR. Independently review that content-free initialization commit before its first push; all substantive documents and implementation then go through a PR. Record bootstrap evidence in P0.00. The documentation PR supplies `.github/workflows/checks.yml`, which reports `checks` on pull requests; enable the main ruleset before merging that substantive PR. This is repository initialization, not a standing bypass policy.
+## Review and merge
 
-## Independent review and merge
+**Opus reviews each pushed commit.** Astra sends Opus the SHA over Herdr after each push. Opus inspects the commit in file context, checks local correctness, then affected callers, features and tests, then end-to-end behavior. It maps acceptance scenarios to named tests, trusts CI only for commands CI actually ran, and runs relevant verification CI omitted. It posts a per-commit verdict on the PR using the review template and replies to Astra over Herdr. Fix commits name the finding they address. An interim P0 pauses new work on that branch until repaired; P1 repairs may be batched into the next commit.
 
-The implementer may continue while review is pending. Review an explicit pushed-SHA checkpoint while work proceeds; only a final review of the latest stable head and current base can pass the required status. Do not start dependent work on another owner's unmerged branch. A worker taking a different ready issue must hand off or park their previous issue explicitly. Before merge, a separate agent session must examine **each commit** introduced by the PR, and then the **complete PR diff against the current base**. A batch session may review several commits individually. Fix commits name the finding/comment they address. An interim P0 pauses new work on that branch until repaired; P1 repairs may be batched into the next checkpoint. Fix commits and branch-sync merges are included. Review local correctness, affected callers/features/tests, then end-to-end behavior.
+Opus and Astra may run at most three repair rounds on one finding. If a fourth would be needed, Opus tells Fable-Tech-Lead and Astra performs root-cause analysis before any further attempt. Bounds trigger analysis, never a pass.
 
-The review record contains reviewer identity and session, exact base and head SHAs, an explicit verdict for each commit SHA, complete-PR verdict, findings with severity, and verification evidence. Do not infer commit review from a generic PR approval. The reviewer inspects the head in file context, maps acceptance to named tests, trusts CI only for commands it actually ran, and runs relevant verification omitted by CI when the environment permits. Missing required verification remains a blocker. The linked review comment is authoritative; the PR template is an index to it. A reviewer can request repair but must not approve their own repair implementation; use another independent reviewer if they become an author.
+**Fable-Tech-Lead reviews the whole PR before merge.** It reads every commit's Opus verdict, then the complete diff against the current base, and challenges the chosen implementation, design choices, tradeoffs and assumptions. This is not a stricter pass over defects Opus already covers. A challenge states a concrete alternative and its tradeoff. Astra answers with evidence. Fable-Tech-Lead decides technical disagreements with evidence and escalates product scope changes to the user. It may reject the PR design at most twice; a third rejection requires root-cause analysis recorded on the issue first. A rejected design means new commits, which Opus reviews again.
+
+Severity:
 
 - **P0:** stop-ship critical exposure, irreversible data loss or fundamental inability to operate.
-- **P1:** broken required behavior, authorization/consistency defect or missing evidence that makes this change unsafe to integrate.
-- **P2/P3:** lower-impact defects or improvements. Record them; link follow-up issues when deferred. A failed required acceptance criterion still blocks completion regardless of its label. Cosmetic preference alone is not P1.
+- **P1:** broken required behavior, authorization or consistency defect, or missing evidence that makes the change unsafe to integrate.
+- **P2/P3:** lower-impact defects or improvements. Record them; link follow-up issues when deferred. A failed required acceptance criterion blocks completion regardless of label. Cosmetic preference alone is not P1.
 
-Repair and review until there are no unresolved P0/P1 findings, required acceptance criteria are satisfied, and relevant tests pass. Do not silently downgrade findings to pass. Codex resolves technical disagreement with evidence; escalate product scope changes to the user.
+No PR merges with an unresolved P0 or P1, an unsatisfied acceptance criterion, or failing relevant tests. Do not downgrade findings to pass.
 
-When agents share a GitHub identity, GitHub cannot supply independent human self-approval. Use an independently authored review record and a required `tips/independent-review` commit status posted by the reviewer after recording evidence. Link the status to that review comment. Require the `checks` CI context and an up-to-date branch. The status applies only to the reviewed head; the record names the current base. Codex verifies actor/session independence, coverage and base freshness immediately before merge. Use one named integration slot; other PRs do not sync speculatively. Serialize final integration slots: finish one branch's current-base review and merge before preparing the next. Interim commit reviews may run concurrently and their verdicts remain evidence. Final review includes the sync commit, complete current-base diff and semantic effects of intervening main changes on callers/callees. N workers does not promise N merges per cycle; final-review latency limits throughput. File-disjoint changes can still conflict semantically; they do not waive current-base checks. This is an agent process control, not cryptographic isolation between agents sharing credentials. Do not claim it prevents a malicious credential holder from forging a status. A distinct authorized reviewer identity can add native PR approval later without changing the review obligation.
+**Gate.** All agents share one GitHub identity, so GitHub cannot verify reviewer independence. The main ruleset therefore requires a PR, resolved conversations, an up-to-date branch, the `checks` CI context and the `tips/independent-review` commit status. After its whole-PR verdict, Fable-Tech-Lead posts the review record on the PR, then sets `tips/independent-review` on the exact reviewed head SHA with the record's URL as the target. The status applies only to that head; a new head needs a new review and a new status. This is a process interlock, not cryptographic isolation between agents sharing credentials.
 
-Codex merges only after checks and independent review pass on the current head/base and conversations are resolved. The mechanical merge commit must have no extra edits; inspect its tree against the reviewed head, run integrated checks and record the merge SHA before closing delivery evidence. If integration fails, stop dependent dispatch, reproduce and repair or revert through a reviewed PR. Do not label unrelated flaky failures green; identify their impact and track the blocker.
+**Merge.** Fable-Tech-Lead merges only after `checks` and `tips/independent-review` pass on the current head and base and conversations are resolved. The merge commit has no extra edits. After merge, Fable-Tech-Lead runs integrated checks on `main` and records the merge SHA on the issue. Fable-TPM then moves the issue to Done. If integration fails, stop dispatch, reproduce, and repair or revert through a reviewed PR. Never label flaky failures green.
 
-## Context recovery and stalled work
+## Context and handoff
 
-Stop before context exhaustion when possible. Keep the **same issue and branch** open; transfer to a fresh repair session. Record base/head, clean/dirty working-tree state, committed and uncommitted work, exact unresolved review findings, failing commands, evidence, owned files, environment identifiers and the next concrete action. Preserve user changes and never reset or stash blindly. The outgoing session posts the handoff, clears its Agent entry and stops; it need not wait while running out of context. Fable keeps the paths reserved for that issue. Ownership transfers when the incoming session acknowledges and sets its Agent entry. The incoming session owns that field update; TPM reconciliation must not silently overwrite an active claim. Session recovery is not task completion.
+Astra, Opus and Fable-Tech-Lead start every task with fresh context. Fable-TPM resets them before dispatch. The issue plus dispatch comment must therefore be self-sufficient.
 
-The next agent reads the compact handoff, issue and relevant diff, verifies repository state and continues tests/repair. It need not inherit the old transcript. If the scope itself is oversized, Codex/Fable split additional independent behavior into linked issues; required repairs remain blocking and the original issue stays open. Repeated repair loops trigger root-cause analysis or a technical spike, not endless retries of the same approach. There is no arbitrary review-count limit that overrides the no-P0/P1 rule.
+If an agent nears context exhaustion mid-task, it keeps the same issue and branch open and hands off to a fresh session. The handoff records base and head SHAs, clean or dirty working-tree state, committed and uncommitted work, unresolved findings, failing commands, evidence, owned files and the next concrete action. Preserve user changes; never reset or stash blindly. The incoming session reads the handoff, issue and relevant diff, verifies repository state, sets the Agent field and continues. Session recovery is not task completion.
 
-For a lost or unresponsive worker, inspect branch/worktree evidence before reassignment, then explicitly transfer ownership. Do not run two writers because an agent appears idle. Blocker reports state impact and next action; only ask the user for decisions or access agents cannot obtain themselves. Never put credentials in issues, logs or handoffs.
+For a lost or unresponsive agent, inspect branch and worktree evidence before reassignment, then explicitly transfer ownership. Never run two writers because an agent looks idle. Never put credentials in issues, logs or handoffs.
 
-## Dispatch and return templates
+## Comment templates
 
-Dispatch comment:
+Dispatch comment (Fable-TPM):
 
-> Owner/session: …; reviewer: …; base SHA: …; branch/worktree: …; N/occupied slots: …
+> Owner: astra; reviewers: opus, fable-tech-lead; base SHA: …; branch/worktree: …
 > Outcome and exclusions: …
 > Read: exact sections and actual entry points …
 > Own: files/migration reservation …; coordinate: …
@@ -79,7 +87,7 @@ Dispatch comment:
 > Acceptance and commands: …
 > Stop/handoff if: context headroom or prerequisite assumptions fail …
 
-Return/handoff comment:
+Return or handoff comment (Astra):
 
 > Head SHA and working-tree state: …; PR: …
 > Behavior/contracts changed: …
@@ -88,21 +96,21 @@ Return/handoff comment:
 > Unresolved findings/blockers and next action: …
 > Ownership transfer: …
 
-Independent review comment:
+Review comment (Opus per commit, Fable-Tech-Lead per PR):
 
-> Reviewer/session: …; implementer/session: …
+> Reviewer: …; implementer: astra
 > Base SHA: …; head SHA: …
 > Each commit SHA → verdict/findings: …
-> Whole PR → local/downstream/end-to-end verdict: …
+> Whole PR → local/downstream/end-to-end verdict: … (Fable-Tech-Lead only)
 > Tests/evidence inspected or independently run: …
 > Unresolved P0/P1: …; lower-priority follow-ups: …
 
 ## Milestones and external prerequisites
 
-M0 proves reproducible startup/release and test plumbing. M1 proves all five risky boundaries on one revision. M2 proves the complete product. M3 rehearses operations on intended topology. M4 records trial readiness and the owner's public-launch decision. Each gate issue owns E2E scenarios, environment/revision, evidence and unresolved blockers. Feature tests run earlier; milestones are not the first testing opportunity. Each task records acceptance-to-test/evidence mappings as it lands; P14 audits that existing coverage, rather than creating it at the end.
+M0 proves reproducible startup, release and test plumbing. M1 proves all five risky boundaries on one revision. M2 proves the complete product. M3 rehearses operations on the intended topology. M4 records trial readiness and the owner's public-launch decision. Each gate issue owns E2E scenarios, environment and revision, evidence and unresolved blockers. Feature tests run earlier; milestones are not the first testing opportunity. Each task records acceptance-to-test mappings as it lands; P14 audits that coverage rather than creating it at the end.
 
-Fable maintains explicit access/setup issues for hosting/domain/providers, operator identity, vocabulary, founder content and recruitment. Agents propose defaults and use synthetic fixtures for tests; they do not fabricate firsthand production content. Secrets use the execution environment's secret mechanism. No budget has been fixed; absence of a ceiling does not authorize arbitrary purchases.
+Fable-TPM maintains explicit access and setup issues for hosting, domain, providers, operator identity, vocabulary, founder content and recruitment. When a task needs a credential, account or hosting decision, Fable-TPM marks it Blocked and asks the user; the user obtains it. Agents propose defaults and use synthetic fixtures for tests; they do not fabricate firsthand production content. Secrets use the execution environment's secret mechanism. No budget has been fixed; absence of a ceiling does not authorize purchases.
 
-References: [Git worktrees](https://git-scm.com/docs/git-worktree), [GitHub rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets), [sub-issues](https://docs.github.com/en/rest/issues/sub-issues), and [issue dependencies](https://docs.github.com/en/rest/issues/issue-dependencies). These support ordinary Git/GitHub workflows; this project does not need a new scheduling service.
+Before launch, the intended single VPS serves as the preproduction environment. Run real-provider tests only through explicitly authorized invocations with scoped secrets, never automatically on arbitrary PR code. Record authorization in the dispatch comment or alongside the explicitly invoked CI workflow run URL. Ordinary PR CI needs no production secrets.
 
-Before launch, the intended single VPS serves as the preproduction environment. Earlier real-provider tests may run from isolated worktrees or CI with distinct asset namespaces. This does not add a permanent staging fleet. Run real-provider tests only through explicitly authorized/tagged invocations with scoped secrets, never automatically on arbitrary PR code. Record authorization in the dispatch comment for a worktree run, or alongside the explicitly invoked CI workflow run URL. Ordinary PR CI needs no production secrets.
+References: [Git worktrees](https://git-scm.com/docs/git-worktree), [GitHub rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets), [sub-issues](https://docs.github.com/en/rest/issues/sub-issues), [issue dependencies](https://docs.github.com/en/rest/issues/issue-dependencies).
