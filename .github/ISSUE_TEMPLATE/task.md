@@ -1,0 +1,31 @@
+---
+name: Bounded implementation task
+about: One change with explicit prerequisites and acceptance
+title: ""
+labels: "kind:code"
+---
+
+## Outcome and scope
+
+One bounded result. State included behavior and exclusions.
+
+## Prerequisites and required reading
+
+Link integrated prerequisite issues, exact design sections and current code entry points.
+
+## Acceptance
+
+- [ ] Required behavior:
+- [ ] Failure/race behavior and affected callers:
+
+## Verification
+
+Actual commands, fixtures, environment and required evidence. Unavailable checks block completion.
+
+## Ownership and dispatch
+
+TPM fills owner/session, base SHA, branch/worktree, owned/shared files, DB/port/provider namespace and reviewer before Active. Codex confirms shared-file reservations and disjoint ownership. Resolve unknown contracts before Ready.
+
+## Completion
+
+Implementation and tests pass. Separate-session review covers every commit and complete PR with no unresolved P0/P1. Relevant integrated checks pass. Context overrun continues on this issue in a fresh repair session.

@@ -1,0 +1,1176 @@
+[
+  {
+    "id": "P0.00",
+    "package": "P0",
+    "milestone": "M0",
+    "kind": "gate",
+    "title": "Establish reviewed GitHub planning baseline",
+    "outcome": "The private repository, backlog and merge controls are usable before application coding.",
+    "depends_on": [],
+    "reads": [
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "Delivery approach"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Foundation"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Runtime and integration checks"
+      }
+    ],
+    "scope": [
+      "Independently reviewed content-free root commit, then documentation PR with checks workflow, task templates and this backlog.",
+      "Configure Project fields, milestones, parent/sub-issues and dependencies; verify private visibility.",
+      "Enable PR-only main protection requiring checks and tips/independent-review before substantive merge."
+    ],
+    "acceptance": [
+      "Root and substantive commits each have independent review evidence.",
+      "Both required contexts pass on the planning PR; ruleset rejects ordinary direct updates and force/deletion.",
+      "Live issue graph and local snapshot agree at publication; no app gate claimed passed."
+    ],
+    "verification": [
+      "Planning validator, GitHub readback and reviewed PR URL."
+    ],
+    "ownership": [
+      "Codex GitHub/bootstrap; Fable independent review"
+    ],
+    "sizing": "Keep this issue limited to The private repository, backlog and merge controls are usable before application coding. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P0.01",
+    "package": "P0",
+    "milestone": "M0",
+    "kind": "probe",
+    "title": "Pin the application and database toolchain",
+    "outcome": "Choose exact reproducible framework, browser-test and database-extension versions for compatibility probes.",
+    "depends_on": [
+      "P0.00"
+    ],
+    "reads": [
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "Delivery approach"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Foundation"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Runtime and integration checks"
+      }
+    ],
+    "scope": [
+      "Pin Elixir/OTP/Phoenix/LiveView/Ecto/Oban/Tailwind and a candidate SaladUI version using primary documentation.",
+      "Choose the browser test driver and initial browser/device matrix; record concrete smoke commands.",
+      "Inspect PG18 extension build/image requirements; implementation and real SQL proof belong P0.06.",
+      "Pin the Markdown renderer and sanitization policy for untrusted authored content; retain Phoenix secure-header defaults and verify compatibility with required provider embeds."
+    ],
+    "acceptance": [
+      "Version matrix and source references identify exact releases/digests or unresolved compatibility risks.",
+      "Generator and compiler run in a disposable directory; no version is called compatible until P16.00/P0.06 probes pass.",
+      "Browser driver selection and required system dependencies are explicit."
+    ],
+    "verification": [
+      "Record exact versions, commands and output in issue; retain reproducible build recipe if needed."
+    ],
+    "ownership": [
+      "temporary compatibility probe; dependency version decision"
+    ],
+    "sizing": "Keep this issue limited to Choose exact reproducible framework, browser-test and database-extension versions for compatibility probes. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P0.02",
+    "package": "P0",
+    "milestone": "M0",
+    "kind": "code",
+    "title": "Generate the Phoenix application and pin dependencies",
+    "outcome": "A fresh checkout starts the intended single application without overwriting project documents.",
+    "depends_on": [
+      "P0.01"
+    ],
+    "reads": [
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "Work packages and dependencies"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Implementation foundation"
+      }
+    ],
+    "scope": [
+      "Generate one Tips Mix application; preserve AGENTS/designs and reviewed GitHub workflow.",
+      "Install pinned framework, Oban/Swoosh and SaladUI dependency only. P16 owns actual SaladUI setup/styles/hooks. Define the media, embeddings and maintenance queues/supervision entry here; later tasks tune measured limits.",
+      "Add sample nonsecret config and exact setup commands.",
+      "Generate in a temporary directory using the pinned generator, inspect and copy the output into this nonempty repository; never overwrite existing instructions/docs or leave an interactive generator prompt waiting.",
+      "Run the pinned Phoenix auth generator to establish the actual Accounts/web baseline that P1.01 inspects; do not adapt family/admission semantics in this scaffold task."
+    ],
+    "acceptance": [
+      "Formatting and warnings-as-errors compile pass.",
+      "Clean setup renders initial page and health endpoint; no provider credentials required to run local skeleton.",
+      "No placeholder endpoint claims feature success."
+    ],
+    "verification": [
+      "Run generator/setup/compile/format and smoke from clean checkout."
+    ],
+    "ownership": [
+      "mix.exs, lockfile, generated lib/assets/config; Codex reservation"
+    ],
+    "sizing": "Keep this issue limited to A fresh checkout starts the intended single application without overwriting project documents. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P0.03",
+    "package": "P0",
+    "milestone": "M0",
+    "kind": "code",
+    "title": "Make the extension-enabled database reproducible in development and CI",
+    "outcome": "Development, tests and deployment select the same pinned PG18 extension environment.",
+    "depends_on": [
+      "P0.02",
+      "P0.06"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Database implementation"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Runtime and integration checks"
+      }
+    ],
+    "scope": [
+      "Consume the verified image; configure separate request and maintenance timeout settings.",
+      "Document worktree database/port/build isolation; no shared destructive reset.",
+      "No canonical product schema yet."
+    ],
+    "acceptance": [
+      "Fresh database creates both extensions and executes actual queries.",
+      "Request statements retain 2-second timeout; maintenance override does not leak.",
+      "Two isolated test DBs coexist; accidental production reset protected by explicit environment.",
+      "Name explicit per-worktree database/port/build environment variables in setup instructions and prove two concurrent worktrees are isolated."
+    ],
+    "verification": [
+      "Run clean DB/extension smoke and timeout isolation test."
+    ],
+    "ownership": [
+      "Compose, database setup/config; shared config reservation"
+    ],
+    "sizing": "Keep this issue limited to Development, tests and deployment select the same pinned PG18 extension environment. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P0.04",
+    "package": "P0",
+    "milestone": "M0",
+    "kind": "code",
+    "title": "Run application checks and real-browser smoke in CI",
+    "outcome": "A PR exercises the actual app and browser test driver in the pinned environment.",
+    "depends_on": [
+      "P0.03"
+    ],
+    "reads": [
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "Acceptance ownership"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Implementation acceptance"
+      }
+    ],
+    "scope": [
+      "Extend existing checks job with format, compile/static checks and tests; preserve planning validation.",
+      "Use the driver/browser matrix selected in P0.01; add secret scanning for introduced commits using a pinned maintained scanner.",
+      "Browser smoke exercises actual hooks/LiveView connect, not an HTTP assertion renamed E2E."
+    ],
+    "acceptance": [
+      "Clean CI runs migrations and a real browser page interaction.",
+      "Broken compile/test fails required checks.",
+      "Worktree isolation instructions and test invocation runnable; capture browser failures without credentials."
+    ],
+    "verification": [
+      "Run CI on branch and record successful workflow URL."
+    ],
+    "ownership": [
+      ".github/workflows, test support/browser driver; Codex reservation"
+    ],
+    "sizing": "Keep this issue limited to A PR exercises the actual app and browser test driver in the pinned environment. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P0.05",
+    "package": "P0",
+    "milestone": "M0",
+    "kind": "code",
+    "title": "Boot and migrate an application release",
+    "outcome": "The release can migrate, start and report basic app/DB health.",
+    "depends_on": [
+      "P0.03"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Runtime and integration checks"
+      },
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "Milestones"
+      }
+    ],
+    "scope": [
+      "Build release/Compose baseline and explicit release migration command.",
+      "Add bounded public app/DB probe; background progress remains P13b.",
+      "Document health response and startup/restart commands."
+    ],
+    "acceptance": [
+      "Release boots against fresh DB; migration runs without request-pool timeout.",
+      "Unreachable DB makes health fail without leaking config.",
+      "Restart preserves committed DB state."
+    ],
+    "verification": [
+      "Release build/start/migrate/restart smoke with recorded revision."
+    ],
+    "ownership": [
+      "Dockerfile/release helpers/runtime config; Codex reservation"
+    ],
+    "sizing": "Keep this issue limited to The release can migrate, start and report basic app/DB health. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P13a.01",
+    "package": "P13a",
+    "milestone": "M1",
+    "kind": "contract",
+    "title": "Track provider, hosting and operator prerequisites",
+    "outcome": "Each external gate has an accountable owner and a safe access path.",
+    "depends_on": [],
+    "reads": [
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "External prerequisites and readiness"
+      }
+    ],
+    "scope": [
+      "Inventory VPS/domain/Cloudflare Turnstile/R2/Stream/email/embedding/error and uptime access.",
+      "Record needed-by tasks and nonsecret configuration; request missing credentials via secret store.",
+      "Propose concrete services/costs before purchases; user selects material spending and operator identity.",
+      "Include private GHCR distribution credentials if needed; assign exact needed-by task IDs to DNS/email, Stream, VPS and operator prerequisites."
+    ],
+    "acceptance": [
+      "Every provider gate has availability or explicit blocker and next action.",
+      "No keys in repository/issues; no arbitrary purchases.",
+      "Missing production access does not block unrelated local work."
+    ],
+    "verification": [
+      "Review prerequisite matrix against M1/M3/M4 gates."
+    ],
+    "ownership": [
+      "provider prerequisite issue; secret-store metadata"
+    ],
+    "sizing": "Keep this issue limited to Each external gate has an accountable owner and a safe access path. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P13a.02",
+    "package": "P13a",
+    "milestone": "M1",
+    "kind": "code",
+    "title": "Load and validate runtime secrets and provider configuration",
+    "outcome": "Release starts with valid nonsecret configuration and fails safely on missing required values.",
+    "depends_on": [
+      "P0.05",
+      "P13a.01"
+    ],
+    "reads": [
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "External prerequisites and readiness"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Runtime and integration checks"
+      }
+    ],
+    "scope": [
+      "Runtime config for selected adapters; fixture/staging isolation.",
+      "Document secret installation/rotation procedure; redact all displayed values."
+    ],
+    "acceptance": [
+      "Required configuration absence produces a useful secret-free error.",
+      "Dev/test adapters cannot silently become real production providers.",
+      "Record feature-specific provider configuration readiness separately; missing one provider blocks only its consumers, not unrelated provider work. Final real-provider evidence belongs P2.08/P4b.07/P5.09."
+    ],
+    "verification": [
+      "Configuration tests plus redacted staging connectivity evidence."
+    ],
+    "ownership": [
+      "config/runtime.exs, deployment secret instructions"
+    ],
+    "sizing": "Keep this issue limited to Release starts with valid nonsecret configuration and fails safely on missing required values. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P13b.01",
+    "package": "P13b",
+    "milestone": "M3",
+    "kind": "code",
+    "title": "Enforce origin, proxy and request limits",
+    "outcome": "The intended topology enforces the design's request and abuse boundaries.",
+    "depends_on": [
+      "P13a.02",
+      "P2.08"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Defenses"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "First-time signup"
+      },
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "External prerequisites and readiness"
+      }
+    ],
+    "scope": [
+      "Proxy TLS/origin restrictions and forwarded-client trust.",
+      "Choose concrete bounded request/parser/upload/rate configuration preserving fixed design limits.",
+      "Exercise existing Accounts/Media admission at the proxy boundary; Turnstile and admission implementation remain P2-owned.",
+      "Preserve and verify generated Phoenix security headers; choose a practical CSP that permits required media/Turnstile integrations without blindly weakening all sources."
+    ],
+    "acceptance": [
+      "Direct origin bypass rejected; spoofed forwarded IP does not bypass limits.",
+      "Oversized/limited requests fail usefully with preserved frontend input where required.",
+      "Health and legitimate provider traffic work through intended topology.",
+      "Anonymous search abuse is bounded by the shared limiter and proxy settings before public trial; demonstrate keyword-fallback requests cannot bypass intended limits."
+    ],
+    "verification": [
+      "Deploy topology tests and rate/parser boundary tests."
+    ],
+    "ownership": [
+      "proxy/config/rate limiting; Accounts/Media interfaces"
+    ],
+    "sizing": "Keep this issue limited to The intended topology enforces the design's request and abuse boundaries. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P13b.02",
+    "package": "P13b",
+    "milestone": "M3",
+    "kind": "code",
+    "title": "Configure Oban capacity, rescue and graceful shutdown",
+    "outcome": "Committed background work survives interruption under measured queue limits.",
+    "depends_on": [
+      "P5.09",
+      "P4b.07",
+      "P0.05"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Durable background work"
+      }
+    ],
+    "scope": [
+      "Tune the existing three queues from P0.02 using measured concurrency/drain/rescue bounds and seven-day retention; do not create a second supervision/config owner.",
+      "Configure pinned Oban interrupted-job recovery including last-attempt crash.",
+      "Keep durable cleanup identifiers independent of job pruning."
+    ],
+    "acceptance": [
+      "Kill/restart during work; duplicate delivery remains safe.",
+      "Stop grace exceeds measured app/Oban drain; forced interruption recovers.",
+      "Queue saturation stays within DB/provider budgets; exhausted state remains inspectable."
+    ],
+    "verification": [
+      "Real release interruption/last-attempt/pruning tests with exact config and measurements."
+    ],
+    "ownership": [
+      "Oban supervision/config and integration fixtures"
+    ],
+    "sizing": "Keep this issue limited to Committed background work survives interruption under measured queue limits. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P13b.03",
+    "package": "P13b",
+    "milestone": "M3",
+    "kind": "code",
+    "title": "Observe stalled work independently of Oban",
+    "outcome": "An observer detects stalled queues even when no jobs execute.",
+    "depends_on": [
+      "P13b.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Independent background-progress checks"
+      }
+    ],
+    "scope": [
+      "Bounded read-only release/health routine and one external invoker.",
+      "Oldest eligible cleanup/missing embeddings including never-attempted and cooldown rows.",
+      "Set measured thresholds including worst scan runtime, startup/backfill grace; monitor dedup."
+    ],
+    "acceptance": [
+      "Stop Oban while app/DB remain healthy; progress check becomes unhealthy.",
+      "Fifty bounded provider calls do not generate cadence-based false alarms.",
+      "Queries do not hydrate entire backlogs; observer runs outside stopped queue."
+    ],
+    "verification": [
+      "Stopped-queue and slow-scan rehearsal with threshold evidence."
+    ],
+    "ownership": [
+      "progress health helper/release command/monitor"
+    ],
+    "sizing": "Keep this issue limited to An observer detects stalled queues even when no jobs execute. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P13b.04",
+    "package": "P13b",
+    "milestone": "M3",
+    "kind": "code",
+    "title": "Report exhausted failures with sanitized context",
+    "outcome": "Error reporting detects exhausted work without exposing credentials or erasing durable state.",
+    "depends_on": [
+      "P13b.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Durable background work"
+      },
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "External prerequisites and readiness"
+      }
+    ],
+    "scope": [
+      "Configure Sentry redaction/integration and distinguish transient logs from exhausted alerts."
+    ],
+    "acceptance": [
+      "Secret/token/content-sensitive samples are redacted from reports.",
+      "Reporting outage leaves durable failure and cleanup records inspectable."
+    ],
+    "verification": [
+      "Sanitization tests plus controlled reporting-outage evidence."
+    ],
+    "ownership": [
+      "error reporting and sanitized integration"
+    ],
+    "sizing": "Keep this issue limited to Error reporting detects exhausted work without exposing credentials or erasing durable state. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P13b.05",
+    "package": "P13b",
+    "milestone": "M3",
+    "kind": "code",
+    "title": "Back up and restore the database with private retention",
+    "outcome": "Database backups exist before real content and can restore a coherent release database.",
+    "depends_on": [
+      "P0.05",
+      "P13a.02",
+      "P1.11"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Counter repair"
+      },
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "External prerequisites and readiness"
+      }
+    ],
+    "scope": [
+      "Nightly private backups, seven-day retention and distinct restore target.",
+      "Document actual release backup/restore commands and external credentials."
+    ],
+    "acceptance": [
+      "Restore succeeds into an isolated database with schema/representative content/jobs validated.",
+      "Backup failure is visible; restore does not overwrite active databases by default.",
+      "Retention and private access verified."
+    ],
+    "verification": [
+      "Actual backup/restore/retention evidence."
+    ],
+    "ownership": [
+      "backup/restore scripts and runbook"
+    ],
+    "sizing": "Keep this issue limited to Database backups exist before real content and can restore a coherent release database. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P13b.06",
+    "package": "P13b",
+    "milestone": "M3",
+    "kind": "gate",
+    "title": "Rehearse deployment and operational recovery",
+    "outcome": "One complete release survives the intended deploy and recovery scenarios.",
+    "depends_on": [
+      "P13b.01",
+      "P13b.03",
+      "P13b.04",
+      "P13b.05",
+      "M2",
+      "P13b.07",
+      "P13b.08",
+      "P13b.09"
+    ],
+    "reads": [
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "Acceptance ownership"
+      },
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "External prerequisites and readiness"
+      }
+    ],
+    "scope": [
+      "Deploy/migrate/restart on intended topology; record interruption.",
+      "Exercise backup restore, selected retry, observer alerts, secret handling and media purge.",
+      "No new feature implementation hidden in gate."
+    ],
+    "acceptance": [
+      "All operational checks on one revision pass; unavailable provider/host remains blocked.",
+      "Record operator, exact commands, durations, failure evidence and cleanup.",
+      "Run browser smoke after deployment/restart."
+    ],
+    "verification": [
+      "Staging deployment/recovery evidence bundle."
+    ],
+    "ownership": [
+      "operations evidence; feature owners repair in linked issues"
+    ],
+    "sizing": "Keep this issue limited to One complete release survives the intended deploy and recovery scenarios. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P14.01",
+    "package": "P14",
+    "milestone": "M2",
+    "kind": "gate",
+    "title": "Audit implementation coverage against design acceptance",
+    "outcome": "Every authoritative acceptance requirement has test or explicit manual-evidence ownership.",
+    "depends_on": [
+      "P8.07",
+      "P9b.01",
+      "P9b.02",
+      "P9b.03",
+      "P10.02",
+      "P10.03",
+      "P11.04",
+      "P11.06",
+      "P11.07",
+      "P12.01",
+      "P12.03",
+      "P11.10",
+      "P11.11"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Implementation acceptance"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Holistic consensus acceptance"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Implementation acceptance"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Implementation acceptance"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Holistic consensus acceptance"
+      }
+    ],
+    "scope": [
+      "Audit the acceptance-to-test/evidence mappings maintained in each task as implementation lands; fill no gaps silently.",
+      "List unexecuted/manual/provider checks honestly.",
+      "Repair missing feature requirements through bounded issues."
+    ],
+    "acceptance": [
+      "No required acceptance is dropped because it appears only in a cross-cutting list.",
+      "Coverage map distinguishes planned evidence from passing evidence.",
+      "Mandatory gaps block M2.",
+      "M2 requires feature/browser/race evidence; explicitly mapped M3 operational and M4 launch checks may remain planned until their own gates. Missing ownership blocks now; scheduled later evidence does not create a hidden M2-to-M3 cycle."
+    ],
+    "verification": [
+      "Review coverage matrix against all three canonical documents."
+    ],
+    "ownership": [
+      "acceptance evidence map"
+    ],
+    "sizing": "Keep this issue limited to Every authoritative acceptance requirement has test or explicit manual-evidence ownership. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P14.02",
+    "package": "P14",
+    "milestone": "M2",
+    "kind": "gate",
+    "title": "Exercise cross-feature transaction and visibility races",
+    "outcome": "Combined application preserves visibility and database invariants under adversarial schedules.",
+    "depends_on": [
+      "P8.07",
+      "P9b.01",
+      "P9b.02",
+      "P9b.03",
+      "P10.02",
+      "P10.03",
+      "P11.04",
+      "P11.06",
+      "P11.07",
+      "P12.01",
+      "P12.03"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Holistic consensus acceptance"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Admission, locking, and returned data"
+      }
+    ],
+    "scope": [
+      "Full-schema independent-transaction tests for publication/ban, report/delete, media claim/cleanup and counter targets.",
+      "Reuse P11.06's 10,000-review/concurrent-vote fixture; verify independent-review visibility in the integrated race suite.",
+      "Reuse existing feature tests; add only missing cross-feature schedules."
+    ],
+    "acceptance": [
+      "Both lock orders and late-result schedules terminate correctly without leaks/lost effects.",
+      "No deadlock workaround silently weakens atomicity.",
+      "Results include exact fixture size, synchronization and performance measurement."
+    ],
+    "verification": [
+      "Run combined database/race suite on integrated revision."
+    ],
+    "ownership": [
+      "cross-feature integration tests; coordinated feature fixes"
+    ],
+    "sizing": "Keep this issue limited to Combined application preserves visibility and database invariants under adversarial schedules. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P14.03",
+    "package": "P14",
+    "milestone": "M2",
+    "kind": "gate",
+    "title": "Exercise browser recovery, accessibility and capacity",
+    "outcome": "Real browser journeys remain usable under failures and maximum content.",
+    "depends_on": [
+      "P8.07",
+      "P9b.01",
+      "P9b.02",
+      "P9b.03",
+      "P10.02",
+      "P10.03",
+      "P11.04",
+      "P11.06",
+      "P11.07",
+      "P12.01",
+      "P12.03",
+      "P16.03"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Implementation acceptance"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Holistic consensus acceptance"
+      }
+    ],
+    "scope": [
+      "Actual IndexedDB/hooks/tus/reconnect/auth-switch and lost acknowledgement scenarios.",
+      "Keyboard ordering/focus/announcements, 320px reflow/zoom.",
+      "Measure ten delayed attachments and thirty maximum-size reviews; record explicit responsive/memory/payload budgets before measurement."
+    ],
+    "acceptance": [
+      "No stale result/draft clearing or unauthorized media on combined journeys.",
+      "Capacity measurements pass agreed budgets or generate blocking fixes.",
+      "Real browser/device matrix recorded; no fake claims from LiveView-only tests."
+    ],
+    "verification": [
+      "Browser E2E and accessibility/capacity evidence at one SHA."
+    ],
+    "ownership": [
+      "browser integration scenarios"
+    ],
+    "sizing": "Keep this issue limited to Real browser journeys remain usable under failures and maximum content. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P14.04",
+    "package": "P14",
+    "milestone": "M3",
+    "kind": "gate",
+    "title": "Verify full developer journey after operations rehearsal",
+    "outcome": "Deployment and recovery preserve the complete product journey.",
+    "depends_on": [
+      "M2",
+      "P13b.06"
+    ],
+    "reads": [
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "Milestones"
+      },
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "Acceptance ownership"
+      }
+    ],
+    "scope": [
+      "Discover \u2192 authenticate \u2192 publish/review \u2192 evidence \u2192 vote/inbox \u2192 moderate \u2192 recover on intended runtime.",
+      "Repeat critical smoke after deploy/restore where relevant."
+    ],
+    "acceptance": [
+      "Real providers, hybrid search and native video remain functional.",
+      "No unresolved P0/P1 or required evidence gaps.",
+      "Record revision/environment and dispose test assets."
+    ],
+    "verification": [
+      "Post-rehearsal E2E evidence."
+    ],
+    "ownership": [
+      "integrated release acceptance"
+    ],
+    "sizing": "Keep this issue limited to Deployment and recovery preserve the complete product journey. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P15.01",
+    "package": "P15",
+    "milestone": "M4",
+    "kind": "contract",
+    "title": "Prepare contributor guidance and owner-authored seed content",
+    "outcome": "The trial has authentic examples and clear contributor expectations.",
+    "depends_on": [
+      "M1"
+    ],
+    "reads": [
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "External prerequisites and readiness"
+      }
+    ],
+    "scope": [
+      "Draft community/trial guidance; propose vocabulary with Other technique.",
+      "Owner supplies genuine firsthand submissions through normal forms.",
+      "Track invited contributors; public signup stays open."
+    ],
+    "acceptance": [
+      "No synthetic fixture represented as firsthand production experience.",
+      "Content/participants have explicit owner and missing items stay blocked.",
+      "No invitation-code or approval-queue scope added."
+    ],
+    "verification": [
+      "Owner-confirmed guidance/content/recruitment checklist."
+    ],
+    "ownership": [
+      "trial guidance and owner prerequisite"
+    ],
+    "sizing": "Keep this issue limited to The trial has authentic examples and clear contributor expectations. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P15.02",
+    "package": "P15",
+    "milestone": "M4",
+    "kind": "contract",
+    "title": "Prepare release ownership and trial checklist",
+    "outcome": "An operator can run the release and a participant can complete the trial.",
+    "depends_on": [
+      "M3",
+      "P15.01"
+    ],
+    "reads": [
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "External prerequisites and readiness"
+      }
+    ],
+    "scope": [
+      "Named operator/moderator, support and incident path, trial script and release checklist.",
+      "Confirm noindex and weekly twenty-nonstaff-visitors exit criterion without new analytics platform.",
+      "Confirm current recovery/monitoring evidence and actual deployment interruption."
+    ],
+    "acceptance": [
+      "Operator can follow runbooks without chat history.",
+      "Trial script covers success/failure feedback and captures observed usability.",
+      "Any provider/account/content blocker remains visible."
+    ],
+    "verification": [
+      "Fable checklist review plus operator rehearsal."
+    ],
+    "ownership": [
+      "launch checklist and trial script"
+    ],
+    "sizing": "Keep this issue limited to An operator can run the release and a participant can complete the trial. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P15.03",
+    "package": "P15",
+    "milestone": "M4",
+    "kind": "gate",
+    "title": "Record developer-trial launch decision",
+    "outcome": "The owner reviews concrete readiness evidence and decides public launch.",
+    "depends_on": [
+      "P15.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "Milestones"
+      },
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "External prerequisites and readiness"
+      }
+    ],
+    "scope": [
+      "Present integrated release, evidence, residual risks and actual costs.",
+      "Obtain explicit user launch decision; do not infer consent from backlog approval.",
+      "If held, keep this issue open with reason/next action."
+    ],
+    "acceptance": [
+      "M0-M3 evidence complete; all mandatory blockers resolved.",
+      "Owner approval recorded before public launch action.",
+      "No claim that technical acceptance establishes product-market fit."
+    ],
+    "verification": [
+      "Recorded go/hold decision and approved release SHA."
+    ],
+    "ownership": [
+      "owner launch decision; Fable readiness record"
+    ],
+    "sizing": "Keep this issue limited to The owner reviews concrete readiness evidence and decides public launch. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "M0",
+    "package": "P0",
+    "milestone": "M0",
+    "kind": "gate",
+    "title": "M0: demonstrate reproducible foundation",
+    "outcome": "Fresh checkout and release reproduce the pinned app/database/browser environment.",
+    "depends_on": [
+      "P0.04",
+      "P0.05",
+      "P1.11",
+      "P16.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "Milestones"
+      }
+    ],
+    "scope": [
+      "Run clean setup, all migrations, browser smoke and release startup at one SHA."
+    ],
+    "acceptance": [
+      "Pinned DB extensions and full schema verified.",
+      "CI passes and real browser connects.",
+      "Record commands/environment/commit; unavailable check blocks."
+    ],
+    "verification": [
+      "Integrated M0 evidence."
+    ],
+    "ownership": [
+      "Codex integration; Fable evidence"
+    ],
+    "sizing": "Keep this issue limited to Fresh checkout and release reproduce the pinned app/database/browser environment. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "M1",
+    "package": "P14",
+    "milestone": "M1",
+    "kind": "gate",
+    "title": "M1: prove the five risky boundaries together",
+    "outcome": "Cross-browser auth, text recovery, retained image, private video and real hybrid search pass together.",
+    "depends_on": [
+      "M0",
+      "P2.08",
+      "P3.05",
+      "P3.08",
+      "P4b.07",
+      "P5.09",
+      "P6.02",
+      "P7.02",
+      "P9a.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "Milestones"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Runtime and integration checks"
+      }
+    ],
+    "scope": [
+      "Run all five early gates on one integrated revision with real providers."
+    ],
+    "acceptance": [
+      "Lost-ack publish/edit recovers honestly.",
+      "Known image rejection retains evidence; private video completes through hide/delete.",
+      "Another-browser return works; real hybrid quality/runtime gate passes."
+    ],
+    "verification": [
+      "One revision/environment with links to each E2E result and cleanup."
+    ],
+    "ownership": [
+      "milestone integration gate"
+    ],
+    "sizing": "Keep this issue limited to Cross-browser auth, text recovery, retained image, private video and real hybrid search pass together. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "M2",
+    "package": "P14",
+    "milestone": "M2",
+    "kind": "gate",
+    "title": "M2: demonstrate the complete product",
+    "outcome": "All agreed feature journeys and failures pass on the integrated app.",
+    "depends_on": [
+      "M1",
+      "P14.02",
+      "P14.03",
+      "P14.01",
+      "P13b.09"
+    ],
+    "reads": [
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "Milestones"
+      }
+    ],
+    "scope": [
+      "Walk discovery, contribution, review, vote/inbox, profiles/accounts and moderation.",
+      "Confirm full design acceptance coverage."
+    ],
+    "acceptance": [
+      "Browser/database/provider checks passed; no P0/P1.",
+      "No feature deemed complete solely from isolated branch evidence."
+    ],
+    "verification": [
+      "Combined M2 E2E run and coverage report."
+    ],
+    "ownership": [
+      "milestone integration gate"
+    ],
+    "sizing": "Keep this issue limited to All agreed feature journeys and failures pass on the integrated app. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "M3",
+    "package": "P14",
+    "milestone": "M3",
+    "kind": "gate",
+    "title": "M3: demonstrate operational readiness",
+    "outcome": "The intended deployment topology passes recovery and complete-journey checks.",
+    "depends_on": [
+      "P14.04"
+    ],
+    "reads": [
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "Milestones"
+      }
+    ],
+    "scope": [
+      "Review operational rehearsal and post-recovery E2E."
+    ],
+    "acceptance": [
+      "Deployment, jobs, backups, monitoring, provider cleanup and operator recovery evidenced.",
+      "Exact release/environment identified."
+    ],
+    "verification": [
+      "Combined M3 evidence."
+    ],
+    "ownership": [
+      "milestone integration gate"
+    ],
+    "sizing": "Keep this issue limited to The intended deployment topology passes recovery and complete-journey checks. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "M4",
+    "package": "P15",
+    "milestone": "M4",
+    "kind": "gate",
+    "title": "M4: hand over the developer-trial release",
+    "outcome": "The approved release and trial operations are handed over.",
+    "depends_on": [
+      "P15.03"
+    ],
+    "reads": [
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "Milestones"
+      }
+    ],
+    "scope": [
+      "Record release SHA, public hostname, operator and owner-approved trial action."
+    ],
+    "acceptance": [
+      "Owner launch decision honored; live smoke passes if launch approved.",
+      "Guidance, seed content, trial script and incident/recovery ownership usable."
+    ],
+    "verification": [
+      "M4 handoff and approved live smoke evidence."
+    ],
+    "ownership": [
+      "Fable/operator handoff"
+    ],
+    "sizing": "Keep this issue limited to The approved release and trial operations are handed over. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P0.06",
+    "package": "P0",
+    "milestone": "M0",
+    "kind": "code",
+    "title": "Build and verify the shared extension-enabled database image",
+    "outcome": "One private reproducible PG18 image supports actual pg_textsearch and pgvector queries.",
+    "depends_on": [
+      "P0.01"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Database implementation"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Runtime and integration checks"
+      }
+    ],
+    "scope": [
+      "Use a compatible pinned published image or build the required extensions reproducibly.",
+      "If publishing an image is needed, use private GHCR and document CI/VPS push/pull access; build evidence can proceed locally while registry access is blocked."
+    ],
+    "acceptance": [
+      "Both extensions create and representative BM25/vector SQL executes.",
+      "Image digest/build sources are fixed and same image is selected for dev/CI/deployment.",
+      "Private registry distribution is verified when used; missing access remains explicit."
+    ],
+    "verification": [
+      "Build/pull and real SQL extension smoke."
+    ],
+    "ownership": [
+      "database image/build/Compose image reference"
+    ],
+    "sizing": "Keep this issue limited to One private reproducible PG18 image supports actual pg_textsearch and pgvector queries. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P13b.08",
+    "package": "P13b",
+    "milestone": "M3",
+    "kind": "code",
+    "title": "Inspect and retry selected failed jobs through release commands",
+    "outcome": "Operators recover selected work after diagnosing its cause.",
+    "depends_on": [
+      "P13b.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Durable background work"
+      },
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "External prerequisites and readiness"
+      }
+    ],
+    "scope": [
+      "Provide bounded inspection/retry commands using pinned Oban APIs and durable cleanup rows.",
+      "Document cause-first investigation, target eligibility and no blanket retry."
+    ],
+    "acceptance": [
+      "Selected retries respect attempt policy and current business eligibility.",
+      "Jobs pruned after seven days can be reconstructed from durable cleanup identifiers.",
+      "No failed-jobs UI or automatic bypass of configured attempt bounds."
+    ],
+    "verification": [
+      "Selected retry/reconstruction rehearsal on release."
+    ],
+    "ownership": [
+      "operator release helpers and retry runbook"
+    ],
+    "sizing": "Keep this issue limited to Operators recover selected work after diagnosing its cause. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P13b.09",
+    "package": "P13b",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Bootstrap the designated verified moderator explicitly",
+    "outcome": "The selected operator receives moderator access through an auditable release command.",
+    "depends_on": [
+      "P2.08",
+      "P0.05"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Durable background work"
+      },
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "External prerequisites and readiness"
+      }
+    ],
+    "scope": [
+      "The Accounts owner implements both verified-account bootstrap and its release invocation under a single file reservation.",
+      "Record actual operator identity through the external prerequisite issue, not public signup."
+    ],
+    "acceptance": [
+      "Unverified/missing account is rejected; role change uses session revocation semantics.",
+      "No public role selector; command is explicit and documented."
+    ],
+    "verification": [
+      "Bootstrap test plus controlled staging invocation once operator is designated."
+    ],
+    "ownership": [
+      "Accounts owner: role helper, release wrapper and tests; coordinate runtime configuration reservation with Codex"
+    ],
+    "sizing": "Keep this issue limited to The selected operator receives moderator access through an auditable release command. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  },
+  {
+    "id": "P13b.07",
+    "package": "P13b",
+    "milestone": "M3",
+    "kind": "code",
+    "title": "Recount and repair derived counters using release commands",
+    "outcome": "Operators repair derived counts without violating active writes.",
+    "depends_on": [
+      "P10.01",
+      "P13b.05"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Counter repair"
+      },
+      {
+        "path": "docs/implementation/implementation-plan.md",
+        "section": "External prerequisites and readiness"
+      }
+    ],
+    "scope": [
+      "Implement data-model Counter repair procedure and documented maintenance coordination.",
+      "Preserve account/content/media ownership; no bulk destructive reset."
+    ],
+    "acceptance": [
+      "Injected counter corruption is detected and repaired to match committed rows.",
+      "Concurrent write behavior follows documented safe coordination; normal request timeout override does not leak."
+    ],
+    "verification": [
+      "Actual release recount/repair test and restored-DB rehearsal."
+    ],
+    "ownership": [
+      "Content repair helper and operations runbook"
+    ],
+    "sizing": "Keep this issue limited to Operators repair derived counts without violating active writes. Split additional independent behavior before Ready; gate failures return to the owning implementation issue."
+  }
+]

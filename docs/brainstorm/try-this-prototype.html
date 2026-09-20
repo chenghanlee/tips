@@ -1,0 +1,473 @@
+<title>Try This</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=Source+Sans+3:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#F3F5F2; --surface:#FFFFFF; --sunken:#EAEDE9;
+  --ink:#1B2422; --muted:#5F6B68; --faint:#8C9794; --line:#D6DBD7; --line-strong:#B9C1BD;
+  --accent:#1D5C8C; --accent-ink:#FFFFFF; --accent-soft:#E4EEF6;
+  --good:#2E7D4F; --good-soft:#E2F1E7; --bad:#B4452E; --bad-soft:#F8E6E1;
+  --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --sans:"Source Sans 3","Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#141A19; --surface:#1C2422; --sunken:#111716;
+    --ink:#E8ECE9; --muted:#9AA5A1; --faint:#6F7B77; --line:#2C3634; --line-strong:#3E4B48;
+    --accent:#7DB8E6; --accent-ink:#0F1E2B; --accent-soft:#1E2E3B;
+    --good:#7BCB98; --good-soft:#1C3127; --bad:#EE9A82; --bad-soft:#3A241E;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#141A19; --surface:#1C2422; --sunken:#111716;
+  --ink:#E8ECE9; --muted:#9AA5A1; --faint:#6F7B77; --line:#2C3634; --line-strong:#3E4B48;
+  --accent:#7DB8E6; --accent-ink:#0F1E2B; --accent-soft:#1E2E3B;
+  --good:#7BCB98; --good-soft:#1C3127; --bad:#EE9A82; --bad-soft:#3A241E;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+/* prototype chrome */
+.proto{background:var(--sunken);border-bottom:1px solid var(--line);font-size:13px;color:var(--muted)}
+.proto-in{max-width:960px;margin:0 auto;padding:8px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.proto-in strong{color:var(--ink);font-weight:600}
+.proto-tabs{display:flex;gap:4px;margin-left:auto}
+.proto-tabs button{background:transparent;border:1px solid transparent;border-radius:999px;padding:3px 11px;color:var(--muted);cursor:pointer}
+.proto-tabs button[aria-current="true"]{background:var(--surface);border-color:var(--line);color:var(--ink)}
+
+/* site header */
+.top{background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.top-in{max-width:960px;margin:0 auto;padding:14px 16px;display:flex;align-items:center;gap:18px}
+.brand{font-family:var(--serif);font-weight:600;font-size:22px;letter-spacing:-.01em;color:var(--ink);text-decoration:none;white-space:nowrap}
+.brand small{display:block;font-family:var(--sans);font-weight:400;font-size:12px;color:var(--muted);letter-spacing:0}
+.top nav{margin-left:auto;display:flex;gap:6px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:8px;border-radius:var(--r);padding:8px 14px;border:1px solid var(--line-strong);background:var(--surface);cursor:pointer;font-weight:500;line-height:1.2;text-decoration:none;color:var(--ink)}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.quiet{border-color:transparent;color:var(--muted)}
+.btn.quiet:hover{color:var(--ink);border-color:transparent;background:var(--sunken)}
+.btn.small{padding:5px 10px;font-size:14px}
+
+main{max-width:960px;margin:0 auto;padding-block:28px 64px;padding-inline:16px}
+.view[hidden]{display:none}
+
+/* --- HOME --- */
+.hero{max-width:720px}
+.hero h1{font-family:var(--serif);font-weight:500;font-size:clamp(28px,4.2vw,40px);line-height:1.15;letter-spacing:-.015em;margin:0 0 6px;text-wrap:balance}
+.hero p{margin:0 0 20px;color:var(--muted);font-size:17px}
+.search{display:flex;align-items:center;gap:10px;background:var(--surface);border:1.5px solid var(--line-strong);border-radius:var(--r);padding:6px 6px 6px 14px;box-shadow:0 1px 0 rgba(0,0,0,.03)}
+.search:focus-within{border-color:var(--accent)}
+.search svg{flex:none;color:var(--faint)}
+.search input{flex:1;min-width:0;border:0;background:transparent;font-size:17px;padding:8px 0}
+.search input::placeholder{color:var(--faint)}
+.search input:focus{outline:none}
+.setup{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:22px 0 10px;color:var(--muted);font-size:15px}
+.setup label{display:inline-flex;align-items:center;gap:6px}
+.setup select{border:1px solid var(--line-strong);background:var(--surface);border-radius:var(--r);padding:5px 8px;font-size:15px}
+.setup .why{margin-left:auto;color:var(--faint);font-size:14px}
+.listhead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:8px;margin-top:18px}
+.listhead h2{font-size:15px;font-weight:600;margin:0;color:var(--muted)}
+.sort{display:flex;gap:2px}
+.sort button{background:none;border:0;padding:2px 8px;color:var(--muted);cursor:pointer;border-radius:999px;font-size:14px}
+.sort button[aria-pressed="true"]{color:var(--ink);background:var(--sunken)}
+.tips{list-style:none;margin:0;padding:0}
+.tip{display:grid;grid-template-columns:1fr auto;gap:6px 24px;padding:18px 0;border-bottom:1px solid var(--line)}
+.tip h3{margin:0;font-family:var(--serif);font-weight:600;font-size:20px;line-height:1.25;letter-spacing:-.005em}
+.tip h3 a{color:inherit;text-decoration:none}
+.tip h3 a:hover{text-decoration:underline;text-decoration-color:var(--line-strong);text-underline-offset:3px}
+.tip .say{grid-column:1;font-family:var(--mono);font-size:14px;color:var(--ink);background:var(--sunken);border-radius:4px;padding:6px 10px;margin:2px 0 0;white-space:pre-wrap;word-break:break-word;max-width:640px}
+.tip .meta{grid-column:1;display:flex;flex-wrap:wrap;gap:6px 12px;color:var(--muted);font-size:14px;margin-top:2px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:1px 9px;font-size:13px;color:var(--muted);background:var(--surface)}
+.tally{grid-column:2;grid-row:1/4;align-self:start;text-align:right;min-width:150px;font-variant-numeric:tabular-nums}
+.tally .n{display:flex;justify-content:flex-end;gap:14px;font-size:15px}
+.tally .n b{font-weight:600}
+.tally .good{color:var(--good)} .tally .bad{color:var(--bad)}
+.tally .for{font-size:13px;color:var(--faint);margin-top:2px}
+.tally .none{font-size:14px;color:var(--faint);font-style:italic}
+.bar{height:4px;border-radius:2px;background:var(--bad-soft);margin-top:6px;overflow:hidden;display:flex;justify-content:flex-start}
+.bar i{display:block;height:100%;background:var(--good)}
+@media (max-width:620px){.tip{grid-template-columns:1fr}.tally{grid-column:1;grid-row:auto;text-align:left;min-width:0}.tally .n{justify-content:flex-start}.setup .why{margin-left:0}}
+
+/* --- FORMS --- */
+.page{max-width:680px}
+.page h1{font-family:var(--serif);font-weight:500;font-size:clamp(26px,3.6vw,34px);letter-spacing:-.012em;line-height:1.15;margin:0 0 6px;text-wrap:balance}
+.page .lede{color:var(--muted);margin:0 0 26px;font-size:17px;max-width:56ch}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:22px}
+.field > label, .field > .lbl{font-weight:600;font-size:15px}
+.field .hint{color:var(--muted);font-size:14px;margin:-2px 0 2px}
+.field input[type=text], .field textarea, .field select{width:100%;border:1px solid var(--line-strong);background:var(--surface);border-radius:var(--r);padding:10px 12px;font-size:16px}
+.field textarea{resize:vertical;min-height:96px;line-height:1.45}
+.field textarea.mono{font-family:var(--mono);font-size:14.5px}
+.field input:focus, .field textarea:focus, .field select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:520px){.row{grid-template-columns:1fr}}
+.optional{color:var(--faint);font-weight:400;font-size:14px;margin-left:6px}
+.actions{display:flex;align-items:center;gap:14px;margin-top:6px;flex-wrap:wrap}
+.actions .note{color:var(--muted);font-size:14px}
+.thats-all{margin-top:32px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:15px;max-width:56ch}
+.thats-all b{color:var(--ink);font-weight:600}
+
+/* segmented verdict */
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.seg label{position:relative;padding:9px 16px;cursor:pointer;border-right:1px solid var(--line);font-weight:500;color:var(--muted);display:flex;align-items:center;gap:8px}
+.seg label:last-child{border-right:0}
+.seg input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.seg label:has(input:checked){background:var(--sunken);color:var(--ink)}
+.seg label.good:has(input:checked){background:var(--good-soft);color:var(--good)}
+.seg label.bad:has(input:checked){background:var(--bad-soft);color:var(--bad)}
+.seg label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:-2px}
+.seg .dot{width:9px;height:9px;border-radius:50%;background:currentColor;opacity:.75}
+
+/* the tip being reviewed */
+.tipcard{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:18px 20px;margin-bottom:28px}
+.tipcard h2{font-family:var(--serif);font-weight:600;font-size:24px;letter-spacing:-.008em;line-height:1.2;margin:0 0 10px}
+.copybox{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start;background:var(--sunken);border-radius:6px;padding:12px 12px 12px 14px}
+.copybox pre{margin:0;font-family:var(--mono);font-size:15px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.copybox .btn{flex:none}
+.copybox .btn.copied{border-color:var(--good);color:var(--good)}
+.where{margin:10px 0 0;color:var(--muted);font-size:14.5px}
+.where b{color:var(--ink);font-weight:600}
+.tipcard .meta{display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:12px}
+
+.section-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:34px 0 14px}
+.section-h h2{font-family:var(--serif);font-weight:600;font-size:22px;margin:0;letter-spacing:-.005em}
+.section-h .sum{color:var(--muted);font-size:15px;font-variant-numeric:tabular-nums}
+.section-h .sum b{font-weight:600}
+.section-h .sum .good{color:var(--good)}.section-h .sum .bad{color:var(--bad)}
+
+/* example block inside review form */
+.example{border:1px solid var(--line);border-radius:8px;padding:16px;background:var(--surface)}
+.example .field{margin-bottom:16px}
+.example .field:last-child{margin-bottom:0}
+.got{display:flex;flex-direction:column;gap:10px}
+.attach{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.attach .limits{color:var(--faint);font-size:13.5px;flex-basis:100%}
+.thumb{display:inline-flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:6px;padding:6px 8px 6px 6px;background:var(--sunken);font-size:14px}
+.thumb .img{width:56px;height:40px;border-radius:3px;background:linear-gradient(135deg,#9fb8a6,#4f6f5d 60%,#2b3f36);position:relative;overflow:hidden}
+.thumb .img::after{content:"";position:absolute;inset:auto 6px 5px 6px;height:6px;border-radius:2px;background:rgba(255,255,255,.6)}
+.thumb .x{background:none;border:0;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:16px;line-height:1}
+.thumb .x:hover{color:var(--bad)}
+.privacy{color:var(--muted);font-size:14px;display:flex;gap:8px;align-items:flex-start;margin:4px 0 0}
+.privacy svg{flex:none;margin-top:3px;color:var(--faint)}
+
+/* reviews list */
+.reviews{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.review{padding:18px 0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:auto 1fr;gap:6px 14px}
+.verdict{grid-row:1/9;align-self:start;width:10px;height:10px;border-radius:50%;margin-top:7px;background:var(--faint)}
+.verdict.good{background:var(--good)}.verdict.bad{background:var(--bad)}
+.review .head{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;font-size:15px}
+.review .head b{font-weight:600}
+.review .head .v.good{color:var(--good)}.review .head .v.bad{color:var(--bad)}
+.review .head .when{color:var(--faint);font-size:13.5px}
+.review .body{color:var(--ink);margin:0}
+.xchg{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;background:var(--sunken);border-radius:6px;padding:10px 12px;font-size:14.5px;margin-top:4px}
+.xchg dt{color:var(--muted);white-space:nowrap}
+.xchg dd{margin:0;font-family:var(--mono);font-size:13.5px;white-space:pre-wrap;word-break:break-word}
+.xchg dd.plain{font-family:var(--sans);font-size:14.5px}
+.review .imgs{display:flex;gap:8px;margin-top:6px}
+.review .imgs .ph{width:132px;height:88px;border-radius:5px;border:1px solid var(--line);background:linear-gradient(160deg,#c9d7cf,#7f9a8a 55%,#3f5a4c);position:relative}
+.review .imgs .ph::after{content:"";position:absolute;left:10px;right:10px;bottom:9px;height:7px;border-radius:2px;background:rgba(255,255,255,.55)}
+.review .imgs .ph.vid::before{content:"";position:absolute;left:50%;top:50%;width:0;height:0;border-left:14px solid rgba(255,255,255,.9);border-top:9px solid transparent;border-bottom:9px solid transparent;transform:translate(-40%,-50%)}
+.empty{padding:22px 0;color:var(--muted);border-bottom:1px solid var(--line);font-size:15px}
+.empty b{color:var(--ink);font-weight:600}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(8px);background:var(--ink);color:var(--ground);padding:10px 16px;border-radius:999px;font-size:15px;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+
+<div class="proto">
+  <div class="proto-in">
+    <span><strong>Prototype</strong> three screens, sample data</span>
+    <div class="proto-tabs" role="tablist" aria-label="Screens">
+      <button data-go="home" aria-current="true">1 Main page</button>
+      <button data-go="submit">2 Submit a tip</button>
+      <button data-go="review">3 Leave a review</button>
+    </div>
+  </div>
+</div>
+
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="#home" data-go="home">Try This<small>things people say to AI models that actually help</small></a>
+    <nav>
+      <a class="btn quiet" href="#home" data-go="home">Browse</a>
+      <a class="btn primary" href="#submit" data-go="submit">Share a tip</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<!-- ============ 1. HOME ============ -->
+<section class="view" id="v-home">
+  <div class="hero">
+    <h1>What is the model doing that you want to change?</h1>
+    <p>Search by the frustration. Every tip shows how it went for people on your model.</p>
+    <div class="search">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="too wordy, agrees with everything, rewrites my whole file…" aria-label="Search tips">
+      <button class="btn primary" id="go">Search</button>
+    </div>
+  </div>
+
+  <div class="setup">
+    <label>Model <select id="setup-model"><option>Claude Opus 5</option><option>ChatGPT (GPT-5)</option><option>Gemini</option><option>Any model</option></select></label>
+    <label>Where <select id="setup-env"><option>Chat app</option><option>Coding tool</option><option>API</option><option>Anywhere</option></select></label>
+    <span class="why">Counts below are for this setup only.</span>
+  </div>
+
+  <div class="listhead">
+    <h2 id="listlabel">All tips</h2>
+    <div class="sort" role="group" aria-label="Sort">
+      <button aria-pressed="true">Newest</button>
+      <button aria-pressed="false">Most tried</button>
+    </div>
+  </div>
+  <ol class="tips" id="tips"></ol>
+</section>
+
+<!-- ============ 2. SUBMIT ============ -->
+<section class="view page" id="v-submit" hidden>
+  <h1>Share a tip</h1>
+  <p class="lede">Something you say to a model that changes what you get back. Four things, and you can leave two of them blank.</p>
+
+  <form id="f-submit" novalidate>
+    <div class="field">
+      <label for="s-title">What it does</label>
+      <p class="hint">Say it the way you would to a friend. This is what people search for.</p>
+      <input type="text" id="s-title" placeholder="Get direct answers without the preamble">
+    </div>
+
+    <div class="field">
+      <label for="s-say">What to say, and where to put it</label>
+      <p class="hint">The exact words. Then one line on where: start of your message, a system prompt, a fresh conversation.</p>
+      <textarea class="mono" id="s-say" rows="5" placeholder="I have ADHD. Keep answers direct: no preamble, no hedging, no summary at the end.
+
+Put it at the start of your first message."></textarea>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="s-model">Model you tried it on <span class="optional">optional</span></label>
+        <select id="s-model"><option>I don't know / automatic</option><option>Claude Opus 5</option><option>Claude Sonnet 5</option><option>ChatGPT (GPT-5)</option><option>Gemini</option><option>Other</option></select>
+      </div>
+      <div class="field">
+        <label for="s-env">Where <span class="optional">optional</span></label>
+        <select id="s-env"><option>I don't know</option><option>Chat app</option><option>Coding tool</option><option>API</option></select>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="btn primary">Publish tip</button>
+      <span class="note">You can add an example in a review after it's published.</span>
+    </div>
+  </form>
+
+  <p class="thats-all"><b>That's all.</b> No account, no tags, no proof required. Sharing a tip doesn't count as a "worked" vote. Once it's up, you and anyone else can say how it went.</p>
+</section>
+
+<!-- ============ 3. REVIEW ============ -->
+<section class="view page" id="v-review" hidden>
+  <div class="tipcard">
+    <h2>Get direct answers without the preamble</h2>
+    <div class="copybox">
+      <pre>I have ADHD. Keep answers direct: no preamble, no hedging, no summary at the end.</pre>
+      <button class="btn small" data-copy>Copy</button>
+    </div>
+    <p class="where"><b>Where:</b> start of your first message.</p>
+    <div class="meta"><span class="chip">Shared for Claude Opus 5</span><span class="chip">Chat app</span><span class="chip">Added 3 days ago</span></div>
+  </div>
+
+  <div class="section-h">
+    <h2>How did it go?</h2>
+  </div>
+
+  <form id="f-review" novalidate>
+    <div class="field">
+      <span class="lbl">Did it work?</span>
+      <div class="seg" role="radiogroup" aria-label="Did it work?">
+        <label><input type="radio" name="v" value="none" checked><span>No verdict</span></label>
+        <label class="good"><input type="radio" name="v" value="worked"><span class="dot"></span><span>Worked</span></label>
+        <label class="bad"><input type="radio" name="v" value="didnt"><span class="dot"></span><span>Didn't work</span></label>
+      </div>
+      <p class="hint">Only pick one if you tried it. A question or a correction is welcome without a verdict.</p>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="r-model">Model</label>
+        <select id="r-model"><option>Claude Opus 5</option><option>Claude Sonnet 5</option><option>ChatGPT (GPT-5)</option><option>Gemini</option><option>I don't know / automatic</option></select>
+      </div>
+      <div class="field">
+        <label for="r-env">Where</label>
+        <select id="r-env"><option>Chat app</option><option>Coding tool</option><option>API</option><option>I don't know</option></select>
+      </div>
+    </div>
+
+    <div class="field">
+      <span class="lbl">Show what happened <span class="optional">optional</span></span>
+      <div class="example">
+        <div class="field">
+          <label for="r-sent">What I sent</label>
+          <textarea class="mono" id="r-sent" rows="3" placeholder="Your message, including the tip">I have ADHD. Keep answers direct: no preamble, no hedging, no summary at the end.
+
+Explain how DNS works.</textarea>
+        </div>
+        <div class="field got">
+          <label for="r-got">What I got</label>
+          <textarea class="mono" id="r-got" rows="4" placeholder="Paste the reply, or attach the image or video the model made">DNS turns a name like example.com into an IP address.
+
+1. Your computer asks a resolver (usually your ISP's).
+2. The resolver asks a root server, then the .com server, then example.com's own server.
+3. The answer comes back and is cached for a while.</textarea>
+          <div class="attach">
+            <button type="button" class="btn small" id="b-attach">Attach image or video</button>
+            <button type="button" class="btn small quiet" id="b-link">Paste a link instead</button>
+            <span class="thumb" id="thumb" hidden><span class="img" aria-hidden="true"></span><span>output.png</span><button type="button" class="x" aria-label="Remove attachment">×</button></span>
+            <span class="limits">Images up to 10 MB (png, jpg, webp). Video up to 100 MB (mp4, webm). Bigger than that? Paste a link.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="r-note">Anything else <span class="optional">optional</span></label>
+      <textarea id="r-note" rows="2" placeholder="What changed, what didn't, what you'd add"></textarea>
+    </div>
+
+    <p class="privacy">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <span>Include only what's needed to understand the result. Leave out names, keys, and anything private. What you publish is public.</span>
+    </p>
+
+    <div class="actions" style="margin-top:18px">
+      <button type="submit" class="btn primary">Publish review</button>
+      <span class="note">Needs at least a verdict, a note, or an example.</span>
+    </div>
+  </form>
+
+  <div class="section-h">
+    <h2>Reviews</h2>
+    <span class="sum"><b class="good">41 worked</b> · <b class="bad">6 didn't</b> on Claude Opus 5, chat app</span>
+  </div>
+  <ul class="reviews">
+    <li class="review">
+      <span class="verdict good" aria-hidden="true"></span>
+      <div class="head"><b class="v good">Worked</b><span>Claude Opus 5 · Chat app</span><span class="when">yesterday</span></div>
+      <p class="body">Night and day. It stopped opening with "Great question" and cut the closing summary. Same content, half the length.</p>
+      <dl class="xchg">
+        <dt>Sent</dt><dd>I have ADHD. Keep answers direct: no preamble, no hedging, no summary at the end.
+
+Why is my Postgres query slow when I add ORDER BY?</dd>
+        <dt>Got</dt><dd>Because ORDER BY forces a sort, and without an index on that column Postgres sorts the whole result in memory or on disk. Add an index on (status, created_at) matching your WHERE and ORDER BY, then EXPLAIN ANALYZE again.</dd>
+      </dl>
+    </li>
+    <li class="review">
+      <span class="verdict" aria-hidden="true"></span>
+      <div class="head"><b>No verdict</b><span>Claude Opus 5 · Chat app</span><span class="when">2 days ago</span></div>
+      <p class="body">Has anyone compared this with just saying "be direct, skip the preamble"? I'd rather not claim something about myself if the plain version does the same thing.</p>
+    </li>
+    <li class="review">
+      <span class="verdict good" aria-hidden="true"></span>
+      <div class="head"><b class="v good">Worked</b><span>Gemini · Chat app</span><span class="when">4 days ago</span></div>
+      <p class="body">Also works on image prompts. Descriptions came back as one tight paragraph instead of a bulleted essay.</p>
+      <div class="imgs"><span class="ph" role="img" aria-label="Attached image: model output"></span></div>
+    </li>
+    <li class="review">
+      <span class="verdict bad" aria-hidden="true"></span>
+      <div class="head"><b class="v bad">Didn't work</b><span>Claude Opus 5 · Coding tool</span><span class="when">last week</span></div>
+      <p class="body">In Claude Code it made no difference I could see. The replies are already terse there. Probably a chat-app tip.</p>
+    </li>
+  </ul>
+</section>
+
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  var tips = [
+    {id:1, title:"Get direct answers without the preamble", say:"I have ADHD. Keep answers direct: no preamble, no hedging, no summary at the end.", where:"start of your first message", model:"Claude Opus 5", env:"Chat app", added:"3 days ago",
+      counts:{"Claude Opus 5|Chat app":[41,6],"Gemini|Chat app":[3,0],"Claude Opus 5|Coding tool":[0,2]}},
+    {id:2, title:"Stop it from agreeing with everything you say", say:"Before you answer, give the strongest objection to what I just said. Then answer.", where:"start of the message you want challenged", model:"ChatGPT (GPT-5)", env:"Chat app", added:"5 days ago",
+      counts:{"ChatGPT (GPT-5)|Chat app":[27,4],"Claude Opus 5|Chat app":[12,1]}},
+    {id:3, title:"Make it show a diff before touching my file", say:"Only change the lines needed for this. Show me the diff first and wait for me to say go.", where:"once, at the start of the session", model:"Claude Opus 5", env:"Coding tool", added:"1 week ago",
+      counts:{"Claude Opus 5|Coding tool":[19,3],"ChatGPT (GPT-5)|Coding tool":[6,2]}},
+    {id:4, title:"Get one answer, not a menu of options", say:"Pick one. Don't give me options unless I ask for them.", where:"start of your message", model:"I don't know / automatic", env:"Chat app", added:"1 week ago",
+      counts:{"Claude Opus 5|Chat app":[15,5],"ChatGPT (GPT-5)|Chat app":[9,3]}},
+    {id:5, title:"Keep the same look across image generations", say:"Style: 35mm film, overcast light, muted palette. Keep this exact style for every image in this conversation.", where:"end of every image prompt", model:"Gemini", env:"Chat app", added:"2 weeks ago",
+      counts:{"Gemini|Chat app":[8,1]}},
+    {id:6, title:"Stop the LinkedIn voice", say:"Write this like a text message to a colleague you respect, not a post.", where:"anywhere in the message", model:"ChatGPT (GPT-5)", env:"Chat app", added:"2 weeks ago",
+      counts:{"ChatGPT (GPT-5)|Chat app":[22,7],"Claude Opus 5|Chat app":[4,0],"Claude Opus 5|API":[2,1]}}
+  ];
+
+  var $ = function(s){return document.querySelector(s)};
+  var list = $("#tips"), mSel = $("#setup-model"), eSel = $("#setup-env"), q = $("#q");
+
+  function tally(t){
+    var m = mSel.value, e = eSel.value, w=0, d=0, any=false;
+    Object.keys(t.counts).forEach(function(k){
+      var p = k.split("|");
+      if ((m==="Any model" || p[0]===m) && (e==="Anywhere" || p[1]===e)) { w+=t.counts[k][0]; d+=t.counts[k][1]; any=true; }
+    });
+    var label = (m==="Any model"?"any model":m) + ", " + (e==="Anywhere"?"anywhere":e.toLowerCase());
+    if (!any || (w+d)===0) return '<div class="none">No reports yet for '+label+'</div>';
+    var pct = Math.round(100*w/(w+d));
+    return '<div class="n"><span class="good"><b>'+w+'</b> worked</span><span class="bad"><b>'+d+"</b> didn't</span></div>"+
+           '<div class="bar" aria-hidden="true"><i style="width:'+pct+'%"></i></div>'+
+           '<div class="for">for '+label+'</div>';
+  }
+
+  function render(){
+    var term = (q.value||"").trim().toLowerCase();
+    var rows = tips.filter(function(t){ return !term || (t.title+" "+t.say).toLowerCase().indexOf(term)>=0; });
+    $("#listlabel").textContent = term ? rows.length+" tip"+(rows.length===1?"":"s")+" for \""+q.value.trim()+"\"" : "All tips";
+    list.innerHTML = rows.map(function(t){
+      return '<li class="tip">'+
+        '<h3><a href="#review" data-go="review">'+t.title+'</a></h3>'+
+        '<pre class="say">'+t.say+'</pre>'+
+        '<div class="meta"><span>Where: '+t.where+'</span><span class="chip">'+t.model+'</span><span class="chip">'+t.env+'</span><span>'+t.added+'</span></div>'+
+        '<div class="tally">'+tally(t)+'</div>'+
+      '</li>';
+    }).join("") || '<li class="empty">Nothing matches <b>'+q.value.trim()+'</b> yet. If you know something that helps, <a href="#submit" data-go="submit">share it</a>.</li>';
+  }
+  mSel.addEventListener("change", render); eSel.addEventListener("change", render);
+  q.addEventListener("input", render); $("#go").addEventListener("click", render);
+  render();
+
+  function show(name){
+    document.querySelectorAll(".view").forEach(function(v){ v.hidden = v.id !== "v-"+name; });
+    document.querySelectorAll(".proto-tabs button").forEach(function(b){ b.setAttribute("aria-current", b.dataset.go===name ? "true" : "false"); });
+    window.scrollTo({top:0});
+  }
+  document.addEventListener("click", function(ev){
+    var el = ev.target.closest("[data-go]"); if (!el) return;
+    ev.preventDefault(); show(el.dataset.go);
+    try{ history.replaceState(null,"","#"+el.dataset.go); }catch(e){}
+  });
+  var h = (location.hash||"").replace("#",""); if (["home","submit","review"].indexOf(h)>=0) show(h);
+
+  var toastEl = $("#toast"), tt;
+  function toast(msg){ toastEl.textContent = msg; toastEl.classList.add("show"); clearTimeout(tt); tt=setTimeout(function(){toastEl.classList.remove("show")},1800); }
+
+  document.addEventListener("click", function(ev){
+    var b = ev.target.closest("[data-copy]"); if(!b) return;
+    var text = b.parentElement.querySelector("pre").textContent;
+    var done = function(){ b.textContent="Copied"; b.classList.add("copied"); setTimeout(function(){ b.textContent="Copy"; b.classList.remove("copied"); },1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, done); else done();
+  });
+
+  $("#b-attach").addEventListener("click", function(){ $("#thumb").hidden = false; });
+  $("#thumb").querySelector(".x").addEventListener("click", function(){ $("#thumb").hidden = true; });
+  $("#b-link").addEventListener("click", function(){ var g=$("#r-got"); g.value = (g.value?g.value+"\n\n":"")+"https://"; g.focus(); });
+
+  $("#f-submit").addEventListener("submit", function(ev){ ev.preventDefault(); toast("Published. You can review it now."); show("review"); });
+  $("#f-review").addEventListener("submit", function(ev){ ev.preventDefault(); toast("Published"); });
+})();
+</script>

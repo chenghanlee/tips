@@ -1,0 +1,2082 @@
+[
+  {
+    "id": "P16.00",
+    "package": "P16",
+    "milestone": "M0",
+    "kind": "probe",
+    "title": "Prove SaladUI compatibility in a disposable LiveView app",
+    "outcome": "Fable verifies the chosen package works with the pinned native Phoenix stack.",
+    "depends_on": [
+      "P0.01"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Foundation"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Pages to design"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Navigation and content"
+      }
+    ],
+    "scope": [
+      "Create a throwaway app using proposed pins; inspect setup changes and package CSS class scanning.",
+      "Test representative native form controls, validation, patch/reconnect, focus and interaction alongside a minimal Tips-style hook.",
+      "Record accepted versions before real scaffold and later P16 setup."
+    ],
+    "acceptance": [
+      "Actual generated assets render styled controls with no lost events/focus across patches.",
+      "Native selects/details and server-rendered errors remain; no React state layer.",
+      "Compatibility failures update proposed pins before consumers start."
+    ],
+    "verification": [
+      "Disposable browser smoke, version record and setup diff."
+    ],
+    "ownership": [
+      "Fable visual/platform compatibility probe"
+    ],
+    "sizing": "One design baseline with reader/editor exemplars; does not wait for M2 or include final running-screen approval."
+  },
+  {
+    "id": "P16.01",
+    "package": "P16",
+    "milestone": "M0",
+    "kind": "contract",
+    "title": "Establish Fable-owned visual direction and shared component interfaces",
+    "outcome": "Feature owners receive a concrete native-Phoenix visual baseline before broad screen work.",
+    "depends_on": [
+      "P0.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Foundation"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Pages to design"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Navigation and content"
+      }
+    ],
+    "scope": [
+      "Fable or Opus designs compact shadcn-language reader/editor compositions and essential loading/error/recovery states.",
+      "Define tokens, spacing/type scale and required component interface/ownership against pinned SaladUI compatibility evidence."
+    ],
+    "acceptance": [
+      "Reviewable responsive reader/editor artifacts cover 320px reflow and keyboard focus, not only ideal desktop screenshots.",
+      "Native selects/details, page-owned state and server errors remain; no React, forced component catalogue or unrequested dark mode.",
+      "Baseline artifact decisions unblock implementation independently of final feature QA."
+    ],
+    "verification": [
+      "Fable design review and shared component interface sign-off; reference P0 compatibility result."
+    ],
+    "ownership": [
+      "Fable-owned reviewable visual artifacts in docs/design/visual/",
+      "Token/component interface notes in docs/design/visual/ with linked consuming code once implemented."
+    ],
+    "sizing": "One design baseline with reader/editor exemplars; does not wait for M2 or include final running-screen approval."
+  },
+  {
+    "id": "P16.02",
+    "package": "P16",
+    "milestone": "M0",
+    "kind": "code",
+    "title": "Implement required SaladUI tokens and shared native components",
+    "outcome": "Pages can consume a tested visual baseline without toolkit ownership of product state.",
+    "depends_on": [
+      "P16.01",
+      "P0.02",
+      "P16.00"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Foundation"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Navigation and content"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Saving and recovery"
+      }
+    ],
+    "scope": [
+      "Integrate selected SaladUI package mode and required layout/form/button/status primitives under exclusive shared-file ownership.",
+      "Review setup changes to CSS/hooks/layouts and preserve Tips-specific event ownership.",
+      "Publish actual shared component paths and interfaces; Search, Browse and Voting tasks consume these and request changes from the shared UI owner under reservation rather than concurrently editing the files."
+    ],
+    "acceptance": [
+      "Dependency CSS classes appear in built assets; representative validation/focus/live-patch/reconnect controls work.",
+      "Native select/details behavior and server-rendered errors remain; components carry no second draft/search/upload state.",
+      "Shared interfaces and usage examples exist beside code; adapt only concrete required components, not a general library fork."
+    ],
+    "verification": [
+      "Pinned dependency asset build and representative LiveView/browser component smoke; accessibility/focus review by Fable."
+    ],
+    "ownership": [
+      "Shared UI owner designated by Fable exclusively owns shared HEEx components/layouts including tip-row, filter, page-navigation and vote-control components.",
+      "Design tokens/styles and JS registration coordinated with P0 under explicit file reservation.",
+      "Shared component integration tests."
+    ],
+    "sizing": "One required component baseline; if too many unrelated controls appear, implement only first reader/editor needs and dispatch later additions by consuming task."
+  },
+  {
+    "id": "P16.03",
+    "package": "P16",
+    "milestone": "M2",
+    "kind": "gate",
+    "title": "Review visual consistency and usability on all completed page areas",
+    "outcome": "Fable confirms real screens match the visual baseline and preserve failure/recovery usability.",
+    "depends_on": [
+      "P8.07",
+      "P9b.01",
+      "P9b.02",
+      "P9b.03",
+      "P10.03",
+      "P12.01",
+      "P12.02",
+      "P12.03",
+      "P16.02",
+      "P11.04",
+      "P11.07",
+      "P10.02",
+      "P11.03",
+      "P11.08",
+      "P11.09",
+      "P11.10",
+      "P11.11"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Pages to design"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Implementation acceptance"
+      }
+    ],
+    "scope": [
+      "Review browse/search, tip/reviews, publish/edit, accounts/profiles, inbox and moderation on integrated revision.",
+      "Record precise page/state findings and send bounded repairs to owning task; include known missing-description limitation."
+    ],
+    "acceptance": [
+      "Loading, empty, validation, disconnection, conflict and provider-failure states are legible at desktop/mobile/zoom.",
+      "Keyboard focus/status announcements and 320px reflow verified on actual pages; no design-only claim substitutes for runtime test.",
+      "No P0/P1 visual/usability findings remain; lower-priority findings recorded and accessibility conformance not claimed without evidence.",
+      "Final QA depends on feature completion but baseline tasks remain independent, preventing dependency cycle."
+    ],
+    "verification": [
+      "Fable reviewed-screen/state matrix with revision and browser/device evidence; linked repair/review records."
+    ],
+    "ownership": [
+      "Visual acceptance report and bounded follow-up findings"
+    ],
+    "sizing": "One final cross-page review gate; fixes remain owned changes and independent reviewers use separate sessions."
+  },
+  {
+    "id": "P3.01",
+    "package": "P3",
+    "milestone": "M1",
+    "kind": "contract",
+    "title": "Define editor intent and browser recovery interfaces",
+    "outcome": "Both editor kinds and their hooks share one concrete intent, identity and recovery contract.",
+    "depends_on": [
+      "P1.10",
+      "P1.11"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Saving and recovery"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Publication-to-edit handoff"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Publishing and retry contract"
+      }
+    ],
+    "scope": [
+      "Specify text intent, explicit blanks, complete edit base, draft identity/revision and publication result shapes beside code and representative fixtures.",
+      "Specify page/hook events, account/form identities and later media slot extension points without implementing media behavior."
+    ],
+    "acceptance": [
+      "Tip/review fixtures include new/edit/recovered/handoff modes and unknown media identity.",
+      "The contract distinguishes browser draft revision, server edit_version and publication key.",
+      "No success stub or parallel normalization ruleset is introduced."
+    ],
+    "verification": [
+      "Review concrete fixtures/types with Accounts, Search, Media and editor owners; identify the actual files downstream tasks must read."
+    ],
+    "ownership": [
+      "Content intent/result types and focused contract fixtures",
+      "Editor hook event/DOM interface declarations"
+    ],
+    "sizing": "One interface decision with examples; split implementation out, and resolve contradictory outcomes before marking downstream work Ready."
+  },
+  {
+    "id": "P3.02",
+    "package": "P3",
+    "milestone": "M1",
+    "kind": "code",
+    "title": "Implement canonical content intent normalization and comparison",
+    "outcome": "Publication retries and edits agree about equivalent, different and unknown complete intent.",
+    "depends_on": [
+      "P3.01"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Publishing and retry contract"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Editing and conflicts"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Edit"
+      }
+    ],
+    "scope": [
+      "Implement one Content comparator for normalized author-editable fields.",
+      "Include setup blanks, tag, ordered media identity and descriptions; media fixtures may precede adapters."
+    ],
+    "acceptance": [
+      "Identical text/setup/order/description normalizes equivalently; a change in any editable field differs.",
+      "Unknown image identity, missing slot or incomplete intent yields unknown rather than an empty attachment list.",
+      "Counters, timestamps and moderation state do not enter editable comparison; incomplete base disables conflict shortcut."
+    ],
+    "verification": [
+      "Focused comparator tests covering Unicode/whitespace rules from the schema and complete/incomplete intent tables."
+    ],
+    "ownership": [
+      "Content normalization/comparison module and unit tests"
+    ],
+    "sizing": "One pure contract implementation; split additional parsing/validation concerns if they require provider or browser behavior."
+  },
+  {
+    "id": "P3.03",
+    "package": "P3",
+    "milestone": "M1",
+    "kind": "code",
+    "title": "Commit new text publications and their required side effects atomically",
+    "outcome": "A tip or review inserts exactly one publication, self-vote, search row and eligible review notification.",
+    "depends_on": [
+      "P3.02",
+      "P4a.01",
+      "P2.05",
+      "P2.09"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Publishing and retry contract"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Publish a tip or review"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Visibility and transaction boundaries"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Notifications"
+      }
+    ],
+    "scope": [
+      "Implement text-only publish_tip and publish_review transactions against canonical constraints.",
+      "Implement the minimal notification fold needed by review publication; use Search-owned writer and database counter triggers."
+    ],
+    "acceptance": [
+      "A new tip/review receives its self-vote and current search text in the same commit; no self notification is created.",
+      "Review publication requires a live parent and independent submitted setup including cleared blanks; same-author one-undeleted-review is enforced.",
+      "Duplicate key/constraint races resolve after rollback with equivalent/different/unknown receipts before another-key already-reviewed response.",
+      "Publication versus ban or parent hide/delete is tested with independently committed transactions and ordered locks; failure leaves no partial dependent writes."
+    ],
+    "verification": [
+      "Content publication transaction tests with actual canonical constraints/triggers.",
+      "Explicit synchronized two-connection retry and eligibility-race tests."
+    ],
+    "ownership": [
+      "Content publication operations",
+      "Minimal notification fold helper",
+      "Publication integration tests"
+    ],
+    "sizing": "One atomic publication behavior for both table variants; split tip/review implementations only if initial context estimate exceeds one session, preserving shared side effects."
+  },
+  {
+    "id": "P3.04",
+    "package": "P3",
+    "milestone": "M1",
+    "kind": "code",
+    "title": "Save guarded text edits without replaying publication effects",
+    "outcome": "Eligible authors edit current content with one version guard and truthful conflict/uncertain outcomes.",
+    "depends_on": [
+      "P3.03"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Editing and conflicts"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Edit"
+      }
+    ],
+    "scope": [
+      "Implement consistent editable snapshots and text edit operations using the original expected version.",
+      "Use shared comparator/search writer and return the current authorized state after failed guards."
+    ],
+    "acceptance": [
+      "Current-version real edit increments version once and updates edited_at; current-version no-op changes neither; stale no-op fails.",
+      "Votes, original dates, ranking inputs, notification timestamps/count/read state remain unchanged; hidden content stays hidden.",
+      "Changed search text invalidates embedding transactionally; review edits need no parent-tip lock when liveness is unchanged.",
+      "Deletion, full ban, ownership loss and uncertain commit preserve explicit failure outcomes; no automatic version advancement."
+    ],
+    "verification": [
+      "Content edit tests including stale/no-op and search freshness assertions.",
+      "Synchronized edit versus account/visibility mutation tests."
+    ],
+    "ownership": [
+      "Content edit operations and snapshot projection",
+      "Text edit integration tests"
+    ],
+    "sizing": "One versioned text-edit behavior; attachment transaction work belongs to P6/P8."
+  },
+  {
+    "id": "P3.05",
+    "package": "P3",
+    "milestone": "M1",
+    "kind": "code",
+    "title": "Provide early author-delete and guarded hide/restore primitives",
+    "outcome": "Early slices can prove visibility and deletion without waiting for the complete moderation screens.",
+    "depends_on": [
+      "P3.04"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Delete, by the author"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Moderate"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Author-deleted tip pages"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Visibility and transaction boundaries"
+      }
+    ],
+    "scope": [
+      "Implement author deletion plus minimal moderator hide/restore operations against current admission and canonical visibility.",
+      "Resolve applicable flags/notifications for text-only content. P6.03 must extend this real operation to transactional media cleanup before any media lifecycle gate; do not install a successful placeholder cleanup callback."
+    ],
+    "acceptance": [
+      "Full-ban authors may delete owned content but cannot edit; rejected actions change no dependents.",
+      "Tip hide/delete preserves independently visible reviews and their media; deletion takes precedence and cannot be restored.",
+      "Hide/restore compares edit_version and reviewed report state, changes version but not author dates, and never replays publication notifications.",
+      "Review liveness mutations lock parent tip before review so counter triggers and later bulk operations share lock order."
+    ],
+    "verification": [
+      "Content liveness/deletion tests on canonical schema; verify metadata/projection masks through shared policy.",
+      "Synchronized single-review liveness schedule against a representative bulk lock transaction."
+    ],
+    "ownership": [
+      "Content deletion and minimal Moderation operations",
+      "Liveness transaction tests"
+    ],
+    "sizing": "One content-lifecycle boundary; split delete and hide/restore into separate children if implementation requires unrelated module work, retaining both before early video gate."
+  },
+  {
+    "id": "P3.06",
+    "package": "P3",
+    "milestone": "M1",
+    "kind": "code",
+    "title": "Implement account-scoped text draft CAS storage",
+    "outcome": "Browser drafts cannot overwrite or clear a newer draft from another tab.",
+    "depends_on": [
+      "P3.01",
+      "P0.04"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Saving and recovery"
+      }
+    ],
+    "scope": [
+      "Implement IndexedDB record creation/save/discard/clear with draft_id and revision CAS.",
+      "Store text/selections/key/base metadata; reserve media descriptors without persisting file bytes."
+    ],
+    "acceptance": [
+      "Two first writers cannot both create the account/form record; missing/replaced record conflicts even at the same numeric revision.",
+      "Autosave and clear guard both identity and revision, preserving newer work after stale save/discard.",
+      "Storage failure allows composing/publishing and reports unsaved risk; no localStorage or server-draft fallback.",
+      "Account/form scoping prevents another account from restoring values."
+    ],
+    "verification": [
+      "Real-browser IndexedDB tests using separate tabs, delayed transactions, discard/recreate and quota/availability failure."
+    ],
+    "ownership": [
+      "Browser draft storage module and browser tests"
+    ],
+    "sizing": "One browser persistence boundary; hook mount/restore and publication orchestration remain P3.07/P3.08."
+  },
+  {
+    "id": "P3.07",
+    "package": "P3",
+    "milestone": "M1",
+    "kind": "code",
+    "title": "Mount text editors with safe draft restoration and reconnect recovery",
+    "outcome": "Authors resume the correct text draft without overwriting typing or changing account/form identity.",
+    "depends_on": [
+      "P3.04",
+      "P3.06",
+      "P9a.02",
+      "P2.07",
+      "P16.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Pages to design"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Saving and recovery"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Review content and evidence"
+      }
+    ],
+    "scope": [
+      "Create one page LiveView per content kind with new/edit actions and page-owned state.",
+      "Wire draft mount, pristine-DOM checks, IndexedDB restore and same-page DOM reconnect recovery to the settled interfaces.",
+      "Initialize review setup only on a fresh form; retain explicit blanks and immutable edit base across recovery."
+    ],
+    "acceptance": [
+      "Typing before hook mount or during delayed storage read is preserved; restore applies only while pristine, and late callbacks after fallback/destruction are ignored.",
+      "Reconnect uses DOM form recovery without IndexedDB restore; account/form, key, blanks, original base/version remain intact.",
+      "Review setup initializes once from parent, stays clearable and is never refilled after restore/edit; required Other technique is available."
+    ],
+    "verification": [
+      "LiveView tests for form identity/defaults and real-browser hook tests for typing before/during restore, reconnect, delayed/failed storage and stale callbacks."
+    ],
+    "ownership": [
+      "Tip/review editor LiveViews/templates",
+      "Draft hook lifecycle",
+      "Editor browser tests"
+    ],
+    "sizing": "One editor mount/recovery lifecycle; submission validation and expired-auth presentation are P3.09."
+  },
+  {
+    "id": "P3.08",
+    "package": "P3",
+    "milestone": "M1",
+    "kind": "code",
+    "title": "Reconcile text publication acknowledgements and clear only submitted drafts",
+    "outcome": "Lost responses and same-key divergent drafts never erase unacknowledged work.",
+    "depends_on": [
+      "P3.03",
+      "P3.07",
+      "P3.09"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Publishing and retry contract"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Saving and recovery"
+      }
+    ],
+    "scope": [
+      "Wire explicit publish/retry and bounded get_publication recovery with immutable submitted values.",
+      "Clear/navigate only for created or equivalent receipts plus successful submitted-revision CAS; preserve divergent proposals for later explicit handoff.",
+      "For unknown text edit outcome, retain proposal and read current authorized saved state; never use publication-key lookup as proof of the edit or blindly replay with a new version."
+    ],
+    "acceptance": [
+      "Simultaneous different drafts sharing a key return truthful comparison; identity-only/deleted/unknown receipts cannot clear local values.",
+      "Lost acknowledgement triggers bounded reconciliation; absent allows explicit same-key retry without assuming prior request stopped.",
+      "Lookup failure remains unresolved with Check again/Sign in; no background republish loop.",
+      "Newer local edits or failed clear CAS remain recoverable and are not labelled published or navigated away.",
+      "Lost edit acknowledgement leaves proposal available beside current saved state; any further edit is explicit and retains the normal expected-version guard."
+    ],
+    "verification": [
+      "Real-browser text publish/edit lost-response slice with two tabs and intercepted responses.",
+      "Context receipt and LiveView clear/navigation assertions."
+    ],
+    "ownership": [
+      "Editor submission/reconciliation handlers",
+      "Draft acknowledgement hook integration",
+      "Early text slice tests"
+    ],
+    "sizing": "One publication acknowledgement boundary; edit conflict choices and K/E handoff remain separate later tasks."
+  },
+  {
+    "id": "P3.09",
+    "package": "P3",
+    "milestone": "M1",
+    "kind": "code",
+    "title": "Validate text submissions and preserve input after authorization expiry",
+    "outcome": "Text editors present complete actionable errors while keeping unsaved input through refused saves.",
+    "depends_on": [
+      "P3.07",
+      "P2.07",
+      "P16.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Pages to design"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Saving and recovery"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Review content and evidence"
+      }
+    ],
+    "scope": [
+      "Wire Content changeset validation to submit-first errors and correction-on-change after a failed submit.",
+      "Implement linked focusable error summary, disclosure opening and current-admission failure presentation without forced reload."
+    ],
+    "acceptance": [
+      "Publish/Save validates all required text including untouched fields; preserve long pasted values without maxlength and use a single validation presentation.",
+      "First failure focuses the summary and errors open optional evidence disclosure; subsequent correction clears stale errors without autosave/reconnect triggering validation.",
+      "Expired admission or full ban preserves current text and draft, displays the relevant explanation and carries validated return destination; no automatic save follows sign-in.",
+      "Required Other technique exists in the seeded vocabulary; review optional setup remains clearable and independently stored."
+    ],
+    "verification": [
+      "LiveView changeset/error lifecycle tests and browser summary-link focus/disclosure/auth-expiry input-preservation checks."
+    ],
+    "ownership": [
+      "Editor validation/admission presentation handlers and templates",
+      "Text validation/auth-expiry browser tests"
+    ],
+    "sizing": "One submission validation and refused-save presentation boundary; no additional draft-storage lifecycle."
+  },
+  {
+    "id": "P6.01",
+    "package": "P6",
+    "milestone": "M1",
+    "kind": "code",
+    "title": "Retain image selections through publish/edit rejection and uncertain outcome",
+    "outcome": "An image remains selected after known failure and is consumed only after confirmed success.",
+    "depends_on": [
+      "P3.08",
+      "P3.05",
+      "P5.02",
+      "P5.05",
+      "P5.07"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Saving and recovery"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Image/GIF upload integration"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Image/GIF attempts"
+      }
+    ],
+    "scope": [
+      "Integrate page-owned LiveView image entries with Media upload attempt and Content transactions for publish/edit.",
+      "Freeze immutable attempt values; validate text before file consumption; retain entry paths only for their owning lifetime."
+    ],
+    "acceptance": [
+      "Invalid text and definite rate-limit rejection retain image/text and require explicit same-key retry.",
+      "Failure on a later image cleans only confirmed unattached attempt objects and preserves every valid selection.",
+      "Lost commit response reconciles before consumption/cleanup; unknown outcome never implies rollback or deletion permission.",
+      "Successful commit attaches the correct stable media row and description; edit replacement/cleanup rolls back on stale version."
+    ],
+    "verification": [
+      "LiveView upload lifecycle tests plus real-browser retained-selection retry.",
+      "Injected later-file failure/unknown commit tests through actual Content/Media boundary."
+    ],
+    "ownership": [
+      "Editor image submission integration",
+      "Content attachment transaction integration",
+      "Image slice tests"
+    ],
+    "sizing": "One image submission ownership boundary; do not add multi-file UX, drag helpers or async task staging unless measured blocking demands the existing page-owned option."
+  },
+  {
+    "id": "P6.02",
+    "package": "P6",
+    "milestone": "M1",
+    "kind": "gate",
+    "title": "Prove the integrated image journey against R2",
+    "outcome": "A real image can be uploaded, read and cleaned while rejection retains usable editor state.",
+    "depends_on": [
+      "P6.01",
+      "P13a.02",
+      "P6.03",
+      "P5.01"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Runtime and integration checks"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Implementation acceptance"
+      }
+    ],
+    "scope": [
+      "Run real R2 journey using isolated asset identifiers; record revision/environment/cleanup."
+    ],
+    "acceptance": [
+      "Known rejection followed by explicit retry publishes exactly once with the original selection.",
+      "Read path renders valid image, hides/deletes through current projection, and confirms required deletion/cache purge.",
+      "A stub or unavailable R2 configuration cannot pass this gate; operational blocker is recorded."
+    ],
+    "verification": [
+      "Recorded browser run and provider object/purge evidence with sanitized identifiers."
+    ],
+    "ownership": [
+      "Image E2E scenario and evidence"
+    ],
+    "sizing": "One provider journey and evidence; fixes return to responsible coding tasks rather than accumulating unrelated changes in a gate."
+  },
+  {
+    "id": "P6.03",
+    "package": "P6",
+    "milestone": "M1",
+    "kind": "code",
+    "title": "Extend content lifecycle operations to durable media cleanup",
+    "outcome": "Author deletion and deliberate visibility changes preserve the agreed independent media lifecycle.",
+    "depends_on": [
+      "P3.05",
+      "P5.05",
+      "P5.07"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Delete, by the author"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Moderate"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Author-deleted tip pages"
+      }
+    ],
+    "scope": [
+      "Extend early text lifecycle operations to attached-media visibility and transactional durable cleanup using real Media operations.",
+      "Use fixture-attached media to test lifecycle independently of editor submission."
+    ],
+    "acceptance": [
+      "Deleting content clears only its own live media membership and enqueues actual cleanup in the same transaction; rejected delete changes neither content nor media/jobs.",
+      "Tip hide/delete preserves independently visible review media; hide/restore only changes authorization and makes no provider activation/deletion write.",
+      "Cleanup rows retain provider identifiers until confirmed provider deletion/cache purge; unknown outcomes do not authorize early object deletion.",
+      "Banned authors retain owned-content deletion; no placeholder cleanup callback can report success."
+    ],
+    "verification": [
+      "Content lifecycle transaction tests with actual media rows/jobs, cleanup retry and independent review-media assertions."
+    ],
+    "ownership": [
+      "Content deletion/hide/restore media integration",
+      "Lifecycle media transaction tests"
+    ],
+    "sizing": "One content-lifecycle extension; image selection/upload/retry remains P6.01."
+  },
+  {
+    "id": "P7.01",
+    "package": "P7",
+    "milestone": "M1",
+    "kind": "code",
+    "title": "Integrate one private video with resumable upload and bounded status",
+    "outcome": "A selected video reaches durable readiness without blocking writing or duplicating assets.",
+    "depends_on": [
+      "P6.02",
+      "P5.09"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Result composer"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Video upload before publication"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Managed video"
+      }
+    ],
+    "scope": [
+      "Wire external LiveView preflight to durable media identity and tus adapter; persist identity/order before transfer completes.",
+      "Implement one page-owned nonoverlapping status cycle using selected pending IDs and committed Media transitions."
+    ],
+    "acceptance": [
+      "Pause/resume or file reselection uses the same valid asset; one-hour transfer deadline never extends; no duplicate preflight on reconnect.",
+      "Pending processing/status timeout or rate limit keeps writing responsive with bounded backoff; ready rows need no provider read.",
+      "Selection change/unmount cancels old cycle, and late status/preflight responses cannot restore removed/cleanup-marked media.",
+      "Publish remains explicit and blocked until selected video is playable; expired/failed row retains its place with replace/remove actions."
+    ],
+    "verification": [
+      "Real-browser tus adapter tests against controlled endpoints and LiveView tests of timer/task lifecycle.",
+      "Injected slow/rate-limited/out-of-order status results."
+    ],
+    "ownership": [
+      "Video uploader adapter",
+      "Editor video selection/status handlers",
+      "Video browser tests"
+    ],
+    "sizing": "One video editor integration; split tus adapter and page status ownership if their combined required context cannot retain repair reserve, using the settled event contract."
+  },
+  {
+    "id": "P7.02",
+    "package": "P7",
+    "milestone": "M1",
+    "kind": "gate",
+    "title": "Prove real private video publication playback hide and deletion",
+    "outcome": "The first real Stream journey proves private creation, readiness, access and cleanup on integrated code.",
+    "depends_on": [
+      "P7.01",
+      "P3.05",
+      "P13a.02",
+      "P9a.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Managed video"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Video upload before publication"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Implementation acceptance"
+      }
+    ],
+    "scope": [
+      "Exercise actual browser tus and signed player/thumbnail routes against configured private Stream."
+    ],
+    "acceptance": [
+      "Video is private from reservation; upload/processing/ready are distinct and cannot auto-publish.",
+      "A ready video publishes during status-provider outage and plays through fresh authorized app routes without provider activation writes.",
+      "Hide stops new ordinary-reader tokens, restore respects current visibility, and author deletion enqueues eventual provider deletion; issued token expiry is documented.",
+      "A visible review video remains usable under hidden/deleted parent; no stale status response revives removed rows."
+    ],
+    "verification": [
+      "Sanitized revision/environment/provider evidence; browser playback and hide/delete checks; tracked fixture cleanup."
+    ],
+    "ownership": [
+      "Private-video E2E scenario/evidence"
+    ],
+    "sizing": "One real-provider lifecycle gate; unavailable access remains blocked rather than accepting a simulated upload."
+  },
+  {
+    "id": "P8.01",
+    "package": "P8",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Complete ordered mixed-attachment editing transactions",
+    "outcome": "Both editors save one complete ordered media selection with descriptions and guarded cleanup.",
+    "depends_on": [
+      "P7.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Edit"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Result composer"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Editing and conflicts"
+      }
+    ],
+    "scope": [
+      "Extend publication/edit integration to up to ten mixed retained/new images and staged videos.",
+      "Validate ownership/uniqueness/limits and defer media slot constraints only inside the guarded edit transaction."
+    ],
+    "acceptance": [
+      "Swaps retain stable IDs/descriptions; duplicates, foreign assets, another target and eleven total attachments fail atomically.",
+      "Only new images count toward decimal 50 MB aggregate and 10 MB each; videos keep separate 1 GB/three-minute limits.",
+      "Stale edit cannot change attachments or enqueue cleanup; removed assets retain provider identity for durable cleanup.",
+      "Unknown file identities remain unknown for publication comparison; missing restored slots never become an empty selection."
+    ],
+    "verification": [
+      "Content transaction tests for reorder/swap/mixed limit and stale edits; LiveView combined-selection tests."
+    ],
+    "ownership": [
+      "Content media selection transaction",
+      "Editor mixed-selection handlers",
+      "Mixed attachment tests"
+    ],
+    "sizing": "One ordered-selection persistence behavior; preview and reorder interaction hooks remain separate tasks."
+  },
+  {
+    "id": "P8.02",
+    "package": "P8",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Add accessible attachment selection and reorder controls",
+    "outcome": "Drag, keyboard and touch users can select and reorder the same attachment identities.",
+    "depends_on": [
+      "P8.01",
+      "P16.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Result composer"
+      }
+    ],
+    "scope": [
+      "Route supported paste/drop to existing image/video configurations and append without replacing text.",
+      "Add maintained drag helper plus Move earlier/later controls with preserved focus and announcements."
+    ],
+    "acceptance": [
+      "Full ten-item mixed tray supports end/middle/long-distance moves; descriptions and durable IDs move with items and no re-upload occurs.",
+      "Touch hold does not capture ordinary scroll; keyboard buttons disable unavailable directions and announce changed positions.",
+      "Invalid selection preserves other files/text; combined count includes retained media and neither drop nor paste bypasses backend limits.",
+      "Hook DOM ownership leaves server readiness/errors/remove controls patchable."
+    ],
+    "verification": [
+      "Browser keyboard/touch-equivalent drag/drop/paste tests and full-tray reorder persistence run."
+    ],
+    "ownership": [
+      "Result function components",
+      "Selection/reorder hooks",
+      "Reorder browser tests"
+    ],
+    "sizing": "One selection/order interaction boundary; no second client upload/progress store."
+  },
+  {
+    "id": "P8.03",
+    "package": "P8",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Render static composer previews with safe lifecycle cleanup",
+    "outcome": "Local image previews never animate and late decoding cannot corrupt a replacement attachment.",
+    "depends_on": [
+      "P8.01"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Result composer"
+      }
+    ],
+    "scope": [
+      "Draw one downscaled canvas frame for image/GIF/WebP/APNG and release URLs/decoder references on removal/unmount.",
+      "Keep named preview-unavailable fallback and explicit Show/Hide where static decoding is unsafe."
+    ],
+    "acceptance": [
+      "Animated formats remain still on selection, restore and LiveView patch; failed decode never falls back to autoplaying img.",
+      "Description policy supplies accessible name; filename is not alternative text.",
+      "Late decode after replacement/removal is ignored, and server controls remain current alongside ignored canvas subtree.",
+      "Large-source memory and responsiveness are measured honestly; downscaled destination does not claim bounded decode memory."
+    ],
+    "verification": [
+      "Browser fixture tests across supported matrix for large static/GIF/WebP/APNG, decode failure and patch/unmount."
+    ],
+    "ownership": [
+      "Composer preview hook and fixture tests"
+    ],
+    "sizing": "One browser preview lifecycle; source decoding limits found in measurement become explicit follow-up decisions rather than another image pipeline."
+  },
+  {
+    "id": "P8.04",
+    "package": "P8",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Restore missing image slots and recoverable staged videos",
+    "outcome": "Reopened drafts retain every attachment position and clearly resolve missing or expired evidence.",
+    "depends_on": [
+      "P8.01",
+      "P3.06"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Saving and recovery"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Result composer"
+      }
+    ],
+    "scope": [
+      "Extend draft descriptors/recovery to image reselection and durable staged videos; retain named unresolved positions."
+    ],
+    "acceptance": [
+      "Missing images retain filename/type/size/order/description and bind reselect to the chosen slot; publish stays blocked until resolve/remove.",
+      "Recovered completed videos show readiness/expiry without extending 48-hour recovery window; expired/missing assets retain place."
+    ],
+    "verification": [
+      "Real-browser refresh/reselection/storage-failure and delayed video restoration tests."
+    ],
+    "ownership": [
+      "Draft media descriptors/recovery hook",
+      "Media-slot restoration browser tests"
+    ],
+    "sizing": "One media-draft restoration boundary; exit risk and discard belong to P8.08."
+  },
+  {
+    "id": "P8.05",
+    "package": "P8",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Recover edit conflicts with explicit unchanged-base or manual-reapply paths",
+    "outcome": "Authors retain their proposal and can resolve a stale edit without silently overwriting newer content.",
+    "depends_on": [
+      "P8.04",
+      "P3.04"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Saving and recovery"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Editing and conflicts"
+      }
+    ],
+    "scope": [
+      "Implement shared-comparator unchanged-base shortcut and preserved read-only proposal reference for changed/incomplete bases.",
+      "Handle unknown edit responses by reading current authorized state without blind replay."
+    ],
+    "acceptance": [
+      "Moderation-only version change with equal editable base offers explicit Save at current version and preserves hiding; another race may still reject.",
+      "Retag/description/order/content changes or incomplete base require explicit load-latest/manual-reapply.",
+      "Reference survives partial reapply, reload and tab eviction; second conflict does not replace an unresolved reference.",
+      "Storage failure keeps visible at-risk proposal; destroyed attachments cannot be restored; auth loss preserves input."
+    ],
+    "verification": [
+      "Browser conflict scenarios plus Content comparator/guard tests including hide-restore ABA and lost edit response."
+    ],
+    "ownership": [
+      "Editor conflict state and draft reference integration",
+      "Conflict browser tests"
+    ],
+    "sizing": "One conflict resolution state machine; no automatic merge, version bump or background retry."
+  },
+  {
+    "id": "P8.06",
+    "package": "P8",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Carry divergent publication proposals into edit without re-upload",
+    "outcome": "A differing or unknown receipt can become an explicit edit while preserving page-owned files and unrelated drafts.",
+    "depends_on": [
+      "P8.05",
+      "P3.08",
+      "P8.08"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Publication-to-edit handoff"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Publishing and retry contract"
+      }
+    ],
+    "scope": [
+      "Patch same-kind new editor into exact-item edit action with current authorization/base/version.",
+      "Retain original K draft record as edit-mode proposal; offer explicit K/E choice without moving/copying either record."
+    ],
+    "acceptance": [
+      "Image entries/previews/tus adapters survive in-place handoff; exact-item ready staged videos attach without rebind/re-upload.",
+      "Save/discard K clears only submitted K revision and leaves unrelated E unchanged; E later gets normal stale-version recovery.",
+      "Back/new-form URL, refresh and reconnect retain logical edit mode after account/target checks.",
+      "Deleted originals cannot be exposed/edited; ban/auth loss preserves proposal; lost edit response never uses original publication key as edit proof."
+    ],
+    "verification": [
+      "Real-browser K/E coexistence with selected images/ready video, refresh/Back/reconnect and storage failure.",
+      "Content target-equivalence rejection for another user/item/parent."
+    ],
+    "ownership": [
+      "Editor action-patch handoff",
+      "Draft logical-target integration",
+      "Handoff browser tests"
+    ],
+    "sizing": "One publication-to-edit transition with bounded two-record coordination; split only if backend exact-item rule has not already landed in Media contract."
+  },
+  {
+    "id": "P8.07",
+    "package": "P8",
+    "milestone": "M2",
+    "kind": "gate",
+    "title": "Verify full editor behavior and bounded browser usability",
+    "outcome": "Complete tip/review editors meet accessibility and responsiveness requirements under realistic maximum input.",
+    "depends_on": [
+      "P8.02",
+      "P8.03",
+      "P8.04",
+      "P8.05",
+      "P8.06",
+      "P8.08"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Implementation acceptance"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Holistic consensus acceptance"
+      }
+    ],
+    "scope": [
+      "Run supported browser/device matrix over both editor kinds with ten delayed attachments and maximum text.",
+      "Record responsiveness/memory measurements and repair actionable failures in owning tasks."
+    ],
+    "acceptance": [
+      "Keyboard ordering, focus/error summary, 320 CSS px reflow/zoom and meaningful status-change announcements work.",
+      "Ten delayed attachments do not block writing; publish readiness updates automatically without auto-submit.",
+      "Real IndexedDB, tus and hooks run; simulated LiveView upload tests alone cannot pass.",
+      "Any page-owned async publication change is justified by measurement and retains entry lifetimes/uncertain-outcome rules."
+    ],
+    "verification": [
+      "Browser matrix report tied to revision, fixtures, initial performance budgets and pass/fail measurements set by foundation probe."
+    ],
+    "ownership": [
+      "Editor capacity/accessibility scenario and evidence"
+    ],
+    "sizing": "One integrated editor evidence gate; if a performance limit needs architecture change return to tech lead rather than expanding the gate into redesign."
+  },
+  {
+    "id": "P8.08",
+    "package": "P8",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Protect at-risk editor exits and confirm draft discard",
+    "outcome": "Authors get a leave warning only when work could be lost, and explicit discard cannot erase another draft revision.",
+    "depends_on": [
+      "P8.04",
+      "P3.08"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Saving and recovery"
+      }
+    ],
+    "scope": [
+      "Implement conditional native leave warning using existing saved/dirty/conflict/file state and ordinary editor exit anchors.",
+      "Implement once-confirmed discard guarded by draft identity/revision and reconciled publication outcome."
+    ],
+    "acceptance": [
+      "Safely saved text plus recoverable processing video needs no warning; unsaved/conflicted text, new images or unfinished transfer does.",
+      "Cancel discard keeps values; confirmed discard clears only matching draft revision, never published attachments, and triggers no second leave warning.",
+      "Audit every editor exit including logo/account links; uncertain publication must reconcile before discard and leaving is not cancellation/discard.",
+      "Storage failure retains input and at-risk feedback; native warnings remain best effort with autosave independent."
+    ],
+    "verification": [
+      "Real-browser editor exit/close/reload and cancel/confirm discard matrix including storage failure, CAS conflict and uncertain publication."
+    ],
+    "ownership": [
+      "Editor leave/discard hook and event integration",
+      "Exit/discard browser tests"
+    ],
+    "sizing": "One exit-risk and explicit discard boundary; no new storage mechanism or navigation history subsystem."
+  },
+  {
+    "id": "P9a.01",
+    "package": "P9a",
+    "milestone": "M1",
+    "kind": "code",
+    "title": "Build minimal safe tip and selected-review projections from fixtures",
+    "outcome": "Early authoring receives readable destinations without depending on publication code.",
+    "depends_on": [
+      "P1.09",
+      "P1.11",
+      "P2.05"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Tip page"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Individual review links"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Admission, locking, and returned data"
+      }
+    ],
+    "scope": [
+      "Implement minimal tip/selected-review read operations using canonical fixture rows and shared Content visibility policy.",
+      "Return own-review identity/current capabilities and authorized evidence metadata without raw association leakage."
+    ],
+    "acceptance": [
+      "Deleted originals are masked for everyone; hidden originals only visible to current author/moderator; visible reviews remain independent.",
+      "Selected review lookup ignores list filters/page and never substitutes another review when unavailable.",
+      "Anonymous public read needs no token lookup; privileged projections require current admission and stop after revoked session even if disconnect fails.",
+      "Own hidden review remains reachable/deletable for fully banned owner under removed/deleted parent."
+    ],
+    "verification": [
+      "Projection matrix tests using fixture inserts, not publish functions; unauthorized metadata/slug/title checks."
+    ],
+    "ownership": [
+      "Content reading projection operations",
+      "Fixture-based projection tests"
+    ],
+    "sizing": "One minimal read contract; full browse/ranked review lists remain P9b."
+  },
+  {
+    "id": "P9a.02",
+    "package": "P9a",
+    "milestone": "M1",
+    "kind": "code",
+    "title": "Render minimal tip and single-review routes in initial HTML",
+    "outcome": "Published text and early media have honest readable destinations before broad screen expansion.",
+    "depends_on": [
+      "P9a.01",
+      "P16.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Pages to design"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Interaction and recovery"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Implementation acceptance"
+      }
+    ],
+    "scope": [
+      "Wire minimal public page routes/templates to projections with text rendering, placeholders, capabilities and evidence extension points.",
+      "Render Markdown safely and verbatim Prompt/Result with meaningful selected-review states."
+    ],
+    "acceptance": [
+      "Disconnected and first connected HTML show readable projected content; no deleted title leaks in metadata/slug/link.",
+      "Hidden/deleted tip placeholder keeps permitted review; selected unavailable review shows correct supplied reason without substitution.",
+      "Contribution header prioritizes Your review and current deletion capability; unavailable parent without own review does not create sign-in dead end.",
+      "Author-hidden notice is generic and contains no reporter details."
+    ],
+    "verification": [
+      "Controller/LiveView disconnected/connected HTML tests with projection fixtures."
+    ],
+    "ownership": [
+      "Tip/selected-review LiveView/templates",
+      "Safe text rendering helpers",
+      "Reading page tests"
+    ],
+    "sizing": "One minimal readable destination; no feed filters, complete visual polish or inbox work."
+  },
+  {
+    "id": "P9b.01",
+    "package": "P9b",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Implement browse paging and shared context-preserving filters",
+    "outcome": "Readers browse Hot/New with shareable immediate filters and stable current-page state.",
+    "depends_on": [
+      "M1",
+      "P9a.02",
+      "P16.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Main feed and clickable filters"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Navigation and content"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Paged reading lists"
+      }
+    ],
+    "scope": [
+      "Implement browse query/projection and URL page lifecycle with twenty rows plus lookahead.",
+      "Integrate shared selects/tip rows with Search owner through explicit interface; do not edit SearchLive concurrently."
+    ],
+    "acceptance": [
+      "Technique/model/environment use exact combined AND matching on tip-author setup; unset filters produce no disabling SQL OR predicates.",
+      "Select changes keep focus and native keyboard behavior, reset page one, and Clear filters preserves applicable sort/submitted query.",
+      "Curated metadata link changes only its filter in discovery; free-text model never becomes exact-filter link.",
+      "Initial HTML is readable; out-of-range page offers Previous/First; no totals/streams/caches or automatic reorder after vote.",
+      "Back restores URL/useful reading position and accepts current-ranking drift."
+    ],
+    "verification": [
+      "Browse query and LiveView navigation tests; browser focus/Back checks; query-plan evidence on target fixtures."
+    ],
+    "ownership": [
+      "BrowseLive and browse Content queries",
+      "Consumes P16.02-owned filter/page/tip-row components; shared-file changes are assigned to the shared UI owner under exclusive reservation.",
+      "Browse tests"
+    ],
+    "sizing": "One browse/filter lifecycle; Search async/retrieval stays P4b ownership."
+  },
+  {
+    "id": "P9b.02",
+    "package": "P9b",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Complete ranked review reading and evidence interactions",
+    "outcome": "Tip readers can filter/sort reviews and open evidence without losing selected-review semantics.",
+    "depends_on": [
+      "M1",
+      "P9a.02",
+      "P16.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Implementation acceptance"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Interaction and recovery"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Tip page"
+      }
+    ],
+    "scope": [
+      "Implement thirty-row normal review pages with Best/New and optional exact reviewer-setup filters.",
+      "Complete own-review actions, original/updated dates, earlier-visible-review notice and independently authorized evidence."
+    ],
+    "acceptance": [
+      "Selected-review mode hides list controls and opens evidence; Show all removes selected ID, review filters/page while retaining sort; Back restores actual prior URL.",
+      "Normal review filters default All including unspecified setup; changing filter/sort resets page and preserves focus.",
+      "Earlier-review note uses only visible reviews and readable tip edit time; no hidden metadata leaks.",
+      "Stable own-review action group respects ban/delete/edit capability on header/ranked/selected views.",
+      "A functional thirty-review page renders the full required content and ordinary focus/navigation correctly; maximum-size capacity/memory measurements belong only to P14.03."
+    ],
+    "verification": [
+      "Content list/projection tests and LiveView page/control tests plus a light functional thirty-review browser check; reuse these fixtures in the separate P14.03 capacity gate."
+    ],
+    "ownership": [
+      "Tip review list queries/templates",
+      "Own-review controls",
+      "Review navigation and functional page-size tests"
+    ],
+    "sizing": "One review list and selected-view composition; evidence hooks are P9b.03."
+  },
+  {
+    "id": "P9b.03",
+    "package": "P9b",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Add explicit motion playback and exact text copying",
+    "outcome": "Readers control animation/video playback and copy exact prompt/result text with honest outcomes.",
+    "depends_on": [
+      "M1",
+      "P9a.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Result composer"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Publishing and retry contract"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Managed video"
+      }
+    ],
+    "scope": [
+      "Render static images with descriptions, opt-in animated image controls and fresh authorized video player/thumbnail links.",
+      "Implement user-triggered Copy for nonempty raw Prompt/Result with selection fallback."
+    ],
+    "acceptance": [
+      "Animated images never autoplay on disclosure/remount/vote/restore; Hide removes animation and returns focus.",
+      "Missing description has truthful fallback and separately named full-size action; filename never substitutes for alt.",
+      "Video opens through fresh authorization/no-store app routes; expired/hidden/deleted access fails honestly without public fallback.",
+      "Long Unicode/whitespace copy is byte-equivalent text and success appears only after clipboard resolution; denied copy retains selection fallback."
+    ],
+    "verification": [
+      "Browser animation/remount/focus/clipboard denial tests; signed media route integration checks."
+    ],
+    "ownership": [
+      "Published evidence function components",
+      "Copy/animation hooks",
+      "Evidence browser tests"
+    ],
+    "sizing": "One explicit reader evidence-control boundary; provider signing itself remains Media ownership."
+  },
+  {
+    "id": "P10.01",
+    "package": "P10",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Set desired vote state atomically and return confirmed counters",
+    "outcome": "Repeated vote requests cannot toggle twice or duplicate unchanged-vote notifications.",
+    "depends_on": [
+      "P3.03",
+      "P2.05",
+      "P1.04"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Voting"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Vote"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Notifications"
+      }
+    ],
+    "scope": [
+      "Implement set_vote desired 1/-1/nil with direct-target locks and shared admission.",
+      "Extend minimal fold helper for eligible helpful-vote events; read confirmed counters after trigger writes."
+    ],
+    "acceptance": [
+      "Desired-state repeats are no-ops with no extra fold; change/remove adjusts counters once and distinguishes denied operation from unchanged state.",
+      "Self votes preserve agreed behavior without self notifications; remove then helpful counts another intended event.",
+      "Review vote takes no ancestor lock; hide/delete/full-ban races serialize eligibility correctly.",
+      "Unban cannot recreate invalidated votes and vote edits never alter content edit_version."
+    ],
+    "verification": [
+      "Synchronized transactional vote/visibility tests and notification fold/counter assertions."
+    ],
+    "ownership": [
+      "Content vote operation",
+      "Notification fold extensions",
+      "Vote transaction tests"
+    ],
+    "sizing": "One desired-state vote transaction for both target types; screen integration is separate."
+  },
+  {
+    "id": "P10.02",
+    "package": "P10",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Share truthful vote controls across summary and detail pages",
+    "outcome": "Readers see pending/current vote state without stale intent replay or page reorder.",
+    "depends_on": [
+      "P10.01",
+      "P9b.01",
+      "P9b.02",
+      "M1"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Interaction and recovery"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Voting"
+      }
+    ],
+    "scope": [
+      "Hydrate visible viewer-votes/capabilities in batches and share controls in summaries/details.",
+      "Allow one in-flight request per target and reconcile uncertain responses before new action."
+    ],
+    "acceptance": [
+      "Summaries show net score; detail shows Helpful/Not helpful counts from server-confirmed response.",
+      "Signed-out/expired-session click returns through auth with current state and requires explicit click; no automatic replay.",
+      "Uncertain older action cannot override newer choice; only confirmed row changes, with no list rerank/cache.",
+      "Full ban removes contribution actions while own-content deletion remains available.",
+      "Actual vote controls work consistently on browse and SearchLive summaries as well as tip/review detail, using P4b shared row interface without a second voting implementation."
+    ],
+    "verification": [
+      "LiveView summary/detail control parity tests and browser delayed/lost vote response tests."
+    ],
+    "ownership": [
+      "Summary/detail vote event and hydration integration coordinated with page owners",
+      "Shared vote-control component changes assigned to P16.02 shared UI owner under exclusive reservation.",
+      "Vote browser tests"
+    ],
+    "sizing": "One cross-page vote interaction; reserve shared component ownership and coordinate Search integration explicitly."
+  },
+  {
+    "id": "P10.03",
+    "package": "P10",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Implement paged inbox with captured-count read marking",
+    "outcome": "Opening inbox clears only captured unread activity while later arrivals stay unread.",
+    "depends_on": [
+      "P10.01",
+      "P9a.01",
+      "P16.02",
+      "M1"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Notifications"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Interaction and recovery"
+      }
+    ],
+    "scope": [
+      "Implement repeatable-read inbox page/capture projection, guarded mark-read and capped badge.",
+      "Render twenty-row URL paging and one connected-visit marking lifecycle."
+    ],
+    "acceptance": [
+      "Disconnected mount is read-only; first connected visit captures all unread pairs including unloaded rows; page changes do not mark again.",
+      "Fold/new row after snapshot stays unread; marking matches both id/count and account.",
+      "Targets use deletion-first projection inside snapshot; no hidden/deleted title leak via raw joins.",
+      "Vote notifications have no actor names/numeric event totals; inbox accurately describes recent activity/opening badge clearing."
+    ],
+    "verification": [
+      "Deterministically synchronized snapshot/fold/read tests; LiveView disconnected/connected/page/remount lifecycle tests."
+    ],
+    "ownership": [
+      "Content inbox queries/mark-read",
+      "InboxLive and badge integration",
+      "Inbox tests"
+    ],
+    "sizing": "One snapshot/read-state journey; no notification dropdown, broadcast or second cache."
+  },
+  {
+    "id": "P11.01",
+    "package": "P11",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Store reports with honest receipts and deletion-safe locking",
+    "outcome": "The reporting context returns truthful persistence outcomes under uniqueness and deletion races.",
+    "depends_on": [
+      "P3.05",
+      "P2.05",
+      "P1.04"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Reports and moderation"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Moderate"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Reporting interaction"
+      }
+    ],
+    "scope": [
+      "Implement reason/detail validation and one-open report transaction.",
+      "Use confirmed eligible reporter/direct-target lock and post-rollback actual receipt lookup."
+    ],
+    "acceptance": [
+      "Reason required and explanation capped at 1000 characters; fabricated label matches policy; unconfirmed/banned/deleted reporters rejected.",
+      "Report-first deletion resolves report; delete-first fails target eligibility; review report takes no ancestor-tip lock.",
+      "Existing-open receipt never claims new supplied detail saved; resolution/receipt race preserves input with uncertainty and no auto retry.",
+      "Reports never automatically hide content, change ranking or impose penalties; context errors preserve explicit uncertain/denied outcomes."
+    ],
+    "verification": [
+      "Two-order report/delete transaction tests plus uniqueness/receipt-resolution races using independently committed transactions."
+    ],
+    "ownership": [
+      "Content Moderation report operation",
+      "Report transaction tests"
+    ],
+    "sizing": "One reporting context transaction; sign-in return and reporting interaction are P11.10."
+  },
+  {
+    "id": "P11.02",
+    "package": "P11",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Render authorized moderation queue and reviewed case snapshots",
+    "outcome": "Moderators inspect individual report details and a precise reviewable content version.",
+    "depends_on": [
+      "P11.01",
+      "P16.02",
+      "M1",
+      "P13b.09"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Reports and moderation"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Moderate"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Moderation queue"
+      }
+    ],
+    "scope": [
+      "Implement twenty-case grouping/order/lookahead and case read with reviewed report IDs and content version.",
+      "Render current authorized media and explicit conflict reload state."
+    ],
+    "acceptance": [
+      "Queue sorts report count descending, earliest report then kind/id; page URL/remount/out-of-range behavior is consistent.",
+      "Case includes individual reasons/details, not only counts; deleted original content stays masked even for moderators.",
+      "Revoked session, removed moderator role and full ban block privileged reads even with stale LiveView scope.",
+      "Newly arriving reports are not silently included in the captured reviewed set."
+    ],
+    "verification": [
+      "Privileged projection/queue ordering tests and LiveView paged case tests."
+    ],
+    "ownership": [
+      "Content Moderation reads",
+      "Moderation queue/case LiveViews",
+      "Moderation read tests"
+    ],
+    "sizing": "One privileged queue/case snapshot; action mutations remain separate."
+  },
+  {
+    "id": "P11.03",
+    "package": "P11",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Apply reviewed hide restore and dismissal without consuming new reports",
+    "outcome": "Moderator actions reject stale content/report snapshots and preserve independent review visibility.",
+    "depends_on": [
+      "P11.02",
+      "P3.05"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Reports and moderation"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Dismissing reviewed reports"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Moderate"
+      }
+    ],
+    "scope": [
+      "Wire complete reviewed-set semantics and UI to early hide/restore primitives.",
+      "Implement dismiss_reports for captured IDs without visibility changes."
+    ],
+    "acceptance": [
+      "Content-version or captured-report-state conflict changes nothing and requires explicit reload/retry.",
+      "Reports arriving after reviewed set stay open; dismissal neither restores visibility nor advances edit_version.",
+      "Hide/restore advances content version only on change, preserves author dates, never restores author-deleted content or individually hidden child reviews.",
+      "Author-facing removal remains generic without report detail/reason inference."
+    ],
+    "verification": [
+      "Concurrent new-report/resolve/content-edit and hide-restore ABA tests; LiveView preserved selection/conflict feedback."
+    ],
+    "ownership": [
+      "Content Moderation guarded actions",
+      "Case action controls",
+      "Moderation action tests"
+    ],
+    "sizing": "One reviewed-snapshot action family; no auto retry against newer versions."
+  },
+  {
+    "id": "P11.04",
+    "package": "P11",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Retag tips with author-content and search freshness protection",
+    "outcome": "Moderators change only classification through the canonical version guard and search writer.",
+    "depends_on": [
+      "P11.02",
+      "P4a.01"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Reports and moderation"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Moderate"
+      }
+    ],
+    "scope": [
+      "Implement retag_tip through shared Search writer and add a technique selector preserving selection on conflict."
+    ],
+    "acceptance": [
+      "Require active moderator, active tag and nondeleted tip; current-version unchanged tag is a no-op.",
+      "Changed tag advances edit_version once and invalidates vector/reset cooldown atomically, preserving author fields, edited_at and visibility.",
+      "A paused embedding worker with the old freshness token cannot commit after retag; stale author/moderator submissions cannot silently undo classification."
+    ],
+    "verification": [
+      "Retag authorization/no-op/conflict tests and paused embedding writer versus retag integration test."
+    ],
+    "ownership": [
+      "Content Moderation retag operation",
+      "Case technique control",
+      "Retag tests"
+    ],
+    "sizing": "One guarded classification change and downstream search invalidation; no media action implementation."
+  },
+  {
+    "id": "P11.05",
+    "package": "P11",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Implement full-ban transitions independently from content actions",
+    "outcome": "Moderators change account eligibility without implicitly hiding content or restoring votes.",
+    "depends_on": [
+      "P2.05",
+      "P1.11"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Bans and lifting a ban"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Reports and moderation"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Visibility and transaction boundaries"
+      }
+    ],
+    "scope": [
+      "Implement Accounts ban/lift under sorted moderator/subject account locks; no screen work in this task."
+    ],
+    "acceptance": [
+      "Ban leaves existing content visible; lift restores eligibility only and never restores content/votes/notifications/media.",
+      "Full ban blocks contributions/moderation but permits reading and own-content/account deletion.",
+      "Current moderator eligibility rechecked under locks; publication and account eligibility changes serialize without stale-scope authorization."
+    ],
+    "verification": [
+      "Accounts ban/lift permission tests and synchronized publication versus ban/unban schedules."
+    ],
+    "ownership": [
+      "Moderation task owner reserves the actual Accounts ban/lift implementation and test paths exclusively through Codex before dispatch; Accounts owner pauses changes to those reserved paths until integration.",
+      "Accounts ban/lift transaction tests under the same reservation."
+    ],
+    "sizing": "One account eligibility context transition under an explicit Accounts file reservation; moderator controls are P11.11."
+  },
+  {
+    "id": "P11.06",
+    "package": "P11",
+    "milestone": "M2",
+    "kind": "gate",
+    "title": "Prove bulk moderation capacity under concurrent voting",
+    "outcome": "The agreed atomic moderation model fits request budgets on a representative large account.",
+    "depends_on": [
+      "P11.08",
+      "P11.09"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Reports and moderation"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Implementation acceptance"
+      }
+    ],
+    "scope": [
+      "Run at least 10,000 reviews across many tips with concurrent votes using actual schema/triggers and normal request timeout."
+    ],
+    "acceptance": [
+      "Bulk hide/vote invalidation is atomic, deadlock-free in tested schedules and within measured request deadline.",
+      "Counters and visibility match committed rows; concurrent new publication/eligibility changes obey lock order.",
+      "Failure records measurements and blocks gate; any Oban/chunking proposal requires technical review instead of raising request-pool timeout."
+    ],
+    "verification": [
+      "Reproducible fixture/measurement report with revision, row counts, concurrency, latency and correctness queries."
+    ],
+    "ownership": [
+      "Bulk moderation capacity fixture/test and evidence"
+    ],
+    "sizing": "One measured capacity gate; redesign or repair is dispatched to bounded follow-up tasks."
+  },
+  {
+    "id": "P11.07",
+    "package": "P11",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Permanently remove selected media with guarded durable cleanup",
+    "outcome": "Moderators remove exactly the chosen evidence without altering text or unselected attachments.",
+    "depends_on": [
+      "P11.02",
+      "P8.01"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Permanent removal of selected media"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Moderate"
+      }
+    ],
+    "scope": [
+      "Implement selected-media removal through durable Media cleanup and once-confirmed irreversible selected-count UI."
+    ],
+    "acceptance": [
+      "Selected IDs must all belong live to target; stale version or foreign selection removes nothing.",
+      "Removal advances version once, clears only selected positions, retains provider identifiers/cleanup jobs and preserves unselected text/media.",
+      "Old editor/status response cannot resurrect destroyed assets; cleanup outage does not undo committed reference removal."
+    ],
+    "verification": [
+      "Stale/foreign/partial-selection transaction tests, late-editor/status rejection and durable cleanup retry checks."
+    ],
+    "ownership": [
+      "Content Moderation media removal",
+      "Case media selection controls",
+      "Moderation media tests"
+    ],
+    "sizing": "One permanent selected-asset removal boundary; provider adapters and job durability are reused."
+  },
+  {
+    "id": "P11.08",
+    "package": "P11",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Hide a subject account content set atomically",
+    "outcome": "Bulk hiding uses one stable account-locked target set and applies liveness counters once.",
+    "depends_on": [
+      "P11.03",
+      "P11.05"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Bans and lifting a ban"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Reports and moderation"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Visibility and transaction boundaries"
+      }
+    ],
+    "scope": [
+      "Implement distinct Content bulk hide after subject-account locking, then ordered trigger parents and target rows."
+    ],
+    "acceptance": [
+      "Discover affected content only after subject accounts lock so concurrent publication cannot escape the operation.",
+      "Atomic hide advances affected versions, preserves author dates/deletions, and counter triggers apply once.",
+      "Single-review liveness mutations and bulk hiding follow compatible full-schema FK/trigger lock order; no automatic coupling to ban."
+    ],
+    "verification": [
+      "Independently committed two-connection publication/bulk and review-liveness/bulk schedules; rollback/counter assertions."
+    ],
+    "ownership": [
+      "Content bulk hiding operation",
+      "Explicit bulk hide controls",
+      "Bulk-hide transaction tests"
+    ],
+    "sizing": "One atomic content-set visibility mutation; capacity evidence is the separate gate."
+  },
+  {
+    "id": "P11.09",
+    "package": "P11",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Invalidate selected vote sets under ordered locks",
+    "outcome": "Moderator vote invalidation removes each contribution once and cannot be undone by unban.",
+    "depends_on": [
+      "P11.05",
+      "P10.01",
+      "M1"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Bans and lifting a ban"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Reports and moderation"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Visibility and transaction boundaries"
+      }
+    ],
+    "scope": [
+      "Implement privileged vote-investigation projection and explicit selected vote invalidation under account/parent/dependent lock order."
+    ],
+    "acceptance": [
+      "Investigation returns voter identity/value/date only under fresh moderator admission, with deleted content projection respected.",
+      "Prelock subject accounts then affected tip/review parents before deleting votes; triggers subtract committed contributions once.",
+      "Concurrent votes and invalidation serialize safely; lifting a ban recreates no votes and a later explicit eligible vote is a new event."
+    ],
+    "verification": [
+      "Privilege tests plus concurrent vote/invalidation schedules and counter agreement checks."
+    ],
+    "ownership": [
+      "Content vote investigation/invalidation",
+      "Moderator vote controls",
+      "Vote invalidation tests"
+    ],
+    "sizing": "One selected-vote invalidation boundary with its required privileged read; bulk capacity remains separate."
+  },
+  {
+    "id": "P11.10",
+    "package": "P11",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Present explicit reporting and truthful receipt states",
+    "outcome": "Readers report deliberately after sign-in and keep their explanation when the outcome is uncertain.",
+    "depends_on": [
+      "M1",
+      "P11.01",
+      "P2.07",
+      "P16.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Reporting interaction"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Reports and moderation"
+      }
+    ],
+    "scope": [
+      "Wire signed-out report intent through validated return destination and explicit report interaction.",
+      "Present required reason/detail validation, newly stored/existing receipt, expired admission and uncertain outcomes."
+    ],
+    "acceptance": [
+      "Sign-in rechecks target/current eligibility and never inserts or replays the earlier report; expired admission preserves input.",
+      "Report received appears only after confirmed new persistence; existing-open feedback never claims newly supplied explanation saved.",
+      "Resolution/receipt race or interrupted result retains detail and permits explicit retry without automatic loops.",
+      "Reason label fabricated and 1000-character detail limit use context rules with input preserved."
+    ],
+    "verification": [
+      "LiveView reporting validation/receipt tests and browser sign-in-return/auth-expiry/uncertain-result input preservation."
+    ],
+    "ownership": [
+      "Report interaction components/events",
+      "Reporting browser tests"
+    ],
+    "sizing": "One reader reporting interaction; transaction races remain P11.01."
+  },
+  {
+    "id": "P11.11",
+    "package": "P11",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Present explicit full-ban and lift-ban controls",
+    "outcome": "Moderators change account eligibility without implying that content or votes were changed.",
+    "depends_on": [
+      "M1",
+      "P11.02",
+      "P11.05",
+      "P16.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Lifting a ban"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Bans and lifting a ban"
+      }
+    ],
+    "scope": [
+      "Add current-capability ban/lift controls using Accounts outcomes and keep bulk hide/vote invalidation as distinct explicit actions."
+    ],
+    "acceptance": [
+      "Ban/lift feedback describes eligibility only and does not promise content restoration, hiding or vote recreation.",
+      "Stale/expired moderator access refuses action with preserved context; a disconnect failure cannot bypass context admission.",
+      "Full-ban member presentation preserves reading and own-content/account deletion paths while contributions are unavailable."
+    ],
+    "verification": [
+      "Moderation LiveView ban/lift permission/error feedback tests and browser capability checks."
+    ],
+    "ownership": [
+      "Moderation account controls/templates under moderation owner",
+      "Ban/lift UI tests; no Accounts implementation edits in this task."
+    ],
+    "sizing": "One moderator account-control interaction; transactional state and locking are P11.05."
+  },
+  {
+    "id": "P12.01",
+    "package": "P12",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Change sign-in email through recent authentication and verified replacement",
+    "outcome": "Email change preserves identity while revoking old credentials only after successful confirmation.",
+    "depends_on": [
+      "M1",
+      "P16.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Changing the sign-in email"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Lost mailbox access"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Interaction and recovery"
+      }
+    ],
+    "scope": [
+      "Adapt generated request/confirm email-change operations and settings/confirmation UI.",
+      "Use existing sudo/family semantics and direct mail outcomes."
+    ],
+    "acceptance": [
+      "Current email remains active until valid new-address confirmation commits; uniqueness rechecked, token bound account/old/new addresses.",
+      "Stale link cannot revert newer email or restore deleted user; failure leaves sessions unchanged.",
+      "Success revokes old sessions/auth links, issues fresh confirming-browser family and preserves account ID/handle/content/ban/drafts.",
+      "Expired sudo requests current-address reauthentication and returns to explicit operation; mailbox help offers no manual ownership override."
+    ],
+    "verification": [
+      "Accounts token/uniqueness/session-family transaction tests and two-browser email-change E2E with failed disconnect."
+    ],
+    "ownership": [
+      "Accounts email-change integration",
+      "Account settings/confirmation routes",
+      "Email-change tests"
+    ],
+    "sizing": "One sensitive account-change journey; reuse auth foundation, no second token system."
+  },
+  {
+    "id": "P12.02",
+    "package": "P12",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Delete an account with explicit recent-auth confirmation",
+    "outcome": "Users including banned authors can end account access while retained contributions use deleted-author presentation.",
+    "depends_on": [
+      "M1",
+      "P3.05",
+      "P16.02"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Account-deletion confirmation"
+      },
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Full bans and deletion"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Account deletion"
+      }
+    ],
+    "scope": [
+      "Implement current-account sudo-guarded deletion and confirmation UI with token revocation in one transaction.",
+      "Clear identity fields and sign out after committed state while preserving contribution rows."
+    ],
+    "acceptance": [
+      "Banned account may delete itself; expired recent auth returns to confirmation and never auto-deletes.",
+      "Handle/email clear and are reusable; tokens revoked; content remains under deleted-author label without retaining original attribution.",
+      "Confirmation explains irreversible account access loss and retained content; users can delete own content beforehand.",
+      "Lost/failed confirmation does not falsely announce deletion, and old links cannot restore account."
+    ],
+    "verification": [
+      "Accounts deletion/reuse/revocation tests and browser sudo/confirmation flow; retained-content projection checks."
+    ],
+    "ownership": [
+      "Accounts deletion operation",
+      "Settings deletion confirmation",
+      "Account deletion tests"
+    ],
+    "sizing": "One sensitive deletion boundary; no bulk content deletion or recovery override."
+  },
+  {
+    "id": "P12.03",
+    "package": "P12",
+    "milestone": "M2",
+    "kind": "code",
+    "title": "Render mixed contribution profiles with current capabilities",
+    "outcome": "Profiles show one deterministic list of visible tips/reviews and appropriate author controls.",
+    "depends_on": [
+      "M1",
+      "P12.02",
+      "P9b.01"
+    ],
+    "reads": [
+      {
+        "path": "docs/design/technical/backend-design.md",
+        "section": "Profile reads"
+      },
+      {
+        "path": "docs/design/technical/data-model.md",
+        "section": "Profile"
+      },
+      {
+        "path": "docs/design/technical/frontend-design.md",
+        "section": "Navigation and content"
+      }
+    ],
+    "scope": [
+      "Implement UNION ALL contributions with kind filter before twenty-row paging and composite row identity.",
+      "Render native Contributions selector with shared focus/URL behavior and masked parent labels."
+    ],
+    "acceptance": [
+      "Equal timestamps/overlapping tip-review IDs remain stable using kind/id tie-breakers; no inactive-tab cache.",
+      "Hidden rows require fresh own/moderator admission; deleted rows excluded, parent labels masked without losing visible review link.",
+      "Kind change resets page; All clears filter; out-of-range states and Back use current URL.",
+      "Banned author retains eligible delete/Your review routes while contribution controls remain unavailable."
+    ],
+    "verification": [
+      "Profile query ordering/visibility/capability tests and LiveView/browser selector/Back tests."
+    ],
+    "ownership": [
+      "Content profile queries",
+      "ProfileLive/templates",
+      "Profile tests"
+    ],
+    "sizing": "One mixed profile list; account mutations remain separate."
+  }
+]
