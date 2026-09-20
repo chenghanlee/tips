@@ -1,0 +1,11 @@
+.DS_Store
+.claude/
+.codex/
+.agents/
+.env
+.env.*
+!.env.example
+.agent-runs/
+.worktrees/
+__pycache__/
+*.pyc
