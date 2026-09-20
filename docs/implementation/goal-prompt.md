@@ -15,7 +15,7 @@ Every issue in [GitHub Project 15](https://github.com/users/chenghanlee/projects
 | `opus` | wJ:p9 | Per-commit correctness reviewer. |
 | `fable-tech-lead` | wJ:p8 | Design reviewer, gate owner, merger. |
 
-Address agents by Herdr name, never by pane ID. Names are cleared when an agent exits or resets (`/clear` and `/new` both clear the name), so `fable-tpm` re-applies them at the start of every iteration and again right after every reset in step 3:
+Address agents by Herdr name. Pane IDs are used only in the rename block below and in Herdr commands that need them. Names are cleared when an agent exits or resets (`/clear` and `/new` both clear the name), so `fable-tpm` re-applies them at the start of every iteration and right after every reset in step 3. An agent that starts a fresh session mid-task re-applies its own name first:
 
 ```bash
 herdr agent rename wJ:p1 fable-tpm
@@ -35,7 +35,7 @@ herdr agent rename wJ:p8 fable-tech-lead
 
 `fable-tpm` repeats this until the goal is met.
 
-**Step 0, first iteration only.** Commit the current dirty working tree on `main` as PR "Serial agent workflow": it contains this file, the rewritten agent-workflow.md, AGENTS.md, `.gitignore`, and the pending docs changes. Review and merge it like any other PR (Opus per commit, Fable-Tech-Lead whole PR). Do not start task work from a dirty base.
+**Step 0.** If the `main` checkout has uncommitted changes, land them first: `fable-tpm` opens an issue, commits them on a `task/<issue>-<slug>` branch, and the PR is reviewed and merged like any other (Opus per commit, Fable-Tech-Lead whole PR). Never start task work from a dirty base.
 
 **1. Reconcile.** Re-apply Herdr names. Read open PRs, failed checks, Active and Blocked issues and their latest comments. Fix any state that disagrees with reality. If a PR is mid-review, resume at the step it is in.
 
@@ -47,11 +47,11 @@ herdr agent rename wJ:p8 fable-tech-lead
 
 **5. Review commits (Opus).** For each SHA: read the commit in a read-only worktree at that SHA, run the relevant checks, post the per-commit verdict on the PR, reply to `astra` with the verdict. Astra repairs P0 immediately and P1 in the next commit. After three rounds on one finding, tell `fable-tech-lead`; Astra does root-cause analysis before trying again.
 
-**6. Review PR (Fable-Tech-Lead).** When Astra reports the PR complete and every commit has an Opus verdict with no open P0/P1: read the whole diff against the current base in a read-only worktree at the head SHA. Challenge the design with a concrete alternative and tradeoff. If rejected, Astra reworks on the same branch and the loop returns to step 5. After two rejections, root-cause analysis is recorded on the issue before a third round. If accepted: post the review record, set `tips/independent-review` on the head SHA linking the record, merge with a merge commit, run integrated checks on `main`, record the merge SHA on the issue.
+**6. Review PR (Fable-Tech-Lead).** When every commit has an Opus verdict with no open P0/P1, Astra marks the PR ready for review, resolves the review threads its fix commits addressed, and reports the PR complete to `fable-tpm` and `fable-tech-lead`. `fable-tpm` moves the issue to In review. Fable-Tech-Lead then reads the whole diff against the current base in a read-only worktree at the head SHA. Challenge the design with a concrete alternative and tradeoff. If rejected, Astra reworks on the same branch and the loop returns to step 5. After two rejections, root-cause analysis is recorded on the issue before a third round. If accepted: post the review record, set `tips/independent-review` on the head SHA linking the record, merge with a merge commit, run integrated checks on `main`, record the merge SHA on the issue.
 
 **7. Close.** `fable-tpm` moves the issue to Done, clears Agent, removes the worktree, and prints a one-paragraph summary in pane wJ:p1: issue, merge SHA, open blockers, next issue.
 
-**8. Report and continue.** If the set of Blocked-on-user issues changed, update `docs/implementation/status.md` on `main` (this is the one file the user reads). Return to step 1. If every issue is Done or Blocked on the user, stop and say so.
+**8. Report and continue.** If the set of Blocked-on-user issues changed, update `docs/implementation/status.md` (this is the one file the user reads). `main` is protected, so `fable-tpm` commits it on branch `docs/status-<YYYY-MM-DD>`, opens a PR, Opus reviews the commit, and Fable-Tech-Lead sets the status and merges. Return to step 1. If every issue is Done or Blocked on the user, stop and say so.
 
 ## Escalation to the user
 
@@ -68,7 +68,7 @@ Everything else is decided by the responsible role with evidence. A blocked issu
 
 ## Engineering guidance
 
-The following repeats `AGENTS.md`. `AGENTS.md` is authoritative.
+The following repeats the Software Design and Testing sections of `AGENTS.md` for convenience. `AGENTS.md` is authoritative and also holds the Problem Solving, Code Review, Writing and Responses rules, which every agent applies.
 
 - Use Elixir and Phoenix Framework idioms, standards and conventions.
 - Use proven architecture, standards and conventions from widely used software similar to Tips.

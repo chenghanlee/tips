@@ -37,11 +37,11 @@ Fable-TPM may create child issues when a task must be split. The goal covers eve
 
 Use one Project Status field: **Backlog → Ready → Active → In review → Done**, with **Blocked** available from any unfinished state. Failed review returns to Active for repair. Blocked issues name the missing prerequisite, the responsible role and the next concrete action. Waiting on a dependency in Backlog is normal, not an incident. Issue comments record dispatch, handoff, review and evidence. The Project Agent field holds the Herdr agent name of the current owner. GitHub assignees identify accountable humans, never fabricated agent accounts.
 
-An issue closes only after its required result is integrated and verified. Closing a parent requires all mandatory children and package acceptance evidence. A milestone gate closes only against one integrated revision with its E2E evidence; sums of isolated task reports do not pass a gate. Failed or unavailable checks are failures or blockers, never passes. Fable-TPM updates issue and project state at dispatch, handoff and merge.
+An issue closes only after its required result is integrated and verified. Closing a parent requires all mandatory children and package acceptance evidence. A milestone gate closes only against one integrated revision with its E2E evidence; sums of isolated task reports do not pass a gate. Failed or unavailable checks are failures or blockers, never passes. Fable-TPM updates issue and project state at dispatch, at handoff, when the PR enters whole-PR review (In review), and at merge.
 
 ## Git
 
-Use protected `main`, short-lived `task/<issue>-<slug>` branches and one worktree per active coding issue under `.worktrees/`. Start from a fetched, known `origin/main` SHA. Open a draft PR early and one PR per bounded change. Link its issue with `Closes #number` only when that PR completes the issue. Partial work uses `Refs #number`.
+Use protected `main`, short-lived `task/<issue>-<slug>` branches and one worktree per active coding issue under `.worktrees/`. Start from a fetched, known `origin/main` SHA. Open a draft PR early and one PR per bounded change. Astra marks it ready for review when every commit has an Opus verdict with no open P0/P1. Astra resolves a review thread only after the fix commit has its Opus verdict; the reviewer reopens it if the fix is wrong. Link its issue with `Closes #number` only when that PR completes the issue. Partial work uses `Refs #number`.
 
 Astra owns its worktree. Opus and Fable-Tech-Lead read the PR head in their own read-only worktrees. Nobody edits another agent's worktree. Fable-Tech-Lead reserves changes to shared files (dependency manifests, router, supervision and config, CI, migrations) in the dispatch comment; a task can own a small shared-file change.
 
@@ -71,7 +71,7 @@ No PR merges with an unresolved P0 or P1, an unsatisfied acceptance criterion, o
 
 Astra, Opus and Fable-Tech-Lead start every task with fresh context. Fable-TPM resets them before dispatch. The issue plus dispatch comment must therefore be self-sufficient.
 
-If an agent nears context exhaustion mid-task, it keeps the same issue and branch open and hands off to a fresh session. The handoff records base and head SHAs, clean or dirty working-tree state, committed and uncommitted work, unresolved findings, failing commands, evidence, owned files and the next concrete action. Preserve user changes; never reset or stash blindly. The incoming session reads the handoff, issue and relevant diff, verifies repository state, sets the Agent field and continues. Session recovery is not task completion.
+If an agent nears context exhaustion mid-task, it keeps the same issue and branch open and hands off to a fresh session. The handoff records base and head SHAs, clean or dirty working-tree state, committed and uncommitted work, unresolved findings, failing commands, evidence, owned files and the next concrete action. Preserve user changes; never reset or stash blindly. The incoming session re-applies its Herdr name, reads the handoff, issue and relevant diff, verifies repository state, sets the Agent field and continues. Session recovery is not task completion.
 
 For a lost or unresponsive agent, inspect branch and worktree evidence before reassignment, then explicitly transfer ownership. Never run two writers because an agent looks idle. Never put credentials in issues, logs or handoffs.
 
