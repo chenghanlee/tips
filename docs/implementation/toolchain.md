@@ -212,6 +212,23 @@ recorded. VPS credentials and its authenticated pull are owned by P13a; use a
 registry credential with package read access on that host and pass it through
 `docker login --password-stdin`, never store it in Compose or this repository.
 
+Native linux/amd64 verification also passed on the
+[PR workflow run](https://github.com/chenghanlee/tips/actions/runs/35534482017)
+for commit `83957b8ad25da14464433b5f9bc5681818115d75`. The same extension versions,
+query assertions and both index plans passed; publication was correctly skipped
+on the PR event. The build verified the pinned amd64 ZIP checksum and logged:
+
+| Downloaded amd64 package | SHA-256 |
+|---|---|
+| `postgresql-18-pgvector_0.8.6-1.pgdg13+1_amd64.deb` | `89402614430b2a7e06345f0f69b441bb7ee93913a14729f10c421f40b06d9d95` |
+| `pg-textsearch-postgresql-18_1.4.0-1_amd64.deb` | `7fffdca1327b63245e72eec1d04fc1e45c73e447006131670eb721ab3bc08307` |
+
+Local Compose was also verified with a fresh named volume: both extensions
+created through host port 5433, survived restart with pg_textsearch preloaded,
+and coexisted with a successful smoke run. The scoped test volume was removed.
+An injected SQL exception made the smoke script exit 3 and remove its disposable
+container and volume; the unmodified fixture was restored before commit.
+
 ## Markdown, embeds and secure headers
 
 Render tip/review authored Markdown through **MDEx 0.13.5 with its built-in Ammonia sanitizer** (`mdex_native`). Use one options list, without HtmlSanitizeEx or a custom Scrubber module:
