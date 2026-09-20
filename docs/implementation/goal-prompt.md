@@ -15,7 +15,7 @@ Every issue in [GitHub Project 15](https://github.com/users/chenghanlee/projects
 | `opus` | wJ:p9 | Per-commit correctness reviewer. |
 | `fable-tech-lead` | wJ:p8 | Design reviewer, gate owner, merger. |
 
-Address agents by Herdr name, never by pane ID. Names are cleared when an agent exits, so `fable-tpm` re-applies them at the start of every iteration:
+Address agents by Herdr name, never by pane ID. Names are cleared when an agent exits or resets (`/clear` and `/new` both clear the name), so `fable-tpm` re-applies them at the start of every iteration and again right after every reset in step 3:
 
 ```bash
 herdr agent rename wJ:p1 fable-tpm
@@ -41,7 +41,7 @@ herdr agent rename wJ:p8 fable-tech-lead
 
 **2. Select.** Pick the next issue on the critical path: P0, then P1, then P2, and so on, respecting issue dependencies. If it is Backlog, draft the readiness refinement on the issue, ask `fable-tech-lead` for the one-line "ready" confirmation, then move it to Ready. If nothing is Ready and nothing can be made Ready without the user, go to step 8.
 
-**3. Reset and dispatch.** Send `/new` to `astra`, `/clear` to `opus` and `fable-tech-lead`; wait until each is idle. Post the dispatch comment on the issue. Move it to Active, set Agent = `astra`. Prompt `astra` with the issue URL and the dispatch comment.
+**3. Reset and dispatch.** Send `/new` to `astra`, `/clear` to `opus` and `fable-tech-lead`; wait until each is idle, then re-apply the Herdr names. Post the dispatch comment on the issue. Move it to Active, set Agent = `astra`. Prompt `astra` with the issue URL and the dispatch comment.
 
 **4. Implement (Astra).** Create `task/<issue>-<slug>` from fetched `origin/main` in a worktree under `.worktrees/`. Open a draft PR. Write the failing integration test for the acceptance scenario first, then make it pass. Push cohesive commits. After each push, send `opus` the SHA and PR URL over Herdr.
 
