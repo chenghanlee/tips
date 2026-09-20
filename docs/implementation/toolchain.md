@@ -229,6 +229,14 @@ and coexisted with a successful smoke run. The scoped test volume was removed.
 An injected SQL exception made the smoke script exit 3 and remove its disposable
 container and volume; the unmodified fixture was restored before commit.
 
+Review follow-up (P2-3/P2-4): the PGDG archive fallback has not been executed;
+all recorded builds resolved pgvector from the live signed index. The final
+image now purges curl/unzip and their unused dependencies in the install layer;
+CA certificates remain. Native arm64 smoke passed again after that cleanup,
+and neither executable is present. Its updated local image configuration ID is
+`sha256:3409e546c7c1646ad211b30cba66070ce2d5c03fde8edcd1432f5dbc854516cd`.
+Registry publication and its manifest digest still await the main-branch run.
+
 ## Markdown, embeds and secure headers
 
 Render tip/review authored Markdown through **MDEx 0.13.5 with its built-in Ammonia sanitizer** (`mdex_native`). Use one options list, without HtmlSanitizeEx or a custom Scrubber module:

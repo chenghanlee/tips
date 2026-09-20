@@ -29,6 +29,7 @@ RUN set -eux; \
     sha256sum ./*.deb; \
     apt-get install -y --no-install-recommends ./postgresql-18-pgvector_*.deb; \
     dpkg -i "pg-textsearch-postgresql-18_1.4.0-1_${TARGETARCH}.deb"; \
+    apt-get purge -y --auto-remove curl unzip; \
     test "$(postgres --version)" = "$postgres_before"; \
     dpkg-query -W postgresql-18 postgresql-18-pgvector pg-textsearch-postgresql-18; \
     rm -rf /tmp/extensions /var/lib/apt/lists/*
