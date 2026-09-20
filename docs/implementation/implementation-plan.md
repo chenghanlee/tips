@@ -6,9 +6,9 @@ Date: 2026-09-20. Status: owner decisions agreed. Concrete tasks and execution p
 
 Deliver the full agreed MVP ready for public developer trials, including deployment, recovery, moderation and operational checks. Demonstrate runnable journeys throughout development. There is no hard launch date or fixed execution/provider budget yet; order work by dependencies and risk rather than inventing a calendar estimate.
 
-Support configurable **N implementation workers**, with schedules for 1, 2 and 4. Codex's engineering-manager/tech-lead role and Fable's technical-program-manager role are coordination responsibilities, separate from the requested worker count. The execution environment's total capacity still applies; N is a ceiling, not a requirement to keep every worker busy.
+The current run is strictly serial, N = 1, per [agent-workflow.md](agent-workflow.md); the N = 2 and N = 4 material below is a historical planning option, not current process. The plan supports configurable **N implementation workers**, with schedules for 1, 2 and 4. Fable-Tech-Lead's role and Fable-TPM's technical-program-manager role are coordination responsibilities, separate from the requested worker count. The execution environment's total capacity still applies; N is a ceiling, not a requirement to keep every worker busy.
 
-The owner selected **shadcn design language with native Phoenix components**, using **[SaladUI](https://github.com/bluzky/salad_ui) for now**. Visual design is assigned to **Fable or an Opus model**; Fable is the designated design owner. Retain Phoenix LiveView and HEEx. Design artifact work counts as a worker slot when it runs alongside implementation.
+The owner selected **shadcn design language with native Phoenix components**, using **[SaladUI](https://github.com/bluzky/salad_ui) for now**. Visual design is assigned to **Fable-Tech-Lead or an Opus model**; Fable-Tech-Lead is the designated design owner. Retain Phoenix LiveView and HEEx. Design artifact work counts as a worker slot when it runs alongside implementation.
 
 The existing product and technical decisions are the baseline:
 
@@ -17,7 +17,7 @@ The existing product and technical decisions are the baseline:
 - [Backend](../design/technical/backend-design.md): operation contracts, authentication, providers and jobs.
 - [Frontend](../design/technical/frontend-design.md): browser state, pages, drafts and recovery.
 
-The three detailed contracts include the latest holistic consensus. Historical reviews and old SQL measurements are evidence and rationale, not alternative requirements. Where the architecture overview abbreviates a procedure, use its detailed owner document. Surface a genuine contradiction to Codex; do not silently choose whichever is easier.
+The three detailed contracts include the latest holistic consensus. Historical reviews and old SQL measurements are evidence and rationale, not alternative requirements. Where the architecture overview abbreviates a procedure, use its detailed owner document. Surface a genuine contradiction to Fable-Tech-Lead; do not silently choose whichever is easier.
 
 The workspace contains designs and review experiments. Version control and the private GitHub tracker are established through the reviewed backlog baseline; the application and its acceptance gates remain unimplemented.
 
@@ -27,7 +27,7 @@ Start with a deployable skeleton and the risky end-to-end boundaries. Then expan
 
 Keep the application architecture independent of the agent count. Agents share ordinary Phoenix contracts; they do not need separate services, runtime APIs, duplicated contexts or a custom workflow engine. Add internal modules when cohesive implementation needs them, not to manufacture parallel tasks.
 
-Codex owns technical decisions, shared contracts, integration order and the integrated result. Fable owns dependency tracking, scope coverage, external prerequisites, demo evidence and release readiness. Neither role can call a feature done on the strength of an isolated agent's report. The owner supplies genuine seed experiences, recruits trial participants and makes material product, spending and public-launch decisions.
+Fable-Tech-Lead owns technical decisions, shared contracts, integration order and the integrated result. Fable-TPM owns dependency tracking, scope coverage, external prerequisites, demo evidence and release readiness. Neither role can call a feature done on the strength of an isolated agent's report. The owner supplies genuine seed experiences, recruits trial participants and makes material product, spending and public-launch decisions.
 
 ## Milestones
 
@@ -64,9 +64,9 @@ The table defines delivery packages, not equal-duration tasks. Split each packag
 | P12 | Account lifecycle and profiles — account owner | M1 | Email change/sudo, account deletion including banned accounts, retained-author presentation, mixed contribution profiles and current capabilities |
 | P13a | Early provider and runtime setup — operations owner | P0 | Secret loading, provider test configuration, production Compose baseline and provider access for the real early gates |
 | P13b | Operational completion — same operations owner | P5 | Proxy/origin controls, independent progress check, sanitized error reporting, backup/restore/repair, moderator bootstrap and selected-job retry runbooks |
-| P14 | Integrated adversarial acceptance — Codex plus feature owners | M1, P8, P9b, P10, P11, P12, P13b, P16 | Cross-feature races, browser failures, real providers, capacity fixtures, accessibility and complete developer journey on one integrated revision |
-| P15 | Trial readiness and launch handoff — Fable plus owner | P14 | Deployment rehearsal, release checklist, genuine seed content, community guidance, operator ownership and developer-trial script |
-| P16 | Visual design and shared UI — Fable, within N worker slots | P0 for component implementation | Pinned SaladUI integration, shadcn visual direction in native Phoenix components, design tokens and shared controls; responsive reader/editor compositions and validation/recovery states; visual consistency across all six page areas; final review of implemented screens |
+| P14 | Integrated adversarial acceptance — Fable-Tech-Lead plus feature owners | M1, P8, P9b, P10, P11, P12, P13b, P16 | Cross-feature races, browser failures, real providers, capacity fixtures, accessibility and complete developer journey on one integrated revision |
+| P15 | Trial readiness and launch handoff — Fable-TPM plus owner | P14 | Deployment rehearsal, release checklist, genuine seed content, community guidance, operator ownership and developer-trial script |
+| P16 | Visual design and shared UI — Fable-Tech-Lead, within N worker slots | P0 for component implementation | Pinned SaladUI integration, shadcn visual direction in native Phoenix components, design tokens and shared controls; responsive reader/editor compositions and validation/recovery states; visual consistency across all six page areas; final review of implemented screens |
 
 P1 declares the search-text writer signature; P4a implements it in Search and integrates that small change before continuing to P4b. P3 calls it rather than duplicating it. P1 declares the normalized whole-content comparison contract; P3 implements it and P8 reuses it. P3 also supplies the transactional notification helpers and deletion/hiding primitives needed by early gates. P11 later adds the complete moderation workflow; P10 extends notification behavior and the inbox, without postponing publication correctness.
 
@@ -76,7 +76,7 @@ P5 can implement and test provider/lifecycle logic against P1's account/scope co
 
 M1 requires P2, P3, P4b, P5, P6, P7, P9a and their P13a environment. P4b permanently owns SearchLive, including the first search-to-result journey and later async/Retry behavior. P9b expands the reading pages and shared components. Keep broad screen expansion after M1 as the existing designs require; P8 can continue the already proven editor path after P7 while search closes its gate. Other spare capacity goes to bounded supporting hooks, tests and provider/operations work. P13b can progress before M1 as its job contracts become executable, and closes against the complete release before P14.
 
-P16 starts early enough to guide shared components and the first reader/editor compositions. Functional boundary tests do not wait for visual polish. Fable owns shared styles/components/layouts during this work and hands their stable interfaces to the feature owners; follow the same exclusive-file rule for later changes. Target the initial visual baseline before broad screen expansion, then finish visual QA against the actual running journeys before P14. Do not add light/dark variants, a component catalogue or new control behavior merely because a toolkit offers them. Use SaladUI as the selected component source. Prefer its package/library integration initially; copy or adapt only concrete components that need source-level changes. Review setup-generated changes to the existing Tailwind configuration, styles, hooks and layouts rather than overwriting them blindly. Preserve the agreed native selects/details, page-owned uploads and server-rendered errors. The package must not become an alternative owner of draft, search or upload state.
+P16 starts early enough to guide shared components and the first reader/editor compositions. Functional boundary tests do not wait for visual polish. Fable-Tech-Lead owns shared styles/components/layouts during this work and hands their stable interfaces to the feature owners; follow the same exclusive-file rule for later changes. Target the initial visual baseline before broad screen expansion, then finish visual QA against the actual running journeys before P14. Do not add light/dark variants, a component catalogue or new control behavior merely because a toolkit offers them. Use SaladUI as the selected component source. Prefer its package/library integration initially; copy or adapt only concrete components that need source-level changes. Review setup-generated changes to the existing Tailwind configuration, styles, hooks and layouts rather than overwriting them blindly. Preserve the agreed native selects/details, page-owned uploads and server-rendered errors. The package must not become an alternative owner of draft, search or upload state.
 
 SaladUI compatibility is a P0/P16 check: pin a released version or exact revision with compatible Phoenix/LiveView/Tailwind versions; render representative form controls, patch a LiveView and exercise reconnect, keyboard focus and validation. Verify its JavaScript integration alongside Tips hooks and that the CSS build includes dependency component classes. The upstream [README](https://github.com/bluzky/salad_ui#installation) and [dependency manifest](https://github.com/bluzky/salad_ui/blob/main/mix.exs) are setup inputs, not executed compatibility evidence. Keep visual changes focused on required screens; there is no hand-built general component library or React migration in this plan.
 
@@ -112,18 +112,18 @@ flowchart TD
     P11 --> P14
     P12 --> P14
     P13b --> P14
-    P0 --> P16[Visual design: Fable]
+    P0 --> P16[Visual design: Fable-Tech-Lead]
     P16 --> P14
     P14 --> P15[Developer-trial readiness]
 ```
 
 ## Parallel execution and ownership
 
-Use protected main and a separate branch/worktree per active bounded issue. Workers start from a known integrated commit. They do not edit each other's worktrees or merge each other's unfinished branches. Codex integrates one tested change at a time and resolves the final combined behavior. The owner selected the private chenghanlee/tips repository, GitHub Actions and the private Tips Project 15. Follow the agent workflow for independent commit/PR review and merge protection.
+Use protected main and a separate branch/worktree per active bounded issue. Workers start from a known integrated commit. They do not edit each other's worktrees or merge each other's unfinished branches. Fable-Tech-Lead integrates one tested change at a time and resolves the final combined behavior. The owner selected the private chenghanlee/tips repository, GitHub Actions and the private Tips Project 15. Follow the agent workflow for independent commit/PR review and merge protection.
 
 One worker owns a mutable file at a time. Package ownership includes its tests and fixtures. In particular:
 
-- Codex coordinates `mix.exs`, lockfiles, router, supervision/configuration, CI and migration ordering. Workers request small changes through their task handoff; Codex integrates them promptly rather than making the user copy patches.
+- Fable-Tech-Lead coordinates `mix.exs`, lockfiles, router, supervision/configuration, CI and migration ordering. Workers request small changes through their task handoff; Fable-Tech-Lead integrates them promptly rather than making the user copy patches.
 - One editor owner controls the editor LiveViews, upload configuration, shared draft hook and draft record format through P3/P6/P7/P8. Media workers supply the tested Media operations and adapters; they do not concurrently rewrite editor state. Preview, reorder, tus and Copy hooks may be delegated as bounded tasks with agreed DOM/event interfaces and distinct files. The editor owner integrates and browser-tests their combined behavior; these helpers count toward N.
 - Search owns retrieval and embedding code. All publication/edit/retag callers use the single search-text write helper; changes to that contract require updating its callers and tests together.
 - Accounts owns admission and session semantics. Content packages use the shared boundary rather than adding local token queries or inconsistent ban guards.
@@ -133,9 +133,9 @@ P1 owns the initial schema. Later migrations have a named owner, a unique order 
 
 Every worktree has isolated build/dependency output where required, an isolated test database and a unique development port. Never run reset/drop tasks against another worker's DB. Tests that need independently committed concurrent transactions use dedicated fixtures/connections and explicit synchronization; ordinary sandboxed tests do not prove those schedules. Real-provider fixtures use distinct asset prefixes/identifiers and tracked cleanup.
 
-GitHub issues hold current requirements, dependencies and evidence; the Tips project holds scheduling state. Use Backlog, Ready, Active, In review, Blocked and Done. Fable maintains task readiness and dispatch comments with owner/session, base commit, owned paths, isolation and evidence. Local task catalogues are publication snapshots, not a second live tracker. Do not build a scheduling service.
+GitHub issues hold current requirements, dependencies and evidence; the Tips project holds scheduling state. Use Backlog, Ready, Active, In review, Blocked and Done. Fable-TPM maintains task readiness and dispatch comments with owner/session, base commit, owned paths, isolation and evidence. The local task index links to the originally published issues; use GitHub for current task details. Do not build a scheduling service.
 
-Dispatch at most `min(N, available worker slots, independent ready tasks)` workers. A ready task has merged prerequisites, stable contracts, no conflicting file owner and the required environment. When those conditions fail, prefer finishing/reviewing a critical-path task to launching speculative work. Increasing N cannot remove serialized migrations, shared editor integration or release checks.
+With N = 1, dispatch one task at a time. (Historical, for N > 1: dispatch at most `min(N, available worker slots, independent ready tasks)` workers.) A ready task has merged prerequisites, stable contracts, no conflicting file owner and the required environment. When those conditions fail, prefer finishing/reviewing a critical-path task to launching speculative work. Increasing N cannot remove serialized migrations, shared editor integration or release checks.
 
 ### Worked schedules
 
@@ -143,13 +143,13 @@ These are dependency-respecting examples, not time estimates. Move to the next r
 
 | Stage | N = 1 | N = 2 | N = 4 |
 |---|---|---|---|
-| Foundation | P0 → P1 → P16 baseline; Fable takes the single worker slot for design | A: P0/P1; B: Fable's P16 baseline after P0, with exclusive shared-file ownership | A: P0/P1; B: Fable's P16 baseline after P0; other slots handle bounded provider/build checks |
+| Foundation | P0 → P1 → P16 baseline; Fable-Tech-Lead takes the single worker slot for design | A: P0/P1; B: Fable-Tech-Lead's P16 baseline after P0, with exclusive shared-file ownership | A: P0/P1; B: Fable-Tech-Lead's P16 baseline after P0; other slots handle bounded provider/build checks |
 | First boundaries | P13a → P2 → P4a → P9a → P3 → P5 → P4b | A: P2 → P9a → P3; B: P13a → P4a → P5 → P4b; P3 finishes after integrated P4a | A: P2 → P3 internals; B: P4a → P4b; C: P5 internals; D: P13a → P9a after P2; finish dependencies still apply |
 | Media integration | P6 → P7; integrate M1 | A owns P6 → P7; B: P13b and bounded supporting tests/hooks | A owns P6 → P7; B/C: assigned search/provider/hook acceptance gaps; D: P13b |
 | Complete features | P8 → P9b → P10 → P11 → P12 → finish P13b | A: P8 → P11 → P12; B: P9b → P10 → finish P13b | A: P8; B: P9b → P10; C: P11 → P12; D: finish P13b and accepted hook/test tasks |
 | Acceptance | P14 → P15 | Partition P14 scenarios by ownership, integrate, then P15 | Partition P14 scenarios by ownership, integrate, then P15 |
 
-P16 final visual QA uses an available worker slot before P14; Fable never becomes an uncounted extra implementation worker. If its baseline remains active when another task is ready, queue that task or pause and hand off design explicitly. For N = 1, design and coding happen sequentially.
+P16 final visual QA uses an available worker slot before P14; Fable-Tech-Lead never becomes an uncounted extra implementation worker. If its baseline remains active when another task is ready, queue that task or pause and hand off design explicitly. For N = 1, design and coding happen sequentially.
 
 The longest expected authoring chain starts P0 → P1 → P2 → P9a → P3 → P6 → P7 → M1, with P4a and P5/P13a also required before their consumers. P4b is an independent gate that can become the critical path. After M1 the longest unfinished feature branch controls P14; estimate that only after observing actual delivery. Reuse idle workers for specific test/review tasks, not duplicated implementation or speculative abstractions.
 
@@ -174,11 +174,11 @@ Run formatting, compilation/static checks and relevant tests per change. The int
 
 ## External prerequisites and readiness
 
-Fable starts a concise prerequisite checklist during P0: Git/CI destination; VPS and domain; Cloudflare proxy, Turnstile, R2/media delivery and private Stream configuration; email provider and sender domain; selected embedding access; Sentry/error and uptime monitoring. Request credentials through the execution environment's secret mechanism, never through committed documents or chat transcripts. Assign an owner and needed-by package to each missing item. P13a must unblock real-provider gates before M1, not wait for feature completion. Track the curated technique/model/environment rows needed before P3; propose a small initial vocabulary for owner review, always including Other technique. Tests use explicit fixtures while production labels are settled.
+Fable-TPM starts a concise prerequisite checklist during P0: Git/CI destination; VPS and domain; Cloudflare proxy, Turnstile, R2/media delivery and private Stream configuration; email provider and sender domain; selected embedding access; Sentry/error and uptime monitoring. Request credentials through the execution environment's secret mechanism, never through committed documents or chat transcripts. Assign an owner and needed-by package to each missing item. P13a must unblock real-provider gates before M1, not wait for feature completion. Track the curated technique/model/environment rows needed before P3; propose a small initial vocabulary for owner review, always including Other technique. Tests use explicit fixtures while production labels are settled.
 
 Pin compatible framework, library, database-extension and provider API versions during P0/P1 and verify the official documentation then. The design references are not proof that an arbitrary newest combination works. If a compatible published database image is unavailable, building and verifying it is P0 work and an immediate schedule risk. Choose and execute the real-browser test driver in P0, not after draft hooks are written. Evaluate the hosted embedding candidate first under the existing gate; use the documented fallback only when the gate warrants it. Do not silently substitute keyword-only search or omit native video from the full MVP.
 
-The ten-query search gate needs representative developer tasks and relevance expectations before tuning. Use the agreed first scenario: a coding agent making a correct scoped change without unrelated edits. Label synthetic fixtures as synthetic; production seed experiences come from their actual authors through normal forms. Fable tracks founder/contributor readiness alongside engineering, without blocking schema or local feature work.
+The ten-query search gate needs representative developer tasks and relevance expectations before tuning. Use the agreed first scenario: a coding agent making a correct scoped change without unrelated edits. Label synthetic fixtures as synthetic; production seed experiences come from their actual authors through normal forms. Fable-TPM tracks founder/contributor readiness alongside engineering, without blocking schema or local feature work.
 
 Provide a release-only, explicit moderator-bootstrap command for a verified account; record the designated operator rather than exposing role selection in signup. Measure deployment interruption in the rehearsal instead of promising a duration.
 
@@ -192,11 +192,11 @@ Use the [agent workflow](agent-workflow.md) for readiness, review evidence, git 
 
 Give each worker this compact brief:
 
-> Implement bounded issue [ID] from integrated commit [SHA]. Read AGENTS.md and the linked owning design sections. Own [paths]; coordinate [shared paths] through Codex. Prerequisites: [passed gates]. Deliver [user-visible behavior] and preserve [critical invariants]. Verify [specific tests/failure schedules]. Return commit(s), changed contract(s), evidence and unresolved blockers. Do not expand product scope or modify another worker's files.
+> Implement bounded issue [ID] from integrated commit [SHA]. Read AGENTS.md and the linked owning design sections. Own [paths]; coordinate [shared paths] through Fable-Tech-Lead. Prerequisites: [passed gates]. Deliver [user-visible behavior] and preserve [critical invariants]. Verify [specific tests/failure schedules]. Return commit(s), changed contract(s), evidence and unresolved blockers. Do not expand product scope or modify another worker's files.
 
-A package is integrated only when its behavior works against the current combined application, its relevant tests pass, direct/downstream effects are reviewed and its linked acceptance items have evidence. Codex merges and reruns checks affected by the combined change. Fable records the evidence and next dependency, rather than asking the user to reconcile agent outputs.
+A package is integrated only when its behavior works against the current combined application, its relevant tests pass, direct/downstream effects are reviewed and its linked acceptance items have evidence. Fable-Tech-Lead merges and reruns checks affected by the combined change. Fable-TPM records the evidence and next dependency, rather than asking the user to reconcile agent outputs.
 
-If a contract must change, Codex traces the affected database, context, browser and operational paths before integration. Update the authoritative design and all affected callers/tests in the same reviewed change. Escalate material product or cost choices to the owner; resolve routine reversible coding details within the agreed design.
+If a contract must change, Fable-Tech-Lead traces the affected database, context, browser and operational paths before integration. Update the authoritative design and all affected callers/tests in the same reviewed change. Escalate material product or cost choices to the owner; resolve routine reversible coding details within the agreed design.
 
 ## Planning review
 

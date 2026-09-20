@@ -14,7 +14,7 @@ Fable accepted three disputed choices:
 
 - Retain strict current-base checks because disjoint files can conflict semantically. Use one named final integration slot, with no speculative syncing of all open branches. Final-review latency limits throughput.
 - Permit implementation to continue during review of a pushed-SHA checkpoint. Fixes name findings; an interim P0 pauses new work on that branch. Only the current final head/base receives a passing review status.
-- Publish the full backlog now, with later issues in Backlog. Ready refinement resolves actual interfaces, paths, commands and evidence. JSON freezes as a publication snapshot; GitHub owns subsequent changes.
+- Publish the full backlog now, with later issues in Backlog. Ready refinement resolves actual interfaces, paths, commands and evidence. The original JSON publication snapshots were later removed; GitHub owns subsequent changes.
 
 Fable found unnecessary full-auth/provider dependencies on fixture and contract tasks, missing limiter/shared-component dependencies, a moderator-bootstrap timing gap, and several oversized tasks. Those were split or given precise prerequisite leaves. Provider probes need only their own credentials; real integrated gates still require the configured runtime. Pure context operations can proceed before broad UI expansion when their contracts and ownership are ready.
 
