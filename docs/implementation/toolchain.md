@@ -237,6 +237,17 @@ and neither executable is present. Its updated local image configuration ID is
 `sha256:3409e546c7c1646ad211b30cba66070ce2d5c03fde8edcd1432f5dbc854516cd`.
 Registry publication and its manifest digest still await the main-branch run.
 
+**Publication evidence (fable-tech-lead, 2026-09-21, after merge of PR #144 at
+`1f3cdfd48e6b8df9e01a7b198c07f66cdb9f35da`).** The main-branch
+[db-image run 35535359371](https://github.com/chenghanlee/tips/actions/runs/35535359371)
+rebuilt and smoked the amd64 image and pushed
+`ghcr.io/chenghanlee/tips-postgres@sha256:bd7e57646cbb85dd277fd1752d77df9ca81a4e354bcdcd7203b8fd92f366a460`
+(tag `18.6-pgvector0.8.6-textsearch1.4.0`, manifest size 3252). Deployment selects
+that digest. An unauthenticated `docker pull` of it is refused with `unauthorized`,
+so the package is not public. An authenticated pull was not completed: the local
+`gh` token lacks the `read:packages` scope, and no package-scoped credential
+exists yet. That check and the VPS pull credential remain P13a.
+
 ## Markdown, embeds and secure headers
 
 Render tip/review authored Markdown through **MDEx 0.13.5 with its built-in Ammonia sanitizer** (`mdex_native`). Use one options list, without HtmlSanitizeEx or a custom Scrubber module:
