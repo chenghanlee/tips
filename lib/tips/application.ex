@@ -10,6 +10,7 @@ defmodule Tips.Application do
     children = [
       TipsWeb.Telemetry,
       Tips.Repo,
+      {Oban, Application.fetch_env!(:tips, Oban)},
       {DNSCluster, query: Application.get_env(:tips, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Tips.PubSub},
       # Start a worker by calling: Tips.Worker.start_link(arg)

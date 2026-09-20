@@ -24,6 +24,10 @@ config :tips,
   ecto_repos: [Tips.Repo],
   generators: [timestamp_type: :utc_datetime]
 
+config :tips, Oban,
+  repo: Tips.Repo,
+  queues: [media: 1, embeddings: 1, maintenance: 1]
+
 # Configure the endpoint
 config :tips, TipsWeb.Endpoint,
   url: [host: "localhost"],
