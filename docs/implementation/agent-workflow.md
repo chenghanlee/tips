@@ -37,7 +37,7 @@ Fable-TPM may create child issues when a task must be split. The goal covers eve
 
 Use one Project Status field: **Backlog → Ready → Active → In review → Done**, with **Blocked** available from any unfinished state. Failed review returns to Active for repair. Blocked issues name the missing prerequisite, the responsible role and the next concrete action. Waiting on a dependency in Backlog is normal, not an incident. Issue comments record dispatch, handoff, review and evidence. The Project Agent field holds the Herdr agent name of the current owner. GitHub assignees identify accountable humans, never fabricated agent accounts.
 
-An issue closes only after its required result is integrated and verified. Closing a parent requires all mandatory children and package acceptance evidence. A milestone gate closes only against one integrated revision with its E2E evidence; sums of isolated task reports do not pass a gate. Failed or unavailable checks are failures or blockers, never passes. Fable-TPM updates issue and project state at dispatch, at handoff, when the PR enters whole-PR review (In review), and at merge.
+An issue closes only after its required result is integrated and verified. Closing a parent requires all mandatory children and package acceptance evidence. A milestone gate closes only against one integrated revision with its E2E evidence; sums of isolated task reports do not pass a gate. Failed or unavailable checks are failures or blockers, never passes. Fable-TPM updates issue and project state at dispatch, at handoff, when the PR enters whole-PR review (In review), when whole-PR review rejects it (back to Active), and at merge.
 
 ## Git
 

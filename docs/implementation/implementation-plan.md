@@ -8,7 +8,7 @@ Deliver the full agreed MVP ready for public developer trials, including deploym
 
 The current run is strictly serial, N = 1, per [agent-workflow.md](agent-workflow.md); the N = 2 and N = 4 material below is a historical planning option, not current process. The plan supports configurable **N implementation workers**, with schedules for 1, 2 and 4. Fable-Tech-Lead's role and Fable-TPM's technical-program-manager role are coordination responsibilities, separate from the requested worker count. The execution environment's total capacity still applies; N is a ceiling, not a requirement to keep every worker busy.
 
-The owner selected **shadcn design language with native Phoenix components**, using **[SaladUI](https://github.com/bluzky/salad_ui) for now**. Visual design is assigned to **Fable-Tech-Lead**, the designated design owner. Retain Phoenix LiveView and HEEx. Design artifact work counts as a worker slot when it runs alongside implementation.
+The owner selected **shadcn design language with native Phoenix components**, using **[SaladUI](https://github.com/bluzky/salad_ui) for now**. Visual design is assigned to **Fable-Tech-Lead or an Opus model**; Fable-Tech-Lead is the designated design owner. Retain Phoenix LiveView and HEEx. Design artifact work counts as a worker slot when it runs alongside implementation.
 
 The existing product and technical decisions are the baseline:
 
@@ -194,7 +194,7 @@ Give each worker this compact brief:
 
 > Implement bounded issue [ID] from integrated commit [SHA]. Read AGENTS.md and the linked owning design sections. Own [paths]; coordinate [shared paths] through Fable-Tech-Lead. Prerequisites: [passed gates]. Deliver [user-visible behavior] and preserve [critical invariants]. Verify [specific tests/failure schedules]. Return commit(s), changed contract(s), evidence and unresolved blockers. Do not expand product scope or modify another worker's files.
 
-A package is integrated only when its behavior works against the current combined application, its relevant tests pass, direct/downstream effects are reviewed and its linked acceptance items have evidence. Fable-Tech-Lead merges and reruns checks affected by the combined change. Fable records the evidence and next dependency, rather than asking the user to reconcile agent outputs.
+A package is integrated only when its behavior works against the current combined application, its relevant tests pass, direct/downstream effects are reviewed and its linked acceptance items have evidence. Fable-Tech-Lead merges and reruns checks affected by the combined change. Fable-TPM records the evidence and next dependency, rather than asking the user to reconcile agent outputs.
 
 If a contract must change, Fable-Tech-Lead traces the affected database, context, browser and operational paths before integration. Update the authoritative design and all affected callers/tests in the same reviewed change. Escalate material product or cost choices to the owner; resolve routine reversible coding details within the agreed design.
 
