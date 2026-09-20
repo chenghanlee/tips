@@ -42,7 +42,7 @@ Run on 2026-09-21 (Asia/Manila), macOS arm64, outside the repository at `/privat
 The following are the exact substantive commands and their results. Output was captured under the parent probe directory. The generator intentionally retained HTML, LiveView, Ecto, mailer and assets; `--no-install` makes dependency resolution and its failures visible separately.
 
 ```sh
-# cwd: /private/tmp; exit 0, returned /private/tmp/tips-22-probe.hv43AG
+# exit 0; creates /private/tmp/tips-22-probe.hv43AG outside the repo
 mktemp -d /private/tmp/tips-22-probe.XXXXXX
 cd /private/tmp/tips-22-probe.hv43AG
 # exit 0; generated TipsProbe with PostgreSQL and Bandit
