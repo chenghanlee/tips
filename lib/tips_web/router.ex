@@ -23,6 +23,12 @@ defmodule TipsWeb.Router do
     get "/", PageController, :home
   end
 
+  scope "/", TipsWeb do
+    pipe_through :api
+
+    get "/healthz", HealthController, :show
+  end
+
   # Other scopes may use custom stacks.
   # scope "/api", TipsWeb do
   #   pipe_through :api
