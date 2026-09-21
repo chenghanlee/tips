@@ -17,6 +17,7 @@ defmodule Tips.Accounts.UserToken do
     field :context, :string
     field :sent_to, :string
     field :authenticated_at, :utc_datetime
+    field :session_family_id, Ecto.UUID
     belongs_to :user, Tips.Accounts.User
 
     timestamps(type: :utc_datetime, updated_at: false)
@@ -44,7 +45,15 @@ defmodule Tips.Accounts.UserToken do
   def build_session_token(user) do
     token = :crypto.strong_rand_bytes(@rand_size)
     dt = user.authenticated_at || DateTime.utc_now(:second)
-    {token, %UserToken{token: token, context: "session", user_id: user.id, authenticated_at: dt}}
+    # Family continuity across reissues belongs to the session lifecycle in #45.
+    {token,
+     %UserToken{
+       token: token,
+       context: "session",
+       user_id: user.id,
+       authenticated_at: dt,
+       session_family_id: Ecto.UUID.generate()
+     }}
   end
 
   @doc """
@@ -56,10 +65,13 @@ defmodule Tips.Accounts.UserToken do
   not expired (after @session_validity_in_days).
   """
   def verify_session_token_query(token) do
+    # Bind UTC instants: ago/2 casts to timestamp, which depends on the DB session zone.
+    cutoff = DateTime.add(DateTime.utc_now(), -@session_validity_in_days, :day)
+
     query =
       from token in by_token_and_context_query(token, "session"),
         join: user in assoc(token, :user),
-        where: token.inserted_at > ago(@session_validity_in_days, "day"),
+        where: token.inserted_at > ^cutoff,
         select: {%{user | authenticated_at: token.authenticated_at}, token.inserted_at}
 
     {:ok, query}
@@ -108,11 +120,12 @@ defmodule Tips.Accounts.UserToken do
     case Base.url_decode64(token, padding: false) do
       {:ok, decoded_token} ->
         hashed_token = :crypto.hash(@hash_algorithm, decoded_token)
+        cutoff = DateTime.add(DateTime.utc_now(), -@magic_link_validity_in_minutes, :minute)
 
         query =
           from token in by_token_and_context_query(hashed_token, "login"),
             join: user in assoc(token, :user),
-            where: token.inserted_at > ago(^@magic_link_validity_in_minutes, "minute"),
+            where: token.inserted_at > ^cutoff,
             where: token.sent_to == user.email,
             select: {user, token}
 
@@ -138,10 +151,11 @@ defmodule Tips.Accounts.UserToken do
     case Base.url_decode64(token, padding: false) do
       {:ok, decoded_token} ->
         hashed_token = :crypto.hash(@hash_algorithm, decoded_token)
+        cutoff = DateTime.add(DateTime.utc_now(), -@change_email_validity_in_days, :day)
 
         query =
           from token in by_token_and_context_query(hashed_token, context),
-            where: token.inserted_at > ago(@change_email_validity_in_days, "day")
+            where: token.inserted_at > ^cutoff
 
         {:ok, query}
 

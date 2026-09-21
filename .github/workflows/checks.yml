@@ -84,6 +84,8 @@ jobs:
       - run: mix compile --warnings-as-errors
       - run: mix format --check-formatted
       - run: mix assets.setup && mix assets.build
+      - name: Check migration rollback and reapply
+        run: mix ecto.create && mix ecto.migrate && mix ecto.rollback --all && mix ecto.migrate
       - run: mix test --include browser --trace
       - name: Upload browser failure screenshots
         if: failure()

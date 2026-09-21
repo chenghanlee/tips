@@ -23,12 +23,14 @@ defmodule TipsWeb.LiveSmokeTest do
 
   feature "registers through the connected LiveView using the SQL sandbox", %{session: session} do
     email = Tips.AccountsFixtures.unique_user_email()
+    handle = Tips.AccountsFixtures.valid_user_attributes().handle
 
     session
     |> resize_window(1280, 800)
     |> visit("/users/register")
     |> assert_has(css(".phx-connected"))
     |> fill_in(text_field("Email"), with: email)
+    |> fill_in(text_field("Handle"), with: handle)
     |> click(button("Create an account"))
     |> assert_has(css("#flash-info", text: "An email was sent to #{email}"))
 
