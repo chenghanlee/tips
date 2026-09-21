@@ -53,7 +53,7 @@ Always with `PGPORT=5433 MIX_ENV=test`. Example for team 2's tester: `PGPORT=543
 
 ## Events, not loops
 
-No agent runs a timer, cron tick, polling monitor, wait loop or periodic GitHub check. Every tick replays that agent's whole context. An agent acts when a Herdr message arrives, does that step, sends the messages that step names, and goes idle. It reads GitHub only inside a step that needs it. Every handoff below is a message; if a step has no message, nobody wakes up.
+No agent runs a timer, cron tick, polling monitor, wait loop or periodic GitHub state check. Every tick replays that agent's whole context. An agent acts when a Herdr message arrives, does that step, sends the messages that step names, and goes idle. It reads GitHub only inside a step that needs it. Every handoff below is a message; if a step has no message, nobody wakes up.
 
 | Step | From | To | Message |
 |---|---|---|---|
@@ -73,14 +73,16 @@ No agent runs a timer, cron tick, polling monitor, wait loop or periodic GitHub 
 | 6 queue | `team-N-tpm` | `lead-tpm` | `MERGE-SLOT-REQUEST #<issue> PR <url> head <sha>` |
 | L4 slot | `lead-tpm` | `team-N-tpm` | `SLOT-GRANTED PR <url>` |
 | L4 slot | `team-N-tpm` | `team-N-lead` | `SLOT-GRANTED PR <url>` |
+| 6 slot update | `team-N-lead` | `team-N-test` | `PUSHED <sha> PR <url>` for the branch-update commit made in the slot; the tester replies `VERDICT` on its conflict resolution |
 | 6 merge | `team-N-lead` | `team-N-tpm` | `MERGED #<issue> merge <sha> checks <run URL>` after integrated checks on `main`, or `MERGE-FAILED PR <url> <reason>` |
+| 6 merge failed | `team-N-tpm` | `lead-tpm` | `MERGE-FAILED #<issue> PR <url> <reason>`; the queue stops, the team keeps the slot and repairs on the same branch (or reverts through a reviewed PR if `main` broke), then sends a new `MERGE-SLOT-REQUEST` |
 | 7 close | `team-N-tpm` | `lead-tpm` | `MERGED #<issue> merge <sha> PR <url>, open blockers: <none or list>` |
 | 7 close | `team-N-tpm` | `team-N-test`, `team-N-lead` | `CLEANUP #<issue>`; each replies `CLEAN` when its review worktree and database are gone |
 | any | `team-N-tpm` | `lead-tpm` | `BLOCKED #<issue>: <prerequisite, role, next action>` |
 | any | `team-N-tpm` | `lead-tpm` | `RETIRE-READY team N` when no issue is assigned and every `CLEAN` arrived |
 | L5 retire | `lead-tpm` | `team-N-tpm` | `RETIRE team N` |
 
-Waiting for a check, such as CI after the branch update in the merge slot, is one bounded wait by the agent that needs the result: `gh pr checks <n> --watch` or `gh run watch <id>` in the foreground, never a loop that re-reads the conversation. The same applies to waiting for one reply: a single `herdr agent prompt <name> "<text>" --wait --timeout <ms>` is allowed, a loop of them is not.
+Waiting for a check, such as CI after the branch update in the merge slot, is one bounded foreground wait on one known run by the agent that needs the result: `gh pr checks <n> --watch` or `gh run watch <id>`. It costs one tool call and no context replay, which is what the ban above is about; a loop that re-reads the conversation is not allowed. The same applies to waiting for one reply: a single `herdr agent prompt <name> "<text>" --wait --timeout <ms>` is allowed, a loop of them is not.
 
 A stalled chain is not detected automatically while every agent is idle. It is found when the next message reaches `lead-tpm` and L1 reads `herdr agent list`, or when the user looks. A sender that used `--wait` and got a timeout reads the receiver once with `herdr agent get` and `herdr agent read`, then messages its TPM.
 
@@ -98,7 +100,7 @@ Nobody switches branches, commits or edits files in the main checkout. Every com
 
 **L3. Approve own lists.** When a team TPM sends an own list after readiness, compare it against every active issue's own list. No overlap allowed. Shared files (`mix.exs`, `mix.lock`, `.github/workflows/*`, `config/*`, `test/test_helper.exs`, `test/support/**`, `lib/tips_web/router.ex`, `priv/repo/seeds.exs`, `docs/design/**`) need a one-line reservation in the own list, which the lead TPM approves or moves to another issue. Reply "own-list approved" or name the conflict and the issue that holds it.
 
-**L4. Merge queue.** Keep a first-in-first-out queue of PRs whose whole-PR review accepted. Grant one merge slot at a time. Send `SLOT-GRANTED` to the team TPM, which forwards it to its tech lead. The tech lead updates its branch from `main`, waits for green `checks` and `release`, merges, runs integrated checks on `main`, records the merge SHA, and sends `MERGED` to its team TPM, which sends `MERGED` to `lead-tpm`. Then grant the next slot. Other teams do not update their branches until their slot, unless the lead TPM tells them a merged change affects them. If integrated checks on `main` fail, stop the queue, and route the repair to the team that merged.
+**L4. Merge queue.** Keep a first-in-first-out queue of PRs whose whole-PR review accepted. Grant one merge slot at a time. Send `SLOT-GRANTED` to the team TPM, which forwards it to its tech lead. The tech lead updates its branch from `main`, waits for green `checks` and `release`, merges, runs integrated checks on `main`, records the merge SHA, and sends `MERGED` to its team TPM, which sends `MERGED` to `lead-tpm`. Then grant the next slot. Other teams do not update their branches until their slot, unless the lead TPM tells them a merged change affects them. On `MERGE-FAILED`, or if integrated checks on `main` fail, stop the queue; the team that holds the slot repairs or reverts through a reviewed PR, then requests the slot again.
 
 **L5. Teams.** Start with two teams. Create a team when an assignable issue exists with no overlap risk and fewer than five teams are up. Retire a team when it sends `RETIRE-READY` and nothing is assignable. Creating a team: `herdr workspace create --label tips-team-N --cwd <main checkout> --no-focus`, split the root pane into four, start the four agents from the Structure table with `herdr agent start <name> --kind <claude|codex> --pane <id> --timeout 120000 -- <launch args>`, then brief the TPM with this file's path and the team number. Retiring a team: send `RETIRE team N`, and close the workspace when the TPM confirms.
 
