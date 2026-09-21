@@ -101,11 +101,29 @@ Mix dependencies. All task worktrees share those binaries:
    verify it against that release's `expert_checksums.txt`, and save it as
    `.elixir-tools/bin/expert`. Run `chmod +x .elixir-tools/bin/expert` and
    `.elixir-tools/bin/expert --version` to install its bundled runtime.
-2. With Go 1.24 or newer installed, run from this checkout:
+2. With Go 1.21 or newer, Bash, Python 3, `patch`, and `shasum` or
+   `sha256sum` installed, run from the main checkout:
 
    ```sh
-   GOBIN="$PWD/.elixir-tools/bin" go install github.com/isaacphi/mcp-language-server@v0.1.1
+   scripts/build_elixir_bridge.sh
    ```
+
+   The script downloads mcp-language-server v0.1.1, applies the checked-in patch,
+   runs Go vet and the LSP/tool tests, and installs into `.elixir-tools/bin`
+   (or `$TIPS_ELIXIR_TOOLS/bin` when set, matching the launcher).
+   It pins `GOTOOLCHAIN=go1.26.3` (downloaded on first use if needed) and
+   `CGO_ENABLED=0`, and prints the compiler version and staged binary SHA-256
+   before installation. Repeated builds on the same OS/architecture reproduce
+   the hash. Verified with `go version go1.26.3 darwin/arm64`:
+
+   ```text
+   c46aa1b0934b74417f2792380c4cc5db244c07f0a19b4c6f6157dbcf87d0ef4a
+   ```
+
+   The patch fixes bridge framing, symbol lookup, document paths, and diagnostic
+   freshness for Expert. Drop it when upstream releases all bundled fixes;
+   [upstream PR #151](https://github.com/isaacphi/mcp-language-server/pull/151)
+   covers the stdin mutex. Generated tools and source stay gitignored.
 
 3. For Codex sessions in the main checkout, add this to `.codex/config.toml`,
    replacing the checkout path. The task script below writes the worktree config:
