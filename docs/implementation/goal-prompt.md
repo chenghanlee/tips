@@ -13,7 +13,7 @@ One **lead TPM** and up to **five teams** work at the same time. The lead TPM as
 | Herdr name | Workspace label | Kind and launch | Role |
 |---|---|---|---|
 | `lead-tpm` | `tips-master` | `claude --effort high` | Lead TPM. Oversight, assignment, merge queue, reporting. |
-| `team-N-tpm` | `tips-team-N` | `claude --effort medium` | Team TPM. Runs the team loop, readiness, dispatch, Project state, talks to `lead-tpm`. |
+| `team-N-tpm` | `tips-team-N` | `claude --effort medium` | Team TPM. Runs the team steps, readiness, dispatch, Project state, talks to `lead-tpm`. |
 | `team-N-lead` | `tips-team-N` | `codex -m gpt-6-astra -c model_reasoning_effort=high` | Tech lead. Readiness amendments, whole-PR design review, `tips/independent-review`, merge. |
 | `team-N-dev` | `tips-team-N` | `codex -m gpt-5.6-sol -c model_reasoning_effort=xhigh -C <worktree>` | Developer. Implements one issue with integration-first TDD in its worktree. |
 | `team-N-test` | `tips-team-N` | `claude --model opus --effort xhigh` | Tester. Adversarial per-commit review; runs the tests and checks itself. |
@@ -48,17 +48,32 @@ Always with `PGPORT=5433 MIX_ENV=test`. Example for team 2's tester: `PGPORT=543
 - **Long exchanges** (design challenges, review feedback with code) go in a shared file: `docs/implementation/communication/<YYYY-MM-DD>-<agent_1>-<agent_2>-<issue>.md` in the main checkout. The folder is gitignored. Send the path over Herdr.
 - **Durable records** are GitHub comments on the issue or PR, in the templates from agent-workflow.md. Communication files are scratch. If it is not on GitHub, it did not happen.
 - TPMs track progress from GitHub, not from pane output.
+
+### Events, not loops
+
+No agent runs a timer, cron tick, polling monitor, wait loop or periodic GitHub check. Every tick replays that agent's whole context. An agent acts when a Herdr message arrives, does that step, sends one message to the next agent, and goes idle. It reads GitHub only inside a step that needs it. The event messages are:
+
+| From | To | Message |
+|---|---|---|
+| `lead-tpm` | `team-N-tpm` | `ASSIGN <issue URL>`, `own-list approved` or the conflict, `SLOT-GRANTED PR <url>`, `RETIRE team N` |
+| `team-N-tpm` | `lead-tpm` | `OWN-LIST #<issue>: <files>`, `MERGE-SLOT-REQUEST #<issue> PR <url> head <sha>`, `MERGED #<issue> merge <sha> PR <url>, open blockers: <none or list>`, `BLOCKED #<issue>: <prerequisite, role, next action>`, `RETIRE-READY team N` |
+| `team-N-dev` | `team-N-test` | `PUSHED <sha> PR <url>` after every push |
+| `team-N-test` | `team-N-dev` | `VERDICT <sha>: pass` or the P0/P1 findings |
+| `team-N-dev` | `team-N-tpm`, `team-N-lead` | `PR-COMPLETE PR <url> head <sha>` |
+| `team-N-lead` | `team-N-tpm` | `ACCEPTED head <sha>` or `REJECTED head <sha>: <record URL>` |
+
+A stuck agent is found by the agent waiting on it: if a reply is overdue, the waiting agent reads the pane with `herdr agent get` and `herdr agent read` once, then messages its TPM. Nobody polls for it.
 - Only `lead-tpm` talks to the user. Team TPMs send user-facing blockers to `lead-tpm`.
 
 ## Main checkout rule
 
 Nobody switches branches, commits or edits files in the main checkout. Every commit, including `status.md` and step-0 landings, happens in a worktree under `.worktrees/`. Claude agents run with the main checkout as their cwd and read it only. Codex developers run in their task worktree. Testers and tech leads read PR heads in their own detached worktrees, named `.worktrees/<issue>-review-team-N-<role>`, and remove them after the merge.
 
-## Lead TPM loop
+## Lead TPM steps
 
-`lead-tpm` runs this on every message from a team TPM and at least every 10 minutes on a timer. The timer tick exists to catch a stuck team or an unrecoverable error that nobody reported.
+`lead-tpm` runs the steps a message calls for on every message from a team TPM or the user, then goes idle. There is no timer.
 
-**L1. Reconcile.** Read open PRs, failed checks, Active, In review and Blocked issues and their latest comments. Read `herdr agent list`. Fix Project state that disagrees with GitHub. A team whose agents are `blocked` on a permission prompt, `unknown`, or silent for more than 20 minutes with no GitHub progress is inspected: read its panes, then message its TPM. Reassign ownership only after inspecting branch and worktree evidence, and only explicitly.
+**L1. Reconcile.** On a team message, read what that message concerns: the PR, its checks, the issue's latest comments. Read `herdr agent list` once. Fix Project state that disagrees with GitHub. A team whose agents are `blocked` on a permission prompt or `unknown`, or that a team TPM reports as unresponsive, is inspected: read its panes, then message its TPM. Reassign ownership only after inspecting branch and worktree evidence, and only explicitly.
 
 **L2. Assign.** For each idle team, pick the next issue on the critical path whose prerequisites are Done: P0, then P1, then P2, and so on. Prefer an issue in the package the team last worked in. Never assign an issue whose likely files overlap an active issue. Message the team TPM with the issue URL. If no assignable issue exists for a team, retire it (L5).
 
@@ -70,9 +85,9 @@ Nobody switches branches, commits or edits files in the main checkout. Every com
 
 **L6. Report.** If the set of Blocked-on-user issues changed, update `docs/implementation/status.md` on a `task/<issue>-status-<YYYY-MM-DD>` branch in a worktree under the standing "Status report" issue, open a PR, and ask a team TPM to have its tester and tech lead review and merge it through the queue. Tell the user only what needs the user: credentials, purchases, hosting, product scope, and review disagreements past their bounds. If every issue is Done or Blocked on the user, say so and stop.
 
-## Team loop
+## Team steps
 
-`team-N-tpm` repeats this for each issue `lead-tpm` assigns.
+`team-N-tpm` runs these for each issue `lead-tpm` assigns, one step per message.
 
 **1. Reconcile.** Re-apply the team's Herdr names. Read the assigned issue, its open PR, failed checks and latest comments. If a PR is mid-review, resume at the step it is in.
 
@@ -90,7 +105,7 @@ Nobody switches branches, commits or edits files in the main checkout. Every com
 
 ## Escalation
 
-A team TPM stops its loop and messages `lead-tpm` for:
+A team TPM stops and messages `lead-tpm` for:
 
 - provider credentials, accounts, hosting or domain decisions;
 - purchases;
