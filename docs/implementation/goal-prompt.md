@@ -15,8 +15,10 @@ One **lead TPM** and up to **five teams** work at the same time. The lead TPM as
 | `lead-tpm` | `tips-master` | `claude --effort high` | Lead TPM. Oversight, assignment, merge queue, reporting. |
 | `team-N-tpm` | `tips-team-N` | `claude --effort medium` | Team TPM. Runs the team loop, readiness, dispatch, Project state, talks to `lead-tpm`. |
 | `team-N-lead` | `tips-team-N` | `codex -m gpt-6-astra -c model_reasoning_effort=high` | Tech lead. Readiness amendments, whole-PR design review, `tips/independent-review`, merge. |
-| `team-N-dev` | `tips-team-N` | `codex -m gpt-6-astra -c model_reasoning_effort=xhigh -C <worktree>` | Developer. Implements one issue with integration-first TDD in its worktree. |
+| `team-N-dev` | `tips-team-N` | `codex -m gpt-5.6-sol -c model_reasoning_effort=xhigh -C <worktree>` | Developer. Implements one issue with integration-first TDD in its worktree. |
 | `team-N-test` | `tips-team-N` | `claude --model opus --effort xhigh` | Tester. Adversarial per-commit review; runs the tests and checks itself. |
+
+The developer is always Codex Sol. `gpt-5.6-sol` is the Sol model this Codex account offers; `gpt-6-sol` returns a 400 on it. Change the model only with the user's decision, in both this table and `scripts/task_worktree.sh`.
 
 `N` is 1 to 5. Every name is unique across the Herdr session, so any agent can address any other by name from any workspace. Names are cleared when an agent exits or resets (`/clear` and `/new` both clear the name). The team TPM re-applies its team's names at the start of every iteration and right after every reset. An agent that starts a fresh session re-applies its own name first:
 
