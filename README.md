@@ -82,6 +82,51 @@ If an agent sandbox cannot write the shared Hex/Mix caches, use the isolated
 cache environment in the [toolchain instructions](docs/implementation/toolchain.md#disposable-generator-evidence)
 before running Mix commands.
 
+### Elixir tooling for Codex
+
+Use [Expert](https://github.com/expert-lsp/expert) for language-server features
+and [Credo](https://github.com/rrrene/credo) for linting. Credo is a development
+and test dependency; run `unbuffer mix credo --strict` to include suggestions.
+The local Codex configuration also enables the `mix-credo` plugin.
+
+The launcher `scripts/elixir_lsp.sh` connects Expert to Codex through
+[mcp-language-server](https://github.com/isaacphi/mcp-language-server).
+Install these tools separately from the application's Mix dependencies:
+
+1. Download the binary for your OS and architecture from
+   [Expert v0.1.10](https://github.com/expert-lsp/expert/releases/tag/v0.1.10),
+   verify it against that release's `expert_checksums.txt`, and save it as
+   `.elixir-tools/bin/expert`. Run `chmod +x .elixir-tools/bin/expert` and
+   `.elixir-tools/bin/expert --version` to install its bundled runtime.
+2. With Go 1.24 or newer installed, run from this checkout:
+
+   ```sh
+   GOBIN="$PWD/.elixir-tools/bin" go install github.com/isaacphi/mcp-language-server@v0.1.1
+   ```
+
+3. Add this to `.codex/config.toml`, replacing the checkout path:
+
+   ```toml
+   [mcp_servers.elixir-lsp]
+   command = "/bin/sh"
+   args = ["scripts/elixir_lsp.sh"]
+   cwd = "/absolute/path/to/tips"
+   startup_timeout_sec = 60
+   tool_timeout_sec = 120
+   enabled_tools = ["definition", "references", "hover", "diagnostics"]
+   ```
+
+Restart Codex after configuring it. `codex mcp get elixir-lsp` checks the
+registration. Expert builds its engine and indexes the project on first use;
+symbol lookup may be empty until that finishes. Its logs are in `.expert/`.
+The Elixir and Erlang executables must be on Codex's `PATH`. Expert uses its
+own user cache and local Erlang processes, so a sandboxed shell can require
+additional access even when the MCP connection works.
+
+The downloaded tools, indexes, and local Codex configuration are gitignored.
+Repeat the setup for a new checkout or worktree. The existing
+`codex-lsp-bridge` supports other languages; use `elixir-lsp` for Elixir.
+
 ### Extension-enabled database
 
 Run `docker compose up -d db` from the main checkout to start the shared PostgreSQL

@@ -6,6 +6,8 @@
 .env.*
 !.env.example
 .agent-runs/
+.elixir-tools/
+.expert/
 .worktrees/
 __pycache__/
 *.pyc
