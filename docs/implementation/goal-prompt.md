@@ -8,7 +8,7 @@ Every issue in [GitHub Project 15](https://github.com/users/chenghanlee/projects
 
 ## Structure
 
-One **lead TPM** and up to **five teams** work at the same time. The lead TPM assigns issues, checks file overlap, runs the merge queue, creates and retires teams, keeps `status.md`, and is the only agent that talks to the user. Each team runs the team loop below for one issue at a time.
+One **lead TPM** and up to **five teams** work at the same time. The lead TPM assigns issues, checks file overlap, runs the merge queue, creates and retires teams, keeps `status.md`, and is the only agent that talks to the user. Each team runs the team steps below for one issue at a time.
 
 | Herdr name | Workspace label | Kind and launch | Role |
 |---|---|---|---|
