@@ -98,4 +98,4 @@ printf 'Developer environment: PGPORT=5433 TIPS_DB_SUFFIX=_t%s TIPS_TEST_PORT=41
 printf 'Tester environment:    PGPORT=5433 TIPS_DB_SUFFIX=_t%sr TIPS_TEST_PORT=41%s1 MIX_ENV=test\n' "$team" "$team"
 printf 'Tech lead environment: PGPORT=5433 TIPS_DB_SUFFIX=_t%sl TIPS_TEST_PORT=41%s2 MIX_ENV=test\n' "$team" "$team"
 printf 'After %s exits and pane %s is back at the shell, run:\n' "$agent" "$pane"
-printf 'herdr agent start %s --kind codex --pane %s --timeout 120000 -- -m gpt-6-astra -c model_reasoning_effort=xhigh -C %q\n' "$agent" "$pane" "$worktree"
+printf 'herdr agent start %s --kind codex --pane %s --timeout 120000 -- -m gpt-5.6-sol -c model_reasoning_effort=xhigh -C %q\n' "$agent" "$pane" "$worktree"
