@@ -6,7 +6,7 @@ defmodule Tips.Accounts do
   import Ecto.Query, warn: false
   alias Tips.Repo
 
-  alias Tips.Accounts.{User, UserToken, UserNotifier}
+  alias Tips.Accounts.{User, UserNotifier, UserToken}
 
   ## Database getters
 
@@ -23,7 +23,7 @@ defmodule Tips.Accounts do
 
   """
   def get_user_by_email(email) when is_binary(email) do
-    Repo.get_by(User, email: email)
+    Repo.get_by(User, email: User.normalize_email(email))
   end
 
   @doc """
@@ -40,7 +40,7 @@ defmodule Tips.Accounts do
   """
   def get_user_by_email_and_password(email, password)
       when is_binary(email) and is_binary(password) do
-    user = Repo.get_by(User, email: email)
+    user = Repo.get_by(User, email: User.normalize_email(email))
     if User.valid_password?(user, password), do: user
   end
 
@@ -76,8 +76,17 @@ defmodule Tips.Accounts do
   """
   def register_user(attrs) do
     %User{}
-    |> User.email_changeset(attrs)
+    |> User.registration_changeset(attrs)
     |> Repo.insert()
+  end
+
+  @doc """
+  Returns a registration changeset for a user's handle and email.
+
+  See `Tips.Accounts.User.registration_changeset/3` for supported options.
+  """
+  def change_user_registration(user, attrs \\ %{}, opts \\ []) do
+    User.registration_changeset(user, attrs, opts)
   end
 
   ## Settings

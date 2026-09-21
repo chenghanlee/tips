@@ -17,6 +17,7 @@ defmodule Tips.Accounts.UserToken do
     field :context, :string
     field :sent_to, :string
     field :authenticated_at, :utc_datetime
+    field :session_family_id, Ecto.UUID
     belongs_to :user, Tips.Accounts.User
 
     timestamps(type: :utc_datetime, updated_at: false)
@@ -44,7 +45,15 @@ defmodule Tips.Accounts.UserToken do
   def build_session_token(user) do
     token = :crypto.strong_rand_bytes(@rand_size)
     dt = user.authenticated_at || DateTime.utc_now(:second)
-    {token, %UserToken{token: token, context: "session", user_id: user.id, authenticated_at: dt}}
+    # Family continuity across reissues belongs to the session lifecycle in #45.
+    {token,
+     %UserToken{
+       token: token,
+       context: "session",
+       user_id: user.id,
+       authenticated_at: dt,
+       session_family_id: Ecto.UUID.generate()
+     }}
   end
 
   @doc """
