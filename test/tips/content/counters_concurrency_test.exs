@@ -68,6 +68,66 @@ defmodule Tips.Content.CountersConcurrencyTest do
     end
   end
 
+  for target <- [:tip, :review] do
+    test "overlapping value change and deletion of the same #{target} vote stay correct", data do
+      target = Map.fetch!(data, unquote(target))
+      [_, voter, _] = data.user_ids
+      vote_query = vote_query(target, voter)
+
+      Sandbox.unboxed_run(Repo, fn -> vote_fixture(target, %{user_id: voter, value: 1}) end)
+
+      change = fn -> Repo.update_all(vote_query, set: [value: -1]) end
+      delete = fn -> Repo.delete_all(vote_query) end
+      overlap_transactions(data.supervisor, change, delete)
+
+      Sandbox.unboxed_run(Repo, fn ->
+        assert %{up_count: 0, down_count: 0, score: 0} = Repo.reload!(target)
+        assert {0, 0} = Counters.recount!()
+      end)
+    end
+  end
+
+  test "a review vote does not wait on a locked parent tip", data do
+    [_, _, voter] = data.user_ids
+    parent = self()
+
+    locker =
+      transaction_task(data.supervisor, parent, fn -> lock_tip(data.tip) end, true)
+
+    review_voter =
+      transaction_task(
+        data.supervisor,
+        parent,
+        fn ->
+          Repo.query!("SET LOCAL lock_timeout = '300ms'")
+          vote_fixture(data.review, %{user_id: voter, value: 1})
+        end,
+        false
+      )
+
+    locker_pid = locker.pid
+    review_voter_pid = review_voter.pid
+    assert_receive {:ready, ^locker_pid, _}, 1_000
+    assert_receive {:ready, ^review_voter_pid, _}, 1_000
+    send(locker_pid, :go)
+    assert_receive {:written, ^locker_pid}, 1_000
+    send(review_voter_pid, :go)
+
+    try do
+      assert_receive {:written, ^review_voter_pid}, 1_000
+      assert {:ok, :committed} = Task.await(review_voter)
+    after
+      send(locker_pid, :commit)
+    end
+
+    assert {:ok, :committed} = Task.await(locker)
+
+    Sandbox.unboxed_run(Repo, fn ->
+      assert %{up_count: 1, down_count: 0} = Repo.reload!(data.review)
+      assert {0, 0} = Counters.recount!()
+    end)
+  end
+
   for first <- [:hide, :bulk_restore] do
     test "review liveness and bulk locks commit when #{first} takes the parent first", data do
       hide = fn ->
@@ -103,6 +163,14 @@ defmodule Tips.Content.CountersConcurrencyTest do
 
   defp lock_tip(tip) do
     Repo.one!(from(t in Tip, where: t.id == ^tip.id, lock: "FOR NO KEY UPDATE"))
+  end
+
+  defp vote_query(%Tip{id: tip_id}, voter_id) do
+    from(v in Vote, where: v.tip_id == ^tip_id and v.user_id == ^voter_id)
+  end
+
+  defp vote_query(%Review{id: review_id}, voter_id) do
+    from(v in Vote, where: v.review_id == ^review_id and v.user_id == ^voter_id)
   end
 
   defp overlap_transactions(supervisor, first_write, second_write) do
