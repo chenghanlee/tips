@@ -74,7 +74,7 @@ The following repeats the Software Design and Testing sections of `AGENTS.md` fo
 - Use proven architecture, standards and conventions from widely used software similar to Tips.
 - Strive for simple, working, elegant solutions. Elegant solutions make complex things seem easy and obvious. Choose simplicity over elegance when they conflict.
 - Build an MVP for fast iteration and product-market fit. No unnecessary enterprise complexity. No backwards compatibility.
-- Accept necessary complexity when it makes the user's experience simpler. Do not make the implementation look simple by pushing its complexity onto the user. Apply this across architecture, backend, data model and frontend.
+- Only accept necessary complexity when it makes the user's experience simpler. Do not make the implementation look simple by pushing its complexity onto the user. Apply this across architecture, backend, data model and frontend.
 - Perfection is achieved not when there is nothing more to add, but when there is nothing left to take away.
 - Testing trophy, integration first. TDD means writing the failing ExUnit integration test for the acceptance scenario before the code. Unit tests only for pure logic with wide blast radius. End-to-end tests only at milestone gates.
 
