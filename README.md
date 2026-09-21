@@ -238,7 +238,7 @@ additional access even when the MCP connection works.
 For each task, run from the main checkout (requires Bash, Git and Python 3):
 
 ```sh
-scripts/task_worktree.sh 36-ci
+scripts/task_worktree.sh 36-ci --team 1 --pane wA:p2
 ```
 
 This fetches `origin` and creates `task/36-ci` in `.worktrees/36-ci` from
@@ -246,7 +246,10 @@ This fetches `origin` and creates `task/36-ci` in `.worktrees/36-ci` from
 `.agents/skills` to the main checkout's skills so edits stay live, and writes
 `.codex/config.toml` with both plugins and the worktree's absolute MCP `cwd`.
 Rerunning it leaves identical config unchanged. It refuses to replace differing
-config unless you inspect it and rerun with `--force`.
+config unless you inspect it and rerun with `--force`. `--team` selects the
+team's port and database block and `--pane` the Herdr pane for the developer's
+Codex; the script prints the environment blocks and the exact start command.
+See [docs/implementation/goal-prompt.md](docs/implementation/goal-prompt.md).
 
 Follow step 3 of the [dispatch workflow](docs/implementation/goal-prompt.md#loop)
 to start Codex in the provisioned worktree.

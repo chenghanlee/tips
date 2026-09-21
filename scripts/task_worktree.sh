@@ -2,17 +2,36 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: $0 <issue>-<slug> [--force]" >&2
+  cat >&2 <<'USAGE'
+Usage: scripts/task_worktree.sh <issue>-<slug> --team N --pane <pane-id> [--agent <name>] [--force]
+
+  --team N       team number 1-5; selects the port and database block
+  --pane ID      Herdr pane that will run the developer's Codex (from `herdr agent list`)
+  --agent NAME   Herdr agent name for the developer (default: team-N-dev)
+  --force        replace a differing .codex/config.toml in the worktree
+USAGE
   exit 1
 }
 
-[[ $# -ge 1 && $# -le 2 ]] || usage
-[[ $1 =~ ^[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$ ]] || usage
+[[ $# -ge 1 ]] || usage
+task=$1
+shift
+[[ $task =~ ^[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$ ]] || usage
 force=false
-if [[ $# == 2 ]]; then
-  [[ $2 == --force ]] || usage
-  force=true
-fi
+team=""
+pane=""
+agent=""
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --team) [[ $# -ge 2 && $2 =~ ^[1-5]$ ]] || usage; team=$2; shift 2 ;;
+    --pane) [[ $# -ge 2 && $2 =~ ^w[A-Za-z0-9]+:p[A-Za-z0-9]+$ ]] || usage; pane=$2; shift 2 ;;
+    --agent) [[ $# -ge 2 && $2 =~ ^[a-z][a-z0-9_-]{0,31}$ ]] || usage; agent=$2; shift 2 ;;
+    --force) force=true; shift ;;
+    *) usage ;;
+  esac
+done
+[[ -n $team && -n $pane ]] || usage
+[[ -n $agent ]] || agent="team-${team}-dev"
 
 main_checkout=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
 if [[ $(pwd -P) != "$main_checkout" ]]; then
@@ -24,8 +43,8 @@ if [[ ! -d "$main_checkout/.agents/skills" ]]; then
   exit 1
 fi
 
-worktree="$main_checkout/.worktrees/$1"
-branch="task/$1"
+worktree="$main_checkout/.worktrees/$task"
+branch="task/$task"
 if [[ ! -e "$worktree" ]]; then
   git fetch origin
   git worktree add --no-track -b "$branch" "$worktree" origin/main
@@ -75,5 +94,8 @@ if [[ ! -L "$skills" || $(readlink "$skills") != "$main_checkout/.agents/skills"
 fi
 
 printf 'Worktree: %s\n' "$worktree"
-printf 'After Astra exits and its pane is back at the shell, run:\n'
-printf 'herdr agent start astra --kind codex --pane wJ:p2 -- -C %q\n' "$worktree"
+printf 'Developer environment: PGPORT=5433 TIPS_DB_SUFFIX=_t%s TIPS_TEST_PORT=41%s0 MIX_ENV=test\n' "$team" "$team"
+printf 'Tester environment:    PGPORT=5433 TIPS_DB_SUFFIX=_t%sr TIPS_TEST_PORT=41%s1 MIX_ENV=test\n' "$team" "$team"
+printf 'Tech lead environment: PGPORT=5433 TIPS_DB_SUFFIX=_t%sl TIPS_TEST_PORT=41%s2 MIX_ENV=test\n' "$team" "$team"
+printf 'After %s exits and pane %s is back at the shell, run:\n' "$agent" "$pane"
+printf 'herdr agent start %s --kind codex --pane %s --timeout 120000 -- -m gpt-6-sol -c model_reasoning_effort=xhigh -C %q\n' "$agent" "$pane" "$worktree"
