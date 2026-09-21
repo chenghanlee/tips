@@ -145,12 +145,8 @@ This fetches `origin` and creates `task/36-ci` in `.worktrees/36-ci` from
 Rerunning it leaves identical config unchanged. It refuses to replace differing
 config unless you inspect it and rerun with `--force`.
 
-Fable-TPM sends `/exit` to Astra, confirms its pane has returned to the shell,
-then runs the printed `herdr agent start astra --kind codex --pane wJ:p2 -- -C ...`
-command. Before coding, Astra runs `codex mcp get elixir-lsp --json` in the
-worktree and verifies `cwd` points there. Project config and skills are loaded
-by the new worktree session; see the [dispatch workflow](docs/implementation/goal-prompt.md).
-Claude Code panes are unchanged.
+Follow step 3 of the [dispatch workflow](docs/implementation/goal-prompt.md#loop)
+to start Codex in the provisioned worktree.
 
 The launcher uses the caller's `$PWD` as the workspace and finds binaries in
 the main checkout's `.elixir-tools/bin` through Git's common directory.

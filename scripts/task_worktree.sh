@@ -28,7 +28,7 @@ worktree="$main_checkout/.worktrees/$1"
 branch="task/$1"
 if [[ ! -e "$worktree" ]]; then
   git fetch origin
-  git worktree add -b "$branch" "$worktree" origin/main
+  git worktree add --no-track -b "$branch" "$worktree" origin/main
 elif [[ $(git -C "$worktree" rev-parse --show-toplevel) != "$worktree" ||
         $(git -C "$worktree" branch --show-current) != "$branch" ||
         $(git -C "$worktree" rev-parse --path-format=absolute --git-common-dir) != "$main_checkout/.git" ]]; then
