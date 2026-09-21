@@ -9,6 +9,9 @@ export CGO_ENABLED=0
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 repo_dir=$(cd -- "$script_dir/.." && pwd)
+tools_dir=${TIPS_ELIXIR_TOOLS:-"$repo_dir/.elixir-tools"}
+# Resolve relative overrides before changing into the temporary source tree.
+[[ "$tools_dir" = /* ]] || tools_dir="$PWD/$tools_dir"
 module_dir=$(go mod download -json github.com/isaacphi/mcp-language-server@v0.1.1 |
   python3 -c 'import json,sys; print(json.load(sys.stdin)["Dir"])')
 build_dir=$(mktemp -d)
@@ -23,8 +26,8 @@ patch -p1 < "$script_dir/mcp-language-server.patch"
 # workspaces/external servers; watcher timing tests can flake under build load (F7).
 go vet ./...
 go test ./internal/lsp ./internal/tools
-mkdir -p "$repo_dir/.elixir-tools/bin"
-staged_binary=$(mktemp "$repo_dir/.elixir-tools/bin/mcp-language-server.XXXXXX")
+mkdir -p "$tools_dir/bin"
+staged_binary=$(mktemp "$tools_dir/bin/mcp-language-server.XXXXXX")
 go build -trimpath -buildvcs=false -o "$staged_binary" .
 go version
 if command -v sha256sum >/dev/null 2>&1; then
@@ -33,5 +36,5 @@ else
   shasum -a 256 "$staged_binary"
 fi
 chmod 755 "$staged_binary"
-mv -f -- "$staged_binary" "$repo_dir/.elixir-tools/bin/mcp-language-server"
+mv -f -- "$staged_binary" "$tools_dir/bin/mcp-language-server"
 staged_binary=""

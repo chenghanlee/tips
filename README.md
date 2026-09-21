@@ -109,7 +109,8 @@ Mix dependencies. All task worktrees share those binaries:
    ```
 
    The script downloads mcp-language-server v0.1.1, applies the checked-in patch,
-   runs Go vet and the LSP/tool tests, and installs into `.elixir-tools/bin`.
+   runs Go vet and the LSP/tool tests, and installs into `.elixir-tools/bin`
+   (or `$TIPS_ELIXIR_TOOLS/bin` when set, matching the launcher).
    It pins `GOTOOLCHAIN=go1.26.3` (downloaded on first use if needed) and
    `CGO_ENABLED=0`, and prints the compiler version and staged binary SHA-256
    before installation. Repeated builds on the same OS/architecture reproduce
