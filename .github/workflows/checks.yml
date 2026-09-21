@@ -67,6 +67,17 @@ jobs:
           test "$(printf '%s' "$chrome_version" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')" = '153.0.8010.52'
           test "$(printf '%s' "$driver_version" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')" = '153.0.8010.52'
           printf 'TIPS_CHROME_BINARY=%s\nTIPS_CHROMEDRIVER=%s\n' "$TIPS_CHROME_BINARY" "$TIPS_CHROMEDRIVER" >> "$GITHUB_ENV"
+      - name: Allow Chrome to create its sandbox
+        # Ubuntu restricts user namespaces for binaries outside its packaged paths.
+        run: |
+          sudo tee /etc/apparmor.d/tips-chrome-for-testing > /dev/null <<EOF
+          abi <abi/4.0>,
+          include <tunables/global>
+          profile tips-chrome-for-testing "$TIPS_CHROME_BINARY" flags=(unconfined) {
+            userns,
+          }
+          EOF
+          sudo apparmor_parser -r /etc/apparmor.d/tips-chrome-for-testing
       - run: mix deps.get --check-locked
       - run: mix compile --warnings-as-errors
       - run: mix format --check-formatted

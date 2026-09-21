@@ -227,6 +227,11 @@ Select your platform's `chrome` and `chromedriver` archives, extract both, and
 set the executable paths below. Headless Chrome runs with its sandbox enabled;
 no Xvfb or provider credentials are needed.
 
+Ubuntu 23.10+ restricts user namespaces for downloaded Chrome binaries. CI loads
+an AppArmor profile granting `userns` to the exact installed Chrome path so its
+sandbox can start. Local Ubuntu installations need the same
+[binary-specific allowance](https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md).
+
 Wallaby starts in `Tips.FeatureCase` setup so ordinary tests need no browser
 installation; starting it in `test_helper.exs` would validate Chrome even when
 all browser tests are excluded.
