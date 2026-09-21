@@ -77,7 +77,8 @@ The two meanings of renewal must remain distinct:
 2. **Token reissue:** `fetch_current_scope_for_user/2` (`user_auth.ex:68`) loads a
    valid token/user, then `maybe_reissue_user_session_token/3` (`:94`) calls
    `create_or_extend_session/3` (`:112`) when the row is at least seven days old.
-   That function inserts a new row, invokes Plug renewal, writes the new token
+   That function inserts a new row, calls `renew_session/2` (a same-user no-op
+   on this path), writes the new token
    with `put_token_in_session/2` (`:166`), and updates the persistent cookie if
    selected. **The predecessor row remains valid until it expires**; reissue
    neither deletes it nor groups it into a family.
@@ -254,7 +255,7 @@ of the password surface exists today:
 | User/schema | `lib/tips/accounts/user.ex:7–8,74,81,92,123`: password fields, changeset, validation, hashing and verification. Coordinate migration `:9` (`hashed_password`) with #25. |
 | Controller/router | `lib/tips_web/controllers/user_session_controller.ex:33,49`: password `create/3` clause and `update_password/2`; `lib/tips_web/router.ex:68`: password-update route. |
 | LiveViews | `login.ex:62,110`: password form/event; `settings.ex:33,89,135,147`: password form, mount dependency and events; `confirmation.ex:67`: password promotion. All are under `lib/tips_web/live/user_live/`. |
-| Tests/dependencies | Password tests in `test/tips/accounts_test.exs`, `test/tips_web/controllers/user_session_controller_test.exs`, `test/tips_web/live/user_live/{login,settings,confirmation}_test.exs`; password helpers in `test/support/fixtures/accounts_fixtures.ex:13,53`; bcrypt dependency in `mix.exs:43` and test cost config in `config/test.exs:4`. |
+| Tests/dependencies | Password tests in `test/tips/accounts_test.exs`, `test/tips_web/controllers/user_session_controller_test.exs`, `test/tips_web/live/user_live/{login,settings}_test.exs`; password helpers in `test/support/fixtures/accounts_fixtures.ex:13,53`; bcrypt dependency in `mix.exs:43` and test cost config in `config/test.exs:4`. |
 
 Removal must keep magic-link registration/login, email change, session timestamps
 and their tests working. No password reset or OAuth replacement is in scope.
@@ -278,8 +279,11 @@ update the 14-day baseline assertion deliberately.
 | Production auth consumer flows | `test/tips/accounts_test.exs`, `test/tips_web/controllers/user_session_controller_test.exs`, `test/tips_web/live/user_live/*_test.exs`. |
 
 The seven-day reissue threshold and 14-day cookie `max_age` belong to the web
-layer, outside this Accounts fixture. Their source inspection and existing
-`UserAuth` tests above provide the baseline evidence.
+layer, outside this Accounts fixture. The **seven-day threshold is source-inspection
+evidence only** (`user_auth.ex:27,97`): the existing reissue test backdates to ten
+days (`test/tips_web/user_auth_test.exs:204`) and does not pin the threshold.
+[#45](https://github.com/chenghanlee/tips/issues/45) owns its boundary tests. The
+14-day cookie is pinned by `user_auth_test.exs:12,85,115,220`.
 
 Exact local commands, from `.worktrees/24-auth-baseline` on Elixir 1.20.4 / OTP 29.1:
 
