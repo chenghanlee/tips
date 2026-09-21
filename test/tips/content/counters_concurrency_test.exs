@@ -36,10 +36,16 @@ defmodule Tips.Content.CountersConcurrencyTest do
 
     on_exit(fn ->
       Sandbox.unboxed_run(Repo, fn ->
-        Repo.delete_all(from(v in Vote, where: v.user_id in ^data.user_ids))
-        Repo.delete_all(from(r in Review, where: r.tip_id == ^data.tip.id))
-        Repo.delete_all(from(t in Tip, where: t.id == ^data.tip.id))
-        Repo.delete_all(from(u in User, where: u.id in ^data.user_ids))
+        Repo.transaction(fn ->
+          Repo.query!("ALTER TABLE votes DISABLE TRIGGER votes_counts")
+          Repo.query!("ALTER TABLE reviews DISABLE TRIGGER reviews_counts")
+          Repo.delete_all(from(v in Vote, where: v.user_id in ^data.user_ids))
+          Repo.delete_all(from(r in Review, where: r.tip_id == ^data.tip.id))
+          Repo.delete_all(from(t in Tip, where: t.id == ^data.tip.id))
+          Repo.delete_all(from(u in User, where: u.id in ^data.user_ids))
+          Repo.query!("ALTER TABLE reviews ENABLE TRIGGER reviews_counts")
+          Repo.query!("ALTER TABLE votes ENABLE TRIGGER votes_counts")
+        end)
       end)
     end)
 
