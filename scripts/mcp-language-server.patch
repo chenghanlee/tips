@@ -1,17 +1,10 @@
 --- a/internal/lsp/client.go
 +++ b/internal/lsp/client.go
-@@ -8,6 +8,7 @@
- 	"io"
- 	"os"
- 	"os/exec"
+@@ -5,0 +6 @@
++	"crypto/sha256"
+@@ -10,0 +12 @@
 +	"path/filepath"
- 	"strings"
- 	"sync"
- 	"sync/atomic"
-@@ -17,10 +18,12 @@
- )
- 
- type Client struct {
+@@ -20,4 +22,6 @@
 -	Cmd    *exec.Cmd
 -	stdin  io.WriteCloser
 -	stdout *bufio.Reader
@@ -22,42 +15,28 @@
 +	closed  chan struct{}
 +	stdout  *bufio.Reader
 +	stderr  io.ReadCloser
- 
- 	// Request ID counter
- 	nextID atomic.Int32
-@@ -40,6 +43,11 @@
- 	// Diagnostic cache
- 	diagnostics   map[protocol.DocumentUri][]protocol.Diagnostic
- 	diagnosticsMu sync.RWMutex
+@@ -42,0 +47,5 @@
 +	// diagnosticsSeq counts publishDiagnostics notifications per URI; diagnosticsPublished is
 +	// closed and replaced on every publish so waiters can block for the next one.
 +	diagnosticsSeq       map[protocol.DocumentUri]uint64
 +	diagnosticsVersions  map[protocol.DocumentUri]*int32
 +	diagnosticsPublished chan struct{}
- 
- 	// Files are currently opened by the LSP
- 	openFiles   map[string]*OpenFileInfo
-@@ -69,12 +77,16 @@
- 	client := &Client{
- 		Cmd:                   cmd,
- 		stdin:                 stdin,
+@@ -71,0 +81 @@
 +		closed:                make(chan struct{}),
- 		stdout:                bufio.NewReader(stdout),
- 		stderr:                stderr,
- 		handlers:              make(map[string]chan *Message),
- 		notificationHandlers:  make(map[string]NotificationHandler),
- 		serverRequestHandlers: make(map[string]ServerRequestHandler),
- 		diagnostics:           make(map[protocol.DocumentUri][]protocol.Diagnostic),
+@@ -77,0 +88,3 @@
 +		diagnosticsSeq:        make(map[protocol.DocumentUri]uint64),
 +		diagnosticsVersions:   make(map[protocol.DocumentUri]*int32),
 +		diagnosticsPublished:  make(chan struct{}),
- 		openFiles:             make(map[string]*OpenFileInfo),
- 	}
- 
-@@ -286,115 +298,108 @@
- 	URI     protocol.DocumentUri
- }
- 
+@@ -285,4 +298,17 @@
+-	Version int32
+-	URI     protocol.DocumentUri
+-}
+-
++	ContentHash [32]byte
++	Version     int32
++	URI         protocol.DocumentUri
++}
++
 +// FileURI gives every tool and the watcher the same document identity.
 +func FileURI(path string) (string, error) {
 +	absolute, err := filepath.Abs(path)
@@ -70,16 +49,16 @@
 +// Hold openFilesMu across the on-disk read and notification write. The watcher and
 +// MCP tool handlers share this path; locking only the map allows duplicate opens
 +// and versions to reach the server out of order.
- func (c *Client) OpenFile(ctx context.Context, filepath string) error {
+@@ -290,2 +315,0 @@
 -	uri := fmt.Sprintf("file://%s", filepath)
 -
- 	c.openFilesMu.Lock()
+@@ -292,0 +317,5 @@
 +	defer c.openFilesMu.Unlock()
 +	uri, err := FileURI(filepath)
 +	if err != nil {
 +		return err
 +	}
- 	if _, exists := c.openFiles[uri]; exists {
+@@ -294,6 +323,2 @@
 -		c.openFilesMu.Unlock()
 -		return nil // Already open
 -	}
@@ -88,10 +67,7 @@
 -	// Skip files that do not exist or cannot be read
 +		return nil
 +	}
- 	content, err := os.ReadFile(filepath)
- 	if err != nil {
- 		return fmt.Errorf("error reading file: %w", err)
- 	}
+@@ -304,10 +329,3 @@
 -
 -	params := protocol.DidOpenTextDocumentParams{
 -		TextDocument: protocol.TextDocumentItem{
@@ -105,12 +81,16 @@
 +	params := protocol.DidOpenTextDocumentParams{TextDocument: protocol.TextDocumentItem{
 +		URI: protocol.DocumentUri(uri), LanguageID: DetectLanguageID(uri), Version: 1, Text: string(content),
 +	}}
- 	if err := c.Notify(ctx, "textDocument/didOpen", params); err != nil {
- 		return err
- 	}
+@@ -317 +335,23 @@
 -
-+	c.openFiles[uri] = &OpenFileInfo{Version: 1, URI: protocol.DocumentUri(uri)}
++	c.openFiles[uri] = &OpenFileInfo{Version: 1, URI: protocol.DocumentUri(uri), ContentHash: sha256.Sum256(content)}
 +	return nil
++}
++
++// SyncFile sends the current contents of an open file only when they changed.
++func (c *Client) SyncFile(ctx context.Context, filepath string) error {
++	_, _, err := c.notifyChangeVersion(ctx, filepath, false)
++	return err
 +}
 +
 +func (c *Client) NotifyChange(ctx context.Context, filepath string) error {
@@ -121,7 +101,12 @@
 +// NotifyChangeVersion returns the sent version and the publication sequence captured
 +// immediately before sending, while holding the document lock.
 +func (c *Client) NotifyChangeVersion(ctx context.Context, filepath string) (int32, uint64, error) {
- 	c.openFilesMu.Lock()
++	// Diagnostics needs a new publication even when the contents are unchanged.
++	return c.notifyChangeVersion(ctx, filepath, true)
++}
++
++func (c *Client) notifyChangeVersion(ctx context.Context, filepath string, force bool) (int32, uint64, error) {
+@@ -319,20 +359,5 @@
 -	c.openFiles[uri] = &OpenFileInfo{
 -		Version: 1,
 -		URI:     protocol.DocumentUri(uri),
@@ -147,8 +132,7 @@
 +	if err != nil {
 +		return 0, 0, err
 +	}
- 	fileInfo, isOpen := c.openFiles[uri]
- 	if !isOpen {
+@@ -341,9 +366,12 @@
 -		c.openFilesMu.Unlock()
 -		return fmt.Errorf("cannot notify change for unopened file: %s", filepath)
 -	}
@@ -164,15 +148,19 @@
 +	if err != nil {
 +		return 0, 0, fmt.Errorf("error reading file: %w", err)
 +	}
++	hash := sha256.Sum256(content)
++	if !force && hash == fileInfo.ContentHash {
++		seq, _ := c.DiagnosticsSeq(protocol.DocumentUri(uri))
++		return fileInfo.Version, seq, nil
++	}
 +	version := fileInfo.Version + 1
- 	params := protocol.DidChangeTextDocumentParams{
- 		TextDocument: protocol.VersionedTextDocumentIdentifier{
+@@ -352,4 +380 @@
 -			TextDocumentIdentifier: protocol.TextDocumentIdentifier{
 -				URI: protocol.DocumentUri(uri),
 -			},
 -			Version: version,
 +			TextDocumentIdentifier: protocol.TextDocumentIdentifier{URI: protocol.DocumentUri(uri)}, Version: version,
- 		},
+@@ -357,10 +382,9 @@
 -		ContentChanges: []protocol.TextDocumentContentChangeEvent{
 -			{
 -				Value: protocol.TextDocumentContentChangeWholeDocument{
@@ -190,19 +178,18 @@
 +		return 0, 0, err
 +	}
 +	fileInfo.Version = version
++	fileInfo.ContentHash = hash
 +	return version, seqBefore, nil
- }
- 
- func (c *Client) CloseFile(ctx context.Context, filepath string) error {
+@@ -370,2 +393,0 @@
 -	uri := fmt.Sprintf("file://%s", filepath)
 -
- 	c.openFilesMu.Lock()
+@@ -372,0 +395,5 @@
 +	defer c.openFilesMu.Unlock()
 +	uri, err := FileURI(filepath)
 +	if err != nil {
 +		return err
 +	}
- 	if _, exists := c.openFiles[uri]; !exists {
+@@ -374,11 +401,3 @@
 -		c.openFilesMu.Unlock()
 -		return nil // Already closed
 -	}
@@ -217,12 +204,10 @@
 +		return nil
 +	}
 +	params := protocol.DidCloseTextDocumentParams{TextDocument: protocol.TextDocumentIdentifier{URI: protocol.DocumentUri(uri)}}
- 	if err := c.Notify(ctx, "textDocument/didClose", params); err != nil {
- 		return err
- 	}
+@@ -388,2 +406,0 @@
 -
 -	c.openFilesMu.Lock()
- 	delete(c.openFiles, uri)
+@@ -391,2 +408,6 @@
 -	c.openFilesMu.Unlock()
 -
 +	// A reopened document starts at version 1; old provenance must not reject it.
@@ -231,22 +216,13 @@
 +	delete(c.diagnosticsVersions, protocol.DocumentUri(uri))
 +	delete(c.diagnosticsSeq, protocol.DocumentUri(uri))
 +	c.diagnosticsMu.Unlock()
- 	return nil
- }
- 
- func (c *Client) IsFileOpen(filepath string) bool {
+@@ -397 +418,4 @@
 -	uri := fmt.Sprintf("file://%s", filepath)
 +	uri, err := FileURI(filepath)
 +	if err != nil {
 +		return false
 +	}
- 	c.openFilesMu.RLock()
- 	defer c.openFilesMu.RUnlock()
- 	_, exists := c.openFiles[uri]
-@@ -431,3 +436,44 @@
- 
- 	return c.diagnostics[uri]
- }
+@@ -433,0 +458,41 @@
 +
 +// DiagnosticsSeq returns how many publishDiagnostics notifications have arrived for uri and a
 +// channel that is closed when the next notification for any file arrives.
@@ -288,7 +264,7 @@
 +		}
 +	}
 +}
---- /dev/null
+--- a/internal/lsp/diagnostics_regression_test.go
 +++ b/internal/lsp/diagnostics_regression_test.go
 @@ -0,0 +1,310 @@
 +package lsp
@@ -633,6 +609,214 @@
  	client.diagnosticsMu.Unlock()
  
  	lspLogger.Info("Received diagnostics for %s: %d items", diagParams.URI, len(diagParams.Diagnostics))
+--- a/internal/lsp/sync_test.go
++++ b/internal/lsp/sync_test.go
+@@ -0,0 +1,205 @@
++package lsp
++
++import (
++	"bufio"
++	"bytes"
++	"context"
++	"encoding/json"
++	"errors"
++	"io"
++	"os"
++	"path/filepath"
++	"sync"
++	"testing"
++)
++
++func syncMessages(t *testing.T, pipe *recordingPipe) []*Message {
++	t.Helper()
++	reader := bufio.NewReader(bytes.NewReader(pipe.Bytes()))
++	var messages []*Message
++	for {
++		msg, err := ReadMessage(reader)
++		if errors.Is(err, io.EOF) {
++			return messages
++		}
++		if err != nil {
++			t.Fatal(err)
++		}
++		messages = append(messages, msg)
++	}
++}
++
++func assertSyncChange(t *testing.T, msg *Message, version int32, text string) {
++	t.Helper()
++	var params struct {
++		TextDocument struct {
++			Version int32 `json:"version"`
++		} `json:"textDocument"`
++		ContentChanges []struct {
++			Text string `json:"text"`
++		} `json:"contentChanges"`
++	}
++	if err := json.Unmarshal(msg.Params, &params); err != nil {
++		t.Fatal(err)
++	}
++	if msg.Method != "textDocument/didChange" || params.TextDocument.Version != version || len(params.ContentChanges) != 1 || params.ContentChanges[0].Text != text {
++		t.Fatalf("unexpected change: method=%s params=%s", msg.Method, msg.Params)
++	}
++}
++
++func TestSyncSkipsUnchangedButRefreshStillSends(t *testing.T) {
++	c, pipe := testClient()
++	path := filepath.Join(t.TempDir(), "sample.ex")
++	if err := os.WriteFile(path, []byte("original"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	ctx := context.Background()
++	if err := c.OpenFile(ctx, path); err != nil {
++		t.Fatal(err)
++	}
++	t.Chdir(filepath.Dir(path))
++	for range 3 {
++		if err := c.SyncFile(ctx, "sample.ex"); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if messages := syncMessages(t, pipe); len(messages) != 1 || messages[0].Method != "textDocument/didOpen" {
++		t.Fatalf("unchanged sync sent extra notifications: %v", messages)
++	}
++	for want := int32(2); want <= 3; want++ {
++		version, _, err := c.NotifyChangeVersion(ctx, path)
++		if err != nil || version != want {
++			t.Fatalf("refresh version=%d err=%v", version, err)
++		}
++		if err := c.SyncFile(ctx, path); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if err := os.WriteFile(path, []byte("edited"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	// A forced refresh also updates the last-sent contents used by navigation.
++	if _, _, err := c.NotifyChangeVersion(ctx, path); err != nil {
++		t.Fatal(err)
++	}
++	if err := c.SyncFile(ctx, path); err != nil {
++		t.Fatal(err)
++	}
++	messages := syncMessages(t, pipe)
++	if len(messages) != 4 {
++		t.Fatalf("got %d messages, want 4", len(messages))
++	}
++	assertSyncChange(t, messages[1], 2, "original")
++	assertSyncChange(t, messages[2], 3, "original")
++	assertSyncChange(t, messages[3], 4, "edited")
++}
++
++func TestConcurrentSyncSendsOneChangedDocument(t *testing.T) {
++	c, pipe := testClient()
++	path := filepath.Join(t.TempDir(), "sample.ex")
++	ctx := context.Background()
++	if err := os.WriteFile(path, []byte("original"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	if err := c.OpenFile(ctx, path); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, []byte("edited"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	var wg sync.WaitGroup
++	for range 32 {
++		wg.Add(1)
++		go func() {
++			defer wg.Done()
++			if err := c.SyncFile(ctx, path); err != nil {
++				t.Error(err)
++			}
++		}()
++	}
++	wg.Wait()
++	messages := syncMessages(t, pipe)
++	if len(messages) != 2 {
++		t.Fatalf("got %d messages, want open and one change", len(messages))
++	}
++	assertSyncChange(t, messages[1], 2, "edited")
++}
++
++type failSyncOnce struct {
++	*recordingPipe
++	fail bool
++}
++
++func (p *failSyncOnce) Write(b []byte) (int, error) {
++	if p.fail {
++		p.fail = false
++		return 0, errors.New("injected write failure")
++	}
++	return p.recordingPipe.Write(b)
++}
++
++func TestSyncRetriesFailedSend(t *testing.T) {
++	c, pipe := testClient()
++	path := filepath.Join(t.TempDir(), "sample.ex")
++	ctx := context.Background()
++	if err := os.WriteFile(path, []byte("original"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	if err := c.OpenFile(ctx, path); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, []byte("edited"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	c.stdin = &failSyncOnce{recordingPipe: pipe, fail: true}
++	if err := c.SyncFile(ctx, path); err == nil {
++		t.Fatal("write failure was not reported")
++	}
++	if err := c.SyncFile(ctx, path); err != nil {
++		t.Fatal(err)
++	}
++	if err := c.SyncFile(ctx, path); err != nil {
++		t.Fatal(err)
++	}
++	messages := syncMessages(t, pipe)
++	if len(messages) != 2 {
++		t.Fatalf("retry sent %d messages, want open and one change", len(messages))
++	}
++	assertSyncChange(t, messages[1], 2, "edited")
++}
++
++func TestSyncReopenUsesNewContents(t *testing.T) {
++	c, pipe := testClient()
++	path := filepath.Join(t.TempDir(), "sample.ex")
++	ctx := context.Background()
++	if err := os.WriteFile(path, []byte("original"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	if err := c.OpenFile(ctx, path); err != nil {
++		t.Fatal(err)
++	}
++	if err := c.CloseFile(ctx, path); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, []byte("edited"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	if err := c.OpenFile(ctx, path); err != nil {
++		t.Fatal(err)
++	}
++	if err := c.SyncFile(ctx, path); err != nil {
++		t.Fatal(err)
++	}
++	// Returning to contents from the previous open must still reach the server.
++	if err := os.WriteFile(path, []byte("original"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	if err := c.SyncFile(ctx, path); err != nil {
++		t.Fatal(err)
++	}
++	messages := syncMessages(t, pipe)
++	if len(messages) != 4 || messages[1].Method != "textDocument/didClose" || messages[2].Method != "textDocument/didOpen" {
++		t.Fatalf("unexpected reopen messages: %v", messages)
++	}
++	assertSyncChange(t, messages[3], 2, "original")
++}
 --- a/internal/lsp/transport.go
 +++ b/internal/lsp/transport.go
 @@ -7,6 +7,7 @@
@@ -735,91 +919,405 @@
  		return fmt.Errorf("failed to send notification: %w", err)
  	}
  
---- a/internal/tools/definition.go
-+++ b/internal/tools/definition.go
-@@ -10,16 +10,9 @@
- )
- 
- func ReadDefinition(ctx context.Context, client *lsp.Client, symbolName string) (string, error) {
--	symbolResult, err := client.Symbol(ctx, protocol.WorkspaceSymbolParams{
--		Query: symbolName,
--	})
-+	results, err := lookupSymbols(ctx, client, symbolName)
- 	if err != nil {
--		return "", fmt.Errorf("failed to fetch symbol: %v", err)
--	}
--
--	results, err := symbolResult.Results()
--	if err != nil {
--		return "", fmt.Errorf("failed to parse results: %v", err)
+--- a/internal/tools/definition_at.go
++++ b/internal/tools/definition_at.go
+@@ -0,0 +1,40 @@
++package tools
++
++import (
++	"context"
++	"fmt"
++
++	"github.com/isaacphi/mcp-language-server/internal/lsp"
++	"github.com/isaacphi/mcp-language-server/internal/protocol"
++)
++
++// ReadDefinitionAt navigates from a call site, independently of workspace indexing.
++// Positions are 1-based; columns use LSP's default UTF-16 encoding, as hover does.
++func ReadDefinitionAt(ctx context.Context, client *lsp.Client, filePath string, line, column int) (string, error) {
++	position, err := navigationPosition(ctx, client, filePath, line, column)
++	if err != nil {
 +		return "", err
- 	}
- 
- 	var definitions []string
-@@ -29,35 +22,15 @@
- 
- 		// Skip symbols that we are not looking for. workspace/symbol may return
- 		// a large number of fuzzy matches.
-+		if !symbolMatches(symbol, symbolName) {
++	}
++	result, err := client.Definition(ctx, protocol.DefinitionParams{TextDocumentPositionParams: position})
++	if err != nil {
++		return "", fmt.Errorf("definition request failed: %w", err)
++	}
++	var locations []protocol.Location
++	switch value := result.Value.(type) {
++	case protocol.Definition:
++		switch definition := value.Value.(type) {
++		case protocol.Location:
++			locations = []protocol.Location{definition}
++		case []protocol.Location:
++			locations = definition
++		}
++	case []protocol.DefinitionLink:
++		for _, link := range value {
++			locations = append(locations, protocol.Location{URI: link.TargetURI, Range: link.TargetSelectionRange})
++		}
++	}
++	if len(locations) == 0 {
++		return fmt.Sprintf("No definition returned for %s at L%d:C%d. The project may still be loading, or the symbol/source may be unavailable; this does not prove the symbol is absent.", filePath, line, column), nil
++	}
++	return formatNavigationLocations(locations, true), nil
++}
+--- a/internal/tools/definition_at_test.go
++++ b/internal/tools/definition_at_test.go
+@@ -0,0 +1,343 @@
++package tools
++
++import (
++	"bufio"
++	"context"
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++	"time"
++	"unicode/utf8"
++
++	"github.com/isaacphi/mcp-language-server/internal/lsp"
++	"github.com/isaacphi/mcp-language-server/internal/protocol"
++)
++
++// An actual LSP subprocess checks that navigation uses the latest buffer and
++// source position, even when workspace search cannot find the dependency.
++func TestDefinitionServer(t *testing.T) {
++	mode := os.Getenv("TIPS_DEFINITION_TEST_SERVER")
++	if mode == "" {
++		return
++	}
++	reader := bufio.NewReader(os.Stdin)
++	sourceURI := os.Getenv("TIPS_DEFINITION_SOURCE_URI")
++	targetURI := protocol.DocumentUri(os.Getenv("TIPS_DEFINITION_TARGET_URI"))
++	synced := false
++	referenceRequests := 0
++	for {
++		msg, err := lsp.ReadMessage(reader)
++		if err != nil {
++			os.Exit(0)
++		}
++		if msg.Method == "textDocument/didChange" {
++			var params struct {
++				TextDocument struct {
++					URI     string `json:"uri"`
++					Version int    `json:"version"`
++				} `json:"textDocument"`
++				ContentChanges []struct {
++					Text string `json:"text"`
++				} `json:"contentChanges"`
++			}
++			_ = json.Unmarshal(msg.Params, &params)
++			if params.TextDocument.URI == sourceURI {
++				expected := "# edited\nDeps.fetch()\n"
++				if mode == "empty_no_newline" {
++					expected = strings.TrimSuffix(expected, "\n")
++				}
++				synced = params.TextDocument.Version == 2 && len(params.ContentChanges) == 1 && params.ContentChanges[0].Text == expected
++			}
++		}
++		if msg.ID == nil {
 +			continue
 +		}
- 		switch v := symbol.(type) {
- 		case *protocol.SymbolInformation:
- 			// SymbolInformation results have richer data.
- 			kind = fmt.Sprintf("Kind: %s\n", protocol.TableKindMap[v.Kind])
- 			if v.ContainerName != "" {
- 				container = fmt.Sprintf("Container Name: %s\n", v.ContainerName)
--			}
--
--			// Handle different matching strategies based on the search term
--			if strings.Contains(symbolName, ".") {
--				// For qualified names like "Type.Method", require exact match
--				if symbol.GetName() != symbolName {
--					continue
--				}
--			} else {
--				// For unqualified names like "Method"
--				if v.Kind == protocol.Method {
--					// For methods, only match if the method name matches exactly Type.symbolName or Type::symbolName or symbolName
--					if !strings.HasSuffix(symbol.GetName(), "::"+symbolName) && !strings.HasSuffix(symbol.GetName(), "."+symbolName) && symbol.GetName() != symbolName {
--						continue
--					}
--				} else if symbol.GetName() != symbolName {
--					// For non-methods, exact match only
--					continue
--				}
--			}
--		default:
--			if symbol.GetName() != symbolName {
--				continue
- 			}
- 		}
- 
++		response := &lsp.Message{JSONRPC: "2.0", ID: msg.ID}
++		var result any
++		loc := protocol.Location{URI: targetURI, Range: protocol.Range{Start: protocol.Position{Line: 1, Character: 6}, End: protocol.Position{Line: 1, Character: 11}}}
++		switch msg.Method {
++		case "textDocument/definition":
++			var params protocol.DefinitionParams
++			_ = json.Unmarshal(msg.Params, &params)
++			if !synced || params.TextDocument.URI != protocol.DocumentUri(sourceURI) || params.Position.Line != 1 || params.Position.Character != 6 {
++				response.Error = &lsp.ResponseError{Code: -32602, Message: "wrong position or stale document"}
++			} else {
++				switch mode {
++				case "empty":
++				case "error":
++					response.Error = &lsp.ResponseError{Code: -32603, Message: "project engine unavailable"}
++				case "multiple", "multiple_long_line":
++					second := loc
++					second.Range.Start.Line = 2
++					second.Range.End.Line = 2
++					result = []protocol.Location{loc, loc, second}
++				case "links":
++					link := protocol.DefinitionLink{TargetURI: targetURI, TargetRange: protocol.Range{Start: protocol.Position{Line: 1}, End: protocol.Position{Line: 1, Character: 24}}, TargetSelectionRange: loc.Range}
++					result = []protocol.DefinitionLink{link, link}
++				default:
++					result = loc
++				}
++			}
++		case "textDocument/hover":
++			var params protocol.HoverParams
++			_ = json.Unmarshal(msg.Params, &params)
++			if !synced || params.TextDocument.URI != protocol.DocumentUri(sourceURI) || params.Position.Line != 1 || params.Position.Character != 6 {
++				response.Error = &lsp.ResponseError{Code: -32602, Message: "wrong position or stale hover document"}
++			} else if mode == "error" {
++				response.Error = &lsp.ResponseError{Code: -32603, Message: "project engine unavailable"}
++			} else if mode != "empty" && mode != "empty_no_newline" {
++				result = protocol.Hover{Contents: protocol.MarkupContent{Kind: "markdown", Value: "Fresh docs for Deps.fetch/0"}}
++			}
++		case "textDocument/references":
++			referenceRequests++
++			var params protocol.ReferenceParams
++			_ = json.Unmarshal(msg.Params, &params)
++			if referenceRequests != 1 || !synced || params.TextDocument.URI != protocol.DocumentUri(sourceURI) || params.Position.Line != 1 || params.Position.Character != 6 || params.Context.IncludeDeclaration {
++				response.Error = &lsp.ResponseError{Code: -32602, Message: "wrong context, stale document, or repeated references request"}
++			} else if mode == "error" {
++				response.Error = &lsp.ResponseError{Code: -32603, Message: "project engine unavailable"}
++			} else if mode != "empty" {
++				second := loc
++				second.Range.Start.Line = 2
++				second.Range.End.Line = 2
++				result = []protocol.Location{loc, loc, second}
++			}
++		case "textDocument/documentSymbol":
++			if mode == "large_module" || mode == "long_line" || mode == "multiple_long_line" {
++				result = []protocol.DocumentSymbol{{Name: "Deps", Kind: protocol.Module, Range: protocol.Range{Start: protocol.Position{}, End: protocol.Position{Line: 10002}}}}
++			} else if mode == "no_symbols" {
++				response.Error = &lsp.ResponseError{Code: -32601, Message: "document symbols unavailable"}
++			} else {
++				result = []protocol.DocumentSymbol{{Name: "Deps", Kind: protocol.Module, Range: protocol.Range{Start: protocol.Position{}, End: protocol.Position{Line: 3, Character: 3}}, Children: []protocol.DocumentSymbol{
++					{Name: "fetch/0", Kind: protocol.Function, Range: protocol.Range{Start: protocol.Position{Line: 1}, End: protocol.Position{Line: 1, Character: 24}}},
++					{Name: "other/0", Kind: protocol.Function, Range: protocol.Range{Start: protocol.Position{Line: 2}, End: protocol.Position{Line: 2, Character: 24}}},
++				}}}
++			}
++		default:
++			response.Error = &lsp.ResponseError{Code: -32601, Message: "unexpected request: " + msg.Method}
++		}
++		if response.Error == nil {
++			response.Result, _ = json.Marshal(result)
++		}
++		if lsp.WriteMessage(os.Stdout, response) != nil {
++			os.Exit(3)
++		}
++	}
++}
++
++func TestDefinitionAtNavigatesWithoutWorkspaceSearch(t *testing.T) {
++	for _, mode := range []string{"single", "multiple", "links", "no_symbols", "missing_source", "empty", "error", "large_module", "long_line", "multiple_long_line"} {
++		t.Run(mode, func(t *testing.T) {
++			dir := t.TempDir()
++			source := filepath.Join(dir, "call.ex")
++			target := filepath.Join(dir, "dependency #1.ex")
++			if err := os.WriteFile(source, []byte("# old\nOld.fetch()\n"), 0600); err != nil {
++				t.Fatal(err)
++			}
++			if mode != "missing_source" {
++				content := "defmodule Deps do\n  def fetch(), do: :fresh\n  def other(), do: :other\nend\n"
++				if mode == "large_module" {
++					content = "defmodule Deps do\n  def fetch(), do: :fresh\n" + strings.Repeat("# unrelated module content\n", 10000) + "end\n"
++				}
++				if mode == "long_line" || mode == "multiple_long_line" {
++					content = "defmodule Deps do\n  def fetch(), do: :fresh # " + strings.Repeat("😀", 10000) + "\n" + strings.Repeat("# context\n", 10000) + "end\n"
++				}
++				if err := os.WriteFile(target, []byte(content), 0600); err != nil {
++					t.Fatal(err)
++				}
++			}
++			uri, _ := lsp.FileURI(source)
++			t.Setenv("TIPS_DEFINITION_TEST_SERVER", mode)
++			t.Setenv("TIPS_DEFINITION_SOURCE_URI", uri)
++			t.Setenv("TIPS_DEFINITION_TARGET_URI", string(protocol.URIFromPath(target)))
++			client, err := lsp.NewClient(os.Args[0], "-test.run=^TestDefinitionServer$")
++			if err != nil {
++				t.Fatal(err)
++			}
++			defer func() { _ = client.Cmd.Process.Kill(); _ = client.Cmd.Wait() }()
++			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
++			defer cancel()
++			if err := client.OpenFile(ctx, source); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(source, []byte("# edited\nDeps.fetch()\n"), 0600); err != nil {
++				t.Fatal(err)
++			}
++			t.Chdir(dir)
++			output, err := ReadDefinitionAt(ctx, client, "call.ex", 2, 7)
++			if mode == "error" {
++				if err == nil || !strings.Contains(err.Error(), "project engine unavailable") {
++					t.Fatalf("output=%q err=%v", output, err)
++				}
++				return
++			}
++			if err != nil {
++				t.Fatal(err)
++			}
++			if mode == "empty" {
++				if !strings.Contains(output, "No definition returned") {
++					t.Fatalf("output=%q", output)
++				}
++				return
++			}
++			if len(output) > 9000 || !utf8.ValidString(output) {
++				t.Fatalf("unbounded or invalid UTF-8 output: %d bytes", len(output))
++			}
++			if mode == "multiple_long_line" && !strings.Contains(output, "preview budget exhausted") {
++				t.Fatalf("missing preview budget notice: %s", output)
++			}
++			wantLocations := 1
++			if mode == "multiple" || mode == "multiple_long_line" {
++				wantLocations = 2
++			}
++			if strings.Count(output, "File: "+target+"\n") != wantLocations {
++				t.Fatalf("locations not preserved/deduplicated: %s", output)
++			}
++			if !strings.Contains(output, "L2:C7") {
++				t.Fatalf("missing original selection: %s", output)
++			}
++			if mode == "missing_source" {
++				if !strings.Contains(output, "Source excerpt unavailable") {
++					t.Fatalf("missing extraction failure: %s", output)
++				}
++			} else {
++				if !strings.Contains(output, "Source preview") {
++					t.Fatalf("context not labeled: %s", output)
++				}
++				if !strings.Contains(output, "def fetch(), do: :fresh") || strings.Contains(output, "defmodule Deps") {
++					t.Fatalf("wrong source excerpt: %s", output)
++				}
++			}
++		})
++	}
++}
++
++func TestDefinitionAtRejectsInvalidPosition(t *testing.T) {
++	for _, position := range [][2]int{{0, 1}, {1, 0}, {-1, 2}, {1, -2}} {
++		if _, err := ReadDefinitionAt(context.Background(), nil, "call.ex", position[0], position[1]); err == nil {
++			t.Fatalf("accepted %v", position)
++		}
++	}
++}
++
++func TestReferencesAtPreservesCallerContext(t *testing.T) {
++	for _, mode := range []string{"locations", "empty", "error"} {
++		t.Run(mode, func(t *testing.T) {
++			dir := t.TempDir()
++			source := filepath.Join(dir, "call.ex")
++			// Deliberately unavailable target: references must preserve locations without opening it.
++			target := filepath.Join(dir, "dependency #1.ex")
++			if err := os.WriteFile(source, []byte("# old\nOld.fetch()\n"), 0600); err != nil {
++				t.Fatal(err)
++			}
++			uri, _ := lsp.FileURI(source)
++			t.Setenv("TIPS_DEFINITION_TEST_SERVER", mode)
++			t.Setenv("TIPS_DEFINITION_SOURCE_URI", uri)
++			t.Setenv("TIPS_DEFINITION_TARGET_URI", string(protocol.URIFromPath(target)))
++			client, err := lsp.NewClient(os.Args[0], "-test.run=^TestDefinitionServer$")
++			if err != nil {
++				t.Fatal(err)
++			}
++			defer func() { _ = client.Cmd.Process.Kill(); _ = client.Cmd.Wait() }()
++			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
++			defer cancel()
++			if err := client.OpenFile(ctx, source); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(source, []byte("# edited\nDeps.fetch()\n"), 0600); err != nil {
++				t.Fatal(err)
++			}
++			t.Chdir(dir)
++			output, err := FindReferencesAt(ctx, client, "call.ex", 2, 7)
++			if mode == "error" {
++				if err == nil || !strings.Contains(err.Error(), "project engine unavailable") {
++					t.Fatalf("output=%q err=%v", output, err)
++				}
++				return
++			}
++			if err != nil {
++				t.Fatal(err)
++			}
++			if mode == "empty" {
++				if !strings.Contains(output, "No references returned") || !strings.Contains(output, "indexing") {
++					t.Fatalf("output=%q", output)
++				}
++				return
++			}
++			if strings.Count(output, "File: "+target+"\n") != 2 || strings.Count(output, "Range: L2:C7") != 1 || strings.Count(output, "Range: L3:C7") != 1 {
++				t.Fatalf("locations lost or duplicated: %s", output)
++			}
++			if !strings.Contains(output, "project selected by the source file") {
++				t.Fatalf("missing scope: %s", output)
++			}
++		})
++	}
++}
++
++func TestReferencesAtRejectsInvalidPosition(t *testing.T) {
++	for _, position := range [][2]int{{0, 1}, {1, 0}, {-1, 2}, {1, -2}} {
++		if _, err := FindReferencesAt(context.Background(), nil, "call.ex", position[0], position[1]); err == nil {
++			t.Fatalf("accepted %v", position)
++		}
++	}
++}
++
++func TestHoverAtSynchronizesOpenDocument(t *testing.T) {
++	for _, mode := range []string{"docs", "empty", "empty_no_newline", "error"} {
++		t.Run(mode, func(t *testing.T) {
++			dir := t.TempDir()
++			source := filepath.Join(dir, "call.ex")
++			if err := os.WriteFile(source, []byte("# old\nOld.fetch()\n"), 0600); err != nil {
++				t.Fatal(err)
++			}
++			uri, _ := lsp.FileURI(source)
++			t.Setenv("TIPS_DEFINITION_TEST_SERVER", mode)
++			t.Setenv("TIPS_DEFINITION_SOURCE_URI", uri)
++			client, err := lsp.NewClient(os.Args[0], "-test.run=^TestDefinitionServer$")
++			if err != nil {
++				t.Fatal(err)
++			}
++			defer func() { _ = client.Cmd.Process.Kill(); _ = client.Cmd.Wait() }()
++			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
++			defer cancel()
++			if err := client.OpenFile(ctx, source); err != nil {
++				t.Fatal(err)
++			}
++			content := "# edited\nDeps.fetch()\n"
++			if mode == "empty_no_newline" {
++				content = strings.TrimSuffix(content, "\n")
++			}
++			if err := os.WriteFile(source, []byte(content), 0600); err != nil {
++				t.Fatal(err)
++			}
++			t.Chdir(dir)
++			output, err := GetHoverInfo(ctx, client, "call.ex", 2, 7)
++			if mode == "error" {
++				if err == nil || !strings.Contains(err.Error(), "project engine unavailable") {
++					t.Fatalf("output=%q err=%v", output, err)
++				}
++				return
++			}
++			if err != nil {
++				t.Fatal(err)
++			}
++			if strings.HasPrefix(mode, "empty") {
++				if !strings.Contains(output, "No hover information") || !strings.Contains(output, "Deps.fetch()") {
++					t.Fatalf("empty hover lost source context: %q", output)
++				}
++			} else if output != "Fresh docs for Deps.fetch/0" {
++				t.Fatalf("hover=%q", output)
++			}
++		})
++	}
++}
++
++func TestHoverAtRejectsInvalidPosition(t *testing.T) {
++	for _, position := range [][2]int{{0, 1}, {1, 0}, {-1, 2}, {1, -2}} {
++		if _, err := GetHoverInfo(context.Background(), nil, "call.ex", position[0], position[1]); err == nil {
++			t.Fatalf("accepted %v", position)
++		}
++	}
++}
 --- a/internal/tools/diagnostics.go
 +++ b/internal/tools/diagnostics.go
-@@ -4,6 +4,7 @@
- 	"context"
- 	"fmt"
- 	"os"
+@@ -6,0 +7 @@
 +	"path/filepath"
- 	"strconv"
- 	"strings"
- 	"time"
-@@ -11,6 +12,10 @@
- 	"github.com/isaacphi/mcp-language-server/internal/lsp"
- 	"github.com/isaacphi/mcp-language-server/internal/protocol"
- )
+@@ -13,0 +15,4 @@
 +
 +// diagnosticsPublishTimeout bounds how long to wait for the server to publish diagnostics after
 +// a change; see GetDiagnosticsForFile. Observed Expert latency: ~1s idle, up to ~7s busy.
 +const diagnosticsPublishTimeout = 10 * time.Second
- 
- // GetDiagnosticsForFile retrieves diagnostics for a specific file from the language server
- func GetDiagnosticsForFile(ctx context.Context, client *lsp.Client, filePath string, contextLines int, showLineNumbers bool) (string, error) {
-@@ -21,43 +26,58 @@
- 		}
- 	}
- 
+@@ -24 +29,7 @@
 -	err := client.OpenFile(ctx, filePath)
 +	// Use the same absolute URI as the workspace watcher and server publications.
 +	var err error
@@ -828,10 +1326,7 @@
 +		return "", fmt.Errorf("could not resolve file path: %w", err)
 +	}
 +	err = client.OpenFile(ctx, filePath)
- 	if err != nil {
- 		return "", fmt.Errorf("could not open file: %v", err)
- 	}
- 
+@@ -29,3 +40,6 @@
 -	// Wait for diagnostics
 -	// TODO: wait for notification
 -	time.Sleep(time.Second * 3)
@@ -841,7 +1336,7 @@
 +		return "", err
 +	}
 +	uri := protocol.DocumentUri(uriString)
- 
+@@ -33,6 +47,5 @@
 -	// Convert the file path to URI format
 -	uri := protocol.DocumentUri("file://" + filePath)
 -
@@ -853,14 +1348,14 @@
 +	version, seqBefore, err := client.NotifyChangeVersion(ctx, filePath)
 +	if err != nil {
 +		return "", fmt.Errorf("could not send file content to the language server: %w", err)
- 	}
+@@ -40,3 +53,3 @@
 -	_, err = client.Diagnostic(ctx, diagParams)
 -	if err != nil {
 -		toolsLogger.Error("Failed to get diagnostics: %v", err)
 +	snapshot, published := client.WaitForDiagnostics(ctx, uri, seqBefore, version, diagnosticsPublishTimeout)
 +	if err := ctx.Err(); err != nil {
 +		return "", err
- 	}
+@@ -44,4 +57,18 @@
 -
 -	// Get diagnostics from the cache
 -	diagnostics := client.GetFileDiagnostics(uri)
@@ -875,7 +1370,7 @@
 +		}
 +		fileInfo += "Showing the last published list; it may be stale.\n"
 +	case snapshot.Version == nil:
-+		fileInfo = fmt.Sprintf("Latest published diagnostics for %s (document version not supplied).\n", filePath)
++		fileInfo = fmt.Sprintf("Latest published diagnostics for %s.\n", filePath)
 +	default:
 +		if len(diagnostics) == 0 {
 +			return fmt.Sprintf("No diagnostics found for %s (document version %d)", filePath, *snapshot.Version), nil
@@ -883,34 +1378,25 @@
 +		fileInfo = fmt.Sprintf("%s (document version %d)\n", filePath, *snapshot.Version)
 +	}
 +	fileInfo += fmt.Sprintf("Diagnostics in File: %d\n", len(diagnostics))
- 	if len(diagnostics) == 0 {
+@@ -49 +76 @@
 -		return "No diagnostics found for " + filePath, nil
 +		return fileInfo, nil
- 	}
+@@ -51,6 +77,0 @@
 -
 -	// Format file header
 -	fileInfo := fmt.Sprintf("%s\nDiagnostics in File: %d\n",
 -		filePath,
 -		len(diagnostics),
 -	)
- 
- 	// Create a summary of all the diagnostics
- 	var diagSummaries []string
+@@ -60 +80,0 @@
 -	var diagLocations []protocol.Location
- 
- 	for _, diag := range diagnostics {
- 		severity := getSeverityString(diag.Severity)
-@@ -83,54 +103,29 @@
- 
- 		diagSummaries = append(diagSummaries, summary)
- 
+@@ -86,5 +105,0 @@
 -		// Create a location for this diagnostic to use with line ranges
 -		diagLocations = append(diagLocations, protocol.Location{
 -			URI:   uri,
 -			Range: diag.Range,
 -		})
- 	}
- 
+@@ -93 +108,7 @@
 -	// Format content with context
 +	result := fileInfo + strings.Join(diagSummaries, "\n") + "\n"
 +	if !showLineNumbers {
@@ -919,13 +1405,12 @@
 +
 +	// Diagnostics already provide line locations. Local context avoids a second
 +	// semantic request that can stall after diagnostics have arrived.
- 	fileContent, err := os.ReadFile(filePath)
- 	if err != nil {
+@@ -96 +117 @@
 -		return fileInfo + "\nError reading file: " + err.Error(), nil
 +		return result + "\nError reading file: " + err.Error(), nil
- 	}
+@@ -98 +118,0 @@
 -
- 	lines := strings.Split(string(fileContent), "\n")
+@@ -100,18 +120,6 @@
 -
 -	// Collect lines to display
 -	var linesToShow map[int]bool
@@ -950,8 +1435,7 @@
 +		line := int(diag.Range.Start.Line)
 +		for i := max(0, line-contextLines); i <= min(len(lines)-1, line+contextLines); i++ {
 +			linesToShow[i] = true
- 		}
- 	}
+@@ -120,14 +128 @@
 -
 -	// Convert to line ranges
 -	lineRanges := ConvertLinesToRanges(linesToShow, len(lines))
@@ -967,9 +1451,6 @@
 -		result += "\n" + FormatLinesWithRanges(lines, lineRanges)
 -	}
 +	result += "\n" + FormatLinesWithRanges(lines, ConvertLinesToRanges(linesToShow, len(lines)))
- 
- 	return result, nil
- }
 --- a/internal/tools/edit_file.go
 +++ b/internal/tools/edit_file.go
 @@ -20,7 +20,11 @@
@@ -996,155 +1477,341 @@
  
 --- a/internal/tools/execute-codelens.go
 +++ b/internal/tools/execute-codelens.go
-@@ -12,7 +12,11 @@
- // ExecuteCodeLens executes a specific code lens command from a file.
- func ExecuteCodeLens(ctx context.Context, client *lsp.Client, filePath string, index int) (string, error) {
- 	// Open the file
+@@ -15 +15,5 @@
 -	err := client.OpenFile(ctx, filePath)
 +	uriString, err := lsp.FileURI(filePath)
 +	if err != nil {
 +		return "", err
 +	}
 +	err = client.OpenFile(ctx, filePath)
- 	if err != nil {
- 		return "", fmt.Errorf("could not open file: %v", err)
- 	}
-@@ -21,7 +25,7 @@
- 
- 	// Get code lenses
- 	docIdentifier := protocol.TextDocumentIdentifier{
+@@ -24 +28 @@
 -		URI: protocol.DocumentUri("file://" + filePath),
 +		URI: protocol.DocumentUri(uriString),
- 	}
- 
- 	params := protocol.CodeLensParams{
 --- a/internal/tools/get-codelens.go
 +++ b/internal/tools/get-codelens.go
-@@ -12,7 +12,11 @@
- 
- // GetCodeLens retrieves code lens hints for a given file location
- func GetCodeLens(ctx context.Context, client *lsp.Client, filePath string) (string, error) {
+@@ -15 +15,5 @@
 -	err := client.OpenFile(ctx, filePath)
 +	uriString, err := lsp.FileURI(filePath)
 +	if err != nil {
 +		return "", err
 +	}
 +	err = client.OpenFile(ctx, filePath)
- 	if err != nil {
- 		return "", fmt.Errorf("could not open file: %v", err)
- 	}
-@@ -21,7 +25,7 @@
- 
- 	// Create document identifier
- 	docIdentifier := protocol.TextDocumentIdentifier{
+@@ -24 +28 @@
 -		URI: protocol.DocumentUri("file://" + filePath),
 +		URI: protocol.DocumentUri(uriString),
- 	}
- 
- 	// Request code lens from LSP
 --- a/internal/tools/hover.go
 +++ b/internal/tools/hover.go
-@@ -11,8 +11,12 @@
- 
- // GetHoverInfo retrieves hover information (type, documentation) for a symbol at the specified position
- func GetHoverInfo(ctx context.Context, client *lsp.Client, filePath string, line, column int) (string, error) {
-+	uriString, err := lsp.FileURI(filePath)
+@@ -5,0 +6 @@
++	"os"
+@@ -14,2 +15 @@
+-	// Open the file if not already open
+-	err := client.OpenFile(ctx, filePath)
++	params, err := navigationPosition(ctx, client, filePath, line, column)
+@@ -17 +17 @@
+-		return "", fmt.Errorf("could not open file: %v", err)
++		return "", err
+@@ -19,14 +18,0 @@
+-
+-	params := protocol.HoverParams{}
+-
+-	// Convert 1-indexed line/column to 0-indexed for LSP protocol
+-	position := protocol.Position{
+-		Line:      uint32(line - 1),
+-		Character: uint32(column - 1),
+-	}
+-	uri := protocol.DocumentUri("file://" + filePath)
+-	params.TextDocument = protocol.TextDocumentIdentifier{
+-		URI: uri,
+-	}
+-	params.Position = position
+-
+@@ -34 +20 @@
+-	hoverResult, err := client.Hover(ctx, params)
++	hoverResult, err := client.Hover(ctx, protocol.HoverParams{TextDocumentPositionParams: params})
+@@ -39,24 +25,2 @@
+-	var result strings.Builder
+-
+-	// Process the hover contents based on Markup content
+-	if hoverResult.Contents.Value == "" {
+-		// Extract the line where the hover was requested
+-		lineText, err := ExtractTextFromLocation(protocol.Location{
+-			URI: uri,
+-			Range: protocol.Range{
+-				Start: protocol.Position{
+-					Line:      position.Line,
+-					Character: 0,
+-				},
+-				End: protocol.Position{
+-					Line:      position.Line + 1,
+-					Character: 0,
+-				},
+-			},
+-		})
+-		if err != nil {
+-			toolsLogger.Warn("failed to extract line at position: %v", err)
+-		}
+-		result.WriteString(fmt.Sprintf("No hover information available for this position on the following line:\n%s", lineText))
+-	} else {
+-		result.WriteString(hoverResult.Contents.Value)
++	if hoverResult.Contents.Value != "" {
++		return hoverResult.Contents.Value, nil
+@@ -65 +29,12 @@
+-	return result.String(), nil
++	// Read the requested line directly; the final line need not have a newline.
++	lineText := ""
++	content, err := os.ReadFile(filePath)
++	if err != nil {
++		toolsLogger.Warn("failed to read line at hover position: %v", err)
++	} else {
++		lines := strings.Split(string(content), "\n")
++		if int(params.Position.Line) < len(lines) {
++			lineText = lines[params.Position.Line]
++		}
++	}
++	return fmt.Sprintf("No hover information available for this position on the following line:\n%s", lineText), nil
+--- a/internal/tools/navigation.go
++++ b/internal/tools/navigation.go
+@@ -0,0 +1,96 @@
++package tools
++
++import (
++	"context"
++	"fmt"
++	"math"
++	"net/url"
++	"os"
++	"strings"
++	"unicode/utf8"
++
++	"github.com/isaacphi/mcp-language-server/internal/lsp"
++	"github.com/isaacphi/mcp-language-server/internal/protocol"
++)
++
++// Synchronize the caller's document, preserving the context used for project selection.
++func navigationPosition(ctx context.Context, client *lsp.Client, filePath string, line, column int) (protocol.TextDocumentPositionParams, error) {
++	var params protocol.TextDocumentPositionParams
++	if line < 1 || column < 1 || uint64(line) > math.MaxUint32 || uint64(column) > math.MaxUint32 {
++		return params, fmt.Errorf("line and column must be positive integers no greater than %d", uint64(math.MaxUint32))
++	}
++	uri, err := lsp.FileURI(filePath)
++	if err != nil {
++		return params, err
++	}
++	if err := client.OpenFile(ctx, filePath); err != nil {
++		return params, fmt.Errorf("could not open file: %w", err)
++	}
++	if err := client.SyncFile(ctx, filePath); err != nil {
++		return params, fmt.Errorf("could not synchronize file: %w", err)
++	}
++	return protocol.TextDocumentPositionParams{
++		TextDocument: protocol.TextDocumentIdentifier{URI: protocol.DocumentUri(uri)},
++		Position:     protocol.Position{Line: uint32(line - 1), Character: uint32(column - 1)},
++	}, nil
++}
++
++// Locations remain useful even when source is missing or preview space runs out.
++// Reading previews directly avoids starting another project engine for dependencies.
++func formatNavigationLocations(locations []protocol.Location, preview bool) string {
++	var output strings.Builder
++	seen := make(map[protocol.Location]bool)
++	budget := 8 * 1024
++	for _, loc := range locations {
++		if seen[loc] {
++			continue
++		}
++		seen[loc] = true
++		target := string(loc.URI)
++		parsed, err := url.Parse(target)
++		local := err == nil && parsed.Scheme == "file" && (parsed.Host == "" || parsed.Host == "localhost")
++		if local {
++			target = parsed.Path
++		}
++		fmt.Fprintf(&output, "---\n\nFile: %s\nRange: L%d:C%d - L%d:C%d\n", target, loc.Range.Start.Line+1, loc.Range.Start.Character+1, loc.Range.End.Line+1, loc.Range.End.Character+1)
++		if !preview {
++			continue
++		}
++		if !local {
++			output.WriteString("Source excerpt unavailable for this URI.\n")
++			continue
++		}
++		if budget == 0 {
++			output.WriteString("Source preview omitted: response preview budget exhausted.\n")
++			continue
++		}
++		content, err := os.ReadFile(target)
++		if err != nil {
++			fmt.Fprintf(&output, "Source excerpt unavailable: %v\n", err)
++			continue
++		}
++		lines := strings.Split(string(content), "\n")
++		start := int(loc.Range.Start.Line)
++		if start >= len(lines) {
++			output.WriteString("Source excerpt unavailable: target line is outside the file.\n")
++			continue
++		}
++		end := min(start+40, len(lines))
++		excerpt := addLineNumbers(strings.Join(lines[start:end], "\n"), start+1)
++		truncated := end < len(lines) || len(excerpt) > budget
++		if len(excerpt) > budget {
++			excerpt = excerpt[:budget]
++			for !utf8.ValidString(excerpt) {
++				excerpt = excerpt[:len(excerpt)-1]
++			}
++			budget = 0
++		} else {
++			budget -= len(excerpt)
++		}
++		fmt.Fprintf(&output, "\nSource preview (up to 40 lines; may include neighboring code):\n\n%s\n", excerpt)
++		if truncated {
++			output.WriteString("Preview truncated; read the file at the location above for more.\n")
++		}
++	}
++	return output.String()
++}
+--- a/internal/tools/navigation_sync_test.go
++++ b/internal/tools/navigation_sync_test.go
+@@ -0,0 +1,108 @@
++package tools
++
++import (
++	"bufio"
++	"context"
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++	"time"
++
++	"github.com/isaacphi/mcp-language-server/internal/lsp"
++	"github.com/isaacphi/mcp-language-server/internal/protocol"
++)
++
++// Reject redundant updates and navigation requests against stale document text.
++func TestNavigationSyncServer(t *testing.T) {
++	if os.Getenv("TIPS_SYNC_SERVER") != "1" {
++		t.Skip("subprocess fixture")
++	}
++	reader := bufio.NewReader(os.Stdin)
++	var current, uri string
++	redundant := false
++	for {
++		msg, err := lsp.ReadMessage(reader)
++		if err != nil {
++			os.Exit(0)
++		}
++		var params struct {
++			TextDocument struct {
++				URI  string `json:"uri"`
++				Text string `json:"text"`
++			} `json:"textDocument"`
++			ContentChanges []struct {
++				Text string `json:"text"`
++			} `json:"contentChanges"`
++		}
++		if err := json.Unmarshal(msg.Params, &params); err != nil {
++			os.Exit(2)
++		}
++		switch msg.Method {
++		case "textDocument/didOpen":
++			uri, current = params.TextDocument.URI, params.TextDocument.Text
++		case "textDocument/didChange":
++			if len(params.ContentChanges) != 1 {
++				os.Exit(3)
++			}
++			text := params.ContentChanges[0].Text
++			redundant = redundant || text == current
++			current = text
++		}
++		if msg.ID == nil {
++			continue
++		}
++		response := &lsp.Message{JSONRPC: "2.0", ID: msg.ID}
++		disk, err := os.ReadFile(strings.TrimPrefix(uri, "file://"))
++		if redundant {
++			response.Error = &lsp.ResponseError{Code: -32603, Message: "redundant didChange"}
++		} else if err != nil || string(disk) != current || params.TextDocument.URI != uri {
++			response.Error = &lsp.ResponseError{Code: -32603, Message: "stale navigation document"}
++		} else {
++			loc := protocol.Location{URI: protocol.DocumentUri(uri), Range: protocol.Range{Start: protocol.Position{Line: 1}, End: protocol.Position{Line: 1, Character: 5}}}
++			switch msg.Method {
++			case "textDocument/hover":
++				response.Result, _ = json.Marshal(protocol.Hover{Contents: protocol.MarkupContent{Kind: "plaintext", Value: current}})
++			case "textDocument/definition":
++				response.Result, _ = json.Marshal(loc)
++			case "textDocument/references":
++				response.Result, _ = json.Marshal([]protocol.Location{loc})
++			default:
++				response.Error = &lsp.ResponseError{Code: -32601, Message: "unexpected request"}
++			}
++		}
++		if lsp.WriteMessage(os.Stdout, response) != nil {
++			os.Exit(4)
++		}
++	}
++}
++
++func TestNavigationSkipsUnchangedUpdates(t *testing.T) {
++	for _, tool := range []struct {
++		name string
++		run  func(context.Context, *lsp.Client, string, int, int) (string, error)
++	}{{"hover", GetHoverInfo}, {"definition", ReadDefinitionAt}, {"references", FindReferencesAt}} {
++		t.Run(tool.name, func(t *testing.T) {
++			path := filepath.Join(t.TempDir(), "call.ex")
++			t.Setenv("TIPS_SYNC_SERVER", "1")
++			client, err := lsp.NewClient(os.Args[0], "-test.run=^TestNavigationSyncServer$")
++			if err != nil {
++				t.Fatal(err)
++			}
++			defer func() { _ = client.Cmd.Process.Kill(); _ = client.Cmd.Wait() }()
++			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
++			defer cancel()
++			for _, content := range []string{"# original\nvalue()\n", "# edited\nvalue()\n", "# original\nvalue()\n"} {
++				if err := os.WriteFile(path, []byte(content), 0600); err != nil {
++					t.Fatal(err)
++				}
++				for range 3 {
++					if _, err := tool.run(ctx, client, path, 2, 1); err != nil {
++						t.Fatal(err)
++					}
++				}
++			}
++		})
++	}
++}
+--- a/internal/tools/references_at.go
++++ b/internal/tools/references_at.go
+@@ -0,0 +1,29 @@
++package tools
++
++import (
++	"context"
++	"fmt"
++
++	"github.com/isaacphi/mcp-language-server/internal/lsp"
++	"github.com/isaacphi/mcp-language-server/internal/protocol"
++)
++
++// FindReferencesAt retains the caller's source/project context instead of
++// moving the request to a declaration discovered through workspace search.
++func FindReferencesAt(ctx context.Context, client *lsp.Client, filePath string, line, column int) (string, error) {
++	position, err := navigationPosition(ctx, client, filePath, line, column)
 +	if err != nil {
 +		return "", err
 +	}
- 	// Open the file if not already open
--	err := client.OpenFile(ctx, filePath)
-+	err = client.OpenFile(ctx, filePath)
- 	if err != nil {
- 		return "", fmt.Errorf("could not open file: %v", err)
- 	}
-@@ -24,7 +28,7 @@
- 		Line:      uint32(line - 1),
- 		Character: uint32(column - 1),
- 	}
--	uri := protocol.DocumentUri("file://" + filePath)
-+	uri := protocol.DocumentUri(uriString)
- 	params.TextDocument = protocol.TextDocumentIdentifier{
- 		URI: uri,
- 	}
---- a/internal/tools/lsp-utilities.go
-+++ b/internal/tools/lsp-utilities.go
-@@ -37,12 +37,11 @@
- 	var searchSymbols func(symbols []protocol.DocumentSymbolResult) bool
- 	searchSymbols = func(symbols []protocol.DocumentSymbolResult) bool {
- 		for _, sym := range symbols {
--			if containsPosition(sym.GetRange(), startLocation.Range.Start) {
--				symbolRange = sym.GetRange()
--				found = true
--				return true
-+			if !containsPosition(sym.GetRange(), startLocation.Range.Start) {
-+				continue
- 			}
--			// Handle nested symbols if it's a DocumentSymbol
-+			// Prefer the innermost symbol containing the position: a module or
-+			// class range contains every member, so descend before accepting.
- 			if ds, ok := sym.(*protocol.DocumentSymbol); ok && len(ds.Children) > 0 {
- 				childSymbols := make([]protocol.DocumentSymbolResult, len(ds.Children))
- 				for i := range ds.Children {
-@@ -52,6 +51,9 @@
- 					return true
- 				}
- 			}
-+			symbolRange = sym.GetRange()
-+			found = true
-+			return true
- 		}
- 		return false
- 	}
---- a/internal/tools/references.go
-+++ b/internal/tools/references.go
-@@ -21,33 +21,14 @@
- 		}
- 	}
- 
--	// First get the symbol location like ReadDefinition does
--	symbolResult, err := client.Symbol(ctx, protocol.WorkspaceSymbolParams{
--		Query: symbolName,
--	})
-+	results, err := lookupSymbols(ctx, client, symbolName)
- 	if err != nil {
--		return "", fmt.Errorf("failed to fetch symbol: %v", err)
--	}
--
--	results, err := symbolResult.Results()
--	if err != nil {
--		return "", fmt.Errorf("failed to parse results: %v", err)
-+		return "", err
- 	}
- 
- 	var allReferences []string
- 	for _, symbol := range results {
--		// Handle different matching strategies based on the search term
--		if strings.Contains(symbolName, ".") {
--			// For qualified names like "Type.Method", check for various matches
--			parts := strings.Split(symbolName, ".")
--			methodName := parts[len(parts)-1]
--
--			// Try matching the unqualified method name for languages that don't use qualified names in symbols
--			if symbol.GetName() != symbolName && symbol.GetName() != methodName {
--				continue
--			}
--		} else if symbol.GetName() != symbolName {
--			// For unqualified names, exact match only
-+		if !symbolMatches(symbol, symbolName) {
- 			continue
- 		}
- 
-@@ -60,7 +41,7 @@
- 				TextDocument: protocol.TextDocumentIdentifier{
- 					URI: loc.URI,
- 				},
--				Position: loc.Range.Start,
-+				Position: referencePosition(loc.URI.Path(), loc.Range.Start, symbolName),
- 			},
- 			Context: protocol.ReferenceContext{
- 				IncludeDeclaration: false,
---- /dev/null
++	locations, err := client.References(ctx, protocol.ReferenceParams{
++		TextDocumentPositionParams: position,
++		Context:                    protocol.ReferenceContext{IncludeDeclaration: false},
++	})
++	if err != nil {
++		return "", fmt.Errorf("references request failed: %w", err)
++	}
++	if len(locations) == 0 {
++		return fmt.Sprintf("No references returned for %s at L%d:C%d. The project may still be indexing; this does not prove there are no usages.", filePath, line, column), nil
++	}
++	return "References returned by the language server for the project selected by the source file; other projects may have additional usages.\n\n" + formatNavigationLocations(locations, false), nil
++}
+--- a/internal/tools/relative_paths_test.go
 +++ b/internal/tools/relative_paths_test.go
 @@ -0,0 +1,108 @@
 +package tools
@@ -1278,288 +1945,123 @@
  	position := protocol.Position{
  		Line:      uint32(line - 1),
  		Character: uint32(column - 1),
---- /dev/null
-+++ b/internal/tools/symbol_position.go
-@@ -0,0 +1,142 @@
-+package tools
-+
-+import (
-+	"bufio"
-+	"context"
-+	"fmt"
-+	"os"
-+	"strings"
-+
-+	"github.com/isaacphi/mcp-language-server/internal/lsp"
-+	"github.com/isaacphi/mcp-language-server/internal/protocol"
-+)
-+
-+// referencePosition returns the position to use for a references request on
-+// a symbol found by workspace/symbol. Servers report the range of the whole
-+// declaration, whose start often precedes the name or sits on the first
-+// segment of a qualified name (for example "TipsWeb" in
-+// "defmodule TipsWeb.LiveAcceptance"). Querying there resolves the wrong
-+// symbol. This moves the cursor onto the last segment of symbolName when the
-+// full name, or failing that the last segment alone, appears as a whole
-+// identifier on the range's first line. Otherwise it returns start unchanged.
-+func referencePosition(path string, start protocol.Position, symbolName string) protocol.Position {
-+	line, ok := readLine(path, int(start.Line))
-+	if !ok {
-+		return start
-+	}
-+	segment := lastSegment(symbolName)
-+	if idx := indexIdentifier(line, symbolName); idx >= 0 {
-+		return protocol.Position{Line: start.Line, Character: uint32(idx + len(symbolName) - len(segment))}
-+	}
-+	if idx := indexIdentifier(line, segment); idx >= 0 {
-+		return protocol.Position{Line: start.Line, Character: uint32(idx)}
-+	}
-+	return start
-+}
-+
-+// indexIdentifier finds name in line as a whole identifier: the bytes on
-+// either side must not be identifier characters.
-+func indexIdentifier(line, name string) int {
-+	from := 0
-+	for {
-+		i := strings.Index(line[from:], name)
-+		if i < 0 {
-+			return -1
-+		}
-+		idx := from + i
-+		end := idx + len(name)
-+		if (idx == 0 || !isIdent(line[idx-1])) && (end == len(line) || !isIdent(line[end])) {
-+			return idx
-+		}
-+		from = idx + 1
-+	}
-+}
-+
-+func isIdent(b byte) bool {
-+	return b == '_' || b == '?' || b == '!' ||
-+		(b >= '0' && b <= '9') || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
-+}
-+
-+func readLine(path string, n int) (string, bool) {
-+	f, err := os.Open(path)
-+	if err != nil {
-+		return "", false
-+	}
-+	defer f.Close()
-+	scanner := bufio.NewScanner(f)
-+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-+	for i := 0; scanner.Scan(); i++ {
-+		if i == n {
-+			return scanner.Text(), true
-+		}
-+	}
-+	return "", false
-+}
-+
-+// symbolBaseName strips an Elixir/Erlang arity suffix ("/1") from a
-+// workspace symbol name so "Tips.Accounts.register_user/1" matches a query
-+// for "Tips.Accounts.register_user" or "register_user".
-+func symbolBaseName(name string) string {
-+	slash := strings.LastIndex(name, "/")
-+	if slash < 0 || slash == len(name)-1 {
-+		return name
-+	}
-+	for _, b := range []byte(name[slash+1:]) {
-+		if b < '0' || b > '9' {
-+			return name
-+		}
-+	}
-+	return name[:slash]
-+}
-+
-+// lastSegment returns the bare name for dotted and C++ qualified symbols.
-+func lastSegment(name string) string {
-+	start := strings.LastIndex(name, ".") + 1
-+	if colon := strings.LastIndex(name, "::"); colon >= 0 && colon+2 > start {
-+		start = colon + 2
-+	}
-+	return name[start:]
-+}
-+
-+// symbolMatches reports whether a workspace symbol answers a query for
-+// symbolName. The symbol's arity suffix is ignored. A qualified query
-+// ("Mod.fun") matches the same qualified name, a longer name ending in
-+// ".Mod.fun", or a bare "fun" for servers that report unqualified names. An unqualified query ("fun") matches "fun"
-+// or any qualified name ending in ".fun" or "::fun".
-+func symbolMatches(symbol protocol.WorkspaceSymbolResult, symbolName string) bool {
-+	name := symbolBaseName(symbol.GetName())
-+	if name == symbolName {
-+		return true
-+	}
-+	if segment := lastSegment(symbolName); segment != symbolName && name == segment {
-+		return true
-+	}
-+	return strings.HasSuffix(name, "."+symbolName) || strings.HasSuffix(name, "::"+symbolName)
-+}
-+
-+// lookupSymbols queries workspace/symbol for symbolName. Some servers index
-+// functions by bare name only and return nothing for a qualified query, so
-+// on an empty result for "Mod.fun" it retries with "fun"; callers filter the
-+// wider result with symbolMatches.
-+func lookupSymbols(ctx context.Context, client *lsp.Client, symbolName string) ([]protocol.WorkspaceSymbolResult, error) {
-+	results, err := querySymbols(ctx, client, symbolName)
-+	if err != nil || len(results) > 0 {
-+		return results, err
-+	}
-+	if dot := strings.LastIndex(symbolName, "."); dot >= 0 {
-+		return querySymbols(ctx, client, symbolName[dot+1:])
-+	}
-+	return results, nil
-+}
-+
-+func querySymbols(ctx context.Context, client *lsp.Client, query string) ([]protocol.WorkspaceSymbolResult, error) {
-+	symbolResult, err := client.Symbol(ctx, protocol.WorkspaceSymbolParams{Query: query})
-+	if err != nil {
-+		return nil, fmt.Errorf("failed to fetch symbol: %v", err)
-+	}
-+	results, err := symbolResult.Results()
-+	if err != nil {
-+		return nil, fmt.Errorf("failed to parse results: %v", err)
-+	}
-+	return results, nil
-+}
---- /dev/null
-+++ b/internal/tools/symbol_position_test.go
-@@ -0,0 +1,85 @@
-+package tools
-+
-+import (
-+	"os"
-+	"path/filepath"
-+	"testing"
-+
-+	"github.com/isaacphi/mcp-language-server/internal/protocol"
-+)
-+
-+func TestReferencePosition(t *testing.T) {
-+	dir := t.TempDir()
-+	path := filepath.Join(dir, "live_acceptance.ex")
-+	src := "defmodule TipsWeb.LiveAcceptance do\n" +
-+		"  def on_mount(_, _, _, socket), do: {:cont, socket}\n" +
-+		"  def register_user(attrs), do: attrs\n" +
-+		"end\n" +
-+		"int Foo::bar() {\n"
-+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
-+		t.Fatal(err)
-+	}
-+	cases := []struct {
-+		name  string
-+		start protocol.Position
-+		sym   string
-+		want  uint32
-+	}{
-+		{"qualified module → last segment", protocol.Position{Line: 0}, "TipsWeb.LiveAcceptance", 18},
-+		{"unqualified name → itself", protocol.Position{Line: 1, Character: 2}, "on_mount", 6},
-+		{"qualified function absent → last segment fallback", protocol.Position{Line: 2, Character: 2}, "Accounts.register_user", 6},
-+		{"identifier boundary: 'user' inside 'register_user' is not a match", protocol.Position{Line: 2, Character: 2}, "user", 2},
-+		{"C++ qualified function → last segment", protocol.Position{Line: 4}, "Foo::bar", 9},
-+		{"C++ qualified function absent → last segment fallback", protocol.Position{Line: 4}, "Other::bar", 9},
-+		{"absent → unchanged", protocol.Position{Line: 3}, "Missing", 0},
-+	}
-+	for _, c := range cases {
-+		got := referencePosition(path, c.start, c.sym)
-+		if got.Line != c.start.Line || got.Character != c.want {
-+			t.Errorf("%s: got %+v, want character %d", c.name, got, c.want)
-+		}
-+	}
-+}
-+
-+func TestSymbolBaseName(t *testing.T) {
-+	cases := map[string]string{
-+		"Tips.Accounts.register_user/1": "Tips.Accounts.register_user",
-+		"TipsWeb.LiveAcceptance":        "TipsWeb.LiveAcceptance",
-+		"path/to/thing":                 "path/to/thing",
-+		"weird/":                        "weird/",
-+	}
-+	for in, want := range cases {
-+		if got := symbolBaseName(in); got != want {
-+			t.Errorf("%q: got %q, want %q", in, got, want)
-+		}
-+	}
-+}
-+
-+func TestSymbolMatches(t *testing.T) {
-+	sym := func(name string) protocol.WorkspaceSymbolResult {
-+		return &protocol.SymbolInformation{Name: name}
-+	}
-+	cases := []struct {
-+		symbol, query string
-+		want          bool
-+	}{
-+		{"Tips.Accounts.register_user/1", "register_user", true},
-+		{"Tips.Accounts.register_user/1", "Tips.Accounts.register_user", true},
-+		{"Tips.Accounts.register_user/1", "Accounts.register_user", true},
-+		{"Other.Accounts.register_user/1", "Accounts.register_user", true},
-+		{"Tips.Accounts.register_user/1", "Web.Accounts.register_user", false},
-+		{"TipsWeb.LiveAcceptance", "TipsWeb.LiveAcceptance", true},
-+		{"TipsWeb", "TipsWeb.LiveAcceptance", false},
-+		{"register_user", "Tips.Accounts.register_user", true},
-+		{"Foo::bar", "bar", true},
-+		{"bar", "Foo::bar", true},
-+		{"Outer::Foo::bar", "Foo::bar", true},
-+		{"Other::bar", "Foo::bar", false},
-+		{"unregister_user/1", "register_user", false},
-+	}
-+	for _, c := range cases {
-+		if got := symbolMatches(sym(c.symbol), c.query); got != c.want {
-+			t.Errorf("symbolMatches(%q, %q) = %v, want %v", c.symbol, c.query, got, c.want)
-+		}
-+	}
-+}
 --- a/tools.go
 +++ b/tools.go
-@@ -87,7 +87,7 @@
- 		}
- 
- 		coreLogger.Debug("Executing edit_file for file: %s", filePath)
+@@ -6 +6,3 @@
+-
++	"math"
++
++	"github.com/isaacphi/mcp-language-server/internal/lsp"
+@@ -9,0 +12,20 @@
++
++func parsePosition(arguments map[string]any) ([2]int, error) {
++	position := [2]int{}
++	for i, name := range []string{"line", "column"} {
++		var number float64
++		switch value := arguments[name].(type) {
++		case float64:
++			number = value
++		case int:
++			number = float64(value)
++		default:
++			return position, fmt.Errorf("%s must be a positive integer", name)
++		}
++		if math.IsNaN(number) || number < 1 || number > math.MaxUint32 || number != math.Trunc(number) {
++			return position, fmt.Errorf("%s must be a positive integer within the LSP position range", name)
++		}
++		position[i] = int(number)
++	}
++	return position, nil
++}
+@@ -90 +112 @@
 -		response, err := tools.ApplyTextEdits(s.ctx, s.lspClient, filePath, edits)
 +		response, err := tools.ApplyTextEdits(ctx, s.lspClient, filePath, edits)
- 		if err != nil {
- 			coreLogger.Error("Failed to apply edits: %v", err)
- 			return mcp.NewToolResultError(fmt.Sprintf("failed to apply edits: %v", err)), nil
-@@ -111,7 +111,7 @@
- 		}
- 
- 		coreLogger.Debug("Executing definition for symbol: %s", symbolName)
+@@ -98,47 +120,31 @@
+-	readDefinitionTool := mcp.NewTool("definition",
+-		mcp.WithDescription("Read the source code definition of a symbol (function, type, constant, etc.) from the codebase. Returns the complete implementation code where the symbol is defined."),
+-		mcp.WithString("symbolName",
+-			mcp.Required(),
+-			mcp.Description("The name of the symbol whose definition you want to find (e.g. 'mypackage.MyFunction', 'MyType.MyMethod')"),
+-		),
+-	)
+-
+-	s.mcpServer.AddTool(readDefinitionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+-		// Extract arguments
+-		symbolName, ok := request.Params.Arguments["symbolName"].(string)
+-		if !ok {
+-			return mcp.NewToolResultError("symbolName must be a string"), nil
+-		}
+-
+-		coreLogger.Debug("Executing definition for symbol: %s", symbolName)
 -		text, err := tools.ReadDefinition(s.ctx, s.lspClient, symbolName)
-+		text, err := tools.ReadDefinition(ctx, s.lspClient, symbolName)
- 		if err != nil {
- 			coreLogger.Error("Failed to get definition: %v", err)
- 			return mcp.NewToolResultError(fmt.Sprintf("failed to get definition: %v", err)), nil
-@@ -135,7 +135,7 @@
- 		}
- 
- 		coreLogger.Debug("Executing references for symbol: %s", symbolName)
+-		if err != nil {
+-			coreLogger.Error("Failed to get definition: %v", err)
+-			return mcp.NewToolResultError(fmt.Sprintf("failed to get definition: %v", err)), nil
+-		}
+-		return mcp.NewToolResultText(text), nil
+-	})
+-
+-	findReferencesTool := mcp.NewTool("references",
+-		mcp.WithDescription("Find all usages and references of a symbol throughout the codebase. Returns a list of all files and locations where the symbol appears."),
+-		mcp.WithString("symbolName",
+-			mcp.Required(),
+-			mcp.Description("The name of the symbol to search for (e.g. 'mypackage.MyFunction', 'MyType')"),
+-		),
+-	)
+-
+-	s.mcpServer.AddTool(findReferencesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+-		// Extract arguments
+-		symbolName, ok := request.Params.Arguments["symbolName"].(string)
+-		if !ok {
+-			return mcp.NewToolResultError("symbolName must be a string"), nil
+-		}
+-
+-		coreLogger.Debug("Executing references for symbol: %s", symbolName)
 -		text, err := tools.FindReferences(s.ctx, s.lspClient, symbolName)
-+		text, err := tools.FindReferences(ctx, s.lspClient, symbolName)
- 		if err != nil {
- 			coreLogger.Error("Failed to find references: %v", err)
- 			return mcp.NewToolResultError(fmt.Sprintf("failed to find references: %v", err)), nil
-@@ -144,13 +144,13 @@
- 	})
- 
- 	getDiagnosticsTool := mcp.NewTool("diagnostics",
+-		if err != nil {
+-			coreLogger.Error("Failed to find references: %v", err)
+-			return mcp.NewToolResultError(fmt.Sprintf("failed to find references: %v", err)), nil
+-		}
+-		return mcp.NewToolResultText(text), nil
+-	})
++	for _, navigation := range []struct {
++		name        string
++		description string
++		run         func(context.Context, *lsp.Client, string, int, int) (string, error)
++	}{
++		{"definition", "Go to the definition at a source position. Returns unique source locations and bounded source previews (up to 40 lines per location, sharing an 8 KiB preview budget).", tools.ReadDefinitionAt},
++		{"references", "Find references at a source position in the project selected by the source file. Returns unique locations reported by the language server; other projects may contain additional usages.", tools.FindReferencesAt},
++		{"hover", "Get documentation and types at a source position, synchronizing the latest file contents before requesting hover information.", tools.GetHoverInfo},
++	} {
++		tool := mcp.NewTool(navigation.name,
++			mcp.WithDescription(navigation.description),
++			mcp.WithString("filePath", mcp.Required(), mcp.Description("Path to the file containing the symbol usage")),
++			mcp.WithNumber("line", mcp.Required(), mcp.Min(1), mcp.Max(math.MaxUint32), mcp.MultipleOf(1), mcp.Description("Line of the symbol usage (1-indexed)")),
++			mcp.WithNumber("column", mcp.Required(), mcp.Min(1), mcp.Max(math.MaxUint32), mcp.MultipleOf(1), mcp.Description("Column within the symbol usage (1-indexed UTF-16 code units)")),
++		)
++		s.mcpServer.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
++			filePath, ok := request.Params.Arguments["filePath"].(string)
++			if !ok || filePath == "" {
++				return mcp.NewToolResultError("filePath must be a non-empty string"), nil
++			}
++			position, err := parsePosition(request.Params.Arguments)
++			if err != nil {
++				return mcp.NewToolResultError(err.Error()), nil
++			}
++			text, err := navigation.run(ctx, s.lspClient, filePath, position[0], position[1])
++			if err != nil {
++				return mcp.NewToolResultError(fmt.Sprintf("failed to get %s: %v", navigation.name, err)), nil
++			}
++			return mcp.NewToolResultText(text), nil
++		})
++	}
+@@ -147 +153 @@
 -		mcp.WithDescription("Get diagnostic information for a specific file from the language server."),
 +		mcp.WithDescription("Get diagnostic information for a file. Supplied document versions are checked. Servers such as Expert omit versions; their latest published list is useful but cannot certify the current file is clean."),
- 		mcp.WithString("filePath",
- 			mcp.Required(),
- 			mcp.Description("The path to the file to get diagnostics for"),
- 		),
- 		mcp.WithBoolean("contextLines",
+@@ -153 +159 @@
 -			mcp.Description("Lines to include around each diagnostic."),
 +			mcp.Description("Include up to five lines around each diagnostic."),
- 			mcp.DefaultBool(false),
- 		),
- 		mcp.WithBoolean("showLineNumbers",
-@@ -166,9 +166,10 @@
- 			return mcp.NewToolResultError("filePath must be a string"), nil
- 		}
- 
+@@ -169,3 +175,4 @@
 -		contextLines := 5 // default value
 -		if contextLinesArg, ok := request.Params.Arguments["contextLines"].(int); ok {
 -			contextLines = contextLinesArg
@@ -1567,33 +2069,175 @@
 +		contextLines := 0
 +		if includeContext, _ := request.Params.Arguments["contextLines"].(bool); includeContext {
 +			contextLines = 5
- 		}
- 
- 		showLineNumbers := true // default value
-@@ -177,7 +178,7 @@
- 		}
- 
- 		coreLogger.Debug("Executing diagnostics for file: %s", filePath)
+@@ -180 +187 @@
 -		text, err := tools.GetDiagnosticsForFile(s.ctx, s.lspClient, filePath, contextLines, showLineNumbers)
 +		text, err := tools.GetDiagnosticsForFile(ctx, s.lspClient, filePath, contextLines, showLineNumbers)
- 		if err != nil {
- 			coreLogger.Error("Failed to get diagnostics: %v", err)
- 			return mcp.NewToolResultError(fmt.Sprintf("failed to get diagnostics: %v", err)), nil
-@@ -294,7 +295,7 @@
- 		}
- 
- 		coreLogger.Debug("Executing hover for file: %s line: %d column: %d", filePath, line, column)
+@@ -253,52 +259,0 @@
+-	hoverTool := mcp.NewTool("hover",
+-		mcp.WithDescription("Get hover information (type, documentation) for a symbol at the specified position."),
+-		mcp.WithString("filePath",
+-			mcp.Required(),
+-			mcp.Description("The path to the file to get hover information for"),
+-		),
+-		mcp.WithNumber("line",
+-			mcp.Required(),
+-			mcp.Description("The line number where the hover is requested (1-indexed)"),
+-		),
+-		mcp.WithNumber("column",
+-			mcp.Required(),
+-			mcp.Description("The column number where the hover is requested (1-indexed)"),
+-		),
+-	)
+-
+-	s.mcpServer.AddTool(hoverTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+-		// Extract arguments
+-		filePath, ok := request.Params.Arguments["filePath"].(string)
+-		if !ok {
+-			return mcp.NewToolResultError("filePath must be a string"), nil
+-		}
+-
+-		// Handle both float64 and int for line and column due to JSON parsing
+-		var line, column int
+-		switch v := request.Params.Arguments["line"].(type) {
+-		case float64:
+-			line = int(v)
+-		case int:
+-			line = v
+-		default:
+-			return mcp.NewToolResultError("line must be a number"), nil
+-		}
+-
+-		switch v := request.Params.Arguments["column"].(type) {
+-		case float64:
+-			column = int(v)
+-		case int:
+-			column = v
+-		default:
+-			return mcp.NewToolResultError("column must be a number"), nil
+-		}
+-
+-		coreLogger.Debug("Executing hover for file: %s line: %d column: %d", filePath, line, column)
 -		text, err := tools.GetHoverInfo(s.ctx, s.lspClient, filePath, line, column)
-+		text, err := tools.GetHoverInfo(ctx, s.lspClient, filePath, line, column)
- 		if err != nil {
- 			coreLogger.Error("Failed to get hover information: %v", err)
- 			return mcp.NewToolResultError(fmt.Sprintf("failed to get hover information: %v", err)), nil
-@@ -355,7 +356,7 @@
- 		}
- 
- 		coreLogger.Debug("Executing rename_symbol for file: %s line: %d column: %d newName: %s", filePath, line, column, newName)
+-		if err != nil {
+-			coreLogger.Error("Failed to get hover information: %v", err)
+-			return mcp.NewToolResultError(fmt.Sprintf("failed to get hover information: %v", err)), nil
+-		}
+-		return mcp.NewToolResultText(text), nil
+-	})
+-
+@@ -312,0 +268 @@
++			mcp.Min(1), mcp.Max(math.MaxUint32), mcp.MultipleOf(1),
+@@ -317 +273,2 @@
+-			mcp.Description("The column number where the symbol is located (1-indexed)"),
++			mcp.Min(1), mcp.Max(math.MaxUint32), mcp.MultipleOf(1),
++			mcp.Description("The column number where the symbol is located (1-indexed UTF-16 code units)"),
+@@ -337,19 +294,5 @@
+-		// Handle both float64 and int for line and column due to JSON parsing
+-		var line, column int
+-		switch v := request.Params.Arguments["line"].(type) {
+-		case float64:
+-			line = int(v)
+-		case int:
+-			line = v
+-		default:
+-			return mcp.NewToolResultError("line must be a number"), nil
+-		}
+-
+-		switch v := request.Params.Arguments["column"].(type) {
+-		case float64:
+-			column = int(v)
+-		case int:
+-			column = v
+-		default:
+-			return mcp.NewToolResultError("column must be a number"), nil
+-		}
++		position, err := parsePosition(request.Params.Arguments)
++		if err != nil {
++			return mcp.NewToolResultError(err.Error()), nil
++		}
++		line, column := position[0], position[1]
+@@ -358 +301 @@
 -		text, err := tools.RenameSymbol(s.ctx, s.lspClient, filePath, line, column, newName)
 +		text, err := tools.RenameSymbol(ctx, s.lspClient, filePath, line, column, newName)
- 		if err != nil {
- 			coreLogger.Error("Failed to rename symbol: %v", err)
- 			return mcp.NewToolResultError(fmt.Sprintf("failed to rename symbol: %v", err)), nil
+--- a/tools_test.go
++++ b/tools_test.go
+@@ -0,0 +1,79 @@
++package main
++
++import (
++	"context"
++	"encoding/json"
++	"fmt"
++	"math"
++	"strings"
++	"testing"
++
++	"github.com/mark3labs/mcp-go/server"
++)
++
++// Invalid coordinates must be rejected before any language-server call or edit.
++func TestPositionToolsRejectInvalidCoordinates(t *testing.T) {
++	s := &mcpServer{mcpServer: server.NewMCPServer("test", "1", server.WithRecovery())}
++	if err := s.registerTools(); err != nil {
++		t.Fatal(err)
++	}
++	for _, tool := range []string{"definition", "references", "hover", "rename_symbol"} {
++		for _, field := range []string{"line", "column"} {
++			for _, value := range []any{nil, "1", 0, -1, 1.5, 4294967296.0} {
++				t.Run(fmt.Sprintf("%s/%s/%v", tool, field, value), func(t *testing.T) {
++					args := map[string]any{"filePath": "unused.ex", "line": 1, "column": 1, "newName": "renamed"}
++					if value == nil {
++						delete(args, field)
++					} else {
++						args[field] = value
++					}
++					raw, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": map[string]any{"name": tool, "arguments": args}})
++					if err != nil {
++						t.Fatal(err)
++					}
++					response := s.mcpServer.HandleMessage(context.Background(), raw)
++					encoded, err := json.Marshal(response)
++					if err != nil {
++						t.Fatal(err)
++					}
++					var envelope struct {
++						Result struct {
++							IsError bool `json:"isError"`
++							Content []struct {
++								Text string `json:"text"`
++							} `json:"content"`
++						} `json:"result"`
++					}
++					if err := json.Unmarshal(encoded, &envelope); err != nil {
++						t.Fatal(err)
++					}
++					if !envelope.Result.IsError || len(envelope.Result.Content) != 1 || !strings.Contains(envelope.Result.Content[0].Text, field+" must be a positive integer") {
++						t.Fatalf("invalid coordinate reached beyond validation: %s", encoded)
++					}
++				})
++			}
++		}
++	}
++}
++
++// The parser is shared by all position tools, including edits through rename.
++func TestParsePositionBoundaries(t *testing.T) {
++	for _, value := range []any{1, float64(1), float64(math.MaxUint32)} {
++		position, err := parsePosition(map[string]any{"line": value, "column": value})
++		if err != nil || position[0] < 1 || position[0] != position[1] {
++			t.Fatalf("value=%v position=%v err=%v", value, position, err)
++		}
++		want := 1
++		if value == float64(math.MaxUint32) {
++			want = math.MaxUint32
++		}
++		if position[0] != want {
++			t.Fatalf("got %v, want %d", position, want)
++		}
++	}
++	for _, value := range []float64{math.NaN(), math.Inf(1), math.Inf(-1)} {
++		if _, err := parsePosition(map[string]any{"line": value, "column": 1}); err == nil {
++			t.Fatalf("accepted non-finite coordinate: %v", value)
++		}
++	}
++}

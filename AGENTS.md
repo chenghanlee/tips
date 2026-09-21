@@ -20,7 +20,7 @@ Scope searches to relevant paths and file types; broaden as needed.
 
 - **ripgrep (`rg`)**: Find text: names, strings, errors, config keys, and template content. Use `rg --files -g 'PATTERN'` to find files. Fall back to `grep` if unavailable.
 - **ast-grep**: Find code structures: calls with specific arguments, pipelines, or expressions inside functions. Prefer it over multiline regexes. Read the `ast-grep` skill and verify patterns against known examples. Use LSP for symbol resolution.
-- **elixir-lsp (Expert)**: Use `definition` for implementations, `references` for usages before API changes, `hover` for docs and types, and `diagnostics` for compiler feedback on changed `.ex`, `.exs`, `.heex`, and `.leex` files. Prefer LSP over text search when resolving symbols.
+- **elixir-lsp (Expert)**: Use `definition(filePath, line, column)` at a call site for implementations (1-based positions; UTF-16 columns), `references(filePath, line, column)` at an application call site for usages before API changes, `hover` for docs and types, and `diagnostics` for compiler feedback on changed `.ex`, `.exs`, `.heex`, and `.leex` files. Prefer LSP over text search when resolving symbols.
 - **mix-credo**: Run `mix credo --strict` on any edited `.ex`/`.exs` files and fix issues you introduced. Skip only if the Credo task is unavailable; report dependency and project failures.
 
 Report unavailable tools and failed checks; use appropriate fallbacks. Failed searches do not establish that no matches exist. LSP and Credo checks do not replace formatting, compilation, or tests.
