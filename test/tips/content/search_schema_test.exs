@@ -107,18 +107,47 @@ defmodule Tips.Content.SearchSchemaTest do
 
       assert %{code: :not_null_violation} = error.postgres
     end
+
+    test "#{kind} search rows require a freshness token" do
+      kind = unquote(kind)
+      id = content_id(kind)
+
+      error =
+        assert_raise Postgrex.Error, fn ->
+          Repo.query!(
+            "INSERT INTO #{search_table(kind)} (#{id_column(kind)}, search_text, text_at) VALUES ($1, 'text', NULL)",
+            [id]
+          )
+        end
+
+      assert %{code: :not_null_violation} = error.postgres
+    end
+
+    test "#{kind} search rows default the freshness token" do
+      kind = unquote(kind)
+      id = content_id(kind)
+
+      assert %{rows: [[%DateTime{}]]} =
+               Repo.query!(
+                 "INSERT INTO #{search_table(kind)} (#{id_column(kind)}, search_text) VALUES ($1, 'text') RETURNING text_at",
+                 [id]
+               )
+    end
   end
 
-  test "wrong vector dimension fails" do
-    tip = tip_fixture()
+  for kind <- [:tip, :review] do
+    test "wrong vector dimension fails for #{kind} search" do
+      kind = unquote(kind)
+      id = content_id(kind)
 
-    error =
-      assert_raise Postgrex.Error, fn ->
-        insert_search(:tip, tip.id, "wrong vector", "[1,0,0]")
-      end
+      error =
+        assert_raise Postgrex.Error, fn ->
+          insert_search(kind, id, "wrong vector", "[1,0,0]")
+        end
 
-    assert %{code: :data_exception, message: message} = error.postgres
-    assert message =~ "1024 dimensions"
+      assert %{code: :data_exception, message: message} = error.postgres
+      assert message =~ "1024 dimensions"
+    end
   end
 
   test "1024-dimensional vectors store on both search tables" do
@@ -155,9 +184,6 @@ defmodule Tips.Content.SearchSchemaTest do
     assert_bm25_scores(:tip, postgresql_tip.id, bread_tip.id)
     assert_bm25_scores(:review, postgresql_review.id, bread_review.id)
 
-    assert cosine_ids(:tip, unit_vector(0)) == [postgresql_tip.id, bread_tip.id]
-    assert cosine_ids(:review, unit_vector(0)) == [postgresql_review.id, bread_review.id]
-
     Repo.query!("SET LOCAL enable_seqscan = off")
     Repo.query!("SET LOCAL hnsw.iterative_scan = relaxed_order")
 
@@ -165,6 +191,11 @@ defmodule Tips.Content.SearchSchemaTest do
     assert plan_uses_index?(bm25_plan(:review), "reviews_bm25")
     assert plan_uses_index?(cosine_plan(:tip, unit_vector(0)), "tips_embedding")
     assert plan_uses_index?(cosine_plan(:review, unit_vector(0)), "reviews_embedding")
+
+    assert bm25_ids(:tip) == [postgresql_tip.id]
+    assert bm25_ids(:review) == [postgresql_review.id]
+    assert cosine_ids(:tip, unit_vector(0)) == [postgresql_tip.id, bread_tip.id]
+    assert cosine_ids(:review, unit_vector(0)) == [postgresql_review.id, bread_review.id]
   end
 
   test "queue indexes do not enforce parent visibility" do
@@ -223,13 +254,17 @@ defmodule Tips.Content.SearchSchemaTest do
       kind = unquote(kind)
       id = content_id(kind)
 
-      assert {:ok, :written} =
+      assert {:ok, {first_token, second_token}} =
                Repo.transact(fn ->
                  assert :ok = write_text(kind, id, "first text")
-                 {:ok, :written}
+                 first_token = search_token(kind, id)
+                 assert :ok = write_text(kind, id, "second text")
+                 {:ok, {first_token, search_token(kind, id)}}
                end)
 
-      assert %{rows: [[first_token]]} =
+      assert DateTime.compare(second_token, first_token) == :gt
+
+      assert %{rows: [[^second_token]]} =
                Repo.query!(
                  """
                  UPDATE #{search_table(kind)}
@@ -242,19 +277,27 @@ defmodule Tips.Content.SearchSchemaTest do
 
       assert {:ok, :written} =
                Repo.transact(fn ->
-                 assert :ok = write_text(kind, id, "second text")
+                 assert :ok = write_text(kind, id, "third text")
                  {:ok, :written}
                end)
 
-      assert %{rows: [["second text", second_token, true, nil]]} =
+      assert %{rows: [["third text", third_token, true, nil]]} =
                search_row(kind, id)
 
-      assert DateTime.compare(second_token, first_token) == :gt
+      assert DateTime.compare(third_token, second_token) == :gt
     end
 
     test "#{kind} caller rollback restores search rows" do
       kind = unquote(kind)
       id = content_id(kind)
+
+      assert {:error, :caller_failed} =
+               Repo.transact(fn ->
+                 write_text(kind, id, "rolled-back insert")
+                 {:error, :caller_failed}
+               end)
+
+      assert %{rows: []} = search_row(kind, id)
 
       assert {:ok, :written} =
                Repo.transact(fn ->
@@ -314,7 +357,17 @@ defmodule Tips.Content.SearchSchemaTest do
 
       assert %{num_rows: 0} = stale_success(kind, id, old_token)
       assert %{num_rows: 0} = stale_failure(kind, id, old_token)
-      assert %{rows: [["current text", _token, true, nil]]} = search_row(kind, id)
+
+      current_token = search_token(kind, id)
+      assert %{num_rows: 1} = stale_failure(kind, id, current_token)
+
+      assert %{rows: [["current text", ^current_token, true, %DateTime{}]]} =
+               search_row(kind, id)
+
+      assert %{num_rows: 1} = stale_success(kind, id, current_token)
+
+      assert %{rows: [["current text", ^current_token, false, %DateTime{}]]} =
+               search_row(kind, id)
     end
   end
 
@@ -410,6 +463,22 @@ defmodule Tips.Content.SearchSchemaTest do
 
     assert matching_score < 0
     assert other_score >= 0
+  end
+
+  defp bm25_ids(kind) do
+    Repo.query!("""
+    SELECT #{id_column(kind)}
+    FROM (
+      SELECT #{id_column(kind)},
+             search_text <@> to_bm25query('postgresql', '#{index_name(kind, :bm25)}') AS distance
+      FROM #{search_table(kind)}
+      ORDER BY distance
+      LIMIT 5
+    ) candidates
+    WHERE distance < 0
+    ORDER BY distance, #{id_column(kind)}
+    """).rows
+    |> List.flatten()
   end
 
   defp cosine_ids(kind, vector) do
