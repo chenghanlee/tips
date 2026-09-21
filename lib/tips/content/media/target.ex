@@ -3,6 +3,8 @@ defmodule Tips.Content.Media.Target do
 
   use Ecto.Type
 
+  @max_id 9_223_372_036_854_775_807
+
   @type t ::
           {:new_tip, Ecto.UUID.t()}
           | {:new_review, pos_integer(), Ecto.UUID.t()}
@@ -99,12 +101,12 @@ defmodule Tips.Content.Media.Target do
     end
   end
 
-  defp positive_integer(id) when is_integer(id) and id > 0, do: {:ok, id}
+  defp positive_integer(id) when is_integer(id) and id > 0 and id <= @max_id, do: {:ok, id}
   defp positive_integer(_id), do: :error
 
   defp canonical_integer(encoded) do
     case Integer.parse(encoded) do
-      {id, ""} when id > 0 ->
+      {id, ""} when id > 0 and id <= @max_id ->
         if Integer.to_string(id) == encoded, do: {:ok, id}, else: :error
 
       _invalid ->

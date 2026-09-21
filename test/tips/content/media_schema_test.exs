@@ -408,6 +408,7 @@ defmodule Tips.Content.MediaSchemaTest do
             {:new_review, -1, uuid},
             {:new_review, "1", uuid},
             {:edit_tip, 0},
+            {:edit_tip, 9_223_372_036_854_775_808},
             {:edit_review, -1},
             {:unknown, 1},
             {:edit_tip, 1, :extra}
@@ -425,6 +426,14 @@ defmodule Tips.Content.MediaSchemaTest do
       assert {:ok, "new_tip:" <> ^lowercase} = Target.dump({:new_tip, uppercase})
     end
 
+    test "accepts the PostgreSQL bigint id boundary" do
+      max_id = 9_223_372_036_854_775_807
+
+      assert {:ok, {:edit_tip, ^max_id}} = Target.cast({:edit_tip, max_id})
+      assert {:ok, "edit_tip:9223372036854775807"} = Target.dump({:edit_tip, max_id})
+      assert {:ok, {:edit_tip, ^max_id}} = Target.load("edit_tip:9223372036854775807")
+    end
+
     test "load rejects noncanonical and malformed stored forms" do
       uuid = Ecto.UUID.generate()
 
@@ -437,8 +446,10 @@ defmodule Tips.Content.MediaSchemaTest do
             "new_tip:#{String.upcase(uuid)}",
             "new_tip:bad",
             "new_tip:#{uuid}:extra",
+            "new_review:#{uuid}",
             "new_review:1:bad",
             "new_review:01:#{uuid}",
+            "edit_tip:9223372036854775808",
             "other:1",
             <<0::128>>,
             nil
@@ -456,6 +467,12 @@ defmodule Tips.Content.MediaSchemaTest do
 
       assert %{rows: [["new_tip:" <> ^expected_uuid]]} =
                Repo.query!("SELECT target FROM media WHERE id = $1", [video.id])
+    end
+
+    test "direct struct inserts reject invalid target tuples through dump/1" do
+      assert_raise Ecto.ChangeError, ~r/does not match type/, fn ->
+        staged_video_fixture(user_fixture(), %{target: {:edit_tip, 0}})
+      end
     end
   end
 
