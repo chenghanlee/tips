@@ -164,7 +164,7 @@ Mix dependencies. All task worktrees share those binaries:
    ```
 
    The script downloads mcp-language-server v0.1.1, applies the checked-in patch,
-   runs Go vet and the LSP/tool tests, and installs into `.elixir-tools/bin`
+   runs Go vet and the registration/LSP/tool tests, and installs into `.elixir-tools/bin`
    (or `$TIPS_ELIXIR_TOOLS/bin` when set, matching the launcher).
    It pins `GOTOOLCHAIN=go1.26.3` (downloaded on first use if needed) and
    `CGO_ENABLED=0`, and prints the compiler version and staged binary SHA-256
@@ -172,11 +172,12 @@ Mix dependencies. All task worktrees share those binaries:
    the hash. Verified with `go version go1.26.3 darwin/arm64`:
 
    ```text
-   c46aa1b0934b74417f2792380c4cc5db244c07f0a19b4c6f6157dbcf87d0ef4a
+   89e96b69d76d3dec3dc46c48618383a881d0520b42990eab1f3dc5c1f266a1d0
    ```
 
-   The patch fixes bridge framing, symbol lookup, document paths, and diagnostic
-   freshness for Expert. Drop it when upstream releases all bundled fixes;
+   The patch fixes bridge framing, definition/reference navigation, bounded source
+   previews, document paths, hover synchronization, and diagnostic freshness for Expert. Drop it when upstream releases
+   all bundled fixes;
    [upstream PR #151](https://github.com/isaacphi/mcp-language-server/pull/151)
    covers the stdin mutex. Generated tools and source stay gitignored.
 
@@ -201,6 +202,35 @@ Mix dependencies. All task worktrees share those binaries:
 Restart Codex after configuring it. `codex mcp get elixir-lsp` checks the
 registration. Expert builds its engine and indexes the project on first use;
 symbol lookup may be empty until that finishes. Its logs are in `.expert/`.
+
+Use `definition`, `references`, and `hover` with `filePath`, `line`, and `column`
+at a call site. Lines and columns are 1-based; columns count UTF-16 code units.
+Each tool synchronizes the latest file contents, including files already opened
+by earlier calls, then sends the corresponding native LSP request. Navigation skips
+unchanged contents using a hash of the last successful send. Diagnostics explicitly
+refreshes the document even when unchanged so it can wait for another publication.
+`rename_symbol` uses the same positive integer coordinate validation. Empty hover
+results include the current source line even when the file has no final newline.
+
+Definitions return unique source locations with labeled previews: at most 40
+lines per location, sharing an 8 KiB source-preview budget per response. A preview
+may include neighboring code; it is not a reconstructed implementation boundary.
+Unavailable source or exhausted preview space does not hide resolved locations.
+
+References return unique locations from the project selected by the source file.
+Use an application call site to find application usages of a dependency. Other
+projects may contain additional usages. Neither navigation tool depends on
+workspace symbol search. Empty results can also mean indexing is incomplete or
+the symbol/source is unavailable; server errors are reported as errors.
+
+After rebuilding the bridge, restart Codex to load the new tool schema and binary.
+Expert omits the optional document version from diagnostic publications. Routine
+results therefore say "Latest published diagnostics" without a missing-version
+notice. The bridge still synchronizes the file and waits for a new publication,
+but cannot certify an exact edit match when no version is provided. Supplied
+versions are checked; timeouts still report that the last list may be stale.
+The same limitation is documented in the diagnostics tool description.
+
 The Elixir and Erlang executables must be on Codex's `PATH`. Expert uses its
 own user cache and local Erlang processes, so a sandboxed shell can require
 additional access even when the MCP connection works.
