@@ -273,8 +273,13 @@ update the 14-day baseline assertion deliberately.
 | 15-minute generated magic links | `generator 15-minute magic links are valid at 14 minutes and invalid at 16 minutes`; checks lookup and expired login. |
 | Seven-day generated email change | `generator 7-day email-change links update the email at 6 days` and `generator 7-day email-change links leave the email unchanged at 8 days`. |
 | A3 preservation/advance | `generator session reissue preserves authenticated_at; magic-link reauthentication advances it`; persisted rows, Accounts reloads, sudo and consumed proof. |
+| Default 20-minute sudo window | `test/tips/accounts_test.exs:90–106`: accepts 19 minutes, rejects 21 minutes and nil recency, and checks the ten-minute override. |
 | Existing Plug/cookie/reissue behavior | `test/tips_web/user_auth_test.exs:24,37,47,78,121,197,296`; generated tests cover session writes/clearing, remember-me cookie, logout, reissue and sudo. |
 | Production auth consumer flows | `test/tips/accounts_test.exs`, `test/tips_web/controllers/user_session_controller_test.exs`, `test/tips_web/live/user_live/*_test.exs`. |
+
+The seven-day reissue threshold and 14-day cookie `max_age` belong to the web
+layer, outside this Accounts fixture. Their source inspection and existing
+`UserAuth` tests above provide the baseline evidence.
 
 Exact local commands, from `.worktrees/24-auth-baseline` on Elixir 1.20.4 / OTP 29.1:
 
