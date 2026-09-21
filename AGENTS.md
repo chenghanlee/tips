@@ -21,7 +21,7 @@ Scope searches to relevant paths and file types; broaden as needed.
 - **ripgrep (`rg`)**: Find text: names, strings, errors, config keys, and template content. Use `rg --files -g 'PATTERN'` to find files. Fall back to `grep` if unavailable.
 - **ast-grep**: Find code structures: calls with specific arguments, pipelines, or expressions inside functions. Prefer it over multiline regexes. Read the `ast-grep` skill and verify patterns against known examples. Use LSP for symbol resolution.
 - **elixir-lsp (Expert)**: Use `definition` for implementations, `references` for usages before API changes, `hover` for docs and types, and `diagnostics` for compiler feedback on changed `.ex`, `.exs`, `.heex`, and `.leex` files. Prefer LSP over text search when resolving symbols.
-- **mix-credo**: Run `mix credo --strict` on edited `.ex`/`.exs` files and fix issues you introduced. Skip only if the Credo task is unavailable; report dependency and project failures.
+- **mix-credo**: Run `mix credo --strict` on any edited `.ex`/`.exs` files and fix issues you introduced. Skip only if the Credo task is unavailable; report dependency and project failures.
 
 Report unavailable tools and failed checks; use appropriate fallbacks. Failed searches do not establish that no matches exist. LSP and Credo checks do not replace formatting, compilation, or tests.
 
@@ -33,7 +33,7 @@ project that the user is building.
 - Strive for simple working and elegant solutions. Elegant solutions make complex things seem easy
 and obvious. Choose simplicity over elegance when they conflict.
 - Build an MVP for fast iteration and finding product-market fit. Avoid unnecessary enterprise complexity. No backwards compatibility.
-- Accept necessary complexity when it makes the user's experience simpler. Don't make the implementation look simple by pushing its complexity onto the user. Apply this principle across the software architecture, backend, data model, and frontend.
+- Only accept necessary complexity when it makes the user's experience simpler. Don't make the implementation look simple by pushing its complexity onto the user. Apply this principle across the software architecture, backend, data model, and frontend.
 - "Perfection is achieved, not when there is nothing more to add, but when there is nothing left to take away"
 
 ## Testing
@@ -44,7 +44,7 @@ and obvious. Choose simplicity over elegance when they conflict.
 ## Code Review and Software Architecture Review
 
 - First, check for immediate, local correctness
-- Second, assess each review and its proposed fix's direct and downstream effects on its direct module, feature, or tests.
+- Second, assess each review and its proposed fix's direct and downstream effects on its own and related modules, features, or tests.
 - Lastly, assess each review and its proposed fix's against the project's software design and implementation as a whole and end to end.
 
 ## Writing
