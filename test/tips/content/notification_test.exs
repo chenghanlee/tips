@@ -17,9 +17,10 @@ defmodule Tips.Content.NotificationTest do
         notification_fixture(recipient, %{tip_id: tip.id})
       end
 
-      original
-      |> change(read_at: DateTime.utc_now(:second))
-      |> Repo.update!()
+      original =
+        original
+        |> change(read_at: DateTime.utc_now(:second))
+        |> Repo.update!()
 
       replacement = notification_fixture(recipient, %{tip_id: tip.id})
 
@@ -182,7 +183,7 @@ defmodule Tips.Content.NotificationTest do
           {:user_id, -1, %{}},
           {:actor_id, -1, %{}},
           {:tip_id, -1, %{}},
-          {:review_id, -1, %{type: :review_upvoted}}
+          {:review_id, -1, %{type: :tip_reviewed}}
         ] do
       test "notifications_#{field}_fkey rejects an unknown reference" do
         attrs = Map.put(unquote(Macro.escape(attrs)), unquote(field), unquote(value))

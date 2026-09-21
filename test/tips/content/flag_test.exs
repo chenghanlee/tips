@@ -17,9 +17,10 @@ defmodule Tips.Content.FlagTest do
         flag_fixture(reporter, %{tip_id: tip.id})
       end
 
-      original
-      |> change(resolved_at: DateTime.utc_now(:second))
-      |> Repo.update!()
+      original =
+        original
+        |> change(resolved_at: DateTime.utc_now(:second))
+        |> Repo.update!()
 
       replacement = flag_fixture(reporter, %{tip_id: tip.id})
 
@@ -43,9 +44,10 @@ defmodule Tips.Content.FlagTest do
         flag_fixture(reporter, %{review_id: review.id})
       end
 
-      original
-      |> change(resolved_at: DateTime.utc_now(:second))
-      |> Repo.update!()
+      original =
+        original
+        |> change(resolved_at: DateTime.utc_now(:second))
+        |> Repo.update!()
 
       replacement = flag_fixture(reporter, %{review_id: review.id})
 
@@ -139,11 +141,7 @@ defmodule Tips.Content.FlagTest do
   describe "foreign keys" do
     for {field, value} <- [user_id: -1, tip_id: -1, review_id: -1, resolved_by: -1] do
       test "flags_#{field}_fkey rejects an unknown reference" do
-        attrs =
-          case unquote(field) do
-            :review_id -> %{reason: :fabricated, review_id: unquote(value)}
-            field -> %{field => unquote(value), reason: :fabricated}
-          end
+        attrs = %{unquote(field) => unquote(value), reason: :fabricated}
 
         assert_raise Ecto.ConstraintError, ~r/flags_#{unquote(field)}_fkey/, fn ->
           flag_fixture(user_fixture(), attrs)
