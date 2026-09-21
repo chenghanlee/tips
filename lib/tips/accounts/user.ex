@@ -68,7 +68,7 @@ defmodule Tips.Accounts.User do
       changeset
       |> update_change(:email, &normalize_email/1)
       |> validate_required([:email])
-      |> validate_format(:email, ~r/^[^@,;\s]+@[^@,;\s]+$/,
+      |> validate_format(:email, ~r/^[^@,;\s]+@[^@,;\s]+$/u,
         message: "must have the @ sign and no spaces"
       )
       |> validate_length(:email, max: 160)
