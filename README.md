@@ -86,12 +86,15 @@ before running Mix commands.
 
 Use [Expert](https://github.com/expert-lsp/expert) for language-server features
 and [Credo](https://github.com/rrrene/credo) for linting. Credo is a development
-and test dependency; run `unbuffer mix credo --strict` to include suggestions.
-The local Codex configuration also enables the `mix-credo` plugin.
+and test dependency; run `mix credo --strict` to include suggestions.
+The local Codex configuration enables the `mix-compile` and `mix-credo` plugins.
+The Credo hook checks edited `.ex`/`.exs` files with the project's configuration;
+review its feedback and fix findings introduced by your edits.
 
 The launcher `scripts/elixir_lsp.sh` connects Expert to Codex through
 [mcp-language-server](https://github.com/isaacphi/mcp-language-server).
-Install these tools separately from the application's Mix dependencies:
+Install these tools once in the main checkout, separately from the application's
+Mix dependencies. All task worktrees share those binaries:
 
 1. Download the binary for your OS and architecture from
    [Expert v0.1.10](https://github.com/expert-lsp/expert/releases/tag/v0.1.10),
@@ -104,9 +107,15 @@ Install these tools separately from the application's Mix dependencies:
    GOBIN="$PWD/.elixir-tools/bin" go install github.com/isaacphi/mcp-language-server@v0.1.1
    ```
 
-3. Add this to `.codex/config.toml`, replacing the checkout path:
+3. For Codex sessions in the main checkout, add this to `.codex/config.toml`,
+   replacing the checkout path. The task script below writes the worktree config:
 
    ```toml
+   [plugins."mix-compile@elixir-agent-tools"]
+   enabled = true
+   [plugins."mix-credo@elixir-agent-tools"]
+   enabled = true
+
    [mcp_servers.elixir-lsp]
    command = "/bin/sh"
    args = ["scripts/elixir_lsp.sh"]
@@ -123,9 +132,29 @@ The Elixir and Erlang executables must be on Codex's `PATH`. Expert uses its
 own user cache and local Erlang processes, so a sandboxed shell can require
 additional access even when the MCP connection works.
 
-The downloaded tools, indexes, and local Codex configuration are gitignored.
-Repeat the setup for a new checkout or worktree. The existing
-`codex-lsp-bridge` supports other languages; use `elixir-lsp` for Elixir.
+For each task, run from the main checkout (requires Bash, Git and Python 3):
+
+```sh
+scripts/task_worktree.sh 36-ci
+```
+
+This fetches `origin` and creates `task/36-ci` in `.worktrees/36-ci` from
+`origin/main`, or reuses that task worktree without resetting it. It links
+`.agents/skills` to the main checkout's skills so edits stay live, and writes
+`.codex/config.toml` with both plugins and the worktree's absolute MCP `cwd`.
+Rerunning it leaves identical config unchanged. It refuses to replace differing
+config unless you inspect it and rerun with `--force`.
+
+Follow step 3 of the [dispatch workflow](docs/implementation/goal-prompt.md#loop)
+to start Codex in the provisioned worktree.
+
+The launcher uses the caller's `$PWD` as the workspace and finds binaries in
+the main checkout's `.elixir-tools/bin` through Git's common directory.
+`TIPS_ELIXIR_TOOLS` can override the tools directory (the directory containing
+`bin`); no per-worktree install is needed. Install Mix dependencies separately
+in each worktree as described below. The downloaded tools, indexes, skills and
+local Codex configuration are gitignored. The existing `codex-lsp-bridge`
+supports other languages; use `elixir-lsp` for Elixir.
 
 ### Extension-enabled database
 
