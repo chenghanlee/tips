@@ -62,7 +62,7 @@ jobs:
           TIPS_CHROMEDRIVER: ${{ steps.chrome.outputs.chromedriver-path }}
         run: |
           chrome_version=$("$TIPS_CHROME_BINARY" --version)
-          driver_version=$(chromedriver --version)
+          driver_version=$("$TIPS_CHROMEDRIVER" --version)
           printf '%s\n%s\n' "$chrome_version" "$driver_version"
           test "$(printf '%s' "$chrome_version" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')" = '153.0.8010.52'
           test "$(printf '%s' "$driver_version" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')" = '153.0.8010.52'
@@ -78,6 +78,8 @@ jobs:
           }
           EOF
           sudo apparmor_parser -r /etc/apparmor.d/tips-chrome-for-testing
+      - name: Check sandboxed Chrome startup
+        run: timeout 20 "$TIPS_CHROME_BINARY" --headless --disable-gpu --dump-dom about:blank
       - run: mix deps.get --check-locked
       - run: mix compile --warnings-as-errors
       - run: mix format --check-formatted
