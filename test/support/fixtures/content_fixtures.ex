@@ -34,4 +34,21 @@ defmodule Tips.ContentFixtures do
     )
     |> Repo.insert!()
   end
+
+  def vote_fixture(target, attrs \\ %{}) do
+    target_attrs =
+      case target do
+        %Tip{id: id} -> %{tip_id: id}
+        %Review{id: id} -> %{review_id: id}
+      end
+
+    attrs =
+      attrs
+      |> Enum.into(Map.put(target_attrs, :value, 1))
+      |> Map.put_new_lazy(:user_id, fn -> user_fixture().id end)
+
+    Tips.Content.Vote
+    |> struct!(attrs)
+    |> Repo.insert!()
+  end
 end
