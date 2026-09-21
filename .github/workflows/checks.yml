@@ -5,15 +5,90 @@ on:
     branches: [main]
 permissions:
   contents: read
+  packages: read
+  pull-requests: read
 jobs:
   checks:
     name: checks
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
+    env:
+      MIX_ENV: test
+      PGPORT: '5433'
+      TIPS_DB_SUFFIX: _ci
+      TIPS_TEST_PORT: '4036'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Scan introduced commits for secrets
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: 'false'
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
       - run: python scripts/check_docs.py
-      # P0.04 extends this required job with actual app/database/browser checks.
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          elixir-version: '1.20.4'
+          otp-version: '29.1'
+          version-type: strict
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-${{ runner.arch }}-otp29.1-elixir1.20.4-test-${{ hashFiles('mix.lock') }}
+      - name: Start extension-enabled PostgreSQL
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin && docker compose pull db; then
+            echo 'Using the published database image'
+          else
+            docker compose build db
+          fi
+          docker compose up -d --wait --no-build db
+      - uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2
+        id: chrome
+        with:
+          chrome-version: '153.0.8010.52'
+          install-chromedriver: true
+      - name: Check browser and driver pins
+        env:
+          TIPS_CHROME_BINARY: ${{ steps.chrome.outputs.chrome-path }}
+          TIPS_CHROMEDRIVER: ${{ steps.chrome.outputs.chromedriver-path }}
+        run: |
+          chrome_version=$("$TIPS_CHROME_BINARY" --version)
+          driver_version=$("$TIPS_CHROMEDRIVER" --version)
+          printf '%s\n%s\n' "$chrome_version" "$driver_version"
+          test "$(printf '%s' "$chrome_version" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')" = '153.0.8010.52'
+          test "$(printf '%s' "$driver_version" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')" = '153.0.8010.52'
+          printf 'TIPS_CHROME_BINARY=%s\nTIPS_CHROMEDRIVER=%s\n' "$TIPS_CHROME_BINARY" "$TIPS_CHROMEDRIVER" >> "$GITHUB_ENV"
+      - name: Allow Chrome to create its sandbox
+        # Ubuntu restricts user namespaces for binaries outside its packaged paths.
+        run: |
+          sudo tee /etc/apparmor.d/tips-chrome-for-testing > /dev/null <<EOF
+          abi <abi/4.0>,
+          include <tunables/global>
+          profile tips-chrome-for-testing "$TIPS_CHROME_BINARY" flags=(unconfined) {
+            userns,
+          }
+          EOF
+          sudo apparmor_parser -r /etc/apparmor.d/tips-chrome-for-testing
+      - name: Check sandboxed Chrome startup
+        run: timeout 20 "$TIPS_CHROME_BINARY" --headless --disable-gpu --dump-dom about:blank
+      - run: mix deps.get --check-locked
+      - run: mix compile --warnings-as-errors
+      - run: mix format --check-formatted
+      - run: mix assets.setup && mix assets.build
+      - run: mix test --include browser --trace
+      - name: Upload browser failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-failure-screenshots
+          path: screenshots/
+          if-no-files-found: ignore

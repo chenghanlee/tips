@@ -17,12 +17,54 @@ config :tips, Tips.Repo,
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: System.schedulers_online() * 2
 
-# We don't run a server during test. If one is required,
-# you can enable the server option below.
+port = String.to_integer(System.get_env("TIPS_TEST_PORT", "4002"))
+
+config :tips, :sql_sandbox, true
+
 config :tips, TipsWeb.Endpoint,
-  http: [ip: {127, 0, 0, 1}, port: 4002],
+  http: [ip: {127, 0, 0, 1}, port: port],
   secret_key_base: "gxew8SnxosBITKPd0wkqsojsMlaW7Ee9HTrithPNvzD86TbQJQ2r4eAh2NqNsY2i",
-  server: false
+  server: true
+
+config :wallaby,
+  otp_app: :tips,
+  base_url: "http://localhost:#{port}",
+  driver: Wallaby.Chrome,
+  chromedriver: [
+    headless: true,
+    # Wallaby defaults without --no-sandbox. Keep --user-agent for sandbox metadata.
+    capabilities: %{
+      javascriptEnabled: false,
+      loadImages: false,
+      version: "",
+      rotatable: false,
+      takesScreenshot: true,
+      cssSelectorsEnabled: true,
+      nativeEvents: false,
+      platform: "ANY",
+      unhandledPromptBehavior: "accept",
+      loggingPrefs: %{browser: "DEBUG"},
+      chromeOptions: %{
+        args: [
+          "window-size=1280,800",
+          "--disable-gpu",
+          "--headless",
+          "--fullscreen",
+          "--user-agent=Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36"
+        ]
+      }
+    }
+  ],
+  screenshot_on_failure: true,
+  screenshot_dir: "screenshots"
+
+if binary = System.get_env("TIPS_CHROME_BINARY") do
+  config :wallaby, chromedriver: [binary: binary]
+end
+
+if path = System.get_env("TIPS_CHROMEDRIVER") do
+  config :wallaby, chromedriver: [path: path]
+end
 
 # In test we don't send emails
 config :tips, Tips.Mailer, adapter: Swoosh.Adapters.Test
