@@ -8,7 +8,6 @@ defmodule Tips.Content.SchemaTest do
 
   test "database rejects a tip title shorter than three code points" do
     user = user_fixture()
-    Repo.query!("INSERT INTO tags (id, label, sort_order) VALUES ('other', 'Other technique', 9)")
 
     error =
       assert_raise Postgrex.Error, fn ->
@@ -329,6 +328,28 @@ defmodule Tips.Content.SchemaTest do
 
         assert saved.user_id == row.user_id
 
+        new_key = Ecto.UUID.generate()
+
+        for changeset <- [
+              schema.changeset(saved, %{submission_key: new_key}),
+              change(saved, submission_key: new_key)
+            ] do
+          assert_raise ArgumentError, ~r/writable/, fn -> Repo.update(changeset) end
+        end
+
+        assert Repo.reload!(saved).submission_key == row.submission_key
+
+        assert {:ok, retried} =
+                 saved
+                 |> schema.changeset(%{
+                   submission_key: saved.submission_key,
+                   body: "Updated body"
+                 })
+                 |> Repo.update()
+
+        assert retried.submission_key == row.submission_key
+        assert retried.body == "Updated body"
+
         assert %{
                  up_count: 0,
                  down_count: 0,
@@ -382,6 +403,46 @@ defmodule Tips.Content.SchemaTest do
       end
     end
 
+    test "a saved review cannot move to another tip through any update changeset" do
+      review = review_fixture()
+      other_tip = tip_fixture()
+
+      for changeset <- [
+            Review.changeset(review, %{tip_id: other_tip.id}),
+            change(review, tip_id: other_tip.id)
+          ] do
+        assert_raise ArgumentError, ~r/writable/, fn -> Repo.update(changeset) end
+      end
+
+      assert Repo.reload!(review).tip_id == review.tip_id
+
+      assert {:ok, retried} =
+               review
+               |> Review.changeset(%{tip_id: review.tip_id, body: "Updated review"})
+               |> Repo.update()
+
+      assert retried.tip_id == review.tip_id
+      assert retried.body == "Updated review"
+    end
+
+    for {schema, fields} <- [
+          {Tip, [:title, :body, :model_other, :prompt, :output]},
+          {Review, [:body, :model_other, :prompt, :output]}
+        ] do
+      test "#{inspect(schema)} returns field errors for null bytes without stripping input" do
+        schema = unquote(schema)
+        row = schema_fixture(schema)
+
+        for field <- unquote(fields) do
+          value = "abc\0def"
+          assert {:error, changeset} = row |> schema.changeset(%{field => value}) |> Repo.update()
+          assert %{^field => ["cannot contain a null byte"]} = errors_on(changeset)
+          assert get_change(changeset, field) == value
+          assert Repo.reload!(row) == row
+        end
+      end
+    end
+
     test "review changeset maps one-per-user uniqueness" do
       original = review_fixture()
 
@@ -406,6 +467,29 @@ defmodule Tips.Content.SchemaTest do
         for field <- fields, do: assert(Map.has_key?(errors, field))
         row = schema_fixture(schema)
         assert %{body: [_ | _]} = row |> schema.changeset(%{body: " \t\n"}) |> errors_on()
+      end
+    end
+  end
+
+  test "committed vocabulary is available before any fixture runs" do
+    assert Repo.aggregate(Tag, :count) == 9
+    assert Repo.aggregate(Model, :count) == 3
+    assert Repo.aggregate(Environment, :count) == 3
+    assert %{label: "Other technique"} = Repo.get!(Tag, "other")
+  end
+
+  for schema <- [Tip, Review] do
+    test "#{inspect(schema)} fixtures reuse vocabulary without rewriting it" do
+      for vocabulary <- [Tag, Model, Environment] do
+        Repo.update_all(vocabulary, set: [label: "Test-specific choice", active: false])
+      end
+
+      schema_fixture(unquote(schema))
+
+      for vocabulary <- [Tag, Model, Environment] do
+        refute Repo.exists?(
+                 from v in vocabulary, where: v.active or v.label != "Test-specific choice"
+               )
       end
     end
   end
@@ -437,8 +521,6 @@ defmodule Tips.Content.SchemaTest do
              )
              |> Enum.map(fn {{id, label}, order} -> {id, label, order, true} end)
 
-    refute Repo.exists?(Model)
-    refute Repo.exists?(Environment)
     Vocabulary.seed_synthetic!()
     Repo.update_all(Model, set: [label: "Changed", sort_order: 99, active: false])
     Repo.update_all(Environment, set: [label: "Changed", sort_order: 99, active: false])

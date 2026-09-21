@@ -1,15 +1,12 @@
 defmodule Tips.ContentFixtures do
   @moduledoc "Database fixtures for contributions, including invalid-row constraint tests."
 
-  alias Tips.Content.{Review, Tip, Vocabulary}
+  alias Tips.Content.{Review, Tip}
   alias Tips.Repo
 
   import Tips.AccountsFixtures
 
   def tip_fixture(user \\ user_fixture(), attrs \\ %{}) do
-    Vocabulary.seed_tags!()
-    Vocabulary.seed_synthetic!()
-
     Tip
     |> struct!(
       Enum.into(attrs, %{
@@ -25,9 +22,6 @@ defmodule Tips.ContentFixtures do
   end
 
   def review_fixture(tip \\ tip_fixture(), attrs \\ %{}) do
-    Vocabulary.seed_tags!()
-    Vocabulary.seed_synthetic!()
-
     Review
     |> struct!(
       Enum.into(attrs, %{

@@ -14,7 +14,7 @@ defmodule Tips.Content.Tip do
     field :model_other, :string
     field :prompt, :string
     field :output, :string
-    field :submission_key, Ecto.UUID
+    field :submission_key, Ecto.UUID, writable: :insert, on_writable_violation: :raise
     field :edit_version, :integer, default: 1
     field :up_count, :integer, default: 0
     field :down_count, :integer, default: 0
@@ -53,8 +53,15 @@ defmodule Tips.Content.Tip do
     |> validate_format(:prompt, ~r/\S/u)
     |> validate_length(:output, max: 20_000, count: :codepoints)
     |> validate_format(:output, ~r/\S/u)
+    |> validate_no_null_bytes()
     |> validate_model_choice()
     |> unique_constraint(:submission_key, name: :tips_submission_unique)
+  end
+
+  defp validate_no_null_bytes(changeset) do
+    Enum.reduce([:title, :body, :model_other, :prompt, :output], changeset, fn field, changeset ->
+      validate_format(changeset, field, ~r/\A[^\x00]*\z/, message: "cannot contain a null byte")
+    end)
   end
 
   defp validate_model_choice(changeset) do

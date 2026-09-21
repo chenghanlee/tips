@@ -5,7 +5,8 @@ defmodule Tips.Content.Review do
 
   schema "reviews" do
     belongs_to :user, Tips.Accounts.User
-    belongs_to :tip, Tips.Content.Tip
+    belongs_to :tip, Tips.Content.Tip, define_field: false
+    field :tip_id, :id, writable: :insert, on_writable_violation: :raise
     belongs_to :model, Tips.Content.Model, type: :string
     belongs_to :environment, Tips.Content.Environment, type: :string
 
@@ -13,7 +14,7 @@ defmodule Tips.Content.Review do
     field :model_other, :string
     field :prompt, :string
     field :output, :string
-    field :submission_key, Ecto.UUID
+    field :submission_key, Ecto.UUID, writable: :insert, on_writable_violation: :raise
     field :edit_version, :integer, default: 1
     field :up_count, :integer, default: 0
     field :down_count, :integer, default: 0
@@ -48,9 +49,16 @@ defmodule Tips.Content.Review do
     |> validate_format(:prompt, ~r/\S/u)
     |> validate_length(:output, max: 20_000, count: :codepoints)
     |> validate_format(:output, ~r/\S/u)
+    |> validate_no_null_bytes()
     |> validate_model_choice()
     |> unique_constraint(:submission_key, name: :reviews_submission_unique)
     |> unique_constraint(:tip_id, name: :reviews_one_per_user)
+  end
+
+  defp validate_no_null_bytes(changeset) do
+    Enum.reduce([:body, :model_other, :prompt, :output], changeset, fn field, changeset ->
+      validate_format(changeset, field, ~r/\A[^\x00]*\z/, message: "cannot contain a null byte")
+    end)
   end
 
   defp validate_model_choice(changeset) do
