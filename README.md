@@ -190,7 +190,9 @@ in normal setup. Releases do not include Mix.
 ### Isolated worktrees
 
 Use one Compose server, started from the main checkout. Give each worktree a
-unique `TIPS_DB_SUFFIX` and HTTP `PORT`; use `PGPORT=5433` for the shared server.
+unique `TIPS_DB_SUFFIX`, development HTTP `PORT`, and `TIPS_TEST_PORT`;
+use `PGPORT=5433` for the shared server. Tests start their own endpoint on
+`TIPS_TEST_PORT` (default 4002), including when browser tests are excluded.
 Each checkout already has its own `deps/` and `_build/`, so install dependencies
 in each worktree. Do not share or symlink those directories. Phoenix loads no
 `.env` automatically; export the worktree's values in its shell.
@@ -199,12 +201,12 @@ For example, after creating two worktrees at the revision to test:
 
 ```sh
 # Terminal A, in .worktrees/a
-export TIPS_DB_SUFFIX=_a PGPORT=5433 PORT=4001
+export TIPS_DB_SUFFIX=_a PGPORT=5433 PORT=4001 TIPS_TEST_PORT=4031
 mix deps.get --check-locked
 mix test
 
 # Terminal B, concurrently in .worktrees/b
-export TIPS_DB_SUFFIX=_b PGPORT=5433 PORT=4002
+export TIPS_DB_SUFFIX=_b PGPORT=5433 PORT=4002 TIPS_TEST_PORT=4032
 mix deps.get --check-locked
 mix test
 ```
@@ -215,3 +217,51 @@ with `psql -h 127.0.0.1 -p 5433 -U postgres -l`. `mix ecto.setup` and
 4001/4002. `MIX_TEST_PARTITION` can further partition each test database.
 Only reset your own suffixed database. Do not reset another worktree's database
 or run `docker compose down -v`, which destroys the shared server's data.
+
+### Browser tests and CI
+
+`mix test` excludes tests tagged `:browser`. To include them, install matching
+Chrome for Testing and ChromeDriver **153.0.8010.52** outside the repository from
+the [Chrome for Testing downloads](https://googlechromelabs.github.io/chrome-for-testing/153.0.8010.52.json).
+Select your platform's `chrome` and `chromedriver` archives, extract both, and
+set the executable paths below. Headless Chrome runs with its sandbox enabled;
+no Xvfb or provider credentials are needed.
+
+Wallaby starts in `Tips.FeatureCase` setup so ordinary tests need no browser
+installation; starting it in `test_helper.exs` would validate Chrome even when
+all browser tests are excluded.
+
+From a task worktree with its own dependencies and build directory:
+
+```sh
+export PGPORT=5433 TIPS_DB_SUFFIX=_36 TIPS_TEST_PORT=4036 MIX_ENV=test
+export TIPS_CHROME_BINARY='/absolute/path/to/chrome'
+export TIPS_CHROMEDRIVER='/absolute/path/to/chromedriver'
+"$TIPS_CHROME_BINARY" --version
+"$TIPS_CHROMEDRIVER" --version
+mix deps.get --check-locked
+mix assets.setup
+mix assets.build
+mix test --include browser --trace
+# Or select only the smoke tests:
+TIPS_BROWSER=1 mix test test/tips_web/features/live_smoke_test.exs --trace
+```
+
+Both version commands must report `153.0.8010.52`. On macOS the browser
+executable is inside `Google Chrome for Testing.app/Contents/MacOS/`.
+ChromeDriver may instead be on PATH. The browser smoke checks connected
+LiveView email validation at 1280×800, the registration form at 390×844, and
+registration through the connected LiveView. Each browser test has an isolated
+SQL sandbox; inserts are rolled back and mail uses the Swoosh test adapter.
+The narrow viewport checks layout in Chrome, not a physical mobile browser.
+
+The required `checks` CI job preserves documentation validation and adds
+introduced-commit secret scanning, locked dependencies, compilation with
+warnings as errors, formatting, assets, migrations and the full suite including
+these browser tests. It uses the pinned runtime, database image and browser
+pair. Credo in CI is tracked separately in issue #153.
+
+On browser assertion failures, Wallaby saves screenshots under `screenshots/`
+(gitignored). CI uploads them as `browser-failure-screenshots`; inspect that
+artifact and the `mix test --trace` logs from the failed run. These smoke tests
+use synthetic accounts only and need no production secrets.
