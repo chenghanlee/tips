@@ -9,7 +9,7 @@ defmodule TipsWeb.LiveSmokeTest do
     |> visit("/users/register")
     |> assert_has(css(".phx-connected"))
     |> fill_in(text_field("Email"), with: "invalid")
-    |> assert_has(css("#registration_form", text: "intentional issue 36 red probe: this text must not exist"))
+    |> assert_has(css("#registration_form", text: "intentional red probe"))
   end
 
   feature "shows the registration form on a mobile viewport", %{session: session} do
