@@ -26,4 +26,6 @@ Created by #48 (P13a.01 provider, hosting and operator prerequisites) on 2026-09
 
 ## Last merged
 
+- 2026-09-22: PR #172 (#48) provider, hosting and operator prerequisites, merge d7f80d3.
+- 2026-09-22: PR #189 (#186) developers on gpt-5.6-sol, merge e764cd4.
 - 2026-09-22: PR #170 (#169) developer model, merge 5ea4289.
