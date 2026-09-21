@@ -8,15 +8,17 @@ Every issue in [GitHub Project 15](https://github.com/users/chenghanlee/projects
 
 ## Structure
 
-One **lead TPM** and up to **five teams** work at the same time. The lead TPM assigns issues, checks file overlap, runs the merge queue, creates and retires teams, keeps `status.md`, and is the only agent that talks to the user. Each team runs the team loop below for one issue at a time.
+One **lead TPM** and up to **five teams** work at the same time. The lead TPM assigns issues, checks file overlap, runs the merge queue, creates and retires teams, keeps `status.md`, and is the only agent that talks to the user. Each team runs the team steps below for one issue at a time.
 
 | Herdr name | Workspace label | Kind and launch | Role |
 |---|---|---|---|
 | `lead-tpm` | `tips-master` | `claude --effort high` | Lead TPM. Oversight, assignment, merge queue, reporting. |
-| `team-N-tpm` | `tips-team-N` | `claude --effort medium` | Team TPM. Runs the team loop, readiness, dispatch, Project state, talks to `lead-tpm`. |
+| `team-N-tpm` | `tips-team-N` | `claude --effort medium` | Team TPM. Runs the team steps, readiness, dispatch, Project state, talks to `lead-tpm`. |
 | `team-N-lead` | `tips-team-N` | `codex -m gpt-6-astra -c model_reasoning_effort=high` | Tech lead. Readiness amendments, whole-PR design review, `tips/independent-review`, merge. |
-| `team-N-dev` | `tips-team-N` | `codex -m gpt-6-astra -c model_reasoning_effort=xhigh -C <worktree>` | Developer. Implements one issue with integration-first TDD in its worktree. |
+| `team-N-dev` | `tips-team-N` | `codex -m gpt-5.6-sol -c model_reasoning_effort=xhigh -C <worktree>` | Developer. Implements one issue with integration-first TDD in its worktree. |
 | `team-N-test` | `tips-team-N` | `claude --model opus --effort xhigh` | Tester. Adversarial per-commit review; runs the tests and checks itself. |
+
+The developer is always Codex Sol. `gpt-5.6-sol` is the Sol model this Codex account offers; `gpt-6-sol` returns a 400 on it. Change the model only with the user's decision, in both this table and `scripts/task_worktree.sh`.
 
 `N` is 1 to 5. Every name is unique across the Herdr session, so any agent can address any other by name from any workspace. Names are cleared when an agent exits or resets (`/clear` and `/new` both clear the name). The team TPM re-applies its team's names at the start of every iteration and right after every reset. An agent that starts a fresh session re-applies its own name first:
 
@@ -46,49 +48,86 @@ Always with `PGPORT=5433 MIX_ENV=test`. Example for team 2's tester: `PGPORT=543
 - **Long exchanges** (design challenges, review feedback with code) go in a shared file: `docs/implementation/communication/<YYYY-MM-DD>-<agent_1>-<agent_2>-<issue>.md` in the main checkout. The folder is gitignored. Send the path over Herdr.
 - **Durable records** are GitHub comments on the issue or PR, in the templates from agent-workflow.md. Communication files are scratch. If it is not on GitHub, it did not happen.
 - TPMs track progress from GitHub, not from pane output.
+
 - Only `lead-tpm` talks to the user. Team TPMs send user-facing blockers to `lead-tpm`.
+
+## Events, not loops
+
+No agent runs a timer, cron tick, polling monitor, wait loop or periodic GitHub state check. Every tick replays that agent's whole context. An agent acts when a Herdr message arrives, does that step, sends the messages that step names, and goes idle. It reads GitHub only inside a step that needs it. Every handoff below is a message; if a step has no message, nobody wakes up.
+
+| Step | From | To | Message |
+|---|---|---|---|
+| L2 assign | `lead-tpm` | `team-N-tpm` | `ASSIGN <issue URL>` |
+| 2 readiness | `team-N-tpm` | `team-N-lead` | `READY? <issue URL>` with the draft refinement |
+| 2 readiness | `team-N-lead` | `team-N-tpm` | `READY <issue URL>` with amendments, or the objection |
+| 2 own list | `team-N-tpm` | `lead-tpm` | `OWN-LIST #<issue>: <files>` |
+| L3 own list | `lead-tpm` | `team-N-tpm` | `own-list approved` or the conflict and the issue that holds it |
+| 3 dispatch | `team-N-tpm` | `team-N-dev` | `IMPLEMENT <issue URL> <dispatch comment URL>` |
+| 3 dispatch | `team-N-tpm` | `team-N-test`, `team-N-lead` | `BRIEF <issue URL>` with the team names and the environment block |
+| 4 push | `team-N-dev` | `team-N-test` | `PUSHED <sha> PR <url>` after every push |
+| 5 verdict | `team-N-test` | `team-N-dev` | `VERDICT <sha>: pass` or the P0/P1 findings |
+| 5 bound | `team-N-test` | `team-N-lead` | `THIRD-ROUND <finding> PR <url>` after three repair rounds on one finding |
+| 6 complete | `team-N-dev` | `team-N-tpm`, `team-N-lead` | `PR-COMPLETE PR <url> head <sha>` |
+| 6 verdict | `team-N-lead` | `team-N-tpm` | `ACCEPTED head <sha> <record URL>` or `REJECTED head <sha> <record URL>` |
+| 6 rework | `team-N-tpm` | `team-N-dev` | `REWORK PR <url> <record URL>`; the developer replies with `PUSHED` to `team-N-test` and the chain continues at step 5 |
+| 6 queue | `team-N-tpm` | `lead-tpm` | `MERGE-SLOT-REQUEST #<issue> PR <url> head <sha>` |
+| L4 slot | `lead-tpm` | `team-N-tpm` | `SLOT-GRANTED PR <url>` |
+| L4 slot | `team-N-tpm` | `team-N-lead` | `SLOT-GRANTED PR <url>` |
+| 6 slot update | `team-N-lead` | `team-N-test` | `PUSHED <sha> PR <url>` for the branch-update commit made in the slot |
+| 6 slot update | `team-N-test` | `team-N-lead` | `VERDICT <sha>: pass` on the conflict resolution, or the findings |
+| 6 merge | `team-N-lead` | `team-N-tpm` | `MERGED #<issue> merge <sha> checks <run URL>` after integrated checks on `main`, or `MERGE-FAILED PR <url> <reason>` |
+| 6 merge failed | `team-N-tpm` | `lead-tpm` | `MERGE-FAILED #<issue> PR <url> <reason>`; the slot is released and the queue stops until this team repairs on the same branch (or reverts through a reviewed PR if `main` broke) and sends a new `MERGE-SLOT-REQUEST`, which goes to the front of the queue |
+| 7 close | `team-N-tpm` | `lead-tpm` | `MERGED #<issue> merge <sha> PR <url>, open blockers: <none or list>` |
+| 7 close | `team-N-tpm` | `team-N-test`, `team-N-lead` | `CLEANUP #<issue>`; each replies `CLEAN` when its review worktree and database are gone |
+| any | `team-N-tpm` | `lead-tpm` | `BLOCKED #<issue>: <prerequisite, role, next action>` |
+| any | `team-N-tpm` | `lead-tpm` | `RETIRE-READY team N` when no issue is assigned and every `CLEAN` arrived |
+| L5 retire | `lead-tpm` | `team-N-tpm` | `RETIRE team N` |
+
+Waiting for a check, such as CI after the branch update in the merge slot, is one bounded foreground wait on one known run by the agent that needs the result: `gh pr checks <n> --watch` or `gh run watch <id>`. It costs one tool call and no context replay, which is what the ban above is about; a loop that re-reads the conversation is not allowed. The same applies to waiting for one reply: a single `herdr agent prompt <name> "<text>" --wait --timeout <ms>` is allowed, a loop of them is not.
+
+A stalled chain is not detected automatically while every agent is idle. It is found when the next message reaches `lead-tpm` and L1 reads `herdr agent list`, or when the user looks. A sender that used `--wait` and got a timeout reads the receiver once with `herdr agent get` and `herdr agent read`, then messages its TPM.
 
 ## Main checkout rule
 
 Nobody switches branches, commits or edits files in the main checkout. Every commit, including `status.md` and step-0 landings, happens in a worktree under `.worktrees/`. Claude agents run with the main checkout as their cwd and read it only. Codex developers run in their task worktree. Testers and tech leads read PR heads in their own detached worktrees, named `.worktrees/<issue>-review-team-N-<role>`, and remove them after the merge.
 
-## Lead TPM loop
+## Lead TPM steps
 
-`lead-tpm` runs this on every message from a team TPM and at least every 10 minutes on a timer. The timer tick exists to catch a stuck team or an unrecoverable error that nobody reported.
+`lead-tpm` runs the steps a message calls for on every message from a team TPM or the user, then goes idle. There is no timer; the message table above names every event.
 
-**L1. Reconcile.** Read open PRs, failed checks, Active, In review and Blocked issues and their latest comments. Read `herdr agent list`. Fix Project state that disagrees with GitHub. A team whose agents are `blocked` on a permission prompt, `unknown`, or silent for more than 20 minutes with no GitHub progress is inspected: read its panes, then message its TPM. Reassign ownership only after inspecting branch and worktree evidence, and only explicitly.
+**L1. Reconcile.** On a team message, read what that message concerns: the PR, its checks, the issue's latest comments. Read `herdr agent list` once. Fix Project state that disagrees with GitHub. A team whose agents are `blocked` on a permission prompt or `unknown`, or that a team TPM reports as unresponsive, is inspected: read its panes, then message its TPM. Reassign ownership only after inspecting branch and worktree evidence, and only explicitly.
 
 **L2. Assign.** For each idle team, pick the next issue on the critical path whose prerequisites are Done: P0, then P1, then P2, and so on. Prefer an issue in the package the team last worked in. Never assign an issue whose likely files overlap an active issue. Message the team TPM with the issue URL. If no assignable issue exists for a team, retire it (L5).
 
 **L3. Approve own lists.** When a team TPM sends an own list after readiness, compare it against every active issue's own list. No overlap allowed. Shared files (`mix.exs`, `mix.lock`, `.github/workflows/*`, `config/*`, `test/test_helper.exs`, `test/support/**`, `lib/tips_web/router.ex`, `priv/repo/seeds.exs`, `docs/design/**`) need a one-line reservation in the own list, which the lead TPM approves or moves to another issue. Reply "own-list approved" or name the conflict and the issue that holds it.
 
-**L4. Merge queue.** Keep a first-in-first-out queue of PRs whose whole-PR review accepted. Grant one merge slot at a time. The team tech lead updates its branch from `main`, waits for green `checks` and `release`, merges, runs integrated checks on `main`, records the merge SHA, and reports back. Then grant the next slot. Other teams do not update their branches until their slot, unless the lead TPM tells them a merged change affects them. If integrated checks on `main` fail, stop the queue, and route the repair to the team that merged.
+**L4. Merge queue.** Keep a first-in-first-out queue of PRs whose whole-PR review accepted. Grant one merge slot at a time. Send `SLOT-GRANTED` to the team TPM, which forwards it to its tech lead. The tech lead updates its branch from `main`, waits for green `checks` and `release`, merges, runs integrated checks on `main`, records the merge SHA, and sends `MERGED` to its team TPM, which sends `MERGED` to `lead-tpm`. Then grant the next slot. Other teams do not update their branches until their slot, unless the lead TPM tells them a merged change affects them. On `MERGE-FAILED`, or if integrated checks on `main` fail, the slot is released and the queue stops; the team that had it repairs or reverts through a reviewed PR, then requests the slot again and goes to the front of the queue.
 
-**L5. Teams.** Start with two teams. Create a team when an assignable issue exists with no overlap risk and fewer than five teams are up. Retire a team when it has been idle for a full tick with nothing assignable. Creating a team: `herdr workspace create --label tips-team-N --cwd <main checkout> --no-focus`, split the root pane into four, start the four agents from the Structure table with `herdr agent start <name> --kind <claude|codex> --pane <id> --timeout 120000 -- <launch args>`, then brief the TPM with this file's path and the team number. Retiring a team: ask its TPM to confirm no open work, then close the workspace.
+**L5. Teams.** Start with two teams. Create a team when an assignable issue exists with no overlap risk and fewer than five teams are up. Retire a team when it sends `RETIRE-READY` and nothing is assignable. Creating a team: `herdr workspace create --label tips-team-N --cwd <main checkout> --no-focus`, split the root pane into four, start the four agents from the Structure table with `herdr agent start <name> --kind <claude|codex> --pane <id> --timeout 120000 -- <launch args>`, then brief the TPM with this file's path and the team number. Retiring a team: send `RETIRE team N`, and close the workspace when the TPM confirms.
 
 **L6. Report.** If the set of Blocked-on-user issues changed, update `docs/implementation/status.md` on a `task/<issue>-status-<YYYY-MM-DD>` branch in a worktree under the standing "Status report" issue, open a PR, and ask a team TPM to have its tester and tech lead review and merge it through the queue. Tell the user only what needs the user: credentials, purchases, hosting, product scope, and review disagreements past their bounds. If every issue is Done or Blocked on the user, say so and stop.
 
-## Team loop
+## Team steps
 
-`team-N-tpm` repeats this for each issue `lead-tpm` assigns.
+`team-N-tpm` runs these for each issue `lead-tpm` assigns, one step per message.
 
 **1. Reconcile.** Re-apply the team's Herdr names. Read the assigned issue, its open PR, failed checks and latest comments. If a PR is mid-review, resume at the step it is in.
 
-**2. Readiness.** If the issue is Backlog, draft the readiness refinement on the issue: actual entry points, settled signatures, named tests, runnable commands, the team's port and database block, and the own list. Ask `team-N-lead` for the one-line "ready" confirmation with amendments. Send the final own list to `lead-tpm` and wait for "own-list approved". Then move the issue to Ready.
+**2. Readiness.** If the issue is Backlog, draft the readiness refinement on the issue: actual entry points, settled signatures, named tests, runnable commands, the team's port and database block, and the own list. Send `READY?` to `team-N-lead` and act on its `READY` reply or objection. Send `OWN-LIST` to `lead-tpm`; on `own-list approved`, move the issue to Ready.
 
-**3. Reset and dispatch.** From the main checkout, run `scripts/task_worktree.sh <issue>-<slug> --team N --pane <dev-pane-id>` to create or reuse the task branch, provision its Codex config and skills link, and print the developer start command and the team's environment block. Identical config is left unchanged; inspect any differing config before using `--force`. Send `/exit` to `team-N-dev`, confirm with `herdr pane get <dev-pane-id>` that the pane is back at the shell, then run the printed start command. Send `/clear` to `team-N-test` and `/new` to `team-N-lead`, wait until each is idle, then re-apply the team's names. Post the dispatch comment on the issue, recording the base SHA for a new branch or the existing base and head for resumed work. Move it to Active, set Agent = `team-N-dev`. Prompt `team-N-dev` with the issue URL and the dispatch comment. Brief `team-N-test` and `team-N-lead` with the issue URL, the team names, and their environment blocks.
+**3. Reset and dispatch.** From the main checkout, run `scripts/task_worktree.sh <issue>-<slug> --team N --pane <dev-pane-id>` to create or reuse the task branch, provision its Codex config and skills link, and print the developer start command and the team's environment block. Identical config is left unchanged; inspect any differing config before using `--force`. Send `/exit` to `team-N-dev`, confirm with `herdr pane get <dev-pane-id>` that the pane is back at the shell, then run the printed start command. Send `/clear` to `team-N-test` and `/new` to `team-N-lead`, wait until each is idle, then re-apply the team's names. Post the dispatch comment on the issue, recording the base SHA for a new branch or the existing base and head for resumed work. Move it to Active, set Agent = `team-N-dev`. Send `IMPLEMENT` to `team-N-dev` with the issue URL and the dispatch comment. Send `BRIEF` to `team-N-test` and `team-N-lead` with the issue URL, the team names, and their environment blocks.
 
-**4. Implement (developer).** The branch and worktree already exist; the developer owns the worktree after provisioning. Before coding, run `codex mcp get elixir-lsp --json` from the task worktree and verify that `cwd` is its absolute path. Open a draft PR. Write the failing integration test for the acceptance scenario first, then make it pass. Push cohesive commits. After each push, send `team-N-test` the SHA and PR URL over Herdr.
+**4. Implement (developer).** The branch and worktree already exist; the developer owns the worktree after provisioning. Before coding, run `codex mcp get elixir-lsp --json` from the task worktree and verify that `cwd` is its absolute path. Open a draft PR. Write the failing integration test for the acceptance scenario first, then make it pass. Push cohesive commits. After each push, send `PUSHED` to `team-N-test` with the SHA and PR URL.
 
-**5. Review commits (tester).** For each SHA: read the commit in a read-only worktree at that SHA, run the relevant checks with the tester's environment block, post the per-commit verdict on the PR, reply to the developer with the verdict. The developer repairs P0 immediately and P1 in the next commit. After three rounds on one finding, tell `team-N-lead`; the developer does root-cause analysis before trying again. Browser evidence is the CI `checks` run on the SHA; do not install a browser.
+**5. Review commits (tester).** For each SHA: read the commit in a read-only worktree at that SHA, run the relevant checks with the tester's environment block, post the per-commit verdict on the PR, send `VERDICT` to the developer. The developer repairs P0 immediately and P1 in the next commit. After three rounds on one finding, send `THIRD-ROUND` to `team-N-lead`; the developer does root-cause analysis before trying again. Browser evidence is the CI `checks` run on the SHA; do not install a browser.
 
-**6. Review PR (tech lead).** When every commit has a tester verdict with no open P0/P1, the developer marks the PR ready for review, resolves the review threads its fix commits addressed, and reports the PR complete to `team-N-tpm` and `team-N-lead`. The team TPM moves the issue to In review. The tech lead reads the whole diff against the current base in a read-only worktree at the head SHA. Challenge the design with a concrete alternative and tradeoff. If rejected, the team TPM moves the issue back to Active, the developer reworks on the same branch, and the loop returns to step 5. After two rejections, root-cause analysis is recorded on the issue before a third round. If accepted: post the review record, set `tips/independent-review` on the head SHA linking the record, then ask `lead-tpm` for a merge slot. With the slot: update the branch from `main`, wait for green checks, merge with a merge commit, run integrated checks on `main`, record the merge SHA on the issue, tell `lead-tpm`.
+**6. Review PR (tech lead).** When every commit has a tester verdict with no open P0/P1, the developer marks the PR ready for review, resolves the review threads its fix commits addressed, and sends `PR-COMPLETE` to `team-N-tpm` and `team-N-lead`. The team TPM moves the issue to In review. The tech lead reads the whole diff against the current base in a read-only worktree at the head SHA. Challenge the design with a concrete alternative and tradeoff. On `REJECTED`, the team TPM moves the issue back to Active and sends `REWORK` to the developer, who reworks on the same branch; the chain continues at step 5. After two rejections, root-cause analysis is recorded on the issue before a third round. If accepted: post the review record, set `tips/independent-review` on the head SHA linking the record, and send `ACCEPTED` to `team-N-tpm`, which sends `MERGE-SLOT-REQUEST` to `lead-tpm`. When `SLOT-GRANTED` reaches the tech lead through the team TPM: update the branch from `main`, send `PUSHED` for the merge commit to `team-N-test`, wait once for green checks with `gh pr checks <n> --watch`, and after green checks and the tester's `VERDICT: pass` set the status on the new head and merge with a merge commit, run integrated checks on `main`, record the merge SHA on the issue, and send `MERGED` to `team-N-tpm`.
 
-**7. Close.** The team TPM moves the issue to Done, clears Agent, removes the task worktree, deletes the merged local branch, asks the tester and tech lead to remove their review worktrees and drop their test databases, and reports to `lead-tpm`: issue, merge SHA, open blockers. Then wait for the next assignment.
+**7. Close.** The team TPM moves the issue to Done, clears Agent, removes the task worktree, deletes the merged local branch, sends `MERGED` to `lead-tpm` with issue, merge SHA and open blockers, and sends `CLEANUP` to the tester and tech lead, who remove their review worktrees, drop their test databases and reply `CLEAN`. With no next assignment, send `RETIRE-READY` and wait.
 
 ## Escalation
 
-A team TPM stops its loop and messages `lead-tpm` for:
+A team TPM stops and messages `lead-tpm` for:
 
 - provider credentials, accounts, hosting or domain decisions;
 - purchases;

@@ -1,6 +1,6 @@
 # Implementing Tips with agents
 
-This is the operating agreement for the agents that build Tips. Product requirements remain in the technical designs. Engineering guidance is in `AGENTS.md`. Runtime wiring for the current run (names, workspaces, loops, communication files) is in [goal-prompt.md](goal-prompt.md). [GitHub issues](https://github.com/chenghanlee/tips/issues) hold current task requirements and evidence; the [Tips project](https://github.com/users/chenghanlee/projects/15) holds scheduling state. Refine current issues in GitHub. When a contract changes, the tech lead that changed it links that decision from every affected Backlog issue so readiness refinement sees it.
+This is the operating agreement for the agents that build Tips. Product requirements remain in the technical designs. Engineering guidance is in `AGENTS.md`. Runtime wiring for the current run (names, workspaces, steps, event messages, communication files) is in [goal-prompt.md](goal-prompt.md). [GitHub issues](https://github.com/chenghanlee/tips/issues) hold current task requirements and evidence; the [Tips project](https://github.com/users/chenghanlee/projects/15) holds scheduling state. Refine current issues in GitHub. When a contract changes, the tech lead that changed it links that decision from every affected Backlog issue so readiness refinement sees it.
 
 ## Roles
 
@@ -9,7 +9,7 @@ One lead TPM oversees up to five teams. Each team has four members.
 | Role | Agent | Owns |
 |---|---|---|
 | Lead TPM (`lead-tpm`) | Claude | Issue assignment to teams, own-list overlap checks and shared-file reservations, the merge queue, team creation and retirement, Blocked-on-user tracking, `status.md`, all communication with the user. |
-| Team TPM (`team-N-tpm`) | Claude | The team loop for one issue at a time: readiness refinement, dispatch, Project Status and Agent fields, handoffs, communication with `lead-tpm` and other team TPMs. |
+| Team TPM (`team-N-tpm`) | Claude | The team steps for one issue at a time: readiness refinement, dispatch, Project Status and Agent fields, handoffs, communication with `lead-tpm` and other team TPMs. |
 | Tech lead (`team-N-lead`) | Codex | Technical contracts, readiness amendments and path narrowing, whole-PR adversarial design review, the `tips/independent-review` status, the merge in its granted slot, integrated checks on `main`. |
 | Developer (`team-N-dev`) | Codex | Implementation of one issue with integration-first TDD, its branch, worktree and PR. |
 | Tester (`team-N-test`) | Claude | Adversarial per-commit correctness review of pushed commits, running the tests and checks itself, browser evidence from CI. |
@@ -69,7 +69,7 @@ No PR merges with an unresolved P0 or P1, an unsatisfied acceptance criterion, o
 
 **Gate.** All agents share one GitHub identity, so GitHub cannot verify reviewer independence. The main ruleset therefore requires a PR, resolved conversations, an up-to-date branch, the `checks`, `release` and `tips/independent-review` contexts. After its whole-PR verdict, the tech lead posts the review record on the PR, then sets `tips/independent-review` on the exact reviewed head SHA with the record's URL as the target. The status applies only to that head; a new head needs a new review and a new status. A branch update from `main` in the merge slot is a new head: the tech lead reviews the merge commit's conflict resolution, if any, and sets the status again. This is a process interlock, not cryptographic isolation between agents sharing credentials.
 
-**Merge queue.** The lead TPM keeps a first-in-first-out queue of accepted PRs and grants one merge slot at a time. In its slot the tech lead updates the branch from `main`, waits for green checks on the new head, sets the status, merges with a merge commit and no extra edits, runs integrated checks on `main`, records the merge SHA on the issue, and reports to the lead TPM, who grants the next slot. If integrated checks on `main` fail, the queue stops; the team that merged reproduces and repairs or reverts through a reviewed PR before any other merge. Never label flaky failures green.
+**Merge queue.** The lead TPM keeps a first-in-first-out queue of accepted PRs and grants one merge slot at a time. In its slot the tech lead updates the branch from `main`, waits for green checks on the new head, sets the status, merges with a merge commit and no extra edits, runs integrated checks on `main`, records the merge SHA on the issue, and reports to its team TPM, which reports to the lead TPM, who grants the next slot. If integrated checks on `main` fail, the queue stops; the team that merged reproduces and repairs or reverts through a reviewed PR before any other merge. Never label flaky failures green.
 
 ## Context and handoff
 

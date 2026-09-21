@@ -251,7 +251,7 @@ team's port and database block and `--pane` the Herdr pane for the developer's
 Codex; the script prints the environment blocks and the exact start command.
 See [docs/implementation/goal-prompt.md](docs/implementation/goal-prompt.md).
 
-Follow step 3 of the [dispatch workflow](docs/implementation/goal-prompt.md#loop)
+Follow step 3 of the [dispatch workflow](docs/implementation/goal-prompt.md#team-steps)
 to start Codex in the provisioned worktree.
 
 The launcher uses the caller's `$PWD` as the workspace and finds binaries in
