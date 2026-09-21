@@ -1,7 +1,8 @@
 #!/bin/sh
 set -eu
 
-cd "$(dirname "$0")/.."
-exec .elixir-tools/bin/mcp-language-server \
+main_checkout=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
+tools_dir=${TIPS_ELIXIR_TOOLS:-"$main_checkout/.elixir-tools"}
+exec "$tools_dir/bin/mcp-language-server" \
   --workspace "$PWD" \
-  --lsp "$PWD/.elixir-tools/bin/expert" -- --stdio
+  --lsp "$tools_dir/bin/expert" -- --stdio
