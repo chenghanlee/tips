@@ -1,11 +1,3 @@
-# Script for populating the database. You can run it as:
-#
-#     mix run priv/repo/seeds.exs
-#
-# Inside the script, you can read and write to any of your
-# repositories directly:
-#
-#     Tips.Repo.insert!(%Tips.SomeSchema{})
-#
-# We recommend using the bang functions (`insert!`, `update!`
-# and so on) as they will fail if something goes wrong.
+# mix ecto.setup seeds development/test choices. Releases run migrations only.
+Tips.Content.Vocabulary.seed_tags!()
+Tips.Content.Vocabulary.seed_synthetic!()
