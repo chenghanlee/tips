@@ -37,8 +37,8 @@ does not authorize purchases, account creation or provider calls.
 | Item | Needed-by issues | Nonsecret configuration (env names only) | Access path | Status / evidence | Owner | Next action |
 |---|---|---|---|---|---|---|
 | GitHub repository and ordinary CI | [#49], [#96], [#133], [#136] | `GITHUB_TOKEN` | GitHub repository permissions; workflow-scoped token | Available: [CI foundation #36]; no production provider access implied | Team TPM / tech lead | Keep ordinary checks independent of provider secrets; review authorized provider invocations separately. |
-| Published GHCR database image | [#123], [#130] | None; image reference is documented | GHCR; authenticated host pull is the separate row below | Available: published amd64 manifest in [toolchain.md] and [publication run] | Tech lead | Deploy the recorded manifest digest; publication does not prove authenticated pull. |
-| VPS pull credential for private GHCR image | [#123], [#130] | TBD ([#49]) | User installs package-read credential in VPS credential store | Missing: [#173] — [toolchain.md] records unauthorized anonymous pull and no completed authenticated pull | User | Supply a package-read credential through the secret store; authorize an authenticated pull of the published digest on the intended host and record a redacted result. |
+| Published GHCR database image | [#52], [#96], [#123], [#130] | None; image reference is documented | GHCR; authenticated host pull is the separate row below | Available: published amd64 manifest in [toolchain.md] and [publication run] | Tech lead | Deploy the recorded manifest digest; publication does not prove authenticated pull. |
+| VPS pull credential for private GHCR image | [#52], [#96], [#123], [#130] | TBD ([#49]) | User installs package-read credential in VPS credential store | Missing: [#173] — [toolchain.md] records unauthorized anonymous pull and no completed authenticated pull | User | Supply a package-read credential through the secret store; authorize an authenticated pull of the published digest on the intended host and record a redacted result. |
 | Intended single VPS / preproduction host | [#52], [#96], [#119], [#123], [#130] | TBD ([#49]) | User-granted host administration; release secret store | Missing: [#174] — no host/access record in [#48] | User | Select the host after reviewing a concrete capacity/cost proposal; provide scoped operator access. The intended VPS is preproduction for the M1 auth gate as well as the later operational rehearsal. |
 | Application domain, Cloudflare DNS and proxy | [#119], [#50], [#52], [#130], [#136] | TBD ([#49]) | User-granted Cloudflare zone administration; scoped credentials in secret store | Missing: [#175] — domain/zone not recorded in [#48] | User | Select the domain and grant DNS/proxy access for TLS, origin restrictions and mail DNS records; approve any registration expense first. |
 | Cloudflare Turnstile site and secret keys | [#43], [#52] | TBD ([#49]) | Local / CI / VPS secret stores; site configuration supplied separately | Missing: [#176] — [#48] / [toolchain.md] | User | Supply site configuration for the selected host and a scoped secret; [#52] must prove real validation and invalid-challenge rejection. [#43] uses [#49] config names and local contract tests without real keys. Required widget host is exactly `https://challenges.cloudflare.com`. |
@@ -58,12 +58,14 @@ does not authorize purchases, account creation or provider calls.
 
 ## Gate boundaries
 
-- **M1 [#96]:** [#52] consumes Turnstile, mail and the selected host/domain
-  configuration; [#54] / [#60] consume OpenRouter; [#61] / [#70] / [#84] / [#86]
-  consume R2, media delivery/purge and Stream. Feature-specific probes [#54] and
-  [#61] can run in isolation when their access and explicit authorization exist;
-  neither requires unrelated providers or a deployed release. Integrated gates
-  use [#49] and must record real-provider evidence on one revision.
+- **M1 [#96]:** [#52] consumes Turnstile, mail, the selected host/domain
+  configuration and the private published GHCR image through an authenticated
+  pull of its recorded digest; [#54] / [#60] consume OpenRouter; [#61] / [#70] /
+  [#84] / [#86] consume R2, media delivery/purge and Stream. Feature-specific
+  probes [#54] and [#61] can run in isolation when their access and explicit
+  authorization exist; neither requires unrelated providers or a deployed
+  release. Integrated gates use [#49] and must record real-provider evidence on
+  one revision.
 - **M3 [#133]:** [#130] consumes the intended host/domain, authenticated GHCR
   pull, operator, private backup/restore, monitoring and media cleanup evidence.
   [#121] owns the independent invoker; [#122] owns sanitized reporting; [#123]
