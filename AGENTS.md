@@ -3,6 +3,28 @@
 - Ask why 5–15 times to find the root problem. Stop when two more whys do not change the answer.
 - Start with first principles, then use Occam's razor and the 80/20 rule to find the simplest working solution for the root problem
 
+## Skills
+
+Before writing, changing, or reviewing Elixir code, read and follow the `elixir` skill and any relevant skills below:
+
+- `phoenix`: LiveView, components, controllers, routes, Plug, channels, and PubSub.
+- `ecto`: schemas, changesets, queries, transactions, and migrations.
+- `oban`: background jobs, retries, scheduling, and workflows.
+- `otp`: processes, supervision, GenServer, Task, Registry, and ETS.
+
+Load only relevant skills. State which skills you are using before making changes.
+
+## Tool Use
+
+Scope searches to relevant paths and file types; broaden as needed.
+
+- **ripgrep (`rg`)**: Find text: names, strings, errors, config keys, and template content. Use `rg --files -g 'PATTERN'` to find files. Fall back to `grep` if unavailable.
+- **ast-grep**: Find code structures: calls with specific arguments, pipelines, or expressions inside functions. Prefer it over multiline regexes. Read the `ast-grep` skill and verify patterns against known examples. Use LSP for symbol resolution.
+- **elixir-lsp (Expert)**: Use `definition` for implementations, `references` for usages before API changes, `hover` for docs and types, and `diagnostics` for compiler feedback on changed `.ex`, `.exs`, `.heex`, and `.leex` files. Prefer LSP over text search when resolving symbols.
+- **mix-credo**: Review automatic hook feedback and fix issues introduced by your edits. It checks each edited `.ex` or `.exs` file that still exists using project configuration. Skip only if the Credo task is unavailable; report dependency and project failures.
+
+Report unavailable tools and failed checks; use appropriate fallbacks. Failed searches do not establish that no matches exist. LSP and Credo checks do not replace formatting, compilation, or tests.
+
 ## Software Design
 
 - Use Elixir and Phoenix Framework idioms, standards, and conventions.
