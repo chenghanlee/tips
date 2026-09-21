@@ -16,6 +16,26 @@ Keep a single Phoenix application with PostgreSQL, Bandit, LiveView, Ecto, maile
 
 No `postgres` role exists on this dev machine: P0.02 ([#23](https://github.com/chenghanlee/tips/issues/23)) must read DB credentials from the environment, and P0.03 ([#31](https://github.com/chenghanlee/tips/issues/31)) must use the containerized database.
 
+## Release images
+
+Generated with `mix phx.gen.release --docker` from Phoenix 1.8.14 for [#37](https://github.com/chenghanlee/tips/issues/37).
+Both stages use the same Debian bookworm snapshot. These are multi-platform
+manifest-list digests (amd64 CI and arm64 local), verified with
+`docker buildx imagetools inspect` on 2026-09-21.
+
+| Stage | Tag | Manifest-list digest |
+|---|---|---|
+| Builder | `hexpm/elixir:1.20.4-erlang-29.1-debian-bookworm-20260918-slim` | `sha256:29469d18548322a4612a7840aa542c05f359e4ff13f07dac9bb6336af0a97c58` |
+| Runtime | `debian:bookworm-20260918-slim` | `sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251` |
+
+Sources: [Hex build images](https://hub.docker.com/r/hexpm/elixir/tags),
+[Debian images](https://hub.docker.com/_/debian). The builder installs
+`build-essential git`, Hex 2.5.1, and the generator's Rebar bootstrap. The runtime
+installs `libstdc++6 openssl libncurses6 locales ca-certificates` and uses `nobody`.
+APT packages use bookworm's configured repositories; the image pins do not pin
+subsequent package updates. Compose continues using the independently pinned
+extension-enabled database image from `db/Dockerfile`.
+
 ## Application dependencies
 
 The matrix versions for generated dependencies come from the captured `mix.lock`, not the generator’s `~>` ranges. The committed lock enforces exact resolved versions, including transitive dependencies. “Pinned” means the selected version is exact; it does not mean all Tips behavior has passed. Keep the generator’s `~>` requirements in `mix.exs` and commit the application’s `mix.lock`. P0.04 ([#36](https://github.com/chenghanlee/tips/issues/36)) adds `mix deps.get --check-locked` to CI so pending lock changes fail the build. Reviewed upgrades use `mix deps.update` within those ranges and commit the updated lock. Keep exact downloaded asset-binary versions in config. Do not replace these with `latest`. The generated baseline's full lock is retained below so its transitive dependencies can be reproduced.

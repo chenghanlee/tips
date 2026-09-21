@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "127.0.0.1:5433:5432"
+      - "127.0.0.1:${TIPS_DB_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
@@ -14,5 +14,22 @@ services:
       interval: 2s
       timeout: 5s
       retries: 30
+  app:
+    image: ${TIPS_RELEASE_IMAGE:-tips-release:local}
+    build:
+      context: .
+      args:
+        RELEASE_REVISION: ${RELEASE_REVISION:-local}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=ecto://postgres:postgres@db/tips_release
+      # Omit when unset so runtime.exs raises its missing-secret error.
+      - SECRET_KEY_BASE
+      - PHX_HOST=${PHX_HOST:-localhost}
+      - PORT=4000
+    ports:
+      - "127.0.0.1:${TIPS_APP_PORT:-4300}:4000"
 volumes:
   postgres_data:

@@ -76,11 +76,66 @@ curl --include --fail http://localhost:4000/healthz
 `SELECT 1` succeeds, or `{"status":"error"}` with HTTP 503 when it fails. The
 entire probe has a one-second deadline; both responses use `cache-control: no-store` and
 contain no diagnostics. Production monitoring uses the public HTTPS hostname
-through the TLS-terminating proxy; release and proxy setup belong to P0.05.
+through the TLS-terminating proxy with `X-Forwarded-Proto: https`. The release
+also exempts `/healthz` from HTTP redirects for direct probes. It checks app/DB
+liveness only; optional providers and background progress are not readiness gates.
 
 If an agent sandbox cannot write the shared Hex/Mix caches, use the isolated
 cache environment in the [toolchain instructions](docs/implementation/toolchain.md#disposable-generator-evidence)
 before running Mix commands.
+
+### Local application release
+
+The Dockerfile builds the pinned Elixir/OTP release on Debian bookworm with the
+C toolchain for bcrypt, then runs it as a non-root user in Debian slim. Docker
+Compose publishes the app only on `127.0.0.1:4300` and the database on
+`127.0.0.1:5433` (`TIPS_APP_PORT` / `TIPS_DB_PORT` override those host ports).
+`PHX_HOST` defaults to `localhost`; the smoke sets `tips.example` to test the
+public hostname and canonical HTTPS redirect.
+
+Generate a local secret in each shell before running the app; never commit it.
+The app's runtime configuration requires it, while DB-only commands do not.
+If it is unset, the app container exits; `docker compose logs app` reports
+`environment variable SECRET_KEY_BASE is missing`:
+
+```sh
+export SECRET_KEY_BASE=$(mix phx.gen.secret)
+export RELEASE_REVISION=$(git rev-parse HEAD)
+docker compose build app
+docker compose up -d db
+# Once the DB is healthy, create this database once on a fresh volume:
+docker compose exec db psql -U postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE tips_release'
+docker compose run --rm app bin/migrate
+docker compose up -d app
+curl --include --fail http://localhost:4300/healthz
+docker compose restart app
+docker compose logs -f app
+```
+
+Migrations are explicit and idempotent; app startup does not run them or create
+the database. `Tips.Release` uses `Ecto.Migrator.with_repo` in a separate release
+VM. Ecto migration transactions and DDL use infinite timeouts; the request Repo
+retains its two-second timeout. The initial extension migration needs superuser
+privileges, provided by the local container's `postgres` role. These Compose
+credentials are for local use; hosting, TLS termination, and production database
+provisioning are separate deployment work.
+
+Run the acceptance test with Docker, Bash, curl, and OpenSSL installed:
+
+```sh
+scripts/release_smoke.sh
+```
+
+It builds and labels the image with the Git revision, prints its content-addressed
+image ID, creates and migrates a fresh DB, checks direct/proxy health and HTTPS
+redirects, stops the DB to assert a 503 within three seconds, replaces the DB container (discarding anonymous volumes), and restarts the app to
+verify committed migrations persist. It generates an ephemeral secret when unset.
+It exclusively uses Compose project `tips-release-smoke` on ports 5437/4300 and
+removes that project's containers and volume on exit. Run one smoke at a time;
+stop a local release app using port 4300 first. It never resets the shared
+Compose database. CI runs this same test in the parallel `release` job with
+Docker layer caching. `--skip-build` is for an already-built image whose revision
+label matches `RELEASE_REVISION`, as used by CI.
 
 ### Elixir tooling for Codex
 
