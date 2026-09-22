@@ -1,0 +1,555 @@
+--- a/apps/engine/lib/engine/code_intelligence/references.ex
++++ b/apps/engine/lib/engine/code_intelligence/references.ex
+@@ -23 +23 @@
+-        []
++        {:error, :unresolved_symbol}
+@@ -24,0 +25,4 @@
++  catch
++    # Index installation can block the Store before it can answer :loading.
++    :exit, {:timeout, {GenServer, :call, [Store, _request, _timeout]}} ->
++      {:error, :index_not_ready}
+@@ -50,4 +54,3 @@
+-    case Store.prefix(subject, type: {:function, :_}, subtype: subtype) do
+-      {:ok, entries} -> Enum.map(entries, &to_location/1)
+-      _ -> []
+-    end
++    subject
++    |> Store.prefix(type: {:function, :_}, subtype: subtype)
++    |> search_result()
+@@ -76 +79 @@
+-    :error
++    {:error, :unresolved_symbol}
+@@ -96,4 +99 @@
+-    case Store.exact(subject, opts) do
+-      {:ok, entries} -> Enum.map(entries, &to_location/1)
+-      _ -> []
+-    end
++    subject |> Store.exact(opts) |> search_result()
+@@ -100,0 +101,9 @@
++
++  # The shared Store uses bare [] only while disabled. A completed search is tagged.
++  defp search_result({:ok, entries}), do: Enum.map(entries, &to_location/1)
++  defp search_result([]), do: {:error, :index_not_ready}
++  defp search_result({:error, {:not_enabled, _}}), do: {:error, :index_not_ready}
++  defp search_result({:error, :loading}), do: {:error, :index_not_ready}
++  defp search_result({:error, {:index_failed, _}} = error), do: error
++  defp search_result({:error, reason}), do: {:error, {:query_failed, reason}}
++  defp search_result(other), do: {:error, {:query_failed, other}}
+--- a/apps/engine/lib/engine/search/store/state.ex
++++ b/apps/engine/lib/engine/search/store/state.ex
+@@ -14,6 +14,7 @@
+     :create_index,
+     :update_index,
+     :loaded?,
++    :load_error,
+     :fuzzy,
+     :async_load_ref,
+     :update_buffer
+@@ -49,8 +50,10 @@
+   `async_load_complete/2`.
+   """
+   def async_load(%__MODULE__{loaded?: false, async_load_ref: nil} = state) do
+-    {:ok, backend_result} = state.backend.new(state.project)
+-    prepare_backend_async(state, backend_result)
++    case state.backend.new(state.project) do
++      {:ok, backend_result} -> prepare_backend_async(state, backend_result)
++      {:error, reason} -> load_failed(state, reason)
++    end
+   end
+ 
+   def async_load(%__MODULE__{} = state) do
+@@ -58,9 +61,10 @@
+   end
+ 
+   def async_load_complete(%__MODULE__{} = state, result) do
+-    new_state = %__MODULE__{state | loaded?: true, async_load_ref: nil}
+-
+-    response =
++    new_state = %__MODULE__{state | loaded?: false, load_error: nil, async_load_ref: nil}
++
++    %__MODULE__{} =
++      response =
+       case result do
+         {:create_index, result} ->
+           create_index_complete(new_state, result)
+@@ -70,10 +74,21 @@
+ 
+         :initialize_fuzzy ->
+           initialize_fuzzy(new_state)
++
++        {:error, reason} ->
++          load_failed(new_state, reason)
+       end
+ 
+-    Dispatch.broadcast(project_index_ready(project: state.project))
+-    response
++    if is_nil(response.load_error) do
++      Dispatch.broadcast(project_index_ready(project: state.project))
++      %__MODULE__{response | loaded?: true}
++    else
++      response
++    end
++  rescue
++    error -> load_failed(state, Exception.message(error))
++  catch
++    kind, reason -> load_failed(state, {kind, reason})
+   end
+ 
+   def replace(%__MODULE__{} = state, entries) do
+@@ -83,6 +98,10 @@
+     end
+   end
+ 
++  def exact(%__MODULE__{load_error: {:error, reason}}, _subject, _constraints) do
++    {:error, {:index_failed, reason}}
++  end
++
+   def exact(%__MODULE__{loaded?: false}, _subject, _constraints) do
+     {:error, :loading}
+   end
+@@ -95,6 +114,10 @@
+       l when is_list(l) -> {:ok, l}
+       error -> error
+     end
++  end
++
++  def prefix(%__MODULE__{load_error: {:error, reason}}, _subject, _constraints) do
++    {:error, {:index_failed, reason}}
+   end
+ 
+   def prefix(%__MODULE__{loaded?: false}, _prefix, _constraints) do
+@@ -238,6 +261,15 @@
+   end
+ 
+   def update_nosync(%__MODULE__{} = state, path, entries) do
++    update_entries(state, path, entries)
++  catch
++    :exit, {:timeout, _} ->
++      Logger.warning("Timeout updating index for path: #{path}")
++      {:ok, state}
++  end
++
++  # Initial installation must preserve timeouts instead of declaring the index ready.
++  defp update_entries(%__MODULE__{} = state, path, entries) do
+     with {:ok, deleted_ids} <- state.backend.delete_by_path(path),
+          :ok <- state.backend.insert(entries) do
+       fuzzy =
+@@ -247,34 +279,24 @@
+ 
+       {:ok, %__MODULE__{state | fuzzy: fuzzy}}
+     end
++  end
++
++  defp prepare_backend_async(%__MODULE__{async_load_ref: nil} = state, backend_result) do
++    task = Task.async(fn -> load_index(state, backend_result) end)
++    %__MODULE__{state | async_load_ref: task.ref}
++  end
++
++  defp load_index(state, backend_result) do
++    case state.backend.prepare(backend_result) do
++      {:ok, :empty} -> {:create_index, state.create_index.(state.project)}
++      {:ok, :stale} -> {:update_index, state.update_index.(state.project, state.backend)}
++      {:error, :not_leader} -> :initialize_fuzzy
++      {:error, _} = error -> error
++    end
++  rescue
++    error -> {:error, Exception.message(error)}
+   catch
+-    :exit, {:timeout, _} ->
+-      Logger.warning("Timeout updating index for path: #{path}")
+-      {:ok, state}
+-  end
+-
+-  defp prepare_backend_async(%__MODULE__{async_load_ref: nil} = state, backend_result) do
+-    task =
+-      Task.async(fn ->
+-        case state.backend.prepare(backend_result) do
+-          {:ok, :empty} ->
+-            Logger.info("backend reports empty")
+-            {:create_index, state.create_index.(state.project)}
+-
+-          {:ok, :stale} ->
+-            Logger.info("backend reports stale")
+-            {:update_index, state.update_index.(state.project, state.backend)}
+-
+-          {:error, :not_leader} ->
+-            :initialize_fuzzy
+-
+-          error ->
+-            Logger.error("Could not initialize index due to #{inspect(error)}")
+-            error
+-        end
+-      end)
+-
+-    %__MODULE__{state | async_load_ref: task.ref}
++    kind, reason -> {:error, {kind, reason}}
+   end
+ 
+   defp create_index_complete(%__MODULE__{} = state, {:ok, entries}) do
+@@ -282,37 +304,37 @@
+       {:ok, state} ->
+         state
+ 
+-      {:error, _} ->
+-        Logger.warning("Could not replace entries")
+-        state
+-    end
+-  end
+-
+-  defp create_index_complete(%__MODULE__{} = state, {:error, _} = error) do
++      {:error, reason} ->
++        load_failed(state, reason)
++    end
++  end
++
++  defp create_index_complete(%__MODULE__{} = state, {:error, reason} = error) do
+     Logger.warning("Could not create index, got: #{inspect(error)}")
+-    state
++    load_failed(state, reason)
+   end
+ 
+   defp update_index_complete(%__MODULE__{} = state, {:ok, updated_entries, deleted_paths}) do
+-    starting_state = initialize_fuzzy(%__MODULE__{state | loaded?: true})
+-
+-    new_state =
+-      updated_entries
+-      |> Enum.group_by(& &1.path)
+-      |> Enum.reduce(starting_state, fn {path, entry_list}, state ->
+-        {:ok, new_state} = update_nosync(state, path, entry_list)
+-        new_state
+-      end)
+-
+-    Enum.reduce(deleted_paths, new_state, fn path, state ->
+-      {:ok, new_state} = update_nosync(state, path, [])
+-      new_state
++    starting_state = initialize_fuzzy(state)
++    updates = Enum.group_by(updated_entries, & &1.path)
++    deletions = Enum.map(deleted_paths, &{&1, []})
++
++    Enum.reduce_while(Enum.to_list(updates) ++ deletions, starting_state, fn {path, entries},
++                                                                             acc ->
++      case update_entries(acc, path, entries) do
++        {:ok, updated} -> {:cont, updated}
++        {:error, reason} -> {:halt, load_failed(acc, reason)}
++      end
+     end)
+   end
+ 
+-  defp update_index_complete(%__MODULE__{} = state, {:error, _} = error) do
++  defp update_index_complete(%__MODULE__{} = state, {:error, reason} = error) do
+     Logger.warning("Could not update index, got: #{inspect(error)}")
+-    state
++    load_failed(state, reason)
++  end
++
++  defp load_failed(%__MODULE__{} = state, reason) do
++    %__MODULE__{state | loaded?: false, load_error: {:error, reason}, async_load_ref: nil}
+   end
+ 
+   defp maybe_sync(%__MODULE__{} = state) do
+--- a/apps/engine/test/engine/code_intelligence/references_test.exs
++++ b/apps/engine/test/engine/code_intelligence/references_test.exs
+@@ -312,7 +312,7 @@
+   end
+ 
+   describe "unsupported entities" do
+-    test "returns an empty list for plain atoms", %{project: project} do
++    test "reports unresolved plain atoms", %{project: project} do
+       query = ~S[
+         defmodule MyModule do
+           def my_fun do
+@@ -323,7 +323,7 @@
+ 
+       {_, code} = pop_cursor(query)
+ 
+-      assert [] == references(project, query, code)
++      assert {:error, :unresolved_symbol} == references(project, query, code)
+     end
+   end
+ 
+--- /dev/null
++++ b/apps/engine/test/engine/code_intelligence/references_outcome_test.exs
+@@ -0,0 +1,147 @@
++defmodule Engine.CodeIntelligence.ReferencesOutcomeTest do
++  use ExUnit.Case, async: false
++  use Patch
++
++  import Forge.Test.CursorSupport
++  import Forge.Test.EventualAssertions
++  import Forge.Test.Fixtures
++
++  alias Engine.CodeIntelligence.References
++  alias Engine.Search.Store
++  alias Engine.Search.Store.Backends.Ets
++
++  setup do
++    project = project()
++    Ets.destroy_all(project)
++    Engine.set_project(project)
++    start_supervised!(Engine.ApplicationCache)
++    start_supervised!(Forge.Document.Store)
++    start_supervised!(Engine.Dispatch)
++    start_supervised!(Ets)
++    on_exit(fn -> Ets.destroy_all(project) end)
++    %{project: project}
++  end
++
++  test "disabled and loading are distinct from a successful empty search", %{project: project} do
++    owner = self()
++
++    create = fn _ ->
++      send(owner, {:indexing, self()})
++
++      receive do
++        :finish -> {:ok, []}
++      end
++    end
++
++    start_supervised!({Store, [project, create, fn _, _ -> {:ok, [], []} end, Ets]})
++    assert {:error, :index_not_ready} = references()
++    Store.enable()
++    assert_receive {:indexing, loader}
++    assert {:error, :index_not_ready} = references()
++    send(loader, :finish)
++    assert_eventually Store.loaded?()
++    assert [] = references()
++  end
++
++  test "failed initialization remains an explicit failure", %{project: project} do
++    start_supervised!(
++      {Store, [project, fn _ -> {:error, :disk_failure} end, fn _, _ -> {:ok, [], []} end, Ets]}
++    )
++
++    Store.enable()
++    assert_eventually match?({:error, {:index_failed, :disk_failure}}, references())
++    refute Store.loaded?()
++  end
++
++  test "a query timeout while installing the index remains retryable", %{project: project} do
++    owner = self()
++
++    patch(Ets, :replace_all, fn entries ->
++      send(owner, {:installing, self()})
++
++      receive do
++        :finish_install -> real(Ets).replace_all(entries)
++      end
++    end)
++
++    start_supervised!(
++      {Store, [project, fn _ -> {:ok, []} end, fn _, _ -> {:ok, [], []} end, Ets]}
++    )
++
++    Store.enable()
++    assert_receive {:installing, store}, 1_000
++
++    try do
++      # Exercise the real Store call's five-second deadline.
++      assert {:error, :index_not_ready} = references()
++    after
++      send(store, :finish_install)
++    end
++
++    assert_eventually Store.loaded?()
++    assert [] = references()
++  end
++
++  test "query errors and unresolved symbols are not successful empty results", %{project: project} do
++    start_supervised!(
++      {Store, [project, fn _ -> {:ok, []} end, fn _, _ -> {:ok, [], []} end, Ets]}
++    )
++
++    Store.enable()
++    assert_eventually Store.loaded?()
++    patch(Ets, :find_by_subject, {:error, :broken_backend})
++    assert {:error, {:query_failed, :broken_backend}} = references()
++    {position, document} = pop_cursor(":unresolved|", as: :document)
++
++    assert {:error, :unresolved_symbol} =
++             References.references(Forge.Ast.analyze(document), position, false)
++  end
++
++  for phase <- [:new, :prepare, :replace_all, :refresh, :raise] do
++    test "index initialization failure during #{phase} cannot become ready", %{project: project} do
++      phase = unquote(phase)
++
++      create = initialization_failure(phase)
++      start_supervised!({Store, [project, create, fn _, _ -> {:error, :disk_failure} end, Ets]})
++      Store.enable()
++      assert_eventually match?({:error, {:index_failed, _}}, references())
++      refute Store.loaded?()
++    end
++  end
++
++  test "a backend timeout during stale-index installation is a failure", %{project: project} do
++    patch(Ets, :prepare, fn pid ->
++      {:ok, _} = GenServer.call(pid, :prepare, :infinity)
++      {:ok, :stale}
++    end)
++
++    patch(Ets, :delete_by_path, fn _ -> exit({:timeout, :backend}) end)
++
++    start_supervised!(
++      {Store, [project, fn _ -> {:ok, []} end, fn _, _ -> {:ok, [], ["/failed.ex"]} end, Ets]}
++    )
++
++    Store.enable()
++
++    assert_eventually match?(
++                        {:error, {:index_failed, {:exit, {:timeout, :backend}}}},
++                        references()
++                      )
++
++    refute Store.loaded?()
++  end
++
++  defp initialization_failure(phase) do
++    if phase in [:new, :prepare, :replace_all], do: patch(Ets, phase, {:error, :disk_failure})
++    if phase == :refresh, do: patch(Ets, :prepare, {:ok, :stale})
++
++    fn _ ->
++      if phase == :raise, do: raise("indexer failed"), else: {:ok, []}
++    end
++  end
++
++  defp references do
++    {position, document} = pop_cursor("defmodule Sam|ple do\nend", as: :document)
++    References.references(Forge.Ast.analyze(document), position, false)
++  end
++end
+--- a/apps/expert/lib/expert.ex
++++ b/apps/expert/lib/expert.ex
+@@ -127,6 +127,13 @@
+            code: GenLSP.Enumerations.ErrorCodes.method_not_found(),
+            message: "Method not found"
+          }, lsp}
++
++      {:error, %GenLSP.ErrorResponse{} = response} ->
++        {:reply, response, lsp}
++
++      {:error, :engine_not_initialized, _project}
++      when is_struct(request, Requests.TextDocumentReferences) ->
++        {:reply, Handlers.FindReferences.error_response(:index_not_ready), lsp}
+ 
+       {:error, :engine_not_initialized, project} ->
+         Logger.info(
+--- a/apps/expert/lib/expert/provider/handlers/find_references.ex
++++ b/apps/expert/lib/expert/provider/handlers/find_references.ex
+@@ -22,9 +22,32 @@
+           EngineApi.references(project, analysis, params.position, include_declaration?)
+ 
+         _ ->
+-          nil
++          {:error, :unresolved_symbol}
+       end
+ 
+-    {:ok, locations}
++    case locations do
++      locations when is_list(locations) -> {:ok, locations}
++      {:error, reason} -> {:error, error_response(reason)}
++      other -> {:error, error_response({:query_failed, other})}
++    end
++  rescue
++    error -> {:error, error_response({:query_failed, Exception.message(error)})}
++  catch
++    kind, reason -> {:error, error_response({:query_failed, {kind, reason}})}
+   end
++
++  def error_response(reason) do
++    {reason, detail} = if is_tuple(reason), do: reason, else: {reason, nil}
++
++    %GenLSP.ErrorResponse{
++      code: GenLSP.Enumerations.LSPErrorCodes.request_failed(),
++      message: error_message(reason),
++      data: %{reason: to_string(reason), detail: inspect(detail)}
++    }
++  end
++
++  defp error_message(:unresolved_symbol),
++    do: "Symbol could not be resolved; references are unconfirmed"
++
++  defp error_message(reason), do: "References unavailable: #{reason}"
+ end
+--- a/apps/expert/test/expert/expert_test.exs
++++ b/apps/expert/test/expert/expert_test.exs
+@@ -149,6 +149,43 @@
+     assert_receive {:project_stopped, ^expected_uri}
+   end
+ 
++  test "references carries its own readiness and failure outcomes on the wire", %{client: client} do
++    Expert.Configuration.new() |> Expert.Configuration.set()
++    uri = Document.Path.to_uri("/tmp/references_contract.ex")
++    :ok = Document.Store.open(uri, "defmodule ReferencesContract do\nend", 1)
++    patch(Expert.ActiveProjects, :projects, [])
++
++    params = %{
++      textDocument: %{uri: uri},
++      position: %{line: 0, character: 12},
++      context: %{includeDeclaration: false}
++    }
++
++    request(client, %{jsonrpc: "2.0", id: 900, method: "textDocument/references", params: params})
++    assert_error(900, %{"code" => -32_803, "data" => %{"reason" => "index_not_ready"}})
++
++    patch(Expert.ActiveProjects, :projects, [project()])
++    patch(Project, :project_for_document, project())
++    patch(Expert.ActiveProjects, :active?, true)
++
++    for {outcome, reason, id} <- [
++          {{:error, :index_not_ready}, "index_not_ready", 901},
++          {{:error, {:index_failed, :disk}}, "index_failed", 902},
++          {{:error, {:query_failed, :backend}}, "query_failed", 903},
++          {{:error, :unresolved_symbol}, "unresolved_symbol", 904}
++        ] do
++      patch(Expert.EngineApi, :references, outcome)
++
++      request(client, %{jsonrpc: "2.0", id: id, method: "textDocument/references", params: params})
++
++      assert_error(^id, %{"code" => -32_803, "data" => %{"reason" => ^reason}})
++    end
++
++    patch(Expert.EngineApi, :references, [])
++    request(client, %{jsonrpc: "2.0", id: 905, method: "textDocument/references", params: params})
++    assert_result(905, [])
++  end
++
+   describe "initialize request" do
+     test "starts a project at the initial workspace folders", %{
+       client: client,
+--- a/apps/expert/test/expert/provider/handlers/find_references_test.exs
++++ b/apps/expert/test/expert/provider/handlers/find_references_test.exs
+@@ -79,12 +79,31 @@
+       assert location.uri =~ "file.ex"
+     end
+ 
+-    test "returns nothing if the entity can't resolve it", %{project: project, uri: uri} do
+-      patch(EngineApi, :references, nil)
++    test "reports uncertainty if the entity cannot resolve", %{project: project, uri: uri} do
++      patch(EngineApi, :references, {:error, :unresolved_symbol})
+ 
+       {:ok, request} = build_request(uri, 1, 5)
+ 
+-      assert {:ok, nil} == handle(request, project)
++      assert {:error, %GenLSP.ErrorResponse{data: %{reason: "unresolved_symbol"}}} =
++               handle(request, project)
++    end
++  end
++
++  for reason <- [
++        :index_not_ready,
++        :unresolved_symbol,
++        {:index_failed, :disk},
++        {:query_failed, :backend}
++      ] do
++    expected = if is_tuple(reason), do: elem(reason, 0), else: reason
++
++    test "preserves #{inspect(reason)} as a structured response", %{project: project, uri: uri} do
++      reason = unquote(Macro.escape(reason))
++      patch(EngineApi, :references, {:error, reason})
++      {:ok, request} = build_request(uri, 5, 6)
++      assert {:error, %GenLSP.ErrorResponse{code: -32_803, data: data}} = handle(request, project)
++      expected = unquote(expected)
++      assert data.reason == to_string(expected)
+     end
+   end
+ end
