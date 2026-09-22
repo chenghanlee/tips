@@ -1,66 +1,80 @@
 # Tips
 
-Tips helps developers discover and share practical AI techniques and firsthand results.
+Tips helps developers find and share practical AI techniques and firsthand results.
+It is an Elixir/Phoenix application with PostgreSQL.
 
-## Quick start
+The app currently has the Phoenix starter page, generated authentication, background
+job infrastructure and a database health check. The design documents describe target
+product behavior; GitHub issues and PRs track what has been implemented.
 
-Install the pinned Elixir/OTP versions, Docker with Compose, and a C build toolchain
-listed in the [development guide](docs/development/local-development.md).
-Start the shared database from the main checkout:
+## Run the app
+
+Follow the [local development guide](docs/development/local-development.md) to:
+
+1. Install the required tools.
+2. Start the shared database from the main checkout.
+3. Set up your checkout, environment and dependencies.
+4. Start Phoenix and open <http://localhost:4000>.
+
+Local setup needs no external provider credentials. If you use multiple
+worktrees, follow the [worktree setup](docs/development/local-development.md#isolated-worktrees)
+to give each checkout its own database and port.
+
+The [toolchain guide](docs/development/toolchain.md) identifies version sources,
+dependency choices and upgrade rules.
+
+## Test changes
+
+After setup, run these checks from your development checkout:
 
 ```sh
-docker compose up -d db
+mix format --check-formatted
+mix compile --warnings-as-errors
+mix credo --strict
+mix test
+python3 scripts/check_docs.py
 ```
 
-In your development checkout:
+`mix test` excludes browser tests. Follow the
+[browser test instructions](docs/development/local-development.md#browser-tests-and-ci)
+when a change needs browser coverage. CI runs the full suite, including browser tests.
 
-```sh
-cp .env.example .env
-set -a
-. ./.env
-set +a
-mix deps.get --check-locked
-mix ecto.setup
-mix assets.setup
-mix assets.build
-mix phx.server
-```
+Follow [AGENTS.md](AGENTS.md) for engineering rules. Put the task scope, acceptance
+criteria and review evidence in the relevant GitHub issue and PR.
 
-Open <http://localhost:4000>. No provider credentials are needed for local setup.
-For agent worktrees, use the [team launcher](agent/teams/README.md#start-and-assign)
-to assign isolated databases and ports before starting development.
+## Use agents (optional)
 
-## Documentation
+- [Agent teams](agent/teams/README.md): prerequisites, configuration, task assignment,
+  handoffs, review and cleanup.
+- [Elixir language server](agent/lsp/README.md): build the shared tools and run a
+  separate server for each coding client's worktree.
 
-- [Development and testing](docs/development/local-development.md)
-- [Agent teams: dispatch, handoff, review and cleanup](agent/teams/README.md)
-- [Elixir LSP: build, configuration and acceptance](agent/lsp/README.md)
-- [Toolchain](docs/development/toolchain.md)
-- [Architecture](docs/design/software-architecture.md) and [product glossary](docs/design/glossary.md)
-- Historical LSP evidence: [parallel-worktree exploration](docs/brainstorm/elixir-lsp-parallel-exploration.md) and [stress results](docs/brainstorm/elixir-lsp-stress-2026-09-22.md)
-- [GitHub Project 15](https://github.com/users/chenghanlee/projects/15) and [issues](https://github.com/chenghanlee/tips/issues)
+Agent tooling is separate from the application. You do not need it to run Tips.
 
-GitHub owns current requirements, task status, blockers and review evidence.
-`docs/design/` holds current design contracts; `docs/development/` explains how to
-work on the application. GitHub holds delivery planning and prerequisites.
-`agent/teams/` owns orchestration; `agent/lsp/` owns agent language-server tooling.
-Application source, tests, assets and configuration retain the Phoenix layout.
-Historical reviews and retired experiments remain in Git history; references link
-to their committed revisions. They are not current instructions or acceptance
-evidence for later revisions.
+## Find requirements and tasks
+
+- [GitHub Project 15](https://github.com/users/chenghanlee/projects/15): task planning and progress.
+- [GitHub issues](https://github.com/chenghanlee/tips/issues): scope, acceptance criteria and blockers.
+- [Architecture](docs/design/software-architecture.md): system boundaries and deployment.
+- [Backend design](docs/design/backend-design.md): operations, permissions and integrations.
+- [Frontend design](docs/design/frontend-design.md): pages, forms and browser behavior.
+- [Data model](docs/design/data-model.md): schema and database rules.
+- [Glossary](docs/design/glossary.md): product terms.
 
 ## Where files belong
 
-| Purpose | Location |
+| Location | Purpose |
 |---|---|
-| Application code, configuration, assets and release resources | Phoenix's `lib/`, `config/`, `assets/`, `priv/`, `rel/` |
-| Application tests and fixtures | `test/` |
-| Agent coordination, configuration, tests and instructions | `agent/teams/` |
-| Agent LSP wrapper, builds, patches, tests and instructions | `agent/lsp/` |
-| Application/database maintenance commands | `scripts/`, `db/` |
-| Current design and development documentation | `docs/design/`, `docs/development/` |
+| `lib/`, `config/`, `assets/`, `priv/` | Application code, configuration and resources |
+| `test/` | Application tests and fixtures |
+| `rel/` | Scripts packaged into application releases |
+| `scripts/`, `db/` | Maintenance commands and the database image |
+| `docs/development/` | Setup, testing and toolchain guides |
+| `docs/design/` | Current product and technical requirements |
+| `agent/teams/` | Agent coordination, configuration, instructions and tests |
+| `agent/lsp/` | Agent language-server launcher, builds and patches |
 
-Keep maintained tests with their owner. Put disposable experiment output in the
-ignored `tmp/` directory or outside the repository. Framework/client-managed
-directories such as `_build/`, `deps/`, `.codex/` and `.claude/` retain their expected
-locations; they are not source folders to reorganize.
+Keep root files in their standard locations for Mix, Git and Docker.
+Put disposable experiment output in ignored `tmp/` or outside the repository.
+Leave generated and client-managed folders, such as `_build/`, `deps/`, `.codex/`
+and `.claude/`, in their expected locations.

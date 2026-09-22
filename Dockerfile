@@ -1,4 +1,4 @@
-# Generated with Phoenix 1.8.14; image pins are recorded in docs/implementation/toolchain.md.
+# Pinned application build and runtime images. See docs/development/toolchain.md.
 FROM hexpm/elixir:1.20.4-erlang-29.1-debian-bookworm-20260918-slim@sha256:29469d18548322a4612a7840aa542c05f359e4ff13f07dac9bb6336af0a97c58 AS builder
 
 # install build dependencies

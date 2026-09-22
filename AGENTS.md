@@ -1,3 +1,8 @@
+## Start here
+
+Read [README.md](README.md) for setup, testing, documentation and optional agent workflows.
+Follow the engineering instructions below when working on the project.
+
 ## Problem Solving
 
 - Ask why 5–15 times to find the root problem. Stop when two more whys do not change the answer.

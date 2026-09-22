@@ -1,14 +1,12 @@
-# Data model v3 (Postgres)
+# Data model (Postgres)
 
-Date: 2026-09-20. Incorporates the holistic architecture, backend and frontend consensus alongside prior UX and owner decisions. This is the current schema and flow contract; Ecto migrations become executable schema truth during implementation. Historical decisions and measurements at the end describe superseded schemas, not evidence for this revision. The [holistic backend review](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/holistic-backend-review.md) records the schema/concurrency decisions; the [architecture](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/holistic-architecture-review.md) and [frontend](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/holistic-frontend-review.md) reviews record their cross-layer effects.
+This document defines the schema and database behavior. Ecto migrations own the executable schema; keep this contract aligned with them.
 
 Use established patterns from Reddit, Hacker News, Google Maps, Steam, Discourse, and Instagram.
 
 Follow the [architecture's MVP design constraints](software-architecture.md#mvp-design-constraints): accept necessary complexity when it makes the user's experience simpler. Retain state and invariants needed for reliable saving, recovery, ordering and permissions. Fewer columns or states is not sufficient justification if the resulting workflow makes users repeat or repair their work.
 
 Postgres stores the data and runs search with two extensions. Two views select live content, and two triggers maintain counters. A background worker generates embeddings. Cloudflare R2 stores images/GIFs and Stream stores videos. Anyone can read public content; contributions require a confirmed account.
-
-The revised full schema and application flows have not yet been implemented or integration-tested. Earlier fixtures exercised an older schema on Postgres 18.6. The adversarial review separately reproduced account/publication races, lock upgrades, attachment ordering and report uniqueness with reduced schemas. The holistic review also reproduced report-after-delete and transaction-start deadline failures and checked both lock orders for the report-lock and session-family proposals in [reduced PostgreSQL examples](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/holistic-boundary-checks.py). None of these results establishes correctness of the complete migration, Phoenix integration or search extensions.
 
 Ecto migrations own tables, generated columns, views, triggers, constraints and Oban setup. Use `execute` where needed and explicit down steps; tests run all migrations against pinned, extension-enabled Postgres in development and CI. The SQL here specifies database behavior and selected query shapes; it is not a standalone migration or a replacement for generated authentication/Oban migrations. Keep documents aligned with those migrations. No backwards-compatibility path is required.
 
@@ -26,8 +24,8 @@ Ecto migrations own tables, generated columns, views, triggers, constraints and 
 10. **Search data uses separate tables.** `tip_search` and `review_search` hold search text and vectors. A vote changes counters on the content row and updates its indexes. Keeping BM25 and vector indexes in separate tables avoids rebuilding search entries on each vote.
 11. **Lock related eligibility before writing.** Transactions lock participating users, tips, reviews and dependent rows in that order, each group sorted by id. Lock and recheck the author and applicable parent; an unlocked subquery alone cannot serialize against unban or deletion. Guarded writes retain ownership, version and deletion checks. Evaluate upload and registration deadlines using current wall time after acquiring the required row locks; transaction-start `now()` is unsuitable for these decisions. This is a decision-time guarantee, not a guarantee that commit precedes the passing deadline. Ordinary changeset inserts are valid after locked eligibility checks. Interpret affected-row counts and map expected constraint errors after rollback; zero rows is not automatically success or the same error for every operation.
 
-12. **Add filter conditions only when a filter is set.** In the measured generic plan, `$1 is null or col = $1` prevented index use and required 4708 buffers instead of 7.
-13. **Publishing has a stable submission key.** The client supplies one UUID for each intended new tip or review and reuses it on retries. Each content table enforces uniqueness on `(user_id, submission_key)`, including deleted and killed rows. A retry returns the original publication's identity and current state, plus equivalent/different/unknown comparison against complete submitted intent; identity alone never acknowledges local draft values. It does not edit, restore or repeat side effects. This supersedes the earlier decision to omit `request_id`, with protection limited to publishing.
+12. **Add filter conditions only when a filter is set.** Add the selected predicates directly; generic optional predicates such as `$1 is null or col = $1` can prevent index use.
+13. **Publishing has a stable submission key.** The client supplies one UUID for each intended new tip or review and reuses it on retries. Each content table enforces uniqueness on `(user_id, submission_key)`, including deleted and killed rows. A retry returns the original publication's identity and current state, plus equivalent/different/unknown comparison against complete submitted intent; identity alone never acknowledges local draft values. It does not edit, restore or repeat side effects. This protection is limited to publishing.
 
 ### Visibility and transaction boundaries
 
@@ -401,7 +399,7 @@ These indexes supplement the unique indexes defined above. The `by_user` indexes
 
 The unread badge and unread capture use `notifications_fold`. It starts with `user_id` and has the required `read_at is null` predicate. A test with 2000 unread rows used 104 buffers for the capped badge. A narrower `(user_id) where read_at is null` index reduced this to 29. Add that index if logs show the badge query needs it.
 
-Two indexes support filtering by the curated tags. Model and environment filters are applied to rows found through the tag index. In historical fixtures using the earlier schema and paging queries, a tag filter over 20k tips used 84 buffers. Adding model and environment filters used 238 buffers. A combination with no matches used about 1100 buffers and took 1.7 ms. Without the tag index, the three-filter page used 2557 buffers and the query with no matches scanned the table.
+Two indexes support filtering by the curated tags. Model and environment filters are applied to rows found through the tag index.
 
 Use HNSW from launch. Opus A and C measured the cost of an exact scan: a 1024-float vector takes 4 KB and is stored in TOAST. Reading 20k vectors took about 100 MB and 115 ms before calculating distances. There are ten times as many reviews. Keeping vectors in separate tables prevents votes from updating the HNSW graph. Filtered search branches set `hnsw.iterative_scan = relaxed_order` and sort candidates by distance and id before ranking.
 
@@ -705,7 +703,7 @@ The three notification types are `tip_upvoted` ("Your tip got new helpful votes"
 
 ### Search
 
-The hybrid query follows the Tiger Data guide. Execute it with the actual pinned pg_textsearch/pgvector versions in development and CI; historical fixtures without those extensions do not verify it.
+The hybrid query follows the Tiger Data guide. Execute it with the actual pinned pg_textsearch/pgvector versions in development and CI.
 
 One shared search-text writer handles publication, searchable edits and tip retagging in the content transaction. Set the current `search_text` and fresh `text_at`, clear `embedding`, and reset `embed_after`. Curated labels remain stable for the MVP; a label change rebuilds affected documents through this helper. A worker’s success or failure write with an older `text_at` must not change the new row. One Oban cron singleton processes up to 50 rows per scan, alternating tips and reviews, with active-state uniqueness, queue concurrency 1 and `max_attempts: 1`. `embed_after` is its only per-row cooldown. Make one bounded provider request per row, disable nested HTTP retries, classify errors and continue past poison rows. Crashed scans resume at the next tick. Select eligible pending tips with `tip_search s join live_tips t on t.id = s.tip_id where s.embedding is null and (s.embed_after is null or s.embed_after < clock_timestamp())`; use corresponding review/parent visibility for reviews. Measure throughput rather than assuming a batch finishes in a minute.
 
@@ -780,11 +778,11 @@ from fused group by tip_id order by score desc, tip_id limit 20 offset $3;
 -- $3 is a validated multiple of 20, from 0 through 180, into the final <=200-tip window.
 ```
 
-The keyword branches exclude zero/nonnegative scores outside their bounded candidate subqueries and before ranking/grouping/fusion. Standalone scoring may return zero for nonmatching documents; those are not lexical hits. Vector branches remain independent. Verify empty matches, stopword-only input, fewer-than-limit matches, filtered sequential/index plans and excerpt attribution on the pinned extension. The query is unexecuted in the local extension-free PostgreSQL environment.
+The keyword branches exclude zero/nonnegative scores outside their bounded candidate subqueries and before ranking/grouping/fusion. Standalone scoring may return zero for nonmatching documents; those are not lexical hits. Vector branches remain independent. Verify empty matches, stopword-only input, fewer-than-limit matches, filtered sequential/index plans and excerpt attribution on the pinned extension.
 
 Search returns one result per tip, as Hacker News does. If a review matches, `matched_review` identifies the best matching review, and the result shows its snippet under the tip. Return a matching review excerpt's source as Review (body), Prompt, Result, or Reviewer setup. Hydrate tip ids, viewer votes/capabilities and matching excerpts with current visibility checks, then apply the shared projection; an old hit id does not authorize hidden text. Preserve returned ranking order. `total_in_window` determines whether the current bounded ranking has another page; an empty page has none. Candidate limits do not grow with offset. Cross-page repeats/omissions are accepted, and each request may independently fall back to keywords.
 
-If query embedding fails or the hybrid statement times out, retry without the vector branches only within the remaining total operation budget. The [backend search contract](backend-design.md#task-first-discovery) bounds provider request concurrency, queue wait and the complete operation; retain the two-second statement timeout. Failure of the keyword path or overall budget returns a search error, not no matches. Put tag, model, and environment filters inside all four branches. Model filters always use the parent tip's `t.model_id`, including review branches; do not substitute or OR in `r.model_id`. `search_text` includes the tag id and each contribution’s own model/environment labels or free text so words such as "persona" and "opus" can match. Test whether these fields improve results with a small query set on the Docker image. Strict quoted-phrase search is deferred: the app treats input as ordinary text and must escape or normalize engine syntax consistently rather than pass through raw query operators. Verify the actual pg_textsearch parser behavior before implementation. Include Result text (`output`) in both tip and review search documents. Evaluate queries for output examples and error messages as well as technique descriptions; long outputs may affect relevance. Uploaded image/video contents are not transcribed or indexed. Publication, searchable edits and retagging use the shared search-text writer and freshness guard above. These additions require updated, unexecuted search fixtures.
+If query embedding fails or the hybrid statement times out, retry without the vector branches only within the remaining total operation budget. The [backend search contract](backend-design.md#task-first-discovery) bounds provider request concurrency, queue wait and the complete operation; retain the two-second statement timeout. Failure of the keyword path or overall budget returns a search error, not no matches. Put tag, model, and environment filters inside all four branches. Model filters always use the parent tip's `t.model_id`, including review branches; do not substitute or OR in `r.model_id`. `search_text` includes the tag id and each contribution’s own model/environment labels or free text so words such as "persona" and "opus" can match. Test whether these fields improve results with a small query set on the Docker image. Strict quoted-phrase search is deferred: the app treats input as ordinary text and must escape or normalize engine syntax consistently rather than pass through raw query operators. Verify the actual pg_textsearch parser behavior before implementation. Include Result text (`output`) in both tip and review search documents. Evaluate queries for output examples and error messages as well as technique descriptions; long outputs may affect relevance. Uploaded image/video contents are not transcribed or indexed. Publication, searchable edits and retagging use the shared search-text writer and freshness guard above. Cover these fields and freshness rules in search fixtures.
 
 ## Upload
 
@@ -939,14 +937,14 @@ where r.id = x.id and (r.up_count, r.down_count) is distinct from (coalesce(v.up
 - Verify same-key publication races and lost confirmations, retries after deletion, different keys for an existing review, and exactly one successful set of self-vote/media/search/notification effects. Retain original-version local draft CAS and uncertain-outcome reconciliation.
 - Verify selected-review mode reads no ranked page or pinned own-review body; normal lists keep the own live review at rank. Hidden/deleted tip context never leaks original text, links or media; independently visible reviews remain readable. Own-review header lookup is lightweight and current-authorized.
 - Verify page offsets, one-row lookahead, empty deep pages and Previous, current-page Back position, mixed-profile type/id ordering and type filters. No arbitrary cap outside bounded search. Inbox marks once per connected visit with the captured-count guard, not on each page.
-- Run search SQL on the pinned extensions, test current visibility and exact parent-tip setup filters in every branch, filtered HNSW recall, keyword fallback, final bounded offset and matched-review hydration. Measure deep offsets and warm/cold latency on the target corpus; historical keyset timings do not apply.
+- Run search SQL on the pinned extensions, test current visibility and exact parent-tip setup filters in every branch, filtered HNSW recall, keyword fallback, final bounded offset and matched-review hydration. Measure deep offsets and warm/cold latency on the target corpus.
 - Evaluate the same ten-query search gate with the hosted embedding candidate first and select one runtime. Include model/environment text, verbatim output/error-message queries, long-input behavior and no mixed-model vectors.
 - Verify 10 MB per image/GIF, 50 MB total new image/GIF bytes, ten total mixed attachments, 1 GB and 180 seconds per video. Limits are enforced server-side; retained images do not consume the new-byte allowance.
-- Verify cross-page query/filter preservation, Clear filters and unfiltered Show all reviews, summary/detail viewer vote state, current own-review action capabilities, review excerpt source labels and authentication without automatic report insertion. These checks are unexecuted.
+- Verify cross-page query/filter preservation, Clear filters and unfiltered Show all reviews, summary/detail viewer vote state, current own-review action capabilities, review excerpt source labels and authentication without automatic report insertion.
 - Verify one-time review setup prefill, including free-text model, explicit changes/clears, blanks on restore and independence from later tip edits. No Same-as-tip button or confirmation gate.
 - Verify media cache headers and purge, Turnstile/write/upload limits, nightly backup/restore, and the noindex exit condition in the launch checklist. Browser accessibility and provider integration checks remain implementation work.
 
-### Holistic consensus acceptance
+### Cross-layer acceptance
 
 - Publication receipts distinguish created/equivalent/different/unknown. Test same-key divergent tabs, fixed retries, missing file identities, authorized hidden/deleted originals and comparison after rollback; no identity-only draft clear.
 - Test report insertion versus author deletion in both lock orders on the full schema, including trigger/FK locks and unconfirmed reporters. Verify registration and media deadlines after lock waits; transaction-start time must not extend them.
@@ -955,204 +953,3 @@ where r.id = x.id and (r.up_count, r.down_count) is distinct from (coalesce(v.up
 - Put fifty uncertain expired uploads before later due rows; verify cooldown fairness, restart persistence, fixed author deadlines and attachment/cleanup guards. Observe stalled jobs and never-attempted embeddings independently of Oban.
 - Verify exact-publication target equivalence for recovered ready videos and all rejection cases; test the frontend’s complete-base conflict shortcut without weakening hide/restore versions.
 - Measure atomic bulk moderation on ten thousand reviews with concurrent votes before changing its execution model. Do not infer a need for chunks, partial-progress state or automatic bans.
-
-Full integration gates remain unexecuted. The reduced SQL examples linked above validate only their isolated schedules. During this document reconciliation, the current non-search table/view/trigger SQL and exact report `INSERT … FOR SHARE` ran successfully in an isolated PostgreSQL database. Focused checks passed for required session-family grouping, the static expiry index and the cooldown cleanup guard. Search tables/indexes were excluded because the extensions are unavailable locally; this does not validate full migrations or application behavior.
-
-## Historical verification (superseded schemas)
-
-The results in this section were measured on earlier versions of this schema. They show that those versions behaved as described; they do not verify the current contract, which has since changed visibility, report/vote schemas, media metadata, pagination and the video status lifecycle. The implementation acceptance list below defines the checks the current design must pass.
-
-On 2026-09-20 the then-current non-search table/index SQL was executed in an isolated Postgres 18.6 database, then removed. Checks passed for independent hiding and review counters, deferred attachment swaps and invalid final slots, video provisioning/attachment/cleanup constraints, both report uniqueness rules, and expired-account token removal. Search tables/indexes were excluded because the local server lacks pgvector and pg_textsearch. This does not validate Oban, generated auth behavior, provider calls or browser flows.
-
-The following measurements describe the historical schema, not the revised contract above. New migrations and end-to-end tests must cover the acceptance list below. The review’s reduced-schema scripts were retired from the working tree; their [committed sources](https://github.com/chenghanlee/tips/tree/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm) remain available in Git. They establish the narrow historical failures/fixes only.
-
-Three scripts were run on local Postgres 18.6 on 2026-09-19 after chavruta 03:
-
-- [data-model-v3-test.sql](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/data-model-v3-test.sql) creates the schema, views, and triggers, loads a small fixture, and checks constraints and behavior using this document's statements.
-- [data-model-v3-concurrency.sh](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/data-model-v3-concurrency.sh) runs three races in two psql sessions. It exits with status 1 if any check fails.
-- [data-model-v3-scale.sql](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/data-model-v3-scale.sql) loads 2k users, 20k tips, 200k reviews and their search rows, 600k votes through the trigger, and 320k notifications. It then runs EXPLAIN on this document's queries.
-
-The local server lacks pgvector and pg_textsearch, so the test script skips embedding columns and search indexes. Those definitions can be created as written on the timescaledb-ha Docker image from the guide.
-
-All fifteen invalid inputs were rejected:
-
-- A tip without a tag, or with an unknown tag.
-- A model with both a selected id and custom text.
-- A second undeleted review by the same user on one tip.
-- A vote with value 2, or targeting both a tip and a review.
-- An eleventh image, or an image key ending in `.svg`.
-- A handle that differs only by case, or a two-character handle.
-- A ban without a date.
-- A flag without a reporter.
-- An unknown notification type, a notification with two targets, or a `tip_reviewed` notification with a tip id.
-
-All behavior tests passed:
-
-- A fully banned user's publish and vote insert nothing.
-- Publish sets the counters through the trigger: the self vote gives `up_count = 1`, the live review gives `review_count`.
-- A shadow-banned user's tip and review have `dead_at` set and `up_count = 0` and do not show on browse.
-- A vote on a dead tip and a review on a dead tip insert nothing.
-- A shadow-banned user's vote has `dead_at` set and does not affect counters. After unban, voting again with the same value makes it live. After a second shadow ban, changing the vote makes it dead and subtracts the previous live vote. Removing a dead vote leaves counters unchanged.
-- Hot with the same age: score 5 first, -10 last. Scores 0 and -1 tie, because log of 1 is 0. That matches Reddit.
-- An older score-2 tip ranks above a newer score-1 tip on Hot and below it on New.
-- Wilson scores (2,0) as 0.549 and (1,1) as 0.164. Reviews with only a self vote tie at 0.378 and sort newest first.
-- Inserting, changing, or removing a vote takes one statement each. The triggers update the counters. A repeated vote returns no row and changes nothing.
-- The viewer's own review is excluded from the list. The historical test included unspecified rows in a model filter; the interview supersedes that behavior with explicit matches only, requiring updated tests.
-- The tip's own image and its reviews' images come from one query.
-- Three up votes fold into one notification with count 3. A review notification is its own row with only `review_id`, and the inbox resolves its tip through the review.
-- Inbox page and capture in a repeatable-read transaction; a fold after the snapshot leaves that row unread with count 4.
-- The historical tests verified a two-hour edit limit. The current UX consensus removes that limit for both tips and reviews; update fixtures to verify late edits, atomic attachment/search changes, unchanged review count and identity, and the visible updated timestamp.
-- A failed embedding write for stale text is a no-op; for current text it sets `embed_after`.
-- A delete by the wrong user changes no notifications. The author's delete removes the tip's notifications, including the `tip_reviewed` row found through the review, returns the media keys, and keeps the reviews and the page.
-- A deleted review leaves the list, and the trigger decreases `review_count`. Its row and votes remain. A replacement review uses a new row.
-- Invalidating every live vote by two accounts is one statement; the trigger subtracts each.
-- Killing a review as a non-moderator does nothing. Killing twice subtracts once. Unkill adds once.
-- Bulk kill hides the user's live reviews, and the trigger updates their parent tips' counts.
-- The destroy-files action returns file keys and removes media rows.
-- Account deletion sets handle and email to NULL and keeps the content.
-- Resolving a flag twice makes no change on the second attempt. The queue groups reports by target.
-- A `do` block compares every counter, dead rows included, with its live votes and reviews and raises on any difference. It ran before any repair and passed.
-- The recount statements for tips and for reviews change zero rows.
-
-All concurrent-session checks passed:
-
-- The same user votes up on a tip in one session, held open, and down in another. One statement each. The second waits on the vote row; the trigger then updates the counters from its own snapshot: 0 up, 1 down, vote -1. A single statement that computed the parent from its own snapshot failed the check constraint here.
-- The same race on a review starting at 0 up, 1 down: the one-statement CTE form failed Wilson's square root; the trigger form ends at 0 up, 1 down.
-- One session reads the inbox page and the unread capture in a repeatable-read transaction. Another folds one more event between the two reads. The capture saw count 1. Mark all read leaves that row unread with count 2.
-
-The scale results below count 8 KB buffers, including hits and reads. Timings were measured on a laptop. Some queries ran with a cold cache.
-
-| Query | Plan | Pages | Time |
-|---|---|---|---|
-| Browse Hot, first page, through `live_tips` | Index scan `tips_hot`, users by primary key | 80 | 0.12 ms |
-| Browse Hot, next page after 10000 | Same, cursor in the index condition | 86 | 0.12 ms |
-| Browse Hot, tag filter, full page select | Index scan `tips_hot_by_tag`, users by primary key | 84 | 0.06 ms |
-| Browse Hot, tag plus model plus environment | Index scan `tips_hot_by_tag`, row filter, users by primary key | 238 | 0.32 ms |
-| Browse Hot, a combination with no matches | Bitmap on `tips_new_by_tag`, sort of 0 rows | 1120 | 1.7 ms |
-| Browse New, next page after 10000, full page select | Index scan `tips_new`, users by primary key | 80 | 0.06 ms |
-| Tip with 2004 reviews, Best, first page, full row select through `live_reviews` | Index scan `reviews_best`, tips and users by primary key | 126 | 0.13 ms |
-| Same, model filter built into the SQL | Index scan `reviews_best`, row filter | 126 | 0.04 ms |
-| Same, next page after 1500 | Index scan `reviews_best`, cursor in the index condition | 117 | 0.11 ms |
-| My votes on a page of 20 tips | Index scan `votes_one_per_tip` | 3 | 0.02 ms |
-| Vote, one statement, trigger included | Users by key, unique index probe, tips by key | 22 | 0.35 ms |
-| Vote response, counters | Tips by key | 5 | 0.01 ms |
-| Who voted on tip 1 in the last day | Bitmap on `votes_by_tip` | 19 | 0.11 ms |
-| Inbox, user with 20k notifications, page | Index scan `notifications_inbox` | 108 | 0.08 ms |
-| Inbox, unread capture, 1851 rows | Bitmap on `notifications_fold` | 298 | 0.56 ms |
-| Unread badge, capped | Index only scan `notifications_fold` | 4 | 0.02 ms |
-| Mark all read, 1851 rows, count-matched | Bitmap on `notifications_fold` | 26580 | 14 ms |
-| Profile reviews, next page | Index scan `reviews_by_user` | 153 | 0.09 ms |
-
-Keyset pagination avoids work proportional to page depth. Mark-all-read costs more as the number of unread rows increases. Much of that work rechecks foreign keys on unchanged columns. It runs once per inbox visit. The badge and unread capture use `notifications_fold` without a separate unread index.
-
-The one-review-per-user-per-tip constraint limits each tip to one undeleted review per user. The fixture's busiest tip had 2004 reviews, despite 50k insert attempts.
-
-## Historical decision log, 2026-09-19
-
-This records how the design evolved. The reconciled rules, schema and operation contracts above take precedence over superseded alternatives in this history.
-
-The backend interview confirms that clarification questions, general comments, and replies are deferred. Keep reviews as firsthand accounts without reply relationships or separate comment records. This preserves the existing rule that a deleted review leaves the list because it has no replies to retain.
-
-The user made the following decisions in the initial question session. Later changes are listed by review below.
-
-- Edit window: 2 hours for tips; no time limit for reviews, including text and attachments. Review edits update the existing review rather than appending a log. Vote changes any time.
-- Delete: any time, by the author. Deleted tip keeps page and reviews, Reddit style. Deleted review showed "[deleted]" until review 3, below.
-- URL: `/tips/{base36 id}/{slug}`, slug regenerated from the title, not stored.
-- Moderation: HN model. `deleted_at` versus `dead_at`. Moderator-only kill. Dead rows visible to author and moderators.
-- Users: one `role` column for now. Ban states: none, shadow, full. Account deletion is Reddit style.
-- Reviews: `body` required, one per user per tip, own model and environment optional, author may review own tip and is labelled.
-- Votes: Helpful and Not helpful on tips and reviews, `value` plus or minus 1, toggle to remove, auto up vote on own post. Count only in public.
-- Images: up to 10 per tip and per review, no captions, purge on delete, keep on kill.
-- Counts: stored counters. Live counts and the 90-day window dropped.
-- Ranking: tips Hot (classic Reddit, votes only) and New. Reviews Best (Wilson) and New. No Top yet.
-- Search: hybrid in v1. pg_textsearch on tips and review bodies, Qwen3-Embedding-0.6B vectors on tips and reviews, RRF, one result per tip. Async embedding with retry. MLX server locally.
-- Tags: one per tip, required, curated. Nine to start: Phrase, Persona, System prompt, Examples, Task structure, Output format, Workflow, Cost and speed, and Other technique. The fallback is an ordinary curated tag (`other`), not free text or a new-tag request. Selecting it allows immediate publication; review its submissions to identify missing categories.
-- Notifications: one table, fold on write, three types, in-app only, badge on page load, mark all read on open, no settings, deleted with their target, no self or down vote or hidden-actor notifications. Keep the count as a count of events.
-- Dropped: `request_id`, stored unique slug, `worked`, likes only (proposed, then reversed), external search service.
-
-### Review 1 with Codex
-
-- Fixed the sign in the Hot formula and added `returning old/new` for votes.
-- Added user eligibility checks to vote inserts and guards to kill and delete statements. Content created under a shadow ban starts with zero counters.
-- Allowed NULL handles and emails for deleted accounts and made embedding writes conditional on the text version.
-- Grouped matching reviews by tip in search and preserved search order when fetching results. Review indexes checked `dead_at` only at this stage.
-- Required login for flags, removed `data jsonb`, and masked killed content in the inbox.
-- Added ETag checks to upload validation and copying.
-
-### Hosting and authentication decisions after review 2
-
-The user asked Claude to resolve the remaining questions with the simplest working implementation. The decisions were email magic links, one VPS with Docker Compose, and a Hot divisor of 345600. At the expected posting rate, Reddit's divisor of 45000 made Hot return the same order as New. The divisor can be changed back. The latest review date indicates when a tip was last tested, without an extra column.
-
-### Review 2 with Codex and Opus A, B, and C
-
-The user required the review to preserve agreed features and use 10 to 15 successive "why" questions to identify root causes.
-
-Changes at this stage:
-
-- Used two statements per counter change. Vote `dead_at` follows the current ban, and votes and reviews require a live target.
-- Moved search text and vectors to separate tables, added HNSW for launch, and included `prompt` in search text.
-- Added filter predicates only when set and added tag indexes.
-- Removed the viewer's own review from the main list, masked hidden content in SQL, and fetched tip images.
-- Limited deleted reviews to three per user per tip per day.
-- Checked moderator status in SQL and added bulk kill by user. Kill resolved flags and moved images to quarantine. The flag queue grouped reports by target.
-- Used a fresh media key per upload attempt and set Content-Type on the server. Bound each staging key to its uploader.
-- Matched mark-all-read updates to captured counts, capped the badge, and added a retry time per embedding row.
-- Added the `notification_type` domain, handle limits of 3 to 30 characters, reserved handles, and backups.
-
-Rejected proposals:
-
-- Replace Hot with Top, or Wilson ranking with up-count.
-- Limit content to one image or two filter categories, or search only tips.
-- Use decimal ids or worked/didn't-work labels.
-- Remove shadow bans, vote notifications, or deleted-review placeholders.
-- Require a minimum account age to vote.
-- Add separate counter tables or an authorization proxy for images.
-- Group matching reviews by scanning all rows.
-- Truncate review prompts and outputs and fetch the rest on expansion. Full text remained, using gzip and streamed HTML, as proposed in Codex A5.
-- Write the notification in a separate transaction or add `last_up_at`.
-
-### Review 3 with Codex
-
-See `chavruta-03-holistic.md`. The user requested a review of the full system, established industry practices, and unnecessary complexity. The review used 7 to 15 successive "why" questions for each complex part.
-
-Agreed changes:
-
-- Two `AFTER` row triggers maintain counters. App code no longer writes them, and child parent ids cannot change.
-- Notifications have one target, enforced by three checks. Tip deletion finds `tip_reviewed` notifications through reviews.
-- The inbox page and unread capture share one read-only repeatable-read transaction. Mark-all-read still matches captured counts.
-- `live_tips` and `live_reviews` select live content for browse and search candidates.
-- The app builds search text once. The separate `notifications_unread` index is deferred.
-- Write statements check their own conditions, and the app checks the returned row count.
-- The scale script runs the documented statements.
-- Removed `embedding_model` and `votes.id`. Renamed `notifications.created_at` to `updated_at`.
-- Embedding failures retry after ten minutes. Failure updates check that the vector is still pending and the text version is unchanged.
-
-Image delivery bypassed content authorization, which had led to file moves in `settle`. The user chose to keep files at their original keys. Kill and unkill now update rows only. Author deletion removes media rows and files. Moderators can destroy files separately. A saved URL for a killed image remains usable until the file is destroyed. Uploads use one request through the app.
-
-The user also chose to remove deleted-review placeholders and the per-day cap on deleted reviews. Review rows remain in the database. Exact mark-all-read was retained after Codex reproduced a new review notification being marked read before it appeared in the inbox snapshot.
-
-Two proposals were rejected after testing or checking platform limits:
-
-- Signed URLs for serving images: R2 presigned URLs do not support custom domains, and an issued URL cannot be revoked.
-- Moving user eligibility, moderator, edit-window, and content-visibility checks out of SQL: a ban or deletion committed between an app check and a write can pass the earlier check.
-
-### Idioms review v2, 2026-09-20
-
-Three-phase adversarial review (architecture, backend, frontend) reached consensus in two rounds per phase. Changes applied to this document: the four domains became named CHECK constraints with `Ecto.Enum`; the owner chose always-private Stream assets with locally signed click-time playback, removing `activated_at`, `activation_job_id`, activation jobs, snooze, attempt budget and author activation status; `checked_at` and `media_status_scan` support the worker-only status scan, and webhook/callback wording was removed; null-uid provisioning rows expire locally under a conditional uid-persist guard with no provider correlation lookup; upload targets carry stable content identity without an edit version and no rebind operation; lock order states subject accounts before mutable bulk discovery and per-operation lock sets; single-record edits prefer `optimistic_lock`; the embedding runtime is chosen at the search gate with a hosted candidate first; historical measurements are labelled superseded. Preserved: counters and triggers, both revisions and report constraints, IndexedDB draft compare-and-set, poster previews, inline signup reclaim. The framework reviews remain in Git history: [architecture](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/idioms-v2-architecture-review.md), [backend](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/idioms-v2-backend-review.md), [frontend](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/idioms-v2-frontend-review.md).
-
-### Backend design interview
-
-- Review composition has three main sections: required Markdown review (`body`), optional prompt (`prompt`), and optional result (`output` text and/or attached `media`). Result uses one combined composer with an attachment button, paste/drop support, and removable previews. Accept text alone, media alone, both, or neither; no format discriminator is needed.
-- Include images, GIFs, and short videos in MVP result attachments. Keep images/GIFs in R2 and use Cloudflare Stream for videos, with a maximum duration of 180 seconds per video. Accept common recording formats and wait for playable video before publication. Schema/upload changes remain to be designed; the existing image-only SQL is not sufficient.
-- If mailbox access and usable recent authentication are lost, require recovery through the email provider or a new Tips account. No manual ownership override, recovery codes, transfer of contributions, or release of the old account's handle as a recovery action.
-- Allow login-email changes after recent sign-in and verification of the new address. Keep the existing address active until confirmation and preserve account identity, handle, contributions, and moderation state.
-- Keep handles fixed after signup and explain this before completion. This also applies to an accepted autogenerated handle. Account deletion retains the existing handle-release behavior.
-- Signup starts with an editable autogenerated handle, then email entry and magic-link verification, then the intended editor. Returning users use email sign-in. Handle suggestions do not reserve names or create user rows.
-- Confirm report receipt after persistence; provide no report-status page or promised outcome message in the MVP. Keep resolution in the moderator queue without adding reporter notifications or outcome-tracking fields.
-- Use reviews and votes for effectiveness and outdated techniques. Reserve moderation reports for suspected community-rule violations; replace `wrong` with `fabricated` for invented firsthand accounts or supporting evidence. Keep the existing optional report detail.
-- Reject stale author edits using a per-content `edit_version`; preserve unsaved text and require loading the latest version before retrying. Cover text, selections, and attachments with one guard. No edit history or automatic merging.
-- Full bans block contributions and edits but allow deletion of the account's own content or account. Extend verification to cover allowed deletions and rejected edits, vote changes/removal, reports, and moderation, including a ban committed after an editor opens.
-- Add a client-supplied `submission_key` to tips and reviews, with uniqueness per author in each table. Retry the same intended publication using the same key and return its original identity and current state. This supersedes the initial decision to drop `request_id` without introducing a general request log.
-- Keep keys on deleted content. A retry does not restore deleted content or repeat votes, notifications, search entries, or media attachments.
-- Distinguish a confirmed failed transaction from an unknown commit outcome before cleaning up image uploads.
-- These SQL additions have not yet been run through the historical verification scripts; the required checks are listed under Implementation acceptance.

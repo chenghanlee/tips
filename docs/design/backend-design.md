@@ -1,16 +1,14 @@
 # Backend design
 
-Date: 2026-09-20. Status: incorporates the holistic architecture, backend and frontend consensus, alongside the prior UX and owner decisions. Implementation and full integration verification remain outstanding.
-
 ## Scope
 
 This document defines business operations, context boundaries, authorization, transactions, external service coordination, and background work.
 
 Apply the architecture's user-experience principle to every operation: accept necessary implementation complexity that removes user effort. Keep ownership, idempotency, conflict protection, recoverable failure handling and automatic progress where the user journey requires them. A smaller backend is not an improvement if users must repeatedly check status, redo completed work, repair duplicate submissions or manage provider details themselves. Prefer established capabilities and shared mechanisms before removing these protections.
 
-Follow the [software architecture](software-architecture.md), including its [MVP design constraints](software-architecture.md#mvp-design-constraints). The [frontend design](frontend-design.md) owns LiveView, forms and browser interactions. The [data model](data-model.md) owns the canonical schema and database invariants. The [framework review](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/idioms-v2-backend-review.md) and [final UX review](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/ux-idioms-backend-review.md) record the reasoning and superseded alternatives; this document states the selected contract, including the owner decision to prefill review setup.
+Follow the [software architecture](software-architecture.md), including its [MVP design constraints](software-architecture.md#mvp-design-constraints). The [frontend design](frontend-design.md) owns LiveView, forms and browser interactions. The [data model](data-model.md) owns the canonical schema and database invariants.
 
-The [holistic architecture review](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/holistic-architecture-review.md), [backend review](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/holistic-backend-review.md) and [frontend review](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/holistic-frontend-review.md) record the cross-layer decisions now applied here. Keep one Phoenix release with Accounts/Content, PostgreSQL, Oban and LiveView. The data model owns schema and locking invariants; this document owns operations; the frontend owns browser state and navigation. Link to those contracts rather than maintaining parallel procedures.
+Keep one Phoenix release with Accounts/Content, PostgreSQL, Oban and LiveView. The data model owns schema and locking invariants; this document owns operations; the frontend owns browser state and navigation. Link to those contracts rather than maintaining parallel procedures.
 
 ## Business requirements
 
@@ -115,7 +113,7 @@ The selected review must belong to the requested tip and be visible to the calle
 
 The frontend owns the URL format, positioning, and visual emphasis. The URL must carry the selected review id in a path or query parameter that reaches the backend; a fragment alone cannot tell the initial server request which review to fetch. Use the existing tip URL with a `review` query parameter and a review anchor for scrolling. For a selected review belonging to that tip, show “Review deleted by author” when deleted, or “Review removed by moderators” when deliberately moderator-hidden from the caller. Keep tip context available and provide Show all reviews to the normal list. Unavailable reviews remain absent from the normal list; the notice is for a direct-link destination, not a retained list item. If the id is unknown, malformed, belongs to another tip, or its removal cause cannot be safely disclosed, use “Review unavailable” without exposing review data. A nonexistent tip still returns 404. Author/moderator access to hidden reviews follows the existing permissions. This adapts Reddit's deletion/removal distinction to flat reviews without replies.
 
-Search supports Previous/Next pages and refining the query or filters. Rerun retrieval and ranking for every requested page using current content and visibility. New tips, reviews, edits, completed embeddings, and semantic-service availability can change later pages. This supersedes the earlier stable-order guarantee and Postgres/ETS snapshot proposals; no search snapshot table, lifetime, expiry notice, or cleanup worker is required.
+Search supports Previous/Next pages and refining the query or filters. Rerun retrieval and ranking for every requested page using current content and visibility. New tips, reviews, edits, completed embeddings, and semantic-service availability can change later pages. No search snapshot table, lifetime, expiry notice, or cleanup worker is required.
 
 ### Bounded search pagination
 
@@ -127,7 +125,7 @@ Every request checks current visibility and only returns authorized tips and mat
 
 Page-based requests are established in [Algolia pagination](https://www.algolia.com/doc/api-reference/api-parameters/page). Keeping a bounded ranking window follows the principle described in [Elasticsearch RRF pagination](https://www.elastic.co/docs/reference/elasticsearch/rest-apis/reciprocal-rank-fusion#pagination-in-rrf); neither source establishes a cross-request frozen-order guarantee for Tips. The data-model SQL applies the final bounded offset; verify current-visibility checks during result and excerpt hydration against the pinned extensions.
 
-Include matching-excerpt hydration, selected-review lookup, and authenticated operation admission in query measurements; historical statement counts are not current guarantees.
+Include matching-excerpt hydration, selected-review lookup, and authenticated operation admission in query measurements.
 
 ## Implementation foundation
 
@@ -203,7 +201,7 @@ Queries select eligible rows; one shared Content visibility policy feeds small, 
 
 ### Runtime and integration checks
 
-Development and CI run migrations against a pinned production-compatible Postgres image containing both pg_textsearch and pgvector. Exercise actual hybrid queries, filtered recall, keyword fallback, punctuation handling, bounded pagination, latency and memory, including long document inference on the intended production runtime. Do not treat the historical SQL timings as validation of these paths.
+Development and CI run migrations against a pinned production-compatible Postgres image containing both pg_textsearch and pgvector. Exercise actual hybrid queries, filtered recall, keyword fallback, punctuation handling, bounded pagination, latency and memory, including long document inference on the intended production runtime.
 
 Use ordinary provider functions with injectable request options and `Req.Test` (or the selected SDK's equivalent) for provider failures and unknown outcomes. Add behaviours only when a concrete test needs them. Request queries retain the 2-second database timeout; migration and maintenance connections use explicit longer or disabled timeouts without leaking overrides into the request pool. Test the actual release migration, backup, restore and repair commands.
 
@@ -246,6 +244,34 @@ Use one bounded, read-only health routine outside Oban execution. Inspect releva
 
 Thresholds include the maximum bounded scan runtime, queue delay and deployment/startup/backfill grace. Fifty bounded calls can exceed a minute cadence; do not use twice that cadence as a universal failure threshold. Treat six hours for eligible embedding age and twenty-four hours for unfinished cleanup as initial tunable investigation thresholds, not service guarantees. Verify stalled cron, stopped queues, never-attempted rows and recovery, including when the web/DB probe stays healthy.
 
+## Markdown, embeds and secure headers
+
+Render tip/review authored Markdown through **MDEx 0.13.5 with its built-in Ammonia sanitizer** (`mdex_native`). Use one options list, without HtmlSanitizeEx or a custom Scrubber module:
+
+```elixir
+render: [unsafe: false],
+sanitize: [
+  tags: ~w(p br hr h1 h2 h3 h4 h5 h6 blockquote ul ol li pre code em strong del a table thead tbody tr th td),
+  tag_attributes: %{"a" => ~w(href title)},
+  generic_attributes: [],
+  url_schemes: ~w(http https mailto),
+  link_rel: "nofollow noopener noreferrer"
+]
+```
+
+`unsafe: false` omits author raw HTML, but Markdown image syntax still produces an `img` tag. The sanitizer’s tag allowlist removes those images. Only the sanitized result may be marked HTML-safe. See [MDEx safety options](https://github.com/leandrocp/mdex/blob/v0.13.5/guides/safety.md). Titles and metadata stay escaped text; prompt/result fields stay verbatim escaped text with copy preserving bytes.
+
+Allowed output tags: `p`, `br`, `hr`, `h1`–`h6`, `blockquote`, `ul`, `ol`, `li`, `pre`, `code`, `em`, `strong`, `del`, `a`, `table`, `thead`, `tbody`, `tr`, `th`, `td`. Allow only validated `href` and `title` on links; URI schemes are HTTPS/HTTP/mailto plus relative URLs/fragments. Add application-controlled `rel="nofollow noopener noreferrer"`; do not accept author `target`, styles, event handlers, scripts, forms, SVG, images, video or iframe tags. Uploaded media is rendered separately through authorized components. Disable syntax highlighting initially so the allowlist needs no author-controlled style/class exceptions. The implementation task must test malformed HTML, encoded/script/data URLs, raw HTML omission and normal Markdown; this policy is not evidence that those fixtures already pass.
+
+**Author embed host allowlist: empty.** No pasted iframe or automatic third-party URL embed. Required application-owned embeds are separate HEEx components:
+
+- Turnstile script/frame: exactly `https://challenges.cloudflare.com`.
+- Private Stream player: exactly the configured `https://customer-<CODE>.cloudflarestream.com` host (the code comes from provider configuration). The initial iframe source is the same-origin `/media/{id}/watch` route, which authorizes then redirects to the signed `/iframe` destination. Do not wildcard all customer hosts or accept an author-supplied destination. Thumbnails use the separately authorized route; R2 images use the configured cookie-free media origin.
+
+Retain the generated `put_secure_browser_headers` plug and all [Phoenix 1.8.14 defaults](https://github.com/phoenixframework/phoenix/blob/v1.8.14/lib/phoenix/controller.ex): CSP `base-uri 'self'; frame-ancestors 'self';`, `referrer-policy: strict-origin-when-cross-origin`, `x-content-type-options: nosniff`, and `x-permitted-cross-domain-policies: none`. Those defaults restrict who can frame Tips; they do not forbid Tips from embedding Stream or Turnstile.
+
+When adding a stricter CSP, preserve those default directives and allow `frame-src 'self' https://challenges.cloudflare.com https://customer-<CODE>.cloudflarestream.com`, plus Turnstile's exact script host or its documented nonce approach. Follow [Turnstile's CSP requirements](https://developers.cloudflare.com/turnstile/reference/content-security-policy/). Test the real redirects, signed video playback and signup widget during the authorized provider gate. Do not weaken global headers to accommodate authored HTML.
+
 ## Publishing and draft recovery
 
 ### Review content and evidence
@@ -268,7 +294,7 @@ Each tip or review allows up to ten attachments in any mix of images, GIFs, and 
 
 Start with a limit of 10 MB (10,000,000 bytes) per image/GIF and 50 MB (50,000,000 bytes) across newly uploaded images/GIFs in one publish or edit submission. Retained published attachments do not consume this upload-byte allowance. Videos retain their separate 1 GB per-file limit and direct Stream transport; all media still share the ten-attachment limit. Validate individual sizes and the aggregate selection before transfer for feedback, and enforce the limits on the server during upload and before R2 storage/publication. These are adjustable MVP defaults, not a requirement to compress files automatically.
 
-Use [built-in LiveView uploads](https://phoenix-live-view.hexdocs.pm/uploads.html), with upload on selection disabled. On submission, LiveView transfers files to temporary server storage before invoking the submit callback. Validate text first, then use `consume_uploaded_entries` with `{:postpone, path}` to obtain completed files without releasing them. Start with a synchronous Content attempt over those page-owned paths; Content validates files, stores R2 objects and owns transaction/cleanup decisions. Consume with `{:ok, result}` only after the submitted content is acknowledged as created/equivalent or its explicit edit is confirmed; different/unknown receipts retain the entries for recovery. Known failures retain the entries for retry while the page lives; unknown outcomes reconcile before another attempt. Disable attachment changes during submission. Never pass consumed temp paths to background work, keep R2 keys as reusable page-only staging, or delete uncertain objects when the page terminates. Keep sockets and LiveView upload entries out of context APIs. Preserve the existing permissions, file limits, retry, and orphan-cleanup contracts. Temporary upload completion is not publication or durable draft recovery. The frontend may use one page-owned async attempt only if measured blocking warrants it, retaining entries until page-side consumption; no detached task or durable job may own these paths. This replaces historical multipart-controller transport; video uploads still go directly to Stream on selection.
+Use [built-in LiveView uploads](https://phoenix-live-view.hexdocs.pm/uploads.html), with upload on selection disabled. On submission, LiveView transfers files to temporary server storage before invoking the submit callback. Validate text first, then use `consume_uploaded_entries` with `{:postpone, path}` to obtain completed files without releasing them. Start with a synchronous Content attempt over those page-owned paths; Content validates files, stores R2 objects and owns transaction/cleanup decisions. Consume with `{:ok, result}` only after the submitted content is acknowledged as created/equivalent or its explicit edit is confirmed; different/unknown receipts retain the entries for recovery. Known failures retain the entries for retry while the page lives; unknown outcomes reconcile before another attempt. Disable attachment changes during submission. Never pass consumed temp paths to background work, keep R2 keys as reusable page-only staging, or delete uncertain objects when the page terminates. Keep sockets and LiveView upload entries out of context APIs. Preserve the existing permissions, file limits, retry, and orphan-cleanup contracts. Temporary upload completion is not publication or durable draft recovery. The frontend may use one page-owned async attempt only if measured blocking warrants it, retaining entries until page-side consumption; no detached task or durable job may own these paths. Video uploads go directly to Stream on selection.
 
 ### Managed video
 
@@ -393,7 +419,7 @@ Only a successful versioned write permits the related attachment and search chan
 
 An unchanged submission at the current authorized version is a no-op and does not advance the edit version. A stale or unsuccessful conditional write rolls back before reading current authorized state to distinguish conflict, deletion, lost permission or another current eligibility failure. Do not replace the expected version automatically. For a confirmed failed attempt, Media removes only newly uploaded unattached images; reusable staged videos retain their normal expiry. For a confirmed successful edit, transactionally enqueued cleanup removes retired files after commit, retaining identifiers until confirmation. An unknown commit requires reloading current saved state while preserving input; never blindly replay an edit with a freshly fetched version.
 
-The [data model](data-model.md#edit) defines the version fields and eligibility contract; the Ecto mechanism above replaces the requirement for hand-written SQL on every single-record edit. Moderator file destruction also advances the edit version so an old editor cannot restore destroyed attachments. No edit-history table, editor session lock or automatic merge mechanism is needed.
+The [data model](data-model.md#edit) defines the version fields and eligibility contract. Moderator file destruction also advances the edit version so an old editor cannot restore destroyed attachments. No edit-history table, editor session lock or automatic merge mechanism is needed.
 
 For conflict recovery, compare the latest authorized editable fields with the editor’s complete original base using the same Content normalization/comparator. If they are equal, offer an explicit Save at current version through the ordinary version guard; a concurrent change can still reject it. Missing/incomplete base or changed editable fields uses the frontend’s preserved-reference/manual-reapply path. Hide/restore still advances the single `edit_version`, preventing stale moderator actions from undoing later restoration; the shortcut is not an automatic rebase or a second version column.
 
@@ -558,14 +584,14 @@ Public profiles default to one newest-first combined contributions list, with `k
 
 ## Implementation acceptance
 
-Run the early vertical slices described above before broad screen expansion. The holistic review’s reduced SQL checks are evidence for individual races only; the following full integration checks remain unexecuted.
+Run the early vertical slices described above before broad screen expansion. Run the following integration checks against the implementation.
 
 1. Implement migrations from the canonical data model and run them in extension-enabled development and CI. Test named constraints, author deletion and deliberate hiding, stable media ids and complete lock order, including bulk writes and triggers.
 2. Exercise publication retries, whole-edit/no-op version handling and report races, including lost confirmations. Test publication versus ban/unban eligibility and vote eligibility versus hide/delete, including single-review liveness changes against bulk tip-then-review operations. Verify every returned shape masks deletion before hiding and never leaks raw associations or stale search excerpts.
 3. Test generated auth admission after revoked tokens even when disconnect broadcasting fails; cover verification versus seven-day cleanup/reclaim and token reuse against replacement accounts.
 4. Verify Oban rescue, seven-day pruning and shutdown; retain cleanup identifiers across job pruning. Test async nonoverlapping editor status cycles, provider timeouts/rate limits, late results, NULL-uid expiry versus late persistence, completion-based expiry and attachment-versus-cleanup races. Verify private-at-creation uploads, fresh signed inline-player/thumbnail access, token expiry, visibility changes, fixed provider destinations and no-store responses. Ready rows remain usable during status-provider outages; pending polling never blocks writing. Media signing remains local.
 
-Additional consensus gates:
+Additional integration checks:
 
 - Race different drafts under one publication key, including a fixed retry, unknown image identities, deleted originals and unique-conflict rollback. Clear only created/equivalent submitted content. Verify exact-item video target equivalence and rejection for another author/item/parent.
 - Test both report/delete lock orders, confirmed-reporter enforcement and the full schema’s implicit trigger/FK lock graph. Cross upload/registration deadlines while waiting for locks.
@@ -573,7 +599,7 @@ Additional consensus gates:
 - Verify zero lexical hits stay empty under sequential and index plans; pause an embedding scan across retagging; exercise bounded search cancellation, provider queue saturation and total-budget exhaustion.
 - Verify expiry progress past fifty uncertain rows, cooldown survival across restart, guarded late results and independent health detection when cron/queues stall. Run the bulk moderation capacity fixture before introducing a background bulk workflow.
 
-Verify context-preserving curated filter links and Clear filters, unfiltered Show all reviews destinations, summary vote/capability hydration, labelled review-body excerpts, consistent own-review action capabilities, and sign-in-to-report without an automatic insert. These acceptance scenarios are unexecuted.
+Verify context-preserving curated filter links and Clear filters, unfiltered Show all reviews destinations, summary vote/capability hydration, labelled review-body excerpts, consistent own-review action capabilities, and sign-in-to-report without an automatic insert.
 
 Page titles, review-filter presentation and technique-selector guidance are specified in the [frontend design](frontend-design.md#navigation-and-content); their underlying visibility and selection invariants remain in the data model.
 
@@ -583,8 +609,6 @@ Page titles, review-filter presentation and technique-selector guidance are spec
 - [Ecto transaction guidance](https://hexdocs.pm/ecto/Ecto.Multi.html)
 - [Ecto optimistic locking](https://ecto.hexdocs.pm/Ecto.Changeset.html#optimistic_lock/3)
 - [Ecto counter-cache example](https://ecto.hexdocs.pm/Ecto.Changeset.html#prepare_changes/2)
-- [Framework backend review](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/idioms-v2-backend-review.md)
-- [Final UX backend review](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/ux-idioms-backend-review.md)
 - [Phoenix authentication generator](https://hexdocs.pm/phoenix/mix_phx_gen_auth.html)
 - [Stream signed playback](https://developers.cloudflare.com/stream/viewing-videos/securing-your-stream/)
 - [JOSE JWT signing](https://jose.hexdocs.pm/JOSE.JWT.html#sign/3)

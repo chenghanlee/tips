@@ -24,7 +24,7 @@ Actual commands, fixtures, environment and required evidence. Unavailable checks
 
 ## Ownership and dispatch
 
-TPM fills owner/session, base SHA, branch/worktree, owned/shared files, DB/port/provider namespace and reviewer before Active. Codex confirms shared-file reservations and disjoint ownership. Resolve unknown contracts before Ready.
+TPM records owner/session, base SHA, branch/worktree, DB/port/provider namespace and reviewer before Active. Confirm checkout ownership and resolve unknown contracts before Ready.
 
 ## Completion
 
