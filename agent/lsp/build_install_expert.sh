@@ -4,8 +4,7 @@ set -euo pipefail
 
 revision=1a74fe98762fde17409434fdfc64c4dae1e67537
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-repo_dir=$(cd -- "$script_dir/../.." && pwd)
-tools_dir=${TIPS_ELIXIR_TOOLS:-"$repo_dir/.elixir-tools"}
+tools_dir=${TIPS_ELIXIR_TOOLS:-"$script_dir/vendor"}
 [[ "$tools_dir" = /* ]] || tools_dir="$PWD/$tools_dir"
 # An optional local clone still has to supply the exact pinned commit.
 source_repo=${TIPS_EXPERT_REPOSITORY:-https://github.com/expert-lsp/expert.git}

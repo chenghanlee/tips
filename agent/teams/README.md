@@ -92,11 +92,11 @@ The required skills and Mix plugins come from
 From the main checkout, install the pinned source and link its five skills:
 
 ```bash
-git clone https://github.com/georgeguimaraes/elixir-agent-tools.git .elixir-tools/agent-tools
-git -C .elixir-tools/agent-tools checkout --detach ac3a5a1661a087158b39d5eb742b3c25fe3c7b44
+git clone https://github.com/georgeguimaraes/elixir-agent-tools.git agent/elixir-agent-tools
+git -C agent/elixir-agent-tools checkout --detach ac3a5a1661a087158b39d5eb742b3c25fe3c7b44
 mkdir -p .agents/skills
 for skill in elixir phoenix ecto otp oban; do
-  ln -s "$PWD/.elixir-tools/agent-tools/plugins/elixir-dev/skills/$skill" ".agents/skills/$skill"
+  ln -s "$PWD/agent/elixir-agent-tools/plugins/elixir-dev/skills/$skill" ".agents/skills/$skill"
 done
 ```
 
@@ -108,12 +108,12 @@ Install the plugins for each client you use, from the same main checkout:
 
 ```bash
 # Codex
-codex plugin marketplace add "$PWD/.elixir-tools/agent-tools"
+codex plugin marketplace add "$PWD/agent/elixir-agent-tools"
 codex plugin add mix-compile@elixir-agent-tools
 codex plugin add mix-credo@elixir-agent-tools
 
 # Claude Code (user scope makes the installations available across worktrees)
-claude plugin marketplace add "$PWD/.elixir-tools/agent-tools"
+claude plugin marketplace add "$PWD/agent/elixir-agent-tools"
 claude plugin install --scope user elixir-dev@elixir-agent-tools
 claude plugin install --scope user mix-compile@elixir-agent-tools
 claude plugin install --scope user mix-credo@elixir-agent-tools

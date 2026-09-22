@@ -25,7 +25,6 @@
 .agent-runs
 .worktrees
 .expert
-.elixir-tools
 docs
 agent
 screenshots
