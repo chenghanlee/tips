@@ -92,8 +92,7 @@ in each worktree. Elixir and Erlang must be on the client's `PATH`.
 ## Check changes
 
 ```bash
-python3 agent/teams/test_task_worktree.py
-python3 agent/teams/test_team.py
+python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
 ```
 
 Before adopting launcher or tool changes, pilot both real clients in disposable

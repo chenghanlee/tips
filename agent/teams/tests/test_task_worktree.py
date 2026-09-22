@@ -30,7 +30,7 @@ class FixtureState(TypedDict):
     shell_timeout: bool
 
 
-TEAMS = Path(__file__).resolve().parent
+TEAMS = Path(__file__).resolve().parents[1]
 LSP_WRAPPER = TEAMS.parents[1] / "agent/lsp/launch_worktree_lsp.sh"
 # Deliberately fixed test data: changing production defaults must not rewrite tests.
 CONFIG = """\

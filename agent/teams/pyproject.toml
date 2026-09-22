@@ -12,7 +12,7 @@ select = ["B", "C4", "C90", "D100", "D104", "E", "F", "I", "N", "PT", "RUF", "S"
 max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
-"test_*.py" = ["S101"]
+"tests/**/*.py" = ["S101"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -20,7 +20,7 @@ indent-style = "space"
 line-ending = "lf"
 
 [tool.pyright]
-include = ["*.py"]
+include = ["*.py", "tests"]
 exclude = [".venv", ".ruff_cache", ".pytest_cache", "dist"]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"

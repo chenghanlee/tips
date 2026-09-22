@@ -12,9 +12,10 @@ from pathlib import Path
 from typing import cast
 
 from team import command_args, execute
-from test_task_worktree import CONFIG  # Fixed fixture values, independent of production tuning.
 
-SCRIPT = Path(__file__).with_name("team.py").resolve()
+from .test_task_worktree import CONFIG  # Fixed fixture values, independent of production tuning.
+
+SCRIPT = Path(__file__).resolve().parents[1] / "team.py"
 
 HERDR = r"""#!/usr/bin/env python3
 import json, os, sys
