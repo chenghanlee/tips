@@ -27,6 +27,7 @@
 .expert
 .elixir-tools
 docs
+agent
 screenshots
 
 # Common development/test artifacts
