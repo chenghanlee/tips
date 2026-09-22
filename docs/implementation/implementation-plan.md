@@ -1,21 +1,21 @@
 # Tips implementation plan
 
-Date: 2026-09-20. Status: owner decisions agreed. Concrete tasks and execution policy are in [the task catalogue](task-index.md) and [agent workflow](agent-workflow.md). No application implementation has started.
+Date: 2026-09-20. Status: owner decisions agreed. Concrete tasks and execution policy are in [the task catalogue](task-index.md) and [agent workflow](../../agent/teams/README.md). No application implementation has started.
 
 ## Outcome and owner decisions
 
 Deliver the full agreed MVP ready for public developer trials, including deployment, recovery, moderation and operational checks. Demonstrate runnable journeys throughout development. There is no hard launch date or fixed execution/provider budget yet; order work by dependencies and risk rather than inventing a calendar estimate.
 
-The current run is strictly serial, N = 1, per [agent-workflow.md](agent-workflow.md); the N = 2 and N = 4 material below is a historical planning option, not current process. The plan supports configurable **N implementation workers**, with schedules for 1, 2 and 4. Fable-Tech-Lead's role and Fable-TPM's technical-program-manager role are coordination responsibilities, separate from the requested worker count. The execution environment's total capacity still applies; N is a ceiling, not a requirement to keep every worker busy.
+The current run is strictly serial, N = 1, per [agent-workflow.md](../../agent/teams/README.md); the N = 2 and N = 4 material below is a historical planning option, not current process. The plan supports configurable **N implementation workers**, with schedules for 1, 2 and 4. Fable-Tech-Lead's role and Fable-TPM's technical-program-manager role are coordination responsibilities, separate from the requested worker count. The execution environment's total capacity still applies; N is a ceiling, not a requirement to keep every worker busy.
 
 The owner selected **shadcn design language with native Phoenix components**, using **[SaladUI](https://github.com/bluzky/salad_ui) for now**. Visual design is assigned to **Fable-Tech-Lead or an Opus model**; Fable-Tech-Lead is the designated design owner. Retain Phoenix LiveView and HEEx. Design artifact work counts as a worker slot when it runs alongside implementation.
 
 The existing product and technical decisions are the baseline:
 
-- [Architecture](../design/technical/software-architecture.md): one Phoenix application and release, Accounts and Content contexts, LiveView, Postgres and Oban.
-- [Data model](../design/technical/data-model.md): schema, visibility, constraints and concurrency invariants.
-- [Backend](../design/technical/backend-design.md): operation contracts, authentication, providers and jobs.
-- [Frontend](../design/technical/frontend-design.md): browser state, pages, drafts and recovery.
+- [Architecture](../design/software-architecture.md): one Phoenix application and release, Accounts and Content contexts, LiveView, Postgres and Oban.
+- [Data model](../design/data-model.md): schema, visibility, constraints and concurrency invariants.
+- [Backend](../design/backend-design.md): operation contracts, authentication, providers and jobs.
+- [Frontend](../design/frontend-design.md): browser state, pages, drafts and recovery.
 
 The three detailed contracts include the latest holistic consensus. Historical reviews and old SQL measurements are evidence and rationale, not alternative requirements. Where the architecture overview abbreviates a procedure, use its detailed owner document. Surface a genuine contradiction to Fable-Tech-Lead; do not silently choose whichever is easier.
 
@@ -189,7 +189,7 @@ Public signup remains open after email verification. Personal trial invitations 
 
 ## Task handoff and completion
 
-Use the [agent workflow](agent-workflow.md) for readiness, review evidence, git isolation, handoff and milestone gates. The catalogue refines the package schedule into executable dependencies. An unknown signature or test command must be resolved before its issue becomes Ready.
+Use the [agent workflow](../../agent/teams/README.md) for readiness, review evidence, git isolation, handoff and milestone gates. The catalogue refines the package schedule into executable dependencies. An unknown signature or test command must be resolved before its issue becomes Ready.
 
 Give each worker this compact brief:
 

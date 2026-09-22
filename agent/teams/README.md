@@ -1,9 +1,10 @@
 # Agent teams
 
-Run the commands below from the repository root. See the
-[LSP build and acceptance guide](elixir-lsp-startup.md) for language-server setup.
+Run the commands below from the repository root. This directory contains the team
+launchers, configuration and their tests. Shared Elixir LSP tooling lives in
+`agent/lsp/`; see the [LSP build and acceptance guide](../lsp/README.md).
 
-This is the operating agreement for building Tips. [AGENTS.md](../../AGENTS.md) governs engineering. GitHub issues and PRs hold requirements, decisions, review history and evidence. [team configuration](../../config/agent-team.toml) owns agent settings; do not duplicate its defaults in commands or prose.
+This is the operating agreement for building Tips. [AGENTS.md](../../AGENTS.md) governs engineering. GitHub issues and PRs hold requirements, decisions, review history and evidence. [team configuration](config.toml) owns agent settings; do not duplicate its defaults in commands or prose.
 
 The lead TPM coordinates assigned work in [Project 15](https://github.com/users/chenghanlee/projects/15), including child issues. Work continues within the user's assigned scope until completed or blocked on the user.
 
@@ -25,7 +26,7 @@ The user decides material product changes, purchases, credentials, hosting and p
 
 ## Configuration
 
-Edit [config/agent-team.toml](../../config/agent-team.toml) to change team limits, client/model/effort by role, port/database allocation, permission modes, coordinator compaction and time budgets. Scripts read the canonical main checkout's file; `TIPS_TEAM_CONFIG=/absolute/path` selects a staged configuration for a disposable pilot. Settings take effect on the next launch. The patched bridge has a compiled request deadline; changing its corresponding client timeout requires rebuilding and retesting the bridge too.
+Edit [agent/teams/config.toml](config.toml) to change team limits, client/model/effort by role, port/database allocation, permission modes, coordinator compaction and time budgets. Scripts read the canonical main checkout's file; `TIPS_TEAM_CONFIG=/absolute/path` selects a staged configuration for a disposable pilot. Settings take effect on the next launch. The patched bridge has a compiled request deadline; changing its corresponding client timeout requires rebuilding and retesting the bridge too.
 
 The generated Codex config applies `launch.codex_lsp_approval_mode` only to the four enabled LSP tools. It leaves the overall approval and sandbox policies in place. This uses the [supported per-tool MCP setting](https://developers.openai.com/codex/mcp); `never` otherwise rejects a tool that requires approval.
 
@@ -49,7 +50,7 @@ An issue closes only when its required result is integrated and evidenced. Parti
 
 Use protected `main`, short-lived `task/<issue>-<slug>` branches and worktrees under `.worktrees/`. The main checkout is read-only for source changes: never switch its branch, edit, commit or run tests there. Repository administration such as fetch and worktree creation runs from main. Make every source change in a worktree, including documentation and operational scripts.
 
-The TPM uses `scripts/task_worktree.py` to provision and start coding clients. Keep the existing task slug when an issue is renamed. The developer owns its task worktree; tester and tech lead have separate detached review worktrees. No agent edits another's checkout. The helper checks reviewer cleanliness even at the same SHA, checks selected-client configuration before changing HEAD, reuses a matching live session, and stops the old client and verifies descendant exit before advancing a reviewer. `/new`, `/clear` and `cd` inside an already-running client do not reroot its LSP.
+The TPM uses `agent/teams/task_worktree.py` to provision and start coding clients. Keep the existing task slug when an issue is renamed. The developer owns its task worktree; tester and tech lead have separate detached review worktrees. No agent edits another's checkout. The helper checks reviewer cleanliness even at the same SHA, checks selected-client configuration before changing HEAD, reuses a matching live session, and stops the old client and verifies descendant exit before advancing a reviewer. `/new`, `/clear` and `cd` inside an already-running client do not reroot its LSP.
 
 Open a draft PR early. Commit cohesive changes and run relevant checks before pushing. Unpushed local commits may be reorganized; published commits are fixed. Never force-push or push implementation directly to main. Repository rules block force pushes on `task/**` while permitting deletion of merged branches. Merge with merge commits; keep strict up-to-date checks and automatic deletion of merged remote heads.
 
@@ -60,19 +61,19 @@ Handle each client's repository trust prompt during initial setup. In the tested
 Run lifecycle commands from the main checkout. It remains read-only for source changes. Use one lifecycle caller per team.
 
 ```bash
-scripts/team.py start N
+agent/teams/team.py start N
 ```
 
-This creates/reuses the team's workspace and four named panes, starts/briefs its TPM and prints pane IDs. Coding panes stay at the shell until assigned. `scripts/team.py start lead` provides the same configured launch for a new lead TPM; do not run it if another live agent already owns `lead-tpm`.
+This creates/reuses the team's workspace and four named panes, starts/briefs its TPM and prints pane IDs. Coding panes stay at the shell until assigned. `agent/teams/team.py start lead` provides the same configured launch for a new lead TPM; do not run it if another live agent already owns `lead-tpm`.
 
 The lead TPM reads relevant issue/PR evidence on each message, picks an unblocked issue on the critical path and sends its URL to the team TPM. No file reservation list or merge slot is required. The team TPM refines readiness on the issue and starts the tech lead at a captured base SHA to confirm it. After readiness, it posts the self-contained dispatch and adds `active`.
 
 Use the existing issue's task slug; do not generate a new branch when its title changes. Obtain pane IDs from the start output or `herdr pane list`; never guess them. Examples (`TASK` is `<issue>-<slug>`, `SHA` is the exact fetched revision being dispatched):
 
 ```bash
-scripts/task_worktree.py "$TASK" --team "$N" --role dev --pane "$DEV_PANE" --start
-scripts/task_worktree.py "$ISSUE-review-team-$N-test" --team "$N" --role test --pane "$TEST_PANE" --review-ref "$SHA" --start
-scripts/task_worktree.py "$ISSUE-review-team-$N-lead" --team "$N" --role lead --pane "$LEAD_PANE" --review-ref "$SHA" --start
+agent/teams/task_worktree.py "$TASK" --team "$N" --role dev --pane "$DEV_PANE" --start
+agent/teams/task_worktree.py "$ISSUE-review-team-$N-test" --team "$N" --role test --pane "$TEST_PANE" --review-ref "$SHA" --start
+agent/teams/task_worktree.py "$ISSUE-review-team-$N-lead" --team "$N" --role lead --pane "$LEAD_PANE" --review-ref "$SHA" --start
 ```
 
 The helper provisions skills and only the chosen client's local config, applies environment in the target pane and starts the real interactive client. `--kind` is optional and must match the role's configured kind. Inspect config conflicts before explicitly replacing generated files with `--force`. Repeated calls reuse an already matching live session. Conflicting assignments fail. Reviewer advances require clean source even at the same SHA and verified old-client shutdown before a different SHA. Fresh reviewer sessions carry history through PR comments.
@@ -147,7 +148,7 @@ The tech lead performs the exact-SHA review/status and native merge sequence in 
 After merge, the lead TPM retires the team from another workspace:
 
 ```bash
-scripts/team.py stop N
+agent/teams/team.py stop N
 ```
 
 Cleanup verifies client/descendant exit and clean, integrated work before removing resources. On failure, inspect the printed leftovers; do not force-delete them. Start the team again when assigning its next issue. A client cannot stop itself through this command.

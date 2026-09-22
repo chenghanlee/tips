@@ -8,7 +8,7 @@ export GOTOOLCHAIN=go1.26.3
 export CGO_ENABLED=0
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-repo_dir=$(cd -- "$script_dir/.." && pwd)
+repo_dir=$(cd -- "$script_dir/../.." && pwd)
 tools_dir=${TIPS_ELIXIR_TOOLS:-"$repo_dir/.elixir-tools"}
 # Resolve relative overrides before changing into the temporary source tree.
 [[ "$tools_dir" = /* ]] || tools_dir="$PWD/$tools_dir"

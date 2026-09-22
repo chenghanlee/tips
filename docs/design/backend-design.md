@@ -8,9 +8,9 @@ This document defines business operations, context boundaries, authorization, tr
 
 Apply the architecture's user-experience principle to every operation: accept necessary implementation complexity that removes user effort. Keep ownership, idempotency, conflict protection, recoverable failure handling and automatic progress where the user journey requires them. A smaller backend is not an improvement if users must repeatedly check status, redo completed work, repair duplicate submissions or manage provider details themselves. Prefer established capabilities and shared mechanisms before removing these protections.
 
-Follow the [software architecture](software-architecture.md), including its [MVP design constraints](software-architecture.md#mvp-design-constraints). The [frontend design](frontend-design.md) owns LiveView, forms and browser interactions. The [data model](data-model.md) owns the canonical schema and database invariants. The [framework review](../../brainstorm/idioms-v2-backend-review.md) and [final UX review](../../brainstorm/ux-idioms-backend-review.md) record the reasoning and superseded alternatives; this document states the selected contract, including the owner decision to prefill review setup.
+Follow the [software architecture](software-architecture.md), including its [MVP design constraints](software-architecture.md#mvp-design-constraints). The [frontend design](frontend-design.md) owns LiveView, forms and browser interactions. The [data model](data-model.md) owns the canonical schema and database invariants. The [framework review](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/idioms-v2-backend-review.md) and [final UX review](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/ux-idioms-backend-review.md) record the reasoning and superseded alternatives; this document states the selected contract, including the owner decision to prefill review setup.
 
-The [holistic architecture review](../../brainstorm/holistic-architecture-review.md), [backend review](../../brainstorm/holistic-backend-review.md) and [frontend review](../../brainstorm/holistic-frontend-review.md) record the cross-layer decisions now applied here. Keep one Phoenix release with Accounts/Content, PostgreSQL, Oban and LiveView. The data model owns schema and locking invariants; this document owns operations; the frontend owns browser state and navigation. Link to those contracts rather than maintaining parallel procedures.
+The [holistic architecture review](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/holistic-architecture-review.md), [backend review](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/holistic-backend-review.md) and [frontend review](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/holistic-frontend-review.md) record the cross-layer decisions now applied here. Keep one Phoenix release with Accounts/Content, PostgreSQL, Oban and LiveView. The data model owns schema and locking invariants; this document owns operations; the frontend owns browser state and navigation. Link to those contracts rather than maintaining parallel procedures.
 
 ## Business requirements
 
@@ -583,8 +583,8 @@ Page titles, review-filter presentation and technique-selector guidance are spec
 - [Ecto transaction guidance](https://hexdocs.pm/ecto/Ecto.Multi.html)
 - [Ecto optimistic locking](https://ecto.hexdocs.pm/Ecto.Changeset.html#optimistic_lock/3)
 - [Ecto counter-cache example](https://ecto.hexdocs.pm/Ecto.Changeset.html#prepare_changes/2)
-- [Framework backend review](../../brainstorm/idioms-v2-backend-review.md)
-- [Final UX backend review](../../brainstorm/ux-idioms-backend-review.md)
+- [Framework backend review](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/idioms-v2-backend-review.md)
+- [Final UX backend review](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/ux-idioms-backend-review.md)
 - [Phoenix authentication generator](https://hexdocs.pm/phoenix/mix_phx_gen_auth.html)
 - [Stream signed playback](https://developers.cloudflare.com/stream/viewing-videos/securing-your-stream/)
 - [JOSE JWT signing](https://jose.hexdocs.pm/JOSE.JWT.html#sign/3)

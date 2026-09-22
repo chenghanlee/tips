@@ -7,17 +7,17 @@ The [readiness amendments A1–A5](https://github.com/chenghanlee/tips/issues/24
 are applied using the actual source line numbers.
 
 The baseline is Phoenix **1.8.14**, LiveView **1.2.12** (`mix.lock:37,42`),
-Elixir **1.20.4**, OTP **29.1** ([toolchain](toolchain.md)).
+Elixir **1.20.4**, OTP **29.1** ([toolchain](../development/toolchain.md)).
 [#23's recorded command](https://github.com/chenghanlee/tips/issues/23#issuecomment-5752041493)
 was `mix phx.gen.auth Accounts User users --live`; commit `6a3c68d` added its
 unchanged auth output. This is the LiveView/scope generator with magic-link
 registration **and retained password login/settings**, not a password-free variant.
 Password removal is tracked in [#160](https://github.com/chenghanlee/tips/issues/160).
 
-The governing targets are [Sessions and authentication foundation](../design/technical/backend-design.md#sessions-and-authentication-foundation),
-[Session renewal and logout](../design/technical/backend-design.md#session-renewal-and-logout),
-[Changing the sign-in email](../design/technical/backend-design.md#changing-the-sign-in-email),
-and [Tables](../design/technical/data-model.md#tables).
+The governing targets are [Sessions and authentication foundation](../design/backend-design.md#sessions-and-authentication-foundation),
+[Session renewal and logout](../design/backend-design.md#session-renewal-and-logout),
+[Changing the sign-in email](../design/backend-design.md#changing-the-sign-in-email),
+and [Tables](../design/data-model.md#tables).
 This document and the [executable fixture](../../test/tips/accounts/auth_baseline_test.exs)
 inspect those adaptation points; they implement no production adaptation.
 

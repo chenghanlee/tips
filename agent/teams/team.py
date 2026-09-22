@@ -112,7 +112,7 @@ def load_config():
     script = Path(__file__).resolve()
     common = Path(run('git', '-C', script.parent, 'rev-parse', '--path-format=absolute', '--git-common-dir'))
     canonical = common.parent
-    path = Path(os.environ.get('TIPS_TEAM_CONFIG', canonical / 'config/agent-team.toml'))
+    path = Path(os.environ.get('TIPS_TEAM_CONFIG', canonical / 'agent/teams/config.toml'))
     with path.open('rb') as f:
         value = tomllib.load(f)
     for key in ('launch_seconds', 'shutdown_seconds', 'shell_seconds', 'checks_minutes', 'mcp_startup_seconds', 'mcp_tool_seconds'):
@@ -177,7 +177,7 @@ def coordinator(pane, name, role):
         raise RuntimeError(f'{pane["pane_id"]}: not an available shell')
     token = 'team-setup-' + uuid.uuid4().hex
     env = {'TIPS_CHECK_TIMEOUT_SECONDS': str(cfg['timeouts']['checks_minutes'] * 60),
-           'TIPS_TEAM_CONFIG': str(Path(os.environ.get('TIPS_TEAM_CONFIG', main / 'config/agent-team.toml')).resolve())}
+           'TIPS_TEAM_CONFIG': str(Path(os.environ.get('TIPS_TEAM_CONFIG', main / 'agent/teams/config.toml')).resolve())}
     if spec['kind'] == 'claude':
         env['CLAUDE_AUTOCOMPACT_PCT_OVERRIDE'] = str(spec['compaction_percent'])
     command = 'cd -- ' + shlex.quote(str(main)) + ' && unset CLAUDE_AUTOCOMPACT_PCT_OVERRIDE && export ' + shlex.join([f'{k}={v}' for k, v in env.items()])
@@ -203,9 +203,9 @@ def coordinator(pane, name, role):
             Path(started.get('foreground_cwd', '')).resolve() != main or
             started.get('agent_status') in ('blocked', 'unknown')):
         raise RuntimeError('Coordinator launch returned an unexpected client/root/state; inspect its pane')
-    herdr('agent', 'prompt', name, f'Read docs/implementation/agent-workflow.md. '
+    herdr('agent', 'prompt', name, f'Read agent/teams/README.md. '
           f'You are {name}. Coordinate from this read-only main checkout; coding agents start only in assigned worktrees. '
-          f'Use config/agent-team.toml for launch settings. Only the team TPM advances review stages. '
+          f'Use agent/teams/config.toml for launch settings. Only the team TPM advances review stages. '
           f'Each dispatch must include the exact herdr agent prompt command addressed to its TPM, '
           f'to execute after posting evidence and before ending the turn, including on a blocker. '
           f'A GitHub comment or final chat response is not a delivered handoff. '
@@ -315,7 +315,7 @@ def cli():
     configure()
     args = sys.argv[1:]
     if len(args) != 2 or args[0] not in ('start', 'stop'):
-        raise RuntimeError('Usage: scripts/team.py start|stop N; start lead')
+        raise RuntimeError('Usage: agent/teams/team.py start|stop N; start lead')
     target = args[1]
     if target == 'lead':
         if args[0] != 'start':

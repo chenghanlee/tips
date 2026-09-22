@@ -1,6 +1,6 @@
 # Initial task catalogue
 
-[Live GitHub Project](https://github.com/users/chenghanlee/projects/15) · [Agent workflow](agent-workflow.md)
+[Live GitHub Project](https://github.com/users/chenghanlee/projects/15) · [Agent workflow](../../agent/teams/README.md)
 
 This is the initial publication index. GitHub issues own current requirements and dependencies; the project owns status. Future tasks stay in Backlog until their contracts, paths and commands are resolved. No application acceptance is claimed here.
 

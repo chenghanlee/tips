@@ -56,7 +56,7 @@ def main():
     root = Path(git('rev-parse', '--path-format=absolute', '--git-common-dir')).parent
     if Path.cwd() != root:
         raise Refusal(f'Run from the main checkout: {root}')
-    config_path = Path(os.environ.get('TIPS_TEAM_CONFIG', str(root / 'config/agent-team.toml'))).resolve()
+    config_path = Path(os.environ.get('TIPS_TEAM_CONFIG', str(root / 'agent/teams/config.toml'))).resolve()
     _, config = load_config()
     team, timeouts, policies = config['team'], config['timeouts'], config['launch']
     role = config['roles'][role_name]
@@ -113,7 +113,7 @@ def main():
             worktree = matches[0] if matches else root / '.worktrees' / branch.removeprefix('task/')
             if worktree.parent != root / '.worktrees':
                 raise Refusal(f'Task branch belongs to a worktree outside the managed directory: {worktree}')
-    wrapper = root / 'scripts/elixir_lsp.sh'
+    wrapper = root / 'agent/lsp/elixir_lsp.sh'
     if not wrapper.is_file() or not (root / '.agents/skills').is_dir():
         raise Refusal('Canonical LSP wrapper or shared skills directory is missing.')
     if args.start:

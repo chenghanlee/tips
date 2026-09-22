@@ -170,9 +170,9 @@ class TeamLifecycleTest(unittest.TestCase):
         subprocess.run(['git','-C',str(self.repo),'add','.'],check=True)
         subprocess.run(['git','-C',str(self.repo),'commit','-qm','initial'],check=True)
         subprocess.run(['git','-C',str(self.repo),'remote','add','origin',str(self.repo)],check=True)
-        (self.repo/'scripts').mkdir(); (self.repo/'config').mkdir()
-        (self.repo/'scripts/team.py').write_text(SCRIPT.read_text())
-        (self.repo/'config/agent-team.toml').write_text(CONFIG)
+        (self.repo/'agent/teams').mkdir(parents=True)
+        (self.repo/'agent/teams/team.py').write_text(SCRIPT.read_text())
+        (self.repo/'agent/teams/config.toml').write_text(CONFIG)
         (self.bin/'herdr').write_text(TEAM_HERDR); (self.bin/'herdr').chmod(0o755)
         (self.bin/'ps').write_text('#!/bin/sh\nexit 0\n'); (self.bin/'ps').chmod(0o755)
         (self.bin/'docker').write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$DOCKER_LOG"\n'); (self.bin/'docker').chmod(0o755)
@@ -183,7 +183,7 @@ class TeamLifecycleTest(unittest.TestCase):
     def tearDown(self): self.tmp.cleanup()
 
     def run_team(self,*args):
-        return subprocess.run(['python3',str(self.repo/'scripts/team.py'),*args],cwd=self.repo,env=self.env,text=True,capture_output=True,timeout=10)
+        return subprocess.run(['python3',str(self.repo/'agent/teams/team.py'),*args],cwd=self.repo,env=self.env,text=True,capture_output=True,timeout=10)
 
     def calls(self): return [json.loads(line) for line in (self.root/'calls').read_text().splitlines()]
 
@@ -198,13 +198,13 @@ class TeamLifecycleTest(unittest.TestCase):
         self.assertIn('--strict-mcp-config',starts[0])
 
     def test_repository_configuration_validates_without_herdr_mutation(self):
-        env=dict(self.env,TIPS_TEAM_CONFIG=str(SCRIPT.parent.parent/'config/agent-team.toml'))
+        env=dict(self.env,TIPS_TEAM_CONFIG=str(SCRIPT.parent/'config.toml'))
         r=subprocess.run(['python3','-c','import sys; sys.path.insert(0,sys.argv[1]); from team import load_config; load_config()',str(SCRIPT.parent)],env=env,text=True,capture_output=True)
         self.assertEqual(r.returncode,0,r.stderr)
         self.assertFalse((self.root/'calls').exists())
 
     def test_config_drives_model_effort_and_team_limit(self):
-        path=self.repo/'config/agent-team.toml'
+        path=self.repo/'agent/teams/config.toml'
         path.write_text(path.read_text().replace('max_teams = 6','max_teams = 2').replace('model = ""','model = "configured-model"').replace('effort = "medium"','effort = "low"'))
         self.assertNotEqual(self.run_team('start','3').returncode,0)
         self.assertFalse((self.root/'calls').exists())
@@ -253,7 +253,7 @@ class TeamLifecycleTest(unittest.TestCase):
 
     def test_ambiguous_team_partition_names_refuse_before_database_access(self):
         self.assertEqual(self.run_team('start','1').returncode,0)
-        path=self.repo/'config/agent-team.toml'
+        path=self.repo/'agent/teams/config.toml'
         path.write_text(path.read_text().replace('max_teams = 6','max_teams = 10'))
         (self.bin/'docker').write_text('#!/bin/sh\nprintf "tips_test_t1\\ntips_test_t10\\n"\nprintf "%s\\n" "$*" >> "$DOCKER_LOG"\n')
         r=self.run_team('stop','1'); self.assertNotEqual(r.returncode,0)
