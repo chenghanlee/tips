@@ -11,15 +11,15 @@ the engine preparation cache. TPMs run without an LSP.
 | `launch_worktree_lsp.sh` | Start the bridge and Expert in the supplied worktree. |
 | `build_install_expert.sh` | Build, test and install patched Expert. |
 | `build_install_mcp_bridge.sh` | Build, test and install the patched MCP bridge. |
-| `expert-reference-results.patch` | Distinguish reference results, index readiness and failures. |
-| `expert-generated-data.patch` | Keep per-checkout logs, indexes and builds under `_build/expert/`. |
-| `expert-worktree-isolation.patch` | Isolate project indexes and serialize shared engine preparation. |
-| `mcp-bridge-tools-and-lifecycle.patch` | Fix navigation, document synchronization, deadlines and process cleanup. |
+| `patches/expert-reference-results.patch` | Distinguish reference results, index readiness and failures. |
+| `patches/expert-generated-data.patch` | Keep per-checkout logs, indexes and builds under `_build/expert/`. |
+| `patches/expert-worktree-isolation.patch` | Isolate project indexes and serialize shared engine preparation. |
+| `patches/mcp-bridge-tools-and-lifecycle.patch` | Fix navigation, document synchronization, deadlines and process cleanup. |
 
 Existing installed binaries can run without the patch files. A new teammate needs
 the patches to reproduce those working binaries. Deleting them would leave our
 fixes only inside the current installation, unless recovered from Git history.
-Keep the patches with the build scripts.
+Keep the patches in `patches/`; the build scripts apply them before compiling.
 
 ## Build and validate
 
