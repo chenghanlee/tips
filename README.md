@@ -76,5 +76,7 @@ Agent tooling is separate from the application. You do not need it to run Tips.
 
 Keep root files in their standard locations for Mix, Git and Docker.
 Put disposable experiment output in ignored `tmp/` or outside the repository.
+Expert stores its generated logs, indexes and builds in `_build/expert/`.
+
 Leave generated and client-managed folders, such as `_build/`, `deps/`, `.codex/`
 and `.claude/`, in their expected locations.

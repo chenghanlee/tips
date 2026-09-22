@@ -1,0 +1,86 @@
+--- a/apps/forge/lib/forge/project.ex
++++ b/apps/forge/lib/forge/project.ex
+@@ -34 +34 @@
+-  @workspace_directory_name ".expert"
++  @workspace_directory_name "_build/expert"
+@@ -245 +245 @@
+-        File.mkdir(workspace_path)
++        File.mkdir_p(workspace_path)
+--- a/apps/forge/test/forge/project_test.exs
++++ b/apps/forge/test/forge/project_test.exs
+@@ -198,0 +199,22 @@
++    test "creates isolated generated data under each checkout's _build", %{tmp_dir: tmp_dir} do
++      for side <- ["left", "right"] do
++        root = Path.join([tmp_dir, side, "app"])
++        File.mkdir_p!(root)
++        project = root |> Document.Path.to_uri() |> Project.new()
++        workspace = Path.join(root, "_build/expert")
++
++        assert :ok = Project.ensure_workspace(project)
++        assert Project.workspace_path(project) == workspace
++        assert File.read!(Path.join(workspace, ".gitignore")) == "*\n"
++        assert Project.build_path(project) == Path.join(workspace, "build")
++        assert Project.workspace_path(project, "indexes") == Path.join(workspace, "indexes")
++        refute File.exists?(Path.join(root, ".expert"))
++
++        marker = Path.join(workspace, "existing-index")
++        File.write!(marker, side)
++        assert :ok = Project.ensure_workspace(project)
++        assert File.read!(marker) == side
++      end
++    end
++
++    @tag :tmp_dir
+--- a/apps/expert/lib/expert/logging/project_log_file.ex
++++ b/apps/expert/lib/expert/logging/project_log_file.ex
+@@ -18 +18 @@
+-    workspace_path = Path.join(root_path, ".expert")
++    workspace_path = Path.join(root_path, "_build/expert")
+@@ -42 +42 @@
+-      |> Path.join(".expert")
++      |> Path.join("_build/expert")
+--- a/apps/expert/test/expert/logging/project_log_file_test.exs
++++ b/apps/expert/test/expert/logging/project_log_file_test.exs
+@@ -16,3 +16,3 @@
+-  test "attach/1 creates .expert, .gitignore and expert.log", %{tmp_dir: tmp_dir} do
+-    log_path = Path.join([tmp_dir, ".expert", "expert.log"])
+-    gitignore_path = Path.join([tmp_dir, ".expert", ".gitignore"])
++  test "attach/1 creates _build/expert, .gitignore and expert.log", %{tmp_dir: tmp_dir} do
++    log_path = Path.join([tmp_dir, "_build/expert", "expert.log"])
++    gitignore_path = Path.join([tmp_dir, "_build/expert", ".gitignore"])
+@@ -25 +25 @@
+-    assert File.dir?(Path.join(tmp_dir, ".expert"))
++    assert File.dir?(Path.join(tmp_dir, "_build/expert"))
+@@ -27,0 +28 @@
++    refute File.exists?(Path.join(tmp_dir, ".expert"))
+--- a/apps/engine/lib/engine/search/indexer.ex
++++ b/apps/engine/lib/engine/search/indexer.ex
+@@ -211 +211 @@
+-    excluded_roots = build_exclusion_roots(project, roots)
++    excluded_roots = [Project.workspace_path(project) | build_exclusion_roots(project, roots)]
+@@ -228,2 +227,0 @@
+-
+-  defp reject_paths_under(paths, []), do: paths
+--- a/apps/engine/test/engine/search/indexer_test.exs
++++ b/apps/engine/test/engine/search/indexer_test.exs
+@@ -113,0 +114,11 @@
++    @tag :tmp_dir
++    test "does not index Expert generated files in a bare project", %{tmp_dir: tmp_dir} do
++      source_file = write_file!(Path.join(tmp_dir, "source.ex"), "defmodule Source do end")
++      project = tmp_dir |> Forge.Document.Path.to_uri() |> Project.new()
++      generated = Project.workspace_path(project, "build/generated.ex")
++      write_file!(generated, "defmodule Generated do end")
++
++      assert source_file in Indexer.indexable_files(project)
++      refute generated in Indexer.indexable_files(project)
++    end
++
+@@ -117 +128 @@
+-        Path.join([Project.root_path(project), ".expert", "build", "dev"])
++        Path.join([Project.root_path(project), "_build/expert", "build", "dev"])
+@@ -131 +142 @@
+-      with_env("MIX_BUILD_PATH", Path.join([tmp_dir, ".expert", "build", "dev"]))
++      with_env("MIX_BUILD_PATH", Path.join([tmp_dir, "_build/expert", "build", "dev"]))
+@@ -155 +166 @@
+-      with_env("MIX_BUILD_PATH", Path.join([tmp_dir, ".expert", "build", "dev"]))
++      with_env("MIX_BUILD_PATH", Path.join([tmp_dir, "_build/expert", "build", "dev"]))
