@@ -1,8 +1,9 @@
 # Agent teams
 
 Run the commands below from the repository root. This directory contains the team
-launchers, configuration and their tests. Shared Elixir LSP tooling lives in
-`agent/lsp/`; see the [LSP build and acceptance guide](../lsp/README.md).
+launchers and configuration; `tests/` contains their integration tests. Shared
+Elixir LSP tooling lives in `agent/lsp/`; see the
+[LSP build and acceptance guide](../lsp/README.md).
 
 This is the operating agreement for building Tips. [AGENTS.md](../../AGENTS.md) governs engineering. GitHub issues and PRs hold requirements, decisions, review history and evidence. [team configuration](config.toml) owns agent settings; do not duplicate its defaults in commands or prose.
 
@@ -16,12 +17,12 @@ From your task worktree, use Python 3.12 and the installed Ruff and Pyright tool
 ruff check agent/teams
 ruff format --check agent/teams
 pyright --project agent/teams/pyproject.toml
-python3 -m unittest discover -s agent/teams -p 'test_*.py'
+python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
 ```
 
 [Python check settings](pyproject.toml) follow the harness's Python profile: strict
 types, a complexity limit of 10, and the same lint rules. The test assertion
-exception applies to `test_*.py`, matching this directory's unittest layout.
+exception applies only to Python files under `tests/`.
 The scripts and tests use only the standard library.
 
 Tests use disposable Git repositories, a fake Herdr CLI, and owned child processes.
