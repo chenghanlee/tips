@@ -1,4 +1,8 @@
 defmodule TipsWeb.UserAuth do
+  @moduledoc """
+  Handles session authentication and LiveView authentication hooks.
+  """
+
   use TipsWeb, :verified_routes
 
   import Plug.Conn

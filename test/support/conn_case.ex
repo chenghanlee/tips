@@ -17,6 +17,8 @@ defmodule TipsWeb.ConnCase do
 
   use ExUnit.CaseTemplate
 
+  alias Tips.Accounts.Scope
+
   using do
     quote do
       # The default endpoint for testing
@@ -46,7 +48,7 @@ defmodule TipsWeb.ConnCase do
   """
   def register_and_log_in_user(%{conn: conn} = context) do
     user = Tips.AccountsFixtures.user_fixture()
-    scope = Tips.Accounts.Scope.for_user(user)
+    scope = Scope.for_user(user)
 
     opts =
       context
