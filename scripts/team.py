@@ -203,9 +203,14 @@ def coordinator(pane, name, role):
             Path(started.get('foreground_cwd', '')).resolve() != main or
             started.get('agent_status') in ('blocked', 'unknown')):
         raise RuntimeError('Coordinator launch returned an unexpected client/root/state; inspect its pane')
-    herdr('agent', 'prompt', name, f'Read docs/implementation/goal-prompt.md and docs/implementation/agent-workflow.md. '
+    herdr('agent', 'prompt', name, f'Read docs/implementation/agent-workflow.md. '
           f'You are {name}. Coordinate from this read-only main checkout; coding agents start only in assigned worktrees. '
-          f'Use config/agent-team.toml for launch settings. Report readiness to '
+          f'Use config/agent-team.toml for launch settings. Only the team TPM advances review stages. '
+          f'Each dispatch must include the exact herdr agent prompt command addressed to its TPM, '
+          f'to execute after posting evidence and before ending the turn, including on a blocker. '
+          f'A GitHub comment or final chat response is not a delivered handoff. '
+          f'Use short messages with evidence link, SHA, action and owner. Run commands directly; '
+          f'no hooks, --wait, polling, output pipelines or ad hoc JSON formatters. Report readiness to '
           f'{"the user" if role == "lead_tpm" else "lead-tpm"}; await assignment.')
 
 
