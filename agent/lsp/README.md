@@ -63,6 +63,10 @@ in each worktree. Elixir and Erlang must be on the client's `PATH`.
 
 ## Tool behavior
 
+- Source files must belong to the Expert session's workspace. An outside file
+  returns a workspace-mismatch error with both paths. Use a session rooted at
+  that file's project; retrying the current session will not load it.
+  Definition results may still point to external dependency source files.
 - `definition`, `references` and `hover` take `filePath`, `line` and `column`.
   Positions are 1-based; columns use UTF-16 code units.
 - References belong to the project selected by the source file. Query a call site

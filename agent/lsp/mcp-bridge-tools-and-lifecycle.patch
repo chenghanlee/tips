@@ -670,7 +670,7 @@
 +}
 --- /dev/null
 +++ b/internal/lsp/expert.go
-@@ -0,0 +1,223 @@
+@@ -0,0 +1,251 @@
 +package lsp
 +
 +import (
@@ -695,9 +695,10 @@
 +}
 +
 +type expertStartup struct {
-+	mu       sync.Mutex
-+	projects map[string]*expertProject
-+	changed  chan struct{}
++	workspace string
++	mu        sync.Mutex
++	projects  map[string]*expertProject
++	changed   chan struct{}
 +}
 +
 +func (e *expertStartup) project(name string) *expertProject {
@@ -894,6 +895,33 @@
 +
 +// IndexRetryDelay is shared by the legacy definition adapter and typed references.
 +const IndexRetryDelay = 2 * time.Second
++
++// Validate input documents only: returned definitions can live in dependencies
++// outside the workspace. Other language servers may support external inputs.
++func (c *Client) checkExpertWorkspace(path string) error {
++	if c.expert == nil || c.expert.workspace == "" {
++		return nil
++	}
++	absolute, err := filepath.Abs(path)
++	if err != nil {
++		return fmt.Errorf("could not resolve source file: %w", err)
++	}
++	workspace := c.expert.workspace
++	contains := func(root, file string) bool {
++		relative, err := filepath.Rel(root, file)
++		return err == nil && filepath.IsLocal(relative)
++	}
++	if contains(workspace, absolute) {
++		return nil
++	}
++	// Accept aliases such as macOS /var and /private/var for the same checkout.
++	realRoot, rootErr := filepath.EvalSymlinks(workspace)
++	realFile, fileErr := filepath.EvalSymlinks(absolute)
++	if rootErr == nil && fileErr == nil && contains(realRoot, realFile) {
++		return nil
++	}
++	return fmt.Errorf("file %q is outside this Expert session's workspace %q. Use an LSP session rooted at the file's project; retrying this session will not load that project", absolute, workspace)
++}
 --- /dev/null
 +++ b/internal/lsp/expert_filter_test.go
 @@ -0,0 +1,21 @@
@@ -1974,7 +2002,7 @@
 +		URI: protocol.DocumentUri(uriString),
 --- /dev/null
 +++ b/internal/tools/expert_startup_test.go
-@@ -0,0 +1,431 @@
+@@ -0,0 +1,509 @@
 +package tools
 +
 +import (
@@ -2111,6 +2139,9 @@
 +				loc := protocol.Location{URI: protocol.DocumentUri(p.TextDocument.URI), Range: protocol.Range{Start: protocol.Position{Line: 0}, End: protocol.Position{Line: 0, Character: 3}}}
 +				switch msg.Method {
 +				case "textDocument/definition":
++					if target := os.Getenv("TIPS_STARTUP_DEFINITION_TARGET"); target != "" {
++						loc.URI = protocol.DocumentUri(target)
++					}
 +					result = loc
 +				case "textDocument/references":
 +					result = []protocol.Location{loc}
@@ -2262,7 +2293,7 @@
 +
 +func TestExpertOverlappingProjects(t *testing.T) {
 +	client, fast := startupClient(t, "cold")
-+	slowRoot := filepath.Join(filepath.Dir(filepath.Dir(fast)), "slow")
++	slowRoot := filepath.Join(filepath.Dir(fast), "slow")
 +	if err := os.MkdirAll(slowRoot, 0700); err != nil {
 +		t.Fatal(err)
 +	}
@@ -2404,6 +2435,81 @@
 +	}
 +	if time.Since(start) > 500*time.Millisecond {
 +		t.Fatal("successful empty response retried based on unrelated log")
++	}
++}
++
++// An unrelated checkout must fail before didOpen or startup waiting. A retry
++// against this session cannot initialize a project outside its workspace.
++func TestExpertToolsRejectOutsideWorkspace(t *testing.T) {
++	client, inside := startupClient(t, "cold")
++	root := filepath.Dir(inside)
++	outsideRoot := root + "-other"
++	if err := os.Mkdir(outsideRoot, 0700); err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { _ = os.RemoveAll(outsideRoot) })
++	outside := filepath.Join(outsideRoot, "sample.ex")
++	for _, name := range []string{"mix.exs", "sample.ex"} {
++		if err := os.WriteFile(filepath.Join(outsideRoot, name), []byte("# fixture\n"), 0600); err != nil {
++			t.Fatal(err)
++		}
++	}
++	for _, tool := range []struct {
++		name string
++		run  func(context.Context, *lsp.Client, string, int, int) (string, error)
++	}{{"definition", ReadDefinitionAt}, {"references", FindReferencesAt}, {"hover", GetHoverInfo},
++		{"diagnostics", func(ctx context.Context, c *lsp.Client, p string, _, _ int) (string, error) {
++			return GetDiagnosticsForFile(ctx, c, p, 0, false)
++		}}} {
++		t.Run(tool.name, func(t *testing.T) {
++			ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
++			defer cancel()
++			result, err := tool.run(ctx, client, outside, 1, 1)
++			if err == nil {
++				t.Fatalf("expected workspace error, got %q", result)
++			}
++			for _, want := range []string{"outside this Expert session's workspace", outside, root, "Use an LSP session rooted at the file's project"} {
++				if !strings.Contains(err.Error(), want) {
++					t.Errorf("missing %q in %v", want, err)
++				}
++			}
++			if client.IsFileOpen(outside) {
++				t.Error("outside file was sent to Expert")
++			}
++		})
++	}
++	ctx, cancel := context.WithTimeout(context.Background(), 21*time.Second)
++	defer cancel()
++	result, err := ReadDefinitionAt(ctx, client, inside, 1, 1)
++	if err != nil || !strings.Contains(result, "File: "+inside) {
++		t.Fatalf("own workspace lookup: %q, %v", result, err)
++	}
++}
++
++func TestExpertWorkspaceAliasesAndExternalDefinition(t *testing.T) {
++	target := filepath.Join(t.TempDir(), "dependency.ex")
++	if err := os.WriteFile(target, []byte("defmodule Dependency do end\n"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	targetURI, err := lsp.FileURI(target)
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Setenv("TIPS_STARTUP_DEFINITION_TARGET", targetURI)
++	client, path := startupClient(t, "cold")
++	alias := filepath.Join(t.TempDir(), "workspace-link")
++	if err := os.Symlink(filepath.Dir(path), alias); err != nil {
++		t.Fatal(err)
++	}
++	ctx, cancel := context.WithTimeout(context.Background(), 21*time.Second)
++	defer cancel()
++	if err := client.OpenFile(ctx, filepath.Join(alias, "sample.ex")); err != nil {
++		t.Fatalf("workspace alias: %v", err)
++	}
++	t.Chdir(filepath.Dir(path))
++	result, err := ReadDefinitionAt(ctx, client, "sample.ex", 1, 1)
++	if err != nil || !strings.Contains(result, "File: "+target) || !strings.Contains(result, "defmodule Dependency") {
++		t.Fatalf("external definition target: %q, %v", result, err)
 +	}
 +}
 --- a/internal/tools/get-codelens.go
@@ -3523,3 +3629,18 @@
 +		t.Fatalf("missing or repeated startup timing: %s", got)
 +	}
 +}
+--- a/internal/lsp/client.go
++++ b/internal/lsp/client.go
+@@ -135,0 +136,8 @@
++	// Keep the same root sent to Expert for source-file validation.
++	if c.expert != nil {
++		absolute, err := filepath.Abs(workspaceDir)
++		if err != nil {
++			return nil, fmt.Errorf("could not resolve workspace: %w", err)
++		}
++		c.expert.workspace = absolute
++	}
+@@ -307,0 +316,3 @@
++	if err := c.checkExpertWorkspace(filepath); err != nil {
++		return err
++	}
