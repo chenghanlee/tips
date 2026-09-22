@@ -1,8 +1,12 @@
 defmodule Tips.Accounts.UserNotifier do
+  @moduledoc """
+  Delivers account-related emails.
+  """
+
   import Swoosh.Email
 
-  alias Tips.Mailer
   alias Tips.Accounts.User
+  alias Tips.Mailer
 
   # Delivers the email using the application mailer.
   defp deliver(recipient, subject, body) do
