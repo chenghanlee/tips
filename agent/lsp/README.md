@@ -12,6 +12,7 @@ the engine preparation cache. TPMs run without an LSP.
 | `build_install_expert.sh` | Build, test and install patched Expert. |
 | `build_install_mcp_bridge.sh` | Build, test and install the patched MCP bridge. |
 | `expert-reference-results.patch` | Distinguish reference results, index readiness and failures. |
+| `expert-generated-data.patch` | Keep per-checkout logs, indexes and builds under `_build/expert/`. |
 | `expert-worktree-isolation.patch` | Isolate project indexes and serialize shared engine preparation. |
 | `mcp-bridge-tools-and-lifecycle.patch` | Fix navigation, document synchronization, deadlines and process cleanup. |
 
@@ -78,7 +79,11 @@ in each worktree. Elixir and Erlang must be on the client's `PATH`.
   handler deadline starts.
 - Diagnostics without document versions cannot confirm an exact edit match.
   A timeout can leave stale diagnostics. Inspect the reported result.
-- Expert logs are in the assigned worktree's `.expert/` directory.
+- Expert logs, indexes and builds are in the assigned worktree's `_build/expert/`
+  directory. Installed binaries remain in the main checkout's `.elixir-tools/`.
+  Removing `_build/` also removes this generated data; Expert recreates it.
+- After installing this version, restart old LSP sessions before removing their
+  obsolete `.expert/` directories. Do not move or delete data used by a live server.
 
 ## Check changes
 

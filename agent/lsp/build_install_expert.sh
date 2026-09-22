@@ -16,7 +16,7 @@ trap 'rm -rf -- "$build_dir"; if [[ -n "$staged_link" ]]; then rm -f -- "$staged
 for command in git python3 unbuffer mix; do
   command -v "$command" >/dev/null || { echo "Missing build prerequisite: $command" >&2; exit 1; }
 done
-hash=$(python3 - "$script_dir/expert-reference-results.patch" "$script_dir/expert-worktree-isolation.patch" <<'PY'
+hash=$(python3 - "$script_dir/expert-reference-results.patch" "$script_dir/expert-worktree-isolation.patch" "$script_dir/expert-generated-data.patch" <<'PY'
 import hashlib, sys
 digest = hashlib.sha256()
 for path in sys.argv[1:]:
@@ -45,9 +45,11 @@ patch -p1 --dry-run < "$script_dir/expert-reference-results.patch"
 patch -p1 < "$script_dir/expert-reference-results.patch"
 patch -p1 --dry-run < "$script_dir/expert-worktree-isolation.patch"
 patch -p1 < "$script_dir/expert-worktree-isolation.patch"
+patch -p1 --dry-run < "$script_dir/expert-generated-data.patch"
+patch -p1 < "$script_dir/expert-generated-data.patch"
 printf '%s\n' "$version" > version.txt
 
-for app in engine expert; do
+for app in forge engine expert; do
   (
     cd "apps/$app"
     export MIX_ENV=test
@@ -56,17 +58,24 @@ for app in engine expert; do
     # Pinned upstream emits existing type warnings on Elixir 1.20; tests below
     # still reject new warnings in the contract tests.
     unbuffer mix compile
-    if [[ "$app" = engine ]]; then
-      changed=(lib/engine/code_intelligence/references.ex lib/engine/search/store/state.ex
+    if [[ "$app" = forge ]]; then
+      changed=(lib/forge/project.ex test/forge/project_test.exs)
+      tests=(test/forge/project_test.exs)
+    elif [[ "$app" = engine ]]; then
+      changed=(lib/engine/search/indexer.ex test/engine/search/indexer_test.exs
+        lib/engine/code_intelligence/references.ex lib/engine/search/store/state.ex
         lib/engine/search/store/backends/ets.ex test/engine/search/store/backends/project_isolation_test.exs
         test/engine/code_intelligence/references_outcome_test.exs test/engine/code_intelligence/references_test.exs)
-      tests=(test/engine/code_intelligence/references_outcome_test.exs test/engine/code_intelligence/references_test.exs
+      tests=(test/engine/search/indexer_test.exs test/engine/code_intelligence/references_outcome_test.exs
+        test/engine/code_intelligence/references_test.exs
         test/engine/search/store_test.exs test/engine/search/store/state_test.exs
         test/engine/search/store/backends/project_isolation_test.exs test/engine/search/store/backends/ets/state_test.exs)
     else
-      changed=(priv/build_engine.exs lib/expert.ex lib/expert/provider/handlers/find_references.ex
+      changed=(lib/expert/logging/project_log_file.ex test/expert/logging/project_log_file_test.exs
+        priv/build_engine.exs lib/expert.ex lib/expert/provider/handlers/find_references.ex
         test/expert/expert_test.exs test/expert/provider/handlers/find_references_test.exs)
-      tests=(test/expert/expert_test.exs test/expert/provider/handlers/find_references_test.exs)
+      tests=(test/expert/logging/project_log_file_test.exs test/expert/expert_test.exs
+        test/expert/provider/handlers/find_references_test.exs)
     fi
     unbuffer mix format --check-formatted "${changed[@]}"
     unbuffer mix credo --strict "${changed[@]}"
