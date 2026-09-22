@@ -24,7 +24,7 @@ defmodule Tips.RepoTimeoutTest do
 
       error =
         try do
-          Repo.maintenance_query!("SELECT pg_sleep(3)", [], timeout: 100)
+          Repo.maintenance_query!("SELECT pg_sleep(3)", [], timeout: 100, checkout_retries: 0)
         rescue
           error in [DBConnection.ConnectionError, Postgrex.Error] -> error
         end
@@ -35,7 +35,9 @@ defmodule Tips.RepoTimeoutTest do
 
   defp assert_request_timeout do
     Sandbox.unboxed_run(Repo, fn ->
-      {elapsed, result} = :timer.tc(fn -> Repo.query("SELECT pg_sleep(3)") end)
+      {elapsed, result} =
+        :timer.tc(fn -> Repo.query("SELECT pg_sleep(3)", [], checkout_retries: 0) end)
+
       assert {:error, error} = result
       assert_timeout_error(error)
       assert elapsed >= 2_000_000
