@@ -8,6 +8,31 @@ This is the operating agreement for building Tips. [AGENTS.md](../../AGENTS.md) 
 
 The lead TPM coordinates assigned work in [Project 15](https://github.com/users/chenghanlee/projects/15), including child issues. Work continues within the user's assigned scope until completed or blocked on the user.
 
+## Check changes to these scripts
+
+From your task worktree, use Python 3.12 and the installed Ruff and Pyright tools:
+
+```sh
+ruff check agent/teams
+ruff format --check agent/teams
+pyright --project agent/teams/pyproject.toml
+python3 -m unittest discover -s agent/teams -p 'test_*.py'
+```
+
+[Python check settings](pyproject.toml) follow the harness's Python profile: strict
+types, a complexity limit of 10, and the same lint rules. The test assertion
+exception applies to `test_*.py`, matching this directory's unittest layout.
+The scripts and tests use only the standard library.
+
+Tests use disposable Git repositories, a fake Herdr CLI, and owned child processes.
+They do not operate live teams. Process tests require permission to run `ps` and
+signal their own children.
+
+Ruff's two S603 findings remain unsuppressed: the shared command runner and the
+process-test launcher accept variable argument lists. Review these calls for
+trusted executable selection and argument handling; test success alone does not
+prove subprocess safety.
+
 ## Roles
 
 One lead TPM assigns work to teams within the configured trial limit. Each team handles one issue at a time.
