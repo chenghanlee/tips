@@ -44,8 +44,9 @@ GitHub owns current requirements, task status, blockers and review evidence.
 work on the application. GitHub holds delivery planning and prerequisites.
 `agent/teams/` owns orchestration; `agent/lsp/` owns agent language-server tooling.
 Application source, tests, assets and configuration retain the Phoenix layout.
-Historical reviews and experiments remain under `docs/brainstorm/`; old planning
-notes remain under `docs/implementation/`. They are not current operating instructions.
+Historical reviews and retired experiments remain in Git history; references link
+to their committed revisions. They are not current instructions or acceptance
+evidence for later revisions.
 
 ## Where files belong
 

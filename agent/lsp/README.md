@@ -35,9 +35,9 @@ In that same disposable pilot, have each configured client create one small file
 
 ## Evidence and limits
 
-The prototype parallel-build stager and its parallel/cache-inversion probes are
-historical exploration tools. The maintained build applies
-`expert-parallel-exploration.patch` and runs its regression tests.
+The prototype parallel-build stager and its parallel/cache-inversion probes have
+been retired. Their committed sources remain in Git history. The maintained build
+still applies `expert-parallel-exploration.patch` and runs its regression tests.
 
 The earlier lifecycle run recorded five real cold **MCP sessions**, each returning exact own-root references in roughly 97–104 seconds; warm calls took roughly 36–55 milliseconds. A follow-up tracked ten processes per session through complete exit. Actual Claude initialized its MCP server and began compilation before a model prompt, then exited cleanly. This was not five actual Codex agents or evidence of capacity for every team's coding clients simultaneously. The configured team cap remains a trial.
 
