@@ -331,6 +331,19 @@ class WorktreeIntegrationTest(unittest.TestCase):
         result = execute(["fixture-command"], env=self.env, check=True)
         assert result.stdout == "fixture only\n"
 
+    def test_command_resolves_relative_paths_from_child_directory(self) -> None:
+        child = self.root / "child"
+        binary = child / "bin"
+        binary.mkdir(parents=True)
+        executable = binary / "fixture-command"
+        executable.write_text("#!/bin/sh\nprintf 'child directory\\n'\n")
+        executable.chmod(0o755)
+        env = {**self.env, "PATH": "bin"}
+        for command in ("fixture-command", "./bin/fixture-command"):
+            with self.subTest(command=command):
+                result = execute([command], cwd=child, env=env, check=True)
+                assert result.stdout == "child directory\n"
+
     def test_invalid_herdr_response_preserves_checkout(self) -> None:
         (self.root / "fakebin/herdr").write_text(
             '#!/bin/sh\nprintf \'%s\\n\' \'{"result":{"agents":"wrong"}}\'\n'

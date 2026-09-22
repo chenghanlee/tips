@@ -85,12 +85,21 @@ main: Path
 cfg: Config
 
 
-def command_args(args: Sequence[str | Path | int], *, path: str | None = None) -> list[str]:
+def command_args(
+    args: Sequence[str | Path | int],
+    *,
+    path: str | None = None,
+    cwd: str | Path | None = None,
+) -> list[str]:
     """Resolve the executable on PATH; keep every argument separate."""
     if not args:
         raise ValueError("Expected a nonempty command")
     command = list(map(str, args))
-    executable = shutil.which(command[0], path=path)
+    directory = Path(cwd or Path.cwd()).resolve()
+    search_path = os.environ.get("PATH", os.defpath) if path is None else path
+    search_path = os.pathsep.join(str(directory / entry) for entry in search_path.split(os.pathsep))
+    program = str(directory / command[0]) if os.path.dirname(command[0]) else command[0]
+    executable = shutil.which(program, path=search_path)
     if executable is None:
         raise FileNotFoundError(f"Executable not found: {command[0]}")
     command[0] = executable
@@ -107,7 +116,7 @@ def execute(
 ) -> subprocess.CompletedProcess[str]:
     """Run a resolved executable without a shell and capture its output."""
     return subprocess.run(
-        command_args(args, path=env.get("PATH", os.defpath) if env is not None else None),
+        command_args(args, path=env.get("PATH", os.defpath) if env is not None else None, cwd=cwd),
         cwd=cwd,
         env=env,
         timeout=timeout,
