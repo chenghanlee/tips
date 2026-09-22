@@ -24,4 +24,3 @@ include = ["*.py"]
 exclude = [".venv", ".ruff_cache", ".pytest_cache", "dist"]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
-
