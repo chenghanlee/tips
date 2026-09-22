@@ -1,0 +1,26 @@
+# Python checks follow agent-team-harness's Python profile.
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["."]
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["B", "C4", "C90", "D100", "D104", "E", "F", "I", "N", "PT", "RUF", "S", "SIM", "UP", "W"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+"test_*.py" = ["S101"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.pyright]
+include = ["*.py"]
+exclude = [".venv", ".ruff_cache", ".pytest_cache", "dist"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
