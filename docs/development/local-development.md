@@ -2,21 +2,23 @@
 
 Run commands from the repository root.
 
-
 The Phoenix skeleton includes generated authentication, local email previews, Oban
 and a database health endpoint. Product-specific authentication and provider
 integrations are separate tasks.
 
-Install Elixir **1.20.4**, Erlang/OTP **29.1**, Docker with Compose, and a C build
+Install Elixir **1.20.4**, Erlang/OTP **29.1**, Python **3.11+**, Docker with Compose, and a C build
 toolchain (Xcode Command Line Tools on macOS, or a C compiler and `make` on Linux)
-for the generated bcrypt dependency. See the [toolchain decision](toolchain.md)
+for the generated bcrypt dependency. Python runs documentation checks and optional
+agent tooling. See the [toolchain guide](toolchain.md)
 for all dependency and asset pins. Start the shared extension-enabled PostgreSQL
-**18.6** server from the main checkout with `docker compose up -d db`.
+**18.6** server from the main checkout with `docker compose up -d --wait db`.
+Wait for a successful health check before running database setup or migrations.
 
 From a fresh checkout:
 
 ```sh
 mix local.hex 2.5.1 --force
+mix local.rebar --force
 cp .env.example .env
 ```
 
@@ -46,9 +48,10 @@ search extensions. `TIPS_DB_SUFFIX` is appended to both database names; test
 partitioning adds `MIX_TEST_PARTITION` after that suffix when set.
 
 No provider credentials are needed. Development mail stays in the local Swoosh
-mailbox at <http://localhost:4000/dev/mailbox>. Generated authentication is the
-unmodified Phoenix baseline; it does not yet implement Tips admission or session
-rules. Oban runs in the same application and Repo with `media`, `embeddings`, and
+mailbox at <http://localhost:4000/dev/mailbox>. Generated authentication has been
+adapted for Tips identity fields and session-family IDs. Tips admission and the
+full session-family lifecycle remain pending. Oban runs in the same application
+and Repo with `media`, `embeddings`, and
 `maintenance` queues, each with concurrency 1. There are no workers yet. Tests
 use Oban's manual testing mode.
 
@@ -68,9 +71,22 @@ through the TLS-terminating proxy with `X-Forwarded-Proto: https`. The release
 also exempts `/healthz` from HTTP redirects for direct probes. It checks app/DB
 liveness only; optional providers and background progress are not readiness gates.
 
-If an agent sandbox cannot write the shared Hex/Mix caches, use the isolated
-cache environment in the [toolchain instructions](toolchain.md#disposable-generator-evidence)
-before running Mix commands.
+### Isolated build caches
+
+If shared Hex/Mix caches are not writable in the agent sandbox, use a writable
+cache directory for that shell. From the worktree root:
+
+```sh
+export HEX_HOME="$PWD/tmp/hex"
+export MIX_HOME="$PWD/tmp/mix"
+export MIX_XDG=0
+export XDG_CACHE_HOME="$PWD/tmp/cache"
+mix local.hex 2.5.1 --force
+mix local.rebar --force
+mix deps.get --check-locked
+```
+
+These directories are ignored. Keep the committed lockfile.
 
 ### Local application release
 
@@ -90,8 +106,8 @@ If it is unset, the app container exits; `docker compose logs app` reports
 export SECRET_KEY_BASE=$(mix phx.gen.secret)
 export RELEASE_REVISION=$(git rev-parse HEAD)
 docker compose build app
-docker compose up -d db
-# Once the DB is healthy, create this database once on a fresh volume:
+docker compose up -d --wait db
+# Create this database once on a fresh volume:
 docker compose exec db psql -U postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE tips_release'
 docker compose run --rm app bin/migrate
 docker compose up -d app
@@ -132,7 +148,7 @@ Use the [agent team guide](../../agent/teams/README.md) for coordination and
 
 ### Extension-enabled database
 
-Run `docker compose up -d db` from the main checkout to start the shared PostgreSQL
+Run `docker compose up -d --wait db` from the main checkout to start the shared PostgreSQL
 18.6 image with pgvector 0.8.6 and pg_textsearch 1.4.0. [Compose](../../compose.yaml) serves it on
 `127.0.0.1:5433` with the local-only user/password `postgres`/`postgres` and
 persists data in a named volume. `docker compose down` preserves that data.
@@ -146,7 +162,7 @@ Run `scripts/db_smoke.sh` to build the same recipe and verify real BM25 and
 1024-dimension vector queries in a disposable container. It publishes no port,
 so it can run while Compose is up, and removes its container and volume on exit.
 See the [database image contract](toolchain.md#postgresql-image-and-extension-contract)
-for pins, package checksums, CI evidence and private-registry publication.
+for build inputs and private-registry publication.
 
 Ordinary Repo queries have a two-second client timeout. A timeout disconnects
 that pool connection. Use `Tips.Repo.maintenance_query!(sql, params, opts)` for
@@ -234,7 +250,7 @@ registration through the connected LiveView. Each browser test has an isolated
 SQL sandbox; inserts are rolled back and mail uses the Swoosh test adapter.
 The narrow viewport checks layout in Chrome, not a physical mobile browser.
 
-The required `checks` CI job preserves documentation validation and adds
+The required `checks` CI job runs documentation validation,
 introduced-commit secret scanning, locked dependencies, compilation with
 warnings as errors, formatting, assets, migrations and the full suite including
 these browser tests. It uses the pinned runtime, database image and browser
@@ -244,3 +260,22 @@ On browser assertion failures, Wallaby saves screenshots under `screenshots/`
 (gitignored). CI uploads them as `browser-failure-screenshots`; inspect that
 artifact and the `mix test --trace` logs from the failed run. These smoke tests
 use synthetic accounts only and need no production secrets.
+
+#### Browser milestone coverage
+
+Use LiveViewTest for normal server-side integration tests and Wallaby for
+real-browser milestone checks. Keep browser sessions isolated for login and
+draft races. Chrome needs its OS libraries, CA certificates, fonts, a writable
+temporary profile directory and local process/loopback access. Run it as a
+non-root user.
+
+| Coverage | Check |
+|---|---|
+| Linux desktop, 1280×800 | Automated Chrome milestone paths, with fresh and multiple sessions |
+| Chrome, 390×844 viewport | Automated responsive smoke; this does not test a mobile browser engine |
+| Safari on macOS and physical iOS; Chrome on physical Android | Manual milestone checks for keyboard/focus, draft recovery, uploads and private video playback; record OS/browser/device versions with the results |
+
+Use dispatched events or the required button path to test drag reordering.
+Use branded Google Chrome for real Stream playback: Cloudflare's
+[player documentation](https://developers.cloudflare.com/stream/viewing-videos/using-the-stream-player/)
+notes H.264 requirements.

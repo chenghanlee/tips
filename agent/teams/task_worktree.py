@@ -113,7 +113,7 @@ def main():
             worktree = matches[0] if matches else root / '.worktrees' / branch.removeprefix('task/')
             if worktree.parent != root / '.worktrees':
                 raise Refusal(f'Task branch belongs to a worktree outside the managed directory: {worktree}')
-    wrapper = root / 'agent/lsp/elixir_lsp.sh'
+    wrapper = root / 'agent/lsp/launch_worktree_lsp.sh'
     if not wrapper.is_file() or not (root / '.agents/skills').is_dir():
         raise Refusal('Canonical LSP wrapper or shared skills directory is missing.')
     if args.start:

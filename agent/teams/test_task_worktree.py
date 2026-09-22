@@ -11,7 +11,7 @@ import tomllib
 import unittest
 
 TEAMS = Path(__file__).resolve().parent
-LSP_WRAPPER = TEAMS.parents[1] / "agent/lsp/elixir_lsp.sh"
+LSP_WRAPPER = TEAMS.parents[1] / "agent/lsp/launch_worktree_lsp.sh"
 # Deliberately fixed test data: changing production defaults must not rewrite tests.
 CONFIG = """\
 # Agent launch settings. Changes apply to newly started sessions.
@@ -138,7 +138,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
             (self.root/d).mkdir(parents=True)
         (self.root/'.gitignore').write_text('.codex/\n.claude/\n.agents/\n.elixir-tools/\n.worktrees/\nfakebin/\nstate.json\nstop.py\n')
         shutil.copy(TEAMS/'task_worktree.py', self.root/'agent/teams/task_worktree.py')
-        shutil.copy(LSP_WRAPPER, self.root/'agent/lsp/elixir_lsp.sh')
+        shutil.copy(LSP_WRAPPER, self.root/'agent/lsp/launch_worktree_lsp.sh')
         (self.root/'agent/teams/team.py').write_text((TEAMS/'team.py').read_text() + '\nimport os, subprocess, sys\ndef stop_agent(pane, root):\n    if subprocess.run([sys.executable, os.environ["FAKE_STOP"], pane, root]).returncode:\n        raise RuntimeError("stop failed")\n')
         (self.root/'agent/teams/config.toml').write_text(CONFIG)
         (self.root/'tracked.txt').write_text('base\n')
@@ -173,7 +173,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
 
     def test_codex_only_canonical_wrapper_and_idempotent_config(self):
         self.call(); path=self.wt/'.codex/config.toml'; cfg=tomllib.loads(path.read_text())['mcp_servers']['elixir-lsp']
-        self.assertEqual(cfg['args'],[str(self.root/'agent/lsp/elixir_lsp.sh'),str(self.wt)])
+        self.assertEqual(cfg['args'],[str(self.root/'agent/lsp/launch_worktree_lsp.sh'),str(self.wt)])
         self.assertEqual(cfg['cwd'],str(self.wt)); self.assertEqual(cfg['tool_timeout_sec'],120)
         self.assertFalse((self.wt/'.claude').exists())
         before=path.stat().st_mtime_ns; self.call(); self.assertEqual(before,path.stat().st_mtime_ns)
@@ -183,7 +183,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call('--start',role='test',team='6')
         self.assertFalse((self.wt/'.codex').exists())
         mcp=json.loads((self.wt/'.claude/elixir-mcp.json').read_text())['mcpServers']['elixir-lsp']
-        self.assertEqual(mcp['args'],[str(self.root/'agent/lsp/elixir_lsp.sh'),str(self.wt)])
+        self.assertEqual(mcp['args'],[str(self.root/'agent/lsp/launch_worktree_lsp.sh'),str(self.wt)])
         self.assertEqual(mcp['timeout'],120000)
         self.assertFalse(json.loads((self.wt/'.claude/settings.local.json').read_text())['enabledPlugins']['elixir-lsp@elixir-agent-tools'])
         s=self.state(); self.assertEqual(s['launch_env'],dict(PGPORT='5433',TIPS_DB_SUFFIX='_t6r',TIPS_TEST_PORT='4161',MIX_ENV='test',MIX_TEST_PARTITION=None,CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=None,TIPS_CHECK_TIMEOUT_SECONDS='1800',TIPS_TEAM_CONFIG=str(self.root/'agent/teams/config.toml')))
@@ -263,12 +263,12 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.assertEqual(self.git('-C',str(self.wt),'rev-parse','HEAD'),self.base)
 
     def test_canonical_wrapper_not_needed_in_reviewed_commit(self):
-        self.git('rm','agent/lsp/elixir_lsp.sh'); self.commit('old revision without wrapper'); old=self.git('rev-parse','HEAD')
+        self.git('rm','agent/lsp/launch_worktree_lsp.sh'); self.commit('old revision without wrapper'); old=self.git('rev-parse','HEAD')
         (self.root/'agent/lsp').mkdir(exist_ok=True)
-        shutil.copy(LSP_WRAPPER,self.root/'agent/lsp/elixir_lsp.sh')
+        shutil.copy(LSP_WRAPPER,self.root/'agent/lsp/launch_worktree_lsp.sh')
         self.call('--start',ref=old)
         cfg=tomllib.loads((self.wt/'.codex/config.toml').read_text())['mcp_servers']['elixir-lsp']
-        self.assertTrue(Path(cfg['args'][0]).is_file()); self.assertFalse((self.wt/'agent/lsp/elixir_lsp.sh').exists())
+        self.assertTrue(Path(cfg['args'][0]).is_file()); self.assertFalse((self.wt/'agent/lsp/launch_worktree_lsp.sh').exists())
 
     def test_kind_mismatch_and_unsupported_bridge_timeout_refused(self):
         self.call('--kind','claude',ok=False)
@@ -380,7 +380,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
     def test_wrapper_explicit_root_is_used_from_main(self):
         self.call(); bridge=self.root/'.elixir-tools/bin/mcp-language-server'
         bridge.write_text('#!/usr/bin/env python3\nimport json,os,sys\nprint(json.dumps({"cwd":os.getcwd(),"argv":sys.argv[1:]}))\n')
-        p=subprocess.run(['/bin/sh',str(self.root/'agent/lsp/elixir_lsp.sh'),str(self.wt)],cwd=self.root,env=self.env,text=True,capture_output=True,check=True)
+        p=subprocess.run(['/bin/sh',str(self.root/'agent/lsp/launch_worktree_lsp.sh'),str(self.wt)],cwd=self.root,env=self.env,text=True,capture_output=True,check=True)
         self.assertEqual(json.loads(p.stdout)['cwd'],str(self.wt))
 
 

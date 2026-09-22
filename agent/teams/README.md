@@ -54,9 +54,62 @@ The TPM uses `agent/teams/task_worktree.py` to provision and start coding client
 
 Open a draft PR early. Commit cohesive changes and run relevant checks before pushing. Unpushed local commits may be reorganized; published commits are fixed. Never force-push or push implementation directly to main. Repository rules block force pushes on `task/**` while permitting deletion of merged branches. Merge with merge commits; keep strict up-to-date checks and automatic deletion of merged remote heads.
 
+## One-time setup
+
+Before starting a team, install Python 3.11+ and the client CLIs selected in
+[team configuration](config.toml), and authenticate those clients and GitHub CLI
+(`gh`) for this repository. The merge commands also need GNU `timeout` on `PATH`.
+On macOS, install it with `brew install coreutils`; on Linux, use your distribution's
+`coreutils` package.
+
+The required skills and Mix plugins come from
+[Elixir Agent Tools](https://github.com/georgeguimaraes/elixir-agent-tools).
+From the main checkout, install the pinned source and link its five skills:
+
+```bash
+git clone https://github.com/georgeguimaraes/elixir-agent-tools.git .elixir-tools/agent-tools
+git -C .elixir-tools/agent-tools checkout --detach ac3a5a1661a087158b39d5eb742b3c25fe3c7b44
+mkdir -p .agents/skills
+for skill in elixir phoenix ecto otp oban; do
+  ln -s "$PWD/.elixir-tools/agent-tools/plugins/elixir-dev/skills/$skill" ".agents/skills/$skill"
+done
+```
+
+These are ignored local dependencies. If a destination already exists, inspect it
+before replacing it. The task launcher links the main checkout's `.agents/skills`
+into each worktree; it does not download skills. Keep the source checkout in place.
+
+Install the plugins for each client you use, from the same main checkout:
+
+```bash
+# Codex
+codex plugin marketplace add "$PWD/.elixir-tools/agent-tools"
+codex plugin add mix-compile@elixir-agent-tools
+codex plugin add mix-credo@elixir-agent-tools
+
+# Claude Code (user scope makes the installations available across worktrees)
+claude plugin marketplace add "$PWD/.elixir-tools/agent-tools"
+claude plugin install --scope user elixir-dev@elixir-agent-tools
+claude plugin install --scope user mix-compile@elixir-agent-tools
+claude plugin install --scope user mix-credo@elixir-agent-tools
+```
+
+Codex discovers the linked `.agents/skills`; do not also install `elixir-dev` for
+Codex. Claude loads the same five skills through the `elixir-dev` plugin, using
+its native plugin discovery. The generated client configs enable the two Mix
+check plugins. Follow each client's plugin trust prompts during setup.
+Tips uses its own patched LSP bridge; the generated Claude config disables the
+upstream `elixir-lsp` plugin.
+
+Build the shared Expert and MCP bridge binaries using the
+[LSP setup guide](../lsp/README.md#build-and-validate), then start new client sessions.
+
 ## Start and assign
 
-Handle each client's repository trust prompt during initial setup. In the tested client pair, trust in the canonical repository carried over to new sibling worktrees. An unexpected approval prompt stops launch; inspect it and follow the active approval policy. The launcher does not edit home-directory trust settings.
+Complete [one-time setup](#one-time-setup) first. Run the commands below in a Herdr
+terminal, where `HERDR_ENV=1` is set by Herdr.
+
+Handle each client's repository trust prompt during initial setup. An unexpected approval prompt stops launch; inspect it and follow the active approval policy. The launcher does not edit home-directory trust settings.
 
 Run lifecycle commands from the main checkout. It remains read-only for source changes. Use one lifecycle caller per team.
 
@@ -135,7 +188,7 @@ For context recovery, keep the issue/branch open and record base/head SHAs, work
 
 The helper applies the selected role's configured model, effort, permissions, database suffix and test port in the actual target process. Only the selected client's generated configuration is written. Both clients invoke the canonical main checkout's LSP wrapper with the assigned absolute worktree root. Review revisions do not need to contain that wrapper. Keep installed patched bridge/Expert tools available independently of task worktrees.
 
-Startup reports **client launched**, not index ready. Brief the agent once Herdr reports it ready. Expert can keep compiling in the background. Do not add a compile gate or launch a second LSP as a probe. Configuration/tooling changes require a disposable actual-client pilot checking both the client root and LSP root for each client. Five observed cold sessions do not establish capacity for every configured team to compile simultaneously; the team limit remains a trial.
+Startup reports **client launched**, not index ready. Brief the agent once Herdr reports it ready. Expert can keep compiling in the background. Do not add a compile gate or launch a second LSP as a probe. Configuration/tooling changes require a disposable actual-client pilot checking both the client root and LSP root for each client. The configured team limit is not a verified simultaneous cold-start capacity; measure it before scaling up.
 
 TPMs run without the Elixir LSP. Coordinator launches use configured compaction; coding launches do not inherit that coordinator override. Codex approval policy does not change or guarantee its sandbox; it retains the user's sandbox configuration. Claude's permission mode comes from the same config.
 

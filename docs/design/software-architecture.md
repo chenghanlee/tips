@@ -1,20 +1,16 @@
 # Software architecture
 
-Date: 2026-09-20. Status: incorporates the final UX consensus, user-effort reassessment and owner-selected review setup defaults. Implementation and integration verification remain outstanding.
-
 ## Decision
 
 Build Tips as one Elixir/Phoenix application, organized into contexts and deployed as one application release. Use Ecto and Postgres for persistence. Adopt LiveView as the default for interactive pages, with HEEx components and conventional controller routes where needed.
 
 Keep three logical responsibilities: presentation, business operations, and data access. Follow Phoenix's conventions to implement them. Contexts encapsulate business operations and data access; these responsibilities do not require separate projects or matching layers of wrapper modules.
 
-This revision incorporates the consensus from the [architecture](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/idioms-v2-architecture-review.md), [backend](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/idioms-v2-backend-review.md), and [frontend](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/idioms-v2-frontend-review.md) reviews. Codex and Fable used José Valim-inspired and Chris McCord-inspired perspectives; neither person reviewed or endorsed this design. The source notes below preserve the earlier framework research. The review found the monolith cohesive and recommended simpler implementations within it.
-
 ## Purpose and scope
 
 Tips lets people publish practical tips, share reviews, vote on usefulness, and discover content. The architecture should make those features straightforward to build and operate while preserving permissions, content visibility, and data consistency.
 
-This document describes the system’s major parts, boundaries, runtime and deployment. The [frontend design](frontend-design.md) owns LiveView, pages, components and browser interactions. The [backend design](backend-design.md) owns operation orchestration and external-service coordination. The [data model](data-model.md) is the canonical schema and database-invariant specification. Ecto migrations become executable schema truth when implemented; historical measurements do not validate the revised design.
+This document describes the system’s major parts, boundaries, runtime and deployment. The [frontend design](frontend-design.md) owns LiveView, pages, components and browser interactions. The [backend design](backend-design.md) owns operation orchestration and external-service coordination. The [data model](data-model.md) is the canonical schema and database-invariant specification. Ecto migrations become executable schema truth when implemented.
 
 ## Design approach
 
@@ -28,13 +24,11 @@ This is a greenfield MVP seeking product-market fit. Optimize for shipping compl
 
 Accept necessary complexity when it makes the user's experience simpler. Don't make the implementation look simple by pushing its complexity onto the user. This governs the architecture, backend, data model and frontend. Evaluate a simplification locally, across affected features, and through the complete user journey: include repeated actions, waiting, recovery, accessibility and lost capabilities, not just code or state removed. Prefer proven framework, library and managed-service capabilities that absorb this work. Preserve reliable saving, recovery, clear progress and permissions when they protect the user's task; defer optional scope when its user value does not justify its total cost.
 
-The final [UX architecture](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/ux-idioms-architecture-review.md), [backend](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/ux-idioms-backend-review.md) and [frontend](https://github.com/chenghanlee/tips/blob/ecab8c99c1cf1f8e2f41b761861088b0026a4340/docs/brainstorm/ux-idioms-frontend-review.md) agreements are incorporated into the technical contracts, including the subsequent owner decision to prefill review setup from the tip. Earlier rejected or superseded proposals in those records are not parallel implementation choices. The design is adopted; implementation and integration verification remain outstanding.
-
 Use industry patterns as evidence for a choice, then assess their cost at Tips' scale. Prefer existing Phoenix, Ecto, Postgres, and community library capabilities. Add storage, processes, dependencies, or abstractions when a concrete flow or recurring implementation problem needs them. Keep performance limits tunable and validate them with relevant measurements. Routine reversible implementation choices do not need a separate product decision.
 
 Module and function proposals in the design documents describe responsibilities. They are not a scaffolding checklist: start with ordinary functions and extract internal modules when cohesive logic makes the separation useful. Phoenix conventions provide a starting point that we can adapt as the product develops.
 
-This applies Chris's description of product-led framework development (01:35–04:01) and DurableServer's extraction from working product code (16:51–19:20) in the [supplied interview transcript](#interview-transcript). For Tips, the first unit of progress is a working user flow through LiveView, a context, and Postgres.
+The first unit of progress is a working user flow through LiveView, a context, and Postgres.
 
 ## System structure
 
@@ -107,17 +101,17 @@ Operators inspect and retry selected exhausted background jobs through documente
 
 Code boundaries and process boundaries serve different purposes. Use ordinary functions for business operations and supervised processes for runtime lifecycles. A connected LiveView manages a page's temporary state; a background worker manages ongoing work. Tips and votes remain database records accessed through contexts.
 
-Design supervision around dependency lifetimes and failure isolation, as well as startup order. Shared infrastructure must not disappear when an unrelated worker subtree restarts. Chris's registry incident (09:18–14:18) illustrates why fixing ownership and supervision can remove the need for scattered recovery checks.
+Design supervision around dependency lifetimes and failure isolation, as well as startup order. Shared infrastructure must not disappear when an unrelated worker subtree restarts.
 
 Use open-source [Oban](https://oban.hexdocs.pm/Oban.html) for persistent background jobs, scheduled work, and retries. Run its supervised workers inside the same Phoenix release and use the existing Ecto Repo and Postgres database. Enqueue required jobs in the same transaction as the business change they follow. Workers call the context/helper operations; Oban owns scheduling and attempts, while application records own business state. Repeat-safe operations remain necessary because a provider call may succeed before a worker loses its confirmation. This adds a library and its database tables, not another deployed service.
 
-Rerun bounded search retrieval and ranking for each requested page. Use existing Postgres search data and the embedding service; the web layer retains query, filters, and page position. Accept that rankings can change between requests. This supersedes the Postgres and ETS search-snapshot proposals: no saved-order table, cache process, lifetime, or expiry-cleanup job is needed.
+Rerun bounded search retrieval and ranking for each requested page. Use existing Postgres search data and the embedding service; the web layer retains query, filters, and page position. Accept that rankings can change between requests. No saved-order table, cache process, lifetime, or expiry-cleanup job is needed.
 
-Postgres holds durable application state. Persist the business data and progress needed for recovery, and reconstruct temporary runtime state from it. Chris emphasizes this distinction at 31:40–33:00. Recovery must handle incompatible or invalid stored state deliberately; restarting alone does not repair it.
+Postgres holds durable application state. Persist the business data and progress needed for recovery, and reconstruct temporary runtime state from it. Recovery must handle incompatible or invalid stored state deliberately; restarting alone does not repair it.
 
-Keep DurableServer as an optional tool for a demonstrated process requirement: global addressability, resuming saved progress, placement, or load distribution. Chris describes adopting these capabilities incrementally at 24:05–25:01 and 56:18–57:49. The current Tips workflows fit Postgres transactions and supervised workers. Ordinary GenServers remain appropriate when a stateful process is needed; neither every entity nor every operation needs one.
+The current Tips workflows fit Postgres transactions and supervised workers. Use a GenServer only when a stateful process is needed; neither every entity nor every operation needs one.
 
-Show a confirmed save only after the required durable write succeeds. An interrupted response can leave the outcome uncertain, so reconnects must reconcile with stored state. This is our application of the durability boundary made explicit in Chris's [August 2026 DurableServer change](https://github.com/phoenixframework/durable_server/commit/bf05e3241029bcf1018bf50d14d7228471a4ae67). Detailed retry behavior belongs in the backend design.
+Show a confirmed save only after the required durable write succeeds. An interrupted response can leave the outcome uncertain, so reconnects must reconcile with stored state. Detailed retry behavior belongs in the backend design.
 
 ## Web experience
 
@@ -150,33 +144,3 @@ Scaling decisions should follow measured constraints. Context boundaries can evo
 Build one complete read → publish → edit journey using the backend and frontend contracts. Pin framework/provider versions, implement migrations, and exercise disconnected rendering, reconnect recovery and failed writes. At the existing ten-query search gate, evaluate the hosted candidate named in [data-model.md](data-model.md#search) (Qwen3-Embedding-8B via OpenRouter, reduced to 1024 dimensions) using representative long inputs, model-specific query/document preparation, latency, rate limits and actual-volume cost. Equal dimensions do not imply compatible vectors: ingestion and queries must use the same selected model, and any experimental corpus must be rebuilt when it changes. Eligible public document text and reader queries leave the server with hosted inference; already-admitted calls may overlap later hiding. Keep one bounded client and keyword fallback, without a model registry or dual-provider failover. Retain pg_textsearch unless a concrete build/deployment blocker warrants evaluating native PostgreSQL full-text search. Verify private Stream playback/thumbnail URLs, initial upload expiry and the persist-before-handoff guard against the real provider.
 
 Keep managed native video, hybrid search, local draft conflict protection and seven-day signup expiry with guarded inline reclamation. Defer shadow bans, server/cross-device drafts, handle rename, Markdown preview and whole-tip export. The selected UX uses exact setup filters through immediate native controls, indefinite author edits, one-form signup, focused review destinations, optional evidence disclosure, Copy prompt/result, controlled image animation and accessible drag ordering. Remove Back-only refresh notices while retaining actual reconnect/error feedback. The three technical contracts specify these choices without parallel legacy behavior.
-
-## Sources for this revision
-
-Dates below refer to events, commits, or releases, rather than search crawl dates. Commit authorship and dates were checked through GitHub's API.
-
-| Date | Source | Evidence used |
-|---|---|---|
-| 2025-08-05 (approved exception) | Chris McCord, [Phoenix 1.8 announcement](https://www.phoenixframework.org/blog/phoenix-1-8-released) | Scopes, magic-link authentication, simpler generators, explicit layouts, and agent guidance |
-| 2025-11-26 | Chris McCord, [Phoenix test guidelines](https://github.com/phoenixframework/phoenix/commit/bd3cf83824bd5e1c8899ce165b06a5b4d2ba510f) | Supervised test processes and explicit synchronization |
-| 2025-12-08 | Chris McCord, [stale join-reference fix](https://github.com/phoenixframework/phoenix/commit/c73bbfcfeafce3d42cb270a7ecb41a4ca39ae393) | Rejecting incoming messages from an earlier channel join |
-| April 2026 | Chris McCord, [DurableServer keynote](https://www.elixirconf.eu/keynotes/durableserver-always-running-somewhere/) at [ElixirConf EU, April 23–24](https://www.elixirconf.eu/) | Organizer-published abstract reviewed: persistence and process recovery |
-| 2026-04-25 (recorded) | Chris McCord, BEAM There, Done That interview; [user-supplied transcript](#interview-transcript) | Direct discussion of product-led design, transport abstraction, supervision dependencies, and incremental use of durability |
-| 2026-06-10 | Steffen Deusch, [LiveView 1.2 release](https://www.phoenixframework.org/blog/phoenix-liveview-1-2-released) | Supporting framework evidence: colocated CSS alongside existing JavaScript integration |
-| 2026-08-27 | Chris McCord, [explicit synchronization failure change](https://github.com/phoenixframework/durable_server/commit/bf05e3241029bcf1018bf50d14d7228471a4ae67) | Failure before acknowledging a callback whose required persistence failed |
-
-The Phoenix 1.8 announcement is an explicit exception to the review window; its linked scopes guide supplies supporting detail. The Phoenix.new introduction (2025-06-20) remains outside the review. These sources support the specific observations above, rather than a complete architecture prescription from Chris.
-
-### Interview transcript
-
-Source: transcript supplied by the project owner in this conversation. The closing statement identifies the recording date as 2026-04-25. Timestamps refer to that transcript; no recording URL was supplied with it.
-
-| Timestamp | Chris's point used in this design |
-|---|---|
-| 01:35–04:01; 16:51–19:20 | Framework features and extracted libraries follow concrete product problems |
-| 06:53–08:26 | LiveView/Channels hide transport details from application code |
-| 09:18–14:18 | Supervision isolation and dependency ownership matter beyond startup order |
-| 24:05–25:01; 31:40–33:00; 56:18–57:49 | Choose durability for specific needs and persist only the state needed to recover |
-| 40:23–41:24; 48:39–49:02 | Modeling every entity as a process can be wrong; durable processes can start on demand |
-
-The event-driven ride model and reconstruction from an event history are Francesco's proposals in the discussion. They are not an agreed prescription from Chris or a requirement for Tips. The multi-region examples concern a different product's requirements and do not change Tips' current deployment plan.

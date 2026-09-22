@@ -20,8 +20,8 @@ trap 'rm -rf -- "$build_dir"; if [[ -n "$staged_binary" ]]; then rm -f -- "$stag
 cp -R "$module_dir/." "$build_dir/"
 chmod -R u+w "$build_dir"
 cd "$build_dir"
-patch -p1 --dry-run < "$script_dir/mcp-language-server.patch"
-patch -p1 < "$script_dir/mcp-language-server.patch"
+patch -p1 --dry-run < "$script_dir/mcp-bridge-tools-and-lifecycle.patch"
+patch -p1 < "$script_dir/mcp-bridge-tools-and-lifecycle.patch"
 # Test the changed packages. Upstream integration tests require missing fixture
 # workspaces/external servers; watcher timing tests can flake under build load (F7).
 go vet ./...
