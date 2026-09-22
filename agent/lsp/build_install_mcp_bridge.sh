@@ -8,8 +8,7 @@ export GOTOOLCHAIN=go1.26.3
 export CGO_ENABLED=0
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-repo_dir=$(cd -- "$script_dir/../.." && pwd)
-tools_dir=${TIPS_ELIXIR_TOOLS:-"$repo_dir/.elixir-tools"}
+tools_dir=${TIPS_ELIXIR_TOOLS:-"$script_dir/vendor"}
 # Resolve relative overrides before changing into the temporary source tree.
 [[ "$tools_dir" = /* ]] || tools_dir="$PWD/$tools_dir"
 module_dir=$(go mod download -json github.com/isaacphi/mcp-language-server@v0.1.1 |
@@ -20,8 +19,8 @@ trap 'rm -rf -- "$build_dir"; if [[ -n "$staged_binary" ]]; then rm -f -- "$stag
 cp -R "$module_dir/." "$build_dir/"
 chmod -R u+w "$build_dir"
 cd "$build_dir"
-patch -p1 --dry-run < "$script_dir/mcp-bridge-tools-and-lifecycle.patch"
-patch -p1 < "$script_dir/mcp-bridge-tools-and-lifecycle.patch"
+patch -p1 --dry-run < "$script_dir/patches/mcp-bridge-tools-and-lifecycle.patch"
+patch -p1 < "$script_dir/patches/mcp-bridge-tools-and-lifecycle.patch"
 # Test the changed packages. Upstream integration tests require missing fixture
 # workspaces/external servers; watcher timing tests can flake under build load (F7).
 go vet ./...

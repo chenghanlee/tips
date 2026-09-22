@@ -212,7 +212,8 @@ class WorktreeTask:
             raise RefusalError("Canonical LSP wrapper or shared skills directory is missing.")
         if self.args.start:
             tools = (
-                Path(os.environ.get("TIPS_ELIXIR_TOOLS", str(self.root / ".elixir-tools"))) / "bin"
+                Path(os.environ.get("TIPS_ELIXIR_TOOLS", str(self.root / "agent/lsp/vendor")))
+                / "bin"
             )
             for binary in ("mcp-language-server", "expert"):
                 if not os.access(tools / binary, os.X_OK):

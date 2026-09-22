@@ -11,15 +11,19 @@ the engine preparation cache. TPMs run without an LSP.
 | `launch_worktree_lsp.sh` | Start the bridge and Expert in the supplied worktree. |
 | `build_install_expert.sh` | Build, test and install patched Expert. |
 | `build_install_mcp_bridge.sh` | Build, test and install the patched MCP bridge. |
-| `expert-reference-results.patch` | Distinguish reference results, index readiness and failures. |
-| `expert-generated-data.patch` | Keep per-checkout logs, indexes and builds under `_build/expert/`. |
-| `expert-worktree-isolation.patch` | Isolate project indexes and serialize shared engine preparation. |
-| `mcp-bridge-tools-and-lifecycle.patch` | Fix navigation, document synchronization, deadlines and process cleanup. |
+| `patches/expert-reference-results.patch` | Distinguish reference results, index readiness and failures. |
+| `patches/expert-generated-data.patch` | Keep per-checkout logs, indexes and builds under `_build/expert/`. |
+| `patches/expert-worktree-isolation.patch` | Isolate project indexes and serialize shared engine preparation. |
+| `patches/mcp-bridge-tools-and-lifecycle.patch` | Fix navigation, document synchronization, deadlines and process cleanup. |
 
 Existing installed binaries can run without the patch files. A new teammate needs
 the patches to reproduce those working binaries. Deleting them would leave our
 fixes only inside the current installation, unless recovered from Git history.
-Keep the patches with the build scripts.
+Keep the patches in `patches/`; the build scripts apply them before compiling.
+
+`vendor/` holds the installed binaries and versioned Expert releases. It is ignored
+by Git and shared from the main checkout. Per-worktree generated data belongs in
+`_build/expert/`.
 
 ## Build and validate
 
@@ -28,7 +32,7 @@ Builds also require Git, Bash, `patch`, Python 3.11+, Go and `unbuffer` (Expect)
 Build from a worktree and set the shared installation directory explicitly:
 
 ```bash
-export TIPS_ELIXIR_TOOLS=/absolute/path/to/main/.elixir-tools
+export TIPS_ELIXIR_TOOLS=/absolute/path/to/main/agent/lsp/vendor
 agent/lsp/build_install_expert.sh
 agent/lsp/build_install_mcp_bridge.sh
 ```
@@ -51,7 +55,7 @@ Configure the MCP client to invoke the wrapper with its worktree path:
 /absolute/path/to/main/agent/lsp/launch_worktree_lsp.sh /absolute/path/to/worktree
 ```
 
-It finds binaries in the main checkout's `.elixir-tools/bin`, unless
+It finds binaries in the main checkout's `agent/lsp/vendor/bin`, unless
 `TIPS_ELIXIR_TOOLS` specifies another tools directory. Install Mix dependencies
 in each worktree. Elixir and Erlang must be on the client's `PATH`.
 
@@ -80,7 +84,7 @@ in each worktree. Elixir and Erlang must be on the client's `PATH`.
 - Diagnostics without document versions cannot confirm an exact edit match.
   A timeout can leave stale diagnostics. Inspect the reported result.
 - Expert logs, indexes and builds are in the assigned worktree's `_build/expert/`
-  directory. Installed binaries remain in the main checkout's `.elixir-tools/`.
+  directory. Installed binaries remain in the main checkout's `agent/lsp/vendor/`.
   Removing `_build/` also removes this generated data; Expert recreates it.
 - After installing this version, restart old LSP sessions before removing their
   obsolete `.expert/` directories. Do not move or delete data used by a live server.

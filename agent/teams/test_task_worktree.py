@@ -232,10 +232,10 @@ class WorktreeIntegrationTest(unittest.TestCase):
         ):
             self.env.pop(k, None)
         self.git("init", "-q", "-b", "main")
-        for d in ("agent/lsp", "agent/teams", ".agents/skills", ".elixir-tools/bin", "fakebin"):
+        for d in ("agent/lsp", "agent/teams", ".agents/skills", "agent/lsp/vendor/bin", "fakebin"):
             (self.root / d).mkdir(parents=True)
         (self.root / ".gitignore").write_text(
-            ".codex/\n.claude/\n.agents/\n.elixir-tools/\n.worktrees/\nfakebin/\nsta"
+            ".codex/\n.claude/\n.agents/\nagent/lsp/vendor/\n.worktrees/\nfakebin/\nsta"
             "te.json\nstop.py\n"
         )
         shutil.copy(TEAMS / "task_worktree.py", self.root / "agent/teams/task_worktree.py")
@@ -251,7 +251,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
         (self.root / "agent/teams/config.toml").write_text(CONFIG)
         (self.root / "tracked.txt").write_text("base\n")
         for name in ("expert", "mcp-language-server"):
-            p = self.root / ".elixir-tools/bin" / name
+            p = self.root / "agent/lsp/vendor/bin" / name
             p.write_text("#!/bin/sh\nexit 0\n")
             p.chmod(0o755)
         self.git("add", ".")
@@ -509,7 +509,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
     def test_missing_tool_and_invalid_team_refused(self) -> None:
         self.call("--start", team="7", ok=False)
         assert not self.wt.exists()
-        (self.root / ".elixir-tools/bin/expert").unlink()
+        (self.root / "agent/lsp/vendor/bin/expert").unlink()
         self.call("--start", ok=False)
         assert not self.wt.exists()
 
@@ -689,7 +689,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
 
     def test_wrapper_explicit_root_is_used_from_main(self) -> None:
         self.call()
-        bridge = self.root / ".elixir-tools/bin/mcp-language-server"
+        bridge = self.root / "agent/lsp/vendor/bin/mcp-language-server"
         bridge.write_text(
             r"""#!/usr/bin/env python3
 import json, os, sys

@@ -74,6 +74,8 @@ Agent tooling is separate from the application. You do not need it to run Tips.
 | `agent/teams/` | Agent coordination, configuration, instructions and tests |
 | `agent/lsp/` | Agent language-server launcher, builds and patches |
 
+Installed LSP binaries live in ignored `agent/lsp/vendor/`, shared from the main checkout.
+
 Keep root files in their standard locations for Mix, Git and Docker.
 Put disposable experiment output in ignored `tmp/` or outside the repository.
 Expert stores its generated logs, indexes and builds in `_build/expert/`.

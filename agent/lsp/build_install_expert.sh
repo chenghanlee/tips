@@ -4,8 +4,7 @@ set -euo pipefail
 
 revision=1a74fe98762fde17409434fdfc64c4dae1e67537
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-repo_dir=$(cd -- "$script_dir/../.." && pwd)
-tools_dir=${TIPS_ELIXIR_TOOLS:-"$repo_dir/.elixir-tools"}
+tools_dir=${TIPS_ELIXIR_TOOLS:-"$script_dir/vendor"}
 [[ "$tools_dir" = /* ]] || tools_dir="$PWD/$tools_dir"
 # An optional local clone still has to supply the exact pinned commit.
 source_repo=${TIPS_EXPERT_REPOSITORY:-https://github.com/expert-lsp/expert.git}
@@ -16,7 +15,7 @@ trap 'rm -rf -- "$build_dir"; if [[ -n "$staged_link" ]]; then rm -f -- "$staged
 for command in git python3 unbuffer mix; do
   command -v "$command" >/dev/null || { echo "Missing build prerequisite: $command" >&2; exit 1; }
 done
-hash=$(python3 - "$script_dir/expert-reference-results.patch" "$script_dir/expert-worktree-isolation.patch" "$script_dir/expert-generated-data.patch" <<'PY'
+hash=$(python3 - "$script_dir/patches/expert-reference-results.patch" "$script_dir/patches/expert-worktree-isolation.patch" "$script_dir/patches/expert-generated-data.patch" <<'PY'
 import hashlib, sys
 digest = hashlib.sha256()
 for path in sys.argv[1:]:
@@ -41,12 +40,12 @@ mkdir "$build_dir/source"
 git -C "$build_dir/repository" -c filter.lfs.process= -c filter.lfs.smudge=cat -c filter.lfs.required=false archive FETCH_HEAD |
   tar -x -C "$build_dir/source"
 cd "$build_dir/source"
-patch -p1 --dry-run < "$script_dir/expert-reference-results.patch"
-patch -p1 < "$script_dir/expert-reference-results.patch"
-patch -p1 --dry-run < "$script_dir/expert-worktree-isolation.patch"
-patch -p1 < "$script_dir/expert-worktree-isolation.patch"
-patch -p1 --dry-run < "$script_dir/expert-generated-data.patch"
-patch -p1 < "$script_dir/expert-generated-data.patch"
+patch -p1 --dry-run < "$script_dir/patches/expert-reference-results.patch"
+patch -p1 < "$script_dir/patches/expert-reference-results.patch"
+patch -p1 --dry-run < "$script_dir/patches/expert-worktree-isolation.patch"
+patch -p1 < "$script_dir/patches/expert-worktree-isolation.patch"
+patch -p1 --dry-run < "$script_dir/patches/expert-generated-data.patch"
+patch -p1 < "$script_dir/patches/expert-generated-data.patch"
 printf '%s\n' "$version" > version.txt
 
 for app in forge engine expert; do
