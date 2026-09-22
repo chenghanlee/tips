@@ -4,30 +4,105 @@
 +	"crypto/sha256"
 @@ -10,0 +12 @@
 +	"path/filepath"
-@@ -20,4 +22,6 @@
+@@ -20,4 +22,7 @@
 -	Cmd    *exec.Cmd
 -	stdin  io.WriteCloser
 -	stdout *bufio.Reader
 -	stderr io.ReadCloser
++	expert  *expertStartup
 +	Cmd     *exec.Cmd
 +	stdin   io.WriteCloser
-+	stdinMu sync.Mutex
++	stdinMu contextMutex
 +	closed  chan struct{}
 +	stdout  *bufio.Reader
 +	stderr  io.ReadCloser
-@@ -42,0 +47,5 @@
+@@ -42,0 +48,5 @@
 +	// diagnosticsSeq counts publishDiagnostics notifications per URI; diagnosticsPublished is
 +	// closed and replaced on every publish so waiters can block for the next one.
 +	diagnosticsSeq       map[protocol.DocumentUri]uint64
 +	diagnosticsVersions  map[protocol.DocumentUri]*int32
 +	diagnosticsPublished chan struct{}
-@@ -71,0 +81 @@
+@@ -46 +56 @@
+-	openFilesMu sync.RWMutex
++	openFilesMu contextMutex
+@@ -71,0 +82 @@
 +		closed:                make(chan struct{}),
-@@ -77,0 +88,3 @@
+@@ -77,0 +89,3 @@
 +		diagnosticsSeq:        make(map[protocol.DocumentUri]uint64),
 +		diagnosticsVersions:   make(map[protocol.DocumentUri]*int32),
 +		diagnosticsPublished:  make(chan struct{}),
-@@ -285,4 +298,17 @@
+@@ -78,0 +93,5 @@
++	}
++
++	if strings.Contains(strings.ToLower(filepath.Base(command)), "expert") {
++		client.expert = &expertStartup{projects: make(map[string]*expertProject), changed: make(chan struct{})}
++		client.RegisterNotificationHandler("window/logMessage", client.expert.observe)
+@@ -116,0 +136,8 @@
++	// Register handlers
++	c.RegisterServerRequestHandler("workspace/applyEdit", HandleApplyEdit)
++	c.RegisterServerRequestHandler("workspace/configuration", HandleWorkspaceConfiguration)
++	c.RegisterServerRequestHandler("client/registerCapability", HandleRegisterCapability)
++	c.RegisterNotificationHandler("window/showMessage", HandleServerMessage)
++	c.RegisterNotificationHandler("textDocument/publishDiagnostics",
++		func(params json.RawMessage) { HandleDiagnostics(c, params) })
++
+@@ -199,12 +225,0 @@
+-	if err := c.Notify(ctx, "initialized", struct{}{}); err != nil {
+-		return nil, fmt.Errorf("initialized notification failed: %w", err)
+-	}
+-
+-	// Register handlers
+-	c.RegisterServerRequestHandler("workspace/applyEdit", HandleApplyEdit)
+-	c.RegisterServerRequestHandler("workspace/configuration", HandleWorkspaceConfiguration)
+-	c.RegisterServerRequestHandler("client/registerCapability", HandleRegisterCapability)
+-	c.RegisterNotificationHandler("window/showMessage", HandleServerMessage)
+-	c.RegisterNotificationHandler("textDocument/publishDiagnostics",
+-		func(params json.RawMessage) { HandleDiagnostics(c, params) })
+-
+@@ -238,19 +253,8 @@
+-	// Force kill the LSP process if it doesn't exit within timeout
+-	forcedKill := make(chan struct{})
+-	go func() {
+-		select {
+-		case <-time.After(2 * time.Second):
+-			lspLogger.Warn("LSP process did not exit within timeout, forcing kill")
+-			if c.Cmd.Process != nil {
+-				if err := c.Cmd.Process.Kill(); err != nil {
+-					lspLogger.Error("Failed to kill process: %v", err)
+-				} else {
+-					lspLogger.Info("Process killed successfully")
+-				}
+-			}
+-			close(forcedKill)
+-		case <-forcedKill:
+-			// Channel closed from completion path
+-			return
+-		}
+-	}()
++	// A timer has one owner; a forced exit must not close a channel twice.
++	timer := time.AfterFunc(2*time.Second, func() {
++		lspLogger.Warn("LSP process did not exit within timeout, forcing kill")
++		if c.Cmd.Process != nil {
++			_ = c.Cmd.Process.Kill()
++		}
++	})
++	defer timer.Stop()
+@@ -264,4 +268 @@
+-	err := c.Cmd.Wait()
+-	close(forcedKill) // Stop the force kill goroutine
+-
+-	return err
++	return c.Cmd.Wait()
+@@ -280,2 +281,6 @@
+-	time.Sleep(time.Second * 1)
+-	return nil
++	select {
++	case <-time.After(time.Second):
++		return nil
++	case <-ctx.Done():
++		return ctx.Err()
++	}
+@@ -285,4 +290,17 @@
 -	Version int32
 -	URI     protocol.DocumentUri
 -}
@@ -49,16 +124,19 @@
 +// Hold openFilesMu across the on-disk read and notification write. The watcher and
 +// MCP tool handlers share this path; locking only the map allows duplicate opens
 +// and versions to reach the server out of order.
-@@ -290,2 +315,0 @@
+@@ -290,3 +308,8 @@
 -	uri := fmt.Sprintf("file://%s", filepath)
 -
-@@ -292,0 +317,5 @@
+-	c.openFilesMu.Lock()
++	if err := c.openFilesMu.Lock(ctx); err != nil {
++		return err
++	}
 +	defer c.openFilesMu.Unlock()
 +	uri, err := FileURI(filepath)
 +	if err != nil {
 +		return err
 +	}
-@@ -294,6 +323,2 @@
+@@ -294,6 +317,2 @@
 -		c.openFilesMu.Unlock()
 -		return nil // Already open
 -	}
@@ -67,7 +145,7 @@
 -	// Skip files that do not exist or cannot be read
 +		return nil
 +	}
-@@ -304,10 +329,3 @@
+@@ -304,10 +323,3 @@
 -
 -	params := protocol.DidOpenTextDocumentParams{
 -		TextDocument: protocol.TextDocumentItem{
@@ -81,19 +159,34 @@
 +	params := protocol.DidOpenTextDocumentParams{TextDocument: protocol.TextDocumentItem{
 +		URI: protocol.DocumentUri(uri), LanguageID: DetectLanguageID(uri), Version: 1, Text: string(content),
 +	}}
-@@ -317 +335,23 @@
+@@ -317,10 +329 @@
+-
+-	c.openFilesMu.Lock()
+-	c.openFiles[uri] = &OpenFileInfo{
+-		Version: 1,
+-		URI:     protocol.DocumentUri(uri),
+-	}
+-	c.openFilesMu.Unlock()
+-
+-	lspLogger.Debug("Opened file: %s", filepath)
 -
 +	c.openFiles[uri] = &OpenFileInfo{Version: 1, URI: protocol.DocumentUri(uri), ContentHash: sha256.Sum256(content)}
-+	return nil
-+}
-+
+@@ -329,0 +333,6 @@
 +// SyncFile sends the current contents of an open file only when they changed.
 +func (c *Client) SyncFile(ctx context.Context, filepath string) error {
 +	_, _, err := c.notifyChangeVersion(ctx, filepath, false)
 +	return err
 +}
 +
-+func (c *Client) NotifyChange(ctx context.Context, filepath string) error {
+@@ -331,8 +340,20 @@
+-	uri := fmt.Sprintf("file://%s", filepath)
+-
+-	content, err := os.ReadFile(filepath)
+-	if err != nil {
+-		return fmt.Errorf("error reading file: %w", err)
+-	}
+-
+-	c.openFilesMu.Lock()
 +	_, _, err := c.NotifyChangeVersion(ctx, filepath)
 +	return err
 +}
@@ -106,33 +199,15 @@
 +}
 +
 +func (c *Client) notifyChangeVersion(ctx context.Context, filepath string, force bool) (int32, uint64, error) {
-@@ -319,20 +359,5 @@
--	c.openFiles[uri] = &OpenFileInfo{
--		Version: 1,
--		URI:     protocol.DocumentUri(uri),
--	}
--	c.openFilesMu.Unlock()
--
--	lspLogger.Debug("Opened file: %s", filepath)
--
--	return nil
--}
--
--func (c *Client) NotifyChange(ctx context.Context, filepath string) error {
--	uri := fmt.Sprintf("file://%s", filepath)
--
--	content, err := os.ReadFile(filepath)
--	if err != nil {
--		return fmt.Errorf("error reading file: %w", err)
--	}
--
--	c.openFilesMu.Lock()
++	if err := c.openFilesMu.Lock(ctx); err != nil {
++		return 0, 0, err
++	}
 +	defer c.openFilesMu.Unlock()
 +	uri, err := FileURI(filepath)
 +	if err != nil {
 +		return 0, 0, err
 +	}
-@@ -341,9 +366,12 @@
+@@ -341,9 +362,12 @@
 -		c.openFilesMu.Unlock()
 -		return fmt.Errorf("cannot notify change for unopened file: %s", filepath)
 -	}
@@ -154,13 +229,13 @@
 +		return fileInfo.Version, seq, nil
 +	}
 +	version := fileInfo.Version + 1
-@@ -352,4 +380 @@
+@@ -352,4 +376 @@
 -			TextDocumentIdentifier: protocol.TextDocumentIdentifier{
 -				URI: protocol.DocumentUri(uri),
 -			},
 -			Version: version,
 +			TextDocumentIdentifier: protocol.TextDocumentIdentifier{URI: protocol.DocumentUri(uri)}, Version: version,
-@@ -357,10 +382,9 @@
+@@ -357,10 +378,9 @@
 -		ContentChanges: []protocol.TextDocumentContentChangeEvent{
 -			{
 -				Value: protocol.TextDocumentContentChangeWholeDocument{
@@ -180,16 +255,19 @@
 +	fileInfo.Version = version
 +	fileInfo.ContentHash = hash
 +	return version, seqBefore, nil
-@@ -370,2 +393,0 @@
+@@ -370,3 +390,8 @@
 -	uri := fmt.Sprintf("file://%s", filepath)
 -
-@@ -372,0 +395,5 @@
+-	c.openFilesMu.Lock()
++	if err := c.openFilesMu.Lock(ctx); err != nil {
++		return err
++	}
 +	defer c.openFilesMu.Unlock()
 +	uri, err := FileURI(filepath)
 +	if err != nil {
 +		return err
 +	}
-@@ -374,11 +401,3 @@
+@@ -374,11 +399,3 @@
 -		c.openFilesMu.Unlock()
 -		return nil // Already closed
 -	}
@@ -204,10 +282,10 @@
 +		return nil
 +	}
 +	params := protocol.DidCloseTextDocumentParams{TextDocument: protocol.TextDocumentIdentifier{URI: protocol.DocumentUri(uri)}}
-@@ -388,2 +406,0 @@
+@@ -388,2 +404,0 @@
 -
 -	c.openFilesMu.Lock()
-@@ -391,2 +408,6 @@
+@@ -391,2 +406,6 @@
 -	c.openFilesMu.Unlock()
 -
 +	// A reopened document starts at version 1; old provenance must not reject it.
@@ -216,13 +294,26 @@
 +	delete(c.diagnosticsVersions, protocol.DocumentUri(uri))
 +	delete(c.diagnosticsSeq, protocol.DocumentUri(uri))
 +	c.diagnosticsMu.Unlock()
-@@ -397 +418,4 @@
+@@ -397,3 +416,10 @@
 -	uri := fmt.Sprintf("file://%s", filepath)
+-	c.openFilesMu.RLock()
+-	defer c.openFilesMu.RUnlock()
 +	uri, err := FileURI(filepath)
 +	if err != nil {
 +		return false
 +	}
-@@ -433,0 +458,41 @@
++	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
++	defer cancel()
++	if err := c.openFilesMu.Lock(ctx); err != nil {
++		return false
++	}
++	defer c.openFilesMu.Unlock()
+@@ -406 +432,3 @@
+-	c.openFilesMu.Lock()
++	if err := c.openFilesMu.Lock(ctx); err != nil {
++		return
++	}
+@@ -433,0 +462,41 @@
 +
 +// DiagnosticsSeq returns how many publishDiagnostics notifications have arrived for uri and a
 +// channel that is closed when the next notification for any file arrives.
@@ -264,7 +355,7 @@
 +		}
 +	}
 +}
---- a/internal/lsp/diagnostics_regression_test.go
+--- /dev/null
 +++ b/internal/lsp/diagnostics_regression_test.go
 @@ -0,0 +1,310 @@
 +package lsp
@@ -577,39 +668,307 @@
 +		t.Fatalf("post-send publication lost: %+v, %v", snapshot, ok)
 +	}
 +}
+--- /dev/null
++++ b/internal/lsp/expert.go
+@@ -0,0 +1,223 @@
++package lsp
++
++import (
++	"context"
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++	"sync"
++	"time"
++)
++
++// Expert 0.1.10's log messages are hints, not a readiness protocol. Compilation
++// can fail and indexing can still be loading after a compile notice. This small
++// adapter only recovers cold calls; it never certifies empty results as complete.
++type expertProject struct {
++	compiled      bool
++	waitAttempted bool
++	waiting       bool
++	lastLoading   time.Time
++}
++
++type expertStartup struct {
++	mu       sync.Mutex
++	projects map[string]*expertProject
++	changed  chan struct{}
++}
++
++func (e *expertStartup) project(name string) *expertProject {
++	if e.projects[name] == nil {
++		e.projects[name] = &expertProject{}
++	}
++	return e.projects[name]
++}
++
++func (e *expertStartup) signal() { close(e.changed); e.changed = make(chan struct{}) }
++
++func (e *expertStartup) observe(raw json.RawMessage) {
++	var event struct {
++		Message string `json:"message"`
++	}
++	if json.Unmarshal(raw, &event) != nil {
++		return
++	}
++	message := strings.TrimSpace(event.Message)
++	// Expert may prepend project metadata to the otherwise identical log text.
++	if strings.HasPrefix(message, "[") {
++		if i := strings.Index(message, "] "); i >= 0 {
++			message = message[i+2:]
++		}
++	}
++	var name string
++	compiled := false
++	if tail, ok := strings.CutPrefix(message, "Compiled "); ok {
++		if i := strings.LastIndex(tail, " in "); i > 0 {
++			name = tail[:i]
++			compiled = true
++		}
++	} else if tail, ok := strings.CutPrefix(message, "Search index is loading for "); ok {
++		name = strings.TrimSuffix(tail, "...")
++	}
++	if name == "" {
++		return
++	}
++	e.mu.Lock()
++	defer e.mu.Unlock()
++	p := e.project(name)
++	if compiled {
++		p.compiled = true
++	} else {
++		p.lastLoading = time.Now()
++	}
++	e.signal()
++}
++
++// Expert routes to the closest Mix project. The log only identifies its folder
++// name, so same-basename projects in one server remain outside this MVP's scope.
++func expertProjectName(path string) string {
++	absolute, err := filepath.Abs(path)
++	if err != nil {
++		return ""
++	}
++	for dir := filepath.Dir(absolute); ; dir = filepath.Dir(dir) {
++		if info, err := os.Stat(filepath.Join(dir, "mix.exs")); err == nil && !info.IsDir() {
++			return filepath.Base(dir)
++		}
++		if filepath.Dir(dir) == dir {
++			return ""
++		}
++	}
++}
++
++// WaitForProject is called after didOpen, which triggers lazy project startup.
++// One attempt per project/session; concurrent callers share it. Leave 20 seconds
++// for the operation and diagnostics publication inside the overall tool budget.
++func (c *Client) WaitForProject(ctx context.Context, path string) error {
++	if err := ctx.Err(); err != nil {
++		return err
++	}
++	if c.expert == nil {
++		return nil
++	}
++	name := expertProjectName(path)
++	if name == "" {
++		return nil
++	}
++	deadline, ok := ctx.Deadline()
++	if !ok {
++		return fmt.Errorf("Expert startup wait requires a bounded tool context")
++	}
++	remaining := time.Until(deadline.Add(-20 * time.Second))
++	if remaining <= 0 {
++		return ctx.Err()
++	}
++	e := c.expert
++	e.mu.Lock()
++	p := e.project(name)
++	if p.compiled || (p.waitAttempted && !p.waiting) {
++		e.mu.Unlock()
++		return nil
++	}
++	leader := !p.waitAttempted
++	if leader {
++		p.waitAttempted = true
++		p.waiting = true
++	}
++	e.mu.Unlock()
++	if leader {
++		defer func() { e.mu.Lock(); p.waiting = false; e.signal(); e.mu.Unlock() }()
++	}
++	timer := time.NewTimer(remaining)
++	defer timer.Stop()
++	for {
++		e.mu.Lock()
++		done := p.compiled || !p.waiting
++		changed := e.changed
++		e.mu.Unlock()
++		if done {
++			return nil
++		}
++		select {
++		case <-changed:
++		case <-timer.C:
++			return ctx.Err()
++		case <-ctx.Done():
++			return ctx.Err()
++		case <-c.closed:
++			return fmt.Errorf("language server closed during project startup")
++		}
++	}
++}
++
++// RetryLoading only retries after evidence emitted since this request began.
++// A missing/late notice is not proof of readiness. Retain uncertainty on empty.
++func (c *Client) RetryLoading(ctx context.Context, path string, since time.Time) (bool, error) {
++	if err := ctx.Err(); err != nil {
++		return false, err
++	}
++	if c.expert == nil {
++		return false, nil
++	}
++	name := expertProjectName(path)
++	if name == "" {
++		return false, nil
++	}
++	e := c.expert
++	e.mu.Lock()
++	loading := e.project(name).lastLoading.After(since)
++	e.mu.Unlock()
++	if !loading {
++		return false, nil
++	}
++	timer := time.NewTimer(IndexRetryDelay)
++	defer timer.Stop()
++	select {
++	case <-timer.C:
++		return true, nil
++	case <-ctx.Done():
++		return false, ctx.Err()
++	case <-c.closed:
++		return false, fmt.Errorf("language server closed while search index was loading")
++	}
++}
++
++func (c *Client) ProjectStatus(path string) string {
++	if c.expert == nil {
++		return ""
++	}
++	name := expertProjectName(path)
++	if name == "" {
++		return ""
++	}
++	e := c.expert
++	e.mu.Lock()
++	defer e.mu.Unlock()
++	p := e.project(name)
++	status := "Expert startup unconfirmed."
++	if p.compiled {
++		status = "Expert project compilation observed; index readiness unconfirmed."
++	}
++	if !p.lastLoading.IsZero() {
++		status += " Search index loading was observed."
++	}
++	return "\n" + status
++}
++
++// ShouldOpenFile limits automatic document opens, not filesystem notifications.
++// Expert still needs asset/config change events but cannot analyze those as Elixir.
++func (c *Client) ShouldOpenFile(path string) bool {
++	if c.expert == nil {
++		return true
++	}
++	switch filepath.Ext(path) {
++	case ".ex", ".exs", ".eex", ".heex", ".leex":
++		return true
++	default:
++		return false
++	}
++}
++
++// IndexRetryDelay is shared by the legacy definition adapter and typed references.
++const IndexRetryDelay = 2 * time.Second
+--- /dev/null
++++ b/internal/lsp/expert_filter_test.go
+@@ -0,0 +1,21 @@
++package lsp
++
++import "testing"
++
++func TestExpertDocumentFilter(t *testing.T) {
++	expert := &Client{expert: &expertStartup{}}
++	generic := &Client{}
++	for _, path := range []string{"mix.exs", "lib/sample.ex", "view.html.eex", "view.html.heex", "view.html.leex"} {
++		if !expert.ShouldOpenFile(path) {
++			t.Errorf("skipped Expert document %s", path)
++		}
++	}
++	for _, path := range []string{"README.md", "app.js", "image.svg", "settings.json", "mix.lock"} {
++		if expert.ShouldOpenFile(path) {
++			t.Errorf("opened non-Elixir document %s", path)
++		}
++		if !generic.ShouldOpenFile(path) {
++			t.Errorf("changed other server behavior for %s", path)
++		}
++	}
++}
+--- a/internal/lsp/protocol.go
++++ b/internal/lsp/protocol.go
+@@ -3,0 +4 @@
++	"bytes"
+@@ -85,2 +86,3 @@
+-	Code    int    `json:"code"`
+-	Message string `json:"message"`
++	Code    int             `json:"code"`
++	Message string          `json:"message"`
++	Data    json.RawMessage `json:"data,omitempty"`
+@@ -116,0 +119,19 @@
++
++func (e *ResponseError) Error() string {
++	message := fmt.Sprintf("request failed: %s (code: %d)", e.Message, e.Code)
++	var data bytes.Buffer
++	if len(e.Data) > 0 && string(e.Data) != "null" && json.Compact(&data, e.Data) == nil {
++		message += "; data: " + data.String()
++	}
++	return message
++}
++
++func (e *ResponseError) Reason() string {
++	var data struct {
++		Reason string `json:"reason"`
++	}
++	if json.Unmarshal(e.Data, &data) != nil {
++		return ""
++	}
++	return data.Reason
++}
 --- a/internal/lsp/server-request-handlers.go
 +++ b/internal/lsp/server-request-handlers.go
-@@ -113,7 +113,11 @@
- 
- // HandleDiagnostics processes textDocument/publishDiagnostics notifications
- func HandleDiagnostics(client *Client, params json.RawMessage) {
+@@ -116 +116,5 @@
 -	var diagParams protocol.PublishDiagnosticsParams
 +	// Preserve presence: protocol's generated int32 field loses absent vs zero.
 +	var diagParams struct {
 +		protocol.PublishDiagnosticsParams
 +		Version *int32 `json:"version"`
 +	}
- 	if err := json.Unmarshal(params, &diagParams); err != nil {
- 		lspLogger.Error("Error unmarshaling diagnostic params: %v", err)
- 		return
-@@ -121,7 +125,16 @@
- 
- 	// Save diagnostics in client
- 	client.diagnosticsMu.Lock()
+@@ -123,0 +128,6 @@
 +	previousVersion := client.diagnosticsVersions[diagParams.URI]
 +	if previousVersion != nil && diagParams.Version != nil && *diagParams.Version < *previousVersion {
 +		client.diagnosticsMu.Unlock()
 +		return
 +	}
 +	client.diagnosticsVersions[diagParams.URI] = diagParams.Version
- 	client.diagnostics[diagParams.URI] = diagParams.Diagnostics
+@@ -124,0 +135,3 @@
 +	client.diagnosticsSeq[diagParams.URI]++
 +	close(client.diagnosticsPublished)
 +	client.diagnosticsPublished = make(chan struct{})
- 	client.diagnosticsMu.Unlock()
- 
- 	lspLogger.Info("Received diagnostics for %s: %d items", diagParams.URI, len(diagParams.Diagnostics))
---- a/internal/lsp/sync_test.go
+--- /dev/null
 +++ b/internal/lsp/sync_test.go
 @@ -0,0 +1,205 @@
 +package lsp
@@ -819,72 +1178,30 @@
 +}
 --- a/internal/lsp/transport.go
 +++ b/internal/lsp/transport.go
-@@ -7,6 +7,7 @@
- 	"fmt"
- 	"io"
- 	"strings"
+@@ -9,0 +10 @@
 +	"time"
- 
- 	"github.com/isaacphi/mcp-language-server/internal/logging"
- )
-@@ -96,6 +97,7 @@
- 
- // handleMessages reads and dispatches messages in a loop
- func (c *Client) handleMessages() {
+@@ -98,0 +100 @@
 +	defer close(c.closed)
- 	for {
- 		msg, err := ReadMessage(c.stdout)
- 		if err != nil {
-@@ -150,7 +152,10 @@
- 			}
- 
- 			// Send response back to server
+@@ -153 +155,2 @@
 -			if err := WriteMessage(c.stdin, response); err != nil {
-+			c.stdinMu.Lock()
-+			err := WriteMessage(c.stdin, response)
-+			c.stdinMu.Unlock()
++			err := c.writeMessage(context.Background(), response)
 +			if err != nil {
- 				lspLogger.Error("Error sending response to server: %v", err)
- 			}
- 
-@@ -165,7 +170,8 @@
- 
- 			if ok {
- 				lspLogger.Debug("Handling notification: %s", msg.Method)
+@@ -168 +171,2 @@
 -				go handler(msg.Params)
 +				// Preserve wire order, particularly for unversioned diagnostic publications.
 +				handler(msg.Params)
- 			} else {
- 				lspLogger.Debug("No handler for notification: %s", msg.Method)
- 			}
-@@ -193,6 +199,12 @@
- 
- // Call makes a request and waits for the response
- func (c *Client) Call(ctx context.Context, method string, params any, result any) error {
+@@ -195,0 +200,6 @@
 +	// Honor shorter request deadlines and bound calls whose caller has no deadline.
 +	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 +	defer cancel()
 +	if err := ctx.Err(); err != nil {
 +		return err
 +	}
- 	id := c.nextID.Add(1)
- 
- 	lspLogger.Debug("Making call: method=%s id=%v", method, id)
-@@ -217,14 +229,24 @@
- 	}()
- 
- 	// Send request
+@@ -220 +230,2 @@
 -	if err := WriteMessage(c.stdin, msg); err != nil {
-+	c.stdinMu.Lock()
-+	err = WriteMessage(c.stdin, msg)
-+	c.stdinMu.Unlock()
++	err = c.writeMessage(ctx, msg)
 +	if err != nil {
- 		return fmt.Errorf("failed to send request: %w", err)
- 	}
- 
- 	lspLogger.Debug("Waiting for response to request ID: %v", msg.ID)
- 
- 	// Wait for response
+@@ -227 +238,8 @@
 -	resp := <-ch
 +	var resp *Message
 +	select {
@@ -894,75 +1211,251 @@
 +	case <-c.closed:
 +		return fmt.Errorf("language server closed while waiting for %s", method)
 +	}
- 
- 	lspLogger.Debug("Received response for request ID: %v", msg.ID)
- 
-@@ -251,6 +273,9 @@
- 
- // Notify sends a notification (a request without an ID that doesn't expect a response)
- func (c *Client) Notify(ctx context.Context, method string, params any) error {
+@@ -232,2 +250,2 @@
+-		lspLogger.Error("Request failed: %s (code: %d)", resp.Error.Message, resp.Error.Code)
+-		return fmt.Errorf("request failed: %s (code: %d)", resp.Error.Message, resp.Error.Code)
++		lspLogger.Error("%v", resp.Error)
++		return resp.Error
+@@ -253,0 +272,3 @@
 +	if err := ctx.Err(); err != nil {
 +		return err
 +	}
- 	lspLogger.Debug("Sending notification: method=%s", method)
- 
- 	msg, err := NewNotification(method, params)
-@@ -258,7 +283,10 @@
- 		return fmt.Errorf("failed to create notification: %w", err)
- 	}
- 
+@@ -261 +282,2 @@
 -	if err := WriteMessage(c.stdin, msg); err != nil {
-+	c.stdinMu.Lock()
-+	err = WriteMessage(c.stdin, msg)
-+	c.stdinMu.Unlock()
++	err = c.writeMessage(ctx, msg)
 +	if err != nil {
- 		return fmt.Errorf("failed to send notification: %w", err)
- 	}
- 
---- a/internal/tools/definition_at.go
+--- /dev/null
++++ b/internal/lsp/write.go
+@@ -0,0 +1,57 @@
++package lsp
++
++import (
++	"context"
++	"sync"
++	"time"
++)
++
++// contextMutex preserves document/frame ordering without trapping callers behind
++// another request's longer deadline. Its zero value is usable.
++type contextMutex struct {
++	once  sync.Once
++	token chan struct{}
++}
++
++func (m *contextMutex) Lock(ctx context.Context) error {
++	m.once.Do(func() { m.token = make(chan struct{}, 1) })
++	if err := ctx.Err(); err != nil {
++		return err
++	}
++	select {
++	case m.token <- struct{}{}:
++		return nil
++	case <-ctx.Done():
++		return ctx.Err()
++	}
++}
++func (m *contextMutex) Unlock() { <-m.token }
++
++func (c *Client) writeMessage(ctx context.Context, message *Message) error {
++	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
++	defer cancel()
++	if err := c.stdinMu.Lock(ctx); err != nil {
++		return err
++	}
++	defer c.stdinMu.Unlock()
++	if err := ctx.Err(); err != nil {
++		return err
++	}
++	// Closing the OS pipe interrupts a blocked write. A partial LSP frame makes
++	// the stream unusable, so cancellation during a write disconnects it rather
++	// than allowing later frames to corrupt the stream. Cancellation while waiting
++	// for the lock above does not disconnect another caller's write.
++	closed := make(chan struct{})
++	stop := context.AfterFunc(ctx, func() { _ = c.stdin.Close(); close(closed) })
++	err := WriteMessage(c.stdin, message)
++	if !stop() {
++		<-closed
++	}
++	if err != nil {
++		_ = c.stdin.Close()
++	}
++	if ctx.Err() != nil {
++		return ctx.Err()
++	}
++	return err
++}
+--- /dev/null
++++ b/internal/lsp/write_deadline_test.go
+@@ -0,0 +1,112 @@
++package lsp
++
++import (
++	"context"
++	"errors"
++	"io"
++	"os"
++	"path/filepath"
++	"strings"
++	"sync"
++	"testing"
++	"time"
++)
++
++type signaledPipe struct {
++	io.WriteCloser
++	started chan struct{}
++	once    sync.Once
++}
++
++func (p *signaledPipe) Write(b []byte) (int, error) {
++	p.once.Do(func() { close(p.started) })
++	return p.WriteCloser.Write(b)
++}
++
++func TestBlockedPipeWriteHonorsDeadline(t *testing.T) {
++	for _, method := range []string{"notify", "call"} {
++		t.Run(method, func(t *testing.T) {
++			reader, writer, err := os.Pipe()
++			if err != nil {
++				t.Fatal(err)
++			}
++			defer reader.Close()
++			defer writer.Close()
++			client, _ := testClient()
++			client.stdin = writer
++			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
++			defer cancel()
++			done := make(chan error, 1)
++			go func() {
++				payload := strings.Repeat("x", 1<<20)
++				if method == "notify" {
++					done <- client.Notify(ctx, "test", payload)
++				} else {
++					done <- client.Call(ctx, "test", payload, nil)
++				}
++			}()
++			select {
++			case err := <-done:
++				if !errors.Is(err, context.DeadlineExceeded) {
++					t.Fatalf("expected deadline, got %v", err)
++				}
++			case <-time.After(time.Second):
++				t.Fatal("full stdin pipe ignored deadline")
++			}
++			// A partial frame cannot be followed by another frame safely.
++			if _, err := writer.Write([]byte("next")); err == nil {
++				t.Fatal("timed-out transport stayed writable")
++			}
++		})
++	}
++}
++
++func TestQueuedDocumentAndTransportWritesHonorDeadline(t *testing.T) {
++	reader, writer, err := os.Pipe()
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer reader.Close()
++	defer writer.Close()
++	client, _ := testClient()
++	pipe := &signaledPipe{WriteCloser: writer, started: make(chan struct{})}
++	client.stdin = pipe
++	path := filepath.Join(t.TempDir(), "large.ex")
++	if err := os.WriteFile(path, []byte(strings.Repeat("x", 1<<20)), 0600); err != nil {
++		t.Fatal(err)
++	}
++	leader, cancel := context.WithCancel(context.Background())
++	defer cancel()
++	done := make(chan error, 1)
++	go func() { done <- client.OpenFile(leader, path) }()
++	<-pipe.started
++	for _, operation := range []string{"document", "transport"} {
++		ctx, stop := context.WithTimeout(context.Background(), 50*time.Millisecond)
++		result := make(chan error, 1)
++		go func() {
++			if operation == "document" {
++				result <- client.OpenFile(ctx, path)
++			} else {
++				result <- client.Notify(ctx, "test", nil)
++			}
++		}()
++		select {
++		case err := <-result:
++			if !errors.Is(err, context.DeadlineExceeded) {
++				t.Errorf("%s: %v", operation, err)
++			}
++		case <-time.After(time.Second):
++			t.Errorf("%s lock ignored deadline", operation)
++		}
++		stop()
++	}
++	cancel()
++	select {
++	case err := <-done:
++		if !errors.Is(err, context.Canceled) {
++			t.Errorf("cancel write: %v", err)
++		}
++	case <-time.After(time.Second):
++		t.Error("blocked document write ignored cancellation")
++	}
++}
+--- /dev/null
 +++ b/internal/tools/definition_at.go
-@@ -0,0 +1,40 @@
+@@ -0,0 +1,53 @@
 +package tools
 +
 +import (
 +	"context"
 +	"fmt"
++	"time"
 +
 +	"github.com/isaacphi/mcp-language-server/internal/lsp"
 +	"github.com/isaacphi/mcp-language-server/internal/protocol"
 +)
 +
-+// ReadDefinitionAt navigates from a call site, independently of workspace indexing.
++// ReadDefinitionAt navigates from a call site in the source file's project.
 +// Positions are 1-based; columns use LSP's default UTF-16 encoding, as hover does.
 +func ReadDefinitionAt(ctx context.Context, client *lsp.Client, filePath string, line, column int) (string, error) {
++	ctx, cancel := context.WithTimeout(ctx, toolTimeout)
++	defer cancel()
 +	position, err := navigationPosition(ctx, client, filePath, line, column)
 +	if err != nil {
 +		return "", err
 +	}
-+	result, err := client.Definition(ctx, protocol.DefinitionParams{TextDocumentPositionParams: position})
-+	if err != nil {
-+		return "", fmt.Errorf("definition request failed: %w", err)
-+	}
-+	var locations []protocol.Location
-+	switch value := result.Value.(type) {
-+	case protocol.Definition:
-+		switch definition := value.Value.(type) {
-+		case protocol.Location:
-+			locations = []protocol.Location{definition}
-+		case []protocol.Location:
-+			locations = definition
++	for {
++		started := time.Now()
++		result, err := client.Definition(ctx, protocol.DefinitionParams{TextDocumentPositionParams: position})
++		if err != nil {
++			return "", fmt.Errorf("definition request failed: %w", err)
 +		}
-+	case []protocol.DefinitionLink:
-+		for _, link := range value {
-+			locations = append(locations, protocol.Location{URI: link.TargetURI, Range: link.TargetSelectionRange})
++		var locations []protocol.Location
++		switch value := result.Value.(type) {
++		case protocol.Definition:
++			switch definition := value.Value.(type) {
++			case protocol.Location:
++				locations = []protocol.Location{definition}
++			case []protocol.Location:
++				locations = definition
++			}
++		case []protocol.DefinitionLink:
++			for _, link := range value {
++				locations = append(locations, protocol.Location{URI: link.TargetURI, Range: link.TargetSelectionRange})
++			}
 +		}
++		if len(locations) == 0 {
++			retry, err := client.RetryLoading(ctx, filePath, started)
++			if err != nil {
++				return "", err
++			}
++			if retry {
++				continue
++			}
++			return fmt.Sprintf("No definition returned for %s at L%d:C%d. The project may still be loading, or the symbol/source may be unavailable; this does not prove the symbol is absent.", filePath, line, column) + client.ProjectStatus(filePath), nil
++		}
++		return formatNavigationLocations(locations, true), nil
 +	}
-+	if len(locations) == 0 {
-+		return fmt.Sprintf("No definition returned for %s at L%d:C%d. The project may still be loading, or the symbol/source may be unavailable; this does not prove the symbol is absent.", filePath, line, column), nil
-+	}
-+	return formatNavigationLocations(locations, true), nil
 +}
---- a/internal/tools/definition_at_test.go
+--- /dev/null
 +++ b/internal/tools/definition_at_test.go
 @@ -0,0 +1,343 @@
 +package tools
@@ -1228,7 +1721,7 @@
 +				t.Fatal(err)
 +			}
 +			if mode == "empty" {
-+				if !strings.Contains(output, "No references returned") || !strings.Contains(output, "indexing") {
++				if !strings.Contains(output, "No references found") || !strings.Contains(output, "current index") {
 +					t.Fatalf("output=%q", output)
 +				}
 +				return
@@ -1312,12 +1805,15 @@
 +++ b/internal/tools/diagnostics.go
 @@ -6,0 +7 @@
 +	"path/filepath"
-@@ -13,0 +15,4 @@
-+
+@@ -14,0 +16,4 @@
 +// diagnosticsPublishTimeout bounds how long to wait for the server to publish diagnostics after
 +// a change; see GetDiagnosticsForFile. Observed Expert latency: ~1s idle, up to ~7s busy.
 +const diagnosticsPublishTimeout = 10 * time.Second
-@@ -24 +29,7 @@
++
+@@ -16,0 +22,2 @@
++	ctx, cancel := context.WithTimeout(ctx, toolTimeout)
++	defer cancel()
+@@ -24 +31,7 @@
 -	err := client.OpenFile(ctx, filePath)
 +	// Use the same absolute URI as the workspace watcher and server publications.
 +	var err error
@@ -1326,20 +1822,21 @@
 +		return "", fmt.Errorf("could not resolve file path: %w", err)
 +	}
 +	err = client.OpenFile(ctx, filePath)
-@@ -29,3 +40,6 @@
+@@ -29,3 +42,3 @@
 -	// Wait for diagnostics
 -	// TODO: wait for notification
 -	time.Sleep(time.Second * 3)
-+	// Convert the file path to URI format
++	if err := client.WaitForProject(ctx, filePath); err != nil {
++		return "", err
++	}
+@@ -34 +47,5 @@
+-	uri := protocol.DocumentUri("file://" + filePath)
 +	uriString, err := lsp.FileURI(filePath)
 +	if err != nil {
 +		return "", err
 +	}
 +	uri := protocol.DocumentUri(uriString)
-@@ -33,6 +47,5 @@
--	// Convert the file path to URI format
--	uri := protocol.DocumentUri("file://" + filePath)
--
+@@ -36,3 +53,5 @@
 -	// Request fresh diagnostics
 -	diagParams := protocol.DocumentDiagnosticParams{
 -		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
@@ -1348,14 +1845,14 @@
 +	version, seqBefore, err := client.NotifyChangeVersion(ctx, filePath)
 +	if err != nil {
 +		return "", fmt.Errorf("could not send file content to the language server: %w", err)
-@@ -40,3 +53,3 @@
+@@ -40,3 +59,3 @@
 -	_, err = client.Diagnostic(ctx, diagParams)
 -	if err != nil {
 -		toolsLogger.Error("Failed to get diagnostics: %v", err)
 +	snapshot, published := client.WaitForDiagnostics(ctx, uri, seqBefore, version, diagnosticsPublishTimeout)
 +	if err := ctx.Err(); err != nil {
 +		return "", err
-@@ -44,4 +57,18 @@
+@@ -44,4 +63,18 @@
 -
 -	// Get diagnostics from the cache
 -	diagnostics := client.GetFileDiagnostics(uri)
@@ -1366,11 +1863,11 @@
 +	case !published:
 +		fileInfo = fmt.Sprintf("Fresh diagnostics unavailable for %s: no matching publication within %s.\n", filePath, diagnosticsPublishTimeout)
 +		if snapshot.Sequence == 0 {
-+			return fileInfo + "No diagnostics have been received for this file since startup.", nil
++			return fileInfo + "No diagnostics have been received for this file since startup." + client.ProjectStatus(filePath), nil
 +		}
-+		fileInfo += "Showing the last published list; it may be stale.\n"
++		fileInfo += "Showing the last published list; it may be stale.\n" + client.ProjectStatus(filePath) + "\n"
 +	case snapshot.Version == nil:
-+		fileInfo = fmt.Sprintf("Latest published diagnostics for %s.\n", filePath)
++		fileInfo = fmt.Sprintf("Latest published diagnostics for %s (document version not supplied).\n", filePath)
 +	default:
 +		if len(diagnostics) == 0 {
 +			return fmt.Sprintf("No diagnostics found for %s (document version %d)", filePath, *snapshot.Version), nil
@@ -1378,25 +1875,25 @@
 +		fileInfo = fmt.Sprintf("%s (document version %d)\n", filePath, *snapshot.Version)
 +	}
 +	fileInfo += fmt.Sprintf("Diagnostics in File: %d\n", len(diagnostics))
-@@ -49 +76 @@
+@@ -49 +82 @@
 -		return "No diagnostics found for " + filePath, nil
 +		return fileInfo, nil
-@@ -51,6 +77,0 @@
+@@ -51,6 +83,0 @@
 -
 -	// Format file header
 -	fileInfo := fmt.Sprintf("%s\nDiagnostics in File: %d\n",
 -		filePath,
 -		len(diagnostics),
 -	)
-@@ -60 +80,0 @@
+@@ -60 +86,0 @@
 -	var diagLocations []protocol.Location
-@@ -86,5 +105,0 @@
+@@ -86,5 +111,0 @@
 -		// Create a location for this diagnostic to use with line ranges
 -		diagLocations = append(diagLocations, protocol.Location{
 -			URI:   uri,
 -			Range: diag.Range,
 -		})
-@@ -93 +108,7 @@
+@@ -93 +114,7 @@
 -	// Format content with context
 +	result := fileInfo + strings.Join(diagSummaries, "\n") + "\n"
 +	if !showLineNumbers {
@@ -1405,12 +1902,12 @@
 +
 +	// Diagnostics already provide line locations. Local context avoids a second
 +	// semantic request that can stall after diagnostics have arrived.
-@@ -96 +117 @@
+@@ -96 +123 @@
 -		return fileInfo + "\nError reading file: " + err.Error(), nil
 +		return result + "\nError reading file: " + err.Error(), nil
-@@ -98 +118,0 @@
+@@ -98 +124,0 @@
 -
-@@ -100,18 +120,6 @@
+@@ -100,18 +126,6 @@
 -
 -	// Collect lines to display
 -	var linesToShow map[int]bool
@@ -1435,7 +1932,7 @@
 +		line := int(diag.Range.Start.Line)
 +		for i := max(0, line-contextLines); i <= min(len(lines)-1, line+contextLines); i++ {
 +			linesToShow[i] = true
-@@ -120,14 +128 @@
+@@ -120,14 +134 @@
 -
 -	// Convert to line ranges
 -	lineRanges := ConvertLinesToRanges(linesToShow, len(lines))
@@ -1453,28 +1950,16 @@
 +	result += "\n" + FormatLinesWithRanges(lines, ConvertLinesToRanges(linesToShow, len(lines)))
 --- a/internal/tools/edit_file.go
 +++ b/internal/tools/edit_file.go
-@@ -20,7 +20,11 @@
- }
- 
- func ApplyTextEdits(ctx context.Context, client *lsp.Client, filePath string, edits []TextEdit) (string, error) {
+@@ -23 +23,5 @@
 -	err := client.OpenFile(ctx, filePath)
 +	uri, err := lsp.FileURI(filePath)
 +	if err != nil {
 +		return "", err
 +	}
 +	err = client.OpenFile(ctx, filePath)
- 	if err != nil {
- 		return "", fmt.Errorf("could not open file: %v", err)
- 	}
-@@ -74,7 +78,7 @@
- 
- 	edit := protocol.WorkspaceEdit{
- 		Changes: map[protocol.DocumentUri][]protocol.TextEdit{
+@@ -77 +81 @@
 -			protocol.DocumentUri(filePath): textEdits,
 +			protocol.DocumentUri(uri): textEdits,
- 		},
- 	}
- 
 --- a/internal/tools/execute-codelens.go
 +++ b/internal/tools/execute-codelens.go
 @@ -15 +15,5 @@
@@ -1487,6 +1972,440 @@
 @@ -24 +28 @@
 -		URI: protocol.DocumentUri("file://" + filePath),
 +		URI: protocol.DocumentUri(uriString),
+--- /dev/null
++++ b/internal/tools/expert_startup_test.go
+@@ -0,0 +1,431 @@
++package tools
++
++import (
++	"bufio"
++	"context"
++	"encoding/json"
++	"errors"
++	"os"
++	"path/filepath"
++	"strings"
++	"sync"
++	"testing"
++	"time"
++
++	"github.com/isaacphi/mcp-language-server/internal/lsp"
++	"github.com/isaacphi/mcp-language-server/internal/protocol"
++)
++
++// A real framed LSP subprocess models Expert's ignored cold lookups, skipped
++// cold changes, unversioned publications and loading notices. No Expert install required.
++func TestExpertStartupServer(t *testing.T) {
++	mode := os.Getenv("TIPS_STARTUP_SERVER")
++	if mode == "" {
++		return
++	}
++	var mu sync.Mutex
++	send := func(msg *lsp.Message) {
++		mu.Lock()
++		defer mu.Unlock()
++		if lsp.WriteMessage(os.Stdout, msg) != nil {
++			os.Exit(2)
++		}
++	}
++	log := func(s string) {
++		raw, _ := json.Marshal(map[string]any{"type": 3, "message": s})
++		send(&lsp.Message{JSONRPC: "2.0", Method: "window/logMessage", Params: raw})
++	}
++	var stateMu sync.Mutex
++	compiled := map[string]bool{}
++	requests := map[string]int{}
++	reader := bufio.NewReader(os.Stdin)
++	for {
++		msg, err := lsp.ReadMessage(reader)
++		if err != nil {
++			os.Exit(0)
++		}
++		var p struct {
++			RootURI      string `json:"rootUri"`
++			TextDocument struct {
++				URI string `json:"uri"`
++			} `json:"textDocument"`
++		}
++		_ = json.Unmarshal(msg.Params, &p)
++		root := filepath.Dir(strings.TrimPrefix(p.TextDocument.URI, "file://"))
++		name := filepath.Base(root)
++		switch msg.Method {
++		case "initialize":
++			if mode == "early" || mode == "endless" || mode == "late" || mode == "empty-log" {
++				name = filepath.Base(strings.TrimPrefix(p.RootURI, "file://"))
++				stateMu.Lock()
++				compiled[name] = true
++				stateMu.Unlock()
++				log("Compiled " + name + " in 0.1 seconds")
++			}
++			send(&lsp.Message{JSONRPC: "2.0", ID: msg.ID, Result: json.RawMessage(`{"capabilities":{}}`)})
++		case "test/lateLoading":
++			log("Search index is loading for " + name + "...")
++			send(&lsp.Message{JSONRPC: "2.0", ID: msg.ID, Result: json.RawMessage(`null`)})
++		case "textDocument/didOpen":
++			if mode == "missing" || mode == "stall" || mode == "early" || mode == "endless" || mode == "late" || mode == "empty-log" || strings.HasPrefix(mode, "typed") || strings.HasPrefix(mode, "failure-") {
++				continue
++			}
++			go func(name string) {
++				delay := 80 * time.Millisecond
++				if name == "slow" {
++					delay = 250 * time.Millisecond
++				}
++				time.Sleep(delay)
++				stateMu.Lock()
++				compiled[name] = true
++				stateMu.Unlock()
++				log("Compiled " + name + " in 0.08 seconds")
++			}(name)
++		case "textDocument/didChange":
++			stateMu.Lock()
++			ready := compiled[name]
++			stateMu.Unlock()
++			if ready {
++				raw, _ := json.Marshal(map[string]any{"uri": p.TextDocument.URI, "diagnostics": []any{}})
++				send(&lsp.Message{JSONRPC: "2.0", Method: "textDocument/publishDiagnostics", Params: raw})
++			}
++		case "textDocument/definition", "textDocument/references", "textDocument/hover":
++			if mode == "stall" {
++				continue
++			}
++			stateMu.Lock()
++			ready := compiled[name]
++			requests[name]++
++			n := requests[name]
++			stateMu.Unlock()
++			if msg.Method == "textDocument/references" {
++				reason := ""
++				if !ready || ((mode == "loading" || mode == "typed" || mode == "typed-late") && n <= 2) || mode == "endless" {
++					reason = "index_not_ready"
++				}
++				if strings.HasPrefix(mode, "failure-") {
++					reason = strings.TrimPrefix(mode, "failure-")
++				}
++				if mode == "typed" || mode == "typed-late" {
++					if n > 2 {
++						reason = ""
++						ready = true
++					}
++				}
++				if reason != "" {
++					data, _ := json.Marshal(map[string]any{"reason": reason, "detail": "retained detail"})
++					send(&lsp.Message{JSONRPC: "2.0", ID: msg.ID, Error: &lsp.ResponseError{Code: -32803, Message: reason, Data: data}})
++					if mode == "typed-late" {
++						log("Search index is loading for " + name + "...")
++					}
++					continue
++				}
++			}
++			var result any
++			if msg.Method == "textDocument/references" {
++				result = []protocol.Location{}
++			}
++			if mode == "empty-log" {
++				log("Search index is loading for " + name + "...")
++			}
++			if ready && ((mode == "loading" && n == 1) || mode == "endless") {
++				log("Search index is loading for " + name + "...")
++			} else if ready && mode != "early" && mode != "late" && mode != "empty-log" {
++				loc := protocol.Location{URI: protocol.DocumentUri(p.TextDocument.URI), Range: protocol.Range{Start: protocol.Position{Line: 0}, End: protocol.Position{Line: 0, Character: 3}}}
++				switch msg.Method {
++				case "textDocument/definition":
++					result = loc
++				case "textDocument/references":
++					result = []protocol.Location{loc}
++				case "textDocument/hover":
++					result = protocol.Hover{Contents: protocol.MarkupContent{Kind: "plaintext", Value: "ready"}}
++				}
++			}
++			raw, _ := json.Marshal(result)
++			send(&lsp.Message{JSONRPC: "2.0", ID: msg.ID, Result: raw})
++		}
++	}
++}
++
++func startupClient(t *testing.T, mode string) (*lsp.Client, string) {
++	t.Helper()
++	root := t.TempDir()
++	path := filepath.Join(root, "sample.ex")
++	for name, text := range map[string]string{"mix.exs": "# fixture project root\n", "sample.ex": "defmodule Sample do\nend\n"} {
++		if err := os.WriteFile(filepath.Join(root, name), []byte(text), 0600); err != nil {
++			t.Fatal(err)
++		}
++	}
++	executable, err := os.Executable()
++	if err != nil {
++		t.Fatal(err)
++	}
++	command := filepath.Join(t.TempDir(), "expert")
++	if err = os.Symlink(executable, command); err != nil {
++		t.Fatal(err)
++	}
++	t.Setenv("TIPS_STARTUP_SERVER", mode)
++	client, err := lsp.NewClient(command, "-test.run=^TestExpertStartupServer$")
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { _ = client.Cmd.Process.Kill(); _ = client.Cmd.Wait() })
++	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
++	defer cancel()
++	if _, err = client.InitializeLSPClient(ctx, root); err != nil {
++		t.Fatal(err)
++	}
++	return client, path
++}
++
++func TestExpertColdFirstCalls(t *testing.T) {
++	for _, tool := range []struct {
++		name string
++		run  func(context.Context, *lsp.Client, string, int, int) (string, error)
++	}{{"definition", ReadDefinitionAt}, {"references", FindReferencesAt}, {"hover", GetHoverInfo}} {
++		t.Run(tool.name, func(t *testing.T) {
++			client, path := startupClient(t, "cold")
++			ctx, cancel := context.WithTimeout(context.Background(), 21*time.Second)
++			defer cancel()
++			result, err := tool.run(ctx, client, path, 1, 2)
++			if err != nil || (!strings.Contains(result, "File:") && result != "ready") {
++				t.Fatalf("cold first call: %q, %v", result, err)
++			}
++		})
++	}
++	t.Run("diagnostics", func(t *testing.T) {
++		client, path := startupClient(t, "cold")
++		ctx, cancel := context.WithTimeout(context.Background(), 21*time.Second)
++		defer cancel()
++		result, err := GetDiagnosticsForFile(ctx, client, path, 0, false)
++		if err != nil || !strings.Contains(result, "Diagnostics in File: 0") || !strings.Contains(result, "version not supplied") {
++			t.Fatalf("cold diagnostics: %q, %v", result, err)
++		}
++	})
++}
++
++func TestExpertLoadingRetries(t *testing.T) {
++	for _, tool := range []struct {
++		name string
++		run  func(context.Context, *lsp.Client, string, int, int) (string, error)
++	}{{"definition", ReadDefinitionAt}, {"references", FindReferencesAt}} {
++		t.Run(tool.name, func(t *testing.T) {
++			client, path := startupClient(t, "loading")
++			ctx, cancel := context.WithTimeout(context.Background(), 21*time.Second)
++			defer cancel()
++			result, err := tool.run(ctx, client, path, 1, 2)
++			if err != nil || !strings.Contains(result, "File:") {
++				t.Fatalf("loading recovery: %q, %v", result, err)
++			}
++		})
++	}
++}
++
++func TestExpertWarmEmptyAndEarlyRegistration(t *testing.T) {
++	client, path := startupClient(t, "early")
++	ctx, cancel := context.WithTimeout(context.Background(), 21*time.Second)
++	defer cancel()
++	start := time.Now()
++	result, err := FindReferencesAt(ctx, client, path, 1, 2)
++	if err != nil || !strings.Contains(result, "No references") {
++		t.Fatalf("warm empty: %q, %v", result, err)
++	}
++	if time.Since(start) > 500*time.Millisecond {
++		t.Fatal("warm empty lookup waited")
++	}
++}
++
++func TestExpertMissingStartupWaitsOnce(t *testing.T) {
++	client, path := startupClient(t, "missing")
++	for i := 0; i < 2; i++ {
++		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second+200*time.Millisecond)
++		start := time.Now()
++		result, err := ReadDefinitionAt(ctx, client, path, 1, 2)
++		elapsed := time.Since(start)
++		cancel()
++		if err != nil || !strings.Contains(result, "startup unconfirmed") {
++			t.Fatalf("missing startup: %q, %v", result, err)
++		}
++		if i == 0 && elapsed < 150*time.Millisecond {
++			t.Fatal("first call skipped startup wait")
++		}
++		if i == 1 && elapsed > 100*time.Millisecond {
++			t.Fatal("second call repeated startup wait")
++		}
++	}
++}
++
++func TestExpertStoppedServerHonorsShorterDeadline(t *testing.T) {
++	client, path := startupClient(t, "stall")
++	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
++	defer cancel()
++	start := time.Now()
++	_, err := ReadDefinitionAt(ctx, client, path, 1, 2)
++	if err == nil || !strings.Contains(err.Error(), "deadline") {
++		t.Fatalf("wanted deadline, got %v", err)
++	}
++	if time.Since(start) > time.Second {
++		t.Fatal("did not respect caller deadline")
++	}
++}
++
++func TestExpertLoadingRetryHonorsDeadline(t *testing.T) {
++	client, path := startupClient(t, "endless")
++	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
++	defer cancel()
++	start := time.Now()
++	_, err := FindReferencesAt(ctx, client, path, 1, 2)
++	if err == nil || !strings.Contains(err.Error(), "deadline") {
++		t.Fatalf("wanted deadline during retry, got %v", err)
++	}
++	if time.Since(start) > time.Second {
++		t.Fatal("retry ignored deadline")
++	}
++}
++
++func TestExpertOverlappingProjects(t *testing.T) {
++	client, fast := startupClient(t, "cold")
++	slowRoot := filepath.Join(filepath.Dir(filepath.Dir(fast)), "slow")
++	if err := os.MkdirAll(slowRoot, 0700); err != nil {
++		t.Fatal(err)
++	}
++	for _, name := range []string{"mix.exs", "sample.ex"} {
++		if err := os.WriteFile(filepath.Join(slowRoot, name), []byte("# fixture\n"), 0600); err != nil {
++			t.Fatal(err)
++		}
++	}
++	ctx, cancel := context.WithTimeout(context.Background(), 21*time.Second)
++	defer cancel()
++	var wg sync.WaitGroup
++	for _, path := range []string{fast, filepath.Join(slowRoot, "sample.ex")} {
++		wg.Add(1)
++		go func() {
++			defer wg.Done()
++			result, err := ReadDefinitionAt(ctx, client, path, 1, 2)
++			if err != nil || !strings.Contains(result, "File: "+path) {
++				t.Errorf("project %s released before its compile: %q, %v", path, result, err)
++			}
++		}()
++	}
++	wg.Wait()
++}
++
++func TestExpertConcurrentCallsShareStartup(t *testing.T) {
++	client, path := startupClient(t, "cold")
++	ctx, cancel := context.WithTimeout(context.Background(), 21*time.Second)
++	defer cancel()
++	var wg sync.WaitGroup
++	for range 5 {
++		wg.Add(1)
++		go func() {
++			defer wg.Done()
++			result, err := ReadDefinitionAt(ctx, client, path, 1, 2)
++			if err != nil || !strings.Contains(result, "File: "+path) {
++				t.Errorf("concurrent cold call skipped startup: %q, %v", result, err)
++			}
++		}()
++	}
++	wg.Wait()
++}
++
++func TestExpertShortCallPreservesStartupWait(t *testing.T) {
++	client, path := startupClient(t, "cold")
++	short, cancel := context.WithTimeout(context.Background(), time.Second)
++	result, err := ReadDefinitionAt(short, client, path, 1, 2)
++	cancel()
++	if err != nil || !strings.Contains(result, "startup unconfirmed") {
++		t.Fatalf("short call: %q, %v", result, err)
++	}
++	long, cancel := context.WithTimeout(context.Background(), 21*time.Second)
++	defer cancel()
++	result, err = ReadDefinitionAt(long, client, path, 1, 2)
++	if err != nil || !strings.Contains(result, "File:") {
++		t.Fatalf("short call consumed the startup wait: %q, %v", result, err)
++	}
++}
++
++func TestExpertLateLoadingNoticeDoesNotRetryCompletedCall(t *testing.T) {
++	client, path := startupClient(t, "late")
++	ctx, cancel := context.WithTimeout(context.Background(), 21*time.Second)
++	defer cancel()
++	result, err := FindReferencesAt(ctx, client, path, 1, 2)
++	if err != nil || !strings.Contains(result, "No references") {
++		t.Fatalf("empty before late notice: %q, %v", result, err)
++	}
++	// Release the loading notice only after the first tool result. The server's
++	// reply to this control request is a barrier, avoiding timing-based assertions.
++	uri, _ := lsp.FileURI(path)
++	if err := client.Call(ctx, "test/lateLoading", map[string]any{"textDocument": map[string]string{"uri": uri}}, nil); err != nil {
++		t.Fatal(err)
++	}
++	start := time.Now()
++	result, err = FindReferencesAt(ctx, client, path, 1, 2)
++	if err != nil || !strings.Contains(result, "No references") {
++		t.Fatalf("late notice: %q, %v", result, err)
++	}
++	if time.Since(start) > 500*time.Millisecond {
++		t.Fatal("historical loading notice caused a retry")
++	}
++}
++
++func TestExpertDiagnosticsAfterConsumedWaitReportsMissingPublication(t *testing.T) {
++	client, path := startupClient(t, "missing")
++	first, cancel := context.WithTimeout(context.Background(), 20*time.Second+20*time.Millisecond)
++	_, err := ReadDefinitionAt(first, client, path, 1, 2)
++	cancel()
++	if err != nil {
++		t.Fatal(err)
++	}
++	result, err := GetDiagnosticsForFile(context.Background(), client, path, 0, false)
++	if err != nil || !strings.Contains(result, "within 10s") || !strings.Contains(result, "startup unconfirmed") {
++		t.Fatalf("missing publication: %q, %v", result, err)
++	}
++}
++
++func TestReferencesTypedReadinessWithoutLogs(t *testing.T) {
++	for _, mode := range []string{"typed", "typed-late"} {
++		t.Run(mode, func(t *testing.T) {
++			client, path := startupClient(t, mode)
++			ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
++			defer cancel()
++			result, err := FindReferencesAt(ctx, client, path, 1, 2)
++			if err != nil || !strings.Contains(result, "File:") {
++				t.Fatalf("%q, %v", result, err)
++			}
++		})
++	}
++}
++
++func TestReferencesTypedFailuresDoNotRetry(t *testing.T) {
++	for _, reason := range []string{"index_failed", "query_failed", "unresolved_symbol", "unknown"} {
++		t.Run(reason, func(t *testing.T) {
++			client, path := startupClient(t, "failure-"+reason)
++			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
++			defer cancel()
++			start := time.Now()
++			_, err := FindReferencesAt(ctx, client, path, 1, 2)
++			var response *lsp.ResponseError
++			if !errors.As(err, &response) || response.Code != -32803 || !strings.Contains(string(response.Data), reason) || !strings.Contains(string(response.Data), "retained detail") {
++				t.Fatalf("structured error lost: %v", err)
++			}
++			if !strings.Contains(err.Error(), "retained detail") {
++				t.Fatalf("tool error omitted server detail: %v", err)
++			}
++			if time.Since(start) > 500*time.Millisecond {
++				t.Fatal("non-readiness error retried")
++			}
++		})
++	}
++}
++
++func TestReferencesSuccessfulEmptyIgnoresLoadingLogs(t *testing.T) {
++	client, path := startupClient(t, "empty-log")
++	start := time.Now()
++	result, err := FindReferencesAt(context.Background(), client, path, 1, 2)
++	if err != nil || !strings.Contains(result, "No references found") {
++		t.Fatalf("%q, %v", result, err)
++	}
++	if time.Since(start) > 500*time.Millisecond {
++		t.Fatal("successful empty response retried based on unrelated log")
++	}
++}
 --- a/internal/tools/get-codelens.go
 +++ b/internal/tools/get-codelens.go
 @@ -15 +15,5 @@
@@ -1503,14 +2422,16 @@
 +++ b/internal/tools/hover.go
 @@ -5,0 +6 @@
 +	"os"
-@@ -14,2 +15 @@
+@@ -14,2 +15,3 @@
 -	// Open the file if not already open
 -	err := client.OpenFile(ctx, filePath)
++	ctx, cancel := context.WithTimeout(ctx, toolTimeout)
++	defer cancel()
 +	params, err := navigationPosition(ctx, client, filePath, line, column)
-@@ -17 +17 @@
+@@ -17 +19 @@
 -		return "", fmt.Errorf("could not open file: %v", err)
 +		return "", err
-@@ -19,14 +18,0 @@
+@@ -19,14 +20,0 @@
 -
 -	params := protocol.HoverParams{}
 -
@@ -1525,10 +2446,10 @@
 -	}
 -	params.Position = position
 -
-@@ -34 +20 @@
+@@ -34 +22 @@
 -	hoverResult, err := client.Hover(ctx, params)
 +	hoverResult, err := client.Hover(ctx, protocol.HoverParams{TextDocumentPositionParams: params})
-@@ -39,24 +25,2 @@
+@@ -39,24 +27,2 @@
 -	var result strings.Builder
 -
 -	// Process the hover contents based on Markup content
@@ -1555,7 +2476,7 @@
 -		result.WriteString(hoverResult.Contents.Value)
 +	if hoverResult.Contents.Value != "" {
 +		return hoverResult.Contents.Value, nil
-@@ -65 +29,12 @@
+@@ -65 +31,12 @@
 -	return result.String(), nil
 +	// Read the requested line directly; the final line need not have a newline.
 +	lineText := ""
@@ -1568,10 +2489,10 @@
 +			lineText = lines[params.Position.Line]
 +		}
 +	}
-+	return fmt.Sprintf("No hover information available for this position on the following line:\n%s", lineText), nil
---- a/internal/tools/navigation.go
++	return fmt.Sprintf("No hover information available for this position on the following line:\n%s", lineText) + client.ProjectStatus(filePath), nil
+--- /dev/null
 +++ b/internal/tools/navigation.go
-@@ -0,0 +1,96 @@
+@@ -0,0 +1,109 @@
 +package tools
 +
 +import (
@@ -1581,14 +2502,22 @@
 +	"net/url"
 +	"os"
 +	"strings"
++	"time"
 +	"unicode/utf8"
 +
 +	"github.com/isaacphi/mcp-language-server/internal/lsp"
 +	"github.com/isaacphi/mcp-language-server/internal/protocol"
 +)
 +
++// toolTimeout matches the configured MCP client timeout of 120 seconds.
++const toolTimeout = 120 * time.Second
++
 +// Synchronize the caller's document, preserving the context used for project selection.
 +func navigationPosition(ctx context.Context, client *lsp.Client, filePath string, line, column int) (protocol.TextDocumentPositionParams, error) {
++	return synchronizedPosition(ctx, client, filePath, line, column, true)
++}
++
++func synchronizedPosition(ctx context.Context, client *lsp.Client, filePath string, line, column int, waitForStartup bool) (protocol.TextDocumentPositionParams, error) {
 +	var params protocol.TextDocumentPositionParams
 +	if line < 1 || column < 1 || uint64(line) > math.MaxUint32 || uint64(column) > math.MaxUint32 {
 +		return params, fmt.Errorf("line and column must be positive integers no greater than %d", uint64(math.MaxUint32))
@@ -1599,6 +2528,11 @@
 +	}
 +	if err := client.OpenFile(ctx, filePath); err != nil {
 +		return params, fmt.Errorf("could not open file: %w", err)
++	}
++	if waitForStartup {
++		if err := client.WaitForProject(ctx, filePath); err != nil {
++			return params, err
++		}
 +	}
 +	if err := client.SyncFile(ctx, filePath); err != nil {
 +		return params, fmt.Errorf("could not synchronize file: %w", err)
@@ -1668,7 +2602,7 @@
 +	}
 +	return output.String()
 +}
---- a/internal/tools/navigation_sync_test.go
+--- /dev/null
 +++ b/internal/tools/navigation_sync_test.go
 @@ -0,0 +1,108 @@
 +package tools
@@ -1779,14 +2713,16 @@
 +		})
 +	}
 +}
---- a/internal/tools/references_at.go
+--- /dev/null
 +++ b/internal/tools/references_at.go
-@@ -0,0 +1,29 @@
+@@ -0,0 +1,46 @@
 +package tools
 +
 +import (
 +	"context"
++	"errors"
 +	"fmt"
++	"time"
 +
 +	"github.com/isaacphi/mcp-language-server/internal/lsp"
 +	"github.com/isaacphi/mcp-language-server/internal/protocol"
@@ -1795,23 +2731,38 @@
 +// FindReferencesAt retains the caller's source/project context instead of
 +// moving the request to a declaration discovered through workspace search.
 +func FindReferencesAt(ctx context.Context, client *lsp.Client, filePath string, line, column int) (string, error) {
-+	position, err := navigationPosition(ctx, client, filePath, line, column)
++	ctx, cancel := context.WithTimeout(ctx, toolTimeout)
++	defer cancel()
++	position, err := synchronizedPosition(ctx, client, filePath, line, column, false)
 +	if err != nil {
 +		return "", err
 +	}
-+	locations, err := client.References(ctx, protocol.ReferenceParams{
-+		TextDocumentPositionParams: position,
-+		Context:                    protocol.ReferenceContext{IncludeDeclaration: false},
-+	})
-+	if err != nil {
-+		return "", fmt.Errorf("references request failed: %w", err)
++	for {
++		locations, err := client.References(ctx, protocol.ReferenceParams{
++			TextDocumentPositionParams: position,
++			Context:                    protocol.ReferenceContext{IncludeDeclaration: false},
++		})
++		if err != nil {
++			var response *lsp.ResponseError
++			if !errors.As(err, &response) || response.Reason() != "index_not_ready" {
++				return "", fmt.Errorf("references request failed: %w", err)
++			}
++			timer := time.NewTimer(lsp.IndexRetryDelay)
++			select {
++			case <-ctx.Done():
++				timer.Stop()
++				return "", fmt.Errorf("references index not ready before deadline: %w", ctx.Err())
++			case <-timer.C:
++				continue
++			}
++		}
++		if len(locations) == 0 {
++			return fmt.Sprintf("No references found for %s at L%d:C%d in the selected project's current index.", filePath, line, column), nil
++		}
++		return "References returned by the language server for the project selected by the source file; other projects may have additional usages.\n\n" + formatNavigationLocations(locations, false), nil
 +	}
-+	if len(locations) == 0 {
-+		return fmt.Sprintf("No references returned for %s at L%d:C%d. The project may still be indexing; this does not prove there are no usages.", filePath, line, column), nil
-+	}
-+	return "References returned by the language server for the project selected by the source file; other projects may have additional usages.\n\n" + formatNavigationLocations(locations, false), nil
 +}
---- a/internal/tools/relative_paths_test.go
+--- /dev/null
 +++ b/internal/tools/relative_paths_test.go
 @@ -0,0 +1,108 @@
 +package tools
@@ -1924,27 +2875,335 @@
 +}
 --- a/internal/tools/rename-symbol.go
 +++ b/internal/tools/rename-symbol.go
-@@ -14,14 +14,18 @@
- // RenameSymbol renames a symbol (variable, function, class, etc.) at the specified position
- // It uses the LSP rename functionality to handle all references across files
- func RenameSymbol(ctx context.Context, client *lsp.Client, filePath string, line, column int, newName string) (string, error) {
+@@ -16,0 +17,4 @@
 +	uriString, err := lsp.FileURI(filePath)
 +	if err != nil {
 +		return "", err
 +	}
- 	// Open the file if not already open
+@@ -18 +22 @@
 -	err := client.OpenFile(ctx, filePath)
 +	err = client.OpenFile(ctx, filePath)
- 	if err != nil {
- 		return "", fmt.Errorf("could not open file: %v", err)
- 	}
- 
- 	// Convert 1-indexed line/column to 0-indexed for LSP protocol
+@@ -24 +28 @@
 -	uri := protocol.DocumentUri("file://" + filePath)
 +	uri := protocol.DocumentUri(uriString)
- 	position := protocol.Position{
- 		Line:      uint32(line - 1),
- 		Character: uint32(column - 1),
+--- /dev/null
++++ b/internal/watcher/document_filter_test.go
+@@ -0,0 +1,62 @@
++package watcher
++
++import (
++	"context"
++	"os"
++	"path/filepath"
++	"testing"
++
++	"github.com/isaacphi/mcp-language-server/internal/protocol"
++)
++
++type recordingClient struct {
++	opened []string
++	events []protocol.FileEvent
++}
++
++func (c *recordingClient) IsFileOpen(string) bool { return false }
++func (c *recordingClient) OpenFile(_ context.Context, path string) error {
++	c.opened = append(c.opened, path)
++	return nil
++}
++func (c *recordingClient) NotifyChange(context.Context, string) error { return nil }
++func (c *recordingClient) DidChangeWatchedFiles(_ context.Context, p protocol.DidChangeWatchedFilesParams) error {
++	c.events = append(c.events, p.Changes...)
++	return nil
++}
++
++type filteredClient struct{ *recordingClient }
++
++func (c *filteredClient) ShouldOpenFile(path string) bool { return filepath.Ext(path) == ".exs" }
++
++func TestAutomaticOpenFilterPreservesFileEvents(t *testing.T) {
++	root := t.TempDir()
++	for _, name := range []string{"mix.exs", "README.md"} {
++		if err := os.WriteFile(filepath.Join(root, name), []byte("fixture"), 0600); err != nil {
++			t.Fatal(err)
++		}
++	}
++	for _, filtered := range []bool{false, true} {
++		client := &recordingClient{}
++		var endpoint LSPClient = client
++		if filtered {
++			endpoint = &filteredClient{client}
++		}
++		w := NewWorkspaceWatcher(endpoint)
++		for _, name := range []string{"mix.exs", "README.md"} {
++			w.openMatchingFile(context.Background(), filepath.Join(root, name))
++		}
++		want := 2
++		if filtered {
++			want = 1
++		}
++		if len(client.opened) != want {
++			t.Errorf("filtered=%v: opened %v", filtered, client.opened)
++		}
++		// Watching assets and opening text documents are separate LSP operations.
++		w.handleFileEvent(context.Background(), "file://"+filepath.Join(root, "README.md"), protocol.FileChangeType(protocol.Changed))
++		if len(client.events) != 1 {
++			t.Errorf("filtered=%v: lost watched file event", filtered)
++		}
++	}
++}
+--- a/internal/watcher/watcher.go
++++ b/internal/watcher/watcher.go
+@@ -632,0 +633,4 @@
++	// A server can watch assets without treating them as open source documents.
++	if filter, ok := w.client.(interface{ ShouldOpenFile(string) bool }); ok && !filter.ShouldOpenFile(path) {
++		return
++	}
+--- /dev/null
++++ b/lifecycle_test.go
+@@ -0,0 +1,180 @@
++package main
++
++import (
++	"bufio"
++	"bytes"
++	"encoding/json"
++	"flag"
++	"fmt"
++	"io"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strconv"
++	"strings"
++	"syscall"
++	"testing"
++	"time"
++)
++
++// Run the real bridge and a framed fake language server as separate processes.
++func TestBridgeLifecycleHelper(t *testing.T) {
++	if os.Getenv("MCP_LIFECYCLE_HELPER") != "1" {
++		return
++	}
++	if len(os.Args) == 4 && os.Args[3] == "fake-lsp" {
++		lifecycleFakeLSP()
++		os.Exit(0)
++	}
++	for i, arg := range os.Args {
++		if arg == "--" {
++			os.Args = append([]string{os.Args[0]}, os.Args[i+1:]...)
++			break
++		}
++	}
++	flag.CommandLine = flag.NewFlagSet("bridge", flag.ExitOnError)
++	main()
++}
++
++func lifecycleFakeLSP() {
++	trace, _ := os.OpenFile(os.Getenv("MCP_LIFECYCLE_TRACE"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
++	defer trace.Close()
++	reader := bufio.NewReader(os.Stdin)
++	for {
++		size := 0
++		for {
++			line, err := reader.ReadString('\n')
++			if err != nil {
++				if os.Getenv("MCP_LIFECYCLE_MODE") == "stubborn" {
++					for {
++						time.Sleep(time.Hour)
++					}
++				}
++				return
++			}
++			if line == "\r\n" {
++				break
++			}
++			if strings.HasPrefix(line, "Content-Length:") {
++				size, _ = strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, "Content-Length:")))
++			}
++		}
++		body := make([]byte, size)
++		if _, err := io.ReadFull(reader, body); err != nil {
++			return
++		}
++		var message map[string]any
++		if json.Unmarshal(body, &message) != nil {
++			return
++		}
++		message["pid"] = os.Getpid()
++		_ = json.NewEncoder(trace).Encode(message)
++		method, _ := message["method"].(string)
++		if method == "exit" && os.Getenv("MCP_LIFECYCLE_MODE") != "stubborn" {
++			return
++		}
++		id, exists := message["id"]
++		if !exists {
++			continue
++		}
++		if method == "initialize" && os.Getenv("MCP_LIFECYCLE_MODE") == "initializing" {
++			continue
++		}
++		var result any
++		if method == "initialize" {
++			result = map[string]any{"capabilities": map[string]any{}}
++		}
++		reply, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "result": result})
++		fmt.Fprintf(os.Stdout, "Content-Length: %d\r\n\r\n%s", len(reply), reply)
++	}
++}
++
++func TestBridgeStartsInWorkspaceAndStopsWithSession(t *testing.T) {
++	for _, mode := range []string{"eof", "signal", "stubborn", "initializing"} {
++		t.Run(mode, func(t *testing.T) {
++			t.Parallel()
++			workspace, err := filepath.EvalSymlinks(t.TempDir())
++			if err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(filepath.Join(workspace, "mix.exs"), []byte("# lifecycle fixture\n"), 0600); err != nil {
++				t.Fatal(err)
++			}
++			trace := filepath.Join(t.TempDir(), "events.jsonl")
++			executable, err := os.Executable()
++			if err != nil {
++				t.Fatal(err)
++			}
++			cmd := exec.Command(executable, "-test.run=^TestBridgeLifecycleHelper$", "--", "--workspace", workspace, "--lsp", executable, "--", "-test.run=^TestBridgeLifecycleHelper$", "--", "fake-lsp")
++			cmd.Env = append(os.Environ(), "MCP_LIFECYCLE_HELPER=1", "MCP_LIFECYCLE_TRACE="+trace, "MCP_LIFECYCLE_MODE="+mode)
++			var output bytes.Buffer
++			cmd.Stdout, cmd.Stderr = &output, &output
++			stdin, err := cmd.StdinPipe()
++			if err != nil {
++				t.Fatal(err)
++			}
++			if err := cmd.Start(); err != nil {
++				t.Fatal(err)
++			}
++			defer stdin.Close()
++			defer cmd.Process.Kill()
++			done := make(chan error, 1)
++			go func() { done <- cmd.Wait() }()
++			events := []map[string]any{}
++			deadline := time.Now().Add(5 * time.Second)
++			ready := false
++			var lspPID int
++			for time.Now().Before(deadline) {
++				data, _ := os.ReadFile(trace)
++				events = nil
++				for _, line := range bytes.Split(data, []byte("\n")) {
++					var event map[string]any
++					if json.Unmarshal(line, &event) != nil {
++						continue
++					}
++					events = append(events, event)
++					lspPID = int(event["pid"].(float64))
++					if event["method"] == "initialize" && mode == "initializing" {
++						ready = true
++					}
++					if event["method"] == "initialized" {
++						ready = true
++					}
++				}
++				if ready {
++					break
++				}
++				time.Sleep(20 * time.Millisecond)
++			}
++			if lspPID != 0 {
++				defer syscall.Kill(lspPID, syscall.SIGKILL)
++			}
++			if !ready {
++				t.Fatal("LSP did not start before a tool call")
++			}
++			params := events[0]["params"].(map[string]any)
++			if params["rootUri"] != "file://"+workspace {
++				t.Fatalf("wrong LSP root: %v", params["rootUri"])
++			}
++			if mode == "signal" || mode == "initializing" {
++				_ = cmd.Process.Signal(syscall.SIGTERM)
++			} else {
++				_ = stdin.Close()
++			}
++			select {
++			case err := <-done:
++				if err != nil {
++					t.Fatalf("bridge exit: %v\n%s", err, output.String())
++				}
++			case <-time.After(8 * time.Second):
++				t.Fatal("bridge survived session shutdown")
++			}
++			if syscall.Kill(lspPID, 0) == nil {
++				t.Fatal("LSP survived bridge shutdown")
++			}
++			if strings.Contains(output.String(), "panic:") {
++				t.Fatalf("shutdown panic: %s", output.String())
++			}
++		})
++	}
++}
+--- a/main.go
++++ b/main.go
+@@ -10,0 +11 @@
++	"sync"
+@@ -16,0 +18 @@
++	"github.com/mark3labs/mcp-go/mcp"
+@@ -21,0 +24 @@
++var processStartedAt = time.Now()
+@@ -105,0 +109,13 @@
++// Record demand once per process without logging tool arguments or file contents.
++func startupTimingHooks(startedAt time.Time, workspace string) *server.Hooks {
++	hooks := &server.Hooks{}
++	var first sync.Once
++	hooks.AddBeforeCallTool(func(_ context.Context, _ any, request *mcp.CallToolRequest) {
++		first.Do(func() {
++			coreLogger.Info("First MCP tool dispatch pid=%d workspace=%q tool=%q startup_elapsed_ms=%d",
++				os.Getpid(), workspace, request.Params.Name, time.Since(startedAt).Milliseconds())
++		})
++	})
++	return hooks
++}
++
+@@ -114,0 +131 @@
++		server.WithHooks(startupTimingHooks(processStartedAt, s.config.workspaceDir)),
+@@ -123 +140 @@
+-	return server.ServeStdio(s.mcpServer)
++	return server.NewStdioServer(s.mcpServer).Listen(s.ctx, os.Stdin, os.Stdout)
+@@ -127 +144 @@
+-	coreLogger.Info("MCP Language Server starting")
++	coreLogger.Info("MCP Language Server starting pid=%d", os.Getpid())
+@@ -175 +192 @@
+-			cleanup(server, done)
++			server.cancelFunc()
+@@ -178 +195,2 @@
+-			cleanup(server, done)
++			server.cancelFunc()
++		case <-done:
+@@ -182 +200,5 @@
+-	if err := server.start(); err != nil {
++	// Only this goroutine owns cleanup, including normal MCP stdin EOF.
++	err = server.start()
++	failed := err != nil && server.ctx.Err() == nil
++	server.cancelFunc()
++	if failed {
+@@ -184 +206,4 @@
+-		cleanup(server, done)
++	}
++	cleanup(server, done)
++	coreLogger.Info("Server shutdown complete for PID: %d", os.Getpid())
++	if failed {
+@@ -187,4 +211,0 @@
+-
+-	<-done
+-	coreLogger.Info("Server shutdown complete for PID: %d", os.Getpid())
+-	os.Exit(0)
+@@ -237,6 +258 @@
+-	// Send signal to the done channel
+-	select {
+-	case <-done: // Channel already closed
+-	default:
+-		close(done)
+-	}
++	close(done)
 --- a/tools.go
 +++ b/tools.go
 @@ -6 +6,3 @@
@@ -2159,18 +3418,21 @@
 @@ -358 +301 @@
 -		text, err := tools.RenameSymbol(s.ctx, s.lspClient, filePath, line, column, newName)
 +		text, err := tools.RenameSymbol(ctx, s.lspClient, filePath, line, column, newName)
---- a/tools_test.go
+--- /dev/null
 +++ b/tools_test.go
-@@ -0,0 +1,79 @@
+@@ -0,0 +1,102 @@
 +package main
 +
 +import (
++	"bytes"
 +	"context"
 +	"encoding/json"
 +	"fmt"
++	"github.com/isaacphi/mcp-language-server/internal/logging"
 +	"math"
 +	"strings"
 +	"testing"
++	"time"
 +
 +	"github.com/mark3labs/mcp-go/server"
 +)
@@ -2239,5 +3501,25 @@
 +		if _, err := parsePosition(map[string]any{"line": value, "column": 1}); err == nil {
 +			t.Fatalf("accepted non-finite coordinate: %v", value)
 +		}
++	}
++}
++
++func TestFirstToolTimingLoggedOnceThroughMCP(t *testing.T) {
++	var output bytes.Buffer
++	previous := logging.TestOutput
++	logging.TestOutput = &output
++	t.Cleanup(func() { logging.TestOutput = previous })
++	s := &mcpServer{mcpServer: server.NewMCPServer("test", "1",
++		server.WithHooks(startupTimingHooks(time.Now().Add(-5*time.Second), "/test/worktree")))}
++	if err := s.registerTools(); err != nil {
++		t.Fatal(err)
++	}
++	for i := 0; i < 2; i++ {
++		s.mcpServer.HandleMessage(context.Background(), []byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"references","arguments":{}}}`))
++	}
++	got := output.String()
++	if strings.Count(got, "First MCP tool dispatch") != 1 ||
++		!strings.Contains(got, `workspace="/test/worktree" tool="references" startup_elapsed_ms=5`) {
++		t.Fatalf("missing or repeated startup timing: %s", got)
 +	}
 +}

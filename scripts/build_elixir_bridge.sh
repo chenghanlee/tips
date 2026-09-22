@@ -25,7 +25,7 @@ patch -p1 < "$script_dir/mcp-language-server.patch"
 # Test the changed packages. Upstream integration tests require missing fixture
 # workspaces/external servers; watcher timing tests can flake under build load (F7).
 go vet ./...
-go test . ./internal/lsp ./internal/tools
+go test . ./internal/lsp ./internal/tools ./internal/watcher
 mkdir -p "$tools_dir/bin"
 staged_binary=$(mktemp "$tools_dir/bin/mcp-language-server.XXXXXX")
 go build -trimpath -buildvcs=false -o "$staged_binary" .

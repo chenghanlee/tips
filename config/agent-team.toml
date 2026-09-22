@@ -1,0 +1,57 @@
+# Agent launch settings. Changes apply to newly started sessions.
+# An empty model uses the client's configured default.
+[team]
+# Current suffixes support at most nine teams; validation rejects partition collisions.
+max_teams = 6
+workspace_prefix = "tips-team"
+port_base = 4100
+port_stride = 10
+postgres_port = 5433
+db_suffix_prefix = "_t"
+
+[timeouts]
+launch_seconds = 120
+shutdown_seconds = 15
+shell_seconds = 15
+mcp_startup_seconds = 60
+mcp_tool_seconds = 120
+checks_minutes = 30
+
+[launch]
+codex_approval = "never"
+# Applies only to definition, references, hover and diagnostics on our LSP server.
+codex_lsp_approval_mode = "approve"
+claude_permission_mode = "bypassPermissions"
+
+[roles.dev]
+kind = "codex"
+model = "gpt-5.6-sol"
+effort = "xhigh"
+db_suffix = ""
+port_offset = 0
+
+[roles.test]
+kind = "claude"
+model = "opus"
+effort = "xhigh"
+db_suffix = "r"
+port_offset = 1
+
+[roles.lead]
+kind = "codex"
+model = "gpt-6-astra"
+effort = "high"
+db_suffix = "l"
+port_offset = 2
+
+[roles.tpm]
+kind = "claude"
+model = ""
+effort = "medium"
+compaction_percent = 35
+
+[roles.lead_tpm]
+kind = "claude"
+model = ""
+effort = "high"
+compaction_percent = 35

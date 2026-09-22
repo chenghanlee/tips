@@ -1,126 +1,86 @@
 # Implementing Tips with agents
 
-This is the operating agreement for the agents that build Tips. Product requirements remain in the technical designs. Engineering guidance is in `AGENTS.md`. Runtime wiring for the current run (names, workspaces, steps, event messages, communication files) is in [goal-prompt.md](goal-prompt.md). [GitHub issues](https://github.com/chenghanlee/tips/issues) hold current task requirements and evidence; the [Tips project](https://github.com/users/chenghanlee/projects/15) holds scheduling state. Refine current issues in GitHub. When a contract changes, the tech lead that changed it links that decision from every affected Backlog issue so readiness refinement sees it.
+This is the operating agreement for building Tips. [AGENTS.md](../../AGENTS.md) governs engineering. [goal-prompt.md](goal-prompt.md) describes dispatch. GitHub issues and PRs hold requirements, decisions, review history and evidence. [agent-team.toml](../../config/agent-team.toml) owns agent settings; do not duplicate its defaults in commands or prose.
 
 ## Roles
 
-One lead TPM oversees up to five teams. Each team has four members.
+One lead TPM assigns work to teams within the configured trial limit. Each team handles one issue at a time.
 
-| Role | Agent | Owns |
-|---|---|---|
-| Lead TPM (`lead-tpm`) | Claude | Issue assignment to teams, own-list overlap checks and shared-file reservations, the merge queue, team creation and retirement, Blocked-on-user tracking, `status.md`, all communication with the user. |
-| Team TPM (`team-N-tpm`) | Claude | The team steps for one issue at a time: readiness refinement, dispatch, Project Status and Agent fields, handoffs, communication with `lead-tpm` and other team TPMs. |
-| Tech lead (`team-N-lead`) | Codex | Technical contracts, readiness amendments and path narrowing, whole-PR adversarial design review, the `tips/independent-review` status, the merge in its granted slot, integrated checks on `main`. |
-| Developer (`team-N-dev`) | Codex | Implementation of one issue with integration-first TDD, its branch, worktree and PR. |
-| Tester (`team-N-test`) | Claude | Adversarial per-commit correctness review of pushed commits, running the tests and checks itself, browser evidence from CI. |
+| Role | Owns |
+|---|---|
+| Lead TPM (`lead-tpm`) | Assign issues, start/retire teams, resolve cross-team dependencies, report blockers to the user. |
+| Team TPM (`team-N-tpm`) | Assess readiness, provision/advance coding sessions, dispatch, update issue labels, route handoffs. |
+| Developer (`team-N-dev`) | Implement the issue with integration-first TDD; own its branch, worktree and PR. |
+| Tester (`team-N-test`) | Independently review each pushed commit and run relevant verification. |
+| Tech lead (`team-N-lead`) | Confirm technical readiness; deeply review the whole PR's design; publish its review status and merge. |
 
-The user decides material product changes, purchases, provider credentials, hosting and public launch. Agents handle routine implementation choices and handoffs themselves.
+TPMs handle coordination so technical leads can concentrate on code review. Reviewers use the issue, code and evidence, with fresh sessions at each dispatched revision. Nobody reviews or merges their own implementation. The common GitHub identity cannot mechanically prove reviewer independence.
 
-Within a team, work is serial: one issue in implementation at a time. The developer may keep working on the same issue while the tester reviews an earlier commit. The developer does not start the next issue until the current PR is merged. Across teams, work is parallel: up to five issues at once, never two with overlapping files. Nobody reviews or merges their own change. Reviewers work from the issue, code and evidence, not from the implementer's conversation.
+The user decides material product changes, purchases, credentials, hosting and public launch. Routine technical choices belong to the responsible role. No budget has been fixed; absence of a ceiling does not authorize purchases.
 
 ## Task readiness
 
-The lead TPM assigns issues on the critical path (P0, then P1, then P2, and so on) whose prerequisites are Done, preferring the package the team last worked in. It never infers that a closed issue's dependent gate passed without its evidence. Before assigning, the lead TPM reconciles open PRs, failed checks, Active and Blocked issues and their latest handoffs in GitHub, and prioritizes repairs and reviews that unblock integration.
+The lead TPM picks critical-path issues whose prerequisites are integrated and evidenced, preferring the team's current package. Package parent issues are not coding assignments. Split work into bounded changes a fresh agent can understand, implement, test and repair.
 
-Packages are parent issues, not coding assignments. Each coding issue is one bounded change that a fresh agent can understand, implement, test and repair in one session. A user story may need several such issues; internal contracts and operational checks need not pretend to be user stories.
+Before dispatch, the team TPM records one outcome, exclusions, exact design sections and real entry points, acceptance scenarios, runnable verification and available prerequisites. The tech lead confirms readiness on the issue, amending the technical contract when necessary. Discovery may be its own task. Do not require file ownership lists, reservations or overlap approval; coordinate concrete shared changes when they arise.
 
-The team TPM drafts the readiness refinement. The team tech lead confirms it with a one-line "ready" comment on the issue, with amendments where needed. The team TPM then sends the own list to the lead TPM; after "own-list approved" it moves the issue from Backlog to Ready. All of these must be true:
-
-- Prerequisites are integrated and their required checks passed. A contract or probe result resolves any open technical choice needed by this task.
-- The issue states one outcome, explicit exclusions, exact owning design sections, acceptance scenarios and relevant failure and race cases.
-- Code exists for any referenced entry points. The tech lead has narrowed anticipated module areas to actual files, signatures, fixtures and runnable verification commands. Agents must not guess paths during dispatch.
-- The own list names every file the task may change. It does not overlap any active issue's own list. Shared files carry a one-line reservation approved by the lead TPM.
-- The scope fits a fresh session, including reading, testing and repair headroom. Split discovery from implementation when uncertainty dominates. Split by behavior or invariant, never by line count.
-- Required test environment or provider access is available, or the issue explicitly delivers only a local contract and its real-provider gate is a separate Blocked issue.
-
-Do not make the developer reread all design and review history. Supply the task's owning sections and a short list of cross-cutting invariants (admission, visibility, lock order, transactional effects) that actually apply.
-
-A team TPM may create child issues when a task must be split, and tells the lead TPM. The goal covers every issue in the project, including children created during the run.
+Each coding issue records acceptance-to-test mappings. Milestone gates require E2E evidence on one integrated revision; isolated task reports do not establish a gate. Closing a package requires its mandatory children and package acceptance evidence.
 
 ## Issue and project state
 
-Use one Project Status field: **Backlog → Ready → Active → In review → Done**, with **Blocked** available from any unfinished state. Failed review returns to Active for repair. Blocked issues name the missing prerequisite, the responsible role and the next concrete action. Waiting on a dependency in Backlog is normal, not an incident. Issue comments record dispatch, handoff, review and evidence. The Project Agent field holds the Herdr agent name of the current owner (`team-N-dev` while Active). GitHub assignees identify accountable humans, never fabricated agent accounts.
+Use GitHub issues and PRs as the source of truth. Add `active` when assigned; add `blocked` when progress requires outside action, with the prerequisite, responsible role and next action in a comment. Remove stale labels as the situation changes. A waiting dependency is not automatically a user blocker. Do not mirror a workflow state machine into Project fields or maintain a separate status document.
 
-An issue closes only after its required result is integrated and verified. Closing a parent requires all mandatory children and package acceptance evidence. A milestone gate closes only against one integrated revision with its E2E evidence; sums of isolated task reports do not pass a gate. Failed or unavailable checks are failures or blockers, never passes. The team TPM updates issue and project state at dispatch, at handoff, when the PR enters whole-PR review (In review), when whole-PR review rejects it (back to Active), and at merge.
+An issue closes only when its required result is integrated and evidenced. Partial work uses `Refs #number`; a completing PR uses `Closes #number`. Child issues created during the run count toward the goal.
 
 ## Git
 
-Use protected `main`, short-lived `task/<issue>-<slug>` branches and one worktree per active coding issue under `.worktrees/`. Nobody switches branches, commits or edits files in the main checkout; every commit happens in a worktree. At dispatch, the team TPM runs `scripts/task_worktree.sh <issue>-<slug> --team N --pane <dev-pane-id>` from the main checkout to create the branch and provision the worktree from fetched `origin/main`, then records its base SHA. An existing task worktree is reused without resetting its branch. The team TPM restarts Codex in that worktree as described in [goal-prompt.md](goal-prompt.md). The developer owns the worktree from then on and verifies its MCP workspace before coding. Open a draft PR early and one PR per bounded change. The developer marks it ready for review when every commit has a tester verdict with no open P0/P1. The developer resolves a review thread only after the fix commit has its tester verdict; the reviewer reopens it if the fix is wrong. Link its issue with `Closes #number` only when that PR completes the issue. Partial work uses `Refs #number`.
+Use protected `main`, short-lived `task/<issue>-<slug>` branches and worktrees under `.worktrees/`. The main checkout is read-only for source changes: never switch its branch, edit, commit or run tests there. Repository administration such as fetch and worktree creation runs from main. Make every source change in a worktree, including documentation and operational scripts.
 
-The developer owns its worktree. The tester and tech lead read the PR head in their own read-only worktrees. Nobody edits another agent's worktree. Shared files (dependency manifests, router, supervision and config, CI, test helper and support, seeds, design docs) change only under a reservation in the own list that the lead TPM approved; a task can own a small shared-file change.
+The TPM uses `scripts/task_worktree.py` to provision and start coding clients. Keep the existing task slug when an issue is renamed. The developer owns its task worktree; tester and tech lead have separate detached review worktrees. No agent edits another's checkout. The helper checks reviewer cleanliness even at the same SHA, checks selected-client configuration before changing HEAD, reuses a matching live session, and stops the old client and verifies descendant exit before advancing a reviewer. `/new`, `/clear` and `cd` inside an already-running client do not reroot its LSP.
 
-Commit cohesive changes and run the relevant checks before pushing. Unreviewed local commits may be reorganized before first push. Once pushed, a SHA is fixed: never rewrite a published commit, never force-push, never push implementation directly to `main`. Every pushed commit receives a verdict, so do not push disposable WIP commits. Merge PRs with merge commits; squash and rebase merging are disabled. Bring new `main` changes into the task branch with an ordinary merge, and only in the granted merge slot or when the lead TPM asks; that merge and its conflict resolution are reviewed like any other commit. Any new head invalidates prior final approval.
+Open a draft PR early. Commit cohesive changes and run relevant checks before pushing. Unpushed local commits may be reorganized; published commits are fixed. Never force-push or push implementation directly to main. Repository rules block force pushes on `task/**` while permitting deletion of merged branches. Merge with merge commits; keep strict up-to-date checks and automatic deletion of merged remote heads.
 
 ## Review and merge
 
-**The tester reviews each pushed commit.** The developer sends the tester the SHA over Herdr after each push. The tester inspects the commit in file context, checks local correctness, then affected callers, features and tests, then end-to-end behavior. It maps acceptance scenarios to named tests, trusts CI only for commands CI actually ran, and runs relevant verification CI omitted, using the team's port and database block. It posts a per-commit verdict on the PR using the review template and replies to the developer over Herdr. Fix commits name the finding they address. An interim P0 pauses new work on that branch until repaired; P1 repairs may be batched into the next commit.
+**Tester:** Review every pushed commit in context, first for local correctness, then callers and related features/tests, then end-to-end behavior. Map acceptance to named tests; trust CI only for commands it ran. Independently run missing relevant checks using the assigned environment. Post the verdict and evidence on the PR and notify the developer. Repairs receive another verdict. Required acceptance failures block completion regardless of severity.
 
-The tester and developer may run at most three repair rounds on one finding. If a fourth would be needed, the tester tells the tech lead and the developer performs root-cause analysis before any further attempt. Bounds trigger analysis, never a pass.
+**Tech lead:** After tester findings are resolved, read the whole diff against the current base. Challenge implementation, architecture and assumptions with concrete alternatives and tradeoffs. Evaluate each proposed fix's downstream effects. Resolve technical disagreement using evidence; escalate material product changes through the TPM. A rejected design creates new commits that the tester reviews again.
 
-**The tech lead reviews the whole PR before merge.** It reads every commit's tester verdict, then the complete diff against the current base, and challenges the chosen implementation, design choices, tradeoffs and assumptions. This is not a stricter pass over defects the tester already covers. A challenge states a concrete alternative and its tradeoff. The developer answers with evidence. The tech lead decides technical disagreements with evidence and escalates product scope changes through the team TPM to the lead TPM. It may reject the PR design at most twice; a third rejection requires root-cause analysis recorded on the issue first. A rejected design means new commits, which the tester reviews again.
+P0 means critical exposure, irreversible loss or fundamental inability to operate. P1 means broken required behavior, authorization/consistency defects or missing evidence needed to integrate safely. P2/P3 are lower-impact defects or improvements; record follow-up issues when deferred. Do not downgrade findings merely to pass. Repeated failed repairs require root-cause analysis rather than more blind attempts.
 
-Severity:
+The tech lead posts a review record with reviewer/implementer, base/head SHAs, commit verdicts, whole-PR findings, independently run checks, unresolved findings and follow-ups. Then it publishes `tips/independent-review` on that exact head, linking the record. Main requires a PR, resolved conversations, an up-to-date branch and the required `checks`, `release` and independent-review contexts. This is an interlock, not credential isolation.
 
-- **P0:** stop-ship critical exposure, irreversible data loss or fundamental inability to operate.
-- **P1:** broken required behavior, authorization or consistency defect, or missing evidence that makes the change unsafe to integrate.
-- **P2/P3:** lower-impact defects or improvements. Record them; link follow-up issues when deferred. A failed required acceptance criterion blocks completion regardless of label. Cosmetic preference alone is not P1.
+Merge uses native GitHub CLI commands, without a TPM merge queue:
 
-No PR merges with an unresolved P0 or P1, an unsatisfied acceptance criterion, or failing relevant tests. Do not downgrade findings to pass.
+```bash
+gh pr update-branch "$PR"
+# If HEAD changed: dispatch the exact new SHA for review before continuing.
+timeout "$TIPS_CHECK_TIMEOUT_SECONDS" gh pr checks "$PR" --watch
+gh pr merge "$PR" --merge --match-head-commit "$REVIEWED_SHA"
+```
 
-**Gate.** All agents share one GitHub identity, so GitHub cannot verify reviewer independence. The main ruleset therefore requires a PR, resolved conversations, an up-to-date branch, the `checks`, `release` and `tips/independent-review` contexts. After its whole-PR verdict, the tech lead posts the review record on the PR, then sets `tips/independent-review` on the exact reviewed head SHA with the record's URL as the target. The status applies only to that head; a new head needs a new review and a new status. A branch update from `main` in the merge slot is a new head: the tech lead reviews the merge commit's conflict resolution, if any, and sets the status again. This is a process interlock, not cryptographic isolation between agents sharing credentials.
-
-**Merge queue.** The lead TPM keeps a first-in-first-out queue of accepted PRs and grants one merge slot at a time. In its slot the tech lead updates the branch from `main`, waits for green checks on the new head, sets the status, merges with a merge commit and no extra edits, runs integrated checks on `main`, records the merge SHA on the issue, and reports to its team TPM, which reports to the lead TPM, who grants the next slot. If integrated checks on `main` fail, the queue stops; the team that merged reproduces and repairs or reverts through a reviewed PR before any other merge. Never label flaky failures green.
+Capture the new head after branch update. A new head needs a new status: the tech lead reviews the base delta and publishes a new status on that SHA; conflict resolution also goes through the tester. Resume the checks/merge sequence after those verdicts arrive. A base change during this sequence can make the strict gate reject the merge; inspect the new state and repeat the necessary review. A timeout, rate limit or failed required check is not success. Record the PR, reviewed head, merge SHA and review evidence on the issue, then notify the TPM. Do not synchronously watch main or automatically revert its changes.
 
 ## Context and handoff
 
-The developer, tester and tech lead start every issue with fresh context. The team TPM resets them before dispatch. The issue plus dispatch comment must therefore be self-sufficient.
+Send one plain message containing the issue/PR link, relevant SHA, requested action and reply-to agent. Record durable evidence on GitHub. Wake the next responsible role with `herdr agent prompt`; then end the turn. No polling or waiting on agent replies. A single bounded foreground wait for known CI checks is allowed. The user detects otherwise silent stalls.
 
-If an agent nears context exhaustion mid-task, it keeps the same issue and branch open and hands off to a fresh session. The handoff records base and head SHAs, clean or dirty working-tree state, committed and uncommitted work, unresolved findings, failing commands, evidence, owned files and the next concrete action. Preserve user changes; never reset or stash blindly. The incoming session re-applies its Herdr name, reads the handoff, issue and relevant diff, verifies repository state, sets the Agent field and continues. Session recovery is not task completion.
+For context recovery, keep the issue/branch open and record base/head SHAs, working-tree cleanliness, committed/uncommitted work, unresolved findings, failed/unrun checks and the next action. Explicitly transfer ownership before starting another writer. Never reset or stash someone else's work to recover a session. Inspect Git and pane evidence before reassigning an unresponsive client. Never put credentials in logs, issues or handoffs.
 
-For a lost or unresponsive agent, the team TPM inspects branch and worktree evidence before reassignment, then explicitly transfers ownership. For a lost or unresponsive team TPM, the lead TPM does the same. Never run two writers because an agent looks idle. Never put credentials in issues, logs or handoffs.
+## Environment and cleanup
 
-## Comment templates
+The helper applies the selected role's configured model, effort, permissions, database suffix and test port in the actual target process. Only the selected client's generated configuration is written. Both clients invoke the canonical main checkout's LSP wrapper with the assigned absolute worktree root. Review revisions do not need to contain that wrapper. Keep installed patched bridge/Expert tools available independently of task worktrees.
 
-Dispatch comment (team TPM):
+Startup reports **client launched**, not index ready. Brief the agent once Herdr reports it ready. Expert can keep compiling in the background. Do not add a compile gate or launch a second LSP as a probe. Configuration/tooling changes require a disposable actual-client pilot checking both the client root and LSP root for each client. Five observed cold sessions do not establish capacity for every configured team to compile simultaneously; the team limit remains a trial.
 
-> Team: N; owner: team-N-dev; reviewers: team-N-test, team-N-lead; base SHA: …; branch/worktree: …
-> Outcome and exclusions: …
-> Read: exact sections and actual entry points …
-> Own: files/migration reservation (approved by lead-tpm) …; coordinate: …
-> Prerequisites/evidence: …; test DB/port block: …
-> Acceptance and commands: …
-> Stop/handoff if: context headroom or prerequisite assumptions fail …
+TPMs run without the Elixir LSP. Coordinator launches use configured compaction; coding launches do not inherit that coordinator override. Codex approval policy does not change or guarantee its sandbox; it retains the user's sandbox configuration. Claude's permission mode comes from the same config.
 
-Return or handoff comment (developer):
+`team.py stop N`, called from outside that team, gracefully stops owned clients and verifies owned descendants exited before cleanup. It refuses dirty or unmerged worktrees, drops only that team's test databases, removes worktrees and closes the workspace. Uncertainty or survivors fail the command and preserve remaining resources for inspection. It never broadly kills BEAM processes or deletes the shared engine cache. Do not run overlapping lifecycle calls; one TPM owns a team's transitions, with no lock or daemon.
 
-> Head SHA and working-tree state: …; PR: …
-> Behavior/contracts changed: …
-> Commands and results (including failures/unexecuted checks): …
-> Acceptance evidence and provider cleanup: …
-> Unresolved findings/blockers and next action: …
-> Ownership transfer: …
-
-Review comment (tester per commit, tech lead per PR):
-
-> Reviewer: …; implementer: team-N-dev
-> Base SHA: …; head SHA: …
-> Each commit SHA → verdict/findings: …
-> Whole PR → local/downstream/end-to-end verdict: … (tech lead only)
-> Tests/evidence inspected or independently run: …
-> Unresolved P0/P1: …; lower-priority follow-ups: …
-
-Merge record (tech lead):
-
-> Merge SHA: …; PR: …; reviewed head: …; base: …
-> Review record: …; integrated checks on main: run URL …
-> Follow-ups carried to: …
+The database connection limit is configured in [compose.yaml](../../compose.yaml), with `TIPS_DB_MAX_CONNECTIONS` as the standard Compose override. Apply it by recreating the database service only while no teams are running. Agent launch settings do not restart PostgreSQL or existing clients.
 
 ## Milestones and external prerequisites
 
-M0 proves reproducible startup, release and test plumbing. M1 proves all five risky boundaries on one revision. M2 proves the complete product. M3 rehearses operations on the intended topology. M4 records trial readiness and the owner's public-launch decision. Each gate issue owns E2E scenarios, environment and revision, evidence and unresolved blockers. Feature tests run earlier; milestones are not the first testing opportunity. Each task records acceptance-to-test mappings as it lands; P14 audits that coverage rather than creating it at the end.
+M0 proves reproducible startup, release and testing; M1 proves risky boundaries on one revision; M2 proves the complete product; M3 rehearses operations; M4 records trial readiness and the user's public-launch decision. Each gate names its environment, revision, evidence and unresolved blockers.
 
-The lead TPM maintains explicit access and setup issues for hosting, domain, providers, operator identity, vocabulary, founder content and recruitment. When a task needs a credential, account or hosting decision, the team TPM marks it Blocked and tells the lead TPM, who asks the user; the user obtains it. Agents propose defaults and use synthetic fixtures for tests; they do not fabricate firsthand production content. Secrets use the execution environment's secret mechanism. No budget has been fixed; absence of a ceiling does not authorize purchases.
-
-Before launch, the intended single VPS serves as the preproduction environment. Run real-provider tests only through explicitly authorized invocations with scoped secrets, never automatically on arbitrary PR code. Record authorization in the dispatch comment or alongside the explicitly invoked CI workflow run URL. Ordinary PR CI needs no production secrets.
-
-References: [Git worktrees](https://git-scm.com/docs/git-worktree), [GitHub rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets), [sub-issues](https://docs.github.com/en/rest/issues/sub-issues), [issue dependencies](https://docs.github.com/en/rest/issues/issue-dependencies).
+The lead TPM tracks access/setup requirements for hosting, domain, providers, operator identity, vocabulary and content in GitHub issues. Agents propose defaults and use synthetic fixtures; they do not fabricate firsthand production content. Before launch, the intended VPS is the preproduction environment. Run real-provider tests only through explicitly authorized invocations with scoped secrets, never automatically on arbitrary PR code. Ordinary PR CI needs no production secrets.

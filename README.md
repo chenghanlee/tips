@@ -146,62 +146,18 @@ The local Codex configuration enables the `mix-compile` and `mix-credo` plugins.
 The Credo hook checks edited `.ex`/`.exs` files with the project's configuration;
 review its feedback and fix findings introduced by your edits.
 
-The launcher `scripts/elixir_lsp.sh` connects Expert to Codex through
-[mcp-language-server](https://github.com/isaacphi/mcp-language-server).
-Install these tools once in the main checkout, separately from the application's
-Mix dependencies. All task worktrees share those binaries:
+The launcher `scripts/elixir_lsp.sh` connects a patched Expert to Codex or Claude
+through [mcp-language-server](https://github.com/isaacphi/mcp-language-server).
+Build and install both local patches using the
+[LSP build instructions](docs/implementation/elixir-lsp-startup.md#build-and-validate).
+Task worktrees share the binaries, with a separate LSP process per client.
+The team helper generates the selected client's config from
+[agent-team.toml](config/agent-team.toml). Coordinators run without Elixir LSP.
 
-1. Download the binary for your OS and architecture from
-   [Expert v0.1.10](https://github.com/expert-lsp/expert/releases/tag/v0.1.10),
-   verify it against that release's `expert_checksums.txt`, and save it as
-   `.elixir-tools/bin/expert`. Run `chmod +x .elixir-tools/bin/expert` and
-   `.elixir-tools/bin/expert --version` to install its bundled runtime.
-2. With Go 1.21 or newer, Bash, Python 3, `patch`, and `shasum` or
-   `sha256sum` installed, run from the main checkout:
-
-   ```sh
-   scripts/build_elixir_bridge.sh
-   ```
-
-   The script downloads mcp-language-server v0.1.1, applies the checked-in patch,
-   runs Go vet and the registration/LSP/tool tests, and installs into `.elixir-tools/bin`
-   (or `$TIPS_ELIXIR_TOOLS/bin` when set, matching the launcher).
-   It pins `GOTOOLCHAIN=go1.26.3` (downloaded on first use if needed) and
-   `CGO_ENABLED=0`, and prints the compiler version and staged binary SHA-256
-   before installation. Repeated builds on the same OS/architecture reproduce
-   the hash. Verified with `go version go1.26.3 darwin/arm64`:
-
-   ```text
-   89e96b69d76d3dec3dc46c48618383a881d0520b42990eab1f3dc5c1f266a1d0
-   ```
-
-   The patch fixes bridge framing, definition/reference navigation, bounded source
-   previews, document paths, hover synchronization, and diagnostic freshness for Expert. Drop it when upstream releases
-   all bundled fixes;
-   [upstream PR #151](https://github.com/isaacphi/mcp-language-server/pull/151)
-   covers the stdin mutex. Generated tools and source stay gitignored.
-
-3. For Codex sessions in the main checkout, add this to `.codex/config.toml`,
-   replacing the checkout path. The task script below writes the worktree config:
-
-   ```toml
-   [plugins."mix-compile@elixir-agent-tools"]
-   enabled = true
-   [plugins."mix-credo@elixir-agent-tools"]
-   enabled = true
-
-   [mcp_servers.elixir-lsp]
-   command = "/bin/sh"
-   args = ["scripts/elixir_lsp.sh"]
-   cwd = "/absolute/path/to/tips"
-   startup_timeout_sec = 60
-   tool_timeout_sec = 120
-   enabled_tools = ["definition", "references", "hover", "diagnostics"]
-   ```
-
-Restart Codex after configuring it. `codex mcp get elixir-lsp` checks the
-registration. Expert builds its engine and indexes the project on first use;
-symbol lookup may be empty until that finishes. Its logs are in `.expert/`.
+The client starts Expert before its first tool call; it can read and plan while
+Expert builds and indexes. Check the real client and LSP roots in the disposable
+pilot after launcher/tooling changes. `mcp get` alone checks registration, not the
+running workspace. Expert logs are in the assigned worktree's `.expert/`.
 
 Use `definition`, `references`, and `hover` with `filePath`, `line`, and `column`
 at a call site. Lines and columns are 1-based; columns count UTF-16 code units.
@@ -220,8 +176,8 @@ Unavailable source or exhausted preview space does not hide resolved locations.
 References return unique locations from the project selected by the source file.
 Use an application call site to find application usages of a dependency. Other
 projects may contain additional usages. Neither navigation tool depends on
-workspace symbol search. Empty results can also mean indexing is incomplete or
-the symbol/source is unavailable; server errors are reported as errors.
+workspace symbol search. The patched server distinguishes successful empty results from an index that is
+not ready or a symbol it cannot resolve; those outcomes are reported as errors.
 
 After rebuilding the bridge, restart Codex to load the new tool schema and binary.
 Expert omits the optional document version from diagnostic publications. Routine
@@ -235,24 +191,22 @@ The Elixir and Erlang executables must be on Codex's `PATH`. Expert uses its
 own user cache and local Erlang processes, so a sandboxed shell can require
 additional access even when the MCP connection works.
 
-For each task, run from the main checkout (requires Bash, Git and Python 3):
+For local agent teams, use Python 3.11 or newer, Git and Herdr. Launch settings
+live in [config/agent-team.toml](config/agent-team.toml). From the main checkout:
 
 ```sh
-scripts/task_worktree.sh 36-ci --team 1 --pane wA:p2
+scripts/team.py start 1
+scripts/task_worktree.py 36-ci --team 1 --role dev --pane "$DEV_PANE" --start
 ```
 
-This fetches `origin` and creates `task/36-ci` in `.worktrees/36-ci` from
-`origin/main`, or reuses that task worktree without resetting it. It links
-`.agents/skills` to the main checkout's skills so edits stay live, and writes
-`.codex/config.toml` with both plugins and the worktree's absolute MCP `cwd`.
-Rerunning it leaves identical config unchanged. It refuses to replace differing
-config unless you inspect it and rerun with `--force`. `--team` selects the
-team's port and database block and `--pane` the Herdr pane for the developer's
-Codex; the script prints the environment blocks and the exact start command.
-See [docs/implementation/goal-prompt.md](docs/implementation/goal-prompt.md).
-
-Follow step 3 of the [dispatch workflow](docs/implementation/goal-prompt.md#team-steps)
-to start Codex in the provisioned worktree.
+Use the pane ID printed by the team launcher. Coding clients start in separate
+worktrees with their configured environment and their own Expert instance.
+The helper reuses an existing issue branch and writes only the selected client's
+config. It refuses conflicting assignments or config; inspect those before using
+`--force`. After merge, `scripts/team.py stop 1` checks shutdown and clean,
+integrated work before removing resources. Follow the
+[dispatch workflow](docs/implementation/goal-prompt.md#start-and-assign) and
+[LSP build instructions](docs/implementation/elixir-lsp-startup.md#build-and-validate).
 
 The launcher uses the caller's `$PWD` as the workspace and finds binaries in
 the main checkout's `.elixir-tools/bin` through Git's common directory.

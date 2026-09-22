@@ -1,158 +1,71 @@
 # Goal: implement every issue in the Tips project
 
-Every agent reads this file. Process rules are in [agent-workflow.md](agent-workflow.md). Engineering guidance is in `AGENTS.md`. When this file and those files disagree, this file is wrong: fix it, do not improvise.
+Every agent reads [agent-workflow.md](agent-workflow.md) and [AGENTS.md](../../AGENTS.md). Complete the issues in [Project 15](https://github.com/users/chenghanlee/projects/15), including new child issues, until everything is done or blocked on the user. GitHub carries state and evidence.
 
-## Goal
+## Configuration
 
-Every issue in [GitHub Project 15](https://github.com/users/chenghanlee/projects/15) is **Done** or **Blocked on the user**. Child issues created during the run count. The run stops when nothing else can move.
+Edit [config/agent-team.toml](../../config/agent-team.toml) to change team limits, client/model/effort by role, port/database allocation, permission modes, coordinator compaction and time budgets. Scripts read the canonical main checkout's file; `TIPS_TEAM_CONFIG=/absolute/path` selects a staged configuration for a disposable pilot. Settings take effect on the next launch. The patched bridge has a compiled request deadline; changing its corresponding client timeout requires rebuilding and retesting the bridge too.
 
-## Structure
+The generated Codex config applies `launch.codex_lsp_approval_mode` only to the four enabled LSP tools. It leaves the overall approval and sandbox policies in place. This uses the [supported per-tool MCP setting](https://developers.openai.com/codex/mcp); `never` otherwise rejects a tool that requires approval.
 
-One **lead TPM** and up to **five teams** work at the same time. The lead TPM assigns issues, checks file overlap, runs the merge queue, creates and retires teams, keeps `status.md`, and is the only agent that talks to the user. Each team runs the team steps below for one issue at a time.
+Database suffixes combine `team.db_suffix_prefix`, the team number and `roles.<role>.db_suffix`. Test ports combine `team.port_base`, team number times `team.port_stride`, and the role's `port_offset`. The launcher exports `PGPORT`, `TIPS_DB_SUFFIX`, `TIPS_TEST_PORT`, `MIX_ENV` and `TIPS_CHECK_TIMEOUT_SECONDS` directly to the coding process. Leave those computed resources in place for tests, including Wallaby.
 
-| Herdr name | Workspace label | Kind and launch | Role |
-|---|---|---|---|
-| `lead-tpm` | `tips-master` | `claude --effort high` | Lead TPM. Oversight, assignment, merge queue, reporting. |
-| `team-N-tpm` | `tips-team-N` | `claude --effort medium` | Team TPM. Runs the team steps, readiness, dispatch, Project state, talks to `lead-tpm`. |
-| `team-N-lead` | `tips-team-N` | `codex -m gpt-6-astra -c model_reasoning_effort=high` | Tech lead. Readiness amendments, whole-PR design review, `tips/independent-review`, merge. |
-| `team-N-dev` | `tips-team-N` | `codex -m gpt-5.6-sol -c model_reasoning_effort=xhigh -C <worktree>` | Developer. Implements one issue with integration-first TDD in its worktree. |
-| `team-N-test` | `tips-team-N` | `claude --model opus --effort xhigh` | Tester. Adversarial per-commit review; runs the tests and checks itself. |
+## Start and assign
 
-The developer is always Codex Sol. `gpt-5.6-sol` is the Sol model this Codex account offers; `gpt-6-sol` returns a 400 on it. Change the model only with the user's decision, in both this table and `scripts/task_worktree.sh`.
+Handle each client's repository trust prompt during initial setup. In the tested client pair, trust in the canonical repository carried over to new sibling worktrees. An unexpected approval prompt stops launch; inspect it and follow the active approval policy. The launcher does not edit home-directory trust settings.
 
-`N` is 1 to 5. Every name is unique across the Herdr session, so any agent can address any other by name from any workspace. Names are cleared when an agent exits or resets (`/clear` and `/new` both clear the name). The team TPM re-applies its team's names at the start of every iteration and right after every reset. An agent that starts a fresh session re-applies its own name first:
+Run lifecycle commands from the main checkout. It remains read-only for source changes. Use one lifecycle caller per team.
 
 ```bash
-herdr agent rename <pane-id> team-N-<role>
+scripts/team.py start N
 ```
 
-Pane IDs come from `herdr agent list` and `herdr pane list --workspace <id>`. Never hard-code them in documents or scripts.
+This creates/reuses the team's workspace and four named panes, starts/briefs its TPM and prints pane IDs. Coding panes stay at the shell until assigned. `scripts/team.py start lead` provides the same configured launch for a new lead TPM; do not run it if another live agent already owns `lead-tpm`.
 
-### Team resources
+The lead TPM reads relevant issue/PR evidence on each message, picks an unblocked issue on the critical path and sends its URL to the team TPM. No file reservation list or merge slot is required. The team TPM refines readiness on the issue and starts the tech lead at a captured base SHA to confirm it. After readiness, it posts the self-contained dispatch and adds `active`.
 
-Team N owns a fixed port and database block, independent of the issue. Reuse it for every issue the team works on.
+Use the existing issue's task slug; do not generate a new branch when its title changes. Obtain pane IDs from the start output or `herdr pane list`; never guess them. Examples (`TASK` is `<issue>-<slug>`, `SHA` is the exact fetched revision being dispatched):
 
-| Member | Ports | Database suffix |
-|---|---|---|
-| `team-N-dev` | `TIPS_TEST_PORT=41N0` | `TIPS_DB_SUFFIX=_tN` |
-| `team-N-test` | `TIPS_TEST_PORT=41N1` | `TIPS_DB_SUFFIX=_tNr` |
-| `team-N-lead` | `TIPS_TEST_PORT=41N2` | `TIPS_DB_SUFFIX=_tNl` |
+```bash
+scripts/task_worktree.py "$TASK" --team "$N" --role dev --pane "$DEV_PANE" --start
+scripts/task_worktree.py "$ISSUE-review-team-$N-test" --team "$N" --role test --pane "$TEST_PANE" --review-ref "$SHA" --start
+scripts/task_worktree.py "$ISSUE-review-team-$N-lead" --team "$N" --role lead --pane "$LEAD_PANE" --review-ref "$SHA" --start
+```
 
-Always with `PGPORT=5433 MIX_ENV=test`. Example for team 2's tester: `PGPORT=5433 TIPS_DB_SUFFIX=_t2r TIPS_TEST_PORT=4121 MIX_ENV=test`. The lead TPM uses `_lead` and port `4190` for its own checks.
+The helper provisions skills and only the chosen client's local config, applies environment in the target pane and starts the real interactive client. `--kind` is optional and must match the role's configured kind. Inspect config conflicts before explicitly replacing generated files with `--force`. Repeated calls reuse an already matching live session. Conflicting assignments fail. Reviewer advances require clean source even at the same SHA and verified old-client shutdown before a different SHA. Fresh reviewer sessions carry history through PR comments.
 
-## Communication
+Brief immediately after successful client launch; do not wait for project compilation. Dispatch includes issue/PR link, base/head SHA, outcome/exclusions, exact reading, acceptance/verification and reply-to name. Developers implement and push; they do not switch to another issue before this one merges.
 
-- **Inside a team**, members message each other directly: `herdr agent prompt <name> "<text>"`. Add `--wait` only for a short reply.
-- **Between teams**, only TPMs talk: `team-1-tpm` to `team-2-tpm`. Handoffs and questions are fine. Anything that changes scope, order, ownership or files goes through `lead-tpm`.
-- **Team to lead**: the team TPM messages `lead-tpm` for assignment, own-list approval, merge slots, blockers and completion. The lead TPM messages the team TPM only.
-- **Long exchanges** (design challenges, review feedback with code) go in a shared file: `docs/implementation/communication/<YYYY-MM-DD>-<agent_1>-<agent_2>-<issue>.md` in the main checkout. The folder is gitignored. Send the path over Herdr.
-- **Durable records** are GitHub comments on the issue or PR, in the templates from agent-workflow.md. Communication files are scratch. If it is not on GitHub, it did not happen.
-- TPMs track progress from GitHub, not from pane output.
+## Who wakes whom
 
-- Only `lead-tpm` talks to the user. Team TPMs send user-facing blockers to `lead-tpm`.
+Use plain messages: **link, SHA, request, reply-to**. No event vocabulary or message protocol is needed.
 
-## Events, not loops
+| Sender | Next recipient/action |
+|---|---|
+| Lead TPM | Team TPM: assign issue or resolve a cross-team/user blocker. |
+| Team TPM | Tech lead: readiness; developer: implementation; reviewer: exact SHA after provisioning its session. |
+| Developer | Team TPM: pushed SHA needing tester dispatch; PR ready for final review. |
+| Team TPM | Tester: commit review; tech lead: complete-PR review after tester verdicts pass. |
+| Tester | Developer and team TPM: PR verdict/evidence; developer repairs findings. |
+| Tech lead | Developer and team TPM: design findings, or merged PR with reviewed/merge SHAs. |
+| Team TPM | Lead TPM: completed issue or blocker requiring outside action. |
 
-No agent runs a timer, cron tick, polling monitor, wait loop or periodic GitHub state check. Every tick replays that agent's whole context. An agent acts when a Herdr message arrives, does that step, sends the messages that step names, and goes idle. It reads GitHub only inside a step that needs it. Every handoff below is a message; if a step has no message, nobody wakes up.
+TPMs handle dispatch and session changes; technical leads retain uninterrupted time for deep PR review. After waking the next role, end the turn. Never poll or wait on another agent. For CI, use the bounded `gh pr checks` command in the workflow. A failed launch or check is a failure to report, not a reason to claim progress.
 
-| Step | From | To | Message |
-|---|---|---|---|
-| L2 assign | `lead-tpm` | `team-N-tpm` | `ASSIGN <issue URL>` |
-| 2 readiness | `team-N-tpm` | `team-N-lead` | `READY? <issue URL>` with the draft refinement |
-| 2 readiness | `team-N-lead` | `team-N-tpm` | `READY <issue URL>` with amendments, or the objection |
-| 2 own list | `team-N-tpm` | `lead-tpm` | `OWN-LIST #<issue>: <files>` |
-| L3 own list | `lead-tpm` | `team-N-tpm` | `own-list approved` or the conflict and the issue that holds it |
-| 3 dispatch | `team-N-tpm` | `team-N-dev` | `IMPLEMENT <issue URL> <dispatch comment URL>` |
-| 3 dispatch | `team-N-tpm` | `team-N-test`, `team-N-lead` | `BRIEF <issue URL>` with the team names and the environment block |
-| 4 push | `team-N-dev` | `team-N-test` | `PUSHED <sha> PR <url>` after every push |
-| 5 verdict | `team-N-test` | `team-N-dev` | `VERDICT <sha>: pass` or the P0/P1 findings |
-| 5 bound | `team-N-test` | `team-N-lead` | `THIRD-ROUND <finding> PR <url>` after three repair rounds on one finding |
-| 6 complete | `team-N-dev` | `team-N-tpm`, `team-N-lead` | `PR-COMPLETE PR <url> head <sha>` |
-| 6 verdict | `team-N-lead` | `team-N-tpm` | `ACCEPTED head <sha> <record URL>` or `REJECTED head <sha> <record URL>` |
-| 6 rework | `team-N-tpm` | `team-N-dev` | `REWORK PR <url> <record URL>`; the developer replies with `PUSHED` to `team-N-test` and the chain continues at step 5 |
-| 6 queue | `team-N-tpm` | `lead-tpm` | `MERGE-SLOT-REQUEST #<issue> PR <url> head <sha>` |
-| L4 slot | `lead-tpm` | `team-N-tpm` | `SLOT-GRANTED PR <url>` |
-| L4 slot | `team-N-tpm` | `team-N-lead` | `SLOT-GRANTED PR <url>` |
-| 6 slot update | `team-N-lead` | `team-N-test` | `PUSHED <sha> PR <url>` for the branch-update commit made in the slot |
-| 6 slot update | `team-N-test` | `team-N-lead` | `VERDICT <sha>: pass` on the conflict resolution, or the findings |
-| 6 merge | `team-N-lead` | `team-N-tpm` | `MERGED #<issue> merge <sha> checks <run URL>` after integrated checks on `main`, or `MERGE-FAILED PR <url> <reason>` |
-| 6 merge failed | `team-N-tpm` | `lead-tpm` | `MERGE-FAILED #<issue> PR <url> <reason>`; the slot is released and the queue stops until this team repairs on the same branch (or reverts through a reviewed PR if `main` broke) and sends a new `MERGE-SLOT-REQUEST`, which goes to the front of the queue |
-| 7 close | `team-N-tpm` | `lead-tpm` | `MERGED #<issue> merge <sha> PR <url>, open blockers: <none or list>` |
-| 7 close | `team-N-tpm` | `team-N-test`, `team-N-lead` | `CLEANUP #<issue>`; each replies `CLEAN` when its review worktree and database are gone |
-| any | `team-N-tpm` | `lead-tpm` | `BLOCKED #<issue>: <prerequisite, role, next action>` |
-| any | `team-N-tpm` | `lead-tpm` | `RETIRE-READY team N` when no issue is assigned and every `CLEAN` arrived |
-| L5 retire | `lead-tpm` | `team-N-tpm` | `RETIRE team N` |
+## Merge and retire
 
-Waiting for a check, such as CI after the branch update in the merge slot, is one bounded foreground wait on one known run by the agent that needs the result: `gh pr checks <n> --watch` or `gh run watch <id>`. It costs one tool call and no context replay, which is what the ban above is about; a loop that re-reads the conversation is not allowed. The same applies to waiting for one reply: a single `herdr agent prompt <name> "<text>" --wait --timeout <ms>` is allowed, a loop of them is not.
+The tech lead performs the exact-SHA review/status and native merge sequence in [agent-workflow.md](agent-workflow.md#review-and-merge). A changed head requires a new review; conflict resolution goes to the tester. The TPM removes stale labels and reports merge evidence to the lead TPM.
 
-A stalled chain is not detected automatically while every agent is idle. It is found when the next message reaches `lead-tpm` and L1 reads `herdr agent list`, or when the user looks. A sender that used `--wait` and got a timeout reads the receiver once with `herdr agent get` and `herdr agent read`, then messages its TPM.
+After merge, the lead TPM retires the team from another workspace:
 
-## Main checkout rule
+```bash
+scripts/team.py stop N
+```
 
-Nobody switches branches, commits or edits files in the main checkout. Every commit, including `status.md` and step-0 landings, happens in a worktree under `.worktrees/`. Claude agents run with the main checkout as their cwd and read it only. Codex developers run in their task worktree. Testers and tech leads read PR heads in their own detached worktrees, named `.worktrees/<issue>-review-team-N-<role>`, and remove them after the merge.
-
-## Lead TPM steps
-
-`lead-tpm` runs the steps a message calls for on every message from a team TPM or the user, then goes idle. There is no timer; the message table above names every event.
-
-**L1. Reconcile.** On a team message, read what that message concerns: the PR, its checks, the issue's latest comments. Read `herdr agent list` once. Fix Project state that disagrees with GitHub. A team whose agents are `blocked` on a permission prompt or `unknown`, or that a team TPM reports as unresponsive, is inspected: read its panes, then message its TPM. Reassign ownership only after inspecting branch and worktree evidence, and only explicitly.
-
-**L2. Assign.** For each idle team, pick the next issue on the critical path whose prerequisites are Done: P0, then P1, then P2, and so on. Prefer an issue in the package the team last worked in. Never assign an issue whose likely files overlap an active issue. Message the team TPM with the issue URL. If no assignable issue exists for a team, retire it (L5).
-
-**L3. Approve own lists.** When a team TPM sends an own list after readiness, compare it against every active issue's own list. No overlap allowed. Shared files (`mix.exs`, `mix.lock`, `.github/workflows/*`, `config/*`, `test/test_helper.exs`, `test/support/**`, `lib/tips_web/router.ex`, `priv/repo/seeds.exs`, `docs/design/**`) need a one-line reservation in the own list, which the lead TPM approves or moves to another issue. Reply "own-list approved" or name the conflict and the issue that holds it.
-
-**L4. Merge queue.** Keep a first-in-first-out queue of PRs whose whole-PR review accepted. Grant one merge slot at a time. Send `SLOT-GRANTED` to the team TPM, which forwards it to its tech lead. The tech lead updates its branch from `main`, waits for green `checks` and `release`, merges, runs integrated checks on `main`, records the merge SHA, and sends `MERGED` to its team TPM, which sends `MERGED` to `lead-tpm`. Then grant the next slot. Other teams do not update their branches until their slot, unless the lead TPM tells them a merged change affects them. On `MERGE-FAILED`, or if integrated checks on `main` fail, the slot is released and the queue stops; the team that had it repairs or reverts through a reviewed PR, then requests the slot again and goes to the front of the queue.
-
-**L5. Teams.** Start with two teams. Create a team when an assignable issue exists with no overlap risk and fewer than five teams are up. Retire a team when it sends `RETIRE-READY` and nothing is assignable. Creating a team: `herdr workspace create --label tips-team-N --cwd <main checkout> --no-focus`, split the root pane into four, start the four agents from the Structure table with `herdr agent start <name> --kind <claude|codex> --pane <id> --timeout 120000 -- <launch args>`, then brief the TPM with this file's path and the team number. Retiring a team: send `RETIRE team N`, and close the workspace when the TPM confirms.
-
-**L6. Report.** If the set of Blocked-on-user issues changed, update `docs/implementation/status.md` on a `task/<issue>-status-<YYYY-MM-DD>` branch in a worktree under the standing "Status report" issue, open a PR, and ask a team TPM to have its tester and tech lead review and merge it through the queue. Tell the user only what needs the user: credentials, purchases, hosting, product scope, and review disagreements past their bounds. If every issue is Done or Blocked on the user, say so and stop.
-
-## Team steps
-
-`team-N-tpm` runs these for each issue `lead-tpm` assigns, one step per message.
-
-**1. Reconcile.** Re-apply the team's Herdr names. Read the assigned issue, its open PR, failed checks and latest comments. If a PR is mid-review, resume at the step it is in.
-
-**2. Readiness.** If the issue is Backlog, draft the readiness refinement on the issue: actual entry points, settled signatures, named tests, runnable commands, the team's port and database block, and the own list. Send `READY?` to `team-N-lead` and act on its `READY` reply or objection. Send `OWN-LIST` to `lead-tpm`; on `own-list approved`, move the issue to Ready.
-
-**3. Reset and dispatch.** From the main checkout, run `scripts/task_worktree.sh <issue>-<slug> --team N --pane <dev-pane-id>` to create or reuse the task branch, provision its Codex config and skills link, and print the developer start command and the team's environment block. Identical config is left unchanged; inspect any differing config before using `--force`. Send `/exit` to `team-N-dev`, confirm with `herdr pane get <dev-pane-id>` that the pane is back at the shell, then run the printed start command. Send `/clear` to `team-N-test` and `/new` to `team-N-lead`, wait until each is idle, then re-apply the team's names. Post the dispatch comment on the issue, recording the base SHA for a new branch or the existing base and head for resumed work. Move it to Active, set Agent = `team-N-dev`. Send `IMPLEMENT` to `team-N-dev` with the issue URL and the dispatch comment. Send `BRIEF` to `team-N-test` and `team-N-lead` with the issue URL, the team names, and their environment blocks.
-
-**4. Implement (developer).** The branch and worktree already exist; the developer owns the worktree after provisioning. Before coding, run `codex mcp get elixir-lsp --json` from the task worktree and verify that `cwd` is its absolute path. Open a draft PR. Write the failing integration test for the acceptance scenario first, then make it pass. Push cohesive commits. After each push, send `PUSHED` to `team-N-test` with the SHA and PR URL.
-
-**5. Review commits (tester).** For each SHA: read the commit in a read-only worktree at that SHA, run the relevant checks with the tester's environment block, post the per-commit verdict on the PR, send `VERDICT` to the developer. The developer repairs P0 immediately and P1 in the next commit. After three rounds on one finding, send `THIRD-ROUND` to `team-N-lead`; the developer does root-cause analysis before trying again. Browser evidence is the CI `checks` run on the SHA; do not install a browser.
-
-**6. Review PR (tech lead).** When every commit has a tester verdict with no open P0/P1, the developer marks the PR ready for review, resolves the review threads its fix commits addressed, and sends `PR-COMPLETE` to `team-N-tpm` and `team-N-lead`. The team TPM moves the issue to In review. The tech lead reads the whole diff against the current base in a read-only worktree at the head SHA. Challenge the design with a concrete alternative and tradeoff. On `REJECTED`, the team TPM moves the issue back to Active and sends `REWORK` to the developer, who reworks on the same branch; the chain continues at step 5. After two rejections, root-cause analysis is recorded on the issue before a third round. If accepted: post the review record, set `tips/independent-review` on the head SHA linking the record, and send `ACCEPTED` to `team-N-tpm`, which sends `MERGE-SLOT-REQUEST` to `lead-tpm`. When `SLOT-GRANTED` reaches the tech lead through the team TPM: update the branch from `main`, send `PUSHED` for the merge commit to `team-N-test`, wait once for green checks with `gh pr checks <n> --watch`, and after green checks and the tester's `VERDICT: pass` set the status on the new head and merge with a merge commit, run integrated checks on `main`, record the merge SHA on the issue, and send `MERGED` to `team-N-tpm`.
-
-**7. Close.** The team TPM moves the issue to Done, clears Agent, removes the task worktree, deletes the merged local branch, sends `MERGED` to `lead-tpm` with issue, merge SHA and open blockers, and sends `CLEANUP` to the tester and tech lead, who remove their review worktrees, drop their test databases and reply `CLEAN`. With no next assignment, send `RETIRE-READY` and wait.
+Cleanup verifies client/descendant exit and clean, integrated work before removing resources. On failure, inspect the printed leftovers; do not force-delete them. Start the team again when assigning its next issue. A client cannot stop itself through this command.
 
 ## Escalation
 
-A team TPM stops and messages `lead-tpm` for:
+Mark blocked work with `blocked` and a comment naming the missing prerequisite, responsible role and next action. Escalate credentials, purchases, hosting, material product decisions and evidence-based technical disagreements through the team TPM to the lead TPM. Inspect permission dialogs and follow the active tool/user approval policy; never treat this document as permission to answer an approval prompt. Keep secrets out of GitHub and logs.
 
-- provider credentials, accounts, hosting or domain decisions;
-- purchases;
-- product scope changes;
-- a review disagreement still unresolved after the rejection bounds above;
-- an own-list conflict, a shared-file change, or a merged change from another team that breaks its branch.
-
-Everything else is decided by the responsible role with evidence. A blocked issue is marked Blocked with the prerequisite, role and next action, and the team asks `lead-tpm` for a new assignment.
-
-**Permission dialogs.** When a team member is `blocked` on a tool-permission prompt, the team TPM inspects it. Approve file, test and git actions inside the repo or its worktrees. Anything touching credentials, purchases, network services beyond GitHub, or paths outside the repo: stop and send it to `lead-tpm`, who asks the user. When a team TPM is blocked, `lead-tpm` inspects it the same way.
-
-## Engineering guidance
-
-The following repeats the Software Design and Testing sections of `AGENTS.md` for convenience. `AGENTS.md` is authoritative and also holds the Problem Solving, Code Review, Writing and Responses rules, which every agent applies.
-
-- Use Elixir and Phoenix Framework idioms, standards and conventions.
-- Use proven architecture, standards and conventions from widely used software similar to Tips.
-- Strive for simple, working, elegant solutions. Elegant solutions make complex things seem easy and obvious. Choose simplicity over elegance when they conflict.
-- Build an MVP for fast iteration and product-market fit. No unnecessary enterprise complexity. No backwards compatibility.
-- Only accept necessary complexity when it makes the user's experience simpler. Do not make the implementation look simple by pushing its complexity onto the user. Apply this across architecture, backend, data model and frontend.
-- Perfection is achieved not when there is nothing more to add, but when there is nothing left to take away.
-- Testing trophy, integration first. TDD means writing the failing ExUnit integration test for the acceptance scenario before the code. Unit tests only for pure logic with wide blast radius. End-to-end tests only at milestone gates.
-
-## Accepted tradeoffs
-
-- The tech lead reviews design at PR time, not before coding. A design rejection can discard tester-reviewed commits. One review surface per role.
-- Merges are serialized through the lead TPM's queue. Each merge costs one branch update and one CI run for the merging team. This replaces a hosted merge queue, which the repository plan does not offer.
-- Issues with overlapping files never run in parallel. Throughput is bounded by independent work, not by team count.
+The lead TPM communicates what the user needs to decide. The user detects silent stalls. No status-file PRs, polling daemon, merge queue or own-list approval is required.
