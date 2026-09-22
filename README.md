@@ -37,6 +37,7 @@ to assign isolated databases and ports before starting development.
 - [Elixir LSP: build, configuration and acceptance](agent/lsp/README.md)
 - [Toolchain](docs/development/toolchain.md)
 - [Architecture](docs/design/software-architecture.md) and [product glossary](docs/design/glossary.md)
+- Historical LSP evidence: [parallel-worktree exploration](docs/brainstorm/elixir-lsp-parallel-exploration.md) and [stress results](docs/brainstorm/elixir-lsp-stress-2026-09-22.md)
 - [GitHub Project 15](https://github.com/users/chenghanlee/projects/15) and [issues](https://github.com/chenghanlee/tips/issues)
 
 GitHub owns current requirements, task status, blockers and review evidence.
