@@ -29,7 +29,13 @@ defmodule MediaProbe.Parser do
     started = System.monotonic_time(:microsecond)
     result = classify_vix(path)
     elapsed = System.monotonic_time(:microsecond) - started
-    emit(Map.merge(result, %{elapsed_us: elapsed, vips_highwater_bytes: Vix.Vips.tracked_get_mem_highwater()}))
+
+    emit(
+      Map.merge(result, %{
+        elapsed_us: elapsed,
+        vips_highwater_bytes: Vix.Vips.tracked_get_mem_highwater()
+      })
+    )
   end
 
   def one("ffprobe", path) do
@@ -48,9 +54,22 @@ defmodule MediaProbe.Parser do
          {:ok, frames} <- frames(header),
          {:ok, w, h} <- page_size(header, frames),
          :ok <- bounds(w, h, frames),
-         {:ok, all} <- load(format, bytes, [n: -1, "fail-on": :VIPS_FAIL_ON_ERROR, access: :VIPS_ACCESS_SEQUENTIAL]),
+         {:ok, all} <-
+           load(format, bytes,
+             n: -1,
+             "fail-on": :VIPS_FAIL_ON_ERROR,
+             access: :VIPS_ACCESS_SEQUENTIAL
+           ),
          {:ok, _avg} <- decode(all) do
-      %{verdict: "accept", format: format, animated: frames > 1, width: w, height: h, frames: frames, bytes: size}
+      %{
+        verdict: "accept",
+        format: format,
+        animated: frames > 1,
+        width: w,
+        height: h,
+        frames: frames,
+        bytes: size
+      }
     else
       {:reject, reason} -> %{verdict: "reject", reason: reason}
     end
@@ -137,7 +156,9 @@ defmodule MediaProbe.Parser do
 
   # ffprobe decodes every frame (-count_frames); the same header bounds apply after.
   def classify_ffprobe(path) do
-    args = ~w(-v error -count_frames -show_entries stream=codec_name,width,height,nb_read_frames -of json) ++ [path]
+    args =
+      ~w(-v error -count_frames -show_entries stream=codec_name,width,height,nb_read_frames -of json) ++
+        [path]
 
     with {:ok, size} <- size(path),
          {out, 0} <- System.cmd("ffprobe", args),
@@ -146,7 +167,15 @@ defmodule MediaProbe.Parser do
          frames when is_integer(frames) and frames > 0 <- parse_int(s["nb_read_frames"]),
          w when is_integer(w) and w > 0 <- s["width"],
          :ok <- bounds(w, s["height"], frames) do
-      %{verdict: "accept", format: format, animated: frames > 1, width: w, height: s["height"], frames: frames, bytes: size}
+      %{
+        verdict: "accept",
+        format: format,
+        animated: frames > 1,
+        width: w,
+        height: s["height"],
+        frames: frames,
+        bytes: size
+      }
     else
       {:reject, reason} -> %{verdict: "reject", reason: reason}
       _ -> %{verdict: "reject", reason: "malformed"}
@@ -174,6 +203,7 @@ defmodule MediaProbe.Parser do
     results =
       for fx <- fixtures, candidate <- ~w(vix ffprobe) do
         measured = measure(candidate, fx.path)
+
         Map.merge(%{fixture: fx.name, candidate: candidate, expected: fx.expected}, measured)
         |> Map.put(:pass, pass?(fx.expected, measured))
       end
@@ -190,7 +220,8 @@ defmodule MediaProbe.Parser do
       retrieved: Date.utc_today() |> Date.to_iso8601(),
       versions: versions(),
       limits: @limits,
-      memory_bound: "measured only: pre-decode pixel/frame budgets bound decode work; no OS memory cap is applied in this probe",
+      memory_bound:
+        "measured only: pre-decode pixel/frame budgets bound decode work; no OS memory cap is applied in this probe",
       fixtures: Enum.map(fixtures, &Map.take(&1, [:name, :recipe, :bytes, :sha256, :expected])),
       results: results,
       candidates: candidates,
@@ -201,10 +232,15 @@ defmodule MediaProbe.Parser do
     File.write!(Path.join(dir, "parser-report.json"), Jason.encode!(report, pretty: true))
 
     for c <- candidates do
-      IO.puts("#{c.candidate}: #{c.fixtures - length(c.failed)}/#{c.fixtures} fixtures pass; failed=#{inspect(c.failed)}")
+      IO.puts(
+        "#{c.candidate}: #{c.fixtures - length(c.failed)}/#{c.fixtures} fixtures pass; failed=#{inspect(c.failed)}"
+      )
     end
 
-    IO.puts("parser_formats_bounds: #{report.verdict} (report #{Path.join(dir, "parser-report.json")})")
+    IO.puts(
+      "parser_formats_bounds: #{report.verdict} (report #{Path.join(dir, "parser-report.json")})"
+    )
+
     if report.verdict == "pass", do: 0, else: 1
   end
 
@@ -217,7 +253,9 @@ defmodule MediaProbe.Parser do
 
   defp pass?(_e, _m), do: false
 
-  defp reject_class(reason) when reason in ~w(malformed unclassifiable loader_mismatch), do: "invalid"
+  defp reject_class(reason) when reason in ~w(malformed unclassifiable loader_mismatch),
+    do: "invalid"
+
   defp reject_class(reason), do: reason
 
   # Each classification runs in a fresh OS process under /usr/bin/time so peak RSS
@@ -225,7 +263,15 @@ defmodule MediaProbe.Parser do
   defp measure(candidate, path) do
     script = __ENV__.file
     args = ["-l", "elixir", script, "--one", candidate, path]
-    port = Port.open({:spawn_executable, "/usr/bin/time"}, [:binary, :exit_status, :stderr_to_stdout, args: args])
+
+    port =
+      Port.open({:spawn_executable, "/usr/bin/time"}, [
+        :binary,
+        :exit_status,
+        :stderr_to_stdout,
+        args: args
+      ])
+
     {:os_pid, os_pid} = Port.info(port, :os_pid)
     deadline = @limits.deadline_ms + 10_000
     started = System.monotonic_time(:millisecond)
@@ -266,7 +312,11 @@ defmodule MediaProbe.Parser do
     base
     |> Map.put(:peak_rss_bytes, rss)
     |> Map.put(:exit_status, status)
-    |> then(fn m -> if m[:elapsed_us] && m.elapsed_us > @limits.deadline_ms * 1000, do: %{m | verdict: "reject"} |> Map.put(:reason, "deadline"), else: m end)
+    |> then(fn m ->
+      if m[:elapsed_us] && m.elapsed_us > @limits.deadline_ms * 1000,
+        do: %{m | verdict: "reject"} |> Map.put(:reason, "deadline"),
+        else: m
+    end)
   end
 
   defp versions do
@@ -300,33 +350,57 @@ defmodule MediaProbe.Fixtures do
     src = "testsrc=size=64x48:rate=5:duration=1"
 
     specs = [
-      {"static.png", fn o -> ff.(o, ["-f", "lavfi", "-i", src, "-frames:v", "1"]) end, accept("png", false)},
-      {"animated.apng", fn o -> ff.(o, ["-f", "lavfi", "-i", src, "-plays", "0", "-f", "apng"]) end, accept("png", true)},
-      {"single-frame.apng", fn o -> ff.(o, ["-f", "lavfi", "-i", src, "-frames:v", "1", "-f", "apng"]) end, accept("png", false)},
-      {"static.jpg", fn o -> ff.(o, ["-f", "lavfi", "-i", src, "-frames:v", "1"]) end, accept("jpeg", false)},
-      {"static.gif", fn o -> ff.(o, ["-f", "lavfi", "-i", src, "-frames:v", "1"]) end, accept("gif", false)},
-      {"animated.gif", fn o -> ff.(o, ["-f", "lavfi", "-i", src, "-loop", "0"]) end, accept("gif", true)},
+      {"static.png", fn o -> ff.(o, ["-f", "lavfi", "-i", src, "-frames:v", "1"]) end,
+       accept("png", false)},
+      {"animated.apng",
+       fn o -> ff.(o, ["-f", "lavfi", "-i", src, "-plays", "0", "-f", "apng"]) end,
+       accept("png", true)},
+      {"single-frame.apng",
+       fn o -> ff.(o, ["-f", "lavfi", "-i", src, "-frames:v", "1", "-f", "apng"]) end,
+       accept("png", false)},
+      {"static.jpg", fn o -> ff.(o, ["-f", "lavfi", "-i", src, "-frames:v", "1"]) end,
+       accept("jpeg", false)},
+      {"static.gif", fn o -> ff.(o, ["-f", "lavfi", "-i", src, "-frames:v", "1"]) end,
+       accept("gif", false)},
+      {"animated.gif", fn o -> ff.(o, ["-f", "lavfi", "-i", src, "-loop", "0"]) end,
+       accept("gif", true)},
       {"static.webp", fn o -> vips_save(p.("static.png"), o, 1) end, accept("webp", false)},
       {"animated.webp", fn o -> vips_save(p.("animated.gif"), o, -1) end, accept("webp", true)},
       {"spoofed-jpeg-as.png", fn o -> copy(p.("static.jpg"), o) end, accept("jpeg", false)},
-      {"spoofed-text-as.gif", fn o -> write(o, "GIF is not here, just text\n") end, reject("unclassifiable")},
-      {"svg-as.png", fn o -> write(o, ~s(<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>)) end, reject("unclassifiable")},
-      {"bmp.bmp", fn o -> ff.(o, ["-f", "lavfi", "-i", src, "-frames:v", "1"]) end, reject("unclassifiable")},
-      {"tiff.tif", fn o -> ff.(o, ["-f", "lavfi", "-i", src, "-frames:v", "1"]) end, reject("unclassifiable")},
+      {"spoofed-text-as.gif", fn o -> write(o, "GIF is not here, just text\n") end,
+       reject("unclassifiable")},
+      {"svg-as.png",
+       fn o -> write(o, ~s(<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>)) end,
+       reject("unclassifiable")},
+      {"bmp.bmp", fn o -> ff.(o, ["-f", "lavfi", "-i", src, "-frames:v", "1"]) end,
+       reject("unclassifiable")},
+      {"tiff.tif", fn o -> ff.(o, ["-f", "lavfi", "-i", src, "-frames:v", "1"]) end,
+       reject("unclassifiable")},
       {"empty.png", fn o -> write(o, "") end, reject("unclassifiable")},
-      {"random.bin", fn o -> write(o, :crypto.hash(:sha512, "tips-61") |> :binary.copy(64)) end, reject("unclassifiable")},
-      {"png-signature-garbage.png", fn o -> write(o, <<0x89, "PNG\r\n", 0x1A, "\n">> <> :binary.copy(<<7>>, 512)) end, reject("malformed")},
+      {"random.bin", fn o -> write(o, :crypto.hash(:sha512, "tips-61") |> :binary.copy(64)) end,
+       reject("unclassifiable")},
+      {"png-signature-garbage.png",
+       fn o -> write(o, <<0x89, "PNG\r\n", 0x1A, "\n">> <> :binary.copy(<<7>>, 512)) end,
+       reject("malformed")},
       {"truncated.png", fn o -> truncate(p.("static.png"), o) end, reject("malformed")},
       {"truncated.jpg", fn o -> truncate(p.("static.jpg"), o) end, reject("malformed")},
       {"truncated.gif", fn o -> truncate(p.("animated.gif"), o) end, reject("malformed")},
       {"truncated.webp", fn o -> truncate(p.("animated.webp"), o) end, reject("malformed")},
       {"truncated.apng", fn o -> truncate(p.("animated.apng"), o) end, reject("malformed")},
       {"corrupt-idat.png", fn o -> corrupt(p.("static.png"), o) end, reject("malformed")},
-      {"huge-dimensions.png", fn o -> vips_black(o, 20_000, 20_000) end, reject("dimensions_over_limit")},
-      {"frame-pixels-over.png", fn o -> vips_black(o, 8000, 8000) end, reject("frame_pixels_over_limit")},
+      {"huge-dimensions.png", fn o -> vips_black(o, 20_000, 20_000) end,
+       reject("dimensions_over_limit")},
+      {"frame-pixels-over.png", fn o -> vips_black(o, 8000, 8000) end,
+       reject("frame_pixels_over_limit")},
       {"at-pixel-budget.png", fn o -> vips_black(o, 6000, 6000) end, accept("png", false)},
-      {"many-frames.gif", fn o -> ff.(o, ["-f", "lavfi", "-i", "color=c=red:size=16x16:rate=50:duration=20", "-loop", "0"]) end, reject("frames_over_limit")},
-      {"total-pixels-over.gif", fn o -> ff.(o, ["-f", "lavfi", "-i", "testsrc=size=2000x2000:rate=10:duration=3", "-loop", "0"]) end, reject("total_pixels_over_limit")},
+      {"many-frames.gif",
+       fn o ->
+         ff.(o, ["-f", "lavfi", "-i", "color=c=red:size=16x16:rate=50:duration=20", "-loop", "0"])
+       end, reject("frames_over_limit")},
+      {"total-pixels-over.gif",
+       fn o ->
+         ff.(o, ["-f", "lavfi", "-i", "testsrc=size=2000x2000:rate=10:duration=3", "-loop", "0"])
+       end, reject("total_pixels_over_limit")},
       {"over-10mb.png", fn o -> noise_png(o) end, reject("bytes_over_limit")}
     ]
 
@@ -334,7 +408,15 @@ defmodule MediaProbe.Fixtures do
       out = p.(name)
       how = recipe.(out)
       bytes = File.read!(out)
-      %{name: name, path: out, recipe: how, bytes: byte_size(bytes), sha256: Base.encode16(:crypto.hash(:sha256, bytes), case: :lower), expected: expected}
+
+      %{
+        name: name,
+        path: out,
+        recipe: how,
+        bytes: byte_size(bytes),
+        sha256: Base.encode16(:crypto.hash(:sha256, bytes), case: :lower),
+        expected: expected
+      }
     end
   end
 
