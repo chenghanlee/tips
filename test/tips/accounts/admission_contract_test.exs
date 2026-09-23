@@ -304,9 +304,11 @@ defmodule Tips.Accounts.AdmissionContractTest do
     end
 
     test "a full-banned owner may still read their own hidden item; others may not" do
-      user = user_fixture()
-      scope = Scope.for_user(user)
-      ban(user)
+      # Stand-in for #47 fresh admission: the real generated lookup after the ban.
+      user = user_fixture() |> ban()
+      token = Accounts.generate_user_session_token(user)
+      {%User{ban: :full} = admitted, _} = Accounts.get_user_by_session_token(token)
+      scope = Scope.for_user(admitted)
 
       assert {:ok, :hidden_item} = CallerExamples.read_own_hidden(scope, user.id)
 
@@ -316,7 +318,7 @@ defmodule Tips.Accounts.AdmissionContractTest do
       assert {:error, :unauthenticated} = CallerExamples.read_own_hidden(nil, user.id)
     end
 
-    test "a full-banned moderator loses moderation actions but keeps the admitted role for reads" do
+    test "a full-banned moderator loses moderation actions but the session still admits the moderator role" do
       moderator = user_fixture() |> moderator() |> ban()
       token = Accounts.generate_user_session_token(moderator)
 
