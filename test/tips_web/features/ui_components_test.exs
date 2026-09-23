@@ -60,10 +60,9 @@ defmodule TipsWeb.UIComponentsTest do
     )
   end
 
-  feature "a filter change patches the URL and keeps focus; Clear filters keeps the query and focuses the filter note",
-          %{
-            session: session
-          } do
+  feature "filter changes keep focus; Clear filters keeps the query and focuses the note", %{
+    session: session
+  } do
     session
     |> connected("/_ui?q=flaky")
     |> js(
@@ -77,8 +76,14 @@ defmodule TipsWeb.UIComponentsTest do
     )
     |> assert_has(css("#applied", text: "q=flaky&technique=planning"))
     |> assert_focus("technique")
-    |> click(button("Clear filters"))
-    |> refute_has(button("Clear filters"))
+    |> assert_has(css("#filters a[href='/_ui?q=flaky']", text: "Clear filters"))
+    |> js("window.historyBefore = history.length", fn _ -> :ok end)
+    |> click(link("Clear filters"))
+    |> refute_has(link("Clear filters"))
+    |> js(
+      "return history.length - window.historyBefore",
+      &assert(&1 == 1, "history entries added: #{&1}")
+    )
     |> js("return document.getElementById('applied').textContent", &assert(&1 == "q=flaky"))
     |> assert_focus("filters-note")
     |> js("return document.getElementById('technique').value", &assert(&1 == ""))

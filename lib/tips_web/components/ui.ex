@@ -302,13 +302,13 @@ defmodule TipsWeb.UI do
         {render_slot(@inner_block)}
       </div>
       <p :if={@active}>
-        <.button
-          type="button"
-          variant="ghost"
-          phx-click={JS.patch(@clear_href) |> JS.focus(to: "##{@id}-note")}
+        <.link
+          patch={@clear_href}
+          phx-click={JS.focus(to: "##{@id}-note")}
+          class={link_button_class("ghost")}
         >
           Clear filters
-        </.button>
+        </.link>
       </p>
     </form>
     """
