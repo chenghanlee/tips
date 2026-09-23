@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Browse and search exemplar · Tips</title>
+  <style>
+    /* Tokens: docs/design/visual/tokens.md. Light only. */
+    :root {
+      --background: oklch(1 0 0);
+      --foreground: oklch(0.129 0.027 261.671);
+      --card: oklch(1 0 0);
+      --card-foreground: oklch(0.129 0.027 261.671);
+      --primary: oklch(0.21 0.032 264.652);
+      --primary-foreground: oklch(0.984 0.002 247.839);
+      --secondary: oklch(0.967 0.003 264.542);
+      --secondary-foreground: oklch(0.21 0.032 264.652);
+      --muted: oklch(0.967 0.003 264.542);
+      --muted-foreground: oklch(0.551 0.023 264.365);
+      --accent: oklch(0.967 0.003 264.542);
+      --accent-foreground: oklch(0.21 0.032 264.652);
+      --destructive: oklch(0.577 0.245 27.325);
+      --destructive-foreground: oklch(0.984 0.002 247.839);
+      --border: oklch(0.928 0.006 264.531);
+      --input: oklch(0.64 0.022 261.325);
+      --ring: oklch(0.129 0.027 261.671);
+      --radius: 0.375rem;
+      --font-sans: ui-sans-serif, system-ui, sans-serif;
+      --font-mono: ui-monospace, monospace;
+      --text-sm: 0.875rem;
+      --text-base: 1rem;
+      --text-lg: 1.125rem;
+      --text-2xl: 1.5rem;
+      --leading: 1.5;
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-6: 24px;
+      --space-8: 32px;
+      --control-sm: 32px;
+      --control-md: 40px;
+      --container-reading: 48rem;
+      --container-editor: 40rem;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html { -webkit-text-size-adjust: 100%; }
+    body { margin: 0; background: var(--background); color: var(--foreground); font-family: var(--font-sans); font-size: var(--text-base); line-height: var(--leading); overflow-wrap: anywhere; }
+    :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+    a { color: var(--foreground); text-underline-offset: 2px; }
+    h1, h2, h3 { margin: 0; font-weight: 600; line-height: 1.25; }
+    h1 { font-size: var(--text-2xl); }
+    h2 { font-size: var(--text-lg); }
+    h3 { font-size: var(--text-base); }
+    p, ul, ol, figure, fieldset { margin: 0; }
+    ul, ol { padding: 0; list-style: none; }
+    fieldset { border: 0; padding: 0; min-width: 0; }
+    legend { padding: 0; font-weight: 600; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    .page { max-width: var(--page-width, var(--container-reading)); margin: 0 auto; padding: var(--space-4); display: grid; gap: var(--space-6); }
+    .stack { display: grid; gap: var(--space-3); }
+    .row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+    .small { font-size: var(--text-sm); }
+    .muted { color: var(--muted-foreground); }
+    .icon { width: 16px; height: 16px; flex: none; }
+
+    /* site_header */
+    .site-header { border-bottom: 1px solid var(--border); }
+    .site-header nav { max-width: var(--page-width, var(--container-reading)); margin: 0 auto; padding: var(--space-2) var(--space-4); display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); }
+    .site-header a { display: inline-flex; align-items: center; min-height: var(--control-sm); }
+    .logo { font-weight: 600; text-decoration: none; }
+
+    /* button */
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-height: var(--control-sm); padding: 0 var(--space-3); border: 1px solid var(--input); border-radius: var(--radius); background: var(--background); color: var(--foreground); font: inherit; font-size: var(--text-sm); font-weight: 500; line-height: 1.25; text-align: center; text-decoration: none; cursor: pointer; }
+    .btn:hover { background: var(--accent); }
+    .btn-lg { min-height: var(--control-md); padding: 0 var(--space-4); }
+    .btn-primary, .btn[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+    .btn-primary:hover, .btn[aria-pressed="true"]:hover { background: var(--primary); opacity: 0.9; }
+    .btn-ghost { border-color: transparent; background: transparent; }
+    .btn-destructive { background: var(--destructive); border-color: var(--destructive); color: var(--destructive-foreground); }
+    .btn-destructive:hover { background: var(--destructive); opacity: 0.9; }
+    .btn:disabled, .btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+    .btn:disabled:hover { opacity: 0.5; }
+
+    /* field, filter_select, search_form */
+    .field { display: grid; gap: var(--space-1); align-content: start; }
+    label, .label { font-size: var(--text-sm); font-weight: 500; }
+    input[type="text"], input[type="search"], textarea, select { width: 100%; min-height: var(--control-md); padding: var(--space-2) var(--space-3); border: 1px solid var(--input); border-radius: var(--radius); background: var(--background); color: var(--foreground); font: inherit; font-size: var(--text-base); }
+    textarea { min-height: 8rem; resize: vertical; }
+    [aria-invalid="true"] { border-color: var(--destructive); }
+    .helper { font-size: var(--text-sm); color: var(--muted-foreground); }
+    .field-error { font-size: var(--text-sm); color: var(--destructive); font-weight: 500; }
+    .search-form { display: grid; gap: var(--space-1); }
+    .search-form .control { display: flex; gap: var(--space-2); }
+    .search-form input { flex: 1; min-width: 0; }
+
+    /* filter_bar */
+    .filter-bar { display: grid; gap: var(--space-2); }
+    .filter-bar .selects { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: var(--space-2) var(--space-3); align-items: end; }
+
+    /* tip_row, setup_meta */
+    .feed { border-top: 1px solid var(--border); }
+    .tip-row { display: grid; gap: var(--space-1); padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+    .tip-row .title { font-weight: 500; text-decoration: none; }
+    .tip-row .title:hover { text-decoration: underline; }
+    .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--space-3); font-size: var(--text-sm); color: var(--muted-foreground); }
+    .meta a { display: inline-flex; align-items: center; min-height: 24px; color: inherit; }
+    .excerpt { display: block; padding-left: var(--space-3); border-left: 2px solid var(--border); font-size: var(--text-sm); text-decoration: none; }
+    .excerpt:hover .excerpt-text { text-decoration: underline; }
+    .excerpt .source { font-weight: 600; }
+
+    /* vote_control */
+    .votes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-1); }
+    .vote-status { font-size: var(--text-sm); }
+
+    /* page_nav */
+    .page-nav { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-2); }
+    .page-nav .current { font-size: var(--text-sm); font-weight: 500; }
+
+    /* notice, error_summary */
+    .notice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius); }
+    .notice > p { flex: 1 1 12rem; }
+    .notice-error { border-color: var(--destructive); border-left-width: 4px; }
+    .notice-error .icon { color: var(--destructive); }
+    .error-summary { display: grid; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--destructive); border-left-width: 4px; border-radius: var(--radius); }
+    .error-summary h2 { color: var(--destructive); font-size: var(--text-base); }
+    .error-summary ul { display: grid; gap: var(--space-1); list-style: disc; padding-left: var(--space-6); }
+
+    /* disclosure */
+    details { border: 1px solid var(--border); border-radius: var(--radius); }
+    summary { display: list-item; min-height: var(--control-sm); padding: var(--space-2) var(--space-3); font-size: var(--text-sm); font-weight: 500; cursor: pointer; }
+    details[open] > summary { border-bottom: 1px solid var(--border); }
+    .details-body { display: grid; gap: var(--space-4); padding: var(--space-3); }
+
+    /* verbatim_block */
+    .verbatim { display: grid; gap: var(--space-2); }
+    .verbatim-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-2); }
+    .verbatim figcaption { font-size: var(--text-sm); font-weight: 600; }
+    pre { margin: 0; padding: var(--space-3); border-radius: var(--radius); background: var(--muted); font-family: var(--font-mono); font-size: var(--text-sm); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .copy-status { font-size: var(--text-sm); }
+
+    /* attachment_view */
+    .media { display: grid; gap: var(--space-2); }
+    .media img { display: block; max-width: 100%; height: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+    .poster { position: relative; display: block; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; border-radius: var(--radius); }
+    .poster .play { position: absolute; inset: 0; margin: auto; width: 56px; height: 56px; padding: 14px; border-radius: 50%; background: var(--primary); color: var(--primary-foreground); }
+
+    /* review_card, tip_header */
+    .badge { display: inline-flex; align-items: center; padding: 0 var(--space-2); border: 1px solid var(--input); border-radius: 999px; font-size: var(--text-sm); font-weight: 500; color: var(--foreground); }
+    .review { display: grid; gap: var(--space-3); padding: var(--space-4) 0; border-bottom: 1px solid var(--border); }
+    .prose { display: grid; gap: var(--space-3); }
+
+    /* Exemplar annotations, not product UI */
+    .states { display: grid; gap: var(--space-6); }
+    .state { display: grid; gap: var(--space-4); padding: var(--space-3); border: 1px dashed var(--input); border-radius: var(--radius); }
+    .state-label { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--muted-foreground); }
+    .annotation-heading { font-family: var(--font-mono); font-size: var(--text-base); color: var(--muted-foreground); border-top: 1px dashed var(--input); padding-top: var(--space-6); }
+  </style>
+</head>
+<body>
+  <header class="site-header" data-component="site_header">
+    <nav aria-label="Site">
+      <a class="logo" href="#">Tips</a>
+      <a href="#">Sign in</a>
+    </nav>
+  </header>
+
+  <main class="page">
+    <form class="search-form" role="search" action="/search" method="get" data-component="search_form">
+      <label for="q">What are you trying to do?</label>
+      <p class="helper" id="q-help">Describe a task or enter keywords. Search matches both meaning and words.</p>
+      <div class="control">
+        <input type="search" id="q" name="q" aria-describedby="q-help">
+        <button class="btn btn-lg btn-primary" type="submit">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+          Search
+        </button>
+      </div>
+    </form>
+
+    <form class="filter-bar" action="/" method="get" data-component="filter_bar" aria-describedby="fb-note">
+      <p class="small" id="fb-note">Changing a selection updates the list. Model and Environment match the tip author's setup.</p>
+      <div class="selects">
+        <div class="field" data-component="filter_select">
+          <label for="sort">Sort</label>
+          <select id="sort" name="sort"><option selected>Hot</option><option>New</option></select>
+        </div>
+        <div class="field" data-component="filter_select">
+          <label for="technique">Technique</label>
+          <select id="technique" name="technique"><option>All</option><option selected>Planning</option><option>Scoped edits</option><option>Test-first</option><option>Context files</option><option>Other technique</option></select>
+        </div>
+        <div class="field" data-component="filter_select">
+          <label for="model">Model</label>
+          <select id="model" name="model"><option selected>All</option><option>Claude Opus 5.5</option><option>Claude Sonnet 5</option><option>Claude Haiku 4.5</option></select>
+        </div>
+        <div class="field" data-component="filter_select">
+          <label for="environment">Environment</label>
+          <select id="environment" name="environment"><option selected>All</option><option>Claude Code</option><option>Codex CLI</option><option>Cursor</option></select>
+        </div>
+      </div>
+      <p><a class="btn btn-ghost" href="/?sort=hot">Clear filters</a></p>
+    </form>
+
+    <section class="stack" aria-labelledby="results-heading">
+      <h1 id="results-heading">Hot tips <span class="small muted">· Technique: Planning</span></h1>
+      <ol class="feed">
+        <li class="tip-row" data-component="tip_row">
+          <a class="title" id="t1" href="#">Ask for a written plan before letting the agent touch a large refactor</a>
+          <div class="meta">
+            <span data-component="setup_meta" style="display: contents"><a href="/?technique=planning">Planning</a><a href="/?technique=planning&amp;model=claude-opus-5-5">Claude Opus 5.5</a></span>
+            <span>by <a href="#">ada</a></span>
+            <time datetime="2026-09-23T09:10:00Z">3 hours ago</time>
+            <span>Net +42</span>
+            <span>12 reviews</span>
+          </div>
+          <div class="votes" data-component="vote_control">
+            <button class="btn" type="button" aria-pressed="true" aria-describedby="t1">Helpful</button>
+            <button class="btn" type="button" aria-pressed="false" aria-describedby="t1">Not helpful</button>
+          </div>
+        </li>
+        <li class="tip-row" data-component="tip_row">
+          <a class="title" id="t2" href="#">Keep a one-page PLAN.md and make the agent update it after every step</a>
+          <div class="meta">
+            <span data-component="setup_meta" style="display: contents"><a href="/?technique=planning">Planning</a><a href="/?technique=planning&amp;model=claude-sonnet-5">Claude Sonnet 5</a></span>
+            <span>by <a href="#">grace_h</a></span>
+            <time datetime="2026-09-23T05:00:00Z">7 hours ago</time>
+            <span>Net +17</span>
+            <span>4 reviews</span>
+          </div>
+          <div class="votes" data-component="vote_control" aria-busy="true">
+            <button class="btn" type="button" aria-pressed="false" aria-disabled="true" aria-describedby="t2">Helpful</button>
+            <button class="btn" type="button" aria-pressed="false" aria-disabled="true" aria-describedby="t2">Not helpful</button>
+            <span class="vote-status" role="status">Saving…</span>
+          </div>
+        </li>
+        <li class="tip-row" data-component="tip_row">
+          <a class="title" id="t3" href="#">Split the plan into steps that each end with a passing test run</a>
+          <div class="meta">
+            <span data-component="setup_meta" style="display: contents"><a href="/?technique=planning">Planning</a><span>local-qwen-coder-32b</span></span>
+            <span>by <a href="#">lin</a></span>
+            <time datetime="2026-09-22T12:00:00Z">1 day ago</time>
+            <span>Net +3</span>
+            <span>0 reviews</span>
+          </div>
+          <div class="votes" data-component="vote_control">
+            <button class="btn" type="button" aria-pressed="false" aria-describedby="t3">Helpful</button>
+            <button class="btn" type="button" aria-pressed="false" aria-describedby="t3">Not helpful</button>
+          </div>
+        </li>
+      </ol>
+      <nav class="page-nav" aria-label="Pages" data-component="page_nav">
+        <a class="btn" href="/?technique=planning&amp;page=1" rel="prev">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+          Previous
+        </a>
+        <span class="current" aria-current="page">Page 2</span>
+        <a class="btn" href="/?technique=planning&amp;page=3" rel="next">
+          Next
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+        </a>
+      </nav>
+    </section>
+
+    <h2 class="annotation-heading">States</h2>
+    <div class="states">
+
+      <section class="state" aria-label="State: search results">
+        <p class="state-label">State: search results with labelled matching excerpts</p>
+        <form class="search-form" role="search" action="/search" method="get" data-component="search_form">
+          <label for="q-s1">What are you trying to do?</label>
+          <p class="helper" id="q-s1-help">Describe a task or enter keywords. Search matches both meaning and words.</p>
+          <div class="control">
+            <input type="search" id="q-s1" name="q" value="fix flaky tests" aria-describedby="q-s1-help">
+            <button class="btn btn-lg btn-primary" type="submit">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+              Search
+            </button>
+          </div>
+        </form>
+        <form class="filter-bar" action="/search" method="get" data-component="filter_bar" aria-describedby="fb-s1-note">
+          <p class="small" id="fb-s1-note">Changing a selection updates the list. Model and Environment match the tip author's setup.</p>
+          <div class="selects">
+            <div class="field" data-component="filter_select">
+              <label for="technique-s1">Technique</label>
+              <select id="technique-s1" name="technique"><option>All</option><option>Planning</option><option>Scoped edits</option><option selected>Test-first</option><option>Context files</option><option>Other technique</option></select>
+            </div>
+            <div class="field" data-component="filter_select">
+              <label for="model-s1">Model</label>
+              <select id="model-s1" name="model"><option selected>All</option><option>Claude Opus 5.5</option><option>Claude Sonnet 5</option><option>Claude Haiku 4.5</option></select>
+            </div>
+            <div class="field" data-component="filter_select">
+              <label for="environment-s1">Environment</label>
+              <select id="environment-s1" name="environment"><option selected>All</option><option>Claude Code</option><option>Codex CLI</option><option>Cursor</option></select>
+            </div>
+          </div>
+          <p><a class="btn btn-ghost" href="/search?q=fix+flaky+tests">Clear filters</a></p>
+        </form>
+        <section class="stack" aria-labelledby="results-s1">
+          <h2 id="results-s1">Results for “fix flaky tests” <span class="small muted">· Technique: Test-first</span></h2>
+          <ol class="feed">
+            <li class="tip-row" data-component="tip_row">
+              <a class="title" id="s1t1" href="#">Have the agent reproduce the flake 20 times before it proposes a fix</a>
+              <div class="meta">
+                <span data-component="setup_meta" style="display: contents"><a href="/search?q=fix+flaky+tests&amp;technique=test-first">Test-first</a><a href="/search?q=fix+flaky+tests&amp;technique=test-first&amp;model=claude-opus-5-5">Claude Opus 5.5</a></span>
+                <span>by <a href="#">ada</a></span>
+                <time datetime="2026-09-20T10:00:00Z">3 days ago</time>
+                <span>Net +28</span>
+                <span>9 reviews</span>
+              </div>
+              <a class="excerpt" href="#"><span class="source">Review:</span> <span class="excerpt-text">…the loop caught a race in our Ecto sandbox setup on the 14th run. Without the repeat count it would have "fixed" the wrong test…</span></a>
+              <div class="votes" data-component="vote_control">
+                <button class="btn" type="button" aria-pressed="false" aria-describedby="s1t1">Helpful</button>
+                <button class="btn" type="button" aria-pressed="false" aria-describedby="s1t1">Not helpful</button>
+              </div>
+            </li>
+            <li class="tip-row" data-component="tip_row">
+              <a class="title" id="s1t2" href="#">Write the failing test first, then paste only the failure into the prompt</a>
+              <div class="meta">
+                <span data-component="setup_meta" style="display: contents"><a href="/search?q=fix+flaky+tests&amp;technique=test-first">Test-first</a><a href="/search?q=fix+flaky+tests&amp;technique=test-first&amp;model=claude-sonnet-5">Claude Sonnet 5</a></span>
+                <span>by <a href="#">mo</a></span>
+                <time datetime="2026-09-18T10:00:00Z">5 days ago</time>
+                <span>Net +11</span>
+                <span>3 reviews</span>
+              </div>
+              <a class="excerpt" href="#"><span class="source">Prompt:</span> <span class="excerpt-text">…this test fails about one run in ten. Do not change the assertion. Find what makes the order of inserts nondeterministic…</span></a>
+              <div class="votes" data-component="vote_control">
+                <button class="btn" type="button" aria-pressed="false" aria-describedby="s1t2">Helpful</button>
+                <button class="btn" type="button" aria-pressed="false" aria-describedby="s1t2">Not helpful</button>
+              </div>
+            </li>
+            <li class="tip-row" data-component="tip_row">
+              <a class="title" id="s1t3" href="#">Ask for a minimal reproduction script before any code change</a>
+              <div class="meta">
+                <span data-component="setup_meta" style="display: contents"><a href="/search?q=fix+flaky+tests&amp;technique=test-first">Test-first</a></span>
+                <span>by <a href="#">sam</a></span>
+                <time datetime="2026-09-15T10:00:00Z">8 days ago</time>
+                <span>Net +6</span>
+                <span>2 reviews</span>
+              </div>
+              <a class="excerpt" href="#"><span class="source">Result:</span> <span class="excerpt-text">…Finished in 0.4 seconds. 1 test, 1 failure (seed 51734). Re-running with the same seed fails every time…</span></a>
+              <div class="votes" data-component="vote_control">
+                <button class="btn" type="button" aria-pressed="false" aria-describedby="s1t3">Helpful</button>
+                <button class="btn" type="button" aria-pressed="false" aria-describedby="s1t3">Not helpful</button>
+              </div>
+            </li>
+            <li class="tip-row" data-component="tip_row">
+              <a class="title" id="s1t4" href="#">Pin the test seed in the prompt so the agent sees the same failure you do</a>
+              <div class="meta">
+                <span data-component="setup_meta" style="display: contents"><a href="/search?q=fix+flaky+tests&amp;technique=test-first">Test-first</a><a href="/search?q=fix+flaky+tests&amp;technique=test-first&amp;model=claude-haiku-4-5">Claude Haiku 4.5</a></span>
+                <span>by <a href="#">rui</a></span>
+                <time datetime="2026-09-10T10:00:00Z">13 days ago</time>
+                <span>Net +2</span>
+                <span>1 review</span>
+              </div>
+              <a class="excerpt" href="#"><span class="source">Reviewer setup:</span> <span class="excerpt-text">Claude Sonnet 5 · Codex CLI</span></a>
+              <div class="votes" data-component="vote_control">
+                <button class="btn" type="button" aria-pressed="false" aria-describedby="s1t4">Helpful</button>
+                <button class="btn" type="button" aria-pressed="false" aria-describedby="s1t4">Not helpful</button>
+              </div>
+            </li>
+          </ol>
+          <nav class="page-nav" aria-label="Pages" data-component="page_nav">
+            <span class="current" aria-current="page">Page 1</span>
+            <a class="btn" href="/search?q=fix+flaky+tests&amp;technique=test-first&amp;page=2" rel="next">
+              Next
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+            </a>
+          </nav>
+        </section>
+      </section>
+
+      <section class="state" aria-label="State: loading">
+        <p class="state-label">State: loading under the new heading after a filter change (no old rows)</p>
+        <section class="stack" aria-labelledby="results-s2">
+          <h2 id="results-s2">Results for “fix flaky tests” <span class="small muted">· Technique: Test-first · Model: Claude Sonnet 5</span></h2>
+          <div class="notice" role="status" data-component="notice">
+            <p>Loading results…</p>
+          </div>
+        </section>
+      </section>
+
+      <section class="state" aria-label="State: retrieval error">
+        <p class="state-label">State: retrieval error for page 3, with Retry (not "no matches")</p>
+        <section class="stack" aria-labelledby="results-s3">
+          <h2 id="results-s3">Results for “fix flaky tests” <span class="small muted">· Page 3</span></h2>
+          <div class="notice notice-error" role="alert" data-component="notice">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+            <p>Couldn't load this page of results.</p>
+            <button class="btn" type="button">Retry</button>
+          </div>
+        </section>
+      </section>
+
+      <section class="state" aria-label="State: blank search">
+        <p class="state-label">State: blank search submitted (field focused, no retrieval, existing results and heading kept)</p>
+        <form class="search-form" role="search" action="/search" method="get" data-component="search_form">
+          <label for="q-s4">What are you trying to do?</label>
+          <p class="helper" id="q-s4-help">Describe a task or enter keywords. Search matches both meaning and words.</p>
+          <div class="control">
+            <input type="search" id="q-s4" name="q" value="   " aria-invalid="true" aria-describedby="q-s4-error q-s4-help">
+            <button class="btn btn-lg btn-primary" type="submit">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+              Search
+            </button>
+          </div>
+          <p class="field-error" id="q-s4-error">Enter a task or keywords to search.</p>
+        </form>
+        <section class="stack" aria-labelledby="results-s4">
+          <h2 id="results-s4">Results for “fix flaky tests”</h2>
+          <ol class="feed">
+            <li class="tip-row" data-component="tip_row">
+              <a class="title" id="s4t1" href="#">Have the agent reproduce the flake 20 times before it proposes a fix</a>
+              <div class="meta">
+                <span data-component="setup_meta" style="display: contents"><a href="/search?q=fix+flaky+tests&amp;technique=test-first">Test-first</a><a href="/search?q=fix+flaky+tests&amp;model=claude-opus-5-5">Claude Opus 5.5</a></span>
+                <span>by <a href="#">ada</a></span>
+                <time datetime="2026-09-20T10:00:00Z">3 days ago</time>
+                <span>Net +28</span>
+                <span>9 reviews</span>
+              </div>
+              <div class="votes" data-component="vote_control">
+                <button class="btn" type="button" aria-pressed="false" aria-describedby="s4t1">Helpful</button>
+                <button class="btn" type="button" aria-pressed="false" aria-describedby="s4t1">Not helpful</button>
+              </div>
+            </li>
+          </ol>
+        </section>
+      </section>
+
+      <section class="state" aria-label="State: empty feed">
+        <p class="state-label">State: empty feed, no filter active (no Clear filters)</p>
+        <form class="filter-bar" action="/" method="get" data-component="filter_bar" aria-describedby="fb-s5-note">
+          <p class="small" id="fb-s5-note">Changing a selection updates the list. Model and Environment match the tip author's setup.</p>
+          <div class="selects">
+            <div class="field" data-component="filter_select">
+              <label for="sort-s5">Sort</label>
+              <select id="sort-s5" name="sort"><option>Hot</option><option selected>New</option></select>
+            </div>
+            <div class="field" data-component="filter_select">
+              <label for="technique-s5">Technique</label>
+              <select id="technique-s5" name="technique"><option selected>All</option><option>Planning</option><option>Scoped edits</option><option>Test-first</option><option>Context files</option><option>Other technique</option></select>
+            </div>
+            <div class="field" data-component="filter_select">
+              <label for="model-s5">Model</label>
+              <select id="model-s5" name="model"><option selected>All</option><option>Claude Opus 5.5</option><option>Claude Sonnet 5</option><option>Claude Haiku 4.5</option></select>
+            </div>
+            <div class="field" data-component="filter_select">
+              <label for="environment-s5">Environment</label>
+              <select id="environment-s5" name="environment"><option selected>All</option><option>Claude Code</option><option>Codex CLI</option><option>Cursor</option></select>
+            </div>
+          </div>
+        </form>
+        <section class="stack" aria-labelledby="results-s5">
+          <h2 id="results-s5">New tips</h2>
+          <div class="notice" data-component="notice"><p>No tips yet</p></div>
+        </section>
+      </section>
+
+      <section class="state" aria-label="State: no matches for filters">
+        <p class="state-label">State: filtered result is empty (Clear filters still shown)</p>
+        <form class="filter-bar" action="/" method="get" data-component="filter_bar" aria-describedby="fb-s6-note">
+          <p class="small" id="fb-s6-note">Changing a selection updates the list. Model and Environment match the tip author's setup.</p>
+          <div class="selects">
+            <div class="field" data-component="filter_select">
+              <label for="sort-s6">Sort</label>
+              <select id="sort-s6" name="sort"><option selected>Hot</option><option>New</option></select>
+            </div>
+            <div class="field" data-component="filter_select">
+              <label for="technique-s6">Technique</label>
+              <select id="technique-s6" name="technique"><option>All</option><option>Planning</option><option>Scoped edits</option><option>Test-first</option><option selected>Context files</option><option>Other technique</option></select>
+            </div>
+            <div class="field" data-component="filter_select">
+              <label for="model-s6">Model</label>
+              <select id="model-s6" name="model"><option>All</option><option>Claude Opus 5.5</option><option>Claude Sonnet 5</option><option selected>Claude Haiku 4.5</option></select>
+            </div>
+            <div class="field" data-component="filter_select">
+              <label for="environment-s6">Environment</label>
+              <select id="environment-s6" name="environment"><option>All</option><option>Claude Code</option><option>Codex CLI</option><option selected>Cursor</option></select>
+            </div>
+          </div>
+          <p><a class="btn btn-ghost" href="/?sort=hot">Clear filters</a></p>
+        </form>
+        <section class="stack" aria-labelledby="results-s6">
+          <h2 id="results-s6">Hot tips <span class="small muted">· Technique: Context files · Model: Claude Haiku 4.5 · Environment: Cursor</span></h2>
+          <div class="notice" data-component="notice"><p>No tips match these filters</p></div>
+        </section>
+      </section>
+
+      <section class="state" aria-label="State: out-of-range page">
+        <p class="state-label">State: out-of-range page (?page=9) offers Previous and First page</p>
+        <section class="stack" aria-labelledby="results-s7">
+          <h2 id="results-s7">Hot tips <span class="small muted">· Page 9</span></h2>
+          <div class="notice" data-component="notice"><p>No tips on page 9.</p></div>
+          <nav class="page-nav" aria-label="Pages" data-component="page_nav">
+            <a class="btn" href="/?page=8" rel="prev">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+              Previous
+            </a>
+            <a class="btn" href="/">First page</a>
+          </nav>
+        </section>
+      </section>
+
+    </div>
+  </main>
+</body>
+</html>
