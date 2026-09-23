@@ -126,7 +126,8 @@ while True: time.sleep(.05)
             "import subprocess,sys; p=subprocess.Popen(sys.argv[2:]); open(sys"
             '.argv[1],"w").write(str(p.pid)); sys.exit(p.wait())'
         )
-        p = subprocess.Popen(
+        # Reviewed S603: fixed synthetic argv for an owned test child, no shell.
+        p = subprocess.Popen(  # noqa: S603
             command_args(
                 [
                     "python3",
