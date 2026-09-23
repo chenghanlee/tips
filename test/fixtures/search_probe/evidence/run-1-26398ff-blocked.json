@@ -1,0 +1,133 @@
+{
+  "error": "http_401",
+  "code": {
+    "dirty": false,
+    "sha": "26398ff2bf434481950d1901f539300670ce23e0"
+  },
+  "memory": {
+    "method": "client OS RSS sampled after every request; hosted GPU memory is not observable",
+    "baseline_rss_kib": 120576,
+    "incremental_mib": 5.875,
+    "peak_rss_kib": 126592
+  },
+  "status": "blocked",
+  "probe": "issue-54 search embedding gate",
+  "requests": [
+    {
+      "phase": "endpoints",
+      "outcome": "ok",
+      "elapsed_ms": 945
+    },
+    {
+      "phase": "key",
+      "outcome": "http_401",
+      "elapsed_ms": 295
+    }
+  ],
+  "usage": {
+    "requests": 2,
+    "cost_usd": 0,
+    "prompt_tokens": 0,
+    "failed_requests": 1,
+    "cost_source": "none reported",
+    "estimated_cost_usd": 0.0
+  },
+  "provider": {
+    "base_url": "https://openrouter.ai/api/v1",
+    "name": "openrouter",
+    "routing": {
+      "allow_fallbacks": false,
+      "only": [
+        "deepinfra"
+      ]
+    }
+  },
+  "fixtures": {
+    "hashes": {
+      "corpus": "a56ae777fde93fa07b9f75bf1b902b328bfeb0ab10a7717873d4075a5150cafd",
+      "gate": "a0a1e92619e8393de0d741dfb2a27d4ec8a0db6ff6bafc17473571d6e5da2845",
+      "queries": "059c61a4782cb37c758ba49fc249fbf9436858805988e9d390a00257be94317e"
+    },
+    "gate_version": "54-gate-v1"
+  },
+  "preflight": {
+    "plan": {
+      "requests": 78,
+      "documents": 40,
+      "long_documents": 5,
+      "max_full_document_bytes": 29504,
+      "token_bound": 213153
+    },
+    "endpoint": {
+      "status": 0,
+      "tag": "deepinfra",
+      "provider": "DeepInfra",
+      "context_tokens": 32768,
+      "prompt_price_usd_per_token": 1.0e-8
+    },
+    "estimated_max_cost_usd": 0.00213153
+  },
+  "dimensions": {
+    "mode": null,
+    "requested": 1024,
+    "returned_lengths": []
+  },
+  "generated_at": "2026-09-23T06:58:07Z",
+  "long_inputs": [
+    {
+      "id": "long-01",
+      "full_bytes": 21502,
+      "bounded_bytes": 16384,
+      "dropped_bytes": 5118
+    },
+    {
+      "id": "long-02",
+      "full_bytes": 18780,
+      "bounded_bytes": 16384,
+      "dropped_bytes": 2396
+    },
+    {
+      "id": "long-03",
+      "full_bytes": 29504,
+      "bounded_bytes": 16384,
+      "dropped_bytes": 13120
+    },
+    {
+      "id": "long-04",
+      "full_bytes": 23723,
+      "bounded_bytes": 16384,
+      "dropped_bytes": 7339
+    },
+    {
+      "id": "long-05",
+      "full_bytes": 24856,
+      "bounded_bytes": 16384,
+      "dropped_bytes": 8472
+    }
+  ],
+  "model": {
+    "card": "https://huggingface.co/Qwen/Qwen3-Embedding-8B",
+    "card_retrieved_at": "2026-09-23",
+    "card_revision": "1d8ad4ca9b3dd8059ad90a75d4983776a23d44af",
+    "context_tokens": 32768,
+    "id": "qwen/qwen3-embedding-8b",
+    "native_dimensions": 4096
+  },
+  "preparation": {
+    "document": "Plain text. Tip: title, blank line, body. Review: body.",
+    "document_max_bytes": 16384,
+    "query_instruction": "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:",
+    "query_max_bytes": 1024,
+    "truncation": "Documents over document_max_bytes keep equal head and tail byte budgets on UTF-8 character boundaries around the separator; the result, separator included, fits document_max_bytes.",
+    "truncation_separator": "\n[... truncated ...]\n"
+  },
+  "blocker": "http_401",
+  "gates": [
+    {
+      "name": "provider_calls",
+      "value": "http_401",
+      "threshold": "all requests succeed",
+      "passed": false
+    }
+  ]
+}
