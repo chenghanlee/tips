@@ -1,0 +1,73 @@
+{
+  "mode": "stream-hour",
+  "run_id": "20260923T103853Z-93b9",
+  "assertions": [
+    {
+      "name": "one_hour_expiry_enforced",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_deadline",
+      "evidence": {
+        "requested_expiry": "2026-09-23T11:38:53.847718Z",
+        "provider_expiry": "2026-09-23T11:38:53Z",
+        "first_chunk": 204,
+        "final_after_expiry": {
+          "status": 400,
+          "body": "{\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10017,\n      \"message\": \"Expiration for upload has passed: The upload URL for the video expired. Generate a new upload URL and try again.\"\n    }\n  ],\n  \"messages\": null\n}\n",
+          "headers": {
+            "cache-control": "private",
+            "cf-cache-status": "DYNAMIC",
+            "cf-ray": "a3f94581098b37d3-HKG",
+            "content-type": "application/json; charset=UTF-8",
+            "date": "Wed, 23 Sep 2026 11:39:56 GMT"
+          }
+        },
+        "video_after": {
+          "size": 9467960,
+          "state": "pendingupload",
+          "modified": "2026-09-23T10:38:54.827496Z",
+          "max_duration": 180,
+          "observed_at": "2026-09-23T11:39:58.360303Z",
+          "err": "",
+          "uploaded": "2026-09-23T10:38:54.825107Z",
+          "created": "2026-09-23T10:38:54.827496Z",
+          "ready": false,
+          "ready_at": null,
+          "upload_expiry": "2026-09-23T11:38:53Z",
+          "duration": -1,
+          "require_signed": true
+        }
+      }
+    },
+    {
+      "name": "hour_fixture_deleted",
+      "status": "pass",
+      "required": true,
+      "experiment": "redaction_cleanup",
+      "evidence": {
+        "delete": 200
+      }
+    }
+  ],
+  "facts": {},
+  "issue": 61,
+  "git_sha": "72c393c697732825bfafa2363be1a9690c500738",
+  "finished_at": "2026-09-23T11:39:58.389790Z",
+  "versions": {
+    "otp": "29",
+    "elixir": "1.20.4",
+    "req": "0.7.4",
+    "jose": "1.11.12",
+    "tus": "1.0.0",
+    "stream_api": "client/v4 (unversioned)"
+  },
+  "bounds": {
+    "max_calls": 400,
+    "provider_calls": 7,
+    "concurrency": 1,
+    "retries": 0,
+    "receive_timeout_ms": 30000,
+    "connect_timeout_ms": 10000
+  },
+  "verdict": "pass"
+}

@@ -1,0 +1,87 @@
+{
+  "mode": "redaction-check",
+  "run_id": "20260923T104809Z-3e37",
+  "assertions": [
+    {
+      "name": "signing_key_response_never_logged",
+      "status": "pass",
+      "required": true,
+      "experiment": "redaction_cleanup",
+      "evidence": {
+        "cases": [
+          {
+            "case": "success-200",
+            "stored": true,
+            "expect_stored": true,
+            "helper_status": [
+              "pass"
+            ]
+          },
+          {
+            "case": "error-400-echoing-key",
+            "stored": false,
+            "expect_stored": false,
+            "helper_status": [
+              "fail"
+            ]
+          },
+          {
+            "case": "success-200-small-body",
+            "stored": true,
+            "expect_stored": true,
+            "helper_status": [
+              "pass"
+            ]
+          },
+          {
+            "case": "malformed-200",
+            "stored": false,
+            "expect_stored": false,
+            "helper_status": [
+              "fail"
+            ]
+          },
+          {
+            "case": "adapter-raises",
+            "stored": false,
+            "expect_stored": false,
+            "helper_status": [
+              "fail"
+            ]
+          }
+        ],
+        "call_log_lines": 5,
+        "leaked_cases": 0
+      }
+    },
+    {
+      "name": "signing_key_stored_only_on_success",
+      "status": "pass",
+      "required": true,
+      "experiment": "redaction_cleanup",
+      "evidence": {}
+    }
+  ],
+  "facts": {},
+  "issue": 61,
+  "git_sha": "0487970ec9dc86f4aca7b0007fe3e34e50fd3f30",
+  "git_tracked_changes": 0,
+  "finished_at": "2026-09-23T10:48:09.561929Z",
+  "versions": {
+    "otp": "29",
+    "elixir": "1.20.4",
+    "req": "0.7.4",
+    "jose": "1.11.12",
+    "tus": "1.0.0",
+    "stream_api": "client/v4 (unversioned)"
+  },
+  "bounds": {
+    "max_calls": 400,
+    "provider_calls": 5,
+    "concurrency": 1,
+    "retries": 0,
+    "receive_timeout_ms": 30000,
+    "connect_timeout_ms": 10000
+  },
+  "verdict": "pass"
+}

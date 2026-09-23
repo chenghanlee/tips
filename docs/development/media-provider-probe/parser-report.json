@@ -1,0 +1,1293 @@
+{
+  "selected": null,
+  "limits": {
+    "max_bytes": 10000000,
+    "max_side": 8192,
+    "max_frame_pixels": 40000000,
+    "max_frames": 300,
+    "max_total_pixels": 100000000,
+    "deadline_ms": 5000
+  },
+  "verdict": "blocked",
+  "fixtures": [
+    {
+      "name": "static.png",
+      "bytes": 442,
+      "expected": {
+        "format": "png",
+        "verdict": "accept",
+        "animated": false
+      },
+      "recipe": "ffmpeg -f lavfi -i testsrc=size=64x48:rate=5:duration=1 -frames:v 1",
+      "sha256": "15b8da68f777d7caaab816ede7dc7364cc979cc9bffaab4e93d39e24b624d49d"
+    },
+    {
+      "name": "animated.apng",
+      "bytes": 982,
+      "expected": {
+        "format": "png",
+        "verdict": "accept",
+        "animated": true
+      },
+      "recipe": "ffmpeg -f lavfi -i testsrc=size=64x48:rate=5:duration=1 -plays 0 -f apng",
+      "sha256": "5055cd64fc50760a45a1ddbb65bf3a80739508960668edd4a2ede0c0c7c6b6d4"
+    },
+    {
+      "name": "single-frame.apng",
+      "bytes": 442,
+      "expected": {
+        "format": "png",
+        "verdict": "accept",
+        "animated": false
+      },
+      "recipe": "ffmpeg -f lavfi -i testsrc=size=64x48:rate=5:duration=1 -frames:v 1 -f apng",
+      "sha256": "15b8da68f777d7caaab816ede7dc7364cc979cc9bffaab4e93d39e24b624d49d"
+    },
+    {
+      "name": "static.jpg",
+      "bytes": 1981,
+      "expected": {
+        "format": "jpeg",
+        "verdict": "accept",
+        "animated": false
+      },
+      "recipe": "ffmpeg -f lavfi -i testsrc=size=64x48:rate=5:duration=1 -frames:v 1",
+      "sha256": "f41a2cfbade71c59078a19ca63a9a1127eaa7b8eb432d51a87a97ab45158dec8"
+    },
+    {
+      "name": "static.gif",
+      "bytes": 1650,
+      "expected": {
+        "format": "gif",
+        "verdict": "accept",
+        "animated": false
+      },
+      "recipe": "ffmpeg -f lavfi -i testsrc=size=64x48:rate=5:duration=1 -frames:v 1",
+      "sha256": "c3b17d078443ade8ef5fd8a42ccfbd1e055bdddc1cbb680f0e102cdc475ed732"
+    },
+    {
+      "name": "animated.gif",
+      "bytes": 3823,
+      "expected": {
+        "format": "gif",
+        "verdict": "accept",
+        "animated": true
+      },
+      "recipe": "ffmpeg -f lavfi -i testsrc=size=64x48:rate=5:duration=1 -loop 0",
+      "sha256": "910f5814d0e830d3d6ce5a528a6ee7787de587162a54f0dc3977724a665c0068"
+    },
+    {
+      "name": "static.webp",
+      "bytes": 908,
+      "expected": {
+        "format": "webp",
+        "verdict": "accept",
+        "animated": false
+      },
+      "recipe": "libvips 8.18.3 webpsave of static.png (n=1)",
+      "sha256": "798b538ba41ab0f26ee7d14db0f7b72ef1972470ccb040795871d4510a8ace0d"
+    },
+    {
+      "name": "animated.webp",
+      "bytes": 4170,
+      "expected": {
+        "format": "webp",
+        "verdict": "accept",
+        "animated": true
+      },
+      "recipe": "libvips 8.18.3 webpsave of animated.gif (n=-1)",
+      "sha256": "85ba85485a61aa7dbf47b6e1215bf173e5976417f8cbccf5e9d76fdb04f01ded"
+    },
+    {
+      "name": "spoofed-jpeg-as.png",
+      "bytes": 1981,
+      "expected": {
+        "format": "jpeg",
+        "verdict": "accept",
+        "animated": false
+      },
+      "recipe": "copy static.jpg",
+      "sha256": "f41a2cfbade71c59078a19ca63a9a1127eaa7b8eb432d51a87a97ab45158dec8"
+    },
+    {
+      "name": "spoofed-text-as.gif",
+      "bytes": 27,
+      "expected": {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      },
+      "recipe": "write 27 synthetic bytes",
+      "sha256": "5538684e34aa237b4b532f35c8cb5af6de938e00b9a885fe072bac222181b9b2"
+    },
+    {
+      "name": "svg-as.png",
+      "bytes": 64,
+      "expected": {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      },
+      "recipe": "write 64 synthetic bytes",
+      "sha256": "b983506ec03173e11b4c8da38c40b58f93155134686bbb36a3ef08438ac6cf0c"
+    },
+    {
+      "name": "bmp.bmp",
+      "bytes": 9270,
+      "expected": {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      },
+      "recipe": "ffmpeg -f lavfi -i testsrc=size=64x48:rate=5:duration=1 -frames:v 1",
+      "sha256": "bd859d6a0f58afbb3457e02a690b89b5a73ad7b3ec8cbffbb19a5b88ca12e4e2"
+    },
+    {
+      "name": "tiff.tif",
+      "bytes": 7715,
+      "expected": {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      },
+      "recipe": "ffmpeg -f lavfi -i testsrc=size=64x48:rate=5:duration=1 -frames:v 1",
+      "sha256": "a3ec4cf75027bfc70e6ef1b9e8cf491fdd340bfdd57b58fae8e85b84513054d1"
+    },
+    {
+      "name": "empty.png",
+      "bytes": 0,
+      "expected": {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      },
+      "recipe": "write 0 synthetic bytes",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "random.bin",
+      "bytes": 4096,
+      "expected": {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      },
+      "recipe": "write 4096 synthetic bytes",
+      "sha256": "4f629d71cc7484699a7164b79f9c7b459e273c51e1ce647cfd9f239b27e5e92d"
+    },
+    {
+      "name": "png-signature-garbage.png",
+      "bytes": 520,
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "recipe": "write 520 synthetic bytes",
+      "sha256": "f613adfbe8a22cc1d191a12655d89bdfcfe154800b8d8a0e39a6685329b3446d"
+    },
+    {
+      "name": "truncated.png",
+      "bytes": 265,
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "recipe": "first 60% of static.png",
+      "sha256": "b1c55222929d7d6c9f704b3584c5d6e7731c9d9298c3cc4de469100a0327c843"
+    },
+    {
+      "name": "truncated.jpg",
+      "bytes": 1188,
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "recipe": "first 60% of static.jpg",
+      "sha256": "1437b423bbff88207ae9b86ba5eeb204417a82b84d80426263f853bdea4808fd"
+    },
+    {
+      "name": "truncated.gif",
+      "bytes": 2293,
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "recipe": "first 60% of animated.gif",
+      "sha256": "e894506bbbb6f1feefcbbc594bf56c4444cc3771f4ff440a255e459978d5aed1"
+    },
+    {
+      "name": "truncated.webp",
+      "bytes": 2502,
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "recipe": "first 60% of animated.webp",
+      "sha256": "edfb44a1516fbce6149775e0724aa0b955649f5ce066c72555ce07837334b40d"
+    },
+    {
+      "name": "truncated.apng",
+      "bytes": 589,
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "recipe": "first 60% of animated.apng",
+      "sha256": "5bb9d10d54ad2ecd834af3ad23e65da30b71f953092848b495ea1438f5987aa4"
+    },
+    {
+      "name": "corrupt-idat.png",
+      "bytes": 442,
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "recipe": "static.png with byte 72 inverted inside IDAT",
+      "sha256": "913cf81e15352e4d279ba19dd24a368c3fab46b25fb489932a967308d350be6b"
+    },
+    {
+      "name": "huge-dimensions.png",
+      "bytes": 389648,
+      "expected": {
+        "reason": "dimensions_over_limit",
+        "verdict": "reject"
+      },
+      "recipe": "libvips black 20000x20000 1-band pngsave compression=9",
+      "sha256": "b4fc4eb805d2813ae978faa28fd17f495d6aed4bcf3a8e2e25be5aef7d0e289b"
+    },
+    {
+      "name": "frame-pixels-over.png",
+      "bytes": 62587,
+      "expected": {
+        "reason": "frame_pixels_over_limit",
+        "verdict": "reject"
+      },
+      "recipe": "libvips black 8000x8000 1-band pngsave compression=9",
+      "sha256": "8e5a2b69ce3b521ce009a5b7099b7c5f3210527ed261b62c7edf2e69b404ad1c"
+    },
+    {
+      "name": "at-pixel-budget.png",
+      "bytes": 35330,
+      "expected": {
+        "format": "png",
+        "verdict": "accept",
+        "animated": false
+      },
+      "recipe": "libvips black 6000x6000 1-band pngsave compression=9",
+      "sha256": "cbf5723e2a37653515e2932ea8b60b4d6942fca72dde28ebee74e6626dbad68d"
+    },
+    {
+      "name": "many-frames.gif",
+      "bytes": 25836,
+      "expected": {
+        "reason": "frames_over_limit",
+        "verdict": "reject"
+      },
+      "recipe": "ffmpeg -f lavfi -i color=c=red:size=16x16:rate=50:duration=20 -loop 0",
+      "sha256": "e6945acaf30ba58cfc48bad4b73a946a2171d4a425039db67909999af395d46f"
+    },
+    {
+      "name": "total-pixels-over.gif",
+      "bytes": 5303194,
+      "expected": {
+        "reason": "total_pixels_over_limit",
+        "verdict": "reject"
+      },
+      "recipe": "ffmpeg -f lavfi -i testsrc=size=2000x2000:rate=10:duration=3 -loop 0",
+      "sha256": "ee14e1f3a4e5e35368b5efec2b476796bc9b97a9586e6a114951e4025647b9e0"
+    },
+    {
+      "name": "over-10mb.png",
+      "bytes": 17310389,
+      "expected": {
+        "reason": "bytes_over_limit",
+        "verdict": "reject"
+      },
+      "recipe": "libvips gaussnoise 2400x2400 sigma=60 3-band pngsave compression=0 (seeded by libvips)",
+      "sha256": "49cdc09af96b22ea114cd57276e835731c1984ac4df6cf44cb6c9c3803d276c2"
+    }
+  ],
+  "results": [
+    {
+      "exit_status": 0,
+      "format": "png",
+      "bytes": 442,
+      "pass": true,
+      "width": 64,
+      "elapsed_us": 17987,
+      "vips_highwater_bytes": 62860,
+      "frames": 1,
+      "verdict": "accept",
+      "animated": false,
+      "height": 48,
+      "candidate": "vix",
+      "fixture": "static.png",
+      "expected": {
+        "format": "png",
+        "verdict": "accept",
+        "animated": false
+      },
+      "peak_rss_bytes": 133005312
+    },
+    {
+      "exit_status": 0,
+      "format": "png",
+      "bytes": 442,
+      "pass": true,
+      "width": 64,
+      "elapsed_us": 65398,
+      "frames": 1,
+      "verdict": "accept",
+      "animated": false,
+      "height": 48,
+      "candidate": "ffprobe",
+      "fixture": "static.png",
+      "expected": {
+        "format": "png",
+        "verdict": "accept",
+        "animated": false
+      },
+      "peak_rss_bytes": 117637120
+    },
+    {
+      "exit_status": 0,
+      "format": "png",
+      "bytes": 982,
+      "pass": false,
+      "width": 64,
+      "elapsed_us": 14976,
+      "vips_highwater_bytes": 66003,
+      "frames": 1,
+      "verdict": "accept",
+      "animated": false,
+      "height": 48,
+      "candidate": "vix",
+      "fixture": "animated.apng",
+      "expected": {
+        "format": "png",
+        "verdict": "accept",
+        "animated": true
+      },
+      "peak_rss_bytes": 134758400
+    },
+    {
+      "exit_status": 0,
+      "format": "png",
+      "bytes": 982,
+      "pass": true,
+      "width": 64,
+      "elapsed_us": 30209,
+      "frames": 5,
+      "verdict": "accept",
+      "animated": true,
+      "height": 48,
+      "candidate": "ffprobe",
+      "fixture": "animated.apng",
+      "expected": {
+        "format": "png",
+        "verdict": "accept",
+        "animated": true
+      },
+      "peak_rss_bytes": 117161984
+    },
+    {
+      "exit_status": 0,
+      "format": "png",
+      "bytes": 442,
+      "pass": true,
+      "width": 64,
+      "elapsed_us": 14769,
+      "vips_highwater_bytes": 56693,
+      "frames": 1,
+      "verdict": "accept",
+      "animated": false,
+      "height": 48,
+      "candidate": "vix",
+      "fixture": "single-frame.apng",
+      "expected": {
+        "format": "png",
+        "verdict": "accept",
+        "animated": false
+      },
+      "peak_rss_bytes": 129826816
+    },
+    {
+      "exit_status": 0,
+      "format": "png",
+      "bytes": 442,
+      "pass": true,
+      "width": 64,
+      "elapsed_us": 30124,
+      "frames": 1,
+      "verdict": "accept",
+      "animated": false,
+      "height": 48,
+      "candidate": "ffprobe",
+      "fixture": "single-frame.apng",
+      "expected": {
+        "format": "png",
+        "verdict": "accept",
+        "animated": false
+      },
+      "peak_rss_bytes": 123797504
+    },
+    {
+      "exit_status": 0,
+      "format": "jpeg",
+      "bytes": 1981,
+      "pass": true,
+      "width": 64,
+      "elapsed_us": 17393,
+      "vips_highwater_bytes": 69288,
+      "frames": 1,
+      "verdict": "accept",
+      "animated": false,
+      "height": 48,
+      "candidate": "vix",
+      "fixture": "static.jpg",
+      "expected": {
+        "format": "jpeg",
+        "verdict": "accept",
+        "animated": false
+      },
+      "peak_rss_bytes": 122273792
+    },
+    {
+      "exit_status": 0,
+      "format": "jpeg",
+      "bytes": 1981,
+      "pass": true,
+      "width": 64,
+      "elapsed_us": 32370,
+      "frames": 1,
+      "verdict": "accept",
+      "animated": false,
+      "height": 48,
+      "candidate": "ffprobe",
+      "fixture": "static.jpg",
+      "expected": {
+        "format": "jpeg",
+        "verdict": "accept",
+        "animated": false
+      },
+      "peak_rss_bytes": 117506048
+    },
+    {
+      "exit_status": 0,
+      "format": "gif",
+      "bytes": 1650,
+      "pass": true,
+      "width": 64,
+      "elapsed_us": 14133,
+      "vips_highwater_bytes": 66003,
+      "frames": 1,
+      "verdict": "accept",
+      "animated": false,
+      "height": 48,
+      "candidate": "vix",
+      "fixture": "static.gif",
+      "expected": {
+        "format": "gif",
+        "verdict": "accept",
+        "animated": false
+      },
+      "peak_rss_bytes": 127877120
+    },
+    {
+      "exit_status": 0,
+      "format": "gif",
+      "bytes": 1650,
+      "pass": true,
+      "width": 64,
+      "elapsed_us": 33173,
+      "frames": 1,
+      "verdict": "accept",
+      "animated": false,
+      "height": 48,
+      "candidate": "ffprobe",
+      "fixture": "static.gif",
+      "expected": {
+        "format": "gif",
+        "verdict": "accept",
+        "animated": false
+      },
+      "peak_rss_bytes": 117751808
+    },
+    {
+      "exit_status": 0,
+      "format": "gif",
+      "bytes": 3823,
+      "pass": true,
+      "width": 64,
+      "elapsed_us": 18471,
+      "vips_highwater_bytes": 162513,
+      "frames": 5,
+      "verdict": "accept",
+      "animated": true,
+      "height": 48,
+      "candidate": "vix",
+      "fixture": "animated.gif",
+      "expected": {
+        "format": "gif",
+        "verdict": "accept",
+        "animated": true
+      },
+      "peak_rss_bytes": 123060224
+    },
+    {
+      "exit_status": 0,
+      "format": "gif",
+      "bytes": 3823,
+      "pass": true,
+      "width": 64,
+      "elapsed_us": 30188,
+      "frames": 5,
+      "verdict": "accept",
+      "animated": true,
+      "height": 48,
+      "candidate": "ffprobe",
+      "fixture": "animated.gif",
+      "expected": {
+        "format": "gif",
+        "verdict": "accept",
+        "animated": true
+      },
+      "peak_rss_bytes": 120504320
+    },
+    {
+      "exit_status": 0,
+      "format": "webp",
+      "bytes": 908,
+      "pass": true,
+      "width": 64,
+      "elapsed_us": 16073,
+      "vips_highwater_bytes": 81782,
+      "frames": 1,
+      "verdict": "accept",
+      "animated": false,
+      "height": 48,
+      "candidate": "vix",
+      "fixture": "static.webp",
+      "expected": {
+        "format": "webp",
+        "verdict": "accept",
+        "animated": false
+      },
+      "peak_rss_bytes": 124813312
+    },
+    {
+      "exit_status": 0,
+      "format": "webp",
+      "bytes": 908,
+      "pass": true,
+      "width": 64,
+      "elapsed_us": 33011,
+      "frames": 1,
+      "verdict": "accept",
+      "animated": false,
+      "height": 48,
+      "candidate": "ffprobe",
+      "fixture": "static.webp",
+      "expected": {
+        "format": "webp",
+        "verdict": "accept",
+        "animated": false
+      },
+      "peak_rss_bytes": 117342208
+    },
+    {
+      "exit_status": 0,
+      "format": "webp",
+      "bytes": 4170,
+      "pass": true,
+      "width": 64,
+      "elapsed_us": 15085,
+      "vips_highwater_bytes": 210381,
+      "frames": 5,
+      "verdict": "accept",
+      "animated": true,
+      "height": 48,
+      "candidate": "vix",
+      "fixture": "animated.webp",
+      "expected": {
+        "format": "webp",
+        "verdict": "accept",
+        "animated": true
+      },
+      "peak_rss_bytes": 126140416
+    },
+    {
+      "exit_status": 0,
+      "reason": "malformed",
+      "pass": false,
+      "elapsed_us": 29187,
+      "verdict": "reject",
+      "candidate": "ffprobe",
+      "fixture": "animated.webp",
+      "expected": {
+        "format": "webp",
+        "verdict": "accept",
+        "animated": true
+      },
+      "peak_rss_bytes": 118554624
+    },
+    {
+      "exit_status": 0,
+      "format": "jpeg",
+      "bytes": 1981,
+      "pass": true,
+      "width": 64,
+      "elapsed_us": 20980,
+      "vips_highwater_bytes": 75645,
+      "frames": 1,
+      "verdict": "accept",
+      "animated": false,
+      "height": 48,
+      "candidate": "vix",
+      "fixture": "spoofed-jpeg-as.png",
+      "expected": {
+        "format": "jpeg",
+        "verdict": "accept",
+        "animated": false
+      },
+      "peak_rss_bytes": 124534784
+    },
+    {
+      "exit_status": 0,
+      "format": "jpeg",
+      "bytes": 1981,
+      "pass": true,
+      "width": 64,
+      "elapsed_us": 32014,
+      "frames": 1,
+      "verdict": "accept",
+      "animated": false,
+      "height": 48,
+      "candidate": "ffprobe",
+      "fixture": "spoofed-jpeg-as.png",
+      "expected": {
+        "format": "jpeg",
+        "verdict": "accept",
+        "animated": false
+      },
+      "peak_rss_bytes": 121028608
+    },
+    {
+      "exit_status": 0,
+      "reason": "unclassifiable",
+      "pass": true,
+      "elapsed_us": 193,
+      "vips_highwater_bytes": 0,
+      "verdict": "reject",
+      "candidate": "vix",
+      "fixture": "spoofed-text-as.gif",
+      "expected": {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 121225216
+    },
+    {
+      "exit_status": 0,
+      "reason": "malformed",
+      "pass": true,
+      "elapsed_us": 26534,
+      "verdict": "reject",
+      "candidate": "ffprobe",
+      "fixture": "spoofed-text-as.gif",
+      "expected": {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 118079488
+    },
+    {
+      "exit_status": 0,
+      "reason": "unclassifiable",
+      "pass": true,
+      "elapsed_us": 133,
+      "vips_highwater_bytes": 0,
+      "verdict": "reject",
+      "candidate": "vix",
+      "fixture": "svg-as.png",
+      "expected": {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 127909888
+    },
+    {
+      "exit_status": 0,
+      "reason": "unclassifiable",
+      "pass": true,
+      "elapsed_us": 43784,
+      "verdict": "reject",
+      "candidate": "ffprobe",
+      "fixture": "svg-as.png",
+      "expected": {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 127680512
+    },
+    {
+      "exit_status": 0,
+      "reason": "unclassifiable",
+      "pass": true,
+      "elapsed_us": 131,
+      "vips_highwater_bytes": 0,
+      "verdict": "reject",
+      "candidate": "vix",
+      "fixture": "bmp.bmp",
+      "expected": {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 120635392
+    },
+    {
+      "exit_status": 0,
+      "reason": "unclassifiable",
+      "pass": true,
+      "elapsed_us": 29952,
+      "verdict": "reject",
+      "candidate": "ffprobe",
+      "fixture": "bmp.bmp",
+      "expected": {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 117047296
+    },
+    {
+      "exit_status": 0,
+      "reason": "unclassifiable",
+      "pass": true,
+      "elapsed_us": 211,
+      "vips_highwater_bytes": 0,
+      "verdict": "reject",
+      "candidate": "vix",
+      "fixture": "tiff.tif",
+      "expected": {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 121896960
+    },
+    {
+      "exit_status": 0,
+      "reason": "unclassifiable",
+      "pass": true,
+      "elapsed_us": 33127,
+      "verdict": "reject",
+      "candidate": "ffprobe",
+      "fixture": "tiff.tif",
+      "expected": {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 122486784
+    },
+    {
+      "exit_status": 0,
+      "reason": "unclassifiable",
+      "pass": true,
+      "elapsed_us": 302,
+      "vips_highwater_bytes": 0,
+      "verdict": "reject",
+      "candidate": "vix",
+      "fixture": "empty.png",
+      "expected": {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 127057920
+    },
+    {
+      "exit_status": 0,
+      "reason": "malformed",
+      "pass": true,
+      "elapsed_us": 27242,
+      "verdict": "reject",
+      "candidate": "ffprobe",
+      "fixture": "empty.png",
+      "expected": {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 119586816
+    },
+    {
+      "exit_status": 0,
+      "reason": "unclassifiable",
+      "pass": true,
+      "elapsed_us": 131,
+      "vips_highwater_bytes": 0,
+      "verdict": "reject",
+      "candidate": "vix",
+      "fixture": "random.bin",
+      "expected": {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 122208256
+    },
+    {
+      "exit_status": 0,
+      "reason": "malformed",
+      "pass": true,
+      "elapsed_us": 26305,
+      "verdict": "reject",
+      "candidate": "ffprobe",
+      "fixture": "random.bin",
+      "expected": {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 116637696
+    },
+    {
+      "exit_status": 0,
+      "reason": "malformed",
+      "pass": true,
+      "elapsed_us": 10911,
+      "vips_highwater_bytes": 0,
+      "verdict": "reject",
+      "candidate": "vix",
+      "fixture": "png-signature-garbage.png",
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 122109952
+    },
+    {
+      "exit_status": 0,
+      "reason": "malformed",
+      "pass": true,
+      "elapsed_us": 29828,
+      "verdict": "reject",
+      "candidate": "ffprobe",
+      "fixture": "png-signature-garbage.png",
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 121257984
+    },
+    {
+      "exit_status": 0,
+      "reason": "malformed",
+      "pass": true,
+      "elapsed_us": 16078,
+      "vips_highwater_bytes": 37716,
+      "verdict": "reject",
+      "candidate": "vix",
+      "fixture": "truncated.png",
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 120537088
+    },
+    {
+      "exit_status": 0,
+      "reason": "malformed",
+      "pass": true,
+      "elapsed_us": 35113,
+      "verdict": "reject",
+      "candidate": "ffprobe",
+      "fixture": "truncated.png",
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 123617280
+    },
+    {
+      "exit_status": 0,
+      "reason": "malformed",
+      "pass": true,
+      "elapsed_us": 30634,
+      "vips_highwater_bytes": 66074,
+      "verdict": "reject",
+      "candidate": "vix",
+      "fixture": "truncated.jpg",
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 130662400
+    },
+    {
+      "exit_status": 0,
+      "format": "jpeg",
+      "bytes": 1188,
+      "pass": false,
+      "width": 64,
+      "elapsed_us": 29998,
+      "frames": 1,
+      "verdict": "accept",
+      "animated": false,
+      "height": 48,
+      "candidate": "ffprobe",
+      "fixture": "truncated.jpg",
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 117997568
+    },
+    {
+      "exit_status": 0,
+      "format": "gif",
+      "bytes": 2293,
+      "pass": false,
+      "width": 64,
+      "elapsed_us": 16931,
+      "vips_highwater_bytes": 150012,
+      "frames": 3,
+      "verdict": "accept",
+      "animated": true,
+      "height": 48,
+      "candidate": "vix",
+      "fixture": "truncated.gif",
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 133529600
+    },
+    {
+      "exit_status": 0,
+      "format": "gif",
+      "bytes": 2293,
+      "pass": false,
+      "width": 64,
+      "elapsed_us": 28709,
+      "frames": 3,
+      "verdict": "accept",
+      "animated": true,
+      "height": 48,
+      "candidate": "ffprobe",
+      "fixture": "truncated.gif",
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 118390784
+    },
+    {
+      "exit_status": 0,
+      "reason": "malformed",
+      "pass": true,
+      "elapsed_us": 14563,
+      "vips_highwater_bytes": 0,
+      "verdict": "reject",
+      "candidate": "vix",
+      "fixture": "truncated.webp",
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 123502592
+    },
+    {
+      "exit_status": 0,
+      "reason": "malformed",
+      "pass": true,
+      "elapsed_us": 38627,
+      "verdict": "reject",
+      "candidate": "ffprobe",
+      "fixture": "truncated.webp",
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 121602048
+    },
+    {
+      "exit_status": 0,
+      "format": "png",
+      "bytes": 589,
+      "pass": false,
+      "width": 64,
+      "elapsed_us": 22376,
+      "vips_highwater_bytes": 59717,
+      "frames": 1,
+      "verdict": "accept",
+      "animated": false,
+      "height": 48,
+      "candidate": "vix",
+      "fixture": "truncated.apng",
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 126861312
+    },
+    {
+      "exit_status": 0,
+      "format": "png",
+      "bytes": 589,
+      "pass": false,
+      "width": 64,
+      "elapsed_us": 33388,
+      "frames": 1,
+      "verdict": "accept",
+      "animated": false,
+      "height": 48,
+      "candidate": "ffprobe",
+      "fixture": "truncated.apng",
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 120750080
+    },
+    {
+      "exit_status": 0,
+      "reason": "malformed",
+      "pass": true,
+      "elapsed_us": 16212,
+      "vips_highwater_bytes": 53431,
+      "verdict": "reject",
+      "candidate": "vix",
+      "fixture": "corrupt-idat.png",
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 122896384
+    },
+    {
+      "exit_status": 0,
+      "reason": "malformed",
+      "pass": true,
+      "elapsed_us": 29720,
+      "verdict": "reject",
+      "candidate": "ffprobe",
+      "fixture": "corrupt-idat.png",
+      "expected": {
+        "reason": "malformed",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 127500288
+    },
+    {
+      "exit_status": 0,
+      "reason": "dimensions_over_limit",
+      "pass": true,
+      "elapsed_us": 18612,
+      "vips_highwater_bytes": 0,
+      "verdict": "reject",
+      "candidate": "vix",
+      "fixture": "huge-dimensions.png",
+      "expected": {
+        "reason": "dimensions_over_limit",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 127172608
+    },
+    {
+      "exit_status": 0,
+      "reason": "malformed",
+      "pass": false,
+      "elapsed_us": 29496,
+      "verdict": "reject",
+      "candidate": "ffprobe",
+      "fixture": "huge-dimensions.png",
+      "expected": {
+        "reason": "dimensions_over_limit",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 122929152
+    },
+    {
+      "exit_status": 0,
+      "reason": "frame_pixels_over_limit",
+      "pass": true,
+      "elapsed_us": 13146,
+      "vips_highwater_bytes": 0,
+      "verdict": "reject",
+      "candidate": "vix",
+      "fixture": "frame-pixels-over.png",
+      "expected": {
+        "reason": "frame_pixels_over_limit",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 123420672
+    },
+    {
+      "exit_status": 0,
+      "reason": "frame_pixels_over_limit",
+      "pass": true,
+      "elapsed_us": 75514,
+      "verdict": "reject",
+      "candidate": "ffprobe",
+      "fixture": "frame-pixels-over.png",
+      "expected": {
+        "reason": "frame_pixels_over_limit",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 121700352
+    },
+    {
+      "exit_status": 0,
+      "format": "png",
+      "bytes": 35330,
+      "pass": true,
+      "width": 6000,
+      "elapsed_us": 29739,
+      "vips_highwater_bytes": 10663881,
+      "frames": 1,
+      "verdict": "accept",
+      "animated": false,
+      "height": 6000,
+      "candidate": "vix",
+      "fixture": "at-pixel-budget.png",
+      "expected": {
+        "format": "png",
+        "verdict": "accept",
+        "animated": false
+      },
+      "peak_rss_bytes": 131137536
+    },
+    {
+      "exit_status": 0,
+      "format": "png",
+      "bytes": 35330,
+      "pass": true,
+      "width": 6000,
+      "elapsed_us": 57397,
+      "frames": 1,
+      "verdict": "accept",
+      "animated": false,
+      "height": 6000,
+      "candidate": "ffprobe",
+      "fixture": "at-pixel-budget.png",
+      "expected": {
+        "format": "png",
+        "verdict": "accept",
+        "animated": false
+      },
+      "peak_rss_bytes": 122896384
+    },
+    {
+      "exit_status": 0,
+      "reason": "frames_over_limit",
+      "pass": true,
+      "elapsed_us": 12699,
+      "vips_highwater_bytes": 0,
+      "verdict": "reject",
+      "candidate": "vix",
+      "fixture": "many-frames.gif",
+      "expected": {
+        "reason": "frames_over_limit",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 123895808
+    },
+    {
+      "exit_status": 0,
+      "reason": "frames_over_limit",
+      "pass": true,
+      "elapsed_us": 30547,
+      "verdict": "reject",
+      "candidate": "ffprobe",
+      "fixture": "many-frames.gif",
+      "expected": {
+        "reason": "frames_over_limit",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 117686272
+    },
+    {
+      "exit_status": 0,
+      "reason": "total_pixels_over_limit",
+      "pass": true,
+      "elapsed_us": 14982,
+      "vips_highwater_bytes": 0,
+      "verdict": "reject",
+      "candidate": "vix",
+      "fixture": "total-pixels-over.gif",
+      "expected": {
+        "reason": "total_pixels_over_limit",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 133955584
+    },
+    {
+      "exit_status": 0,
+      "reason": "total_pixels_over_limit",
+      "pass": true,
+      "elapsed_us": 391259,
+      "verdict": "reject",
+      "candidate": "ffprobe",
+      "fixture": "total-pixels-over.gif",
+      "expected": {
+        "reason": "total_pixels_over_limit",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 121683968
+    },
+    {
+      "exit_status": 0,
+      "reason": "bytes_over_limit",
+      "pass": true,
+      "elapsed_us": 181,
+      "vips_highwater_bytes": 0,
+      "verdict": "reject",
+      "candidate": "vix",
+      "fixture": "over-10mb.png",
+      "expected": {
+        "reason": "bytes_over_limit",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 121782272
+    },
+    {
+      "exit_status": 0,
+      "reason": "bytes_over_limit",
+      "pass": true,
+      "elapsed_us": 133,
+      "verdict": "reject",
+      "candidate": "ffprobe",
+      "fixture": "over-10mb.png",
+      "expected": {
+        "reason": "bytes_over_limit",
+        "verdict": "reject"
+      },
+      "peak_rss_bytes": 119177216
+    }
+  ],
+  "candidates": [
+    {
+      "failed": [
+        "animated.apng",
+        "truncated.gif",
+        "truncated.apng"
+      ],
+      "fixtures": 28,
+      "candidate": "vix",
+      "selectable": false
+    },
+    {
+      "failed": [
+        "animated.webp",
+        "truncated.jpg",
+        "truncated.gif",
+        "truncated.apng",
+        "huge-dimensions.png"
+      ],
+      "fixtures": 28,
+      "candidate": "ffprobe",
+      "selectable": false
+    }
+  ],
+  "experiment": "parser_formats_bounds",
+  "retrieved": "2026-09-23",
+  "versions": {
+    "os": "unix/darwin",
+    "otp": "29",
+    "elixir": "1.20.4",
+    "vix": "0.41.0",
+    "libvips": "8.18.3",
+    "ffprobe": "ffprobe version 8.1 Copyright (c) 2007-2026 the FFmpeg developers"
+  },
+  "memory_bound": "measured only: pre-decode pixel/frame budgets bound decode work; no OS memory cap is applied in this probe"
+}
