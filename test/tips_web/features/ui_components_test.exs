@@ -14,6 +14,14 @@ defmodule TipsWeb.UIComponentsTest do
     execute_script(session, script, [], check)
   end
 
+  defp assert_focus(session, id) do
+    js(
+      session,
+      "const el = document.activeElement; return [el.id, `${el.tagName}#${el.id}.${el.className}`]",
+      fn [active_id, element] -> assert active_id == id, "focus is on #{element}" end
+    )
+  end
+
   feature "built assets carry the Tips baseline", %{session: session} do
     session
     |> connected("/_ui")
@@ -30,21 +38,32 @@ defmodule TipsWeb.UIComponentsTest do
         assert background in ["rgb(255, 255, 255)", "oklch(1 0 0)"]
       end
     )
-    |> send_keys([:tab])
+    # Script focus, not a Tab from <body>: headless Chrome in CI does not move
+    # focus on a page-level Tab. The button follows a focus-visible input, so
+    # it matches :focus-visible too.
     |> js(
       """
-      const style = getComputedStyle(document.activeElement);
-      document.getElementById("fixture_body").focus();
-      const input = getComputedStyle(document.activeElement);
-      return [style.outlineWidth, style.outlineStyle, input.outlineWidth, input.outlineStyle];
+      const outline = (el) => {
+        el.focus();
+        const style = getComputedStyle(document.activeElement);
+        return [style.outlineWidth, style.outlineStyle, describe(document.activeElement)];
+      };
+      const describe = (el) =>
+        `${el.tagName}#${el.id}.${el.className} focus-visible=${el.matches(":focus-visible")}`;
+      const search = [...document.querySelectorAll("button")].find(b => b.textContent.trim() === "Search");
+      return [outline(document.getElementById("fixture_body")), outline(search)];
       """,
-      fn outlines -> assert outlines == ["2px", "solid", "2px", "solid"] end
+      fn [[input_width, input_style, input], [button_width, button_style, button]] ->
+        assert {input_width, input_style} == {"2px", "solid"}, input
+        assert {button_width, button_style} == {"2px", "solid"}, button
+      end
     )
   end
 
-  feature "a filter change patches the URL and keeps focus; Clear filters keeps the query", %{
-    session: session
-  } do
+  feature "a filter change patches the URL and keeps focus; Clear filters keeps the query and focuses the filter note",
+          %{
+            session: session
+          } do
     session
     |> connected("/_ui?q=flaky")
     |> js(
@@ -57,10 +76,11 @@ defmodule TipsWeb.UIComponentsTest do
       fn _ -> :ok end
     )
     |> assert_has(css("#applied", text: "q=flaky&technique=planning"))
-    |> js("return document.activeElement.id", &assert(&1 == "technique"))
-    |> click(link("Clear filters"))
-    |> refute_has(link("Clear filters"))
+    |> assert_focus("technique")
+    |> click(button("Clear filters"))
+    |> refute_has(button("Clear filters"))
     |> js("return document.getElementById('applied').textContent", &assert(&1 == "q=flaky"))
+    |> assert_focus("filters-note")
     |> js("return document.getElementById('technique').value", &assert(&1 == ""))
   end
 
@@ -87,7 +107,7 @@ defmodule TipsWeb.UIComponentsTest do
     |> assert_has(css("#q-error", text: "Enter a task or keywords to search."))
     |> assert_has(css("#applied", text: "q=flaky"))
     |> assert_has(css("#results", text: "Results for “flaky”"))
-    |> js("return document.activeElement.id", &assert(&1 == "q"))
+    |> assert_focus("q")
   end
 
   feature "reconnect renders the URL-driven select values", %{session: session} do

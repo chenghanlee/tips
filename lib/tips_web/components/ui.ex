@@ -268,7 +268,11 @@ defmodule TipsWeb.UI do
 
   @doc """
   Renders a filter group: the behaviour note, the `filter_select/1` controls
-  and, when any filter is active, Clear filters.
+  and, when any filter is active, Clear filters. Clear filters removes
+  itself, so it moves focus to the note; the next Tab reaches the first
+  select. Focus does not go to a select directly: LiveView keeps a focused
+  select's current value when patching, so the select would keep showing the
+  cleared filter.
 
   The page passes `phx-change` and patches the URL; the URL is the only
   filter state, so reconnect form recovery is off.
@@ -293,12 +297,18 @@ defmodule TipsWeb.UI do
       phx-auto-recover="ignore"
       {@rest}
     >
-      <p id={"#{@id}-note"} class="text-sm">{@note}</p>
+      <p id={"#{@id}-note"} class="text-sm" tabindex="-1">{@note}</p>
       <div class="grid grid-cols-[repeat(auto-fit,minmax(7.5rem,1fr))] items-end gap-x-3 gap-y-2">
         {render_slot(@inner_block)}
       </div>
       <p :if={@active}>
-        <.link patch={@clear_href} class={link_button_class("ghost")}>Clear filters</.link>
+        <.button
+          type="button"
+          variant="ghost"
+          phx-click={JS.patch(@clear_href) |> JS.focus(to: "##{@id}-note")}
+        >
+          Clear filters
+        </.button>
       </p>
     </form>
     """
@@ -308,8 +318,11 @@ defmodule TipsWeb.UI do
   Renders the task-framed search field with its Search button.
 
   The page runs the shared trim check: a blank submit sets `error` and changes
-  nothing else. Every submit moves focus to the field. No `required`, which
-  whitespace passes.
+  nothing else. No `required`, which whitespace passes.
+
+  Every submit leaves focus on the field. The focus runs before the push
+  because LiveView blurs the focused element on submit and refocuses it when
+  the server replies; with the field focused first, that is the field.
 
       <TipsWeb.UI.search_form value={@query} error={@search_error} action={~p"/search"} />
   """
@@ -336,7 +349,7 @@ defmodule TipsWeb.UI do
       action={@action}
       method="get"
       class="grid gap-1"
-      phx-submit={JS.push(@on_submit) |> JS.focus(to: "##{@id}")}
+      phx-submit={JS.focus(to: "##{@id}") |> JS.push(@on_submit)}
     >
       <label for={@id} class="text-sm font-medium">What are you trying to do?</label>
       <p id={"#{@id}-help"} class="text-sm text-muted-foreground">
@@ -436,7 +449,7 @@ defmodule TipsWeb.UI do
         </span>
         <time datetime={@tip.datetime}>{@tip.age}</time>
         <span>Net {net_score(@tip.net_score)}</span>
-        <span>{ngettext("1 review", "%{count} reviews", @tip.review_count)}</span>
+        <span>{review_count(@tip.review_count)}</span>
       </div>
       <.link
         :for={excerpt <- @excerpt}
@@ -453,9 +466,8 @@ defmodule TipsWeb.UI do
   defp net_score(score) when score > 0, do: "+#{score}"
   defp net_score(score), do: to_string(score)
 
-  defp ngettext(one, many, count) do
-    if count == 1, do: one, else: String.replace(many, "%{count}", to_string(count))
-  end
+  defp review_count(1), do: "1 review"
+  defp review_count(count), do: "#{count} reviews"
 
   @doc """
   Renders Helpful / Not helpful. Emits `phx-click="vote"` with `target` and

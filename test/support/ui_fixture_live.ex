@@ -84,6 +84,7 @@ defmodule TipsWeb.UIFixtureLive do
   def mount(_params, _session, socket) do
     {:ok,
      assign(socket,
+       page_title: "UI fixture",
        filters: @filters,
        options: @options,
        search_error: nil,

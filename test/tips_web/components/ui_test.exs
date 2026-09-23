@@ -306,7 +306,10 @@ defmodule TipsWeb.UITest do
     assigns = %{}
 
     doc = parse(~H|<UI.filter_bar id="filters" active clear_href="/?sort=hot"></UI.filter_bar>|)
-    assert text(doc, "a[href='/?sort=hot']") =~ "Clear filters"
+    assert text(doc, "button[type=button]") =~ "Clear filters"
+    assert get_attr(doc, "button", "phx-click") =~ ~s("href":"/?sort=hot")
+    assert get_attr(doc, "button", "phx-click") =~ ~s(["focus",{"to":"#filters-note"}])
+    assert get_attr(doc, "#filters-note", "tabindex") == "-1"
     assert text(doc, "#filters-note") =~ "Changing a selection updates the list"
 
     doc =
