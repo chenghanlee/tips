@@ -11,7 +11,7 @@ defmodule Tips.ProviderConfigTest do
   @names @search ++ @image ++ @video
 
   @synthetic %{
-    "OPENROUTER_API_KEY" => "sk-or-synthetic-0001",
+    "OPENROUTER_API_KEY" => "synthetic-key",
     "CLOUDFLARE_ACCOUNT_ID" => "synthetic-account",
     "R2_BUCKET" => "synthetic-bucket",
     "R2_ENDPOINT" => "https://synthetic.r2.example.test",
@@ -33,7 +33,7 @@ defmodule Tips.ProviderConfigTest do
   end
   """
 
-  test "absent or empty .env boots dev; search, image and video lookups name the missing variable",
+  test "dev runtime config evaluates with absent or empty .env; search, image and video lookups name the missing variable",
        %{tmp_dir: tmp_dir} do
     for dotenv <- [nil, ""] do
       results = run!(tmp_dir, :dev, @fetch_all, dotenv: dotenv)
@@ -48,7 +48,7 @@ defmodule Tips.ProviderConfigTest do
   test "all ten names load from .env in dev and test", %{tmp_dir: tmp_dir} do
     dotenv = """
     # Provider settings
-    OPENROUTER_API_KEY=sk-or-synthetic-0001
+    OPENROUTER_API_KEY=synthetic-key
     export CLOUDFLARE_ACCOUNT_ID=synthetic-account
     R2_BUCKET=synthetic-bucket   # trailing comment
     R2_ENDPOINT=https://synthetic.r2.example.test
@@ -68,6 +68,9 @@ defmodule Tips.ProviderConfigTest do
     for env <- [:dev, :test] do
       assert run!(tmp_dir, env, @fetch_all, dotenv: dotenv) == expected
     end
+
+    assert %{"R2_BUCKET" => {:ok, "bom-bucket"}} =
+             run!(tmp_dir, :dev, @fetch_all, dotenv: "\uFEFFR2_BUCKET=bom-bucket\n")
   end
 
   test "exported environment wins over .env", %{tmp_dir: tmp_dir} do
@@ -143,6 +146,10 @@ defmodule Tips.ProviderConfigTest do
       assert output =~ "R2_SECRET_ACCESS_KEY"
       refute output =~ "sentinel", line
     end
+
+    {output, status} = run(tmp_dir, :dev, "nil", dotenv: :directory)
+    assert status != 0
+    assert output =~ ".env: cannot read"
   end
 
   test "production ignores local .env", %{tmp_dir: tmp_dir} do
@@ -182,7 +189,12 @@ defmodule Tips.ProviderConfigTest do
     )
 
     File.rm_rf!(dotenv_path)
-    if dotenv = opts[:dotenv], do: File.write!(dotenv_path, dotenv)
+
+    case opts[:dotenv] do
+      nil -> :ok
+      :directory -> File.mkdir!(dotenv_path)
+      contents -> File.write!(dotenv_path, contents)
+    end
 
     exported =
       (@names ++ ["TIPS_REAL_PROVIDERS"])

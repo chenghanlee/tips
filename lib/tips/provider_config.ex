@@ -39,7 +39,8 @@ defmodule Tips.ProviderConfig do
       |> Map.get(name, "")
 
     if String.trim(value) == "" do
-      raise "#{name} is missing or blank. Set it in .env or export it."
+      raise "#{name} is missing or blank. Set it in .env, then re-source .env or " <>
+              "unset an overriding export; an exported value, even an empty one, wins."
     end
 
     value
@@ -66,8 +67,9 @@ defmodule Tips.ProviderConfig do
 
   defp read_dotenv(path) do
     case File.read(path) do
-      {:ok, contents} -> parse(path, contents)
+      {:ok, contents} -> parse(path, String.trim_leading(contents, "\uFEFF"))
       {:error, :enoent} -> %{}
+      {:error, reason} -> raise "#{path}: cannot read (#{:file.format_error(reason)})"
     end
   end
 

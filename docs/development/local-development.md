@@ -83,9 +83,11 @@ Search, image and video providers use ten fixed names, listed with empty values 
 `CLOUDFLARE_STREAM_SIGNING_KEY`.
 
 In dev and test, `config/runtime.exs` reads these names from the checkout's `.env`
-and from the exported environment. An exported value wins over `.env`, so after
-editing `.env`, export it again or start a new shell. A missing `.env` or empty
-values still boot the app. Other names in `.env` are ignored here.
+and from the exported environment. An exported value, even an empty one, wins over
+`.env`. After editing `.env`, re-source it or unset the overriding export. A
+missing `.env` or empty values still boot the app. Other names in `.env` are
+ignored here. A leading UTF-8 byte-order mark is ignored; a `.env` that exists but
+cannot be read stops startup.
 
 The loader never runs the shell. Each provider line must be `NAME=value`,
 `NAME='value'` or `NAME="value"`, optionally prefixed by `export ` and followed by
