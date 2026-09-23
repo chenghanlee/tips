@@ -480,8 +480,9 @@ def coordinator(pane: Entity, name: str, role: str) -> None:
         + " && unset CLAUDE_AUTOCOMPACT_PCT_OVERRIDE && export "
         + shlex.join([f"{k}={v}" for k, v in env.items()])
     )
-    # Split the marker so terminal input echo cannot satisfy the output acknowledgment.
-    command += " && printf '%s%s\\n' " + shlex.join([token[:10], token[10:]])
+    # printf's format splits the echoed token with non-space text, so neither input echo
+    # nor unwrapping, which can drop spaces at a wrap point, acknowledges setup.
+    command += " && printf 'team-setup-%s\\n' " + token.removeprefix("team-setup-")
     herdr("pane", "run", pane["pane_id"], command)
     herdr(
         "pane",
@@ -490,7 +491,7 @@ def coordinator(pane: Entity, name: str, role: str) -> None:
         "--match",
         token,
         "--source",
-        "detection",
+        "recent-unwrapped",
         "--timeout",
         str(cfg["timeouts"]["shell_seconds"] * 1000),
     )

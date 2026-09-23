@@ -239,6 +239,11 @@ class WorktreeTask:
                         f"Missing executable: {tools / binary}; run tool preflight first."
                     )
 
+    def fetch(self) -> None:
+        # Review heads are often pushed after main's last fetch; fetch before resolving them.
+        if self.args.review_ref or not (self.worktree.exists() or self.existing_branch):
+            git("fetch", "origin")
+
     def inspect_worktree(self) -> None:
         self.review_sha = (
             git("rev-parse", "--verify", "--end-of-options", self.args.review_ref + "^{commit}")
@@ -322,8 +327,6 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
             }
 
     def check_target_tree(self) -> None:
-        if not self.worktree.exists() and (not self.review_sha) and (not self.existing_branch):
-            git("fetch", "origin")
         self.target_tree = git(
             "rev-parse",
             self.review_sha
@@ -515,7 +518,8 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
         )
         if "compaction_percent" not in self.role:
             setup += " && unset CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"
-        setup += " && printf '\\n%s%s\\n' " + shlex.join([marker[:16], marker[16:]])
+        # As in team.coordinator: the echoed format never contains the whole marker.
+        setup += " && printf '\\nTIPS_TASK_READY_%s\\n' " + marker.removeprefix("TIPS_TASK_READY_")
         self.herdr("pane", "run", self.args.pane, setup)
         self.herdr(
             "pane",
@@ -524,7 +528,7 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
             "--match",
             marker,
             "--source",
-            "detection",
+            "recent-unwrapped",
             "--timeout",
             self.timeouts["shell_seconds"] * 1000,
         )
@@ -595,6 +599,7 @@ def main() -> None:
     task = WorktreeTask(parse_arguments())
     task.resolve_worktree()
     task.check_tools()
+    task.fetch()
     task.inspect_worktree()
     task.prepare_config()
     task.check_target_tree()

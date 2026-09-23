@@ -64,7 +64,7 @@ Edit [agent/teams/config.toml](config.toml) to change team limits, client/model/
 
 The generated Codex config applies `launch.codex_lsp_approval_mode` only to the four enabled LSP tools. It leaves the overall approval and sandbox policies in place. This uses the [supported per-tool MCP setting](https://developers.openai.com/codex/mcp); `never` otherwise rejects a tool that requires approval.
 
-Database suffixes combine `team.db_suffix_prefix`, the team number and `roles.<role>.db_suffix`. Test ports combine `team.port_base`, team number times `team.port_stride`, and the role's `port_offset`. The launcher exports `PGPORT`, `TIPS_DB_SUFFIX`, `TIPS_TEST_PORT`, `MIX_ENV` and `TIPS_CHECK_TIMEOUT_SECONDS` directly to the coding process. Leave those computed resources in place for tests, including Wallaby.
+Database suffixes combine `team.db_suffix_prefix`, the team number and `roles.<role>.db_suffix`. Test ports combine `team.port_base`, team number times `team.port_stride`, and the role's `port_offset`. The launcher exports `PGPORT`, `TIPS_DB_SUFFIX`, `TIPS_TEST_PORT`, `MIX_ENV` and `TIPS_CHECK_TIMEOUT_SECONDS` directly to the coding process. Leave those computed resources in place for tests, including Wallaby. To check them from a client's shell tool, run `env | grep -E '^(PGPORT|MIX_ENV|TIPS_)'`; macOS `printenv` prints only its first named variable.
 
 ## Task readiness
 

@@ -45,7 +45,8 @@ defmodule Tips.ProviderConfigTest do
     end
   end
 
-  test "all ten names load from .env in dev and test", %{tmp_dir: tmp_dir} do
+  test "all ten names load from .env in dev and test, including a file with a UTF-8 BOM",
+       %{tmp_dir: tmp_dir} do
     dotenv = """
     # Provider settings
     OPENROUTER_API_KEY=synthetic-key
@@ -129,7 +130,8 @@ defmodule Tips.ProviderConfigTest do
     assert run!(tmp_dir, :dev, mode) == :real
   end
 
-  test "malformed provider assignments fail with secret-free diagnostics", %{tmp_dir: tmp_dir} do
+  test "malformed assignments and an unreadable .env fail with secret-free diagnostics",
+       %{tmp_dir: tmp_dir} do
     for line <- [
           ~s|R2_SECRET_ACCESS_KEY="sentinel-unterminated|,
           ~s|R2_SECRET_ACCESS_KEY='sentinel-unterminated|,
