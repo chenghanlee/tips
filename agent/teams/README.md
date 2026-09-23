@@ -41,7 +41,7 @@ One lead TPM assigns work to teams within the configured trial limit. Each team 
 | Role | Owns |
 |---|---|
 | Lead TPM (`lead-tpm`) | Assign issues, start/retire teams, resolve cross-team blockers, report to the user. Talks only to team TPMs and the user. |
-| Team TPM (`team-N-tpm`) | Labels, Project fields, team start/stop, the tech lead's launch and every worktree provisioning the tech lead requests; cross-team and user blockers. Talks only to its tech lead and the lead TPM. |
+| Team TPM (`team-N-tpm`) | Labels, Project fields, team start, the tech lead's launch and every worktree provisioning the tech lead requests; cross-team and user blockers. Talks only to its tech lead and the lead TPM. |
 | Tech lead (`team-N-lead`) | Confirm readiness; decide when the developer and tester are provisioned; brief and advance them; decide technical disputes; review the whole PR; publish its review status and merge. Persistent for one issue. |
 | Developer (`team-N-dev`) | Implement the issue with integration-first TDD; own its branch, worktree and PR. |
 | Tester (`team-N-test`) | Independently review each pushed commit and run relevant verification. Fresh session per reviewed SHA. |
