@@ -217,6 +217,7 @@ if a[:2] == ["agent", "start"]:
             "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE",
             "TIPS_CHECK_TIMEOUT_SECONDS",
             "TIPS_TEAM_CONFIG",
+            "TIPS_PROVIDER_ENV_FILE",
         ]
     }
     state["launch_argv"] = a
@@ -443,6 +444,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
             "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": None,
             "TIPS_CHECK_TIMEOUT_SECONDS": "1800",
             "TIPS_TEAM_CONFIG": str(self.root / "agent/teams/config.toml"),
+            "TIPS_PROVIDER_ENV_FILE": str(self.root / ".env"),
         }
         assert s["cwd"] == str(self.wt)
         assert "fixture-test" in s["launch_argv"]
