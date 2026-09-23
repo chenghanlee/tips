@@ -268,6 +268,6 @@ The lead TPM communicates what the user needs to decide. The user detects silent
 
 ## Milestones and external prerequisites
 
-M0 proves reproducible startup, release and testing; M1 proves risky boundaries on one revision; M2 proves the complete product; M3 rehearses operations; M4 records trial readiness and the user's public-launch decision. Each gate names its environment, revision, evidence and unresolved blockers.
+Milestones, their gate issues and the dev-adapter policy live in the [Project 15 readme](https://github.com/users/chenghanlee/projects/15); read it with `gh project view 15 --owner chenghanlee` before picking work, since it is not mirrored in this repository. Each gate names its environment, revision, evidence and unresolved blockers.
 
 The lead TPM tracks access/setup requirements for hosting, domain, providers, operator identity, vocabulary and content in GitHub issues. Agents propose defaults and use synthetic fixtures; they do not fabricate firsthand production content. Before launch, the intended VPS is the preproduction environment. Run real-provider tests only through explicitly authorized invocations with scoped secrets, never automatically on arbitrary PR code. Ordinary PR CI needs no production secrets.
