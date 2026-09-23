@@ -606,9 +606,9 @@ class TeamLifecycleTest(unittest.TestCase):
         assert self.run_team("start", "1").returncode == 0
         prompt = next(c[3] for c in self.calls() if c[:2] == ["agent", "prompt"])
         assert "Report readiness to lead-tpm" in prompt
-        assert "talk only to the team tech lead" in prompt
-        assert "every task_worktree.py run the lead requests" in prompt
-        assert "let the reply wake you" in prompt
+        assert "starting with the Team TPM card" in prompt
+        assert "Read agent/teams/README.md" in prompt
+        assert "task_worktree.py" not in prompt
 
     def test_lead_ui_must_share_lead_partition(self) -> None:
         (self.repo / "agent/teams/config.toml").write_text(
