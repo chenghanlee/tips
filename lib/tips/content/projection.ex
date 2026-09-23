@@ -187,12 +187,14 @@ defmodule Tips.Content.Projection do
           | %{state: :deleted | :removed, id: pos_integer(), tip: tip_link()}
 
   @typedoc """
-  A selected-review destination (`?review=id` on a tip page).
+  A selected-review destination (`/reviews/:id`) with its tip context.
 
     * `{:visible, review}` for an authorized review of this tip.
     * `:deleted` for a review of this tip its author deleted: "Review deleted by author".
     * `:removed` for a review of this tip hidden from this viewer: "Review removed by moderators".
-    * `:unavailable` for an unknown, malformed or other-tip id: "Review unavailable".
+    * `:unavailable` for `nil` or another tip's review: "Review unavailable".
+      `/reviews/:id` derives the tip from the review, so a missing review is
+      not found before projection.
   """
   @type selected_review :: %{
           tip: tip_detail(),
