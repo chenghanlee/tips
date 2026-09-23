@@ -512,28 +512,34 @@ def coordinator(pane: Entity, name: str, role: str) -> None:
         raise RuntimeError(
             "Coordinator launch returned an unexpected client/root/state; inspect its pane"
         )
-    herdr(
-        "agent",
-        "prompt",
-        name,
-        (
-            "Read agent/teams/README.md. You are "
-            f"{name}"
-            ". Coordinate from this read-only main checkout; coding agents sta"
-            "rt only in assigned worktrees. Use agent/teams/config.toml for la"
-            "unch settings. You talk only to the team tech lead, who dispatche"
-            "s the developer and tester and advances review stages; you own la"
-            "bels, Project fields and the lead's launch. Each dispatch must in"
-            "clude the exact herdr agent prompt command addressed to its recip"
-            "ient, to execute after posting evidence and before ending the tur"
-            "n, including on a blocker. A GitHub comment or final chat respons"
-            "e is not a delivered handoff. Handoffs are one line: evidence lin"
-            "k, SHA, action, owner. Run commands directly; no hooks, --wait, s"
-            "leep, polling or ad hoc JSON formatters; send a prompt, then end "
-            "the turn and let the reply wake you. Report readiness to "
-            f"{('the user' if role == 'lead_tpm' else 'lead-tpm')}"
-            "; await assignment."
-        ),
+    herdr("agent", "prompt", name, coordinator_brief(name, role))
+
+
+def coordinator_brief(name: str, role: str) -> str:
+    return (
+        "Read agent/teams/README.md. You are "
+        f"{name}"
+        ". Coordinate from this read-only main checkout; coding agents sta"
+        "rt only in assigned worktrees. Use agent/teams/config.toml for la"
+        "unch settings. "
+        + (
+            "You talk only to team TPMs and the user; you assign issues, sta"
+            "rt and retire teams and resolve cross-team blockers. "
+            if role == "lead_tpm"
+            else "You talk only to the team tech lead, who dispatches the deve"
+            "loper and tester and advances review stages; you own labels, P"
+            "roject fields and the lead's launch. "
+        )
+        + "Each dispatch must in"
+        "clude the exact herdr agent prompt command addressed to its recip"
+        "ient, to execute after posting evidence and before ending the tur"
+        "n, including on a blocker. A GitHub comment or final chat respons"
+        "e is not a delivered handoff. Handoffs are one line: evidence lin"
+        "k, SHA, action, owner. Run commands directly; no hooks, --wait, s"
+        "leep, polling or ad hoc JSON formatters; send a prompt, then end "
+        "the turn and let the reply wake you. Report readiness to "
+        f"{('the user' if role == 'lead_tpm' else 'lead-tpm')}"
+        "; await assignment."
     )
 
 

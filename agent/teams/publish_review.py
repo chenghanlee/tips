@@ -59,40 +59,75 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=f"Publish {CONTEXT} on a reviewed head.")
     parser.add_argument("--pr", required=True, type=int)
     parser.add_argument("--sha", required=True, help="Exact reviewed head commit")
-    parser.add_argument("--record", required=True, help="Link to the review record comment")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--record", help="Link to the tech lead's review record comment")
+    source.add_argument(
+        "--owner-waiver",
+        metavar="REASON",
+        help="Owner-driven change with no team live: skip independent review for this reason",
+    )
     return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_arguments()
-    if not re.fullmatch(r"[0-9a-f]{40}", args.sha):
+def verified_pr(number: int, sha: str) -> tuple[str, str]:
+    """Return (owner/repo, PR url) after checking the PR head is the given SHA."""
+    if not re.fullmatch(r"[0-9a-f]{40}", sha):
         raise RefusalError("--sha must be a full 40-character commit id.")
-    path = comment_api_path(args.record)
-    record = json.loads(gh("api", path))["body"]
-    missing = missing_sections(record)
-    if missing:
-        raise RefusalError("Review record is missing sections: " + ", ".join(missing))
-    pr = json.loads(gh("pr", "view", str(args.pr), "--json", "headRefOid,headRepository,url"))
-    if pr["headRefOid"] != args.sha:
-        raise RefusalError(f"PR head is {pr['headRefOid']}, not the reviewed {args.sha}.")
+    pr = json.loads(gh("pr", "view", str(number), "--json", "headRefOid,url"))
+    if pr["headRefOid"] != sha:
+        raise RefusalError(f"PR head is {pr['headRefOid']}, not the reviewed {sha}.")
     repo = re.fullmatch(r"https://github\.com/([^/]+/[^/]+)/pull/\d+", pr["url"])
     if not repo:
         raise RefusalError(f"Unexpected PR URL: {pr['url']}")
+    return repo.group(1), pr["url"]
+
+
+def post_status(repo: str, sha: str, target: str, description: str) -> None:
     gh(
         "api",
         "--method",
         "POST",
-        f"repos/{repo.group(1)}/statuses/{args.sha}",
+        f"repos/{repo}/statuses/{sha}",
         "-f",
         f"context={CONTEXT}",
         "-f",
         "state=success",
         "-f",
-        f"target_url={args.record}",
+        f"target_url={target}",
         "-f",
-        "description=Tech lead review record complete",
+        f"description={description}",
     )
-    print(f"Published {CONTEXT} on {args.sha} -> {args.record}")
+
+
+def main() -> None:
+    args = parse_arguments()
+    if args.record:
+        path = comment_api_path(args.record)
+        record = json.loads(gh("api", path))["body"]
+        missing = missing_sections(record)
+        if missing:
+            raise RefusalError("Review record is missing sections: " + ", ".join(missing))
+        repo, url = verified_pr(args.pr, args.sha)
+        if not args.record.startswith(url + "#"):
+            raise RefusalError(f"Record {args.record} does not belong to PR {url}.")
+        post_status(repo, args.sha, args.record, "Tech lead review record complete")
+        print(f"Published {CONTEXT} on {args.sha} -> {args.record}")
+        return
+    reason = args.owner_waiver.strip()
+    if len(reason) < 12:
+        raise RefusalError("--owner-waiver needs a reason of at least 12 characters.")
+    repo, _ = verified_pr(args.pr, args.sha)
+    waiver = gh(
+        "pr",
+        "comment",
+        str(args.pr),
+        "--body",
+        f"**Owner waiver:** independent review skipped on {args.sha}. "
+        f"No team live; owner-driven change. Reason: {reason}",
+    )
+    comment_api_path(waiver)  # gh prints the new comment URL; refuse anything else.
+    post_status(repo, args.sha, waiver, "Owner waiver: independent review skipped")
+    print(f"Published {CONTEXT} on {args.sha} by owner waiver -> {waiver}")
 
 
 if __name__ == "__main__":

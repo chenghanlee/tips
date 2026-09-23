@@ -22,8 +22,9 @@ a = sys.argv[1:]
 if a[:1] == ["api"] and "--method" not in a:
     print(json.dumps({"body": os.environ["FAKE_GH_BODY"]}))
 elif a[:2] == ["pr", "view"]:
-    print(json.dumps({"headRefOid": os.environ["FAKE_GH_HEAD"], "headRepository": {"name": "tips"},
-                      "url": "https://github.com/o/tips/pull/7"}))
+    print(json.dumps({"headRefOid": os.environ["FAKE_GH_HEAD"], "url": "https://github.com/o/tips/pull/7"}))
+elif a[:2] == ["pr", "comment"]:
+    print("https://github.com/o/tips/pull/7#issuecomment-99")
 """
 
 
@@ -57,7 +58,7 @@ class RecordValidationTest(unittest.TestCase):
 
 class PublishRefusalTest(unittest.TestCase):
     def run_script(
-        self, body: str, head: str, sha: str
+        self, body: str, head: str, sha: str, *source: str
     ) -> tuple[subprocess.CompletedProcess[str], list[list[str]]]:
         with tempfile.TemporaryDirectory() as tmp:
             fake = Path(tmp) / "gh"
@@ -79,8 +80,7 @@ class PublishRefusalTest(unittest.TestCase):
                     "7",
                     "--sha",
                     sha,
-                    "--record",
-                    "https://github.com/o/tips/pull/7#issuecomment-1",
+                    *(source or ("--record", "https://github.com/o/tips/pull/7#issuecomment-1")),
                 ],
                 env=env,
             )
@@ -110,3 +110,41 @@ class PublishRefusalTest(unittest.TestCase):
         assert len(posts) == 1
         assert f"repos/o/tips/statuses/{sha}" in posts[0]
         assert "context=tips/independent-review" in posts[0]
+
+    def test_owner_waiver_posts_comment_then_status_without_a_record(self) -> None:
+        sha = "a" * 40
+        result, calls = self.run_script("", sha, sha, "--owner-waiver", "docs-only process change")
+        assert result.returncode == 0, result.stderr
+        assert calls[0][:2] == ["pr", "view"]
+        assert calls[1][:2] == ["pr", "comment"]
+        assert "Owner waiver" in calls[1][4]
+        posts = [call for call in calls if "--method" in call]
+        assert len(posts) == 1
+        assert "target_url=https://github.com/o/tips/pull/7#issuecomment-99" in posts[0]
+        assert "description=Owner waiver: independent review skipped" in posts[0]
+
+    def test_owner_waiver_needs_a_reason_and_matching_head(self) -> None:
+        sha = "a" * 40
+        result, calls = self.run_script("", sha, sha, "--owner-waiver", "short")
+        assert result.returncode != 0
+        assert "reason" in result.stderr
+        assert calls == []
+        result, calls = self.run_script(
+            "", "b" * 40, sha, "--owner-waiver", "docs-only process change"
+        )
+        assert result.returncode != 0
+        assert "PR head" in result.stderr
+        assert not any(call[:2] == ["pr", "comment"] for call in calls)
+
+    def test_record_from_another_pull_request_is_refused(self) -> None:
+        sha = "a" * 40
+        result, calls = self.run_script(
+            record(*SECTIONS),
+            sha,
+            sha,
+            "--record",
+            "https://github.com/o/tips/pull/8#issuecomment-1",
+        )
+        assert result.returncode != 0
+        assert "does not belong" in result.stderr
+        assert not any("--method" in call for call in calls)

@@ -46,7 +46,7 @@ One lead TPM assigns work to teams within the configured trial limit. Each team 
 | Developer (`team-N-dev`) | Implement the issue with integration-first TDD; own its branch, worktree and PR. |
 | Tester (`team-N-test`) | Independently review each pushed commit and run relevant verification. Fresh session per reviewed SHA. |
 
-Developer, tester and tech lead message each other freely. The tech lead dispatches and advances review stages; the TPM never talks to the developer or tester. The tech lead stays for the whole issue and is restarted by the TPM at the next assignment; the tester gets a fresh session at each reviewed SHA. Tech leads of different teams coordinate directly and tell their TPM only when it changes sequencing, ownership or creates a blocker. Nobody reviews or merges their own implementation. The tester may ask the developer anything, but its verdict cites code, tests and evidence, never the developer's explanation. The common GitHub identity cannot mechanically prove reviewer independence.
+Developer, tester and tech lead message each other freely. The tech lead dispatches and advances review stages; the TPM does not talk to the developer or tester, except as the fallback when a message to the lead fails to send (see [Escalation](#escalation)). The tech lead stays for the whole issue and is restarted by the TPM at the next assignment; the tester gets a fresh session at each reviewed SHA. Tech leads of different teams coordinate directly and tell their TPM only when it changes sequencing, ownership or creates a blocker. Nobody reviews or merges their own implementation. The tester may ask the developer anything, but its verdict cites code, tests and evidence, never the developer's explanation. The common GitHub identity cannot mechanically prove reviewer independence.
 
 Tie-breakers: the tech lead decides technical disputes. Scope or product questions go tech lead → team TPM → lead TPM → user.
 
@@ -82,7 +82,7 @@ Use protected `main`, short-lived `task/<issue>-<slug>` branches and worktrees u
 
 When no team is live, the user or the lead TPM may branch directly in the main checkout and return it to `main` once the PR merges. A PR that changes only documentation needs no local test run; the required CI checks still run on it.
 
-The TPM uses `agent/teams/task_worktree.py` to provision and start coding clients. Keep the existing task slug when an issue is renamed. The developer owns its task worktree; tester and tech lead have separate detached review worktrees. No agent edits another's checkout. The helper checks reviewer cleanliness even at the same SHA, checks selected-client configuration before changing HEAD, reuses a matching live session, and stops the old client and verifies descendant exit before advancing a reviewer. `/new`, `/clear` and `cd` inside an already-running client do not reroot its LSP.
+The team TPM uses `agent/teams/task_worktree.py` to provision and start the tech lead; the tech lead uses it for the developer and tester. Keep the existing task slug when an issue is renamed. The developer owns its task worktree; tester and tech lead have separate detached review worktrees. No agent edits another's checkout. The helper checks reviewer cleanliness even at the same SHA, checks selected-client configuration before changing HEAD, reuses a matching live session, and stops the old client and verifies descendant exit before advancing a reviewer. `/new`, `/clear` and `cd` inside an already-running client do not reroot its LSP.
 
 Open a draft PR early. Commit cohesive changes and run relevant checks before pushing. Unpushed local commits may be reorganized; published commits are fixed. Never force-push or push implementation directly to main. Repository rules block force pushes on `task/**` while permitting deletion of merged branches. Merge with merge commits; keep strict up-to-date checks and automatic deletion of merged remote heads.
 
@@ -156,13 +156,15 @@ The lead TPM reads relevant issue/PR evidence on each message, picks an unblocke
 Use the existing issue's task slug; do not generate a new branch when its title changes. Obtain pane IDs from the start output or `herdr pane list`; never guess them. The helper checks that it runs from the main checkout, so the tech lead runs it in a subshell from its worktree. Examples (`TASK` is `<issue>-<slug>`, `SHA` is the exact fetched revision being dispatched, `MAIN` is the main checkout):
 
 ```bash
-# Team TPM, once per issue:
-agent/teams/task_worktree.py "$ISSUE-review-team-$N-lead" --team "$N" --role lead --pane "$LEAD_PANE" --review-ref "$SHA" --start
+# Team TPM, once per issue (add --ui for an issue labelled ui):
+agent/teams/task_worktree.py "$ISSUE-review-team-$N-lead" --team "$N" --role lead [--ui] --pane "$LEAD_PANE" --review-ref "$SHA" --start
 # Tech lead, from its worktree:
 (cd "$MAIN" && agent/teams/task_worktree.py "$TASK" --team "$N" --role dev --pane "$DEV_PANE" --start)
 (cd "$MAIN" && agent/teams/task_worktree.py "$ISSUE-review-team-$N-test" --team "$N" --role test --pane "$TEST_PANE" --review-ref "$SHA" --start)
-(cd "$MAIN" && agent/teams/task_worktree.py "$ISSUE-review-team-$N-lead" --team "$N" --role lead --pane "$LEAD_PANE" --review-ref "$SHA")
+(cd "$MAIN" && agent/teams/task_worktree.py "$ISSUE-review-team-$N-lead" --team "$N" --role lead [--ui] --pane "$LEAD_PANE" --review-ref "$SHA")
 ```
+
+Repeat `--ui` on every later call for a UI lead; without it the helper resolves the other lead configuration and refuses the running client as a conflict.
 
 The helper provisions skills and only the chosen client's local config, applies environment in the target pane and starts the real interactive client. `--kind` is optional and must match the role's configured kind. Inspect config conflicts before explicitly replacing generated files with `--force`. Repeated calls reuse an already matching live session. Conflicting assignments fail. Tester advances require clean source even at the same SHA and verified old-client shutdown before a different SHA; fresh tester sessions carry history through PR comments. A running tech lead is never stopped for a new SHA: the last command above moves its clean, detached, read-only checkout in place, and its LSP keeps the same root.
 
@@ -172,13 +174,13 @@ Brief immediately after successful client launch; do not wait for project compil
 
 **Tester:** Review every pushed commit in context, first for local correctness, then callers and related features/tests, then end-to-end behavior. Map acceptance to named tests; trust CI only for commands it ran. Independently run missing relevant checks using the assigned environment. Post the verdict and evidence on the PR and send its link and reviewed SHA to the tech lead. Send actionable findings to the developer too; a passing verdict needs no developer acknowledgment. Repairs receive another verdict. Required acceptance failures block completion regardless of severity.
 
-**Tech lead:** After tester findings are resolved, read the whole diff against the current base and run the full check suite once on the final head. Write the review record as a PR comment with these five headings, each with substance:
+**Tech lead:** After tester findings are resolved, read the whole diff against the current base and run the full check suite once on the final head. Write the review record as a PR comment with these five `##` headings, spelled exactly, each with substance:
 
-1. **Local correctness** — the changed functions and modules on their own.
-2. **Downstream effects** — callers, related modules, features and tests the change touches.
-3. **Whole-project fit** — the change against the project's design, architecture and end-to-end behavior.
-4. **Design challenge** — the chosen implementation questioned against concrete alternatives, with tradeoffs and the assumptions it rests on.
-5. **Defect pass** — a stricter hunt for implementation defects than the per-commit reviews, on the integrated diff.
+1. `## Local correctness` — the changed functions and modules on their own.
+2. `## Downstream effects` — callers, related modules, features and tests the change touches.
+3. `## Whole-project fit` — the change against the project's design, architecture and end-to-end behavior.
+4. `## Design challenge` — the chosen implementation questioned against concrete alternatives, with tradeoffs and the assumptions it rests on.
+5. `## Defect pass` — a stricter hunt for implementation defects than the per-commit reviews, on the integrated diff.
 
 Resolve technical disagreement using evidence; escalate material product changes through the TPM. A rejected design creates new commits that the tester reviews again.
 
@@ -192,11 +194,13 @@ agent/teams/publish_review.py --pr "$PR" --sha "$REVIEWED_SHA" --record "$RECORD
 
 Main requires a PR, resolved conversations, an up-to-date branch and the required `checks`, `release` and independent-review contexts. This is an interlock, not credential isolation. The approving review is the closing record; decisions made in chat that are not already in PR threads go in its body. No separate closing note.
 
+**Owner waiver.** When no team is live and the change is owner-driven, the user may skip the independent review. Only on the user's explicit instruction in the session, the user or the lead TPM runs `publish_review.py --owner-waiver "<reason>"` instead of `--record`; it posts a waiver comment with the reason on the PR and publishes the status pointing at it. The waiver is the audit trail. Agents never invoke it on their own, and it does not waive the CI checks.
+
 Merge uses native GitHub CLI commands, without a TPM merge queue:
 
 ```bash
 gh pr update-branch "$PR"
-# If HEAD changed: report it to the team TPM for redispatch before continuing.
+# If HEAD changed: review the base delta and redispatch the tester before continuing.
 timeout "$TIPS_CHECK_TIMEOUT_SECONDS" gh pr checks "$PR" --watch
 gh pr merge "$PR" --merge --match-head-commit "$REVIEWED_SHA"
 ```
@@ -219,7 +223,7 @@ Decisions are durable only on GitHub. Whoever decides posts it on the issue or P
 
 Run lifecycle and messaging commands directly. Keep their stdout, stderr and exit status; do not pipe them through `tail` or ad hoc JSON formatters. Parse Herdr JSON only when a subsequent operation needs a returned ID or field, under `result`. A failed formatter is not evidence that a message was undelivered: inspect once before resending. A successful send confirms submission, not task completion.
 
-For a permission blocker, preserve the work and report the failed operation, exact error and local state to the team TPM for authorized recovery. Do not route around the denial through another application or a remote-only commit. The TPM owns the next workflow decision; the worker retains checkout ownership until explicitly transferred.
+For a permission blocker, preserve the work and report the failed operation, exact error and local state to the tech lead for authorized recovery; the tech lead escalates to the TPM when the recovery needs the user. Do not route around the denial through another application or a remote-only commit. The tech lead owns the next workflow decision; the worker retains checkout ownership until explicitly transferred.
 
 For context recovery, keep the issue/branch open and record base/head SHAs, working-tree cleanliness, committed/uncommitted work, unresolved findings, failed/unrun checks and the next action. Explicitly transfer ownership before starting another writer. Never reset or stash someone else's work to recover a session. Inspect Git and pane evidence before reassigning an unresponsive client. Never put credentials in logs, issues or handoffs.
 
@@ -238,7 +242,7 @@ For context recovery, keep the issue/branch open and record base/head SHAs, work
 
 The helper applies the selected role's configured model, effort, permissions, database suffix and test port in the actual target process. Only the selected client's generated configuration is written. Both clients invoke the canonical main checkout's LSP wrapper with the assigned absolute worktree root. Review revisions do not need to contain that wrapper. Keep installed patched bridge/Expert tools available independently of task worktrees.
 
-Startup reports **client launched**, not index ready. Brief the agent once Herdr reports it ready. Expert can keep compiling in the background. Do not add a compile gate or launch a second LSP as a probe. Configuration/tooling changes require a disposable actual-client pilot checking both the client root and LSP root for each client. The configured team limit is not a verified simultaneous cold-start capacity; measure it before scaling up.
+Startup reports **client launched**, not index ready. Brief the agent once Herdr reports it ready. Expert can keep compiling in the background. Do not add a compile gate or launch a second LSP as a probe. Configuration/tooling changes require a disposable actual-client pilot checking both the client root and LSP root for each client. The first real dispatch of a developer by a tech lead from inside its client is that pilot for the subshell flow; record it on the issue. The configured team limit is not a verified simultaneous cold-start capacity; measure it before scaling up.
 
 TPMs run without the Elixir LSP. Coordinator launches use configured compaction; coding launches do not inherit that coordinator override. Codex approval policy does not change or guarantee its sandbox; it retains the user's sandbox configuration. Claude's permission mode comes from the same config.
 

@@ -446,7 +446,15 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call("--ui", "--start")
         assert "fixture-ui" in self.state()["launch_argv"]
         assert self.state()["launch_env"]["TIPS_TEST_PORT"] == "4132"
-        self.call("--ui", role="dev", task="29-dev", ref=False, ok=False)
+        p = self.call("--ui", role="dev", task="29-dev", ref=False, ok=False)
+        assert "--ui applies only to the lead role" in p.stderr
+        self.commit("next")
+        new = self.git("rev-parse", "HEAD")
+        p = self.call(ref=new, ok=False)
+        assert "Conflicting live agent" in p.stderr
+        p = self.call("--ui", ref=new)
+        assert "Advanced team-3-lead in place" in p.stdout
+        assert self.git("-C", str(self.wt), "rev-parse", "HEAD") == new
 
     def test_failed_stop_preserves_review_head(self) -> None:
         task, wt = "28-review-team-3-test", self.root / ".worktrees/28-review-team-3-test"
