@@ -10,18 +10,51 @@ semantics and image parser selection. The probe code is not a production path.
 
 | Acceptance | Experiment | Result |
 |---|---|---|
-| Server-authorized byte cap ≤ 1,000,000,000 | `stream_length` | **Proven.** Stream stores no byte beyond the declared `Upload-Length`, and the browser cannot raise it. Stream itself accepts 1,000,000,001, so the cap is the server authorizer's job. |
+| Server-authorized byte cap ≤ 1,000,000,000 | `stream_length` | **Proven.** Stream stores no byte beyond the declared `Upload-Length`, and the browser cannot raise it. Stream itself accepts 1,000,000,001, so the cap is the server authorizer's job. The probe's authorizer is only a stand-in; the Phoenix authorizer still has to be built and tested. |
 | Private from reservation; 180 s limit | `stream_private` | **Proven.** Metadata applied at reservation; unsigned manifest, poster and iframe return 401; signed HLS decodes 100 H.264 frames; signed poster is a JPEG; expired and wrong-key tokens return 401; after delete the signed manifest returns 404. A 200 s video fails with `ERR_DURATION_EXCEED_CONSTRAINT`. |
-| Trusted completion; completion + 48 h | `stream_deadline` | **Blocking gap.** Stream's `uploaded` is the reservation time, not transfer completion. No field observed records completion. Proven: the one-hour expiry is fixed at reservation, is not extended by pause/resume, and rejects bytes after it (full one-hour run). |
+| Trusted completion; completion + 48 h | `stream_deadline` | **Blocking gap.** Stream's `uploaded` is the reservation time, not transfer completion. No field observed records completion. Observed: `uploadExpiry` is fixed at reservation and not extended by pause/resume, and every `PATCH` **started after** `uploadExpiry` was rejected (130 s runs and one one-hour run). A `PATCH` in progress at expiry was not tested. |
 | R2 put/get/delete | `r2_roundtrip` | **S3 reads proven; public delivery unproven.** The owner's ISP has a routing loop to `r2.dev` ([owner decision](https://github.com/chenghanlee/tips/issues/61#issuecomment-5794223944)). Custom-domain cache purge is **deferred/unproven, #178 (M4)**. |
 | Maintained parser selected before #62 | `parser_formats_bounds` | **Blocked.** No candidate passes every required fixture. Nothing is selected. |
 | Secrets never in evidence; bounded calls; cleanup | `redaction_cleanup` | **Proven** for the runs recorded here. |
 
-Unsupported semantics go to technical review. Consumers of completion time
-(unattached-video expiry, recovery windows) and of image classification (#62) stay
-blocked until the gaps below are resolved.
+Unsupported semantics go to technical review. The consumers in
+[Blocked consumers](#blocked-consumers) stay blocked until the gaps are resolved.
+The single tester pass is [recorded on the PR](https://github.com/chenghanlee/tips/pull/238#issuecomment-5794684371).
+
+### Blocked consumers
+
+Completion time (Stream `uploaded` is not completion):
+
+- [data-model.md](../design/data-model.md): the `completed_at` column ("trusted upload
+  completion") and its check constraints; [Video states and deadlines](../design/data-model.md#video-states-and-deadlines)
+  ("Store trusted completion once from Stream's `uploaded` field", `completed_at + 48 hours`);
+  [Playback and cleanup](../design/data-model.md#playback-and-cleanup).
+- [backend-design.md](../design/backend-design.md): the unattached-media expiry worker
+  ("Known completed rows expire at completion plus 48 hours") in
+  [Managed video](../design/backend-design.md#managed-video);
+  [Video upload before publication](../design/backend-design.md#video-upload-before-publication);
+  [Browser drafts](../design/backend-design.md#browser-drafts) ("recoverable for 48 hours
+  from trusted completion").
+- [frontend-design.md](../design/frontend-design.md): [Result composer](../design/frontend-design.md#result-composer)
+  text that unpublished video uploads expire 48 hours after upload completion, with its
+  shown expiry time.
+- [visual/editor-review.html](../design/visual/editor-review.html): "Unpublished uploads
+  expire 48 hours after upload: …" helper text.
+
+Image classification (no parser selected):
+
+- #62 (P5.02) and every use of `media.is_animated`: [data-model.md](../design/data-model.md)
+  `is_animated` column and [Image/GIF attempts](../design/data-model.md#imagegif-attempts);
+  [backend-design.md](../design/backend-design.md) [Review content and evidence](../design/backend-design.md#review-content-and-evidence)
+  ("Media validates content with a maintained parser"); the frontend animated-image
+  controls that read `media.is_animated` ([Result composer](../design/frontend-design.md#result-composer)).
 
 ## Run it
+
+> **Do not run `r2`.** It includes reads through the public `r2.dev` URL. The
+> [owner decision](https://github.com/chenghanlee/tips/issues/61#issuecomment-5794223944) forbids any further public R2 request or
+> network workaround from any agent. Public delivery stays unproven; the recorded
+> `r2` run is the only one.
 
 From the repository root. Parser and redaction modes are offline. Provider modes
 refuse to run without `TIPS_REAL_PROVIDERS=1` and read the ten fixed names from
@@ -33,7 +66,7 @@ bash scripts/media_probe.sh parser
 bash scripts/media_probe.sh redaction-check
 TIPS_REAL_PROVIDERS=1 bash scripts/media_probe.sh stream
 TIPS_REAL_PROVIDERS=1 bash scripts/media_probe.sh stream-hour   # about 62 minutes
-TIPS_REAL_PROVIDERS=1 bash scripts/media_probe.sh r2
+# r2: PROHIBITED — see the warning below. Do not run.
 TIPS_REAL_PROVIDERS=1 bash scripts/media_probe.sh cleanup
 TIPS_REAL_PROVIDERS=1 bash scripts/media_probe.sh signing-key  # owner only; see below
 python3 scripts/check_docs.py
@@ -141,16 +174,20 @@ earlier run (`20260923T104941Z-dd93`, `0487970`); the recorded run repeats the r
   does not change it.
 - Expiry shorter than two minutes is refused (400, code 10005, "expiry must be more
   than two minutes in the future"); 130 s is accepted.
-- With a 130 s expiry: a transfer started before expiry and finished after it is
-  rejected (400, code 10017, "Expiration for upload has passed"); a first `PATCH`
-  after expiry is rejected the same way. Both videos stay `pendingupload`.
+- With a 130 s expiry: first chunk accepted before expiry, final `PATCH` **sent
+  about 30 s after** expiry → 400, code 10017 ("Expiration for upload has passed"); a
+  first `PATCH` sent after expiry is rejected the same way. Both videos stay
+  `pendingupload`. Every rejected `PATCH` started after `uploadExpiry`; a `PATCH` in
+  progress at the expiry instant was not tested.
 - **One-hour enforcement** (`stream-hour` `20260923T103853Z-93b9`,
   [report](media-provider-probe/stream-hour-20260923T103853Z-93b9.json)): expiry
   11:38:53Z (provider `uploadExpiry` equal); first chunk 204 at 10:38:54Z; final chunk
   at 11:39:56Z (about 1 min after expiry) → 400, code 10017; video stays
-  `pendingupload`; deleted. The report names `72c393c` because the SHA is read when the
-  report is written; the code was loaded at launch (10:38Z) from `214750e` plus the
-  then-uncommitted `stream-hour` fixes, and that module's logic equals `72c393c`.
+  `pendingupload`; deleted. This is a provider observation from the timestamped
+  responses above, **not a clean-SHA reproduction**: the run started at 10:38:53Z,
+  before `214750e` was committed (10:39:11Z), from uncommitted code that was not
+  recorded. Its `git_sha` (`72c393c`) was read when the report was written, and
+  `git_tracked_changes` is absent. It has not been rerun at a clean SHA.
 - Lost creation response: a creation call with a 1 ms receive timeout fails at the
   client after one attempt (no retry). The reservation **does exist** at Stream,
   found only by its `name` metadata. A caller that loses the response has no uid.
@@ -162,20 +199,25 @@ The design stores `completed_at` from Stream's `uploaded` and sets unattached ex
 to completion + 48 h. At this date `uploaded` does not mean completion, so that rule
 cannot be implemented as written. What is proven instead:
 
-- No byte is accepted after the reservation's expiry, so a successful transfer always
-  completes before `created + 1 h`.
+- Every `PATCH` sent after `uploadExpiry` (the requested expiry, echoed by Stream)
+  was rejected. A `PATCH` in progress at expiry was not tested, so no completion
+  bound is proven for a transfer that spans the expiry instant.
 - The state leaves `pendingupload` only after the last byte.
+- `uploaded` is also set on reservations that never received a byte
+  (late-start, lost-response and the hour run).
 
-Options for technical review (not chosen here): define the recovery deadline from
-the fixed reservation expiry (`expires_at + 48 h`, a bound that never depends on
-observation); or treat the first observation outside `pendingupload` as completion,
+Options for technical review (not chosen here, none proven): define the recovery
+deadline from the fixed reservation expiry (`expires_at + 48 h`), which additionally
+needs the untested expiry-spanning `PATCH` case; or treat the first observation outside `pendingupload` as completion,
 which depends on polling time and was ruled out by the design. A Stream webhook was
 excluded by the design and was not tested.
 
 ## R2 findings
 
-Recorded run: `r2` `20260923T105816Z-a0af` at `00e727a`, clean tracked tree
-([report](media-provider-probe/r2-20260923T105816Z-a0af.json)); `r2` includes the public
+Recorded run: `r2` `20260923T105816Z-a0af` at `00e727a`, with one tracked file
+modified at report time (`git_tracked_changes: 1`)
+([report](media-provider-probe/r2-20260923T105816Z-a0af.json)). The tester confirmed
+`R2Run` is unchanged from `00e727a` to the evidence head; `r2` includes the public
 reads, so it is not rerun under the owner decision. Keys are `media/probe-61/<run-id>/<uuid>.<ext>` in
 the development bucket, with synthetic 64×48 PNG and GIF fixtures.
 
@@ -193,8 +235,12 @@ the development bucket, with synthetic 64×48 PNG and GIF fixtures.
 
 ## Parser findings
 
-Recorded run: `parser` at `0487970`, 28 synthetic fixtures. Report:
-[parser-report.json](media-provider-probe/parser-report.json).
+Recorded report: [parser-report.json](media-provider-probe/parser-report.json), 28
+synthetic fixtures. The artifact records no SHA or run id; it was produced from
+`parser.exs` as of `0487970` (unchanged since). The [tester's independent run at
+`669b96e`](https://github.com/chenghanlee/tips/pull/238#issuecomment-5794684371) reproduced all 56 classifications and 27 of 28 fixture hashes.
+`over-10mb.png` is random `gaussnoise` output and differs on every run; the
+artifact's "seeded by libvips" recipe note is wrong.
 
 Each classification runs in a fresh OS process under `/usr/bin/time -l`, killed at
 the parent deadline. The classifier sniffs magic bytes, calls only the matching
@@ -243,6 +289,16 @@ Measured, not claimed:
   memory cap is applied; the 5 s deadline alone is not a memory bound.
 - Slowest Vix parse: about 31 ms. ffprobe decodes every frame before bounds can be
   applied (391 ms on the 5 MB total-pixel fixture).
+
+Resource-bound limitations:
+
+- The time limit is not tested: the parent kills a child after 15 s wall time, and the
+  5 s parse limit is checked only after the parse returns. No fixture came near either.
+- No memory limit is enforced; memory is only measured, and RSS is dominated by the
+  BEAM baseline.
+- The proposed bounds are proposals for #62, not selected limits.
+- ffprobe's HLS requests in `signed_hls_decodes_video_frames` are outside the
+  provider call budget and call log (bounded by `%+4` and a 90 s timeout).
 
 Blocking results:
 
