@@ -25,12 +25,14 @@ if config_env() != :test do
 end
 
 if config_env() in [:dev, :test] do
-  # Provider settings come from the checkout's .env and the exported environment; see
-  # Tips.ProviderConfig. Test runs stub providers unless TIPS_REAL_PROVIDERS=1.
+  # Provider settings come from the .env file (this checkout's by default, or the one named by
+  # TIPS_PROVIDER_ENV_FILE) and the exported environment; see Tips.ProviderConfig. Test runs
+  # stub providers unless TIPS_REAL_PROVIDERS=1.
   real_providers? = config_env() == :dev or System.get_env("TIPS_REAL_PROVIDERS") == "1"
+  env_file = System.get_env("TIPS_PROVIDER_ENV_FILE", Path.expand("../.env", __DIR__))
 
   config :tips, Tips.ProviderConfig,
-    values: Tips.ProviderConfig.load(Path.expand("../.env", __DIR__), System.get_env()),
+    values: Tips.ProviderConfig.load(env_file, System.get_env()),
     mode: if(real_providers?, do: :real, else: :stub)
 end
 

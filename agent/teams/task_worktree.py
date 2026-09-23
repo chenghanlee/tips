@@ -160,6 +160,8 @@ class WorktreeTask:
             "MIX_ENV": "test",
             "TIPS_CHECK_TIMEOUT_SECONDS": str(self.timeouts["checks_minutes"] * 60),
             "TIPS_TEAM_CONFIG": str(self.config_path),
+            # Provider settings are read by path from the main checkout; nothing is copied.
+            "TIPS_PROVIDER_ENV_FILE": str(self.root / ".env"),
         }
         if "compaction_percent" in self.role:
             self.target_env["CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"] = str(

@@ -367,7 +367,10 @@ class TeamLifecycleTest(unittest.TestCase):
         (self.repo / "agent/teams/config.toml").write_text(CONFIG)
         (self.bin / "herdr").write_text(TEAM_HERDR)
         (self.bin / "herdr").chmod(0o755)
-        (self.bin / "ps").write_text("#!/bin/sh\nexit 0\n")
+        # A stop-time write lands between the two cleanliness checks (ps runs only in stop()).
+        (self.bin / "ps").write_text(
+            '#!/bin/sh\n[ -n "$RACE_DIRTY_FILE" ] && echo raced > "$RACE_DIRTY_FILE"\nexit 0\n'
+        )
         (self.bin / "ps").chmod(0o755)
         (self.bin / "docker").write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$DOCKER_LOG"\n')
         (self.bin / "docker").chmod(0o755)
@@ -509,6 +512,27 @@ class TeamLifecycleTest(unittest.TestCase):
         assert not any(
             c[:2] == ["pane", "get"] for c in self.calls()[len(self.calls_before_stop) :]
         )
+        assert work.exists()
+        assert json.loads(self.state.read_text())["workspaces"]
+        assert not (self.root / "docker-calls").exists()
+
+    def test_worktree_dirtied_during_shutdown_is_preserved_after_clients_exit(self) -> None:
+        assert self.run_team("start", "1").returncode == 0
+        work = self.repo / ".worktrees/task"
+        execute(
+            ["git", "-C", str(self.repo), "worktree", "add", "-q", "--detach", str(work)],
+            check=True,
+        )
+        state = json.loads(self.state.read_text())
+        state["panes"][0].pop("agent")
+        state["panes"][1]["cwd"] = str(work)
+        state["panes"][1]["foreground_cwd"] = "/opt/homebrew/lsp-child"
+        self.state.write_text(json.dumps(state))
+        self.env["RACE_DIRTY_FILE"] = str(work / "written-during-shutdown")
+        r = self.run_team("stop", "1")
+        assert r.returncode != 0
+        assert "client and owned descendants exited" in r.stdout
+        assert "Dirty worktree" in r.stderr
         assert work.exists()
         assert json.loads(self.state.read_text())["workspaces"]
         assert not (self.root / "docker-calls").exists()
