@@ -1,12 +1,128 @@
 defmodule Tips.Accounts do
   @moduledoc """
-  The Accounts context.
+  The Accounts context: identity, authentication and account lifecycle.
+
+  ## Admission contract
+
+  Authentication admits a caller. Eligibility decides whether that caller may
+  perform one operation now. Keep them separate.
+
+  ### Who builds identity
+
+    * `TipsWeb.UserAuth` builds a `Tips.Accounts.Scope` from the server-side
+      session for each controller request and LiveView mount. Anonymous
+      callers have a `nil` scope.
+    * Operations take the scope and business attrs as separate arguments.
+      Ignore identity in attrs, params, events and job args; never turn it
+      into a scope.
+    * Public reads and rendering take no scope and look up no token.
+    * Workers take ids in job args, reload committed state and never retain a
+      browser scope or `Tips.Accounts.SessionRef`.
+
+  ### Session validity
+
+  `get_user_by_session_token/1`, through
+  `Tips.Accounts.UserToken.verify_session_token_query/1`, is the only session
+  validity definition: a matching `"session"` row that has not expired.
+  Deleting the row revokes it. Controllers, LiveViews, renewal and pruning
+  reuse it; do not add a second expiry constant or query.
+
+  ### Runtime admission (#47, not implemented yet)
+
+  These signatures are reserved. They do not exist yet.
+
+    * `get_scope_by_session_token(token)` returns
+      `{:ok, Scope.t(), SessionRef.t(), token_inserted_at}` or
+      `{:error, :unauthenticated}`. It uses the validity definition above and
+      also rejects deleted accounts.
+    * `readmit_scope(session_ref)` returns `{:ok, Scope.t()}` or
+      `{:error, :unauthenticated}`. It queries the referenced row, binds both
+      ids, applies the same validity definition and loads current account
+      state.
+
+  A LiveView keeps its `SessionRef` in private state and re-admits before
+  every mutation and privileged read. Controllers keep per-request
+  authentication.
+
+  ### Operation eligibility
+
+  The owning write operation locks the participating account row
+  (`FOR NO KEY UPDATE`), calls `check_eligibility/2` on that locked row, then
+  checks ownership and visibility. A scope admitted before a ban therefore
+  cannot contribute after the ban commits.
+
+  | Account | `:contribute` | `:moderate` | `:delete_own_content` | `:delete_account` |
+  |---|---|---|---|---|
+  | confirmed | ok | `:forbidden` | ok | ok |
+  | unconfirmed | `:unconfirmed` | `:forbidden` | ok | ok |
+  | full ban | `:forbidden` | `:forbidden` | ok | ok |
+  | moderator | ok | ok | ok | ok |
+  | unconfirmed moderator | `:unconfirmed` | `:unconfirmed` | ok | ok |
+  | full-ban moderator | `:forbidden` | `:forbidden` | ok | ok |
+  | deleted | `:unauthenticated` | `:unauthenticated` | `:unauthenticated` | `:unauthenticated` |
+
+  `:contribute` covers publishing, editing, voting (including removal),
+  reporting and upload authorization. `:moderate` covers moderation reads and
+  actions. Privileged reads of one's own content (hidden items, drafts,
+  previews) need admission and Content ownership only; a full ban does not
+  deny them. Account deletion also requires recent sign-in (`sudo_mode?/1`).
+
+  ### Operation results
+
+  Operations return `t:operation_result/1`. Each operation documents the
+  subset it returns; there is no universal dispatcher. `:forbidden` covers
+  full bans, non-owners and wrong roles. Whether a hidden resource reads as
+  `:not_found` is the owning operation's projection choice. Never relabel an
+  unknown infrastructure or provider outcome as one of these rejections.
   """
 
   import Ecto.Query, warn: false
   alias Tips.Repo
 
   alias Tips.Accounts.{User, UserNotifier, UserToken}
+
+  @typedoc "Standard rejection reasons for business operations, or invalid input."
+  @type operation_error ::
+          :unauthenticated
+          | :unconfirmed
+          | :forbidden
+          | :not_found
+          | :conflict
+          | Ecto.Changeset.t()
+
+  @type operation_result(value) :: {:ok, value} | {:error, operation_error()}
+
+  @type operation :: :contribute | :moderate | :delete_own_content | :delete_account
+
+  ## Eligibility
+
+  @doc """
+  Checks whether the account may perform `operation` now.
+
+  Call it on the account row locked by the owning transaction. See the
+  eligibility table in the module documentation.
+  """
+  @spec check_eligibility(User.t(), operation()) ::
+          :ok | {:error, :unauthenticated | :unconfirmed | :forbidden}
+  def check_eligibility(%User{deleted_at: %DateTime{}}, _operation),
+    do: {:error, :unauthenticated}
+
+  def check_eligibility(%User{}, operation)
+      when operation in [:delete_own_content, :delete_account],
+      do: :ok
+
+  def check_eligibility(%User{role: role}, :moderate) when role != :moderator,
+    do: {:error, :forbidden}
+
+  def check_eligibility(%User{confirmed_at: nil}, operation)
+      when operation in [:contribute, :moderate],
+      do: {:error, :unconfirmed}
+
+  def check_eligibility(%User{ban: :full}, operation)
+      when operation in [:contribute, :moderate],
+      do: {:error, :forbidden}
+
+  def check_eligibility(%User{}, operation) when operation in [:contribute, :moderate], do: :ok
 
   ## Database getters
 
@@ -191,7 +307,9 @@ defmodule Tips.Accounts do
   Gets the user with the given signed token.
 
   If the token is valid `{user, token_inserted_at}` is returned, otherwise `nil` is returned.
+  This is the session validity definition; see the "Admission contract" section.
   """
+  @spec get_user_by_session_token(binary()) :: {User.t(), DateTime.t()} | nil
   def get_user_by_session_token(token) do
     {:ok, query} = UserToken.verify_session_token_query(token)
     Repo.one(query)
