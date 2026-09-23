@@ -9,6 +9,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 import tomllib
 import uuid
@@ -133,6 +134,21 @@ def run(
     if p.returncode:
         raise RuntimeError(p.stderr.strip() or p.stdout.strip() or f"Command failed: {args}")
     return p.stdout.strip()
+
+
+def require_git_admin(common: Path, caller: str) -> None:
+    """Refuse before Git administration when this process cannot write main's .git.
+
+    Create a file to probe: mode bits do not show a client sandbox's write denial.
+    """
+    try:
+        with tempfile.TemporaryFile(dir=common):
+            pass
+    except OSError as error:
+        raise RuntimeError(
+            f"Cannot write {common} ({error.strerror}); "
+            f"ask {caller} to run it from the main checkout."
+        ) from error
 
 
 def object_fields(value: object, label: str) -> dict[str, object]:
@@ -528,7 +544,8 @@ def coordinator_brief(name: str, role: str) -> str:
             if role == "lead_tpm"
             else "You talk only to the team tech lead, who dispatches the deve"
             "loper and tester and advances review stages; you own labels, P"
-            "roject fields and the lead's launch. "
+            "roject fields, the lead's launch and every task_worktree.py ru"
+            "n the lead requests, replying with pane, worktree and SHA. "
         )
         + "Each dispatch must in"
         "clude the exact herdr agent prompt command addressed to its recip"
@@ -601,6 +618,7 @@ def stop_team(target: str) -> None:
     panes = pane_roles(workspace, names)
     roots = owned_worktrees(panes)
     if roots:
+        require_git_admin(main / ".git", "lead-tpm")
         git("fetch", "origin")
     check_worktrees(roots)
     for pane in panes.values():

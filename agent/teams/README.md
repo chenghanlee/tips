@@ -41,10 +41,12 @@ One lead TPM assigns work to teams within the configured trial limit. Each team 
 | Role | Owns |
 |---|---|
 | Lead TPM (`lead-tpm`) | Assign issues, start/retire teams, resolve cross-team blockers, report to the user. Talks only to team TPMs and the user. |
-| Team TPM (`team-N-tpm`) | Labels, Project fields, team start/stop and the tech lead's launch; cross-team and user blockers. Talks only to its tech lead and the lead TPM. |
-| Tech lead (`team-N-lead`) | Confirm readiness; provision, brief and advance developer and tester; decide technical disputes; review the whole PR; publish its review status and merge. Persistent for one issue. |
+| Team TPM (`team-N-tpm`) | Labels, Project fields, team start/stop, the tech lead's launch and every worktree provisioning the tech lead requests; cross-team and user blockers. Talks only to its tech lead and the lead TPM. |
+| Tech lead (`team-N-lead`) | Confirm readiness; decide when the developer and tester are provisioned; brief and advance them; decide technical disputes; review the whole PR; publish its review status and merge. Persistent for one issue. |
 | Developer (`team-N-dev`) | Implement the issue with integration-first TDD; own its branch, worktree and PR. |
 | Tester (`team-N-test`) | Independently review each pushed commit and run relevant verification. Fresh session per reviewed SHA. |
+
+A role receives only duties its configured launch policy can execute. Main-checkout Git administration (branches, worktrees, fetches) belongs to the team TPM: the tech lead decides what to provision and when, and the TPM executes it. A Codex lead's sandbox cannot write main's `.git`; Claude leads follow the same flow.
 
 Developer, tester and tech lead message each other freely. The tech lead dispatches and advances review stages; the TPM does not talk to the developer or tester, except as the fallback when a message to the lead fails to send (see [Escalation](#escalation)). The tech lead stays for the whole issue and is restarted by the TPM at the next assignment; the tester gets a fresh session at each reviewed SHA. Tech leads of different teams coordinate directly and tell their TPM only when it changes sequencing, ownership or creates a blocker. Nobody reviews or merges their own implementation. The tester may ask the developer anything, but its verdict cites code, tests and evidence, never the developer's explanation. The common GitHub identity cannot mechanically prove reviewer independence.
 
@@ -78,11 +80,11 @@ An issue closes only when its required result is integrated and evidenced. Parti
 
 ## Git
 
-Use protected `main`, short-lived `task/<issue>-<slug>` branches and worktrees under `.worktrees/`. While any team is live, the main checkout is read-only for source changes: never switch its branch, edit, commit or run tests there, because running clients and the lifecycle scripts are rooted at it. Repository administration such as fetch and worktree creation runs from main. Make every source change in a worktree, including documentation and operational scripts.
+Use protected `main`, short-lived `task/<issue>-<slug>` branches and worktrees under `.worktrees/`. While any team is live, the main checkout is read-only for source changes: never switch its branch, edit, commit or run tests there, because running clients and the lifecycle scripts are rooted at it. Repository administration such as fetch and worktree creation runs from main, by the team TPM (or the lead TPM for `team.py stop`). Make every source change in a worktree, including documentation and operational scripts.
 
 When no team is live, the user or the lead TPM may branch directly in the main checkout and return it to `main` once the PR merges. A PR that changes only documentation needs no local test run; the required CI checks still run on it.
 
-The team TPM uses `agent/teams/task_worktree.py` to provision and start the tech lead; the tech lead uses it for the developer and tester. Keep the existing task slug when an issue is renamed. The developer owns its task worktree; tester and tech lead have separate detached review worktrees. No agent edits another's checkout. The helper checks reviewer cleanliness even at the same SHA, checks selected-client configuration before changing HEAD, reuses a matching live session, and stops the old client and verifies descendant exit before advancing a reviewer. `/new`, `/clear` and `cd` inside an already-running client do not reroot its LSP.
+The team TPM runs `agent/teams/task_worktree.py` for every role: the tech lead at assignment, and the developer, tester and lead advances on the tech lead's request. Keep the existing task slug when an issue is renamed. The developer owns its task worktree; tester and tech lead have separate detached review worktrees. No agent edits another's checkout. The helper checks reviewer cleanliness even at the same SHA, checks selected-client configuration before changing HEAD, reuses a matching live session, and stops the old client and verifies descendant exit before advancing a reviewer. `/new`, `/clear` and `cd` inside an already-running client do not reroot its LSP.
 
 Open a draft PR early. Commit cohesive changes and run relevant checks before pushing. Unpushed local commits may be reorganized; published commits are fixed. Never force-push or push implementation directly to main. Repository rules block force pushes on `task/**` while permitting deletion of merged branches. Merge with merge commits; keep strict up-to-date checks and automatic deletion of merged remote heads.
 
@@ -151,24 +153,33 @@ agent/teams/team.py start N
 
 This creates/reuses the team's workspace and four named panes, starts/briefs its TPM and prints pane IDs. Coding panes stay at the shell until assigned. `agent/teams/team.py start lead` provides the same configured launch for a new lead TPM; do not run it if another live agent already owns `lead-tpm`.
 
-The lead TPM reads relevant issue/PR evidence on each message, picks an unblocked issue on the critical path and sends its URL to the team TPM. No file reservation list or merge slot is required. The team TPM adds `active` and starts the tech lead at a captured base SHA, with `--ui` when the issue carries the `ui` label. The tech lead confirms readiness on the issue, then provisions and briefs the developer, and later the tester at each pushed SHA.
+The lead TPM reads relevant issue/PR evidence on each message, picks an unblocked issue on the critical path and sends its URL to the team TPM. No file reservation list or merge slot is required. The team TPM adds `active` and starts the tech lead at a captured base SHA, with `--ui` when the issue carries the `ui` label. The tech lead confirms readiness on the issue, then has the TPM provision the developer, and later the tester at each pushed SHA, and briefs each one.
 
-Use the existing issue's task slug; do not generate a new branch when its title changes. Obtain pane IDs from the start output or `herdr pane list`; never guess them. The helper checks that it runs from the main checkout, so the tech lead runs it in a subshell from its worktree. Examples (`TASK` is `<issue>-<slug>`, `SHA` is the exact fetched revision being dispatched, `MAIN` is the main checkout):
+Use the existing issue's task slug; do not generate a new branch when its title changes. Obtain pane IDs from the start output or `herdr pane list`; never guess them.
+
+The TPM runs every provisioning command from the main checkout. Codex and Claude leads use the same flow:
+
+1. Tech lead → TPM: one line with role, pane and exact SHA.
+2. TPM runs the matching command below.
+3. TPM → tech lead: pane, absolute worktree and actual SHA.
+4. Tech lead confirms that pane, worktree and SHA inside the new client (`herdr agent get`, `git -C "$WORKTREE" rev-parse HEAD`) before briefing.
+
+The helper and `team.py stop` check that they can write main's `.git` before fetching; a caller that cannot, such as a sandboxed lead, is refused with the TPM to ask instead. Examples (`TASK` is `<issue>-<slug>`, `SHA` is the exact fetched revision being dispatched):
 
 ```bash
-# Team TPM, once per issue (add --ui for an issue labelled ui):
+# At assignment (add --ui for an issue labelled ui):
 agent/teams/task_worktree.py "$ISSUE-review-team-$N-lead" --team "$N" --role lead [--ui] --pane "$LEAD_PANE" --review-ref "$SHA" --start
-# Tech lead, from its worktree:
-(cd "$MAIN" && agent/teams/task_worktree.py "$TASK" --team "$N" --role dev --pane "$DEV_PANE" --start)
-(cd "$MAIN" && agent/teams/task_worktree.py "$ISSUE-review-team-$N-test" --team "$N" --role test --pane "$TEST_PANE" --review-ref "$SHA" --start)
-(cd "$MAIN" && agent/teams/task_worktree.py "$ISSUE-review-team-$N-lead" --team "$N" --role lead [--ui] --pane "$LEAD_PANE" --review-ref "$SHA")
+# On the tech lead's request:
+agent/teams/task_worktree.py "$TASK" --team "$N" --role dev --pane "$DEV_PANE" --start
+agent/teams/task_worktree.py "$ISSUE-review-team-$N-test" --team "$N" --role test --pane "$TEST_PANE" --review-ref "$SHA" --start
+agent/teams/task_worktree.py "$ISSUE-review-team-$N-lead" --team "$N" --role lead [--ui] --pane "$LEAD_PANE" --review-ref "$SHA"
 ```
 
 Repeat `--ui` on every later call for a UI lead; without it the helper resolves the other lead configuration and refuses the running client as a conflict.
 
 The helper provisions skills and only the chosen client's local config, applies environment in the target pane and starts the real interactive client. `--kind` is optional and must match the role's configured kind. Inspect config conflicts before explicitly replacing generated files with `--force`. Repeated calls reuse an already matching live session. Conflicting assignments fail. Tester advances require clean source even at the same SHA and verified old-client shutdown before a different SHA; fresh tester sessions carry history through PR comments. A running tech lead is never stopped for a new SHA: the last command above moves its clean, detached, read-only checkout in place, and its LSP keeps the same root.
 
-Brief immediately after successful client launch; do not wait for project compilation. Send the issue/PR contract link, base/head SHA, requested action and owner. Put outcome/exclusions, exact reading and acceptance/verification in that linked contract instead of repeating them. Follow [Context and handoff](#context-and-handoff), including the exact completion command in every dispatch. Developers implement and push; they do not switch to another issue before this one merges.
+Brief immediately after confirming the launched client; do not wait for project compilation. Send the issue/PR contract link, base/head SHA, requested action and owner. Put outcome/exclusions, exact reading and acceptance/verification in that linked contract instead of repeating them. Follow [Context and handoff](#context-and-handoff), including the exact completion command in every dispatch. Developers implement and push; they do not switch to another issue before this one merges.
 
 ## Review and merge
 
@@ -219,7 +230,7 @@ herdr agent prompt "team-$N-lead" "$EVIDENCE_URL SHA=$SHA; action=dispatch teste
 
 Waiting is event-driven: Herdr is the event bus. An agent that needs an answer sends the prompt, finishes any work that does not depend on the answer, and ends its turn; the reply arrives as a new prompt in its pane. No `sleep`, polling loop, monitor, cron, hook or `--wait`. The one exception is the tech lead's timed CI wait before merge.
 
-Decisions are durable only on GitHub. Whoever decides posts it on the issue or PR before the next step: the tech lead for engineering and implementation decisions, the TPM for project decisions. The asker links that post in its next handoff. The tech lead reports to the TPM only what changes a label, a Project field or a blocker: readiness confirmed, dispatched, PR opened, verdicts, merged, blocked, scope question. The TPM reads GitHub on every wake; a message is a wake signal, not the record. Team TPMs send completion or outside blockers to `lead-tpm` using the same direct command.
+Decisions are durable only on GitHub. Whoever decides posts it on the issue or PR before the next step: the tech lead for engineering and implementation decisions, the TPM for project decisions. The asker links that post in its next handoff. Besides provisioning requests, the tech lead reports to the TPM only what changes a label, a Project field or a blocker: readiness confirmed, dispatched, PR opened, verdicts, merged, blocked, scope question. The TPM reads GitHub on every wake; a message is a wake signal, not the record. Team TPMs send completion or outside blockers to `lead-tpm` using the same direct command.
 
 Run lifecycle and messaging commands directly. Keep their stdout, stderr and exit status; do not pipe them through `tail` or ad hoc JSON formatters. Parse Herdr JSON only when a subsequent operation needs a returned ID or field, under `result`. A failed formatter is not evidence that a message was undelivered: inspect once before resending. A successful send confirms submission, not task completion.
 
@@ -232,8 +243,8 @@ For context recovery, keep the issue/branch open and record base/head SHAs, work
 | Sender | Next recipient/action |
 |---|---|
 | Lead TPM | Team TPM: assign issue or resolve a cross-team/user blocker. |
-| Team TPM | Tech lead: issue URL and base SHA at assignment; answers to scope questions; restart after silence. |
-| Tech lead | Developer: dispatch, answers, review findings. Tester: exact SHA after provisioning its session. Team TPM: state changes and blockers only. Another team's tech lead: shared-module coordination. |
+| Team TPM | Tech lead: issue URL and base SHA at assignment; pane, worktree and SHA after each provisioning; answers to scope questions; restart after silence. |
+| Tech lead | Developer: dispatch, answers, review findings. Tester: exact SHA after the TPM provisions its session. Team TPM: provision requests with role, pane and SHA; state changes and blockers. Another team's tech lead: shared-module coordination. |
 | Developer | Tech lead: pushed SHA and evidence for tester dispatch, questions, or blocker. Tester: answers to its questions. |
 | Tester | Tech lead: every PR verdict/evidence. Developer: actionable findings and questions. |
 | Team TPM | Lead TPM: completed issue or blocker requiring outside action. |
@@ -242,7 +253,7 @@ For context recovery, keep the issue/branch open and record base/head SHAs, work
 
 The helper applies the selected role's configured model, effort, permissions, database suffix and test port in the actual target process. Only the selected client's generated configuration is written. Both clients invoke the canonical main checkout's LSP wrapper with the assigned absolute worktree root. Review revisions do not need to contain that wrapper. Keep installed patched bridge/Expert tools available independently of task worktrees.
 
-Startup reports **client launched**, not index ready. Brief the agent once Herdr reports it ready. Expert can keep compiling in the background. Do not add a compile gate or launch a second LSP as a probe. Configuration/tooling changes require a disposable actual-client pilot checking both the client root and LSP root for each client. The first real dispatch of a developer by a tech lead from inside its client is that pilot for the subshell flow; record it on the issue. The configured team limit is not a verified simultaneous cold-start capacity; measure it before scaling up.
+Startup reports **client launched**, not index ready. Brief the agent once Herdr reports it ready. Expert can keep compiling in the background. Do not add a compile gate or launch a second LSP as a probe. Configuration/tooling changes require a disposable actual-client pilot checking both the client root and LSP root for each client. The configured team limit is not a verified simultaneous cold-start capacity; measure it before scaling up.
 
 TPMs run without the Elixir LSP. Coordinator launches use configured compaction; coding launches do not inherit that coordinator override. Codex approval policy does not change or guarantee its sandbox; it retains the user's sandbox configuration. Claude's permission mode comes from the same config.
 

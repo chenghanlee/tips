@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 from typing import cast
 
-from team import command_args, execute
+from team import command_args, execute, require_git_admin
 
 from .test_task_worktree import CONFIG  # Fixed fixture values, independent of production tuning.
 
@@ -217,6 +217,16 @@ while True: time.sleep(.05)
         assert r.returncode != 0
         assert p.poll() is None
         assert "surviv" in r.stderr.lower()
+
+
+class GitAdminGuardTest(unittest.TestCase):
+    def test_writable_probe_preserves_existing_git_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            common = Path(tmp)
+            (common / "HEAD").write_text("ref: refs/heads/main\n")
+            require_git_admin(common, "team-1-tpm")
+            assert [path.name for path in common.iterdir()] == ["HEAD"]
+            assert (common / "HEAD").read_text() == "ref: refs/heads/main\n"
 
 
 TEAM_HERDR = r"""#!/usr/bin/env python3
@@ -466,6 +476,34 @@ class TeamLifecycleTest(unittest.TestCase):
         assert not (self.root / "docker-calls").exists()
         assert work.exists()
 
+    @unittest.skipIf(os.geteuid() == 0, "root bypasses directory permissions")
+    def test_stop_with_unwritable_main_git_refers_to_lead_tpm_before_fetch(self) -> None:
+        assert self.run_team("start", "1").returncode == 0
+        work = self.repo / ".worktrees/task"
+        execute(
+            ["git", "-C", str(self.repo), "worktree", "add", "-q", "--detach", str(work)],
+            check=True,
+        )
+        state = json.loads(self.state.read_text())
+        state["panes"][0].pop("agent")
+        state["panes"][1]["foreground_cwd"] = str(work)
+        self.state.write_text(json.dumps(state))
+        git_dir = self.repo / ".git"
+        before = len(self.calls())
+        git_dir.chmod(0o555)
+        try:
+            r = self.run_team("stop", "1")
+        finally:
+            git_dir.chmod(0o755)
+        assert r.returncode != 0
+        assert "ask lead-tpm to run it from the main checkout" in r.stderr
+        assert "fetch" not in r.stderr
+        assert not (git_dir / "FETCH_HEAD").exists()
+        assert not any(c[:2] == ["pane", "process-info"] for c in self.calls()[before:])
+        assert not (self.root / "docker-calls").exists()
+        assert work.exists()
+        assert json.loads(self.state.read_text())["workspaces"]
+
     def test_ambiguous_team_partition_names_refuse_before_database_access(self) -> None:
         assert self.run_team("start", "1").returncode == 0
         path = self.repo / "agent/teams/config.toml"
@@ -484,6 +522,7 @@ class TeamLifecycleTest(unittest.TestCase):
         prompt = next(c[3] for c in self.calls() if c[:2] == ["agent", "prompt"])
         assert "Report readiness to lead-tpm" in prompt
         assert "talk only to the team tech lead" in prompt
+        assert "every task_worktree.py run the lead requests" in prompt
         assert "let the reply wake you" in prompt
 
     def test_lead_ui_must_share_lead_partition(self) -> None:
