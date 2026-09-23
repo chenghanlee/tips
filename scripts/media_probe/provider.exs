@@ -1327,7 +1327,12 @@ defmodule MediaProbe.StreamRun do
     result = Stream.reserve("lost-response", 1_048_576, in_hour(), receive_timeout: 1)
     attempts = Ctx.calls() - before
     Process.sleep(5_000)
-    {:ok, found, _} = Stream.search(Stream.name("lost-response"))
+    # A failed search leaves the reservation to `cleanup`, which searches by name again.
+    found =
+      case Stream.search(Stream.name("lost-response")) do
+        {:ok, found, _} -> found
+        {:error, _} -> nil
+      end
 
     matches =
       Enum.filter(found || [], &(get_in(&1, ["meta", "name"]) == Stream.name("lost-response")))
