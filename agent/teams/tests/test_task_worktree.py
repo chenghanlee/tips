@@ -213,6 +213,14 @@ sys.exit(1 if s.get('stop_fails') else 0)
 """
 
 
+def snapshot(directory: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(directory).as_posix(): path.read_bytes()
+        for path in sorted(directory.rglob("*"))
+        if path.is_file()
+    }
+
+
 class WorktreeIntegrationTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory(prefix="tips helper ")
@@ -351,6 +359,19 @@ class WorktreeIntegrationTest(unittest.TestCase):
         result = self.call("--start", ok=False)
         assert "Herdr agents must be a list" in result.stderr
         assert not self.wt.exists()
+
+    @unittest.skipIf(os.geteuid() == 0, "root bypasses directory permissions")
+    def test_unwritable_main_git_refers_caller_to_team_tpm_before_fetch(self) -> None:
+        git_dir = self.root / ".git"
+        before = snapshot(git_dir)
+        git_dir.chmod(0o555)
+        self.addCleanup(git_dir.chmod, 0o755)
+        result = self.call("--start", role="dev", task="29-dev", ref=False, ok=False)
+        assert "ask team-3-tpm to run it from the main checkout" in result.stderr
+        assert "fetch" not in result.stderr
+        assert self.state()["events"] == []
+        assert not (self.root / ".worktrees").exists()
+        assert snapshot(git_dir) == before
 
     def test_codex_only_canonical_wrapper_and_idempotent_config(self) -> None:
         self.call()
