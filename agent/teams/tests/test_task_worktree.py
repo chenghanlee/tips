@@ -431,9 +431,8 @@ class WorktreeIntegrationTest(unittest.TestCase):
         ]
         assert mcp["args"] == [str(self.root / "agent/lsp/launch_worktree_lsp.sh"), str(self.wt)]
         assert mcp["timeout"] == 120000
-        assert not json.loads((self.wt / ".claude/settings.local.json").read_text())[
-            "enabledPlugins"
-        ]["elixir-lsp@elixir-agent-tools"]
+        # Linked worktrees read project-local settings from the main checkout, never here.
+        assert not (self.wt / ".claude/settings.local.json").exists()
         s = self.state()
         assert s["launch_env"] == {
             "PGPORT": "5433",
@@ -447,8 +446,13 @@ class WorktreeIntegrationTest(unittest.TestCase):
             "TIPS_PROVIDER_ENV_FILE": str(self.root / ".env"),
         }
         assert s["cwd"] == str(self.wt)
-        assert "fixture-test" in s["launch_argv"]
-        assert "--mcp-config" in s["launch_argv"]
+        argv = s["launch_argv"]
+        assert "fixture-test" in argv
+        assert argv[argv.index("--mcp-config") + 1] == str(self.wt / ".claude/elixir-mcp.json")
+        assert json.loads(argv[argv.index("--settings") + 1]) == {
+            "enabledPlugins": {"elixir-lsp@elixir-agent-tools": False}
+        }
+        assert "--strict-mcp-config" not in argv
 
     def test_codex_models_and_config_parameters(self) -> None:
         self.call("--start")
@@ -591,6 +595,14 @@ class WorktreeIntegrationTest(unittest.TestCase):
         f.write_text('{"mine":true}\n')
         self.call("--start")
         assert f.read_text() == '{"mine":true}\n'
+
+    def test_claude_launch_preserves_existing_local_settings(self) -> None:
+        self.call(role="test")
+        f = self.wt / ".claude/settings.local.json"
+        f.write_text('{"mine":true}\n')
+        self.call("--start", role="test")
+        assert f.read_text() == '{"mine":true}\n'
+        assert "--settings" in self.state()["launch_argv"]
 
     def test_wrong_owner_and_busy_pane_refused_before_mutation(self) -> None:
         s = self.state()

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import cast
 
 from team import (
+    CLAUDE_PLUGIN_SETTINGS,
     CodingRole,
     Config,
     Entity,
@@ -301,17 +302,6 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
             self.desired = {self.worktree / ".codex/config.toml": config}
         else:
             self.desired = {
-                self.worktree / ".claude/settings.local.json": json.dumps(
-                    {
-                        "enabledPlugins": {
-                            "mix-compile@elixir-agent-tools": True,
-                            "mix-credo@elixir-agent-tools": True,
-                            "elixir-lsp@elixir-agent-tools": False,
-                        }
-                    },
-                    indent=2,
-                )
-                + "\n",
                 self.worktree / ".claude/elixir-mcp.json": json.dumps(
                     {
                         "mcpServers": {
@@ -546,6 +536,8 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
                 self.policies["claude_permission_mode"],
                 "--effort",
                 self.effort,
+                "--settings",
+                CLAUDE_PLUGIN_SETTINGS,
                 "--mcp-config",
                 str(self.worktree / ".claude/elixir-mcp.json"),
             ]
