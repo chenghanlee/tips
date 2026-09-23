@@ -1,0 +1,440 @@
+{
+  "mode": "cleanup",
+  "run_id": "20260923T115343Z-094e",
+  "assertions": [
+    {
+      "name": "every_owned_stream_uid_deleted",
+      "status": "pass",
+      "required": true,
+      "experiment": "redaction_cleanup",
+      "evidence": {
+        "uids": [
+          {
+            "result": "already_deleted",
+            "uid": "b5dcabf8f00bd9c26dbb99ee8399a613"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "62eb0bb4427a6f2351edbf5750bcb5b6"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "5d6ae1fa5b690b501f8911b824ab7ece"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "4f3d324ce5a8bf6648873eed0cf7ede2"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "1e4d5ef8405eced0a0b27590f276574f"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "dd6f9019565b6cbc59ba3545854ed8a5"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "5f4013ad219816e23c5427d9872004b0"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "ce8394b13177be3f66de401b37e06953"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "e018beb82c5af62f94807351bd64396c"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "bba0f2b393cd2f7fc9478e3b40d9c0e4"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "74d94a5d57bb90ddfef441b7600353c2"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "5f7f891064568ad9f648fb2ad9e44ff3"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "b7bedf3dc0a7d540295479f16156cd7b"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "b30678cb0c8d540ad80d84b387a5c187"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "47fe99878c094baab8f65d4f39041e3d"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "59f972b3973361547933e6a6ddc095d8"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "f764a07c96c36a263c3077ebf6cde0d4"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "8f4acc24efdabf420fab3cc23d22643b"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "46297b2c84d52612a60e30951fff7c9a"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "07eccfb39445f90dabd0a800cdb2c9b0"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "56bd5eecd5b602e2d70025f4243abbf5"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "0c8f726bcbcd6ffcbf2e10fe030d8345"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "8a9872b209783a211cd18d28c3fa7702"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "8dcb885f129708240706b271eac5b03a"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "61b312734ab3b9f68954227ddfda837d"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "32d4e5915cd081d9266b508eff0bd92b"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "095ebbb572ee763d9002be74e86be28d"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "7254aa24ec483e025544ce6dc1001a90"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "9aef37073baa1a030311225269a33aaf"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "2b02a0f7de97652f6895348ab2746361"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "9883d2a4fe222414c7cb6e9b5010cf3f"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "a7ce59d1f965459cc6c242b874e0eba1"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "5d0df831fa190b6cfe9d315030c051f5"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "b7e86560b381e3ca46a4d834478f5119"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "7fdae2771b4479d358d797d0261a209a"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "8c0146bdb5deee4f8328e3ed1f4b6be4"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "31c28e102fa46bc0fe279875ca051766"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "af22d98842c9d254c2c8b44be9d4374b"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "7d925df03e3a47ab455b541824ae508f"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "b3d81336f6a656d836560b4a5217ce2c"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "8bd5418ea6a31bf15bc79fa957b1a1ee"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "92d9f54df6977aae6a3fa12ba72d5773"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "63304689de302de11ebdabd8918d40c9"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "1edae78f33bedd054e00fb3721005c2b"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "908fa61813778ded48e55c2461242da1"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "0ccf7d844eaa65596739c082a238b305"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "ed0717ad9bd50c557d220413961f2571"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "8aa92ffa07f4bf4a4dcb67fc49d67c99"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "b2d16e50086352b5df72b8dbd34568dd"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "3084968b7c8d95ba20d73cd4024b2f12"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "12baf01db65674545d72d4738a6b03de"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "0c7d65c096d8cec4090882e0a5b3faeb"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "2b478cbb3f4484d93b0d71deb021d668"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "ae8db0498d345d1df76d320b35718b49"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "1f755c290506018be598a768f97336a0"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "7ab018754025ce696187af259aa23646"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "bfd036ce632b58c56bee261588748d90"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "78b5b43a96dde9c1a4097489cd2013ad"
+          },
+          {
+            "delete": 200,
+            "result": "deleted",
+            "uid": "579d3e6b3a8d4f9be648b99ce0fc7fc5",
+            "get_after": 404
+          },
+          {
+            "result": "already_deleted",
+            "uid": "4e1dfc045b6b7244e30459623f627da3"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "e090fee281697f8284188440b2b27dcd"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "ec0d4b98d175401266782835a1920fe3"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "b394954b76c3e506670bcd7a2f54ef87"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "185a22a65566ffb28ec04e9184cc7a3a"
+          },
+          {
+            "delete": 200,
+            "result": "deleted",
+            "uid": "39ab9ea1a0941a85a302187120cc3ea8",
+            "get_after": 404
+          },
+          {
+            "delete": 200,
+            "result": "deleted",
+            "uid": "37f669db52b50fb28e28ffe283c4624d",
+            "get_after": 404
+          },
+          {
+            "delete": 200,
+            "result": "deleted",
+            "uid": "72bb81c7026d59a0ceb9c8b9dc730775",
+            "get_after": 404
+          },
+          {
+            "delete": 200,
+            "result": "deleted",
+            "uid": "3611f26ee3923a55215f6d5c242f81eb",
+            "get_after": 404
+          },
+          {
+            "delete": 200,
+            "result": "deleted",
+            "uid": "be0ca4a74efb6c181b35352d6f8f9bf9",
+            "get_after": 404
+          },
+          {
+            "delete": 200,
+            "result": "deleted",
+            "uid": "0e0942006a46d0e8c840b107e9ee2158",
+            "get_after": 404
+          },
+          {
+            "delete": 200,
+            "result": "deleted",
+            "uid": "9c8311152cc69cf579bce24d4de2997b",
+            "get_after": 404
+          },
+          {
+            "delete": 200,
+            "result": "deleted",
+            "uid": "4e5712fbfbca8b39dfbf5325ef69b6f5",
+            "get_after": 404
+          },
+          {
+            "delete": 200,
+            "result": "deleted",
+            "uid": "7e6f669c05e4983d4a361b8a30fef68a",
+            "get_after": 404
+          },
+          {
+            "delete": 200,
+            "result": "deleted",
+            "uid": "0c66022a3ba08c5b654205d40e8cc8ad",
+            "get_after": 404
+          },
+          {
+            "delete": 200,
+            "result": "deleted",
+            "uid": "ae9aaeeea4f158a64a0bcc8e9a4b4d24",
+            "get_after": 404
+          },
+          {
+            "result": "already_deleted",
+            "uid": "fcb84c94a749bc15f5d09e73ce2ddbae"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "109656ee9eb09e292a1f742590301fe6"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "506826bfc103a44ab254467b14f10f5c"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "93cbc04d05d1a051c57f46c7d5a90654"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "471fde4fb2b4f35753caf626f3610821"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "1708cf0919f8bacdcb4d90c9c4e84a41"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "99149c7a5a72e326c5499003644f7cac"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "9d6cd1681a598148ac93b0af71395c61"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "a7f9d194de0b7d18d585aaa802eebca7"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "02517f31cb336a509cf63081d23403ff"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "e146b9d536b55d8e29e0037a1feebe1d"
+          },
+          {
+            "result": "already_deleted",
+            "uid": "734de6bf1973fe1f7e61e83eb7146f64"
+          },
+          {
+            "delete": 200,
+            "result": "deleted",
+            "uid": "d28a12d8d006f60fb4bd3036c0d2e762",
+            "get_after": 404
+          },
+          {
+            "result": "already_deleted",
+            "uid": "7387e9fc03acd674016f73ee1f1d9b29"
+          },
+          {
+            "delete": 200,
+            "result": "deleted",
+            "uid": "ec2ae14a3dacc0823c2d4b7af24afc1a",
+            "get_after": 404
+          }
+        ],
+        "inventory_files": 13,
+        "requested_reservations": 132,
+        "remaining_by_name": []
+      }
+    },
+    {
+      "name": "r2_probe_prefix_empty",
+      "status": "pass",
+      "required": true,
+      "experiment": "redaction_cleanup",
+      "evidence": {
+        "prefix": "media/probe-61/",
+        "remaining": [],
+        "deleted_now": []
+      }
+    }
+  ],
+  "facts": {},
+  "issue": 61,
+  "git_sha": "72c393c697732825bfafa2363be1a9690c500738",
+  "git_tracked_changes": 0,
+  "finished_at": "2026-09-23T11:54:26.122695Z",
+  "versions": {
+    "otp": "29",
+    "elixir": "1.20.4",
+    "req": "0.7.4",
+    "jose": "1.11.12",
+    "tus": "1.0.0",
+    "stream_api": "client/v4 (unversioned)"
+  },
+  "bounds": {
+    "max_calls": 400,
+    "provider_calls": 122,
+    "concurrency": 1,
+    "retries": 0,
+    "receive_timeout_ms": 30000,
+    "connect_timeout_ms": 10000
+  },
+  "verdict": "pass"
+}

@@ -11,9 +11,9 @@ semantics and image parser selection. The probe code is not a production path.
 | Acceptance | Experiment | Result |
 |---|---|---|
 | Server-authorized byte cap ≤ 1,000,000,000 | `stream_length` | **Proven.** Stream stores no byte beyond the declared `Upload-Length`, and the browser cannot raise it. Stream itself accepts 1,000,000,001, so the cap is the server authorizer's job. |
-| Private from reservation; 180 s limit | `stream_private` | **Partly proven.** Metadata applied at reservation; unsigned manifest, poster and iframe return 401; a 200 s video fails with `ERR_DURATION_EXCEED_CONSTRAINT`. **Signed playback unproven**: no signing key (owner prerequisite). |
-| Trusted completion; completion + 48 h | `stream_deadline` | **Blocking gap.** Stream's `uploaded` is the reservation time, not transfer completion. No field observed records completion. Expiry is fixed at reservation, is not extended by pause/resume, and rejects late bytes. |
-| R2 put/get/delete | `r2_roundtrip` | **Partly proven.** S3 origin semantics pass. **Public development URL unproven**: unreachable from the developer sandbox (owner prerequisite). Custom-domain cache purge is **deferred/unproven, #178 (M4)**. |
+| Private from reservation; 180 s limit | `stream_private` | **Proven.** Metadata applied at reservation; unsigned manifest, poster and iframe return 401; signed HLS decodes 100 H.264 frames; signed poster is a JPEG; expired and wrong-key tokens return 401; after delete the signed manifest returns 404. A 200 s video fails with `ERR_DURATION_EXCEED_CONSTRAINT`. |
+| Trusted completion; completion + 48 h | `stream_deadline` | **Blocking gap.** Stream's `uploaded` is the reservation time, not transfer completion. No field observed records completion. Proven: the one-hour expiry is fixed at reservation, is not extended by pause/resume, and rejects bytes after it (full one-hour run). |
+| R2 put/get/delete | `r2_roundtrip` | **S3 reads proven; public delivery unproven.** The owner's ISP has a routing loop to `r2.dev` ([owner decision](https://github.com/chenghanlee/tips/issues/61#issuecomment-5794223944)). Custom-domain cache purge is **deferred/unproven, #178 (M4)**. |
 | Maintained parser selected before #62 | `parser_formats_bounds` | **Blocked.** No candidate passes every required fixture. Nothing is selected. |
 | Secrets never in evidence; bounded calls; cleanup | `redaction_cleanup` | **Proven** for the runs recorded here. |
 
@@ -45,7 +45,7 @@ and exits nonzero when a required assertion fails or is unproven, or when the
 report leak scan finds a secret. Output goes to ignored `tmp/media-probe/`:
 
 - `<mode>-<run-id>.json`: redacted report (copies of the recorded runs are in
-  [media-provider-probe/](media-provider-probe/)).
+  `docs/development/media-provider-probe/`).
 - `private/<mode>-<run-id>-calls.jsonl`: every request, redacted of credentials.
 - `inventory/<mode>-<run-id>.jsonl`: every owned Stream reservation and R2 key,
   written before the request and again with its id. `cleanup` reads all of them.
@@ -73,8 +73,13 @@ further; results describe the service on that date.
 
 ## Stream findings
 
-Recorded run: `stream` `20260923T104941Z-dd93` at `0487970` (79 calls; the one tracked change at report time was this document). Every request is sequential, never retried,
-with a 30 s receive and 10 s connect timeout and a 400-call budget.
+Recorded run: `stream` `20260923T114819Z-1edd` at `72c393c`, clean tracked tree, 91
+calls ([report](media-provider-probe/stream-20260923T114819Z-1edd.json)). Every request
+is sequential, never retried, with a 30 s receive and 10 s connect timeout and a
+400-call budget. Timestamps quoted below from the pause/resume case come from an
+earlier run (`20260923T104941Z-dd93`, `0487970`); the recorded run repeats the result
+(`uploaded` 11:49:21.150Z before the first chunk at 11:49:22.220Z; final chunk
+11:49:44.927Z; `uploaded` unchanged).
 
 ### `stream_length`
 
@@ -105,9 +110,22 @@ with a 30 s receive and 10 s connect timeout and a 400-call budget.
 - The 10 s fixture reaches `ready` with `duration: 10` about 5 s after transfer.
 - The 200 s fixture ends in `state: error`, `errorReasonCode:
   ERR_DURATION_EXCEED_CONSTRAINT`, `readyToStream: false`, `duration: 0`.
-- **Unproven:** signed manifest/segment delivery, signed JPEG poster, expired and
-  wrong-key token rejection, and signed serving after delete. They need
-  `CLOUDFLARE_STREAM_SIGNING_KEY`. The code paths exist and report `unproven`.
+- Tokens are signed locally with JOSE RS256 (`sub`, `kid`, `exp` +1 h,
+  `downloadable: false`) from `CLOUDFLARE_STREAM_SIGNING_KEY`, read through
+  `Tips.ProviderConfig.load/2`.
+- Signed `/<token>/manifest/video.m3u8` → 200 `application/vnd.apple.mpegurl`; its
+  first variant and first media segment → 200, 33,923 bytes `video/mp4`.
+- **Playback:** ffprobe 8.1 opens the signed manifest like a player and decodes 100
+  H.264 frames at 320×240 from the first 4 s. This, not the iframe status, is the
+  playback evidence.
+- Signed `/<token>/thumbnails/thumbnail.jpg` → 200 `image/jpeg`, JPEG magic bytes.
+- Signed `/<token>/iframe` → 200 HTML (informational only).
+- A token with `exp` 120 s in the past → 401. A token signed by a fresh RSA key with
+  the real `kid` → 401.
+- The over-180 s video's signed manifest → 424 (not playable).
+- After `DELETE` (200): API `GET` → 404, repeated `DELETE` → 404 (code 10003), signed
+  manifest with a fresh token → 404.
+- A real browser rendering the iframe player was not tested.
 
 ### `stream_deadline`
 
@@ -126,11 +144,17 @@ with a 30 s receive and 10 s connect timeout and a 400-call budget.
 - With a 130 s expiry: a transfer started before expiry and finished after it is
   rejected (400, code 10017, "Expiration for upload has passed"); a first `PATCH`
   after expiry is rejected the same way. Both videos stay `pendingupload`.
-- One-hour enforcement: <!--HOUR_RESULT-->
+- **One-hour enforcement** (`stream-hour` `20260923T103853Z-93b9`,
+  [report](media-provider-probe/stream-hour-20260923T103853Z-93b9.json)): expiry
+  11:38:53Z (provider `uploadExpiry` equal); first chunk 204 at 10:38:54Z; final chunk
+  at 11:39:56Z (about 1 min after expiry) → 400, code 10017; video stays
+  `pendingupload`; deleted. The report names `72c393c` because the SHA is read when the
+  report is written; the code was loaded at launch (10:38Z) from `214750e` plus the
+  then-uncommitted `stream-hour` fixes, and that module's logic equals `72c393c`.
 - Lost creation response: a creation call with a 1 ms receive timeout fails at the
   client after one attempt (no retry). The reservation **does exist** at Stream,
   found only by its `name` metadata. A caller that loses the response has no uid.
-- Creation latency across 11 successful reservations: min 507 ms, median 582 ms, max 766 ms.
+- Creation latency across 11 successful reservations: min 503 ms, median 582 ms, max 668 ms.
 
 #### Gap: completion time
 
@@ -150,18 +174,21 @@ excluded by the design and was not tested.
 
 ## R2 findings
 
-Recorded run: `r2` `20260923T105816Z-a0af` at `00e727a`. Keys are `media/probe-61/<run-id>/<uuid>.<ext>` in
+Recorded run: `r2` `20260923T105816Z-a0af` at `00e727a`, clean tracked tree
+([report](media-provider-probe/r2-20260923T105816Z-a0af.json)); `r2` includes the public
+reads, so it is not rerun under the owner decision. Keys are `media/probe-61/<run-id>/<uuid>.<ext>` in
 the development bucket, with synthetic 64×48 PNG and GIF fixtures.
 
 - S3 `PUT` with `Content-Type` → 200. S3 `GET` returns identical bytes (SHA-256
   checked) and the stored `Content-Type`.
 - S3 `DELETE` → 204; S3 `GET` right after → 404 `NoSuchKey`; repeated `DELETE` → 204;
   `ListObjectsV2` on the run prefix → empty.
-- **Unproven:** reads through `R2_PUBLIC_URL`. From the developer sandbox the host
-  resolves to Cloudflare addresses but every TCP connect times out, while the S3
-  endpoint and `api.cloudflare.com` work. #177 recorded the public URL answering 404
-  from the owner's machine. Origin deletion is proven; public delivery and any
-  public caching after delete are not.
+- **Public delivery unproven.** Reads through `R2_PUBLIC_URL` never got an HTTP
+  response (TCP connect timeouts to every `r2.dev` address, while the S3 endpoint and
+  `api.cloudflare.com` work). The owner reproduced it on their host for every `r2.dev`
+  name and attributes it to an ISP routing loop; the [owner decision](https://github.com/chenghanlee/tips/issues/61#issuecomment-5794223944) accepts
+  public delivery as unproven and forbids further public reads or network workarounds.
+  Origin deletion is proven; public delivery and public caching after delete are not.
 - Custom media domain and cache purge: **deferred/unproven, #178** (M4).
 
 ## Parser findings
@@ -242,10 +269,22 @@ parsing code; or a different maintained decoder with APNG support.
   R2 endpoint and public URL. Every report is scanned for secret values, JWT-shaped
   strings and upload URLs before it is written; the mode fails on any hit.
 - The signing-key creation response is marked sensitive: its body and any exception
-  text are dropped before logging. `redaction-check` proves this with synthetic
+  text are dropped before logging. `redaction-check` (`20260923T104809Z-3e37` at
+  `0487970`, [report](media-provider-probe/redaction-check-20260923T104809Z-3e37.json)) proves this with synthetic
   key-shaped success, error, small, malformed and exception responses, and fails when
   suppression is disabled.
-- Cleanup: <!--CLEANUP-->
+- Cleanup (`cleanup` `20260923T115343Z-094e` at `72c393c`, clean tree,
+  [report](media-provider-probe/cleanup-20260923T115343Z-094e.json)): read 13
+  inventory files (132 requested reservations, including interrupted runs and
+  lost-response reservations), searched Stream by the `tips-probe-61-` name prefix,
+  and reconciled 90 uids: 76 already deleted, 14 deleted now, each confirmed by `GET`
+  404; none remain by name. The R2 prefix `media/probe-61/` is empty. The shared
+  signing key is kept.
+- Two runs were cut short and have no report: `20260923T112904Z-5c2e` (a local DNS
+  outage at 11:30Z made every later call fail) and `20260923T113726Z-8d78` (the
+  session ended; its partial log showed `signed_hls_decodes_video_frames` failing
+  with no retained detail). Their resources are covered by the cleanup above. The
+  recorded run passes that check.
 
 ## Signing key (owner step)
 
@@ -253,5 +292,6 @@ parsing code; or a different maintained decoder with APNG support.
 `CLOUDFLARE_STREAM_SIGNING_KEY=<base64 JWK>` (the JWK includes `kid`) to
 `TIPS_PROVIDER_ENV_FILE`. It refuses before calling Stream when the variable is
 already set or the file is not writable, and never deletes keys. The developer
-session's permission policy refused this secret-store write, so no key exists yet.
-After the owner creates the key, rerun `stream` for the signed checks.
+session was not permitted to write the secret store; the owner ran the reviewed
+helper at `0487970` (run `20260923T110825Z-a180`), and the key now lives in the main
+checkout's `.env`.
