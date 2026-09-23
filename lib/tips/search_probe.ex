@@ -292,9 +292,12 @@ defmodule Tips.SearchProbe do
   @doc """
   Embeds `inputs` in one request. Returns unit vectors of the gate's dimensions.
 
-  A 4096-value response is cut to its first 1024 values and renormalized (Matryoshka
-  truncation). Once `expected_length` is set, any other length is an error. Errors are
-  atoms or tuples of atoms and status codes; bodies and headers never leave this function.
+  Every response must name the requested model and the pinned upstream, compared without
+  case (OpenRouter reports `Qwen/Qwen3-Embedding-8B` from `DeepInfra` for
+  `qwen/qwen3-embedding-8b` pinned to `deepinfra`). A 4096-value response is cut to its
+  first 1024 values and renormalized (Matryoshka truncation). Once `expected_length` is
+  set, any other length is an error. Errors are atoms or tuples of atoms and status codes;
+  bodies and headers never leave this function.
   """
   def embed(inputs, provider) do
     body =
@@ -305,6 +308,7 @@ defmodule Tips.SearchProbe do
     with {:ok, response} <-
            request(provider, method: :post, url: "/embeddings", json: body, auth: true),
          {:ok, data} <- response_data(response, length(inputs)),
+         :ok <- identity(response, provider),
          {:ok, vectors, length} <- vectors(data, provider) do
       {:ok,
        %{
@@ -318,24 +322,55 @@ defmodule Tips.SearchProbe do
     end
   end
 
+  defp identity(%{"model" => model, "provider" => upstream}, provider)
+       when is_binary(model) and is_binary(upstream) do
+    cond do
+      String.downcase(model) != String.downcase(provider.model) ->
+        {:error, :model_mismatch}
+
+      String.downcase(upstream) != String.downcase(provider.upstream) ->
+        {:error, :upstream_mismatch}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp identity(_response, _provider), do: {:error, :missing_identity}
+
   defp put_if(map, true, key, value), do: Map.put(map, key, value)
   defp put_if(map, false, _key, _value), do: map
 
+  # One monotonic deadline covers pool checkout, connect, send, receive and JSON decode:
+  # Finch's own timeouts each cover one phase. Req's timeouts are set to the same value
+  # only so their defaults never fire first. On expiry the request process is killed, so
+  # no late response is used; a request the provider already accepted cannot be recalled.
   defp request(provider, opts) do
     {auth?, opts} = Keyword.pop(opts, :auth, false)
+    deadline = provider.timeout_ms
 
     opts =
       [
         base_url: provider.base_url,
         retry: false,
-        receive_timeout: provider.timeout_ms,
-        connect_options: [timeout: provider.timeout_ms]
+        pool_timeout: deadline,
+        receive_timeout: deadline,
+        connect_options: [timeout: deadline]
       ]
       |> Keyword.merge(if auth?, do: [auth: {:bearer, provider.api_key}], else: [])
       |> Keyword.merge(opts)
       |> Keyword.merge(provider.req_options)
 
-    case Req.request(opts) do
+    task = Task.async(fn -> Req.request(opts) end)
+
+    case Task.yield(task, deadline) || Task.shutdown(task, :brutal_kill) do
+      {:ok, result} -> response(result)
+      nil -> {:error, :timeout}
+    end
+  end
+
+  defp response(result) do
+    case result do
       {:ok, %Req.Response{status: 200, body: %{} = body}} -> {:ok, body}
       {:ok, %Req.Response{status: 200}} -> {:error, :malformed_response}
       {:ok, %Req.Response{status: status}} -> {:error, {:http_status, status}}
@@ -473,6 +508,7 @@ defmodule Tips.SearchProbe do
          base_url: provider["base_url"],
          model: gate["model"]["id"],
          routing: provider["routing"],
+         upstream: hd(provider["routing"]["only"]),
          dimensions: gate["dimensions"],
          send_dimensions: true,
          expected_length: nil,
@@ -663,13 +699,14 @@ defmodule Tips.SearchProbe do
 
     case {result, state.dimensions_mode} do
       {{:error, {:http_status, 400}}, nil} ->
-        [rejected | rest] = state.requests
-        requests = [%{rejected | outcome: "dimensions_rejected"} | rest]
         provider = %{state.provider | send_dimensions: false, expected_length: 4096}
-        state = %{state | provider: provider, requests: requests}
-        {retry, state} = timed(state, entry, fn -> embed([text], provider) end)
 
-        settle(retry, state, "unsupported")
+        {retry, state} =
+          timed(%{state | provider: provider}, entry, fn -> embed([text], provider) end)
+
+        with {:ok, vector, state} <- settle(retry, state, "unsupported") do
+          {:ok, vector, confirm_rejection(state)}
+        end
 
       {result, nil} ->
         settle(result, state, nil)
@@ -680,6 +717,12 @@ defmodule Tips.SearchProbe do
       {{:error, reason}, _mode} ->
         {:error, reason, state}
     end
+  end
+
+  # The 400 counts as a dimensions rejection only after the retry without the parameter
+  # returned 4096 values; until then it keeps its HTTP label.
+  defp confirm_rejection(%{requests: [retry, rejected | rest]} = state) do
+    %{state | requests: [retry, %{rejected | outcome: "dimensions_rejected"} | rest]}
   end
 
   defp settle({:ok, %{vectors: [vector], returned_length: length}}, state, mode) do
@@ -874,10 +917,10 @@ defmodule Tips.SearchProbe do
         measured.incremental_rss_mib <= g["max_incremental_rss_mib"]
       ),
       gate(
-        "single_model_and_upstream",
-        "one model and one upstream in responses",
+        "candidate_identity",
+        "every response names the requested model and pinned upstream",
         %{models: measured.models, upstreams: measured.upstreams},
-        length(measured.models) <= 1 and length(measured.upstreams) <= 1
+        match?([_], measured.models) and match?([_], measured.upstreams)
       ),
       gate(
         "request_budget",

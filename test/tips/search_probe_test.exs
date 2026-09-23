@@ -7,6 +7,8 @@ defmodule Tips.SearchProbeTest do
   @moduletag :tmp_dir
 
   @secret "sentinel-secret-key"
+  # The provider's documented spelling of the requested candidate and pinned upstream.
+  @identity %{"model" => "Qwen/Qwen3-Embedding-8B", "provider" => "DeepInfra"}
 
   setup_all do
     {:ok, fixtures} = SearchProbe.load(SearchProbe.fixtures_dir())
@@ -176,7 +178,8 @@ defmodule Tips.SearchProbeTest do
     embeddings = Enum.filter(bodies, &match?({"POST", "/api/v1/embeddings", _}, &1))
     assert length(embeddings) == length(eligible) + length(long) + 30
     assert report["usage"]["requests"] == length(bodies)
-    assert report["preflight"]["plan"]["requests"] >= length(bodies)
+    assert %{"preflight" => %{"plan" => %{"requests" => planned}}} = report
+    assert is_integer(planned) and planned >= length(bodies)
   end
 
   test "default invocation never calls a real provider", %{fixtures: fixtures, tmp_dir: tmp_dir} do
@@ -328,6 +331,89 @@ defmodule Tips.SearchProbeTest do
       rejected = Enum.count(report["requests"], &(&1["outcome"] == "dimensions_rejected"))
       assert rejected == extra_requests
     end
+
+    # A 400 stays provisional: when the retry without dimensions also fails, nothing claims
+    # the parameter was rejected.
+    both_fail =
+      stub_provider(fixtures, fn
+        %{request_path: "/api/v1/embeddings"} = conn, body ->
+          status = if body =~ ~s("dimensions"), do: 400, else: 503
+          {:respond, Plug.Conn.send_resp(conn, status, "nope")}
+
+        _conn, _body ->
+          :pass
+      end)
+
+    report = run!(fixtures, both_fail, tmp_dir)
+    assert %{"status" => "failed", "error" => "http_503"} = report
+    assert %{"mode" => nil, "returned_lengths" => []} = report["dimensions"]
+
+    assert ["ok", "ok", "http_400", "http_503"] = Enum.map(report["requests"], & &1["outcome"])
+  end
+
+  test "accepts only the requested model from the pinned upstream", %{
+    fixtures: fixtures,
+    tmp_dir: tmp_dir
+  } do
+    canonical = run!(fixtures, stub_provider(fixtures, fn _, _ -> :pass end), tmp_dir)
+    assert canonical["status"] == "passed"
+
+    assert %{
+             "passed" => true,
+             "value" => %{"models" => ["Qwen/Qwen3-Embedding-8B"], "upstreams" => ["DeepInfra"]}
+           } = Enum.find(canonical["gates"], &(&1["name"] == "candidate_identity"))
+
+    for {identity, error} <- [
+          {%{"model" => "qwen/qwen3-embedding-4b", "provider" => "DeepInfra"}, "model_mismatch"},
+          {%{"model" => "Qwen/Qwen3-Embedding-8B", "provider" => "SiliconFlow"},
+           "upstream_mismatch"},
+          {%{"model" => "Qwen/Qwen3-Embedding-8B"}, "missing_identity"},
+          {%{}, "missing_identity"}
+        ] do
+      plug = stub_provider(fixtures, fn _, _ -> :pass end, identity: identity)
+      report = run!(fixtures, plug, tmp_dir)
+
+      assert %{"status" => "failed", "blocker" => nil, "error" => ^error} = report
+      # The first mismatching response stops the run.
+      assert [_endpoints, _key, %{"phase" => "document", "outcome" => ^error}] =
+               report["requests"]
+    end
+  end
+
+  test "enforces a hard total deadline on each request", %{fixtures: fixtures, tmp_dir: tmp_dir} do
+    test = self()
+
+    slow = fn conn ->
+      Process.sleep(1_000)
+      send(test, :late_response)
+      Req.Test.json(conn, %{})
+    end
+
+    fast = respond(fn _ -> [vector([1.0], 1024)] end)
+    deadline = %{provider(slow) | timeout_ms: 100}
+
+    {elapsed_us, result} = :timer.tc(fn -> SearchProbe.embed(["x"], deadline) end)
+    assert result == {:error, :timeout}
+    assert elapsed_us < 500_000
+    assert {:ok, _} = SearchProbe.embed(["x"], %{provider(fast) | timeout_ms: 100})
+
+    # In a run, the first query past its deadline stops the probe; nothing continues.
+    short = put_in(fixtures.gate["gate"]["query_deadline_ms"], 100)
+
+    plug =
+      stub_provider(short, fn conn, body ->
+        if body =~ "Instruct:", do: {:respond, slow.(conn)}, else: :pass
+      end)
+
+    report = run!(short, plug, tmp_dir)
+    assert %{"status" => "failed", "blocker" => nil, "error" => "timeout"} = report
+
+    assert %{"phase" => "query", "outcome" => "timeout", "elapsed_ms" => ms} =
+             List.last(report["requests"])
+
+    assert ms < 500
+    assert Enum.count(report["requests"], &(&1["phase"] == "query")) == 1
+    refute_receive :late_response, 1_200
   end
 
   # -- helpers --
@@ -364,6 +450,7 @@ defmodule Tips.SearchProbeTest do
       base_url: "https://provider.test/api/v1",
       model: "qwen/qwen3-embedding-8b",
       routing: %{},
+      upstream: "deepinfra",
       dimensions: 1024,
       send_dimensions: true,
       expected_length: nil,
@@ -376,7 +463,7 @@ defmodule Tips.SearchProbeTest do
     fn conn ->
       {:ok, body, conn} = Plug.Conn.read_body(conn)
       %{"input" => inputs} = Jason.decode!(body)
-      Req.Test.json(conn, %{"data" => data_fun.(inputs), "model" => "m"})
+      Req.Test.json(conn, Map.put(@identity, "data", data_fun.(inputs)))
     end
   end
 
@@ -421,12 +508,12 @@ defmodule Tips.SearchProbeTest do
 
       case hook.(conn, body) do
         {:respond, conn} -> conn
-        :pass -> serve(conn, body, text_axes, Keyword.get(opts, :dimensions, :honor))
+        :pass -> serve(conn, body, text_axes, opts)
       end
     end
   end
 
-  defp serve(%{method: "GET", request_path: "/api/v1/models/" <> _} = conn, _body, _axes, _dims) do
+  defp serve(%{method: "GET", request_path: "/api/v1/models/" <> _} = conn, _body, _axes, _opts) do
     Req.Test.json(conn, %{
       "data" => %{
         "endpoints" => [
@@ -442,23 +529,29 @@ defmodule Tips.SearchProbeTest do
     })
   end
 
-  defp serve(%{method: "GET", request_path: "/api/v1/key"} = conn, _body, _axes, _dims) do
+  defp serve(%{method: "GET", request_path: "/api/v1/key"} = conn, _body, _axes, _opts) do
     Req.Test.json(conn, %{
       "data" => %{"label" => "sentinel-label", "limit" => nil, "is_free_tier" => false}
     })
   end
 
-  defp serve(%{method: "POST", request_path: "/api/v1/embeddings"} = conn, body, axes, dims) do
+  defp serve(%{method: "POST", request_path: "/api/v1/embeddings"} = conn, body, axes, opts) do
     request = Jason.decode!(body)
+    identity = Keyword.get(opts, :identity, @identity)
 
-    case {dims, request} do
-      {:reject, %{"dimensions" => _}} -> Plug.Conn.send_resp(conn, 400, "unsupported")
-      {:honor, %{"dimensions" => 1024}} -> embeddings(conn, body, request["input"], axes, 1024)
-      {_dims, _request} -> embeddings(conn, body, request["input"], axes, 4096)
+    case {Keyword.get(opts, :dimensions, :honor), request} do
+      {:reject, %{"dimensions" => _}} ->
+        Plug.Conn.send_resp(conn, 400, "unsupported")
+
+      {:honor, %{"dimensions" => 1024}} ->
+        embeddings(conn, body, request["input"], axes, 1024, identity)
+
+      {_dims, _request} ->
+        embeddings(conn, body, request["input"], axes, 4096, identity)
     end
   end
 
-  defp embeddings(conn, body, inputs, axes, size) do
+  defp embeddings(conn, body, inputs, axes, size, identity) do
     data =
       inputs
       |> Enum.with_index()
@@ -471,11 +564,12 @@ defmodule Tips.SearchProbeTest do
         %{"index" => index, "embedding" => values}
       end)
 
-    Req.Test.json(conn, %{
-      "data" => data,
-      "model" => "qwen/qwen3-embedding-8b",
-      "provider" => "DeepInfra",
-      "usage" => %{"prompt_tokens" => div(byte_size(body), 4), "cost" => 1.0e-7}
-    })
+    Req.Test.json(
+      conn,
+      Map.merge(identity, %{
+        "data" => data,
+        "usage" => %{"prompt_tokens" => div(byte_size(body), 4), "cost" => 1.0e-7}
+      })
+    )
   end
 end
