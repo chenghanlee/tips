@@ -1,0 +1,4 @@
+# PR #221 (#213): synthetic OpenRouter fixture in published commit d5f4632, not a
+# real credential. The fixture now uses a low-entropy value.
+d5f46322090dd09133dc5827ae8fd314af637c21:test/tips/provider_config_test.exs:generic-api-key:14
+d5f46322090dd09133dc5827ae8fd314af637c21:test/tips/provider_config_test.exs:generic-api-key:51

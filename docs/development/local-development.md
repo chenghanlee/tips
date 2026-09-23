@@ -22,8 +22,10 @@ mix local.rebar --force
 cp .env.example .env
 ```
 
-The example selects the local Compose superuser on port 5433. Phoenix does not
-load `.env` automatically. Export it in each new shell:
+The example selects the local Compose superuser on port 5433. Dev and test load
+only the [provider settings](#provider-settings) from `.env` automatically. The
+database and port settings are read by compile-time configuration, so export them
+in each new shell:
 
 ```sh
 set -a
@@ -47,7 +49,8 @@ the generated production configuration. The commands create `tips_dev` and
 search extensions. `TIPS_DB_SUFFIX` is appended to both database names; test
 partitioning adds `MIX_TEST_PARTITION` after that suffix when set.
 
-No provider credentials are needed. Development mail stays in the local Swoosh
+No provider credentials are needed to boot, test or use features that do not call
+a provider. Development mail stays in the local Swoosh
 mailbox at <http://localhost:4000/dev/mailbox>. Generated authentication has been
 adapted for Tips identity fields and session-family IDs. Tips admission and the
 full session-family lifecycle remain pending. Oban runs in the same application
@@ -70,6 +73,44 @@ contain no diagnostics. Production monitoring uses the public HTTPS hostname
 through the TLS-terminating proxy with `X-Forwarded-Proto: https`. The release
 also exempts `/healthz` from HTTP redirects for direct probes. It checks app/DB
 liveness only; optional providers and background progress are not readiness gates.
+
+### Provider settings
+
+Search, image and video providers use ten fixed names, listed with empty values in
+`.env.example`: `OPENROUTER_API_KEY`, `CLOUDFLARE_ACCOUNT_ID`, `R2_BUCKET`,
+`R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_PUBLIC_URL`,
+`CLOUDFLARE_STREAM_API_TOKEN`, `CLOUDFLARE_STREAM_CUSTOMER_CODE` and
+`CLOUDFLARE_STREAM_SIGNING_KEY`.
+
+In dev and test, `config/runtime.exs` reads these names from the checkout's `.env`
+and from the exported environment. An exported value, even an empty one, wins over
+`.env`. After editing `.env`, re-source it or unset the overriding export. A
+missing `.env` or empty values still boot the app. Other names in `.env` are
+ignored here. A leading UTF-8 byte-order mark is ignored; a `.env` that exists but
+cannot be read stops startup.
+
+The loader never runs the shell. Each provider line must be `NAME=value`,
+`NAME='value'` or `NAME="value"`, optionally prefixed by `export ` and followed by
+` # comment`. Unquoted values may contain letters, digits and `_ . / : @ + = , % -`.
+Quote anything else. Double-quoted values may not contain `$`, a backtick or `\`;
+use single quotes instead. Values are single-line. A malformed provider line stops
+startup with its file, line number and name, never its value.
+
+Provider code requests a value when it needs it:
+
+```elixir
+Tips.ProviderConfig.fetch!("R2_BUCKET")
+```
+
+A missing or blank value raises an error naming the variable, never the value.
+Features that do not need it keep working.
+
+`Tips.ProviderConfig.mode/0` returns `:real` in dev. Tests return `:stub` even when
+credentials are present, so provider code uses `Req.Test` stubs. Set
+`TIPS_REAL_PROVIDERS=1` to select `:real` and run tests tagged `:real_provider`,
+which `mix test` otherwise excludes. Opt in only with an explicit authorization to
+call the external service. Production does not read `.env`; production secret
+loading is separate deployment work.
 
 ### Isolated build caches
 
@@ -184,8 +225,9 @@ unique `TIPS_DB_SUFFIX`, development HTTP `PORT`, and `TIPS_TEST_PORT`;
 use `PGPORT=5433` for the shared server. Tests start their own endpoint on
 `TIPS_TEST_PORT` (default 4002), including when browser tests are excluded.
 Each checkout already has its own `deps/` and `_build/`, so install dependencies
-in each worktree. Do not share or symlink those directories. Phoenix loads no
-`.env` automatically; export the worktree's values in its shell.
+in each worktree. Do not share or symlink those directories. Each checkout reads
+provider settings from its own `.env`; export the worktree's database and port
+values in its shell.
 
 For example, after creating two worktrees at the revision to test:
 
