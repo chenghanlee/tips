@@ -305,17 +305,18 @@
                   <button class="btn" type="button" aria-describedby="file-6">Resume upload</button>
                   <button class="btn" type="button" aria-describedby="file-6">Remove</button>
                 </div>
+              </li>
               <li class="item" data-component="attachment_item">
                 <div class="thumb"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg></div>
                 <div class="body">
-                  <p class="small"><strong>old-run.mp4</strong> · 96 MB · 7 of 7</p>
+                  <p class="small"><strong id="file-7">old-run.mp4</strong> · 96 MB · 7 of 7</p>
                   <p class="item-error">Video processing failed. Replace it with a new upload or remove it.</p>
                 </div>
                 <div class="actions row">
-                  <button class="btn" type="button" aria-describedby="file-6">Move earlier</button>
-                  <button class="btn" type="button" aria-describedby="file-6" disabled>Move later</button>
-                  <button class="btn" type="button" aria-describedby="file-6">Replace video</button>
-                  <button class="btn" type="button" aria-describedby="file-6">Remove</button>
+                  <button class="btn" type="button" aria-describedby="file-7">Move earlier</button>
+                  <button class="btn" type="button" aria-describedby="file-7" disabled>Move later</button>
+                  <button class="btn" type="button" aria-describedby="file-7">Replace video</button>
+                  <button class="btn" type="button" aria-describedby="file-7">Remove</button>
                 </div>
               </li>
             </ol>
@@ -325,9 +326,9 @@
 
       <div class="stack">
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-3);">
-        <div class="field" data-component="field">
+        <div class="field" data-component="model_field">
           <label for="model">Model used (optional)</label>
-          <select id="model" name="review[model_id]" aria-describedby="setup-help"><option value="">Not specified</option><option selected>Claude Opus 5.5</option><option>Claude Sonnet 5</option><option>Claude Haiku 4.5</option></select>
+          <select id="model" name="review[model_id]" aria-describedby="setup-help"><option value="">Not specified</option><option selected>Claude Opus 5.5</option><option>Claude Sonnet 5</option><option>Claude Haiku 4.5</option><option value="other">Other model…</option></select>
         </div>
         <div class="field" data-component="field">
           <label for="environment">Environment used (optional)</label>
@@ -367,6 +368,30 @@
         <div class="editor-bar" data-component="editor_bar">
           <div class="status-line"><p role="status"></p><a href="#">Back to tip</a></div>
           <div class="row"><button class="btn btn-lg btn-primary" type="submit">Publish</button></div>
+        </div>
+      </section>
+
+      <section class="state" aria-label="State: fresh composer, free-text tip model">
+        <p class="state-label">State: fresh composer prefilled from a tip with a free-text model</p>
+        <div class="stack">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-3);">
+            <div class="stack" style="gap: var(--space-2)" data-component="model_field">
+              <div class="field">
+                <label for="model-s1b">Model used (optional)</label>
+                <select id="model-s1b" name="review[model_id]" aria-describedby="setup-s1b-help"><option value="">Not specified</option><option>Claude Opus 5.5</option><option>Claude Sonnet 5</option><option>Claude Haiku 4.5</option><option value="other" selected>Other model…</option></select>
+              </div>
+              <div class="field">
+                <label for="model-other-s1b">Model name</label>
+                <input type="text" id="model-other-s1b" name="review[model_other]" value="local-qwen-coder-32b" aria-describedby="model-other-s1b-help">
+                <p class="helper" id="model-other-s1b-help">Up to 80 characters. Shown as plain text, not as a filter.</p>
+              </div>
+            </div>
+            <div class="field" data-component="field">
+              <label for="environment-s1b">Environment used (optional)</label>
+              <select id="environment-s1b" name="review[environment_id]" aria-describedby="setup-s1b-help"><option value="">Not specified</option><option>Claude Code</option><option>Codex CLI</option><option selected>Cursor</option></select>
+            </div>
+          </div>
+          <p class="helper" id="setup-s1b-help">Filled in from the tip. Check that they match your own attempt.</p>
         </div>
       </section>
 

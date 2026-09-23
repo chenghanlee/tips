@@ -23,8 +23,8 @@ SaladUI names. Change only the three values marked **Tips**, and add the
 | `--muted` | `oklch(0.967 0.003 264.542)` | Prompt and Result block background |
 | `--muted-foreground` | `oklch(0.551 0.023 264.365)` | Row metadata, helper text. 4.8:1 on background, 4.4:1 on `--muted`: use it only on `--background` or `--card` |
 | `--accent` / `--accent-foreground` | same as secondary | Hover background |
-| `--destructive` | **Tips** `oklch(0.577 0.245 27.325)` | Error text, error borders, Discard/Remove. SaladUI's `oklch(0.637 0.208 25.326)` is 3.8:1 and fails as text; this is 4.8:1 on background and under white text |
-| `--destructive-foreground` | `oklch(0.984 0.002 247.839)` | Text on destructive |
+| `--destructive` | **Tips** `oklch(0.577 0.245 27.325)` | Error text, error borders, Discard/Remove. SaladUI's `oklch(0.637 0.208 25.326)` is 3.8:1 and fails as text; this is 4.8:1 on background |
+| `--destructive-foreground` | `oklch(0.984 0.002 247.839)` | Text on destructive, 4.55:1 |
 | `--border` | `oklch(0.928 0.006 264.531)` | Dividers and region outlines (decorative) |
 | `--input` | **Tips** `oklch(0.64 0.022 261.325)` | Borders of inputs, textareas, selects and outline buttons. 3.4:1 on background, 3.1:1 on `--muted`, meeting the 3:1 non-text contrast rule; SaladUI's value equals `--border` (1.2:1) |
 | `--ring` | `oklch(0.129 0.027 261.671)` | Focus outline |

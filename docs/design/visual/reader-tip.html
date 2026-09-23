@@ -345,7 +345,7 @@ Finished in 0.9 seconds
           </details>
           <div class="votes" data-component="vote_control">
             <button class="btn" type="button" aria-pressed="false" aria-describedby="r2-h">Helpful 5</button>
-            <button class="btn" type="button" aria-pressed="true" aria-describedby="r2-h">Not helpful 0</button>
+            <button class="btn" type="button" aria-pressed="true" aria-describedby="r2-h">Not helpful 1</button>
           </div>
         </article>
       </div>
@@ -366,7 +366,7 @@ Finished in 0.9 seconds
         <p class="state-label">State: contribution control, one per viewer state</p>
         <div class="stack">
           <p class="state-label">Viewer has a review (links to its single-review view):</p>
-          <div data-component="contribution_control"><a class="btn btn-lg btn-primary" href="?review=81">Your review</a></div>
+          <div data-component="contribution_control"><a class="btn btn-lg btn-primary" href="?review=80">Your review</a></div>
           <p class="state-label">Eligible viewer without a review:</p>
           <div data-component="contribution_control"><a class="btn btn-lg btn-primary" href="#">Tried this? Write a review</a></div>
           <p class="state-label">Signed-out viewer, live tip:</p>
@@ -378,6 +378,18 @@ Finished in 0.9 seconds
           </div>
           <p class="state-label">Fully banned viewer without an own review: no control rendered.</p>
         </div>
+      </section>
+
+      <section class="state" aria-label="State: free-text model">
+        <p class="state-label">State: tip header whose author typed a model name (plain text beside the curated link)</p>
+        <header class="tip-header" data-component="tip_header">
+          <h2 style="font-size: var(--text-2xl)">Split the plan into steps that each end with a passing test run</h2>
+          <div class="meta" data-component="setup_meta">
+            <span>Technique: <a href="/?technique=planning">Planning</a></span>
+            <span>Model: local-qwen-coder-32b</span>
+            <span>Environment: Cursor</span>
+          </div>
+        </header>
       </section>
 
       <section class="state" aria-label="State: copy statuses">
@@ -423,7 +435,7 @@ Finished in 0.9 seconds
           <div class="prose"><p>Did not work for me the first time: the plan was fine but the agent skipped step 2's test.</p></div>
           <div class="votes" data-component="vote_control">
             <button class="btn" type="button" aria-pressed="false" aria-describedby="d1-h">Helpful 5</button>
-            <button class="btn" type="button" aria-pressed="false" aria-describedby="d1-h">Not helpful 0</button>
+            <button class="btn" type="button" aria-pressed="false" aria-describedby="d1-h">Not helpful 1</button>
           </div>
         </article>
       </section>
@@ -471,17 +483,21 @@ Finished in 0.9 seconds
           </details>
           <div class="votes" data-component="vote_control">
             <button class="btn" type="button" aria-pressed="false" aria-describedby="sv-h">Helpful 5</button>
-            <button class="btn" type="button" aria-pressed="false" aria-describedby="sv-h">Not helpful 0</button>
+            <button class="btn" type="button" aria-pressed="false" aria-describedby="sv-h">Not helpful 1</button>
           </div>
         </article>
         <p><a href="?review_sort=best#reviews">Show all reviews</a></p>
       </section>
 
       <section class="state" aria-label="State: review unavailable">
-        <p class="state-label">State: single-review view when the review is unavailable (one of three lines)</p>
-        <div class="notice" data-component="notice"><p>Review deleted by author</p><a href="#reviews">Show all reviews</a></div>
-        <div class="notice" data-component="notice"><p>Review removed by moderators</p><a href="#reviews">Show all reviews</a></div>
-        <div class="notice" data-component="notice"><p>Review unavailable</p><a href="#reviews">Show all reviews</a></div>
+        <p class="state-label">State: single-review view when the review is unavailable (tip context kept; one of three lines)</p>
+        <header class="tip-header" data-component="tip_header">
+          <h2 style="font-size: var(--text-2xl)">Ask for a written plan before letting the agent touch a large refactor</h2>
+          <div class="meta"><span>by <a href="#">ada</a></span><span>Published <time datetime="2026-09-20">Sep 20, 2026</time></span></div>
+        </header>
+        <div class="notice" data-component="notice"><p>Review deleted by author</p><a href="?review_sort=best#reviews">Show all reviews</a></div>
+        <div class="notice" data-component="notice"><p>Review removed by moderators</p><a href="?review_sort=best#reviews">Show all reviews</a></div>
+        <div class="notice" data-component="notice"><p>Review unavailable</p><a href="?review_sort=best#reviews">Show all reviews</a></div>
       </section>
 
     </div>
