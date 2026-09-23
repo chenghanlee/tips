@@ -90,6 +90,7 @@ defmodule TipsWeb do
       # Common modules used in templates
       alias Phoenix.LiveView.JS
       alias TipsWeb.Layouts
+      alias TipsWeb.UI
 
       # Routes generation with the ~p sigil
       unquote(verified_routes())

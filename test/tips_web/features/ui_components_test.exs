@@ -59,8 +59,8 @@ defmodule TipsWeb.UIComponentsTest do
     |> assert_has(css("#applied", text: "q=flaky&technique=planning"))
     |> js("return document.activeElement.id", &assert(&1 == "technique"))
     |> click(link("Clear filters"))
-    |> assert_has(css("#applied", text: "q=flaky"))
     |> refute_has(link("Clear filters"))
+    |> js("return document.getElementById('applied').textContent", &assert(&1 == "q=flaky"))
     |> js("return document.getElementById('technique').value", &assert(&1 == ""))
   end
 
@@ -68,12 +68,12 @@ defmodule TipsWeb.UIComponentsTest do
     session
     |> connected("/_ui")
     |> click(css("#evidence summary"))
-    |> click(css("#vote-tip button", text: "Not helpful"))
-    |> assert_has(css("#vote-tip button[aria-disabled=true]", count: 2))
-    |> assert_has(css("#vote-tip [role=status]", text: "Saving"))
+    |> click(css("#tip-vote button", text: "Not helpful"))
+    |> assert_has(css("#tip-vote button[aria-disabled=true]", count: 2))
+    |> assert_has(css("#tip-vote [role=status]", text: "Saving"))
     |> js("return document.activeElement.textContent.trim()", &assert(&1 == "Not helpful"))
-    |> assert_has(css("#vote-tip button[aria-pressed=true]", text: "Not helpful"))
-    |> refute_has(css("#vote-tip button[aria-disabled=true]"))
+    |> assert_has(css("#tip-vote button[aria-pressed=true]", text: "Not helpful"))
+    |> refute_has(css("#tip-vote button[aria-disabled=true]"))
     |> js("return document.getElementById('evidence').open", &assert(&1 == true))
   end
 

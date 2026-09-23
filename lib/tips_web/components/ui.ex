@@ -20,10 +20,11 @@ defmodule TipsWeb.UI do
   alias SaladUI.Form
   alias TipsWeb.CoreComponents
 
-  # Inputs, textareas and selects use text-base so iOS does not zoom on focus.
-  # ring-0 drops SaladUI's focus ring; the base :focus-visible outline shows instead.
-  @control_overrides "text-base focus-visible:ring-0 aria-invalid:border-destructive"
-  @select_class "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 #{@control_overrides} disabled:cursor-not-allowed disabled:opacity-50"
+  # SaladUI's input look, native. Inputs, textareas and selects use text-base so
+  # iOS does not zoom on focus; without SaladUI's outline-hidden and focus ring,
+  # the base :focus-visible outline shows.
+  @control_class "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base placeholder:text-muted-foreground focus-visible:border-ring aria-invalid:border-destructive disabled:cursor-not-allowed disabled:opacity-50"
+  @textarea_overrides "text-base focus-visible:ring-0 aria-invalid:border-destructive"
 
   @doc """
   Renders the top bar: the Tips home link and the account links.
@@ -152,80 +153,54 @@ defmodule TipsWeb.UI do
         id: field.id,
         errors: errors,
         describedby: if(describedby != "", do: describedby),
-        invalid: errors != [] && "true"
+        invalid: errors != [] && "true",
+        control_class: @control_class,
+        textarea_class: @textarea_overrides
       )
 
     ~H"""
     <Form.form_item>
       <Form.form_label for={@id}>{@label}</Form.form_label>
-      <.control
-        type={@type}
-        id={@id}
-        field={@field}
-        options={@options}
-        rows={@rows}
-        invalid={@invalid}
-        describedby={@describedby}
-        rest={@rest}
-      />
+      <div>
+        <SaladUI.Textarea.textarea
+          :if={@type == "textarea"}
+          id={@id}
+          name={@field.name}
+          value={@field.value}
+          rows={@rows}
+          class={@textarea_class}
+          aria-invalid={@invalid}
+          aria-describedby={@describedby}
+          {@rest}
+        />
+        <select
+          :if={@type == "select"}
+          id={@id}
+          name={@field.name}
+          class={@control_class}
+          aria-invalid={@invalid}
+          aria-describedby={@describedby}
+          {@rest}
+        >
+          {Phoenix.HTML.Form.options_for_select(@options, @field.value)}
+        </select>
+        <%!-- Native, not SaladUI.Input: account tests match `<input type= name= id= value=`,
+          and SaladUI renders class first. The wrapper keeps LiveView's root marker off it. --%>
+        <input
+          :if={@type not in ["textarea", "select"]}
+          type={@type}
+          name={@field.name}
+          id={@id}
+          value={Phoenix.HTML.Form.normalize_value(@type, @field.value)}
+          class={@control_class}
+          aria-invalid={@invalid}
+          aria-describedby={@describedby}
+          {@rest}
+        />
+      </div>
       <Form.form_description :if={@helper} id={"#{@id}-help"}>{@helper}</Form.form_description>
       <Form.form_message :if={@errors != []} id={"#{@id}-error"} errors={@errors} />
     </Form.form_item>
-    """
-  end
-
-  defp control(%{type: "textarea"} = assigns) do
-    assigns = assign(assigns, :class, @control_overrides)
-
-    ~H"""
-    <SaladUI.Textarea.textarea
-      id={@id}
-      name={@field.name}
-      value={@field.value}
-      rows={@rows}
-      class={@class}
-      aria-invalid={@invalid}
-      aria-describedby={@describedby}
-      {@rest}
-    />
-    """
-  end
-
-  defp control(%{type: "select"} = assigns) do
-    assigns = assign(assigns, :class, @select_class)
-
-    ~H"""
-    <select
-      id={@id}
-      name={@field.name}
-      class={@class}
-      aria-invalid={@invalid}
-      aria-describedby={@describedby}
-      {@rest}
-    >
-      {Phoenix.HTML.Form.options_for_select(@options, @field.value)}
-    </select>
-    """
-  end
-
-  defp control(assigns) do
-    assigns =
-      assign(assigns,
-        class: @control_overrides,
-        value: Phoenix.HTML.Form.normalize_value(assigns.type, assigns.field.value)
-      )
-
-    ~H"""
-    <SaladUI.Input.input
-      id={@id}
-      name={@field.name}
-      type={@type}
-      value={@value}
-      class={@class}
-      aria-invalid={@invalid}
-      aria-describedby={@describedby}
-      {@rest}
-    />
     """
   end
 
@@ -279,7 +254,7 @@ defmodule TipsWeb.UI do
   attr :value, :string, default: nil
 
   def filter_select(assigns) do
-    assigns = assign(assigns, :class, @select_class)
+    assigns = assign(assigns, :class, @control_class)
 
     ~H"""
     <div class="grid content-start gap-1">
@@ -347,7 +322,7 @@ defmodule TipsWeb.UI do
   def search_form(assigns) do
     assigns =
       assign(assigns,
-        class: TwMerge.merge([@select_class, "min-w-0 flex-1"]),
+        class: [@control_class, "min-w-0 flex-1"],
         describedby:
           if(assigns.error,
             do: "#{assigns.id}-error #{assigns.id}-help",
