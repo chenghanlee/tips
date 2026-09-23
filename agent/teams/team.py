@@ -324,6 +324,8 @@ def validate_config_fields(path: Path, value: Config) -> None:
     roles = object_fields(fields.get("roles"), f"{path}: roles")
     for name in ("dev", "test", "lead", "tpm", "lead_tpm"):
         validate_role_fields(roles.get(name), f"{path}: roles.{name}", name)
+    if "lead_ui" in roles:
+        validate_role_fields(roles["lead_ui"], f"{path}: roles.lead_ui", "lead")
 
 
 def validate_role_fields(value: object, label: str, name: str) -> None:
@@ -350,12 +352,24 @@ def validate_settings(path: Path, value: Config) -> None:
             raise RuntimeError(f"{path}: timeouts.{key} must be a positive integer")
     if value["team"]["max_teams"] < 1:
         raise RuntimeError(f"{path}: team.max_teams must be positive")
-    for name in ("dev", "test", "lead", "tpm", "lead_tpm"):
-        role = value["roles"][name]
-        if role["kind"] not in ("codex", "claude"):
+    for name in ("dev", "test", "lead", "tpm", "lead_tpm", "lead_ui"):
+        role = value["roles"].get(name)
+        if role is not None and role["kind"] not in ("codex", "claude"):
             raise RuntimeError(f"{path}: invalid role {name}")
+    validate_lead_ui(path, value)
     if value["launch"]["codex_lsp_approval_mode"] not in ("auto", "prompt", "writes", "approve"):
         raise RuntimeError(f"{path}: invalid Codex LSP approval mode")
+
+
+def validate_lead_ui(path: Path, value: Config) -> None:
+    """The UI lead replaces the lead for one issue, so it must share the lead's partition."""
+    ui = value["roles"].get("lead_ui")
+    if ui is None:
+        return
+    lead = cast(CodingRole, value["roles"]["lead"])
+    ui = cast(CodingRole, ui)
+    if ui["port_offset"] != lead["port_offset"] or ui["db_suffix"] != lead["db_suffix"]:
+        raise RuntimeError(f"{path}: roles.lead_ui must share roles.lead port_offset and db_suffix")
 
 
 def validate_allocations(path: Path, value: Config) -> None:
@@ -498,26 +512,34 @@ def coordinator(pane: Entity, name: str, role: str) -> None:
         raise RuntimeError(
             "Coordinator launch returned an unexpected client/root/state; inspect its pane"
         )
-    herdr(
-        "agent",
-        "prompt",
-        name,
-        (
-            "Read agent/teams/README.md. You are "
-            f"{name}"
-            ". Coordinate from this read-only main checkout; coding agents sta"
-            "rt only in assigned worktrees. Use agent/teams/config.toml for la"
-            "unch settings. Only the team TPM advances review stages. Each dis"
-            "patch must include the exact herdr agent prompt command addressed"
-            " to its TPM, to execute after posting evidence and before ending "
-            "the turn, including on a blocker. A GitHub comment or final chat "
-            "response is not a delivered handoff. Use short messages with evid"
-            "ence link, SHA, action and owner. Run commands directly; no hooks"
-            ", --wait, polling, output pipelines or ad hoc JSON formatters. Re"
-            "port readiness to "
-            f"{('the user' if role == 'lead_tpm' else 'lead-tpm')}"
-            "; await assignment."
-        ),
+    herdr("agent", "prompt", name, coordinator_brief(name, role))
+
+
+def coordinator_brief(name: str, role: str) -> str:
+    return (
+        "Read agent/teams/README.md. You are "
+        f"{name}"
+        ". Coordinate from this read-only main checkout; coding agents sta"
+        "rt only in assigned worktrees. Use agent/teams/config.toml for la"
+        "unch settings. "
+        + (
+            "You talk only to team TPMs and the user; you assign issues, sta"
+            "rt and retire teams and resolve cross-team blockers. "
+            if role == "lead_tpm"
+            else "You talk only to the team tech lead, who dispatches the deve"
+            "loper and tester and advances review stages; you own labels, P"
+            "roject fields and the lead's launch. "
+        )
+        + "Each dispatch must in"
+        "clude the exact herdr agent prompt command addressed to its recip"
+        "ient, to execute after posting evidence and before ending the tur"
+        "n, including on a blocker. A GitHub comment or final chat respons"
+        "e is not a delivered handoff. Handoffs are one line: evidence lin"
+        "k, SHA, action, owner. Run commands directly; no hooks, --wait, s"
+        "leep, polling or ad hoc JSON formatters; send a prompt, then end "
+        "the turn and let the reply wake you. Report readiness to "
+        f"{('the user' if role == 'lead_tpm' else 'lead-tpm')}"
+        "; await assignment."
     )
 
 

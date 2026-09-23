@@ -411,29 +411,61 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert s["launch_env"]["TIPS_TEST_PORT"] == "5160"
         assert s["launch_env"]["PGPORT"] == "5434"
 
-    def test_same_live_session_reused_and_new_sha_stops_before_checkout(self) -> None:
-        self.call("--start")
+    def test_same_live_session_reused_and_new_sha_stops_tester_before_checkout(self) -> None:
+        task, wt = "28-review-team-3-test", self.root / ".worktrees/28-review-team-3-test"
+        self.call("--start", role="test", task=task)
         before = len(self.state()["events"])
-        p = self.call("--start")
+        p = self.call("--start", role="test", task=task)
         assert "Already running" in p.stdout
         assert not any(e[:2] == ["agent", "start"] for e in self.state()["events"][before:])
         self.commit("next")
         new = self.git("rev-parse", "HEAD")
-        self.call("--start", ref=new)
+        self.call("--start", role="test", task=task, ref=new)
         stops = [e for e in self.state()["events"] if e[0] == "stop_agent"]
-        assert stops == [["stop_agent", "wA:pB", str(self.wt), self.base]]
-        assert self.git("-C", str(self.wt), "rev-parse", "HEAD") == new
+        assert stops == [["stop_agent", "wA:pB", str(wt), self.base]]
+        assert self.git("-C", str(wt), "rev-parse", "HEAD") == new
         assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 2
 
-    def test_failed_stop_preserves_review_head(self) -> None:
+    def test_running_lead_advances_in_place_without_stop_or_restart(self) -> None:
         self.call("--start")
+        self.commit("next")
+        new = self.git("rev-parse", "HEAD")
+        p = self.call(ref=new)
+        assert "Advanced team-3-lead in place" in p.stdout
+        assert not any(e[0] == "stop_agent" for e in self.state()["events"])
+        assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 1
+        assert self.git("-C", str(self.wt), "rev-parse", "HEAD") == new
+        assert self.git("-C", str(self.wt), "branch", "--show-current") == ""
+
+    def test_ui_flag_selects_lead_ui_role_and_is_lead_only(self) -> None:
+        self.call("--ui", ok=False)
+        (self.root / "agent/teams/config.toml").write_text(
+            CONFIG + '\n[roles.lead_ui]\nkind = "claude"\nmodel = "fixture-ui"\neffort = "high"\n'
+            'db_suffix = "l"\nport_offset = 2\n'
+        )
+        self.call("--ui", "--start")
+        assert "fixture-ui" in self.state()["launch_argv"]
+        assert self.state()["launch_env"]["TIPS_TEST_PORT"] == "4132"
+        p = self.call("--ui", role="dev", task="29-dev", ref=False, ok=False)
+        assert "--ui applies only to the lead role" in p.stderr
+        self.commit("next")
+        new = self.git("rev-parse", "HEAD")
+        p = self.call(ref=new, ok=False)
+        assert "Conflicting live agent" in p.stderr
+        p = self.call("--ui", ref=new)
+        assert "Advanced team-3-lead in place" in p.stdout
+        assert self.git("-C", str(self.wt), "rev-parse", "HEAD") == new
+
+    def test_failed_stop_preserves_review_head(self) -> None:
+        task, wt = "28-review-team-3-test", self.root / ".worktrees/28-review-team-3-test"
+        self.call("--start", role="test", task=task)
         s = self.state()
         s["stop_fails"] = True
         self.save(s)
         self.commit("next")
         new = self.git("rev-parse", "HEAD")
-        self.call("--start", ref=new, ok=False)
-        assert self.git("-C", str(self.wt), "rev-parse", "HEAD") == self.base
+        self.call("--start", role="test", task=task, ref=new, ok=False)
+        assert self.git("-C", str(wt), "rev-parse", "HEAD") == self.base
 
     def test_dirty_review_refused_even_same_sha(self) -> None:
         self.call()
@@ -520,11 +552,12 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call("--start", ok=False)
         assert not any(e[:2] == ["agent", "start"] for e in self.state()["events"])
 
-    def test_provision_only_cannot_advance_active_reviewer(self) -> None:
-        self.call("--start")
+    def test_provision_only_cannot_advance_active_tester(self) -> None:
+        task, wt = "28-review-team-3-test", self.root / ".worktrees/28-review-team-3-test"
+        self.call("--start", role="test", task=task)
         self.commit("next")
-        self.call(ref=self.git("rev-parse", "HEAD"), ok=False)
-        assert self.git("-C", str(self.wt), "rev-parse", "HEAD") == self.base
+        self.call(role="test", task=task, ref=self.git("rev-parse", "HEAD"), ok=False)
+        assert self.git("-C", str(wt), "rev-parse", "HEAD") == self.base
 
     def test_canonical_wrapper_not_needed_in_reviewed_commit(self) -> None:
         self.git("rm", "agent/lsp/launch_worktree_lsp.sh")
@@ -579,14 +612,15 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 1
 
     def test_last_edit_during_shutdown_prevents_advance(self) -> None:
-        self.call("--start")
+        task, wt = "28-review-team-3-test", self.root / ".worktrees/28-review-team-3-test"
+        self.call("--start", role="test", task=task)
         s = self.state()
         s["stop_dirties"] = True
         self.save(s)
         self.commit("next")
-        self.call("--start", ref=self.git("rev-parse", "HEAD"), ok=False)
-        assert self.git("-C", str(self.wt), "rev-parse", "HEAD") == self.base
-        assert (self.wt / "tracked.txt").read_text() == "saved at exit\n"
+        self.call("--start", role="test", task=task, ref=self.git("rev-parse", "HEAD"), ok=False)
+        assert self.git("-C", str(wt), "rev-parse", "HEAD") == self.base
+        assert (wt / "tracked.txt").read_text() == "saved at exit\n"
 
     def test_attached_review_refused_and_partition_preserved(self) -> None:
         self.env["MIX_TEST_PARTITION"] = "2"
