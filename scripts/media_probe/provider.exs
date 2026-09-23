@@ -896,76 +896,129 @@ defmodule MediaProbe.StreamRun do
     {m, mrec} = Stream.cdn_get("signed-manifest", "/#{tok}/manifest/video.m3u8")
     manifest = if status(m) == 200, do: elem(m, 1).body, else: ""
 
-    if expect_ok? do
-      segment = fetch_first_segment(manifest)
-      {t, trec} = Stream.cdn_get("signed-thumbnail", "/#{tok}/thumbnails/thumbnail.jpg")
-      thumb = if status(t) == 200, do: elem(t, 1).body, else: ""
-      {i, irec} = Stream.cdn_get("signed-iframe", "/#{tok}/iframe")
+    if expect_ok?,
+      do: signed_playable(e, uid, jwk, tok, {m, mrec, manifest}),
+      else: signed_not_playable(e, suffix, m)
+  end
 
-      Ctx.assert(
-        e,
-        "signed_hls_manifest_and_segment_delivered",
-        true,
-        status(m) == 200 and String.starts_with?(manifest, "#EXTM3U") and segment[:ok] == true,
-        %{
-          manifest_status: status(m),
-          manifest_type: mrec[:headers]["content-type"],
-          segment: segment
-        }
+  defp signed_playable(e, uid, jwk, tok, {m, mrec, manifest}) do
+    segment = fetch_first_segment(manifest)
+    {t, trec} = Stream.cdn_get("signed-thumbnail", "/#{tok}/thumbnails/thumbnail.jpg")
+    thumb = if status(t) == 200, do: elem(t, 1).body, else: ""
+    {i, irec} = Stream.cdn_get("signed-iframe", "/#{tok}/iframe")
+
+    Ctx.assert(
+      e,
+      "signed_hls_manifest_and_segment_delivered",
+      true,
+      status(m) == 200 and String.starts_with?(manifest, "#EXTM3U") and segment[:ok] == true,
+      %{
+        manifest_status: status(m),
+        manifest_type: mrec[:headers]["content-type"],
+        segment: segment
+      }
+    )
+
+    decoded = decode_signed(Stream.host() <> "/#{tok}/manifest/video.m3u8")
+
+    Ctx.assert(
+      e,
+      "signed_hls_decodes_video_frames",
+      true,
+      decoded[:frames] != nil and decoded.frames > 0 and decoded[:codec] == "h264",
+      decoded
+    )
+
+    Ctx.assert(
+      e,
+      "signed_poster_is_jpeg",
+      true,
+      status(t) == 200 and match?(<<0xFF, 0xD8, 0xFF, _::binary>>, thumb),
+      %{
+        status: status(t),
+        content_type: trec[:headers]["content-type"],
+        bytes: byte_size(thumb)
+      }
+    )
+
+    Ctx.assert(
+      e,
+      "signed_iframe_returns_player",
+      false,
+      if(status(i) == 200, do: :info, else: false),
+      %{
+        status: status(i),
+        content_type: irec[:headers]["content-type"],
+        note: "HTTP 200 alone proves neither playback nor privacy"
+      }
+    )
+
+    {x, _} =
+      Stream.cdn_get(
+        "expired-token-manifest",
+        "/#{Stream.token(uid, jwk, exp: System.system_time(:second) - 120)}/manifest/video.m3u8"
       )
 
-      Ctx.assert(
-        e,
-        "signed_poster_is_jpeg",
-        true,
-        status(t) == 200 and match?(<<0xFF, 0xD8, 0xFF, _::binary>>, thumb),
-        %{
-          status: status(t),
-          content_type: trec[:headers]["content-type"],
-          bytes: byte_size(thumb)
-        }
-      )
+    wrong =
+      JOSE.JWK.generate_key({:rsa, 2048})
+      |> JOSE.JWK.to_map()
+      |> elem(1)
+      |> Map.put("kid", jwk["kid"])
 
-      Ctx.assert(
-        e,
-        "signed_iframe_returns_player",
-        false,
-        if(status(i) == 200, do: :info, else: false),
-        %{
-          status: status(i),
-          content_type: irec[:headers]["content-type"],
-          note: "HTTP 200 alone proves neither playback nor privacy"
-        }
-      )
+    {w, _} =
+      Stream.cdn_get("wrong-key-manifest", "/#{Stream.token(uid, wrong)}/manifest/video.m3u8")
 
-      {x, _} =
-        Stream.cdn_get(
-          "expired-token-manifest",
-          "/#{Stream.token(uid, jwk, exp: System.system_time(:second) - 120)}/manifest/video.m3u8"
-        )
+    Ctx.assert(
+      e,
+      "expired_and_wrong_key_tokens_rejected",
+      true,
+      status(x) in 400..499 and status(w) in 400..499,
+      %{expired: status(x), wrong_key: status(w)}
+    )
+  end
 
-      wrong =
-        JOSE.JWK.generate_key({:rsa, 2048})
-        |> JOSE.JWK.to_map()
-        |> elem(1)
-        |> Map.put("kid", jwk["kid"])
+  defp signed_not_playable(e, suffix, m) do
+    Ctx.assert(e, "signed_manifest#{suffix}_not_playable", true, status(m) != 200, %{
+      manifest_status: status(m)
+    })
+  end
 
-      {w, _} =
-        Stream.cdn_get("wrong-key-manifest", "/#{Stream.token(uid, wrong)}/manifest/video.m3u8")
+  # Playback evidence: FFmpeg follows the signed HLS manifest like a player and decodes
+  # the first 4 s of video frames. Output is redacted; the signed URL is never recorded.
+  defp decode_signed(url) do
+    args =
+      ~w(-v error -select_streams v:0 -count_frames -read_intervals %+4 -show_entries stream=codec_name,width,height,nb_read_frames -of json) ++
+        [url]
 
-      Ctx.assert(
-        e,
-        "expired_and_wrong_key_tokens_rejected",
-        true,
-        status(x) in 400..499 and status(w) in 400..499,
-        %{expired: status(x), wrong_key: status(w)}
-      )
-    else
-      Ctx.assert(e, "signed_manifest#{suffix}_not_playable", true, status(m) != 200, %{
-        manifest_status: status(m)
-      })
+    task = Task.async(fn -> System.cmd("ffprobe", args, stderr_to_stdout: true) end)
+
+    case Task.yield(task, 90_000) || Task.shutdown(task, :brutal_kill) do
+      {:ok, {out, 0}} ->
+        case Jason.decode(out) do
+          {:ok, %{"streams" => [st | _]}} ->
+            %{
+              codec: st["codec_name"],
+              width: st["width"],
+              height: st["height"],
+              frames: parse_frames(st["nb_read_frames"]),
+              tool: "ffprobe 8.1, first 4 s"
+            }
+
+          _ ->
+            %{error: out |> MediaProbe.Redact.text() |> String.slice(0, 300)}
+        end
+
+      {:ok, {out, code}} ->
+        %{exit: code, error: out |> MediaProbe.Redact.text() |> String.slice(0, 300)}
+
+      nil ->
+        %{error: "ffprobe timed out after 90 s"}
     end
   end
+
+  defp parse_frames(nil), do: nil
+  defp parse_frames(n) when is_integer(n), do: n
+  defp parse_frames(n), do: String.to_integer(n)
 
   defp fetch_first_segment(manifest) do
     with [variant | _] <- lines(manifest),
