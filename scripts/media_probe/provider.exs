@@ -902,7 +902,7 @@ defmodule MediaProbe.StreamRun do
   end
 
   defp signed_playable(e, uid, jwk, tok, {m, mrec, manifest}) do
-    segment = fetch_first_segment(manifest)
+    segment = fetch_first_segment(Stream.host() <> "/#{tok}/manifest/video.m3u8", manifest)
     {t, trec} = Stream.cdn_get("signed-thumbnail", "/#{tok}/thumbnails/thumbnail.jpg")
     thumb = if status(t) == 200, do: elem(t, 1).body, else: ""
     {i, irec} = Stream.cdn_get("signed-iframe", "/#{tok}/iframe")
@@ -1020,18 +1020,22 @@ defmodule MediaProbe.StreamRun do
   defp parse_frames(n) when is_integer(n), do: n
   defp parse_frames(n), do: String.to_integer(n)
 
-  defp fetch_first_segment(manifest) do
+  # Like a player: each reference resolves against the URL of the playlist containing it.
+  defp fetch_first_segment(manifest_url, manifest) do
     with [variant | _] <- lines(manifest),
-         {{:ok, %{status: 200, body: vbody}}, _} <- get_abs("signed-variant", variant),
+         variant_url = resolve(manifest_url, variant),
+         {{:ok, %{status: 200, body: vbody}}, _} <- get("signed-variant", variant_url),
          [seg | _] <- lines(vbody),
-         {{:ok, %{status: 200, body: sbody}}, srec} <- get_abs("signed-segment", seg, variant) do
+         {{:ok, %{status: 200, body: sbody}}, srec} <-
+           get("signed-segment", resolve(variant_url, seg)) do
       %{
         ok: byte_size(sbody) > 0,
         bytes: byte_size(sbody),
         content_type: srec[:headers]["content-type"]
       }
     else
-      other -> %{ok: false, detail: inspect(other) |> String.slice(0, 300)}
+      {_result, %{label: label, status: code}} -> %{ok: false, failed: label, status: code}
+      _ -> %{ok: false, failed: "playlist has no media reference"}
     end
   end
 
@@ -1042,18 +1046,8 @@ defmodule MediaProbe.StreamRun do
       |> Enum.map(&String.trim/1)
       |> Enum.reject(&(&1 == "" or String.starts_with?(&1, "#")))
 
-  defp get_abs(label, ref, base \\ nil) do
-    url =
-      cond do
-        String.starts_with?(ref, "http") -> ref
-        base && String.starts_with?(base, "http") -> URI.merge(base, ref) |> to_string()
-        String.starts_with?(ref, "/") -> Stream.host() <> ref
-        base -> URI.merge(Stream.host() <> "/x/" <> base, ref) |> to_string()
-        true -> Stream.host() <> "/" <> ref
-      end
-
-    Http.request(label, method: :get, url: url)
-  end
+  defp resolve(base, ref), do: base |> URI.merge(ref) |> to_string()
+  defp get(label, url), do: Http.request(label, method: :get, url: url)
 
   # --- stream_deadline ---------------------------------------------------------------
 
