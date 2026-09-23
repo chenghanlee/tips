@@ -1,24 +1,28 @@
 defmodule Tips.SearchProbe do
   @moduledoc """
-  Ten-query relevance gate for the hosted embedding candidate (issue #54).
+  Ten-query relevance gate for the hosted embedding candidate (issues #54 and #234).
 
-  The corpus, queries, judgments and numeric gate live in `test/fixtures/search_probe/`
-  and are frozen before any model comparison. `scripts/search_probe.exs` is the entry
-  point:
+  The corpus, queries, judgments and numeric gates live in `test/fixtures/search_probe/`
+  and are frozen before any model comparison. Each gate version is its own file:
+  `v1` is `gate.json` (#54, head/tail truncation) and `v2` is `gate-v2.json` (#234, full
+  documents up to a byte bound, with its run protocol). `scripts/search_probe.exs` is the
+  entry point:
 
-      mix run scripts/search_probe.exs --validate
-      TIPS_REAL_PROVIDERS=1 mix run scripts/search_probe.exs --real --output tmp/search-probe-54.json
+      mix run scripts/search_probe.exs --validate [--gate v2]
+      TIPS_REAL_PROVIDERS=1 mix run scripts/search_probe.exs --real --gate v2 --output PATH
 
-  `--validate` (the default) checks fixtures and the offline request/token bound without
-  HTTP. `--real` needs real provider mode as well; it embeds eligible documents and the
-  instructed queries through OpenRouter with retries disabled and concurrency 1, then
-  writes an allowlisted JSON report. The exit status is 0 only when every gate passes.
+  `--validate` (the default) checks the fixtures and the offline request/token bound of
+  every gate, or of the selected one, without HTTP. `--real` needs an explicit gate, real
+  provider mode and an output path that does not exist yet; it embeds eligible documents
+  and the instructed queries through OpenRouter with retries disabled and concurrency 1,
+  then writes an allowlisted JSON report. The exit status is 0 only when every gate passes.
 
   This is an isolated probe, not the application's search implementation.
   """
 
   @fixtures_dir Path.expand("../../test/fixtures/search_probe", __DIR__)
-  @files %{"corpus" => "corpus.json", "queries" => "queries.json", "gate" => "gate.json"}
+  @gates %{"v1" => "gate.json", "v2" => "gate-v2.json"}
+  @gate_names @gates |> Map.keys() |> Enum.sort()
   @categories ~w(scoped_change setup_environment long_output punctuation_error)
   # Byte-level BPE emits at most one token per byte; this margin covers special tokens.
   @tokens_per_input_margin 8
@@ -31,63 +35,86 @@ defmodule Tips.SearchProbe do
 
   @doc "Runs the command line and returns its exit status."
   def main(argv, opts \\ []) do
-    case OptionParser.parse(argv, strict: [validate: :boolean, real: :boolean, output: :string]) do
+    strict = [validate: :boolean, real: :boolean, gate: :string, output: :string]
+
+    case OptionParser.parse(argv, strict: strict) do
       {parsed, [], []} -> command(parsed, opts)
       _invalid -> usage()
     end
   end
 
   defp command(parsed, opts) do
-    case {parsed[:real], parsed[:validate], parsed[:output]} do
-      {true, nil, output} when is_binary(output) -> live_if_real(output, opts)
-      {nil, _validate, nil} -> validate_only(opts)
-      _other -> usage()
+    case {parsed[:real], parsed[:validate], parsed[:gate], parsed[:output]} do
+      {true, nil, gate, output} when gate in @gate_names and is_binary(output) ->
+        live_if_real(gate, output, opts)
+
+      {nil, _validate, nil, nil} ->
+        validate_only(@gate_names, opts)
+
+      {nil, _validate, gate, nil} when gate in @gate_names ->
+        validate_only([gate], opts)
+
+      _other ->
+        usage()
     end
   end
 
-  defp live_if_real(output, opts) do
-    case Keyword.get_lazy(opts, :mode, &Tips.ProviderConfig.mode/0) do
-      :real -> live(output, opts)
-      _stub -> refuse_live()
+  defp live_if_real(gate, output, opts) do
+    cond do
+      Keyword.get_lazy(opts, :mode, &Tips.ProviderConfig.mode/0) != :real ->
+        refuse("set TIPS_REAL_PROVIDERS=1 (or use MIX_ENV=dev) with --real")
+
+      File.exists?(output) ->
+        refuse("#{output} exists; each live run writes a new report")
+
+      true ->
+        live(gate, output, opts)
     end
   end
 
   defp usage do
     IO.puts("""
-    usage: mix run scripts/search_probe.exs [--validate]
-           TIPS_REAL_PROVIDERS=1 mix run scripts/search_probe.exs --real --output PATH\
+    usage: mix run scripts/search_probe.exs [--validate] [--gate v1|v2]
+           TIPS_REAL_PROVIDERS=1 mix run scripts/search_probe.exs --real --gate v1|v2 --output PATH\
     """)
 
     2
   end
 
-  defp refuse_live do
-    IO.puts("refusing live probe: set TIPS_REAL_PROVIDERS=1 (or use MIX_ENV=dev) with --real")
+  defp refuse(reason) do
+    IO.puts("refusing live probe: #{reason}")
     2
   end
 
-  defp validate_only(opts) do
-    with {:ok, fixtures} <- fixtures(opts),
+  defp validate_only(gates, opts) do
+    gates
+    |> Enum.map(&validate_gate(&1, opts))
+    |> Enum.max()
+  end
+
+  defp validate_gate(gate, opts) do
+    with {:ok, fixtures} <- fixtures(gate, opts),
          {:ok, plan} <- plan(fixtures) do
       IO.puts("fixtures valid: #{fixtures.gate["version"]}")
       Enum.each(fixtures.hashes, fn {name, hash} -> IO.puts("  #{name} sha256 #{hash}") end)
 
       IO.puts(
         "  eligible documents #{plan.documents}, long #{plan.long_documents}, " <>
-          "planned requests #{plan.requests}, input token bound #{plan.token_bound}"
+          "planned requests #{plan.requests}, input token bound #{plan.token_bound}, " <>
+          "max document bytes #{plan.max_full_document_bytes}"
       )
 
       0
     else
       {:error, errors} ->
-        Enum.each(List.wrap(errors), &IO.puts("invalid: #{&1}"))
+        Enum.each(List.wrap(errors), &IO.puts("invalid #{gate}: #{&1}"))
         1
     end
   end
 
-  defp live(output, opts) do
+  defp live(gate, output, opts) do
     report =
-      case fixtures(opts) do
+      case fixtures(gate, opts) do
         {:ok, fixtures} -> run(fixtures, opts)
         {:error, errors} -> %{status: "failed", blocker: nil, errors: errors}
       end
@@ -103,18 +130,23 @@ defmodule Tips.SearchProbe do
     if report.status == "passed", do: 0, else: 1
   end
 
-  defp fixtures(opts) do
+  # Tests may pass loaded `fixtures`, which replace the selected gate's files.
+  defp fixtures(gate, opts) do
     case opts[:fixtures] do
-      nil -> load(opts[:fixtures_dir] || @fixtures_dir)
+      nil -> load(opts[:fixtures_dir] || @fixtures_dir, gate)
       fixtures -> {:ok, fixtures}
     end
   end
 
   ## Fixtures
 
-  @doc "Loads and validates the frozen fixtures, with a SHA-256 hash of each file."
-  def load(dir) do
-    raw = Map.new(@files, fn {name, file} -> {name, File.read!(Path.join(dir, file))} end)
+  @doc """
+  Loads and validates the frozen fixtures for gate `v1` or `v2`, with a SHA-256 hash of
+  each file. Both gates share the corpus and queries.
+  """
+  def load(dir, gate \\ "v1") do
+    files = %{"corpus" => "corpus.json", "queries" => "queries.json", "gate" => @gates[gate]}
+    raw = Map.new(files, fn {name, file} -> {name, File.read!(Path.join(dir, file))} end)
 
     fixtures = %{
       corpus: Jason.decode!(raw["corpus"])["documents"],
@@ -140,8 +172,15 @@ defmodule Tips.SearchProbe do
         {length(ids) != length(Enum.uniq(ids)), "document ids are not unique"},
         {queries |> Enum.map(& &1["id"]) |> Enum.uniq() |> length() != length(queries),
          "query ids are not unique"},
-        {gate["dimensions"] != 1024, "gate dimensions must be 1024"}
+        {gate["dimensions"] != 1024, "gate dimensions must be 1024"},
+        {gate["preparation"]["document_max_bytes"] + @tokens_per_input_margin >
+           gate["model"]["context_tokens"], "document bound exceeds the model context"}
       ] ++
+        for(
+          id <- Map.get(gate["preparation"], "long_input_cohort", []),
+          id not in eligible,
+          do: {true, "long-input cohort #{id} is not an eligible document"}
+        ) ++
         Enum.flat_map(corpus, &document_errors(&1, tips)) ++
         Enum.flat_map(queries, &query_errors(&1, eligible, gate))
 
@@ -206,12 +245,41 @@ defmodule Tips.SearchProbe do
 
   def document_text(%{"kind" => "review", "body" => body}), do: body
 
-  @doc "Prepares a document for embedding under the gate's byte cap."
+  @doc """
+  Prepares a document for embedding. A gate with a truncation separator (v1) bounds the
+  text to its byte cap; otherwise (v2) the full text is kept and `plan/1` rejects a
+  document over the cap before any request.
+  """
   def prepare_document(doc, gate) do
-    %{"document_max_bytes" => max, "truncation_separator" => separator} = gate["preparation"]
     full = document_text(doc)
-    text = bound(full, max, separator)
+
+    text =
+      case gate["preparation"] do
+        %{"document_max_bytes" => max, "truncation_separator" => separator} ->
+          bound(full, max, separator)
+
+        %{"document_max_bytes" => _max} ->
+          full
+      end
+
     %{id: doc["id"], text: text, full_bytes: byte_size(full), truncated: text != full}
+  end
+
+  @doc """
+  Eligible documents whose full text is compared against their prepared text: the gate's
+  frozen cohort in its order, or in v1 the documents truncated by preparation.
+  """
+  def long_cohort(%{corpus: corpus, gate: gate}) do
+    documents = eligible(corpus)
+
+    case Map.fetch(gate["preparation"], "long_input_cohort") do
+      {:ok, ids} ->
+        by_id = Map.new(documents, &{&1["id"], &1})
+        Enum.map(ids, &Map.fetch!(by_id, &1))
+
+      :error ->
+        Enum.filter(documents, &prepare_document(&1, gate).truncated)
+    end
   end
 
   @doc "Prefixes a reader query with the model card's retrieval instruction."
@@ -427,11 +495,18 @@ defmodule Tips.SearchProbe do
 
   ## Live run
 
-  @doc "Offline request and input-token bound for one live run."
-  def plan(%{corpus: corpus, queries: queries, gate: gate}) do
+  @doc """
+  Offline request and input-token bound for one live run. Rejects a prepared document
+  over the gate's byte cap or not valid UTF-8.
+  """
+  def plan(%{corpus: corpus, queries: queries, gate: gate} = fixtures) do
     docs = corpus |> eligible() |> Enum.map(&prepare_document(&1, gate))
-    long = Enum.filter(docs, & &1.truncated)
+    long = long_cohort(fixtures)
     passes = gate["gate"]["query_passes"]
+    max = gate["preparation"]["document_max_bytes"]
+    unfit = for doc <- docs, byte_size(doc.text) > max or not String.valid?(doc.text), do: doc.id
+    # The first document may be sent twice when a rejected dimensions parameter is retried.
+    retry = if retry_rejected_dimensions?(gate), do: 1, else: 0
 
     query_bytes =
       Enum.sum_by(queries, fn query ->
@@ -439,11 +514,11 @@ defmodule Tips.SearchProbe do
         byte_size(text)
       end)
 
-    inputs = length(docs) + length(long) + passes * length(queries) + 1
-    # The first document may be sent twice when the dimensions parameter is rejected.
+    inputs = length(docs) + length(long) + passes * length(queries) + retry
+
     bytes =
-      Enum.sum_by(docs, &byte_size(&1.text)) + byte_size(hd(docs).text) +
-        Enum.sum_by(long, & &1.full_bytes) + passes * query_bytes
+      Enum.sum_by(docs, &byte_size(&1.text)) + retry * byte_size(hd(docs).text) +
+        Enum.sum_by(long, &byte_size(document_text(&1))) + passes * query_bytes
 
     plan = %{
       documents: length(docs),
@@ -456,11 +531,23 @@ defmodule Tips.SearchProbe do
     budget = gate["budget"]
 
     cond do
-      plan.requests > budget["max_requests"] -> {:error, "planned requests exceed the budget"}
-      plan.token_bound > budget["max_input_tokens"] -> {:error, "token bound exceeds the budget"}
-      true -> {:ok, plan}
+      unfit != [] ->
+        {:error, "documents over #{max} bytes or not UTF-8: #{Enum.join(unfit, ", ")}"}
+
+      plan.requests > budget["max_requests"] ->
+        {:error, "planned requests exceed the budget"}
+
+      plan.token_bound > budget["max_input_tokens"] ->
+        {:error, "token bound exceeds the budget"}
+
+      true ->
+        {:ok, plan}
     end
   end
+
+  # v1 retried a dimensions HTTP 400 once without the parameter; v2 stops on it.
+  defp retry_rejected_dimensions?(gate),
+    do: get_in(gate, ["protocol", "retry_rejected_dimensions"]) != false
 
   @doc "Runs the live probe and returns the report. Never raises on provider failures."
   def run(fixtures, opts \\ []) do
@@ -469,6 +556,7 @@ defmodule Tips.SearchProbe do
 
     state = %{
       fixtures: fixtures,
+      started_at: now(),
       requests: [],
       rss_peak: baseline,
       docs: %{},
@@ -512,6 +600,7 @@ defmodule Tips.SearchProbe do
          upstream: hd(provider["routing"]["only"]),
          dimensions: gate["dimensions"],
          send_dimensions: true,
+         retry_rejected_dimensions: retry_rejected_dimensions?(gate),
          expected_length: nil,
          timeout_ms: gate["gate"]["document_deadline_ms"],
          req_options: Keyword.get(opts, :req_options, [])
@@ -580,13 +669,14 @@ defmodule Tips.SearchProbe do
       }
 
       instruction = byte_size(gate["preparation"]["query_instruction"])
+      largest = max(plan.max_full_document_bytes, gate["preparation"]["document_max_bytes"])
 
       cond do
         preflight.estimated_max_cost_usd > gate["budget"]["max_cost_usd"] ->
           {:error, {:budget, "estimated cost bound exceeds the budget"}}
 
-        plan.max_full_document_bytes + @tokens_per_input_margin > context ->
-          {:error, {:budget, "full reference input may exceed the context"}}
+        largest + @tokens_per_input_margin > context ->
+          {:error, {:budget, "largest allowed input may exceed the context"}}
 
         instruction + gate["preparation"]["query_max_bytes"] > context ->
           {:error, {:budget, "query instruction and cap exceed the context"}}
@@ -647,11 +737,8 @@ defmodule Tips.SearchProbe do
   end
 
   defp embed_full_documents(state) do
-    %{corpus: corpus, gate: gate} = state.fixtures
-
-    corpus
-    |> eligible()
-    |> Enum.filter(&prepare_document(&1, gate).truncated)
+    state.fixtures
+    |> long_cohort()
     |> reduce_ok(state, fn doc, st ->
       entry = %{phase: "document_full", id: doc["id"]}
 
@@ -692,14 +779,14 @@ defmodule Tips.SearchProbe do
   end
 
   # The first embedding settles the dimension mode: 1024 values means the parameter was
-  # honored; 4096 means it was ignored. A 400 is retried once without the parameter, and
-  # only a 4096-value success then establishes that it is unsupported.
+  # honored; 4096 means it was ignored. Under v1 a 400 is retried once without the
+  # parameter, and only a 4096-value success then establishes that it is unsupported.
   defp embed_one(state, entry, text) do
     entry = Map.put(entry, :input_bytes, byte_size(text))
     {result, state} = timed(state, entry, fn -> embed([text], state.provider) end)
 
     case {result, state.dimensions_mode} do
-      {{:error, {:http_status, 400}}, nil} ->
+      {{:error, {:http_status, 400}}, nil} when state.provider.retry_rejected_dimensions ->
         provider = %{state.provider | send_dimensions: false, expected_length: 4096}
 
         {retry, state} =
@@ -736,6 +823,7 @@ defmodule Tips.SearchProbe do
 
   # Runs one request, records its allowlisted outcome and samples client RSS.
   defp timed(state, entry, fun) do
+    entry = Map.put(entry, :started_at, now())
     started = System.monotonic_time(:millisecond)
     result = fun.()
     elapsed = System.monotonic_time(:millisecond) - started
@@ -782,6 +870,7 @@ defmodule Tips.SearchProbe do
     results = Enum.map(queries, &query_result(&1, state))
     long = Enum.filter(results, & &1.long_input)
     requests = Enum.reverse(state.requests)
+    query_ms = Enum.reverse(state.query_ms)
 
     measured = %{
       macro_recall: mean(Enum.map(results, & &1.recall)),
@@ -816,7 +905,8 @@ defmodule Tips.SearchProbe do
         full_long_documents: Map.new(results, &{&1.id, &1.scores_full})
       },
       latency: %{
-        query_ms: Enum.reverse(state.query_ms),
+        query_ms: query_ms,
+        passes: passes(query_ms, length(queries)),
         query_p95_ms: measured.query_p95_ms,
         query_max_ms: measured.query_max_ms,
         document_max_ms: measured.document_max_ms,
@@ -826,6 +916,15 @@ defmodule Tips.SearchProbe do
       },
       gates: gates
     })
+  end
+
+  defp passes(query_ms, per_pass) do
+    query_ms
+    |> Enum.chunk_every(per_pass)
+    |> Enum.with_index(1)
+    |> Enum.map(fn {ms, pass} ->
+      %{pass: pass, query_ms: ms, p95_ms: p95(ms), max_ms: Enum.max(ms), mean_ms: mean(ms)}
+    end)
   end
 
   defp query_result(query, state) do
@@ -949,24 +1048,26 @@ defmodule Tips.SearchProbe do
   end
 
   defp base_report(state, baseline) do
-    %{gate: gate, corpus: corpus, hashes: hashes} = state.fixtures
+    %{gate: gate, hashes: hashes} = state.fixtures
     requests = Enum.reverse(state.requests)
 
     long_inputs =
-      for doc <- eligible(corpus),
-          prepared = prepare_document(doc, gate),
-          prepared.truncated do
+      for doc <- long_cohort(state.fixtures) do
+        prepared = prepare_document(doc, gate)
+
         %{
           id: doc["id"],
           full_bytes: prepared.full_bytes,
           bounded_bytes: byte_size(prepared.text),
-          dropped_bytes: prepared.full_bytes - byte_size(prepared.text)
+          dropped_bytes: prepared.full_bytes - byte_size(prepared.text),
+          reference: "full text embedded separately"
         }
       end
 
     %{
-      probe: "issue-54 search embedding gate",
-      generated_at: DateTime.utc_now() |> DateTime.truncate(:second),
+      probe: "search embedding gate",
+      started_at: state.started_at,
+      generated_at: now(),
       code: code_identity(),
       fixtures: %{gate_version: gate["version"], hashes: hashes},
       model: gate["model"],
@@ -1024,6 +1125,8 @@ defmodule Tips.SearchProbe do
   defp error_label({:vector_length, length}), do: "vector_length_#{length}"
   defp error_label({:budget, message}), do: "budget: #{message}"
   defp error_label(reason) when is_atom(reason), do: Atom.to_string(reason)
+
+  defp now, do: DateTime.utc_now() |> DateTime.truncate(:millisecond)
 
   defp code_identity do
     sha = git(["rev-parse", "HEAD"])
