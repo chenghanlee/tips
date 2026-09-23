@@ -46,10 +46,12 @@ class RecordValidationTest(unittest.TestCase):
         body = record(*SECTIONS, sha="a" * 40) + "\n" + record(*SECTIONS[:4], sha="b" * 40)
         assert missing_sections(review_round(body, "a" * 40)) == []
         assert missing_sections(review_round(body, "b" * 40)) == ["Defect pass"]
-        with self.assertRaises(RefusalError):
-            review_round(body, "c" * 40)
-        with self.assertRaises(RefusalError):
-            review_round(body + "\n" + record(*SECTIONS, sha="a" * 40), "a" * 40)
+        for text, sha in ((body, "c" * 40), (body + "\n" + record(*SECTIONS), "a" * 40)):
+            try:
+                review_round(text, sha)
+            except RefusalError:
+                continue
+            self.fail(f"missing or duplicated round accepted for {sha[:7]}")
 
     def test_headings_are_case_insensitive_and_allow_h3(self) -> None:
         body = "\n".join(f"### {name.upper()}\n\ntext\n" for name in SECTIONS)
