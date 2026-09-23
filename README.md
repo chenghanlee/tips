@@ -3,7 +3,7 @@
 Tips helps developers find and share practical AI techniques and firsthand results.
 It is an Elixir/Phoenix application with PostgreSQL.
 
-The app currently has the Phoenix starter page, generated authentication, background
+The app currently has a placeholder home page, generated authentication, background
 job infrastructure and a database health check. The design documents describe target
 product behavior; GitHub issues and PRs track what has been implemented.
 

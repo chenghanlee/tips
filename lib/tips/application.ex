@@ -8,6 +8,7 @@ defmodule Tips.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      TwMerge.Cache,
       TipsWeb.Telemetry,
       Tips.Repo,
       {Oban, Application.fetch_env!(:tips, Oban)},

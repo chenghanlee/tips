@@ -8,35 +8,38 @@ defmodule TipsWeb.UserLive.Registration do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <div class="mx-auto max-w-sm">
-        <div class="text-center">
-          <.header>
-            Register for an account
-            <:subtitle>
-              Already registered?
-              <.link navigate={~p"/users/log-in"} class="font-semibold text-brand hover:underline">
-                Log in
-              </.link>
-              to your account now.
-            </:subtitle>
-          </.header>
+      <div class="mx-auto max-w-sm space-y-6">
+        <div class="space-y-1 text-center">
+          <h1 class="text-2xl font-semibold">Register for an account</h1>
+          <p class="text-sm text-muted-foreground">
+            Already registered? <.link
+              navigate={~p"/users/log-in"}
+              class="font-semibold text-foreground underline"
+              phx-no-format
+            >Log in</.link> to your account now.
+          </p>
         </div>
 
-        <.form for={@form} id="registration_form" phx-submit="save" phx-change="validate">
-          <.input field={@form[:handle]} type="text" label="Handle" required />
-          <.input
+        <.form
+          for={@form}
+          id="registration_form"
+          phx-submit="save"
+          phx-change="validate"
+          class="space-y-4"
+        >
+          <UI.field field={@form[:handle]} label="Handle" />
+          <UI.field
             field={@form[:email]}
             type="email"
             label="Email"
             autocomplete="username"
             spellcheck="false"
-            required
             phx-mounted={JS.focus()}
           />
 
-          <.button phx-disable-with="Creating account..." class="btn btn-primary w-full">
+          <UI.button size="lg" class="w-full" phx-disable-with="Creating account...">
             Create an account
-          </.button>
+          </UI.button>
         </.form>
       </div>
     </Layouts.app>
@@ -52,7 +55,8 @@ defmodule TipsWeb.UserLive.Registration do
   def mount(_params, _session, socket) do
     changeset = Accounts.change_user_registration(%User{}, %{}, validate_unique: false)
 
-    {:ok, assign_form(socket, changeset), temporary_assigns: [form: nil]}
+    {:ok, socket |> assign(:page_title, "Register") |> assign_form(changeset),
+     temporary_assigns: [form: nil]}
   end
 
   @impl true
