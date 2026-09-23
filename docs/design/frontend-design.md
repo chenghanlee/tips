@@ -49,7 +49,16 @@ An unfinished signup expires seven days after registration. Keep the verificatio
 
 Use dedicated routable pages for creating and editing tips and reviews, with one editor LiveView module per content kind and `:new`/`:edit` actions in the same authenticated live session. The page owns the form lifecycle; function components/helpers share behavior. Do not embed review editors in the tip page or use modal editors. The explicit publication-to-edit handoff patches within that LiveView to preserve page-owned uploads; `handle_params` freshly authorizes the target through Content. Keep upload configuration and relevant DOM identity stable during that transition. Unrelated target/account changes must never inherit its values. After content acknowledgement and safe draft clearing, navigate to the tip or the review’s single-review URL. Hidden content follows authorized presentation. Failed, divergent or uncertain outcomes preserve the editor until resolved.
 
-This is the agreed application of [Phoenix's page-navigation pattern](https://phoenix-live-view.hexdocs.pm/live-navigation.html). Exact route paths and the remaining LiveView boundaries are still to be designed.
+This is the agreed application of [Phoenix's page-navigation pattern](https://phoenix-live-view.hexdocs.pm/live-navigation.html). Content routes:
+
+| Page | Path |
+|---|---|
+| Tip | `/tips/:id/:slug` |
+| Selected review | `/reviews/:id` |
+| New tip / edit tip | `/tips/new` / `/tips/:id/edit` |
+| New review / edit review | `/tips/:tip_id/reviews/new` / `/reviews/:id/edit` |
+
+Declare the static editor paths before the dynamic tip route. TipsWeb derives the tip slug from the current authorized projection, including the neutral placeholders; publication and edit receipts carry identity and state, never redirect URLs. A review destination stays readable under an unavailable parent. The reader routes are wired by the tip-page work and the editor routes, with fresh authorization on handoff, by the editor work. The remaining LiveView boundaries are still to be designed.
 
 ## Navigation and content
 
