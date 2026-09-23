@@ -7,6 +7,7 @@ defmodule Tips.AdmissionFixtures do
   """
 
   import ExUnit.Callbacks, only: [start_supervised!: 1]
+  import Supervisor, only: [child_spec: 2]
 
   alias Tips.AdmissionLimiter
 
@@ -15,20 +16,31 @@ defmodule Tips.AdmissionFixtures do
     auth_ip: {3, 1_000},
     write: {2, 1_000},
     upload: {1, 2_000},
-    max_entries: 100,
     cleanup_interval_ms: :timer.hours(1)
   ]
 
-  @doc "Starts an unnamed limiter under the test supervisor. Returns `%{limiter: pid, clock: clock}`."
+  @capacity [auth: 100, write: 100, upload: 100]
+
+  @doc """
+  Starts an unnamed limiter under the test supervisor. Returns `%{limiter: pid, clock: clock}`.
+
+  `:capacity` overrides merge into the default per-class capacity.
+  """
   def start_limiter(opts \\ []) do
     clock = :atomics.new(1, signed: true)
+    {capacity, opts} = Keyword.pop(opts, :capacity, [])
 
     opts =
       @defaults
       |> Keyword.merge(opts)
-      |> Keyword.merge(name: nil, clock: fn -> :atomics.get(clock, 1) end)
+      |> Keyword.merge(
+        capacity: Keyword.merge(@capacity, capacity),
+        name: nil,
+        clock: fn -> :atomics.get(clock, 1) end
+      )
 
-    %{limiter: start_supervised!({AdmissionLimiter, opts}), clock: clock}
+    spec = child_spec({AdmissionLimiter, opts}, id: make_ref())
+    %{limiter: start_supervised!(spec), clock: clock}
   end
 
   @doc "Moves a fixture clock forward by `ms` milliseconds."

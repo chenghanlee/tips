@@ -121,40 +121,150 @@ defmodule Tips.AdmissionLimiterTest do
   end
 
   describe "storage bounds" do
-    test "unique identity floods never exceed capacity" do
-      %{limiter: limiter} = start_limiter(max_entries: 10, write: {1, 1_000})
+    test "unique identity floods never exceed class capacity" do
+      %{limiter: limiter} =
+        start_limiter(
+          write: {1, 1_000},
+          upload: {1, 1_000},
+          capacity: [auth: 6, write: 10, upload: 4]
+        )
 
-      writes = concurrently(100, &AdmissionLimiter.check_write(scope(&1), limiter))
+      # All three classes flood at once; each class stops at its own cap.
+      results =
+        concurrently(300, fn n ->
+          case rem(n, 3) do
+            0 -> {:auth, AdmissionLimiter.check_auth("u#{n}@example.com", ip(n), limiter)}
+            1 -> {:write, AdmissionLimiter.check_write(scope(n), limiter)}
+            2 -> {:upload, AdmissionLimiter.check_upload(scope(n), limiter)}
+          end
+        end)
 
-      assert %{ok: 10, capacity: 90} = tally(writes)
-      assert entry_count(limiter) == 10
+      by_class = Enum.group_by(results, &elem(&1, 0), &elem(&1, 1))
 
-      # Auth needs two new entries; a full table admits neither and stores nothing.
-      auths =
-        concurrently(100, &AdmissionLimiter.check_auth("u#{&1}@example.com", ip(&1), limiter))
+      # A new auth identity needs two rows: a destination and an IP.
+      assert %{ok: 3, capacity: 97} = tally(by_class.auth)
+      assert %{ok: 10, capacity: 90} = tally(by_class.write)
+      assert %{ok: 4, capacity: 96} = tally(by_class.upload)
+      assert entry_count(limiter) == 6 + 10 + 4
+    end
 
-      assert %{capacity: 100} = tally(auths)
-      assert entry_count(limiter) == 10
+    test "auth saturation cannot prevent new writes or uploads" do
+      %{limiter: limiter} = start_limiter(capacity: [auth: 4, write: 2, upload: 2])
 
-      # Capacity retry points at the earliest live window end.
-      assert {:error, {:capacity, 1}} = AdmissionLimiter.check_write(scope(1_000), limiter)
+      # Saturated writes and uploads leave the auth allocation untouched.
+      assert :ok = AdmissionLimiter.check_write(scope(1), limiter)
+      assert :ok = AdmissionLimiter.check_write(scope(2), limiter)
+      assert :ok = AdmissionLimiter.check_upload(scope(1), limiter)
+      assert :ok = AdmissionLimiter.check_upload(scope(2), limiter)
+      assert {:error, {:capacity, _}} = AdmissionLimiter.check_write(scope(3), limiter)
+      assert {:error, {:capacity, _}} = AdmissionLimiter.check_upload(scope(3), limiter)
+
+      assert :ok = AdmissionLimiter.check_auth("a@example.com", ip(1), limiter)
+      assert :ok = AdmissionLimiter.check_auth("b@example.com", ip(2), limiter)
+
+      # Saturated auth leaves the write and upload allocations untouched.
+      assert {:error, {:capacity, _}} =
+               AdmissionLimiter.check_auth("c@example.com", ip(3), limiter)
+
+      %{limiter: limiter} = start_limiter(capacity: [auth: 4, write: 2, upload: 2])
+
+      for n <- 1..2,
+          do: assert(:ok = AdmissionLimiter.check_auth("u#{n}@example.com", ip(n), limiter))
+
+      assert {:error, {:capacity, _}} =
+               AdmissionLimiter.check_auth("new@example.com", ip(99), limiter)
+
+      assert :ok = AdmissionLimiter.check_write(scope(1), limiter)
+      assert :ok = AdmissionLimiter.check_write(scope(2), limiter)
+      assert :ok = AdmissionLimiter.check_upload(scope(1), limiter)
+      assert :ok = AdmissionLimiter.check_upload(scope(2), limiter)
+    end
+
+    test "existing identities with budget proceed at class capacity" do
+      %{limiter: limiter} =
+        start_limiter(
+          auth_destination: {5, 1_000},
+          write: {3, 1_000},
+          capacity: [auth: 2, write: 2]
+        )
+
+      assert :ok = AdmissionLimiter.check_write(scope(1), limiter)
+      assert :ok = AdmissionLimiter.check_write(scope(2), limiter)
+      assert {:error, {:capacity, _}} = AdmissionLimiter.check_write(scope(3), limiter)
+      assert :ok = AdmissionLimiter.check_write(scope(1), limiter)
+
+      assert :ok = AdmissionLimiter.check_auth("a@example.com", ip(1), limiter)
+
+      assert {:error, {:capacity, _}} =
+               AdmissionLimiter.check_auth("b@example.com", ip(1), limiter)
+
+      assert :ok = AdmissionLimiter.check_auth("a@example.com", ip(1), limiter)
     end
 
     test "auth capacity is all-or-none across its two buckets" do
-      %{limiter: limiter} = start_limiter(max_entries: 9, write: {1, 1_000})
+      %{limiter: limiter} = start_limiter(capacity: [auth: 3])
 
-      for id <- 1..8, do: assert(:ok = AdmissionLimiter.check_write(scope(id), limiter))
+      assert :ok = AdmissionLimiter.check_auth("a@example.com", ip(1), limiter)
+      assert :ok = AdmissionLimiter.check_auth("b@example.com", ip(1), limiter)
 
-      # One free slot is not enough for a new destination plus a new IP.
+      # One free auth row is not enough for a new destination plus a new IP.
       assert {:error, {:capacity, _}} =
-               AdmissionLimiter.check_auth("a@example.com", ip(1), limiter)
+               AdmissionLimiter.check_auth("c@example.com", ip(2), limiter)
 
-      assert entry_count(limiter) == 8
-      assert :ok = AdmissionLimiter.check_write(scope(9), limiter)
+      assert entry_count(limiter) == 3
+    end
+
+    test "capacity retry uses the exhausted class expiry" do
+      %{limiter: limiter, clock: clock} =
+        start_limiter(write: {1, 10_000}, upload: {1, 1_000}, capacity: [write: 2])
+
+      assert :ok = AdmissionLimiter.check_write(scope(1), limiter)
+      set_time(clock, 4_500)
+      assert :ok = AdmissionLimiter.check_write(scope(2), limiter)
+      # An upload expires sooner, but it cannot free a write row.
+      assert :ok = AdmissionLimiter.check_upload(scope(1), limiter)
+
+      set_time(clock, 5_000)
+      assert {:error, {:capacity, 5}} = AdmissionLimiter.check_write(scope(3), limiter)
+    end
+
+    test "repeated capacity denials keep exact retry feedback" do
+      %{limiter: limiter, clock: clock} = start_limiter(write: {1, 1_000}, capacity: [write: 2])
+
+      assert :ok = AdmissionLimiter.check_write(scope(1), limiter)
+      set_time(clock, 500)
+      assert :ok = AdmissionLimiter.check_write(scope(2), limiter)
+
+      for {now, retry} <- [{600, 1}, {700, 1}, {999, 1}] do
+        set_time(clock, now)
+        assert {:error, {:capacity, ^retry}} = AdmissionLimiter.check_write(scope(3), limiter)
+      end
+
+      # scope(1)'s expired row is reused in place, so the table stays full.
+      set_time(clock, 1_000)
+      assert :ok = AdmissionLimiter.check_write(scope(1), limiter)
+
+      # Nothing is due until scope(2) expires at 1_500.
+      set_time(clock, 1_200)
+      assert {:error, {:capacity, 1}} = AdmissionLimiter.check_write(scope(3), limiter)
+      set_time(clock, 1_500)
+      assert :ok = AdmissionLimiter.check_write(scope(3), limiter)
+
+      # Longer windows show whole-second retry counting down to the next expiry.
+      %{limiter: limiter, clock: clock} = start_limiter(write: {1, 60_000}, capacity: [write: 1])
+      assert :ok = AdmissionLimiter.check_write(scope(1), limiter)
+
+      for {now, retry} <- [{1, 60}, {30_000, 30}, {59_001, 1}] do
+        set_time(clock, now)
+        assert {:error, {:capacity, ^retry}} = AdmissionLimiter.check_write(scope(2), limiter)
+      end
+
+      set_time(clock, 60_000)
+      assert :ok = AdmissionLimiter.check_write(scope(2), limiter)
     end
 
     test "expired buckets are reclaimed without refunding live buckets" do
-      %{limiter: limiter, clock: clock} = start_limiter(max_entries: 4, write: {1, 1_000})
+      %{limiter: limiter, clock: clock} = start_limiter(write: {1, 1_000}, capacity: [write: 4])
 
       assert :ok = AdmissionLimiter.check_write(scope(1), limiter)
       assert :ok = AdmissionLimiter.check_write(scope(2), limiter)
@@ -221,9 +331,11 @@ defmodule Tips.AdmissionLimiterTest do
                  write: {60, 60_000},
                  upload: {20, 600_000}
                },
-               max_entries: 10_000,
+               capacity: %{auth: 6_000, write: 2_000, upload: 2_000} = capacity,
                cleanup_interval_ms: 60_000
              } = :sys.get_state(supervised)
+
+      assert capacity |> Map.values() |> Enum.sum() == 10_000
 
       assert :ok =
                AdmissionLimiter.check_write(scope(System.unique_integer([:positive])))
@@ -260,6 +372,11 @@ defmodule Tips.AdmissionLimiterTest do
             "spaced out@example.com",
             String.duplicate("a", 200) <> "@example.com",
             String.duplicate(" ", 5_000) <> "a@example.com",
+            <<0xFF, "a@example.com">>,
+            "a@example.com" <> <<0xC3>>,
+            "a\0b@example.com",
+            "a\u0007@example.com",
+            "a@example.com\u007F",
             :"a@example.com"
           ] do
         assert {:error, :invalid_identity} =

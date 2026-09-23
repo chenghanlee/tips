@@ -47,10 +47,13 @@ config :tips, Tips.AdmissionLimiter,
   # Uploads per account: a few attachments per contribution, while bounding
   # provider work.
   upload: {20, 10 * 60_000},
-  # Hard cap on stored buckets. A full table denies new identities rather than
-  # evicting live buckets. Each bucket is one small ETS row with a fixed-size key.
-  max_entries: 10_000,
-  # Sweep for expired buckets; one scan of at most max_entries rows.
+  # Rows per capacity class; the sum (10,000) is the table's hard bound. Classes
+  # never lend rows, so anonymous auth traffic cannot deny signed-in writes or
+  # uploads. A full class denies new identities rather than evicting live
+  # buckets. Auth gets the most rows because each new identity may need two.
+  capacity: [auth: 6_000, write: 2_000, upload: 2_000],
+  # Sweep for expired rows in classes whose earliest expiry is due; one scan of
+  # the capped table per due class.
   cleanup_interval_ms: 60_000
 
 # Configure the endpoint

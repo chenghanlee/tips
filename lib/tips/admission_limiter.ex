@@ -44,12 +44,28 @@ defmodule Tips.AdmissionLimiter do
   short-term burst is up to twice the budget. The budgets are in
   `config/config.exs`.
 
-  The table holds at most `:max_entries` buckets. A live bucket is never evicted
-  to make room: when the table is full, expired buckets are deleted, and if it
-  is still full the request is denied with `:capacity`. Every
-  `:cleanup_interval_ms` the same sweep deletes idle expired buckets. A sweep is
-  one full scan of at most `:max_entries` rows, so its cost is bounded by the
-  cap. Keys are fixed size (digest, IP tuple or account id).
+  Storage is split into three capacity classes with fixed row allocations:
+  `:auth` (destination and IP buckets together), `:write` and `:upload`. Their
+  sum is the table's hard bound. Classes never lend rows to each other, so an
+  anonymous auth flood cannot deny signed-in writes or uploads. Each class
+  tracks its row count and earliest expiry. A live bucket is never evicted: a
+  request that needs a new row in a full class first reclaims that class's
+  expired rows, but only once its earliest expiry is due. Otherwise it is denied
+  with `:capacity` and a retry for that class's earliest expiry, without a scan.
+  Buckets that already exist keep working while their class is full.
+
+  Bounded storage has a cost: enough new identities (for example, many client
+  IPs) can fill the auth class and deny new auth identities until rows expire.
+  Signed-in writes and uploads are unaffected.
+
+  Every `:cleanup_interval_ms` a sweep reclaims expired rows of each class whose
+  earliest expiry is due. A reclaim is one scan of the capped table plus one to
+  find the new earliest expiry. Keys are fixed size (digest, IP tuple or account
+  id).
+
+  IPs are exact addresses. A client that rotates addresses, including within one
+  IPv6 prefix, gets new IP buckets; the destination bucket still bounds mail to
+  each address.
 
   One process owns the table and serializes each admission decision, so
   concurrent callers cannot overspend. Buckets live in memory: a restart or
@@ -62,7 +78,9 @@ defmodule Tips.AdmissionLimiter do
 
   @max_destination_bytes 1_024
   @max_destination_length 160
-  @email_format ~r/^[^@,;\s]+@[^@,;\s]+$/u
+  # The Tips.Accounts.User email format, plus no control characters.
+  @email_format ~r/^[^@,;\s\p{Cc}]+@[^@,;\s\p{Cc}]+$/u
+  @classes %{auth: [:auth_destination, :auth_ip], write: [:write], upload: [:upload]}
 
   @type server :: GenServer.server()
   @type result ::
@@ -76,7 +94,8 @@ defmodule Tips.AdmissionLimiter do
   Starts a limiter.
 
   Options: `:auth_destination`, `:auth_ip`, `:write` and `:upload` as
-  `{limit, window_ms}`; `:max_entries`; `:cleanup_interval_ms`; `:clock`, a
+  `{limit, window_ms}`; `:capacity`, rows per class as
+  `[auth: rows, write: rows, upload: rows]`; `:cleanup_interval_ms`; `:clock`, a
   zero-arity function returning monotonic milliseconds; and `:name` (default
   `#{inspect(__MODULE__)}`, `nil` for an unnamed instance).
   """
@@ -89,32 +108,33 @@ defmodule Tips.AdmissionLimiter do
   def check_auth(destination, trusted_ip, server \\ __MODULE__) do
     with {:ok, digest} <- destination_digest(destination),
          {:ok, ip} <- validate_ip(trusted_ip) do
-      admit(server, [{:auth_destination, digest}, {:auth_ip, ip}])
+      admit(server, :auth, [{:auth_destination, digest}, {:auth_ip, ip}])
     end
   end
 
   @doc "Admits one write by the scope's account."
   @spec check_write(term(), server()) :: result()
   def check_write(scope, server \\ __MODULE__) do
-    with {:ok, id} <- account_id(scope), do: admit(server, [{:write, id}])
+    with {:ok, id} <- account_id(scope), do: admit(server, :write, [{:write, id}])
   end
 
   @doc "Admits one upload by the scope's account."
   @spec check_upload(term(), server()) :: result()
   def check_upload(scope, server \\ __MODULE__) do
-    with {:ok, id} <- account_id(scope), do: admit(server, [{:upload, id}])
+    with {:ok, id} <- account_id(scope), do: admit(server, :upload, [{:upload, id}])
   end
 
-  defp admit(server, keys), do: GenServer.call(server, {:admit, keys})
+  defp admit(server, class, keys), do: GenServer.call(server, {:admit, class, keys})
 
   defp destination_digest(destination)
        when is_binary(destination) and byte_size(destination) <= @max_destination_bytes do
-    normalized = User.normalize_email(destination)
-
-    if String.length(normalized) <= @max_destination_length and normalized =~ @email_format do
+    with true <- String.valid?(destination),
+         normalized = User.normalize_email(destination),
+         true <- String.length(normalized) <= @max_destination_length,
+         true <- normalized =~ @email_format do
       {:ok, :crypto.hash(:sha256, normalized)}
     else
-      {:error, :invalid_identity}
+      false -> {:error, :invalid_identity}
     end
   end
 
@@ -131,16 +151,17 @@ defmodule Tips.AdmissionLimiter do
 
   @impl true
   def init(opts) do
-    max_entries = Keyword.fetch!(opts, :max_entries)
-    # Authentication needs room for two buckets at once.
-    true = is_integer(max_entries) and max_entries >= 2
+    capacity = Keyword.fetch!(opts, :capacity)
 
     state = %{
       table: :ets.new(__MODULE__, [:set, :protected]),
       clock: Keyword.get(opts, :clock, fn -> System.monotonic_time(:millisecond) end),
       policies:
         Map.new([:auth_destination, :auth_ip, :write, :upload], &{&1, fetch_policy!(opts, &1)}),
-      max_entries: max_entries,
+      # A new auth identity needs two rows at once.
+      capacity: Map.new(@classes, fn {class, _} -> {class, fetch_rows!(capacity, class)} end),
+      counts: Map.new(@classes, fn {class, _} -> {class, 0} end),
+      earliest: Map.new(@classes, fn {class, _} -> {class, :infinity} end),
       cleanup_interval_ms: Keyword.fetch!(opts, :cleanup_interval_ms)
     }
 
@@ -154,29 +175,27 @@ defmodule Tips.AdmissionLimiter do
     policy
   end
 
+  defp fetch_rows!(capacity, class) do
+    rows = Keyword.fetch!(capacity, class)
+    true = is_integer(rows) and rows >= length(Map.fetch!(@classes, class))
+    rows
+  end
+
   @impl true
-  def handle_call({:admit, keys}, _from, state) do
+  def handle_call({:admit, class, keys}, _from, state) do
     now = state.clock.()
     buckets = Enum.map(keys, &bucket(&1, now, state))
 
-    reply =
-      cond do
-        retry_ms = spent_retry_ms(buckets, now) ->
-          {:error, {:rate_limited, seconds(retry_ms)}}
-
-        not room?(keys, now, state) ->
-          {:error, {:capacity, seconds(earliest_expiry(state.table) - now)}}
-
-        true ->
-          Enum.each(buckets, &consume(&1, now, state.table))
-      end
-
-    {:reply, reply, state}
+    case spent_retry_ms(buckets, now) do
+      nil -> admit_with_room(class, buckets, now, state)
+      retry_ms -> {:reply, {:error, {:rate_limited, seconds(retry_ms)}}, state}
+    end
   end
 
   @impl true
   def handle_info(:cleanup, state) do
-    reclaim_expired(state.table, state.clock.())
+    now = state.clock.()
+    state = Enum.reduce(Map.keys(@classes), state, &reclaim_if_due(&1, now, &2))
     schedule_cleanup(state)
     {:noreply, state}
   end
@@ -206,35 +225,58 @@ defmodule Tips.AdmissionLimiter do
     |> Enum.max(fn -> nil end)
   end
 
-  defp room?(keys, now, state) do
-    fits?(keys, state) or (reclaim_expired(state.table, now) > 0 and fits?(keys, state))
+  defp admit_with_room(class, buckets, now, state) do
+    state = if fits?(class, buckets, state), do: state, else: reclaim_if_due(class, now, state)
+
+    if fits?(class, buckets, state) do
+      {:reply, :ok, Enum.reduce(buckets, state, &consume(&1, class, now, &2))}
+    else
+      {:reply, {:error, {:capacity, seconds(state.earliest[class] - now)}}, state}
+    end
   end
 
-  # Expired keys still stored are overwritten in place, so only absent keys grow the table.
-  defp fits?(keys, %{table: table, max_entries: max_entries}) do
-    :ets.info(table, :size) + Enum.count(keys, &(not :ets.member(table, &1))) <= max_entries
+  # Expired rows still stored are overwritten in place, so only absent keys need a row.
+  defp fits?(class, buckets, state) do
+    new_rows = Enum.count(buckets, fn {key, _, _, _} -> not :ets.member(state.table, key) end)
+    state.counts[class] + new_rows <= state.capacity[class]
   end
 
-  defp reclaim_expired(table, now) do
-    :ets.select_delete(table, [{{:_, :_, :"$1"}, [{:"=<", :"$1", now}], [true]}])
+  # `earliest` is never later than the class's true earliest expiry: inserts lower
+  # it and only a reclaim raises it. While it is in the future nothing in the class
+  # can have expired, so the scan is skipped and the retry is exact.
+  defp reclaim_if_due(class, now, state) do
+    if state.earliest[class] > now do
+      state
+    else
+      policies = Map.fetch!(@classes, class)
+      expired = for p <- policies, do: {{{p, :_}, :_, :"$1"}, [{:"=<", :"$1", now}], [true]}
+      expiries = for p <- policies, do: {{{p, :_}, :_, :"$1"}, [], [:"$1"]}
+      reclaimed = :ets.select_delete(state.table, expired)
+      earliest = state.table |> :ets.select(expiries) |> Enum.min(fn -> :infinity end)
+
+      %{
+        state
+        | counts: Map.update!(state.counts, class, &(&1 - reclaimed)),
+          earliest: Map.put(state.earliest, class, earliest)
+      }
+    end
   end
 
-  defp earliest_expiry(table) do
-    :ets.foldl(
-      fn {_key, _count, expires_at}, earliest -> min(expires_at, earliest) end,
-      :infinity,
-      table
-    )
+  defp consume({key, _limit, _window_ms, {_count, _expires_at}}, _class, _now, state) do
+    :ets.update_counter(state.table, key, {2, 1})
+    state
   end
 
-  defp consume({key, _limit, _window_ms, {_count, _expires_at}}, _now, table) do
-    :ets.update_counter(table, key, {2, 1})
-    :ok
-  end
+  defp consume({key, _limit, window_ms, nil}, class, now, state) do
+    new_row? = not :ets.member(state.table, key)
+    expires_at = now + window_ms
+    :ets.insert(state.table, {key, 1, expires_at})
 
-  defp consume({key, _limit, window_ms, nil}, now, table) do
-    :ets.insert(table, {key, 1, now + window_ms})
-    :ok
+    %{
+      state
+      | counts: if(new_row?, do: Map.update!(state.counts, class, &(&1 + 1)), else: state.counts),
+        earliest: Map.update!(state.earliest, class, &min(&1, expires_at))
+    }
   end
 
   defp seconds(ms), do: max(div(ms + 999, 1_000), 1)
