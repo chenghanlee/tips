@@ -277,9 +277,7 @@ elif a[:2] == ["pane", "process-info"]:
             "foreground_processes": [
                 {
                     "pid": 99999999,
-                    "cwd": next(x for x in s["panes"] if x["pane_id"] == opt("--pane"))[
-                        "foreground_cwd"
-                    ],
+                    "cwd": next(x for x in s["panes"] if x["pane_id"] == opt("--pane"))["cwd"],
                 }
             ],
         }
@@ -441,7 +439,8 @@ class TeamLifecycleTest(unittest.TestCase):
         (work / "uncommitted").write_text("keep")
         state = json.loads(self.state.read_text())
         state["panes"][0].pop("agent")
-        state["panes"][1]["foreground_cwd"] = str(work)
+        state["panes"][1]["cwd"] = str(work)
+        state["panes"][1]["foreground_cwd"] = "/opt/homebrew/lsp-child"
         self.state.write_text(json.dumps(state))
         self.calls_before_stop = self.calls()
         r = self.run_team("stop", "1")
@@ -466,7 +465,8 @@ class TeamLifecycleTest(unittest.TestCase):
         execute(["git", "-C", str(work), "commit", "-qm", "unmerged"], check=True)
         state = json.loads(self.state.read_text())
         state["panes"][0].pop("agent")
-        state["panes"][1]["foreground_cwd"] = str(work)
+        state["panes"][1]["cwd"] = str(work)
+        state["panes"][1]["foreground_cwd"] = "/opt/homebrew/lsp-child"
         self.state.write_text(json.dumps(state))
         before = len(self.calls())
         r = self.run_team("stop", "1")
@@ -486,7 +486,8 @@ class TeamLifecycleTest(unittest.TestCase):
         )
         state = json.loads(self.state.read_text())
         state["panes"][0].pop("agent")
-        state["panes"][1]["foreground_cwd"] = str(work)
+        state["panes"][1]["cwd"] = str(work)
+        state["panes"][1]["foreground_cwd"] = "/opt/homebrew/lsp-child"
         self.state.write_text(json.dumps(state))
         git_dir = self.repo / ".git"
         before = len(self.calls())
@@ -550,7 +551,8 @@ class TeamLifecycleTest(unittest.TestCase):
         )
         state = json.loads(self.state.read_text())
         state["panes"][0].pop("agent")
-        state["panes"][1]["foreground_cwd"] = str(work)
+        state["panes"][1]["cwd"] = str(work)
+        state["panes"][1]["foreground_cwd"] = "/opt/homebrew/lsp-child"
         self.state.write_text(json.dumps(state))
         (self.bin / "docker").write_text(
             '#!/bin/sh\nprintf "%s\\n" "$*" >> "$DOCKER_LOG"\ncase "$*" in *SELEC'
