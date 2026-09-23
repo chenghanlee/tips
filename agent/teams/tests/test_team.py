@@ -606,8 +606,7 @@ class TeamLifecycleTest(unittest.TestCase):
         assert self.run_team("start", "1").returncode == 0
         prompt = next(c[3] for c in self.calls() if c[:2] == ["agent", "prompt"])
         assert "Report readiness to lead-tpm" in prompt
-        assert "then the Team TPM card" in prompt
-        assert "Client constraints" in prompt
+        assert "agent/teams/roles/team-tpm.md" in prompt
         assert "Read agent/teams/README.md" in prompt
         assert "task_worktree.py" not in prompt
 
@@ -624,7 +623,7 @@ class TeamLifecycleTest(unittest.TestCase):
         r = self.run_team("start", "lead")
         assert r.returncode == 0, r.stderr
         prompt = next(c[3] for c in self.calls() if c[:2] == ["agent", "prompt"])
-        assert "then the Lead TPM card" in prompt
+        assert "agent/teams/roles/lead-tpm.md" in prompt
         assert "Report readiness to the user" in prompt
         assert len(json.loads(self.state.read_text())["panes"]) == 1
         r = self.run_team("stop", "lead")

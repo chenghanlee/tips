@@ -21,27 +21,29 @@ def check_local_links():
             assert (path.parent / target).is_file(), f"{path.relative_to(ROOT)}: broken local link {target}"
 
 
-ROLES = ["Lead TPM", "Team TPM", "Tech lead", "Developer", "Tester"]
+ROLES = {
+    "Lead TPM": "lead-tpm",
+    "Team TPM": "team-tpm",
+    "Tech lead": "tech-lead",
+    "Developer": "developer",
+    "Tester": "tester",
+}
 
 
 def check_role_cards():
     """Every role card carries every event once, in order, with a filled cell."""
-    doc = "agent/teams/README.md"
-    text = (ROOT / doc).read_text()
-    events = re.findall(r"^\d+\. \*\*([^*]+)\*\*:", text, re.M)
-    assert events, f"{doc}: no numbered event list found"
-    parts = [c.split("\n", 1) for c in re.split(r"^## ", text, flags=re.M)[1:]]
-    sections = {name: body for name, body in parts}
-    for role in ROLES:
-        assert text.count(f"\n## {role}\n") == 1, f"{doc}: expected exactly one '## {role}' card"
-        card = sections[role]
-        cells = re.findall(r"^### (.+)$", card, re.M)
-        assert cells == events, f"{doc}: {role} cells {cells} != {events}"
-        for cell, body in zip(cells, re.split(r"^### .+$", card, flags=re.M)[1:]):
-            assert body.strip(), f"{doc}: {role} / {cell} is empty"
-    for name, body in sections.items():
-        if name not in ROLES:
-            assert not re.search(r"^### ", body, re.M), f"{doc}: '{name}' has ### outside a card"
+    readme = ROOT / "agent/teams/README.md"
+    events = re.findall(r"^\d+\. \*\*([^*]+)\*\*:", readme.read_text(), re.M)
+    assert events, "agent/teams/README.md: no numbered event list found"
+    assert not re.search(r"^### ", readme.read_text(), re.M), "agent/teams/README.md: stray ###"
+    for role, slug in ROLES.items():
+        path = ROOT / f"agent/teams/roles/{slug}.md"
+        text = path.read_text()
+        assert text.startswith(f"# {role}\n"), f"{path.relative_to(ROOT)}: title must be '# {role}'"
+        cells = re.findall(r"^## (.+)$", text, re.M)
+        assert cells == events, f"{path.relative_to(ROOT)}: cells {cells} != {events}"
+        for cell, body in zip(cells, re.split(r"^## .+$", text, flags=re.M)[1:]):
+            assert body.strip(), f"{path.relative_to(ROOT)}: {cell} is empty"
 
 
 def check_fragments():
