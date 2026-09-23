@@ -16,7 +16,7 @@ defmodule Tips.Content do
       `t:publication_kind/0` and a `t:intent/0` or `nil`, and returns
       `{:ok, t:publication_receipt/0 | nil}` or `{:error, t:lookup_error/0}`.
     * `get_edit_form(scope, kind, id)` returns `{:ok, t:edit_form/0}` or
-      `{:error, :unauthenticated | :forbidden | :not_found}`.
+      `{:error, :unauthenticated | :not_found}`.
     * `edit_tip(scope, id, expected_version, attrs, uploads)` returns
       `{:ok, t:edit_receipt/0}` or `{:error, t:edit_error/0}`.
     * `edit_review(scope, id, expected_version, attrs, uploads)` returns the
@@ -31,10 +31,26 @@ defmodule Tips.Content do
 
   `uploads` is the entire ordered selection, as `t:attachment/0` values. `[]`
   means the author selected no attachments. A slot the page cannot resolve is
-  `{:missing_image, slot}`, never left out. An image file's temporary path is
-  valid only during the page attempt that owns it. Content uploads images and
-  refreshes pending videos before its transaction; provider calls never run
-  while database locks are held.
+  `{:missing_image, slot}`, never left out.
+
+  A write needs complete, valid intent. Publication first looks up the key:
+  an existing key returns its publication even for an incomplete recovered
+  submission (usually `:existing_unknown`). Only a new write (absent key) and
+  every edit then check completeness, before any provider work or
+  transaction, and return `{:error, changeset}` without saving or dropping
+  anything:
+
+    * each missing editable field gets `{"is missing", [validation: :intent]}`;
+      an explicit `nil` is a blank and gets ordinary required-field validation;
+    * a missing or non-list `uploads` gets an `:uploads` error;
+    * each `{:missing_image, slot}` gets an `:uploads` error with `slot: slot`
+      in its metadata;
+    * each `{:retained, media_id, _}` in a new publication gets an `:uploads`
+      error with `media_id: media_id` in its metadata.
+
+  An image file's temporary path is valid only during the page attempt that
+  owns it. Content uploads images and refreshes pending videos before its
+  transaction; provider calls never run while database locks are held.
 
   Publication stores exactly the submitted setup. It never fills omitted or
   cleared review fields from the parent tip. It validates the tag, model and
@@ -52,14 +68,18 @@ defmodule Tips.Content do
       explicit blank (`nil`); every other value is compared verbatim,
       including surrounding whitespace, prompt/output indentation and the
       Unicode normalization form. An image description is blank-to-`nil` the
-      same way.
+      same way. That description rule is declared here for #65/#72; `Asset`
+      has no changeset yet, and `media_description_chk` rejects blank
+      descriptions.
     * Media compare by media id, position and description. A staged video's
       upload id is its media id, so it equals the same attached media.
     * Missing fields, a missing base, an absent selection (`nil`) and any
       `:missing_image` or `:image_file` slot make the result `:unknown`,
       whatever else differs. Filenames, slot ids and temporary paths never
-      prove that bytes were saved. An edit that is not `:equivalent` is an
-      actual change.
+      prove that bytes were saved. For a complete, valid edit intent, anything
+      other than `:equivalent` is an actual change; there only an
+      `:image_file` makes the result `:unknown`. A missing field, selection
+      or slot never authorizes a save.
     * Counters, timestamps, versions and moderation state are not editable
       intent.
 
@@ -90,8 +110,12 @@ defmodule Tips.Content do
 
   ### Editing
 
-  `get_edit_form/3` reads the complete base, current attachments,
-  `edit_version` and capability hints in one authorized snapshot. The editor
+  `get_edit_form/3` is a freshly admitted current-author read of undeleted
+  content. It reads the complete base, current attachments, `edit_version`
+  and capability hints in one snapshot. An unconfirmed or fully banned author
+  still reads it, with `capabilities.edit == false`; the edit itself returns
+  the Accounts eligibility error. Another account's or deleted content is
+  `:not_found`. The editor
   keeps that version as its expected version until the author explicitly
   loads a newer one.
 
@@ -190,7 +214,8 @@ defmodule Tips.Content do
   @typedoc """
   One slot of the ordered selection:
 
-    * `{:retained, media_id, description}` keeps a saved attachment (edits).
+    * `{:retained, media_id, description}` keeps a saved attachment (edits
+      only; a new publication rejects it).
     * `{:staged_video, media_id}` selects the author's staged Tips video upload.
     * `{:image_file, slot, image_file, description}` adds a new image/GIF.
     * `{:missing_image, slot}` is a restored image slot awaiting reselection.

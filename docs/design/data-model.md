@@ -424,7 +424,7 @@ These are logical read groups, not fixed statement counts. Include fresh admissi
 | Page | Read groups |
 |---|---|
 | Browse | Live tip summaries and applicable viewer votes/capabilities; no media fetch |
-| Tip page | Tip context plus either ranked page or selected review; lightweight own-review id/capabilities; media and votes only for displayed content |
+| Tip page | Tip context plus either a ranked page or, for `/reviews/:id`, one selected review; lightweight own-review id/capabilities; media and votes only for displayed content |
 | Search | Fused ids, current visible tip summaries, applicable viewer votes/capabilities and matching excerpts; no media fetch |
 | Profile | Current combined or type-filtered contributions page, with projected parent links and type-aware identity |
 | Inbox | Page/target hydration and all unread pairs in one repeatable-read snapshot; one guarded mark-read per connected visit, plus badge read |
@@ -469,7 +469,7 @@ Read the tip by id, including ownership, versions and all visibility markers, th
 
 Apply deletion first. The same function projects profile/inbox parent labels, nested associations, selected-review notices, search hydration and metadata. No raw struct, original title in a redirect, or attachment identifier escapes through an alternate return shape. Hidden/deleted parents do not hide independently visible reviews. New reviews require a live parent; existing reviews retain their own permissions. Previously shared image URLs keep the agreed retention policy; video playback tokens already issued remain valid until they expire, and new authorization follows current visibility, with hidden-content access limited to eligible authors/moderators and no original deleted-content access.
 
-Read `latest_review_at` as `max(created_at)` from `live_reviews` for the tip. A selected-review URL returns tip context and only that authorized review, ignoring review-list filter/sort/page parameters. Show all reviews clears the selected id, reviewer model/environment filters and review page, returning to unfiltered page one with the current/default sort; selected mode has no list controls. Do not also fetch a ranked page or pin an own-review body. A normal page keeps the viewer’s live review at its ranked position with a Your review badge; a lightweight own-review id/capability lookup provides the header link, including access to an authorized hidden own review.
+Read `latest_review_at` as `max(created_at)` from `live_reviews` for the tip. A selected-review URL returns tip context and only that authorized review, ignoring review-list filter/sort/page parameters. Show all reviews opens the tip permalink with reviewer model/environment filters and review page cleared, returning to unfiltered page one with the current/default sort; selected mode has no list controls. Do not also fetch a ranked page or pin an own-review body. A normal page keeps the viewer’s live review at its ranked position with a Your review badge; a lightweight own-review id/capability lookup provides the header link, including access to an authorized hidden own review.
 
 For readable tip context, also return `has_earlier_reviews` from an existence query for a currently visible, nondeleted review with `created_at < tip.edited_at`. Apply the viewer-aware review policy; do not expose an unreadable review’s date or an unavailable tip’s edit metadata. No extra stored column or full review hydration is needed for this note.
 
