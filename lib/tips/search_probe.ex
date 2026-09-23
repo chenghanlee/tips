@@ -342,9 +342,11 @@ defmodule Tips.SearchProbe do
   defp put_if(map, false, _key, _value), do: map
 
   # One monotonic deadline covers pool checkout, connect, send, receive and JSON decode:
-  # Finch's own timeouts each cover one phase. Req's timeouts are set to the same value
-  # only so their defaults never fire first. On expiry the request process is killed, so
-  # no late response is used; a request the provider already accepted cannot be recalled.
+  # Finch's own timeouts each cover one phase. The receive and connect limits match the
+  # deadline so Req's shorter defaults (15 s receive) never cut a 30 s document request;
+  # Finch's default pool wait can only end a request earlier. On expiry the request
+  # process is killed, so no late response is used; a request the provider already
+  # accepted cannot be recalled.
   defp request(provider, opts) do
     {auth?, opts} = Keyword.pop(opts, :auth, false)
     deadline = provider.timeout_ms
@@ -353,7 +355,6 @@ defmodule Tips.SearchProbe do
       [
         base_url: provider.base_url,
         retry: false,
-        pool_timeout: deadline,
         receive_timeout: deadline,
         connect_options: [timeout: deadline]
       ]
