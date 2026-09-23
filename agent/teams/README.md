@@ -86,7 +86,7 @@ Use protected `main`, short-lived `task/<issue>-<slug>` branches and worktrees u
 
 When no team is live, the user or the lead TPM may branch directly in the main checkout and return it to `main` once the PR merges. A PR that changes only documentation needs no local test run; the required CI checks still run on it.
 
-The team TPM runs `agent/teams/task_worktree.py` for every role: the tech lead at assignment, and the developer, tester and lead advances on the tech lead's request. Keep the existing task slug when an issue is renamed. The developer owns its task worktree; tester and tech lead have separate detached review worktrees. No agent edits another's checkout. The helper checks reviewer cleanliness even at the same SHA, checks selected-client configuration before changing HEAD, reuses a matching live session, and stops the old client and verifies descendant exit before advancing a reviewer. `/new`, `/clear` and `cd` inside an already-running client do not reroot its LSP.
+The team TPM runs `agent/teams/task_worktree.py` for every role: the tech lead at assignment, and the developer, tester and lead advances on the tech lead's request. Keep the existing task slug when an issue is renamed. The developer owns its task worktree; tester and tech lead have separate detached review worktrees. No agent edits another's checkout. The helper checks reviewer cleanliness even at the same SHA, checks selected-client configuration before changing HEAD, reuses a matching live session, and advances a running reviewer's clean detached checkout in place. Only an explicit `--start` on a running tester at a new SHA stops the old client and verifies descendant exit before launching a fresh one. `/new`, `/clear` and `cd` inside an already-running client do not reroot its LSP.
 
 Open a draft PR early. Commit cohesive changes and run relevant checks before pushing. Unpushed local commits may be reorganized; published commits are fixed. Never force-push or push implementation directly to main. Repository rules block force pushes on `task/**` while permitting deletion of merged branches. Merge with merge commits; keep strict up-to-date checks and automatic deletion of merged remote heads.
 
@@ -187,23 +187,23 @@ Brief immediately after confirming the launched client; do not wait for project 
 
 ## Review and merge
 
-**One comment per role.** The developer, the tester and the tech lead each keep one PR comment and edit it in place, adding a `## <short SHA> <outcome>` section per reviewed head, newest last. A handoff links that comment and names the SHA. No new comment per round.
+**One comment per role.** The developer, the tester and the tech lead each keep one PR comment and edit it in place, adding a `## <short SHA> <outcome>` round per reviewed head, newest last, with `###` headings inside a round. A handoff links that comment and names the SHA. No new comment per round.
 
 **Tester:** Review the first pushed head in full, then each repair delta, first for local correctness, then callers and related features/tests, then end-to-end behavior. Map acceptance to named tests; trust CI only for commands it ran. Independently run missing relevant checks using the assigned environment. Add the verdict and evidence to the tester comment and send its link and reviewed SHA to the tech lead. Send actionable findings to the developer too; a passing verdict needs no developer acknowledgment. Repairs receive another verdict. Required acceptance failures block completion regardless of severity.
 
-**Tech lead:** After the tester passes the last repair, run `gh pr update-branch "$PR"` and take the resulting head. Read the whole diff of that integrated head against `main` and run the full check suite once on it. Write the review record in the lead comment with these five `##` headings, spelled exactly, each with substance:
+**Tech lead:** After the tester passes the last repair, run `gh pr update-branch "$PR"` and take the resulting head. Read the whole diff of that integrated head against `main` and run the full check suite once on it. Write the review record as the `## <short SHA>` round for that head in the lead comment, with these five `###` headings, spelled exactly, each with substance:
 
-1. `## Local correctness` — the changed functions and modules on their own.
-2. `## Downstream effects` — callers, related modules, features and tests the change touches.
-3. `## Whole-project fit` — the change against the project's design, architecture and end-to-end behavior.
-4. `## Design challenge` — the chosen implementation questioned against concrete alternatives, with tradeoffs and the assumptions it rests on.
-5. `## Defect pass` — a stricter hunt for implementation defects than the per-commit reviews, on the integrated diff.
+1. `### Local correctness` — the changed functions and modules on their own.
+2. `### Downstream effects` — callers, related modules, features and tests the change touches.
+3. `### Whole-project fit` — the change against the project's design, architecture and end-to-end behavior.
+4. `### Design challenge` — the chosen implementation questioned against concrete alternatives, with tradeoffs and the assumptions it rests on.
+5. `### Defect pass` — a stricter hunt for implementation defects than the per-commit reviews, on the integrated diff.
 
 Resolve technical disagreement using evidence; escalate material product changes through the TPM. A rejected design creates new commits that the tester reviews again.
 
 P0 means critical exposure, irreversible loss or fundamental inability to operate. P1 means broken required behavior, authorization/consistency defects or missing evidence needed to integrate safely. P2/P3 are lower-impact defects or improvements; record follow-up issues when deferred. Do not downgrade findings merely to pass. Repeated failed repairs require root-cause analysis rather than more blind attempts.
 
-The record also names reviewer/implementer, base/head SHAs, commit verdicts, independently run checks, unresolved findings and follow-ups. Then the tech lead publishes `tips/independent-review` on that exact head through the script, which refuses when a heading is missing or empty, or when the PR head has moved:
+The record also names reviewer/implementer, base/head SHAs, commit verdicts, independently run checks, unresolved findings and follow-ups. Then the tech lead publishes `tips/independent-review` on that exact head through the script, which reads only the round whose `##` heading starts with that SHA and refuses when that round is missing or duplicated, when a heading in it is missing or empty, or when the PR head has moved:
 
 ```bash
 agent/teams/publish_review.py --pr "$PR" --sha "$REVIEWED_SHA" --record "$RECORD_COMMENT_URL"
