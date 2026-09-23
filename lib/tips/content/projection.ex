@@ -5,7 +5,9 @@ defmodule Tips.Content.Projection do
   Content reads load current rows, then call one of these functions before
   returning anything. Each function asks `Tips.Content.Visibility` first and
   builds its output from an explicit field list. Raw schemas, preloaded
-  associations, report data and provider identifiers never pass through.
+  associations, report data, Stream uids and playback tokens never pass
+  through. The only storage reference returned is a readable image's R2 object
+  key; see `t:media_item/0`.
 
   ## Assumptions
 
@@ -77,7 +79,14 @@ defmodule Tips.Content.Projection do
   @typedoc "The viewer's stored vote: Helpful (`1`), Not helpful (`-1`) or none."
   @type vote :: -1 | 1 | nil
 
-  @typedoc "Display hints for a viewer's controls on one tip or review."
+  @typedoc """
+  Whether each action may execute now for this viewer. These are display
+  hints; every operation rechecks its own eligibility.
+
+  `false` is not an instruction to hide a sign-in entry point. An anonymous
+  (`nil`) scope gets all `false`, yet pages still render the signed-out
+  Helpful/Not helpful/Report variants that lead to sign-in.
+  """
   @type capabilities :: %{vote: boolean(), edit: boolean(), delete: boolean(), report: boolean()}
 
   @typedoc "Tip capabilities, plus whether the viewer may write a new review."
@@ -251,7 +260,8 @@ defmodule Tips.Content.Projection do
     * `:labels` - see `t:labels/0`.
     * `:viewer_vote` - the scope's stored vote on this row; `nil` when anonymous.
     * `:media` - current `media` rows for this row; `media/3` filters them.
-    * `:own_review` - the scope's undeleted review of this tip, or `nil`.
+    * `:own_review` - the scope's undeleted review of this tip, or `nil`. Any
+      other row raises `ArgumentError`.
     * `:latest_review_at` - `max(created_at)` of this tip's live reviews.
     * `:has_earlier_reviews` - whether a review readable by this viewer predates `edited_at`.
     * `:parent` - the review's current parent tip row.
@@ -260,7 +270,7 @@ defmodule Tips.Content.Projection do
           optional(:author) => User.t(),
           optional(:labels) => labels(),
           optional(:viewer_vote) => vote(),
-          optional(:media) => [Asset.t()],
+          optional(:media) => [asset_row()],
           optional(:own_review) => review_row() | nil,
           optional(:latest_review_at) => DateTime.t() | nil,
           optional(:has_earlier_reviews) => boolean(),
@@ -276,6 +286,7 @@ defmodule Tips.Content.Projection do
   @typep scope :: Scope.t() | nil
   @typep tip_row :: %Tip{}
   @typep review_row :: %Review{}
+  @typep asset_row :: %Asset{}
 
   @doc """
   Projects a tip's title and slug for page titles, slug redirects, social
@@ -323,7 +334,7 @@ defmodule Tips.Content.Projection do
           down_count: tip.down_count,
           latest_review_at: Map.fetch!(hydration, :latest_review_at),
           has_earlier_reviews: Map.fetch!(hydration, :has_earlier_reviews),
-          capabilities: tip_capabilities(scope, tip, Map.fetch!(hydration, :own_review)),
+          capabilities: tip_capabilities(scope, tip, own_review!(hydration, scope, tip)),
           media: media(scope, tip, Map.fetch!(hydration, :media))
         })
 
@@ -393,6 +404,8 @@ defmodule Tips.Content.Projection do
   Projects the viewer's own undeleted review for the tip page header link.
 
   Pass the row from the own-review lookup, or `nil` when there is none.
+  Passing a row without a signed-in scope, or another user's row, raises
+  `FunctionClauseError`: it is a caller bug, not an unavailable review.
   """
   @spec own_review(scope(), review_row() | nil) :: own_review() | nil
   def own_review(_scope, nil), do: nil
@@ -419,7 +432,7 @@ defmodule Tips.Content.Projection do
   other-parent, staged and unready video rows, in position order. Draft and
   staged previews are the media consumer's own authorized read.
   """
-  @spec media(scope(), tip_row() | review_row(), [Asset.t()]) :: [media_item()]
+  @spec media(scope(), tip_row() | review_row(), [asset_row()]) :: [media_item()]
   def media(scope, parent, assets) when is_list(assets) do
     case Visibility.decision(scope, parent) do
       :visible ->
@@ -479,7 +492,7 @@ defmodule Tips.Content.Projection do
       vote: contribute? and live?,
       edit: contribute? and own? and undeleted?,
       delete: own? and undeleted? and eligible?(scope, :delete_own_content),
-      report: contribute? and live? and not own?
+      report: contribute? and live?
     }
   end
 
@@ -508,6 +521,21 @@ defmodule Tips.Content.Projection do
     case Map.fetch!(hydration, :parent) do
       %Tip{id: ^tip_id} = parent -> parent
       %Tip{} -> raise ArgumentError, "parent hydration is not this review's tip"
+    end
+  end
+
+  defp own_review!(hydration, scope, %Tip{id: tip_id}) do
+    case {Map.fetch!(hydration, :own_review), scope} do
+      {nil, _scope} ->
+        nil
+
+      {%Review{tip_id: ^tip_id, user_id: user_id, deleted_at: nil} = review,
+       %Scope{user: %User{id: user_id}}} ->
+        review
+
+      {%Review{}, _scope} ->
+        raise ArgumentError,
+              "own_review hydration is not this viewer's undeleted review of this tip"
     end
   end
 

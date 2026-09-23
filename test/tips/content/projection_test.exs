@@ -249,7 +249,7 @@ defmodule Tips.Content.ProjectionTest do
       assert keys(detail.capabilities) == ~w(delete edit report review vote)a
       assert keys(review_view.capabilities) == ~w(delete edit report vote)a
       assert keys(own_review) == ~w(capabilities id removed)a
-      assert own_review.capabilities == %{vote: true, edit: true, delete: true, report: false}
+      assert own_review.capabilities == %{vote: true, edit: true, delete: true, report: true}
       assert [image, video] = detail.media
       assert keys(image) == ~w(animated description id kind object_key position)a
       assert keys(video) == ~w(duration_s id kind position thumbnail_path watch_path)a
@@ -306,15 +306,148 @@ defmodule Tips.Content.ProjectionTest do
     end
   end
 
+  describe "capabilities" do
+    # {vote, edit, delete, report} for a visible row, or the row's unavailable state.
+    # Owner rows are keyed by the owner's account state.
+    @capabilities %{
+      {:confirmed, :live} => {true, true, true, true},
+      {:confirmed, :hidden} => {false, true, true, false},
+      {:unconfirmed, :live} => {false, false, true, false},
+      {:unconfirmed, :hidden} => {false, false, true, false},
+      {:banned, :live} => {false, false, true, false},
+      {:banned, :hidden} => {false, false, true, false},
+      {:reader, :live} => {true, false, false, true},
+      {:reader, :hidden} => :removed,
+      {:anonymous, :live} => {false, false, false, false},
+      {:anonymous, :hidden} => :removed,
+      {:moderator, :live} => {true, false, false, true},
+      {:moderator, :hidden} => {false, false, false, false}
+    }
+
+    test "capability hints follow eligibility, ownership and visibility in every projection" do
+      reader = Scope.for_user(user_fixture())
+      moderator = Scope.for_user(moderator!(user_fixture()))
+
+      owners = [
+        confirmed: user_fixture(),
+        unconfirmed: unconfirmed_user_fixture(),
+        banned: full_ban!(user_fixture())
+      ]
+
+      for {owner_state, owner} <- owners,
+          marker <- [:live, :hidden, :deleted],
+          {viewer, scope} <- [
+            owner: Scope.for_user(owner),
+            reader: reader,
+            anonymous: nil,
+            moderator: moderator
+          ] do
+        tip = owner |> tip_fixture() |> put_marker!(marker)
+
+        review =
+          tip_fixture() |> review_fixture(%{user_id: owner.id}) |> put_marker!(marker)
+
+        parent = Repo.get!(Tip, review.tip_id)
+        key = if viewer == :owner, do: owner_state, else: viewer
+
+        expected =
+          if marker == :deleted, do: :deleted, else: Map.fetch!(@capabilities, {key, marker})
+
+        label = {owner_state, marker, viewer}
+
+        review_caps = review_capabilities(scope, parent, review, owner)
+        assert {label, expected} == {label, review_caps}
+
+        tip_caps = tip_capabilities(scope, tip, owner, nil)
+        assert {label, expected_tip(expected, true)} == {label, tip_caps}
+
+        if viewer == :owner do
+          own = Projection.own_review(scope, review)
+
+          own_caps =
+            if own, do: capability_tuple(own.capabilities), else: expected
+
+          assert {label, expected} == {label, own_caps}
+        end
+      end
+    end
+
+    test "tip review capability requires a live tip, eligibility and no undeleted own review" do
+      author = user_fixture()
+      tip = tip_fixture(author)
+      viewer = user_fixture()
+      scope = Scope.for_user(viewer)
+      own_review = review_fixture(tip, %{user_id: viewer.id})
+
+      assert %{capabilities: %{review: true}} =
+               Projection.tip(scope, tip, tip_hydration(author, []))
+
+      assert %{capabilities: %{review: false}} =
+               Projection.tip(scope, tip, %{tip_hydration(author, []) | own_review: own_review})
+
+      assert %{capabilities: %{review: false}} =
+               Projection.tip(nil, tip, tip_hydration(author, []))
+
+      other_tip_review = review_fixture(tip_fixture(), %{user_id: viewer.id})
+
+      for {bad_scope, bad_row} <- [
+            {Scope.for_user(author), own_review},
+            {nil, own_review},
+            {scope, other_tip_review},
+            {scope, put_marker!(own_review, :deleted)}
+          ] do
+        assert_raise ArgumentError, fn ->
+          Projection.tip(bad_scope, tip, %{tip_hydration(author, []) | own_review: bad_row})
+        end
+      end
+
+      assert %{capabilities: %{review: false}} =
+               Projection.tip(
+                 Scope.for_user(unconfirmed_user_fixture()),
+                 tip,
+                 tip_hydration(author, [])
+               )
+
+      assert %{capabilities: %{review: false}} =
+               Projection.tip(
+                 Scope.for_user(author),
+                 put_marker!(tip, :hidden),
+                 tip_hydration(author, [])
+               )
+    end
+
+    test "review capabilities survive unavailable parents and agree across entry points" do
+      owner = user_fixture()
+      reader = Scope.for_user(user_fixture())
+
+      for marker <- [:hidden, :deleted],
+          {scope, expected} <- [
+            {Scope.for_user(owner), {true, true, true, true}},
+            {reader, {true, false, false, true}},
+            {nil, {false, false, false, false}}
+          ] do
+        parent = put_marker!(tip_fixture(), marker)
+        review = review_fixture(parent, %{user_id: owner.id})
+
+        assert {marker, expected} ==
+                 {marker, review_capabilities(scope, parent, review, owner)}
+      end
+    end
+  end
+
   describe "media" do
     test "media projection checks current parent visibility and attachment membership", ctx do
       [image, video] = ctx.tip_media
       [review_image] = ctx.review_media
+      # The fixture inserts an attached row before marking cleanup, which clears
+      # its position; a free slot only avoids media_tip_slot during that insert.
       cleanup = cleanup_media_fixture(ctx.tip, %{position: 3})
       staged = staged_video_fixture(ctx.author)
       other_parent = image_fixture(tip_fixture(), %{position: 0})
       unready = %{attached_video_fixture(ctx.tip, %{position: 2}) | state: :processing}
+
       assets = [video, unready, cleanup, staged, other_parent, review_image, image]
+
       viewers = viewers(ctx.author)
 
       expected = [
@@ -361,6 +494,48 @@ defmodule Tips.Content.ProjectionTest do
       refute text =~ "token"
     end
   end
+
+  # Capabilities from the ranked review projection, checked against the selected
+  # destination for the same viewer, or the unavailable state both return.
+  defp review_capabilities(scope, parent, review, author) do
+    hydration = review_hydration(parent, author, [])
+
+    selected =
+      Projection.selected_review(scope, parent, review, %{
+        tip: tip_hydration(Repo.get!(User, parent.user_id), []),
+        review: Map.delete(hydration, :parent)
+      })
+
+    case {Projection.review(scope, review, hydration), selected.review} do
+      {%{state: :visible, capabilities: capabilities} = ranked, {:visible, ranked}} ->
+        capability_tuple(capabilities)
+
+      {%{state: state}, state} ->
+        state
+    end
+  end
+
+  # Tip page capabilities, checked against the summary's shared keys.
+  defp tip_capabilities(scope, tip, author, own_review) do
+    hydration = %{tip_hydration(author, []) | own_review: own_review}
+
+    case {Projection.tip(scope, tip, hydration), Projection.summary(scope, tip, hydration)} do
+      {%{state: :visible, capabilities: capabilities}, %{capabilities: summary}} ->
+        assert Map.delete(capabilities, :review) == summary
+        {capability_tuple(capabilities), capabilities.review}
+
+      {%{state: state}, %{state: state}} ->
+        state
+    end
+  end
+
+  defp capability_tuple(%{vote: vote, edit: edit, delete: delete, report: report}),
+    do: {vote, edit, delete, report}
+
+  defp expected_tip({vote, _edit, _delete, _report} = capabilities, no_own_review?),
+    do: {capabilities, vote and no_own_review?}
+
+  defp expected_tip(state, _no_own_review?), do: state
 
   defp placeholder(:deleted, id),
     do: %{state: :deleted, id: id, title: "Deleted tip", slug: "deleted-tip"}
