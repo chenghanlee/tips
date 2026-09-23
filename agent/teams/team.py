@@ -117,7 +117,8 @@ def execute(
     check: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     """Run a resolved executable without a shell and capture its output."""
-    return subprocess.run(
+    # Reviewed S603: callers pass fixed tool names; command_args resolves argv[0], no shell.
+    return subprocess.run(  # noqa: S603
         command_args(args, path=env.get("PATH", os.defpath) if env is not None else None, cwd=cwd),
         cwd=cwd,
         env=env,

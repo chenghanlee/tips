@@ -1,0 +1,932 @@
+{
+  "mode": "stream",
+  "run_id": "20260923T114819Z-1edd",
+  "assertions": [
+    {
+      "name": "server_authorizer_refuses_invalid_and_over_cap_before_provider",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_length",
+      "evidence": {
+        "inputs": [
+          {
+            "length": "0",
+            "result": "{:error, :invalid_length}"
+          },
+          {
+            "length": "-1",
+            "result": "{:error, :invalid_length}"
+          },
+          {
+            "length": "\"abc\"",
+            "result": "{:error, :invalid_length}"
+          },
+          {
+            "length": "1000000001",
+            "result": "{:error, :invalid_length}"
+          }
+        ],
+        "provider_calls": 0
+      }
+    },
+    {
+      "name": "provider_rejects_invalid_upload_length",
+      "status": "pass",
+      "required": false,
+      "experiment": "stream_length",
+      "evidence": {
+        "responses": [
+          {
+            "status": 400,
+            "body": "{\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10026,\n      \"message\": \"Invalid Upload-Length: The Upload-Length header is missing or invalid. Verify the value is a non-negative integer and try again.\"\n    }\n  ],\n  \"messages\": null\n}\n",
+            "upload_length": "0"
+          },
+          {
+            "status": 400,
+            "body": "{\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10026,\n      \"message\": \"Invalid Upload-Length: The Upload-Length header is missing or invalid. Verify the value is a non-negative integer and try again.\"\n    }\n  ],\n  \"messages\": null\n}\n",
+            "upload_length": "-1"
+          },
+          {
+            "status": 400,
+            "body": "{\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10026,\n      \"message\": \"Invalid Upload-Length: The Upload-Length header is missing or invalid. Verify the value is a non-negative integer and try again.\"\n    }\n  ],\n  \"messages\": null\n}\n",
+            "upload_length": "abc"
+          }
+        ]
+      }
+    },
+    {
+      "name": "reservations_accept_small_200mb_and_1e9_declarations",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_length",
+      "evidence": {
+        "reservations": [
+          {
+            "label": "decl-small",
+            "status": 201,
+            "declared": 140508,
+            "uid_header": true,
+            "head_length": "140508",
+            "head_offset": "0"
+          },
+          {
+            "label": "decl-200mb",
+            "status": 201,
+            "declared": 200000000,
+            "uid_header": true,
+            "head_length": "200000000",
+            "head_offset": "0"
+          },
+          {
+            "label": "decl-1gb",
+            "status": 201,
+            "declared": 1000000000,
+            "uid_header": true,
+            "head_length": "1000000000",
+            "head_offset": "0"
+          }
+        ],
+        "bytes_transferred": 0
+      }
+    },
+    {
+      "name": "provider_rejects_over_cap_declaration",
+      "status": "info",
+      "required": false,
+      "experiment": "stream_length",
+      "evidence": {
+        "status": 201,
+        "uid": "93cbc04d05d1a051c57f46c7d5a90654",
+        "note": "Stream accepted a length above the Tips cap; the cap is the server authorizer's job"
+      }
+    },
+    {
+      "name": "patch_cannot_raise_declared_length",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_length",
+      "evidence": {
+        "patch": {
+          "status": 400,
+          "body": "{\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10032,\n      \"message\": \"Invalid Content-Length: The Content-Length header is missing or invalid. Verify the value is a non-negative integer and try again.\"\n    }\n  ],\n  \"messages\": null\n}\n",
+          "headers": {
+            "cache-control": "private",
+            "cf-cache-status": "DYNAMIC",
+            "cf-ray": "a3f95204cac35df5-HKG",
+            "content-type": "application/json; charset=UTF-8",
+            "date": "Wed, 23 Sep 2026 11:48:27 GMT"
+          }
+        },
+        "patch_status": 400,
+        "head_length_after": "200000000"
+      }
+    },
+    {
+      "name": "patch_beyond_upload_length_rejected",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_length",
+      "evidence": {
+        "sent": 524288,
+        "patch": {
+          "status": 400,
+          "body": "{\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10015,\n      \"message\": \"Chunk size is too small: The chunk size value is too small. Enter a value of at least 5,242,880 bytes and try again.\"\n    }\n  ],\n  \"messages\": [\n    {\n      \"code\": 10015,\n      \"message\": \"Minimum allowed ChunkSize for a non-final chunk is 5242880 bytes\"\n    }\n  ]\n}\n",
+          "headers": {
+            "cache-control": "private",
+            "cf-cache-status": "DYNAMIC",
+            "cf-ray": "a3f9520bf8e45df5-HKG",
+            "content-type": "application/json; charset=UTF-8",
+            "date": "Wed, 23 Sep 2026 11:48:30 GMT"
+          }
+        },
+        "declared": 262144,
+        "head_offset_after": "0"
+      }
+    },
+    {
+      "name": "bytes_after_complete_upload_not_stored",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_length",
+      "evidence": {
+        "extra": {
+          "status": 204,
+          "body": "",
+          "headers": {
+            "cache-control": "private",
+            "cf-cache-status": "DYNAMIC",
+            "cf-ray": "a3f95229a86c5df5-HKG",
+            "date": "Wed, 23 Sep 2026 11:48:33 GMT",
+            "stream-media-id": "1708cf0919f8bacdcb4d90c9c4e84a41",
+            "tus-resumable": "1.0.0",
+            "upload-offset": "262144"
+          }
+        },
+        "first": {
+          "status": 204,
+          "headers": {
+            "cache-control": "private",
+            "cf-cache-status": "DYNAMIC",
+            "cf-ray": "a3f9521e5f6f5df5-HKG",
+            "date": "Wed, 23 Sep 2026 11:48:32 GMT",
+            "stream-media-id": "1708cf0919f8bacdcb4d90c9c4e84a41",
+            "tus-resumable": "1.0.0",
+            "upload-offset": "262144"
+          }
+        },
+        "bytes_transferred": 524288,
+        "head_offset_after": "262144",
+        "video_size": 262144
+      }
+    },
+    {
+      "name": "reservation_metadata_applied",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_private",
+      "evidence": {
+        "fields": [
+          "allowedOrigins",
+          "clippedFrom",
+          "created",
+          "creator",
+          "duration",
+          "input",
+          "maxDurationSeconds",
+          "maxSizeBytes",
+          "meta",
+          "modified",
+          "playback",
+          "preview",
+          "publicDetails",
+          "readyToStream",
+          "readyToStreamAt",
+          "requireSignedURLs",
+          "scheduledDeletion",
+          "size",
+          "status",
+          "thumbnail",
+          "thumbnailTimestampPct",
+          "uid",
+          "uploadExpiry",
+          "uploaded",
+          "watermark"
+        ],
+        "uid_from_stream_media_id": true,
+        "requireSignedURLs": true,
+        "maxDurationSeconds": 180,
+        "uploadExpiry": "2026-09-23T12:48:33Z",
+        "requested_expiry": "2026-09-23T12:48:33Z"
+      }
+    },
+    {
+      "name": "small_fixture_ready_with_trusted_duration",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_private",
+      "evidence": {
+        "last": {
+          "size": 140508,
+          "state": "ready",
+          "modified": "2026-09-23T11:48:38.836773Z",
+          "max_duration": 180,
+          "observed_at": "2026-09-23T11:48:48.966320Z",
+          "err": "",
+          "uploaded": "2026-09-23T11:48:34.065451Z",
+          "created": "2026-09-23T11:48:34.066732Z",
+          "ready": true,
+          "ready_at": "2026-09-23T11:48:38.826116Z",
+          "upload_expiry": "2026-09-23T12:48:33Z",
+          "duration": 10,
+          "require_signed": true
+        }
+      }
+    },
+    {
+      "name": "unsigned_manifest_and_thumbnail_rejected",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_private",
+      "evidence": {
+        "manifest": 401,
+        "thumbnail": 401,
+        "iframe_status_informational": 401,
+        "iframe_headers": {
+          "cache-control": "no-cache, no-store, must-revalidate",
+          "cf-ray": "a3f952935de31c41-HKG",
+          "content-length": "16",
+          "content-type": "text/plain",
+          "date": "Wed, 23 Sep 2026 11:48:49 GMT"
+        }
+      }
+    },
+    {
+      "name": "signed_hls_manifest_and_segment_delivered",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_private",
+      "evidence": {
+        "segment": {
+          "ok": true,
+          "bytes": 33923,
+          "content_type": "video/mp4"
+        },
+        "manifest_status": 200,
+        "manifest_type": "application/vnd.apple.mpegurl"
+      }
+    },
+    {
+      "name": "signed_hls_decodes_video_frames",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_private",
+      "evidence": {
+        "width": 320,
+        "frames": 100,
+        "codec": "h264",
+        "height": 240,
+        "tool": "ffprobe 8.1, first 4 s"
+      }
+    },
+    {
+      "name": "signed_poster_is_jpeg",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_private",
+      "evidence": {
+        "status": 200,
+        "bytes": 7964,
+        "content_type": "image/jpeg"
+      }
+    },
+    {
+      "name": "signed_iframe_returns_player",
+      "status": "info",
+      "required": false,
+      "experiment": "stream_private",
+      "evidence": {
+        "status": 200,
+        "note": "HTTP 200 alone proves neither playback nor privacy",
+        "content_type": "text/html; charset=utf-8"
+      }
+    },
+    {
+      "name": "expired_and_wrong_key_tokens_rejected",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_private",
+      "evidence": {
+        "expired": 401,
+        "wrong_key": 401
+      }
+    },
+    {
+      "name": "over_180s_fixture_rejected_by_max_duration",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_private",
+      "evidence": {
+        "last": {
+          "size": 380037,
+          "state": "error",
+          "modified": "2026-09-23T11:48:39.990949Z",
+          "max_duration": 180,
+          "observed_at": "2026-09-23T11:49:19.752755Z",
+          "err": "ERR_DURATION_EXCEED_CONSTRAINT",
+          "uploaded": "2026-09-23T11:48:35.876035Z",
+          "created": "2026-09-23T11:48:35.877225Z",
+          "ready": false,
+          "ready_at": null,
+          "upload_expiry": "2026-09-23T12:48:35Z",
+          "duration": 0,
+          "require_signed": true
+        },
+        "fixture_seconds": 200
+      }
+    },
+    {
+      "name": "signed_manifest_over_180s_not_playable",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_private",
+      "evidence": {
+        "manifest_status": 424
+      }
+    },
+    {
+      "name": "small_transfer_uploaded_near_reservation_and_completion",
+      "status": "info",
+      "required": false,
+      "experiment": "stream_deadline",
+      "evidence": {
+        "uploaded": "2026-09-23T11:48:34.065451Z",
+        "created": "2026-09-23T11:48:34.066732Z",
+        "ready_at": "2026-09-23T11:48:38.826116Z",
+        "transfer": {
+          "bytes": 140508,
+          "reserve_started": "2026-09-23T11:48:33.722887Z",
+          "reserve_record_at": "2026-09-23T11:48:33.723061Z",
+          "transfer_start": "2026-09-23T11:48:34.229155Z",
+          "transfer_end": "2026-09-23T11:48:35.545804Z",
+          "final_status": 204,
+          "final_headers": {
+            "cache-control": "private",
+            "cf-cache-status": "DYNAMIC",
+            "cf-ray": "a3f952329fcb5df5-HKG",
+            "date": "Wed, 23 Sep 2026 11:48:35 GMT",
+            "stream-media-id": "99149c7a5a72e326c5499003644f7cac",
+            "tus-resumable": "1.0.0",
+            "upload-offset": "140508"
+          }
+        },
+        "delayed_observation": {
+          "size": 140508,
+          "state": "ready",
+          "modified": "2026-09-23T11:48:38.836773Z",
+          "max_duration": 180,
+          "observed_at": "2026-09-23T11:49:20.798772Z",
+          "err": "",
+          "uploaded": "2026-09-23T11:48:34.065451Z",
+          "created": "2026-09-23T11:48:34.066732Z",
+          "ready": true,
+          "ready_at": "2026-09-23T11:48:38.826116Z",
+          "upload_expiry": "2026-09-23T12:48:33Z",
+          "duration": 10,
+          "require_signed": true
+        },
+        "clock_skew_s": -1,
+        "tolerance_s": 6,
+        "uploaded_stable_across_observations": true,
+        "observations": 3
+      }
+    },
+    {
+      "name": "readiness_is_separate_from_completion",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_deadline",
+      "evidence": {
+        "uploaded": "2026-09-23T11:48:34.065451Z",
+        "ready_at": "2026-09-23T11:48:38.826116Z"
+      }
+    },
+    {
+      "name": "pause_resume_does_not_extend_expiry",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_deadline",
+      "evidence": {
+        "before": {
+          "state": "pendingupload",
+          "modified": "2026-09-23T11:49:21.151068Z",
+          "expiry": "2026-09-23T12:49:20Z",
+          "uploaded": "2026-09-23T11:49:21.149624Z",
+          "created": "2026-09-23T11:49:21.151068Z",
+          "head_expires": null
+        },
+        "transfer": {
+          "reserved_request_at": "2026-09-23T11:49:20.811502Z",
+          "first_chunk_sent_at": "2026-09-23T11:49:22.220072Z",
+          "final_chunk_sent_at": "2026-09-23T11:49:44.926672Z",
+          "final_chunk_acknowledged_at": "2026-09-23T11:49:46.528582Z"
+        },
+        "paused": {
+          "state": "pendingupload",
+          "modified": "2026-09-23T11:49:21.151068Z",
+          "expiry": "2026-09-23T12:49:20Z",
+          "uploaded": "2026-09-23T11:49:21.149624Z"
+        },
+        "after_first_chunk": {
+          "offset": "5242880",
+          "state": "pendingupload",
+          "modified": "2026-09-23T11:49:21.151068Z",
+          "expiry": "2026-09-23T12:49:20Z",
+          "uploaded": "2026-09-23T11:49:21.149624Z",
+          "head_expires": null
+        },
+        "after_resume": {
+          "state": "queued",
+          "modified": "2026-09-23T11:49:46.473246Z",
+          "expiry": "2026-09-23T12:49:20Z",
+          "uploaded": "2026-09-23T11:49:21.149624Z",
+          "head_status": 200
+        }
+      }
+    },
+    {
+      "name": "uploaded_is_transfer_completion",
+      "status": "fail",
+      "required": true,
+      "experiment": "stream_deadline",
+      "evidence": {
+        "uploaded": "2026-09-23T11:49:21.149624Z",
+        "created": "2026-09-23T11:49:21.151068Z",
+        "transfer": {
+          "reserved_request_at": "2026-09-23T11:49:20.811502Z",
+          "first_chunk_sent_at": "2026-09-23T11:49:22.220072Z",
+          "final_chunk_sent_at": "2026-09-23T11:49:44.926672Z",
+          "final_chunk_acknowledged_at": "2026-09-23T11:49:46.528582Z"
+        },
+        "uploaded_set_before_any_byte": true,
+        "uploaded_changed_after_completion": false
+      }
+    },
+    {
+      "name": "modified_moves_when_transfer_completes",
+      "status": "info",
+      "required": false,
+      "experiment": "stream_deadline",
+      "evidence": {
+        "note": "modified is a general last-change field; later processing changes it again",
+        "modified_before": "2026-09-23T11:49:21.151068Z",
+        "modified_paused": "2026-09-23T11:49:21.151068Z",
+        "modified_after": "2026-09-23T11:49:46.473246Z",
+        "state_after": "queued"
+      }
+    },
+    {
+      "name": "late_transfers_rejected_after_expiry",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_deadline",
+      "evidence": {
+        "note": "accelerated expiry; does not by itself prove one-hour enforcement",
+        "tried": [
+          {
+            "seconds": 60,
+            "status": 400,
+            "body": "{\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10005,\n      \"message\": \"Bad Request: The request was invalid. Additional details might be available in messages.\"\n    }\n  ],\n  \"messages\": [\n    {\n      \"code\": 10005,\n      \"message\": \"expiry must be more than two minutes in the future.\"\n    }\n  ]\n}\n"
+          },
+          {
+            "seconds": 120,
+            "status": 400,
+            "body": "{\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10005,\n      \"message\": \"Bad Request: The request was invalid. Additional details might be available in messages.\"\n    }\n  ],\n  \"messages\": [\n    {\n      \"code\": 10005,\n      \"message\": \"expiry must be more than two minutes in the future.\"\n    }\n  ]\n}\n"
+          },
+          {
+            "seconds": 130,
+            "status": 201
+          }
+        ],
+        "late_start": {
+          "status": 400,
+          "body": "{\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10017,\n      \"message\": \"Expiration for upload has passed: The upload URL for the video expired. Generate a new upload URL and try again.\"\n    }\n  ],\n  \"messages\": null\n}\n",
+          "headers": {
+            "cache-control": "private",
+            "cf-cache-status": "DYNAMIC",
+            "cf-ray": "a3f957f09c8b5df5-HKG",
+            "content-type": "application/json; charset=UTF-8",
+            "date": "Wed, 23 Sep 2026 11:52:30 GMT"
+          },
+          "video": {
+            "size": 9498369,
+            "state": "pendingupload",
+            "modified": "2026-09-23T11:49:48.931332Z",
+            "max_duration": 180,
+            "observed_at": "2026-09-23T11:52:30.724486Z",
+            "err": "",
+            "uploaded": "2026-09-23T11:49:48.929151Z",
+            "created": "2026-09-23T11:49:48.931332Z",
+            "ready": false,
+            "ready_at": null,
+            "upload_expiry": "2026-09-23T11:51:57Z",
+            "duration": -1,
+            "require_signed": true
+          }
+        },
+        "expiry_seconds": 130,
+        "late_finish_first_chunk": 204,
+        "late_finish_final": {
+          "status": 400,
+          "body": "{\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10017,\n      \"message\": \"Expiration for upload has passed: The upload URL for the video expired. Generate a new upload URL and try again.\"\n    }\n  ],\n  \"messages\": null\n}\n",
+          "headers": {
+            "cache-control": "private",
+            "cf-cache-status": "DYNAMIC",
+            "cf-ray": "a3f957e76cd35df5-HKG",
+            "content-type": "application/json; charset=UTF-8",
+            "date": "Wed, 23 Sep 2026 11:52:29 GMT"
+          }
+        },
+        "late_finish_video": {
+          "size": 9498369,
+          "state": "pendingupload",
+          "modified": "2026-09-23T11:49:48.395059Z",
+          "max_duration": 180,
+          "observed_at": "2026-09-23T11:52:31.005444Z",
+          "err": "",
+          "uploaded": "2026-09-23T11:49:48.393687Z",
+          "created": "2026-09-23T11:49:48.395059Z",
+          "ready": false,
+          "ready_at": null,
+          "upload_expiry": "2026-09-23T11:51:57Z",
+          "duration": -1,
+          "require_signed": true
+        }
+      }
+    },
+    {
+      "name": "one_hour_expiry_enforced",
+      "status": "unproven",
+      "required": true,
+      "experiment": "stream_deadline",
+      "evidence": {
+        "reason": "run `stream-hour` for the full one-hour experiment",
+        "accepted_one_hour_metadata": true
+      }
+    },
+    {
+      "name": "lost_creation_response_not_retried",
+      "status": "pass",
+      "required": true,
+      "experiment": "stream_deadline",
+      "evidence": {
+        "note": "a reservation can exist at the provider with no uid known to the caller",
+        "client_result": "error",
+        "creation_attempts": 1,
+        "provider_records_found_by_name": 1,
+        "provider_state": [
+          {
+            "size": 1048576,
+            "state": "pendingupload",
+            "modified": "2026-09-23T11:52:31.351695Z",
+            "max_duration": 180,
+            "observed_at": "2026-09-23T11:52:36.975373Z",
+            "err": "",
+            "uploaded": "2026-09-23T11:52:31.349614Z",
+            "created": "2026-09-23T11:52:31.351695Z",
+            "ready": false,
+            "ready_at": null,
+            "upload_expiry": "2026-09-23T12:52:31Z",
+            "duration": -1,
+            "require_signed": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "creation_latency_measured",
+      "status": "info",
+      "required": false,
+      "experiment": "stream_deadline",
+      "evidence": {
+        "count": 11,
+        "min_ms": 503,
+        "p50_ms": 582,
+        "max_ms": 668
+      }
+    },
+    {
+      "name": "stream_delete_is_terminal_and_ends_signed_serving",
+      "status": "pass",
+      "required": true,
+      "experiment": "redaction_cleanup",
+      "evidence": {
+        "first_delete": 200,
+        "repeated_delete": {
+          "status": 404,
+          "body": "{\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10003,\n      \"message\": \"Not Found: The requested resource or operation was not found.\"\n    }\n  ],\n  \"messages\": null\n}\n"
+        },
+        "api_get_after": 404,
+        "signed_manifest_after_delete": 404
+      }
+    },
+    {
+      "name": "stream_inline_cleanup",
+      "status": "pass",
+      "required": true,
+      "experiment": "redaction_cleanup",
+      "evidence": {
+        "deleted": [
+          {
+            "label": "decl-small",
+            "delete": 200,
+            "uid": "fcb84c94a749bc15f5d09e73ce2ddbae",
+            "get_after": 404
+          },
+          {
+            "label": "decl-1gb",
+            "delete": 200,
+            "uid": "506826bfc103a44ab254467b14f10f5c",
+            "get_after": 404
+          },
+          {
+            "label": "decl-over-cap",
+            "delete": 200,
+            "uid": "93cbc04d05d1a051c57f46c7d5a90654",
+            "get_after": 404
+          },
+          {
+            "label": "expiry-late-start-130",
+            "delete": 200,
+            "uid": "e146b9d536b55d8e29e0037a1feebe1d",
+            "get_after": 404
+          },
+          {
+            "label": "private-over-180",
+            "delete": 200,
+            "uid": "9d6cd1681a598148ac93b0af71395c61",
+            "get_after": 404
+          },
+          {
+            "label": "pause-resume",
+            "delete": 200,
+            "uid": "a7f9d194de0b7d18d585aaa802eebca7",
+            "get_after": 404
+          },
+          {
+            "label": "overrun-single",
+            "delete": 200,
+            "uid": "471fde4fb2b4f35753caf626f3610821",
+            "get_after": 404
+          },
+          {
+            "label": "overrun-after-complete",
+            "delete": 200,
+            "uid": "1708cf0919f8bacdcb4d90c9c4e84a41",
+            "get_after": 404
+          },
+          {
+            "label": "expiry-late-finish-130",
+            "delete": 200,
+            "uid": "02517f31cb336a509cf63081d23403ff",
+            "get_after": 404
+          },
+          {
+            "label": "lost-response",
+            "delete": 200,
+            "uid": "734de6bf1973fe1f7e61e83eb7146f64",
+            "get_after": 404
+          },
+          {
+            "label": "decl-200mb",
+            "delete": 200,
+            "uid": "109656ee9eb09e292a1f742590301fe6",
+            "get_after": 404
+          }
+        ]
+      }
+    }
+  ],
+  "facts": {
+    ":expiry_window_probe": [
+      {
+        "seconds": 60,
+        "status": 400,
+        "body": "{\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10005,\n      \"message\": \"Bad Request: The request was invalid. Additional details might be available in messages.\"\n    }\n  ],\n  \"messages\": [\n    {\n      \"code\": 10005,\n      \"message\": \"expiry must be more than two minutes in the future.\"\n    }\n  ]\n}\n"
+      },
+      {
+        "seconds": 120,
+        "status": 400,
+        "body": "{\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10005,\n      \"message\": \"Bad Request: The request was invalid. Additional details might be available in messages.\"\n    }\n  ],\n  \"messages\": [\n    {\n      \"code\": 10005,\n      \"message\": \"expiry must be more than two minutes in the future.\"\n    }\n  ]\n}\n"
+      },
+      {
+        "seconds": 130,
+        "status": 201
+      }
+    ],
+    ":inline_cleanup": [
+      {
+        "label": "decl-small",
+        "delete": 200,
+        "uid": "fcb84c94a749bc15f5d09e73ce2ddbae",
+        "get_after": 404
+      },
+      {
+        "label": "decl-1gb",
+        "delete": 200,
+        "uid": "506826bfc103a44ab254467b14f10f5c",
+        "get_after": 404
+      },
+      {
+        "label": "decl-over-cap",
+        "delete": 200,
+        "uid": "93cbc04d05d1a051c57f46c7d5a90654",
+        "get_after": 404
+      },
+      {
+        "label": "expiry-late-start-130",
+        "delete": 200,
+        "uid": "e146b9d536b55d8e29e0037a1feebe1d",
+        "get_after": 404
+      },
+      {
+        "label": "private-over-180",
+        "delete": 200,
+        "uid": "9d6cd1681a598148ac93b0af71395c61",
+        "get_after": 404
+      },
+      {
+        "label": "pause-resume",
+        "delete": 200,
+        "uid": "a7f9d194de0b7d18d585aaa802eebca7",
+        "get_after": 404
+      },
+      {
+        "label": "overrun-single",
+        "delete": 200,
+        "uid": "471fde4fb2b4f35753caf626f3610821",
+        "get_after": 404
+      },
+      {
+        "label": "overrun-after-complete",
+        "delete": 200,
+        "uid": "1708cf0919f8bacdcb4d90c9c4e84a41",
+        "get_after": 404
+      },
+      {
+        "label": "expiry-late-finish-130",
+        "delete": 200,
+        "uid": "02517f31cb336a509cf63081d23403ff",
+        "get_after": 404
+      },
+      {
+        "label": "lost-response",
+        "delete": 200,
+        "uid": "734de6bf1973fe1f7e61e83eb7146f64",
+        "get_after": 404
+      },
+      {
+        "label": "decl-200mb",
+        "delete": 200,
+        "uid": "109656ee9eb09e292a1f742590301fe6",
+        "get_after": 404
+      }
+    ],
+    ":long_observations": [
+      {
+        "size": 380037,
+        "state": "error",
+        "modified": "2026-09-23T11:48:39.990949Z",
+        "max_duration": 180,
+        "observed_at": "2026-09-23T11:49:19.752755Z",
+        "err": "ERR_DURATION_EXCEED_CONSTRAINT",
+        "uploaded": "2026-09-23T11:48:35.876035Z",
+        "created": "2026-09-23T11:48:35.877225Z",
+        "ready": false,
+        "ready_at": null,
+        "upload_expiry": "2026-09-23T12:48:35Z",
+        "duration": 0,
+        "require_signed": true
+      }
+    ],
+    ":signing_key_present": true,
+    ":small_observations": [
+      {
+        "size": 140508,
+        "state": "queued",
+        "modified": "2026-09-23T11:48:36.903074Z",
+        "max_duration": 180,
+        "observed_at": "2026-09-23T11:48:38.427402Z",
+        "err": "",
+        "uploaded": "2026-09-23T11:48:34.065451Z",
+        "created": "2026-09-23T11:48:34.066732Z",
+        "ready": false,
+        "ready_at": null,
+        "upload_expiry": "2026-09-23T12:48:33Z",
+        "duration": 10,
+        "require_signed": true
+      },
+      {
+        "size": 140508,
+        "state": "inprogress",
+        "modified": "2026-09-23T11:48:38.836773Z",
+        "max_duration": 180,
+        "observed_at": "2026-09-23T11:48:43.700546Z",
+        "err": "",
+        "uploaded": "2026-09-23T11:48:34.065451Z",
+        "created": "2026-09-23T11:48:34.066732Z",
+        "ready": false,
+        "ready_at": null,
+        "upload_expiry": "2026-09-23T12:48:33Z",
+        "duration": 10,
+        "require_signed": true
+      },
+      {
+        "size": 140508,
+        "state": "ready",
+        "modified": "2026-09-23T11:48:38.836773Z",
+        "max_duration": 180,
+        "observed_at": "2026-09-23T11:48:48.966320Z",
+        "err": "",
+        "uploaded": "2026-09-23T11:48:34.065451Z",
+        "created": "2026-09-23T11:48:34.066732Z",
+        "ready": true,
+        "ready_at": "2026-09-23T11:48:38.826116Z",
+        "upload_expiry": "2026-09-23T12:48:33Z",
+        "duration": 10,
+        "require_signed": true
+      }
+    ],
+    ":video_fixtures": {
+      "over-180s.mp4": {
+        "bytes": 380037,
+        "sha256": "ad847d22763ec5bc5d75f8659418057444a6be88f77da115b10d76a2f19f0ab7",
+        "recipe": "ffmpeg -f lavfi -i testsrc=size=160x120:rate=5:duration=200 -c:v libx264 -pix_fmt yuv420p -preset veryfast -movflags +faststart"
+      },
+      "small.mp4": {
+        "bytes": 140508,
+        "sha256": "3cdd8d751087078ff0d33735a9eb0d7b13881cf73ede01ff1c6129b20cf07ed5",
+        "recipe": "ffmpeg -f lavfi -i testsrc=size=320x240:rate=25:duration=10 -f lavfi -i sine=frequency=440:duration=10 -c:v libx264 -pix_fmt yuv420p -preset veryfast -c:a aac -shortest -movflags +faststart"
+      },
+      "two-chunk.mp4": {
+        "bytes": 9498369,
+        "sha256": "9283524751ddb3d4aa870a8015f7b21b011fd7c447fcd8d434fdeedc13d632e9",
+        "recipe": "ffmpeg -f lavfi -i testsrc2=size=1280x720:rate=30:duration=12 -c:v libx264 -pix_fmt yuv420p -preset veryfast -b:v 6M -maxrate 6M -bufsize 12M -movflags +faststart"
+      }
+    },
+    "{:transfer, \"private-over-180\"}": {
+      "bytes": 380037,
+      "reserve_started": "2026-09-23T11:48:35.545835Z",
+      "reserve_record_at": "2026-09-23T11:48:35.546241Z",
+      "transfer_start": "2026-09-23T11:48:36.108606Z",
+      "transfer_end": "2026-09-23T11:48:37.891320Z",
+      "final_status": 204,
+      "final_headers": {
+        "cache-control": "private",
+        "cf-cache-status": "DYNAMIC",
+        "cf-ray": "a3f9523e5a565df5-HKG",
+        "date": "Wed, 23 Sep 2026 11:48:37 GMT",
+        "stream-media-id": "9d6cd1681a598148ac93b0af71395c61",
+        "tus-resumable": "1.0.0",
+        "upload-offset": "380037"
+      }
+    },
+    "{:transfer, \"private-small\"}": {
+      "bytes": 140508,
+      "reserve_started": "2026-09-23T11:48:33.722887Z",
+      "reserve_record_at": "2026-09-23T11:48:33.723061Z",
+      "transfer_start": "2026-09-23T11:48:34.229155Z",
+      "transfer_end": "2026-09-23T11:48:35.545804Z",
+      "final_status": 204,
+      "final_headers": {
+        "cache-control": "private",
+        "cf-cache-status": "DYNAMIC",
+        "cf-ray": "a3f952329fcb5df5-HKG",
+        "date": "Wed, 23 Sep 2026 11:48:35 GMT",
+        "stream-media-id": "99149c7a5a72e326c5499003644f7cac",
+        "tus-resumable": "1.0.0",
+        "upload-offset": "140508"
+      }
+    }
+  },
+  "issue": 61,
+  "git_sha": "72c393c697732825bfafa2363be1a9690c500738",
+  "git_tracked_changes": 0,
+  "finished_at": "2026-09-23T11:52:50.594055Z",
+  "versions": {
+    "otp": "29",
+    "elixir": "1.20.4",
+    "req": "0.7.4",
+    "jose": "1.11.12",
+    "tus": "1.0.0",
+    "stream_api": "client/v4 (unversioned)"
+  },
+  "bounds": {
+    "max_calls": 400,
+    "provider_calls": 91,
+    "concurrency": 1,
+    "retries": 0,
+    "receive_timeout_ms": 30000,
+    "connect_timeout_ms": 10000
+  },
+  "verdict": "fail"
+}
