@@ -22,6 +22,7 @@ from team import (
     execute,
     load_config,
     parse_herdr,
+    require_git_admin,
     stop_agent,
 )
 
@@ -128,6 +129,7 @@ class WorktreeTask:
         self.root = Path(git("rev-parse", "--path-format=absolute", "--git-common-dir")).parent
         if Path.cwd() != self.root:
             raise RefusalError(f"Run from the main checkout: {self.root}")
+        require_git_admin(self.root / ".git", f"team-{self.args.team}-tpm")
         self.config_path = Path(
             os.environ.get("TIPS_TEAM_CONFIG", str(self.root / "agent/teams/config.toml"))
         ).resolve()
