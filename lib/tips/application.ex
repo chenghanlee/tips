@@ -13,6 +13,7 @@ defmodule Tips.Application do
       {Oban, Application.fetch_env!(:tips, Oban)},
       {DNSCluster, query: Application.get_env(:tips, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Tips.PubSub},
+      {Tips.AdmissionLimiter, Application.fetch_env!(:tips, Tips.AdmissionLimiter)},
       # Start a worker by calling: Tips.Worker.start_link(arg)
       # {Tips.Worker, arg},
       # Start to serve requests, typically the last entry
