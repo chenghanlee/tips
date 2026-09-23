@@ -143,11 +143,11 @@ defmodule Tips.Content.ProjectionTest do
 
   describe "selected review destinations" do
     test "unknown and wrong-parent reviews share the generic unavailable result", ctx do
-      other_tip = tip_fixture()
-
+      # The same reviewer wrote every other-tip review, so even its author and
+      # moderators must not learn anything from a wrong-parent id.
       other_reviews =
         for marker <- markers() do
-          other_tip
+          tip_fixture()
           |> review_fixture(%{user_id: ctx.reviewer.id, body: "#{@sentinel} other review"})
           |> put_marker!(marker)
         end
@@ -155,7 +155,7 @@ defmodule Tips.Content.ProjectionTest do
       for {viewer, scope} <- viewers(ctx.reviewer) do
         hydration = %{
           tip: tip_hydration(ctx.author, ctx.tip_media),
-          review: review_hydration(other_tip, ctx.reviewer, [])
+          review: review_hydration(ctx.tip, ctx.reviewer, [])
         }
 
         unknown = Projection.selected_review(scope, ctx.tip, nil, hydration)
@@ -300,7 +300,7 @@ defmodule Tips.Content.ProjectionTest do
 
       text = inspect(outputs, limit: :infinity, printable_limit: :infinity)
 
-      for private <- [detail, reporter.handle, "harmful", "spam", "reason", "flag", "report:"] do
+      for private <- [detail, reporter.handle, "harmful", "spam", "reason", "flag", "reports:"] do
         refute text =~ private
       end
     end
@@ -310,7 +310,7 @@ defmodule Tips.Content.ProjectionTest do
     test "media projection checks current parent visibility and attachment membership", ctx do
       [image, video] = ctx.tip_media
       [review_image] = ctx.review_media
-      cleanup = cleanup_media_fixture(ctx.tip)
+      cleanup = cleanup_media_fixture(ctx.tip, %{position: 3})
       staged = staged_video_fixture(ctx.author)
       other_parent = image_fixture(tip_fixture(), %{position: 0})
       unready = %{attached_video_fixture(ctx.tip, %{position: 2}) | state: :processing}
