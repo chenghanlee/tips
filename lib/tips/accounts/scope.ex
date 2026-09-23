@@ -1,30 +1,32 @@
 defmodule Tips.Accounts.Scope do
   @moduledoc """
-  Defines the scope of the caller to be used throughout the app.
+  The caller's current account identity, built by the server.
 
-  The `Tips.Accounts.Scope` allows public interfaces to receive
-  information about the caller, such as if the call is initiated from an
-  end-user, and if so, which user. Additionally, such a scope can carry fields
-  such as "super user" or other privileges for use in authorization checks,
-  or to ensure specific code paths can only be accessed for a given scope.
+  `TipsWeb.UserAuth` builds a scope from the server-side session with
+  `for_user/1`. Anonymous callers have a `nil` scope. A scope carries current
+  account identity and state, not permission grants, bearer tokens or session
+  row references. Operations check eligibility with
+  `Tips.Accounts.check_eligibility/2` on the locked account row.
 
-  It is useful for logging as well as for scoping pubsub subscriptions and
-  broadcasts when a caller subscribes to an interface or performs a particular
-  action.
-
-  Feel free to extend the fields on this struct to fit the needs of
-  growing application requirements.
+  Never build a scope from request params, LiveView events or job args, and
+  never render or serialize it. See the "Admission contract" section of
+  `Tips.Accounts`.
   """
 
   alias Tips.Accounts.User
 
-  defstruct user: nil
+  @enforce_keys [:user]
+  defstruct [:user]
+
+  @type t :: %__MODULE__{user: User.t()}
 
   @doc """
   Creates a scope for the given user.
 
   Returns nil if no user is given.
   """
+  @spec for_user(User.t()) :: t()
+  @spec for_user(nil) :: nil
   def for_user(%User{} = user) do
     %__MODULE__{user: user}
   end
