@@ -216,6 +216,40 @@ defmodule Tips.SearchProbeTest do
     assert generated >= started
   end
 
+  test "the v2 selector loads the frozen gate from disk", %{v2: v2, tmp_dir: tmp_dir} do
+    output = Path.join(tmp_dir, "report.json")
+    plug = stub_provider(v2, fn _conn, _body -> :pass end)
+
+    # No `fixtures:` override: `--gate v2` reads gate-v2.json through the real CLI path.
+    assert {0, printed} =
+             main(["--real", "--gate", "v2", "--output", output],
+               mode: :real,
+               api_key: @secret,
+               req_options: [plug: plug]
+             )
+
+    assert printed =~ "passed"
+    report = output |> File.read!() |> Jason.decode!()
+
+    assert %{"fixtures" => %{"gate_version" => "234-gate-v2", "hashes" => hashes}} = report
+    assert hashes == v2.hashes
+    assert %{"requests" => 77, "token_bound" => 249_250} = report["preflight"]["plan"]
+    assert report["usage"]["requests"] == 77
+
+    phases = Enum.map(report["requests"], & &1["phase"])
+
+    assert Enum.frequencies(phases) == %{
+             "endpoints" => 1,
+             "key" => 1,
+             "document" => 40,
+             "document_full" => 5,
+             "query" => 30
+           }
+
+    assert Enum.dedup(phases) == ~w(endpoints key document document_full query)
+    refute File.read!(output) =~ @secret
+  end
+
   test "v2 stops after the first provider error", %{v2: v2, tmp_dir: tmp_dir} do
     # A dimensions 400 stops the run; v1 retried without the parameter.
     plug = stub_provider(v2, fn _conn, _body -> :pass end, dimensions: :reject)
