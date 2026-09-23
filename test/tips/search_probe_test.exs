@@ -176,7 +176,7 @@ defmodule Tips.SearchProbeTest do
     embeddings = Enum.filter(bodies, &match?({"POST", "/api/v1/embeddings", _}, &1))
     assert length(embeddings) == length(eligible) + length(long) + 30
     assert report["usage"]["requests"] == length(bodies)
-    assert report["plan"]["requests"] >= length(bodies)
+    assert report["preflight"]["plan"]["requests"] >= length(bodies)
   end
 
   test "default invocation never calls a real provider", %{fixtures: fixtures, tmp_dir: tmp_dir} do
