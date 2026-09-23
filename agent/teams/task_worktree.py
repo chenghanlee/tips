@@ -418,13 +418,9 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
             )
         if not self.review_sha or self.review_sha == self.old_head:
             return self.reuse_running(self.owner)
-        if self.role_name == "lead":
+        if self.role_name == "lead" or not self.args.start:
             return self.advance_in_place()
-        if not self.args.start:
-            raise RefusalError(
-                "A reviewer is running; use --start to stop it safely "
-                "before advancing its revision."
-            )
+        # An explicit --start on a running tester replaces it with a fresh session.
         stop_agent(self.args.pane, str(self.worktree))
         # A final save during shutdown must block checkout advancement.
         if git("-C", self.worktree, "status", "--porcelain", "--untracked-files=all"):
@@ -444,13 +440,13 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
         return True
 
     def advance_in_place(self) -> bool:
-        """The lead stays through the issue; move its clean detached checkout to the new SHA."""
+        """A reviewer stays through the issue; move its clean detached checkout to the new SHA."""
         if self.owner is not None and self.owner.get("agent_status") in ("blocked", "unknown"):
             raise RefusalError(
-                f"Lead session is {self.owner.get('agent_status')}; inspect its pane."
+                f"Reviewer session is {self.owner.get('agent_status')}; inspect its pane."
             )
         if not self.review_sha:
-            raise RefusalError("A running lead advances only to an explicit --review-ref.")
+            raise RefusalError("A running reviewer advances only to an explicit --review-ref.")
         git("-C", self.worktree, "checkout", "--detach", "--no-overwrite-ignore", self.review_sha)
         print(f"Advanced {self.agent_name} in place: {self.worktree} at {self.review_sha}")
         return True

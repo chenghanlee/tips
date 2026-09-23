@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Publish the tips/independent-review status only for a complete tech-lead review record."""
+"""Publish the tips/independent-review status only for a complete tech-lead review record.
+
+The record is the tech lead's rolling PR comment; the round headed `## <sha prefix> ...` for the
+reviewed head must carry all five `###` sections with text.
+"""
 
 import argparse
 import json
@@ -33,6 +37,20 @@ def missing_sections(record: str) -> list[str]:
         if not bodies.get(section.lower()):
             missing.append(section)
     return missing
+
+
+def review_round(record: str, sha: str) -> str:
+    """The body of the one `## <sha prefix> ...` round in a rolling comment that names this head."""
+    parts = re.split(r"^##[ \t]+(.+?)[ \t]*$", record, flags=re.MULTILINE)
+    rounds = [(parts[i].split()[0].lower(), parts[i + 1]) for i in range(1, len(parts) - 1, 2)]
+    matches = [
+        body
+        for prefix, body in rounds
+        if re.fullmatch(r"[0-9a-f]{7,40}", prefix) and sha.startswith(prefix)
+    ]
+    if len(matches) != 1:
+        raise RefusalError(f"Record needs exactly one '## {sha[:7]}…' round for the reviewed head.")
+    return matches[0]
 
 
 def comment_api_path(url: str) -> str:
@@ -104,7 +122,7 @@ def main() -> None:
     if args.record:
         path = comment_api_path(args.record)
         record = json.loads(gh("api", path))["body"]
-        missing = missing_sections(record)
+        missing = missing_sections(review_round(record, args.sha))
         if missing:
             raise RefusalError("Review record is missing sections: " + ", ".join(missing))
         repo, url = verified_pr(args.pr, args.sha)

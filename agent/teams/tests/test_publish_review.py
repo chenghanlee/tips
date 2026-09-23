@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from publish_review import SECTIONS, RefusalError, comment_api_path, missing_sections
+from publish_review import SECTIONS, RefusalError, comment_api_path, missing_sections, review_round
 from team import execute
 
 SCRIPT = Path(__file__).resolve().parents[1] / "publish_review.py"
@@ -28,8 +28,10 @@ elif a[:2] == ["pr", "comment"]:
 """
 
 
-def record(*present: str) -> str:
-    return "\n".join(f"## {name}\n\nchecked.\n" for name in present)
+def record(*present: str, sha: str = "a" * 40, outcome: str = "PASS") -> str:
+    """One `## <sha> <outcome>` round of a rolling review comment with the given `###` sections."""
+    body = "\n".join(f"### {name}\n\nchecked.\n" for name in present)
+    return f"## {sha[:7]} {outcome}\n\n{body}"
 
 
 class RecordValidationTest(unittest.TestCase):
@@ -39,6 +41,17 @@ class RecordValidationTest(unittest.TestCase):
     def test_missing_and_empty_sections_are_named(self) -> None:
         body = record(*SECTIONS[:3]) + "\n## Design challenge\n\n## Defect pass\n\nran mix test.\n"
         assert missing_sections(body) == ["Design challenge"]
+
+    def test_round_for_head_is_selected_by_sha_prefix(self) -> None:
+        body = record(*SECTIONS, sha="a" * 40) + "\n" + record(*SECTIONS[:4], sha="b" * 40)
+        assert missing_sections(review_round(body, "a" * 40)) == []
+        assert missing_sections(review_round(body, "b" * 40)) == ["Defect pass"]
+        for text, sha in ((body, "c" * 40), (body + "\n" + record(*SECTIONS), "a" * 40)):
+            try:
+                review_round(text, sha)
+            except RefusalError:
+                continue
+            self.fail(f"missing or duplicated round accepted for {sha[:7]}")
 
     def test_headings_are_case_insensitive_and_allow_h3(self) -> None:
         body = "\n".join(f"### {name.upper()}\n\ntext\n" for name in SECTIONS)
@@ -94,6 +107,19 @@ class PublishRefusalTest(unittest.TestCase):
         result, calls = self.run_script(record(*SECTIONS[:4]), sha, sha)
         assert result.returncode != 0
         assert "Defect pass" in result.stderr
+        assert not any("--method" in call for call in calls)
+
+    def test_older_complete_round_cannot_supply_a_missing_current_heading(self) -> None:
+        body = record(*SECTIONS, sha="a" * 40) + "\n" + record(*SECTIONS[:4], sha="b" * 40)
+        result, calls = self.run_script(body, "b" * 40, "b" * 40)
+        assert result.returncode != 0
+        assert "Defect pass" in result.stderr
+        assert not any("--method" in call for call in calls)
+
+    def test_record_without_a_round_for_the_head_never_posts_a_status(self) -> None:
+        result, calls = self.run_script(record(*SECTIONS, sha="a" * 40), "b" * 40, "b" * 40)
+        assert result.returncode != 0
+        assert "round" in result.stderr
         assert not any("--method" in call for call in calls)
 
     def test_changed_head_never_posts_a_status(self) -> None:

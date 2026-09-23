@@ -44,15 +44,17 @@ One lead TPM assigns work to teams within the configured trial limit. Each team 
 | Team TPM (`team-N-tpm`) | Labels, Project fields, team start, the tech lead's launch and every worktree provisioning the tech lead requests; cross-team and user blockers. Talks only to its tech lead and the lead TPM. |
 | Tech lead (`team-N-lead`) | Confirm readiness; decide when the developer and tester are provisioned; brief and advance them; decide technical disputes; review the whole PR; publish its review status and merge. Persistent for one issue. |
 | Developer (`team-N-dev`) | Implement the issue with integration-first TDD; own its branch, worktree and PR. |
-| Tester (`team-N-test`) | Independently review each pushed commit and run relevant verification. Fresh session per reviewed SHA. |
+| Tester (`team-N-test`) | Independently review each pushed commit and run relevant verification. One session per issue, advanced in place to each reviewed SHA. |
 
 A role receives only duties its configured launch policy can execute. Main-checkout Git administration (branches, worktrees, fetches) belongs to the team TPM: the tech lead decides what to provision and when, and the TPM executes it. A Codex lead's sandbox cannot write main's `.git`; Claude leads follow the same flow.
 
-Developer, tester and tech lead message each other freely. The tech lead dispatches and advances review stages; the TPM does not talk to the developer or tester, except as the fallback when a message to the lead fails to send (see [Escalation](#escalation)). The tech lead stays for the whole issue and is restarted by the TPM at the next assignment; the tester gets a fresh session at each reviewed SHA. Tech leads of different teams coordinate directly and tell their TPM only when it changes sequencing, ownership or creates a blocker. Nobody reviews or merges their own implementation. The tester may ask the developer anything, but its verdict cites code, tests and evidence, never the developer's explanation. The common GitHub identity cannot mechanically prove reviewer independence.
+Developer, tester and tech lead message each other freely. The tech lead dispatches and advances review stages; the TPM does not talk to the developer or tester, except as the fallback when a message to the lead fails to send (see [Escalation](#escalation)). The tech lead and the tester stay for the whole issue and are restarted by the TPM at the next assignment. The tester reviews the first head in full and each repair delta after that; the tech lead's whole-PR review is the full read of the final diff. A fresh tester starts only when its session is lost or the tech lead rejects the design. Tech leads of different teams coordinate directly and tell their TPM only when it changes sequencing, ownership or creates a blocker. Nobody reviews or merges their own implementation. The tester may ask the developer anything, but its verdict cites code, tests and evidence, never the developer's explanation. The common GitHub identity cannot mechanically prove reviewer independence.
 
 Tie-breakers: the tech lead decides technical disputes. Scope or product questions go tech lead → team TPM → lead TPM → user.
 
 Issues labelled `ui` (frontend UI/UX design and implementation) get the `roles.lead_ui` tech lead, launched with `--ui`; all other issues get `roles.lead`. Developer and tester settings do not change.
+
+Issues labelled `probe` deliver evidence, not a code path: the lead TPM sets the label at Ready, the tester passes once, and the review record keeps its five headings at one line each. Probe code is disposable; do not spend repair rounds on it beyond what the evidence needs.
 
 The user decides material product changes, purchases, credentials, hosting and public launch. Routine technical choices belong to the responsible role. No budget has been fixed; absence of a ceiling does not authorize purchases.
 
@@ -84,7 +86,7 @@ Use protected `main`, short-lived `task/<issue>-<slug>` branches and worktrees u
 
 When no team is live, the user or the lead TPM may branch directly in the main checkout and return it to `main` once the PR merges. A PR that changes only documentation needs no local test run; the required CI checks still run on it.
 
-The team TPM runs `agent/teams/task_worktree.py` for every role: the tech lead at assignment, and the developer, tester and lead advances on the tech lead's request. Keep the existing task slug when an issue is renamed. The developer owns its task worktree; tester and tech lead have separate detached review worktrees. No agent edits another's checkout. The helper checks reviewer cleanliness even at the same SHA, checks selected-client configuration before changing HEAD, reuses a matching live session, and stops the old client and verifies descendant exit before advancing a reviewer. `/new`, `/clear` and `cd` inside an already-running client do not reroot its LSP.
+The team TPM runs `agent/teams/task_worktree.py` for every role: the tech lead at assignment, and the developer, tester and lead advances on the tech lead's request. Keep the existing task slug when an issue is renamed. The developer owns its task worktree; tester and tech lead have separate detached review worktrees. No agent edits another's checkout. The helper checks reviewer cleanliness even at the same SHA, checks selected-client configuration before changing HEAD, reuses a matching live session, and advances a running reviewer's clean detached checkout in place. Only an explicit `--start` on a running tester at a new SHA stops the old client and verifies descendant exit before launching a fresh one. `/new`, `/clear` and `cd` inside an already-running client do not reroot its LSP.
 
 Open a draft PR early. Commit cohesive changes and run relevant checks before pushing. Unpushed local commits may be reorganized; published commits are fixed. Never force-push or push implementation directly to main. Repository rules block force pushes on `task/**` while permitting deletion of merged branches. Merge with merge commits; keep strict up-to-date checks and automatic deletion of merged remote heads.
 
@@ -153,7 +155,7 @@ agent/teams/team.py start N
 
 This creates/reuses the team's workspace and four named panes, starts/briefs its TPM and prints pane IDs. Coding panes stay at the shell until assigned. `agent/teams/team.py start lead` provides the same configured launch for a new lead TPM; do not run it if another live agent already owns `lead-tpm`.
 
-The lead TPM reads relevant issue/PR evidence on each message, picks an unblocked issue on the critical path and sends its URL to the team TPM. No file reservation list or merge slot is required. The team TPM adds `active` and starts the tech lead at a captured base SHA, with `--ui` when the issue carries the `ui` label. The tech lead confirms readiness on the issue, then has the TPM provision the developer, and later the tester at each pushed SHA, and briefs each one.
+The lead TPM reads relevant issue/PR evidence on each message, picks an unblocked issue on the critical path and sends its URL to the team TPM. No file reservation list or merge slot is required. The team TPM adds `active` and starts the tech lead at a captured base SHA, with `--ui` when the issue carries the `ui` label. The tech lead confirms readiness on the issue, then has the TPM provision the developer, and later the tester at the first pushed SHA, and briefs each one. The TPM advances the tester and the tech lead to each later SHA in place.
 
 Use the existing issue's task slug; do not generate a new branch when its title changes. Obtain pane IDs from the start output or `herdr pane list`; never guess them.
 
@@ -172,32 +174,36 @@ agent/teams/task_worktree.py "$ISSUE-review-team-$N-lead" --team "$N" --role lea
 # On the tech lead's request:
 agent/teams/task_worktree.py "$TASK" --team "$N" --role dev --pane "$DEV_PANE" --start
 agent/teams/task_worktree.py "$ISSUE-review-team-$N-test" --team "$N" --role test --pane "$TEST_PANE" --review-ref "$SHA" --start
+# Later SHAs: advance the running reviewers in place (no --start).
+agent/teams/task_worktree.py "$ISSUE-review-team-$N-test" --team "$N" --role test --pane "$TEST_PANE" --review-ref "$SHA"
 agent/teams/task_worktree.py "$ISSUE-review-team-$N-lead" --team "$N" --role lead [--ui] --pane "$LEAD_PANE" --review-ref "$SHA"
 ```
 
 Repeat `--ui` on every later call for a UI lead; without it the helper resolves the other lead configuration and refuses the running client as a conflict.
 
-The helper provisions skills and only the chosen client's local config, applies environment in the target pane and starts the real interactive client. `--kind` is optional and must match the role's configured kind. Inspect config conflicts before explicitly replacing generated files with `--force`. Repeated calls reuse an already matching live session. Conflicting assignments fail. Tester advances require clean source even at the same SHA and verified old-client shutdown before a different SHA; fresh tester sessions carry history through PR comments. A running tech lead is never stopped for a new SHA: the last command above moves its clean, detached, read-only checkout in place, and its LSP keeps the same root.
+The helper provisions skills and only the chosen client's local config, applies environment in the target pane and starts the real interactive client. `--kind` is optional and must match the role's configured kind. Inspect config conflicts before explicitly replacing generated files with `--force`. Repeated calls reuse an already matching live session. Conflicting assignments fail. A running reviewer is not stopped for a new SHA: without `--start`, the helper moves its clean, detached, read-only checkout in place, and its LSP keeps the same root. `--start` with a new SHA on a running tester stops it, verifies descendant exit and launches a fresh session; use it only for a lost session or a rejected design. A running tech lead always advances in place.
 
 Brief immediately after confirming the launched client; do not wait for project compilation. Send the issue/PR contract link, base/head SHA, requested action and owner. Put outcome/exclusions, exact reading and acceptance/verification in that linked contract instead of repeating them. Follow [Context and handoff](#context-and-handoff), including the exact completion command in every dispatch. Developers implement and push; they do not switch to another issue before this one merges.
 
 ## Review and merge
 
-**Tester:** Review every pushed commit in context, first for local correctness, then callers and related features/tests, then end-to-end behavior. Map acceptance to named tests; trust CI only for commands it ran. Independently run missing relevant checks using the assigned environment. Post the verdict and evidence on the PR and send its link and reviewed SHA to the tech lead. Send actionable findings to the developer too; a passing verdict needs no developer acknowledgment. Repairs receive another verdict. Required acceptance failures block completion regardless of severity.
+**One comment per role.** The developer, the tester and the tech lead each keep one PR comment and edit it in place, adding a `## <short SHA> <outcome>` round per reviewed head, newest last, with `###` headings inside a round. A handoff links that comment and names the SHA. No new comment per round.
 
-**Tech lead:** After tester findings are resolved, read the whole diff against the current base and run the full check suite once on the final head. Write the review record as a PR comment with these five `##` headings, spelled exactly, each with substance:
+**Tester:** Review the first pushed head in full, then each repair delta, first for local correctness, then callers and related features/tests, then end-to-end behavior. Map acceptance to named tests; trust CI only for commands it ran. Independently run missing relevant checks using the assigned environment. Add the verdict and evidence to the tester comment and send its link and reviewed SHA to the tech lead. Send actionable findings to the developer too; a passing verdict needs no developer acknowledgment. Repairs receive another verdict. Required acceptance failures block completion regardless of severity.
 
-1. `## Local correctness` — the changed functions and modules on their own.
-2. `## Downstream effects` — callers, related modules, features and tests the change touches.
-3. `## Whole-project fit` — the change against the project's design, architecture and end-to-end behavior.
-4. `## Design challenge` — the chosen implementation questioned against concrete alternatives, with tradeoffs and the assumptions it rests on.
-5. `## Defect pass` — a stricter hunt for implementation defects than the per-commit reviews, on the integrated diff.
+**Tech lead:** After the tester passes the last repair, run `gh pr update-branch "$PR"` and take the resulting head. Read the whole diff of that integrated head against `main` and run the full check suite once on it. Write the review record as the `## <short SHA>` round for that head in the lead comment, with these five `###` headings, spelled exactly, each with substance:
+
+1. `### Local correctness` — the changed functions and modules on their own.
+2. `### Downstream effects` — callers, related modules, features and tests the change touches.
+3. `### Whole-project fit` — the change against the project's design, architecture and end-to-end behavior.
+4. `### Design challenge` — the chosen implementation questioned against concrete alternatives, with tradeoffs and the assumptions it rests on.
+5. `### Defect pass` — a stricter hunt for implementation defects than the per-commit reviews, on the integrated diff.
 
 Resolve technical disagreement using evidence; escalate material product changes through the TPM. A rejected design creates new commits that the tester reviews again.
 
 P0 means critical exposure, irreversible loss or fundamental inability to operate. P1 means broken required behavior, authorization/consistency defects or missing evidence needed to integrate safely. P2/P3 are lower-impact defects or improvements; record follow-up issues when deferred. Do not downgrade findings merely to pass. Repeated failed repairs require root-cause analysis rather than more blind attempts.
 
-The record also names reviewer/implementer, base/head SHAs, commit verdicts, independently run checks, unresolved findings and follow-ups. Then the tech lead publishes `tips/independent-review` on that exact head through the script, which refuses when a heading is missing or empty, or when the PR head has moved:
+The record also names reviewer/implementer, base/head SHAs, commit verdicts, independently run checks, unresolved findings and follow-ups. Then the tech lead publishes `tips/independent-review` on that exact head through the script, which reads only the round whose `##` heading starts with that SHA and refuses when that round is missing or duplicated, when a heading in it is missing or empty, or when the PR head has moved:
 
 ```bash
 agent/teams/publish_review.py --pr "$PR" --sha "$REVIEWED_SHA" --record "$RECORD_COMMENT_URL"
@@ -207,16 +213,21 @@ Main requires a PR, resolved conversations, an up-to-date branch and the require
 
 **Owner waiver.** When no team is live and the change is owner-driven, the user may skip the independent review. Only on the user's explicit instruction in the session, the user or the lead TPM runs `publish_review.py --owner-waiver "<reason>"` instead of `--record`; it posts a waiver comment with the reason on the PR and publishes the status pointing at it. The waiver is the audit trail. Agents never invoke it on their own, and it does not waive the CI checks.
 
+**Hotfix review.** A waived change that touches code still gets a Codex review before merge, through the ad-hoc channel below. Documentation-only changes need none.
+
+**Ad-hoc Codex reviewer.** A Codex reviewer outside a team cannot post to GitHub. Before launching it, the lead TPM creates `tmp/review-<issue>/chavruta.md` (ignored by Git) and names that path in the prompt; both sides append rounds there until they agree, and the lead TPM posts the outcome on the PR. Nothing under `tmp/` enters the repository.
+
 Merge uses native GitHub CLI commands, without a TPM merge queue:
 
 ```bash
-gh pr update-branch "$PR"
-# If HEAD changed: review the base delta and redispatch the tester before continuing.
+gh pr update-branch "$PR"   # "already up to date" is not an error
+REVIEWED_SHA=$(gh pr view "$PR" --json headRefOid --jq .headRefOid)
+# Whole-PR review and publish_review.py on REVIEWED_SHA, then:
 timeout "$TIPS_CHECK_TIMEOUT_SECONDS" gh pr checks "$PR" --watch
 gh pr merge "$PR" --merge --match-head-commit "$REVIEWED_SHA"
 ```
 
-Capture the new head after branch update. A new head needs a new status: the tech lead reviews the base delta and publishes a new status on that SHA; conflict resolution also goes through the tester. Resume the checks/merge sequence after those verdicts arrive. A base change during this sequence can make the strict gate reject the merge; inspect the new state and repeat the necessary review. A timeout, rate limit or failed required check is not success. The timed `gh pr checks --watch` above is the one allowed foreground wait, tech lead only. Record the PR, reviewed head, merge SHA and review evidence on the issue, then notify the TPM. Do not synchronously watch main or automatically revert its changes.
+The branch update comes first so the one whole-PR review covers the integrated head; required CI runs on that head, so no local re-run and no tester round follow a clean update. If the update conflicts, the developer resolves it, the tester reviews the resolution, and the sequence restarts. If `main` moves again before merge, the strict gate rejects the merge: update again, review the base delta, publish a new status on the new head. A timeout, rate limit or failed required check is not success. The timed `gh pr checks --watch` above is the one allowed foreground wait, tech lead only. Record the PR, reviewed head, merge SHA and review evidence on the issue, then notify the TPM. Do not synchronously watch main or automatically revert its changes.
 
 ## Context and handoff
 
@@ -244,7 +255,7 @@ For context recovery, keep the issue/branch open and record base/head SHAs, work
 |---|---|
 | Lead TPM | Team TPM: assign issue or resolve a cross-team/user blocker. |
 | Team TPM | Tech lead: issue URL and base SHA at assignment; pane, worktree and SHA after each provisioning; answers to scope questions; restart after silence. |
-| Tech lead | Developer: dispatch, answers, review findings. Tester: exact SHA after the TPM provisions its session. Team TPM: provision requests with role, pane and SHA; state changes and blockers. Another team's tech lead: shared-module coordination. |
+| Tech lead | Developer: dispatch, answers, review findings. Tester: exact SHA after the TPM provisions or advances its session. Team TPM: provision and advance requests with role, pane and SHA; state changes and blockers. Another team's tech lead: shared-module coordination. |
 | Developer | Tech lead: pushed SHA and evidence for tester dispatch, questions, or blocker. Tester: answers to its questions. |
 | Tester | Tech lead: every PR verdict/evidence. Developer: actionable findings and questions. |
 | Team TPM | Lead TPM: completed issue or blocker requiring outside action. |
@@ -261,7 +272,7 @@ The database connection limit is configured in [compose.yaml](../../compose.yaml
 
 ## Merge and retire
 
-The tech lead performs the exact-SHA review/status and native merge sequence in [Review and merge](#review-and-merge). A changed head requires a new review; conflict resolution goes to the tester. The TPM removes stale labels and reports merge evidence to the lead TPM.
+The tech lead performs the branch update, exact-SHA review/status and native merge sequence in [Review and merge](#review-and-merge). A head that changes after the review requires a new review; conflict resolution goes to the tester. The TPM removes stale labels and reports merge evidence to the lead TPM.
 
 After merge, the lead TPM retires the team from another workspace:
 

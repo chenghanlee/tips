@@ -591,12 +591,16 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call("--start", ok=False)
         assert not any(e[:2] == ["agent", "start"] for e in self.state()["events"])
 
-    def test_provision_only_cannot_advance_active_tester(self) -> None:
+    def test_running_tester_advances_in_place_without_start(self) -> None:
         task, wt = "28-review-team-3-test", self.root / ".worktrees/28-review-team-3-test"
         self.call("--start", role="test", task=task)
         self.commit("next")
-        self.call(role="test", task=task, ref=self.git("rev-parse", "HEAD"), ok=False)
-        assert self.git("-C", str(wt), "rev-parse", "HEAD") == self.base
+        new = self.git("rev-parse", "HEAD")
+        p = self.call(role="test", task=task, ref=new)
+        assert "Advanced team-3-test in place" in p.stdout
+        assert self.git("-C", str(wt), "rev-parse", "HEAD") == new
+        assert not any(e[0] == "stop_agent" for e in self.state()["events"])
+        assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 1
 
     def test_canonical_wrapper_not_needed_in_reviewed_commit(self) -> None:
         self.git("rm", "agent/lsp/launch_worktree_lsp.sh")
