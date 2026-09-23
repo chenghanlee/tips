@@ -19,9 +19,9 @@ from team import (
     Config,
     Entity,
     HerdrResult,
-    client_root,
     execute,
     load_config,
+    occupant,
     parse_herdr,
     require_git_admin,
     stop_agent,
@@ -365,7 +365,14 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
         agents = self.herdr("agent", "list")["agents"]
         self.owner = None
         for agent in agents:
-            agent_root = client_root(agent)
+            pane = agent["pane_id"]
+            root, live = self.occupant(pane)
+            if not live:
+                raise RefusalError(
+                    f"Herdr reports {agent.get('name') or pane} in {pane} without a running "
+                    "client; inspect the pane."
+                )
+            agent_root = str(root)
             self.check_teammate(agent, agent_root)
             relevant = (
                 agent.get("pane_id") == self.args.pane
@@ -449,15 +456,9 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
         return True
 
     def check_shell(self) -> None:
-        if self.args.start or (
-            self.old_head and self.review_sha and (self.old_head != self.review_sha)
-        ):
-            info = self.herdr("pane", "process-info", "--pane", self.args.pane)["process_info"]
-            foreground = info.get("foreground_processes", [])
-            if not foreground or any(p["pid"] != info["shell_pid"] for p in foreground):
-                raise RefusalError(
-                    "Target pane is not at its shell; nothing will be launched there."
-                )
+        advancing = bool(self.old_head and self.review_sha and self.old_head != self.review_sha)
+        if (self.args.start or advancing) and self.occupant(self.args.pane)[1]:
+            raise RefusalError("Target pane is not at its shell; nothing will be launched there.")
 
     def checkout(self) -> None:
         if not self.worktree.exists():
@@ -564,7 +565,7 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
         )
         started = self.herdr("agent", "get", self.args.pane)["agent"]
         if (
-            client_root(started) != str(self.worktree)
+            self.occupant(self.args.pane) != (self.worktree.resolve(), True)
             or started.get("agent") != self.kind
             or started.get("name") != self.agent_name
             or (started.get("agent_status") in ("blocked", "unknown"))
@@ -583,6 +584,9 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
             f"{self.worktree}"
             ". Project compilation may still be running."
         )
+
+    def occupant(self, pane: str) -> tuple[Path, bool]:
+        return occupant(pane, self.herdr("pane", "process-info", "--pane", pane)["process_info"])
 
     def herdr(self, *parts: str | int, timeout: float | None = None) -> HerdrResult:
         text = run(["herdr", *map(str, parts)], timeout=timeout or self.timeouts["shell_seconds"])

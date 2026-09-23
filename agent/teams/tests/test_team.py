@@ -27,13 +27,27 @@ with open(os.environ["HERDR_LOG"], "a") as f:
 if a[:2] == ["pane", "get"]:
     r = {"pane": {"pane_id": "wT:p1", "agent": "codex", "foreground_cwd": s["root"]}}
 elif a[:2] == ["pane", "process-info"]:
+    def alive(pid):
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        return True
+
+    procs = [
+        {"pid": s["pid"], "name": "codex", "cwd": s["root"]},
+        {"pid": s["child"], "name": "node", "cwd": s["root"]},
+    ]
+    procs = [x for x in procs if alive(x["pid"])]
+    if not procs and s.get("replacement"):
+        procs = [{"pid": 424242, "name": "claude", "cwd": s["root"]}]
+    if not procs:
+        procs = [{"pid": s["shell"], "name": "zsh", "cwd": s["root"]}]
     r = {
         "process_info": {
             "shell_pid": s["shell"],
-            "foreground_processes": [
-                {"pid": s["pid"], "name": "codex", "cwd": s["root"]},
-                {"pid": s["child"], "name": "node", "cwd": s["root"]},
-            ],
+            "foreground_process_group_id": procs[0]["pid"],
+            "foreground_processes": procs,
         }
     }
 elif a[:2] == ["agent", "list"]:
@@ -186,6 +200,18 @@ while True: time.sleep(.05)
         calls = [json.loads(line) for line in (self.root / "calls").read_text().splitlines()]
         assert ["agent", "rename", "wT:p1", "--clear"] in calls
 
+    def test_replacement_client_after_exit_preserves_its_name(self) -> None:
+        p = self.client()
+        state = json.loads((self.root / "state.json").read_text())
+        state["replacement"] = True
+        (self.root / "state.json").write_text(json.dumps(state))
+        r = self.stop()
+        assert r.returncode != 0
+        assert "owner changed during shutdown" in r.stderr
+        assert p.wait(timeout=2) == 0
+        calls = [json.loads(line) for line in (self.root / "calls").read_text().splitlines()]
+        assert ["agent", "rename", "wT:p1", "--clear"] not in calls
+
     def test_name_already_released_is_success_after_exit(self) -> None:
         p = self.client()
         state = json.loads((self.root / "state.json").read_text())
@@ -271,15 +297,16 @@ elif a[:2] == ["pane", "split"]:
     s["panes"].append(x)
     result = {"pane": x}
 elif a[:2] == ["pane", "process-info"]:
+    x = next(x for x in s["panes"] if x["pane_id"] == opt("--pane"))
+    leader = 88888888 if x.get("agent") else 99999999
     result = {
         "process_info": {
             "shell_pid": 99999999,
+            "foreground_process_group_id": leader,
             "foreground_processes": [
-                {
-                    "pid": 99999999,
-                    "cwd": next(x for x in s["panes"] if x["pane_id"] == opt("--pane"))["cwd"],
-                }
-            ],
+                {"pid": leader, "cwd": x["cwd"]},
+                {"pid": 88888889, "cwd": "/opt/homebrew/lsp-child"},
+            ][: 2 if x.get("agent") else 1],
         }
     }
 elif a[:2] == ["pane", "get"]:
@@ -447,7 +474,7 @@ class TeamLifecycleTest(unittest.TestCase):
         assert r.returncode != 0
         assert "Dirty worktree" in r.stderr
         assert not any(
-            c[:2] == ["pane", "process-info"] for c in self.calls()[len(self.calls_before_stop) :]
+            c[:2] == ["pane", "get"] for c in self.calls()[len(self.calls_before_stop) :]
         )
         assert work.exists()
         assert json.loads(self.state.read_text())["workspaces"]
@@ -472,7 +499,7 @@ class TeamLifecycleTest(unittest.TestCase):
         r = self.run_team("stop", "1")
         assert r.returncode != 0
         assert "Unmerged worktree" in r.stderr
-        assert not any(c[:2] == ["pane", "process-info"] for c in self.calls()[before:])
+        assert not any(c[:2] == ["pane", "get"] for c in self.calls()[before:])
         assert not (self.root / "docker-calls").exists()
         assert work.exists()
 
@@ -500,7 +527,7 @@ class TeamLifecycleTest(unittest.TestCase):
         assert "ask lead-tpm to run it from the main checkout" in r.stderr
         assert "fetch" not in r.stderr
         assert not (git_dir / "FETCH_HEAD").exists()
-        assert not any(c[:2] == ["pane", "process-info"] for c in self.calls()[before:])
+        assert not any(c[:2] == ["pane", "get"] for c in self.calls()[before:])
         assert not (self.root / "docker-calls").exists()
         assert work.exists()
         assert json.loads(self.state.read_text())["workspaces"]

@@ -130,11 +130,29 @@ if a[:2] == ["pane", "get"]:
         }
     )
 if a[:2] == ["pane", "process-info"]:
+    pane = a[a.index("--pane") + 1]
+    agent = next((x for x in state["agents"] if x["pane_id"] == pane), None)
+    if agent is not None and not agent.get("bare"):
+        # The client leads the foreground group; an LSP child runs elsewhere.
+        client = agent.get("cwd") or agent.get("foreground_cwd")
+        reply(
+            {
+                "process_info": {
+                    "shell_pid": 100,
+                    "foreground_process_group_id": 200,
+                    "foreground_processes": [
+                        {"pid": 200, "cwd": client},
+                        {"pid": 201, "cwd": "/opt/homebrew/lsp-child"},
+                    ],
+                }
+            }
+        )
     pid = 999 if state.get("busy") else 100
     reply(
         {
             "process_info": {
                 "shell_pid": 100,
+                "foreground_process_group_id": pid,
                 "foreground_processes": [{"pid": pid, "cwd": state["cwd"]}],
             }
         }
@@ -721,6 +739,27 @@ class WorktreeIntegrationTest(unittest.TestCase):
         s["agents"][0]["foreground_cwd"] = "/opt/homebrew/lsp-child"
         self.save(s)
         self.call("--start")
+
+    def test_ownership_follows_the_client_process_not_pane_metadata(self) -> None:
+        # A client whose process runs in the target worktree owns it even when Herdr's
+        # pane cwd says otherwise (#232); a reported agent without a client refuses.
+        s = self.state()
+        stray: dict[str, str] = {
+            "name": "stray",
+            "pane_id": "wA:pZ",
+            "agent": "claude",
+            "cwd": str(self.wt),
+            "foreground_cwd": str(self.root),
+        }
+        s["agents"] = [stray]
+        self.save(s)
+        self.call("--start", ok=False)
+        assert not self.wt.exists()
+        s["agents"] = [{**stray, "name": "team-3-dev", "cwd": str(self.root), "bare": "yes"}]
+        self.save(s)
+        r = self.call("--start", ok=False)
+        assert "without a running client" in r.stderr
+        assert not self.wt.exists()
 
     def test_developer_renamed_issue_reuses_branch_and_worktree(self) -> None:
         self.call(role="dev", task="29-original", ref=False)
