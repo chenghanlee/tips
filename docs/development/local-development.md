@@ -226,9 +226,10 @@ unique `TIPS_DB_SUFFIX`, development HTTP `PORT`, and `TIPS_TEST_PORT`;
 use `PGPORT=5433` for the shared server. Tests start their own endpoint on
 `TIPS_TEST_PORT` (default 4002), including when browser tests are excluded.
 Each checkout already has its own `deps/` and `_build/`, so install dependencies
-in each worktree. Do not share or symlink those directories. Provider settings
-are read by path: the team launcher exports `TIPS_PROVIDER_ENV_FILE` pointing at
-the main checkout's `.env`, so no worktree holds a copy. Export the worktree's
+in each worktree. Do not share or symlink those directories. For team-launched
+worktrees, the launcher exports `TIPS_PROVIDER_ENV_FILE` pointing at the main
+checkout's `.env`, so no worktree holds a copy; a manual worktree reads its own
+`.env` unless you export that variable. Export the worktree's
 database and port values in its shell.
 
 For example, after creating two worktrees at the revision to test:

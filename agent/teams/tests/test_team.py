@@ -622,6 +622,9 @@ class TeamLifecycleTest(unittest.TestCase):
     def test_lead_start_applies_config_but_has_no_stop_subcommand(self) -> None:
         r = self.run_team("start", "lead")
         assert r.returncode == 0, r.stderr
+        prompt = next(c[3] for c in self.calls() if c[:2] == ["agent", "prompt"])
+        assert "starting with the Lead TPM card" in prompt
+        assert "Report readiness to the user" in prompt
         assert len(json.loads(self.state.read_text())["panes"]) == 1
         r = self.run_team("stop", "lead")
         assert r.returncode != 0
