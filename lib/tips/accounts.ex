@@ -62,10 +62,12 @@ defmodule Tips.Accounts do
   | deleted | `:unauthenticated` | `:unauthenticated` | `:unauthenticated` | `:unauthenticated` |
 
   `:contribute` covers publishing, editing, voting (including removal),
-  reporting and upload authorization. `:moderate` covers moderation reads and
-  actions. Privileged reads of one's own content (hidden items, drafts,
-  previews) need admission and Content ownership only; a full ban does not
-  deny them. Account deletion also requires recent sign-in (`sudo_mode?/1`).
+  reporting and upload authorization. `:moderate` covers moderation actions
+  only. `check_eligibility/2` is not a read guard: a full ban preserves reading.
+  Privileged reads (own hidden items, drafts, previews, moderator queue and
+  hidden-content reads) need fresh admission plus the owning operation's
+  current role, ownership and visibility checks. Account deletion also
+  requires recent sign-in (`sudo_mode?/1`).
 
   ### Operation results
 

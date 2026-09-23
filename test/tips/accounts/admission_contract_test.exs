@@ -293,6 +293,16 @@ defmodule Tips.Accounts.AdmissionContractTest do
       assert {:error, :unauthenticated} = CallerExamples.delete_own(nil, user.id)
     end
 
+    test "a full-banned moderator loses moderation actions but keeps the admitted role for reads" do
+      moderator = user_fixture() |> moderator() |> ban()
+      token = Accounts.generate_user_session_token(moderator)
+
+      assert {:error, :forbidden} = Accounts.check_eligibility(moderator, :moderate)
+
+      assert {%User{role: :moderator, ban: :full}, _} =
+               Accounts.get_user_by_session_token(token)
+    end
+
     test "account deletion keeps its recent sign-in requirement for banned accounts" do
       user = user_fixture() |> ban()
       recent = %{user | authenticated_at: DateTime.utc_now(:second)}
