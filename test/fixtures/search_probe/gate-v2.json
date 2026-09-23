@@ -1,0 +1,65 @@
+{
+  "version": "234-gate-v2",
+  "frozen_at": "2026-09-23",
+  "baseline": {
+    "version": "54-gate-v1",
+    "gate": "gate.json",
+    "evidence": "evidence/run-2-26398ff-failed.json",
+    "change": "Only document preparation and the run protocol change. Corpus, queries, judgments, model, upstream, dimensions, query instruction, numeric gates and budgets are identical to v1."
+  },
+  "model": {
+    "id": "qwen/qwen3-embedding-8b",
+    "card": "https://huggingface.co/Qwen/Qwen3-Embedding-8B",
+    "card_revision": "1d8ad4ca9b3dd8059ad90a75d4983776a23d44af",
+    "card_retrieved_at": "2026-09-23",
+    "native_dimensions": 4096,
+    "context_tokens": 32768
+  },
+  "provider": {
+    "name": "openrouter",
+    "base_url": "https://openrouter.ai/api/v1",
+    "routing": {"only": ["deepinfra"], "allow_fallbacks": false},
+    "routing_rationale": "One upstream so vectors never mix: DeepInfra serves the full 32,768-token context at the lowest listed price (Nebius lists 32,000; SiliconFlow is fp8 at 4x the price). Listing retrieved 2026-09-23."
+  },
+  "dimensions": 1024,
+  "preparation": {
+    "document": "Plain text. Tip: title, blank line, body. Review: body.",
+    "query_instruction": "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:",
+    "query_max_bytes": 1024,
+    "document_max_bytes": 30000,
+    "over_limit": "No truncation. A document over document_max_bytes UTF-8 bytes, or not valid UTF-8, blocks the run before any HTTP request.",
+    "token_bound": "At most one token per UTF-8 byte plus 8 special tokens per input: 30,008 tokens for the largest allowed document, inside the 32,768-token model and endpoint context. This bounds this corpus only; it is not a guarantee for future inputs.",
+    "long_input_cohort": ["long-01", "long-02", "long-03", "long-04", "long-05"],
+    "long_input_reference": "Each cohort document is embedded a second time from its full text as the reference, even though the prepared text is now identical, so the v1 long-input comparison keeps its five documents."
+  },
+  "protocol": {
+    "runs": 1,
+    "validate_command": "unbuffer mix run scripts/search_probe.exs --validate --gate v2",
+    "real_command": "TIPS_REAL_PROVIDERS=1 unbuffer mix run scripts/search_probe.exs --real --gate v2 --output test/fixtures/search_probe/evidence/v2-run-1.json",
+    "evidence_output": "evidence/v2-run-1.json; the probe refuses to overwrite an existing report.",
+    "request_order": "Endpoint listing, key check, the 40 eligible documents in corpus order, the 5 cohort references in cohort order, then three passes over the ten queries in query order.",
+    "concurrency": 1,
+    "http_retries": false,
+    "warm_up_discarded": false,
+    "dimensions": "Request 1024 dimensions. A 1024- or 4096-value first response settles the length; any later length is an error.",
+    "retry_rejected_dimensions": false,
+    "on_error": "Stop at a failed preflight or the first provider error, including an HTTP 400 for dimensions, and write the report with every attempt kept.",
+    "planned": {"requests": 77, "input_token_bound": 249250, "max_document_bytes": 29504}
+  },
+  "gate": {
+    "k": 5,
+    "every_query_needs_top_k_hit": true,
+    "min_macro_recall": 0.8,
+    "long_input_max_recall_loss": 0.1,
+    "query_passes": 3,
+    "query_p95_ms": 5000,
+    "query_deadline_ms": 10000,
+    "document_deadline_ms": 30000,
+    "max_incremental_rss_mib": 256
+  },
+  "budget": {
+    "max_requests": 100,
+    "max_input_tokens": 500000,
+    "max_cost_usd": 0.1
+  }
+}
