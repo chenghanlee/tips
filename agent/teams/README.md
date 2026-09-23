@@ -86,6 +86,13 @@ For context recovery, keep issue and branch open. Record base and head SHAs, PR 
 
 Read provider settings by path from main checkout's `.env`; only the user adds new credentials there. Never write secrets into worktrees. Inspect launch values with `env | grep -E '^(PGPORT|MIX_ENV|TIPS_)'`; macOS `printenv` prints only its first named variable. Startup confirms client launch, not index readiness: Expert indexes in the background. Never add a compile gate or probe LSP; see [LSP guide](../lsp/README.md). Agents propose defaults and use synthetic fixtures; never fabricate firsthand production content. Real-provider tests require user-authorized invocations quoted on the issue by lead TPM, with scoped secrets; never run automatically on PR code.
 
+**Code navigation.** Developers, testers and tech leads use the Elixir LSP tools on `.ex`, `.exs`, `.heex` and `.leex` files at these moments:
+
+- Before changing a function's name, arity or return shape: run `references` on its definition; list the callers in your PR comment.
+- When a compile error or test failure names a function you did not write: run `definition` on the call site before reading around it.
+- When a warning names a type or spec you do not recognize: run `hover` on it.
+- After your last edit, and on each reviewed file: run `diagnostics`.
+
 **Checks.** Trust CI only for commands actually run. For `agent/teams` Python changes, CI is the evidence: open the exact-head `checks` run, verify these four steps passed and link the run in your round.
 
 ```sh

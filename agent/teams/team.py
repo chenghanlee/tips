@@ -17,6 +17,9 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import NotRequired, TypedDict, cast
 
+# CLI settings outrank project-local files, which linked worktrees read from the main checkout.
+CLAUDE_PLUGIN_SETTINGS = json.dumps({"enabledPlugins": {"elixir-lsp@elixir-agent-tools": False}})
+
 
 class Role(TypedDict):
     """Role settings; resource fields are used only by coding roles."""
@@ -503,7 +506,7 @@ def coordinator(pane: Entity, name: str, role: str) -> None:
             "--effort",
             spec["effort"],
             "--settings",
-            json.dumps({"enabledPlugins": {"elixir-lsp@elixir-agent-tools": False}}),
+            CLAUDE_PLUGIN_SETTINGS,
             "--strict-mcp-config",
             "--mcp-config",
             '{"mcpServers":{}}',
