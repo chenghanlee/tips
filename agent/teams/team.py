@@ -553,9 +553,10 @@ def coordinator_brief(name: str, role: str) -> str:
     card = "Lead TPM" if role == "lead_tpm" else "Team TPM"
     report_to = "the user" if role == "lead_tpm" else "lead-tpm"
     return (
-        f"You are {name}. Read agent/teams/README.md, starting with the {card} "
-        "card, then the shared rules. Coordinate from this read-only main "
-        f"checkout. Report readiness to {report_to}; await assignment."
+        f"You are {name}. Read agent/teams/README.md: Events, Shared rules, The "
+        f"user decides, Client constraints, then the {card} card. Coordinate from "
+        f"this read-only main checkout. Report readiness to {report_to}; await "
+        "assignment."
     )
 
 

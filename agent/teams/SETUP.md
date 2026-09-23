@@ -62,22 +62,7 @@ Configure the database connection limit in [compose.yaml](../../compose.yaml); o
 
 ## Check changes to these scripts
 
-Developers run these four commands in their task worktree before pushing, with Python 3.12 and Ruff and Pyright already on `PATH` (agents never install them):
-
-```sh
-ruff check agent/teams
-ruff format --check agent/teams
-pyright --project agent/teams/pyproject.toml
-python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
-```
-
-The required `checks` job runs all four commands. Reviewers do not rerun them locally; they verify all four steps passed on the exact reviewed head and link that run in their round.
-
-[pyproject.toml](pyproject.toml) follows the harness's Python profile: strict types, a complexity limit of 10, and the same lint rules. The test assertion exception applies only to Python files under `tests/`. The scripts and tests use only the standard library.
-
-Tests use disposable Git repositories, a fake Herdr CLI and owned child processes, never live teams. Process tests need permission to run `ps` and signal their own children.
-
-Two reviewed S603 exceptions carry inline `# noqa: S603`: the shared command runner `team.py:execute` and the process-test launcher `StopAgentTest.client`. Both accept variable argument lists but run without a shell, on a resolved executable with fixed or test-owned arguments. Suppress nothing else. The tech lead reviews trusted executable selection and argument handling whenever these calls change; passing lint cannot prove subprocess safety.
+The four commands, the CI-evidence rule and the test and `# noqa: S603` constraints are the shared Checks rule in the [README](README.md#shared-rules). [pyproject.toml](pyproject.toml) follows the harness's Python profile: strict types, a complexity limit of 10, and the same lint rules; the test assertion exception applies only to Python files under `tests/`. Install Ruff and Pyright yourself if you want developers to run the checks locally; agents never install them.
 
 ## Milestones
 
