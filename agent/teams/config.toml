@@ -2,12 +2,12 @@
 # An empty model uses the client's configured default.
 [team]
 # Current suffixes support at most nine teams; validation rejects partition collisions.
-max_teams = 6
+max_teams = 4
 workspace_prefix = "tips-team"
 port_base = 4100
 port_stride = 10
 postgres_port = 5433
-db_suffix_prefix = "_t"
+db_suffix_prefix = "_team"
 
 [timeouts]
 launch_seconds = 120
@@ -21,27 +21,27 @@ checks_minutes = 30
 codex_approval = "never"
 # Applies only to definition, references, hover and diagnostics on our LSP server.
 codex_lsp_approval_mode = "approve"
-claude_permission_mode = "bypassPermissions"
+claude_permission_mode = "auto"
 
 [roles.dev]
-kind = "codex"
-model = "gpt-5.6-sol"
-effort = "xhigh"
-db_suffix = ""
+kind = "claude"
+model = "opus"
+effort = "high"
+db_suffix = "_dev"
 port_offset = 0
 
 [roles.test]
 kind = "claude"
 model = "opus"
-effort = "xhigh"
-db_suffix = "r"
+effort = "high"
+db_suffix = "_test"
 port_offset = 1
 
 [roles.lead]
 kind = "codex"
 model = "gpt-6-astra"
 effort = "high"
-db_suffix = "l"
+db_suffix = "_dev-lead"
 port_offset = 2
 
 # Lead for issues labelled `ui`; launched with --ui. Shares the lead partition.
@@ -49,17 +49,17 @@ port_offset = 2
 kind = "claude"
 model = "fable"
 effort = "high"
-db_suffix = "l"
+db_suffix = "_dev-lead"
 port_offset = 2
 
 [roles.tpm]
 kind = "claude"
-model = ""
+model = "fable"
 effort = "medium"
 compaction_percent = 35
 
 [roles.lead_tpm]
 kind = "claude"
-model = ""
+model = "fable"
 effort = "high"
 compaction_percent = 35
