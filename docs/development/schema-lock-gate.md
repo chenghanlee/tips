@@ -12,7 +12,7 @@ This gate verifies. It does not repair; gaps go back to their P1 owner.
 trigger, generated column and extension is present and matches the design, apart from
 the accepted deviations below. Migrations run from empty, roll back fully and reapply to
 an identical schema. Report insertion versus author deletion is covered by the #252
-ExUnit fixture and by the direct schedules.
+ExUnit fixture.
 
 | Acceptance | Result |
 |---|---|
@@ -43,15 +43,17 @@ Local run in the isolated test database, on the merge revision:
 4. `unbuffer mix ecto.rollback --all`: all 8 reverted. Left only `schema_migrations` (0 rows) and `plpgsql`; no extension, function, type, table, view or index remained.
 5. `unbuffer mix ecto.migrate`: all 8 reapplied. `pg_dump --schema-only` after step 3 and step 5 are identical, and identical to the first gate run on `8150138`.
 
-Release migration, from CI on integrated `main` `eb650f4`
-([Checks run 35911931510](https://github.com/chenghanlee/tips/actions/runs/35911931510),
-`release` job): `scripts/release_smoke.sh --skip-build` against the published database
-image. It printed revision `eb650f4d06aeae721fc18648d7f470f56adc8aa0`, release image ID
-`sha256:00fea2bb0a42617443137c526c6e26d8579f7bbdb2c7f77c3f2f80a7748ed671`, ran `bin/migrate`
+Release migration, from this PR's own CI
+([Checks run 35912570609](https://github.com/chenghanlee/tips/actions/runs/35912570609),
+head `0bb3adc`): both jobs checked out `476e4fb480a3ba6707a52e4b22dd6326459842c4`, the
+merge of the PR head into `eb650f4`. The `release` job ran
+`scripts/release_smoke.sh --skip-build` against the published database image. It printed
+that revision and release image ID
+`sha256:0a17184ca969967dd9727f05c4a8b4067f077c36ab5516e093fb886f75b6c9b0`, ran `bin/migrate`
 (8 migrations), and passed health, stopped-database 503 and restart-preserves-8-migrations.
-The same run's `checks` job migrated, rolled back all 8 and reapplied them. This branch
-adds only documentation to that revision; its own PR CI runs the same jobs. The local
-smoke was not run: the fixed smoke project must not collide with other teams' runs.
+The `checks` job migrated, rolled back all 8, reapplied them, then passed 543 (3 browser
+features, 540 tests) with 1 excluded. The local smoke was not run: the fixed smoke project
+must not collide with other teams' runs.
 
 ## Schema checklist
 
@@ -107,23 +109,23 @@ triggers active and observed `pg_blocking_pids` synchronization:
 - Report: lock the reporter `FOR NO KEY UPDATE` and check confirmed, unbanned and undeleted; select the live direct target `FOR SHARE`; insert the flag.
 - Author deletion: lock the author, the tip, then the review if the target is a review; set `deleted_at`. A review deletion fires `reviews_counts`, which writes the tip.
 
-All 8 passed: "tip|review report/delete report_first|delete_first with confirmed|unconfirmed reporter".
-Each asserts the flag outcome, deletion, visibility of the other item, vote and review
-counters, and a clean `Counters.recount!()`.
+The contract's evidence identifiers map to its tests:
 
-[report_delete_schedules.exs](schema-lock-gate/report_delete_schedules.exs) repeats the
-schedules directly and adds an FK-only control. It passed again on the merge revision:
-
-| Schedule | Tip | Review |
+| Contract identifier | Tests (tip and review) | Result |
 |---|---|---|
-| `report_insert_first`, confirmed | deleter waits (`Lock:transactionid ShareLock`); 1 flag; tip deleted | same wait; 1 flag; review deleted; `review_count` 1 → 0 |
-| `author_delete_first`, confirmed | reporter's `FOR SHARE` waits; after commit, READ COMMITTED recheck returns 0 rows; 0 flags | same |
-| both orders, unconfirmed reporter | reporter ineligible, takes no target lock; deleter never waits; 0 flags | same |
-| control: flag insert without `FOR SHARE` | insert does not wait; flag lands on the deleted tip | same on the review |
+| `report_insert_first` | "report/delete report_first with confirmed reporter" | deleter waits on the report's `FOR SHARE`; 1 open flag; content deleted |
+| `author_delete_first` | "report/delete delete_first with confirmed reporter" | report's `FOR SHARE` waits; READ COMMITTED recheck finds no live row; 0 flags |
+| unconfirmed reporter, both orders | "report/delete report_first with unconfirmed reporter", "... delete_first with unconfirmed reporter" | rejected under the reporter lock before any target lock; deletion completes while the report transaction is open; 0 flags |
 
-The control shows why `FOR SHARE` is required: the flag FK check takes only
-`FOR KEY SHARE` on the target, which does not conflict with the deleter's
-`FOR NO KEY UPDATE`.
+Every test also asserts the other item stays visible, vote and review counters, and a
+clean `Counters.recount!()`. All 8 passed locally and in PR CI.
+
+Why `FOR SHARE` is required: the flag FK check takes only `FOR KEY SHARE` on the target,
+which does not conflict with the deleter's `FOR NO KEY UPDATE`. A one-off direct control
+in the first gate run showed a flag insert without `FOR SHARE` did not wait and landed on
+the concurrently deleted tip and review
+([script at `d1bc70c`](https://github.com/chenghanlee/tips/blob/d1bc70c92c466b6a2659f89fb8f9bec8049f454e/docs/development/schema-lock-gate/report_delete_schedules.exs)).
+The script was removed because the #252 test replaces its schedules with safe cleanup.
 
 ## Request timeout
 
@@ -143,7 +145,5 @@ The control shows why `FOR SHARE` is required: the flag FK check takes only
 
 On merge `c59fc2f9bfbde11b47376639b5c5e5f92c14a622`:
 
-- `unbuffer mix test --trace`: 540 passed, 4 excluded (3 browser features, 1 real-provider), seed 229776. All contract-named tests above passed. CI on `eb650f4` ran the browser features: 543 passed, 1 excluded.
+- `unbuffer mix test --trace`: 540 passed, 4 excluded (3 browser features, 1 real-provider), seed 229776. All contract-named tests above passed. PR CI ran the browser features: 543 passed, 1 excluded.
 - `unbuffer mix compile --warnings-as-errors`, `unbuffer mix format --check-formatted`, `unbuffer mix credo --strict`, `python3 scripts/check_docs.py`: pass.
-- `unbuffer mix run --no-start docs/development/schema-lock-gate/report_delete_schedules.exs`: 8 schedules and 2 controls pass; test rows removed; no compiler warnings.
-- The script is outside `.formatter.exs` inputs and default Credo runs, so it is checked explicitly: `unbuffer mix format --check-formatted docs/development/schema-lock-gate/report_delete_schedules.exs` and `unbuffer mix credo --strict docs/development/schema-lock-gate/report_delete_schedules.exs` both pass. Expert LSP diagnostics reported 0 without a document version, so they cannot certify the current file.
