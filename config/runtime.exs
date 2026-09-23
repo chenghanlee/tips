@@ -24,6 +24,16 @@ if config_env() != :test do
   config :tips, TipsWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 end
 
+if config_env() in [:dev, :test] do
+  # Provider settings come from the checkout's .env and the exported environment; see
+  # Tips.ProviderConfig. Test runs stub providers unless TIPS_REAL_PROVIDERS=1.
+  real_providers? = config_env() == :dev or System.get_env("TIPS_REAL_PROVIDERS") == "1"
+
+  config :tips, Tips.ProviderConfig,
+    values: Tips.ProviderConfig.load(Path.expand("../.env", __DIR__), System.get_env()),
+    mode: if(real_providers?, do: :real, else: :stub)
+end
+
 if config_env() == :dev do
   # Reload browser tabs when matching files change.
   config :tips, TipsWeb.Endpoint,
