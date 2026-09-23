@@ -496,9 +496,11 @@ order by r.best_score desc, r.id desc limit 31 offset $3;
 -- Lightweight own-review lookup; Content derives link/edit capabilities from current scope/state.
 select id, dead_at from reviews where tip_id = $1 and user_id = $2 and deleted_at is null;
 
--- Selected-review mode uses this instead of the ranked-page query.
--- Project deletion/visibility before hydrating any text, media or vote.
-select r.* from reviews r where r.id = $1 and r.tip_id = $2;
+-- Selected-review mode (/reviews/:id) uses these instead of the ranked-page query.
+-- Read the review by id first; no row is not found. Then load its parent by r.tip_id.
+-- Project deletion/visibility of both before hydrating any text, media or vote.
+select r.* from reviews r where r.id = $1;
+select t.* from tips t where t.id = $1; -- $1 is the review's tip_id
 
 -- Internal media read for already authorized parent/review ids. Never return directly.
 -- Content projects current parent visibility. Video playback and poster URLs are app routes
