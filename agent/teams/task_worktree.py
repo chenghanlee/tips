@@ -407,17 +407,7 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
                 "stop it before reconfiguring."
             )
         if not self.review_sha or self.review_sha == self.old_head:
-            if self.owner.get("agent_status") in ("blocked", "unknown"):
-                raise RefusalError(
-                    f"Existing session is {self.owner.get('agent_status')}; inspect its pane."
-                )
-            if self.args.start and (not self.owner.get("name")):
-                self.herdr("agent", "rename", self.args.pane, self.agent_name)
-            print(
-                f"Already running: {self.agent_name} in {self.worktree} "
-                f"({self.owner.get('agent_status')})"
-            )
-            return True
+            return self.reuse_running(self.owner)
         if self.role_name == "lead":
             return self.advance_in_place()
         if not self.args.start:
@@ -430,6 +420,18 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
         if git("-C", self.worktree, "status", "--porcelain", "--untracked-files=all"):
             raise RefusalError("Review checkout became dirty during shutdown; preserving it.")
         return False
+
+    def reuse_running(self, owner: Entity) -> bool:
+        if owner.get("agent_status") in ("blocked", "unknown"):
+            raise RefusalError(
+                f"Existing session is {owner.get('agent_status')}; inspect its pane."
+            )
+        if self.args.start and (not owner.get("name")):
+            self.herdr("agent", "rename", self.args.pane, self.agent_name)
+        print(
+            f"Already running: {self.agent_name} in {self.worktree} ({owner.get('agent_status')})"
+        )
+        return True
 
     def advance_in_place(self) -> bool:
         """The lead stays through the issue; move its clean detached checkout to the new SHA."""
