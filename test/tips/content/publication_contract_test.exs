@@ -12,7 +12,8 @@ defmodule Tips.Content.PublicationContractTest.Consumer do
           | {:preserve, :offer_edit | :deleted_original | :retry_same_key | :keep_values_fixed}
           | {:preserve, {:fix_attachments, [Content.attachment_ref()]}}
           | {:preserve, {:wait_for_videos, [Content.media_id()]}}
-          | {:preserve, :show_errors | :link_own_review | Content.publication_error()}
+          | {:preserve, {:show_errors, [Content.attachment_ref()]}}
+          | {:preserve, :link_own_review | Content.publication_error()}
 
   @doc "What the editor does after `publish_tip/4` or `publish_review/5`."
   @spec after_publish(
@@ -40,7 +41,8 @@ defmodule Tips.Content.PublicationContractTest.Consumer do
   def after_publish({:error, {:upload_pending, ids}}, _slug),
     do: {:preserve, {:wait_for_videos, ids}}
 
-  def after_publish({:error, %Ecto.Changeset{}}, _slug), do: {:preserve, :show_errors}
+  def after_publish({:error, %Ecto.Changeset{errors: errors}}, _slug),
+    do: {:preserve, {:show_errors, attachment_refs(errors)}}
 
   def after_publish({:error, reason}, _slug)
       when reason in [:unauthenticated, :unconfirmed, :forbidden, :not_found, :conflict],
@@ -54,6 +56,13 @@ defmodule Tips.Content.PublicationContractTest.Consumer do
   def after_lookup({:ok, nil}, _slug), do: {:preserve, :retry_same_key}
   def after_lookup({:ok, receipt}, slug), do: after_publish({:ok, receipt}, slug)
   def after_lookup({:error, reason}, slug), do: after_publish({:error, reason}, slug)
+
+  # Invalid or incomplete intent names the offending attachments in metadata.
+  defp attachment_refs(errors) do
+    for {:uploads, {_message, meta}} <- errors,
+        ref = meta[:slot] || meta[:media_id],
+        do: ref
+  end
 
   # The tip slug comes from the current authorized projection, never the receipt.
   defp destination(%{kind: :tip, id: id}, slug), do: "/tips/#{id}/#{slug}"
@@ -284,9 +293,13 @@ defmodule Tips.Content.PublicationContractTest do
       File.write!(path, "png bytes")
       retained = image_fixture(tip, %{description: "Before"})
       video = staged_video_fixture(author)
-      uploads = every_attachment(retained, video, path)
 
-      assert Enum.map(uploads, &elem(&1, 0)) == declared_tags(Content, :attachment)
+      assert Enum.map(every_attachment(retained, video, path), &elem(&1, 0)) ==
+               declared_tags(Content, :attachment)
+
+      # A new publication selects staged videos and new image files only.
+      assert [{:staged_video, _}, {:image_file, "slot-image", %{path: ^path}, _}] =
+               every_attachment(retained, video, path) |> Enum.slice(1, 2)
 
       for {kind, target} <- [
             tip: {:new_tip, Ecto.UUID.generate()},
@@ -297,6 +310,36 @@ defmodule Tips.Content.PublicationContractTest do
         assert {:ok, ^target} = Target.cast(target)
         assert changeset(kind, attrs, target).valid?
       end
+    end
+
+    test "an incomplete new write is rejected while its key still reconciles" do
+      # Cast ignores an absent optional key, so a changeset alone would save
+      # an incomplete tip with a silent blank.
+      attrs = Map.delete(tip_attrs(%{prompt: "  indented\n"}), :prompt)
+      assert changeset(:tip, attrs, {:new_tip, Ecto.UUID.generate()}).valid?
+
+      for %{operation: :publish, kind: kind, errors: errors} = scenario <-
+            incomplete_write_scenarios() do
+        rejected = rejected_write(kind, errors)
+        assert Map.take(errors_on(rejected), Keyword.keys(errors)) != %{}, scenario.name
+
+        refs = for {:uploads, {_, meta}} <- errors, ref = meta[:slot] || meta[:media_id], do: ref
+
+        assert Consumer.after_publish({:error, rejected}, "x") ==
+                 {:preserve, {:show_errors, refs}}
+      end
+
+      # Under a committed key, the same incomplete intent reconciles first:
+      # identity with unknown equivalence, never a validation error.
+      tip = tip_fixture()
+      scenarios = Map.new(comparison_scenarios(), &{&1.name, &1})
+
+      for name <- ["missing field is not a blank", "absent selection is not an empty selection"] do
+        assert %{expected: :unknown} = scenarios[name]
+      end
+
+      assert Consumer.after_publish({:ok, publication_receipt(tip, :existing_unknown)}, "x") ==
+               {:preserve, :offer_edit}
     end
 
     test "gap for #73: unknown vocabulary raises instead of returning a changeset error" do
@@ -333,6 +376,18 @@ defmodule Tips.Content.PublicationContractTest do
 
   defp changeset(:review, attrs, {:new_review, tip_id, key}),
     do: Review.changeset(%Review{}, Map.merge(attrs, %{submission_key: key, tip_id: tip_id}))
+
+  # The changeset a write returns for incomplete intent, built from the
+  # scenario's expected errors; #73 produces it.
+  defp rejected_write(kind, errors) do
+    Enum.reduce(errors, changeset(kind, attrs(kind), new_target(kind)), fn
+      {field, {message, meta}}, changeset ->
+        Ecto.Changeset.add_error(changeset, field, message, meta)
+    end)
+  end
+
+  defp new_target(:tip), do: {:new_tip, Ecto.UUID.generate()}
+  defp new_target(:review), do: {:new_review, 1, Ecto.UUID.generate()}
 
   # Characterizes the existing changeset casting only; #72 owns the comparator.
   defp changeset_fields(kind, attrs) do

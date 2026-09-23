@@ -26,11 +26,29 @@ defmodule Tips.Content.EditContractTest.Consumer do
   def after_edit({:error, :outcome_unknown}), do: {:preserve, :reload_saved_state}
   def after_edit({:error, {:upload_failed, refs}}), do: {:preserve, {:fix_attachments, refs}}
   def after_edit({:error, {:upload_pending, ids}}), do: {:preserve, {:wait_for_videos, ids}}
-  def after_edit({:error, %Ecto.Changeset{}}), do: {:preserve, :show_errors}
+
+  def after_edit({:error, %Ecto.Changeset{errors: errors}}) do
+    refs =
+      for {:uploads, {_message, meta}} <- errors, ref = meta[:slot] || meta[:media_id], do: ref
+
+    {:preserve, {:show_errors, refs}}
+  end
 
   def after_edit({:error, reason})
       when reason in [:unauthenticated, :unconfirmed, :forbidden, :not_found],
       do: {:preserve, reason}
+
+  @doc "Editor pages live under `/editor`, apart from every reader path."
+  @spec editor_path(
+          :new_tip
+          | {:new_review, pos_integer()}
+          | {:edit, Content.kind(), pos_integer()}
+        ) ::
+          String.t()
+  def editor_path(:new_tip), do: "/editor/tips/new"
+  def editor_path({:new_review, tip_id}), do: "/editor/tips/#{tip_id}/reviews/new"
+  def editor_path({:edit, :tip, id}), do: "/editor/tips/#{id}/edit"
+  def editor_path({:edit, :review, id}), do: "/editor/reviews/#{id}/edit"
 
   @doc """
   Conflict choices after comparing the editor's original base with the latest
@@ -137,6 +155,51 @@ defmodule Tips.Content.EditContractTest do
 
     assert Consumer.after_edit({:error, :conflict}) == {:preserve, :conflict}
     assert Consumer.after_edit({:error, :outcome_unknown}) == {:preserve, :reload_saved_state}
+  end
+
+  test "an incomplete edit is rejected, never saved as a partial edit" do
+    tip = tip_fixture(user_fixture(), %{prompt: "saved prompt"})
+    changed = %{edit_base(tip, []).attrs | body: tip.body <> " More."}
+
+    # Cast ignores an absent key: the changeset would keep the saved prompt
+    # and still advance the version. Completeness is checked first.
+    changeset = Tip.changeset(tip, Map.delete(changed, :prompt))
+    assert changeset.valid?
+    assert Ecto.Changeset.get_field(changeset, :prompt) == "saved prompt"
+
+    for %{operation: :edit, kind: kind, errors: errors} = scenario <-
+          incomplete_write_scenarios() do
+      row = if kind == :tip, do: tip, else: review_fixture(tip)
+      schema = row.__struct__
+
+      rejected =
+        Enum.reduce(errors, schema.changeset(row, %{}), fn {field, {message, meta}}, cs ->
+          Ecto.Changeset.add_error(cs, field, message, meta)
+        end)
+
+      assert Map.take(errors_on(rejected), Keyword.keys(errors)) != %{}, scenario.name
+      refs = for {:uploads, {_, meta}} <- errors, ref = meta[:slot] || meta[:media_id], do: ref
+      assert Consumer.after_edit({:error, rejected}) == {:preserve, {:show_errors, refs}}
+    end
+  end
+
+  test "editor paths never collide with a reader slug" do
+    tip = tip_fixture(user_fixture(), %{title: "Edit"})
+
+    assert Tip.changeset(%Tip{submission_key: tip.submission_key}, %{tip_attrs() | title: "Edit"}).valid?
+
+    assert %{slug: "edit"} = Projection.metadata(nil, tip)
+
+    reader_path = "/tips/#{tip.id}/edit"
+
+    editor_paths =
+      Enum.map(
+        [:new_tip, {:new_review, tip.id}, {:edit, :tip, tip.id}, {:edit, :review, 7}],
+        &Consumer.editor_path/1
+      )
+
+    refute reader_path in editor_paths
+    assert Enum.all?(editor_paths, &String.starts_with?(&1, "/editor/"))
   end
 
   test "incomplete base disables safe conflict recovery" do

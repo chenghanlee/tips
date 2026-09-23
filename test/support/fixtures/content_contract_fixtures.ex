@@ -119,7 +119,10 @@ defmodule Tips.ContentContractFixtures do
   @doc "A restored image slot whose file must be reselected."
   def missing_image(slot), do: {:missing_image, slot}
 
-  @doc "One of each attachment variant, in draft order."
+  @doc """
+  One of each attachment variant, in draft order, for shape coverage. A valid
+  write accepts only some of them; see `incomplete_write_scenarios/0`.
+  """
   def every_attachment(%Asset{} = retained, %Asset{} = video, path) do
     [
       retained(retained),
@@ -144,6 +147,57 @@ defmodule Tips.ContentContractFixtures do
         |> Enum.sort_by(& &1.position)
         |> Enum.map(&retained/1)
     }
+  end
+
+  @doc """
+  Incomplete write intents and the changeset errors a new write (absent key)
+  or an edit must return before any provider work or transaction (#73, #74).
+
+  An existing key is reconciled first, so the same intent under a committed
+  key returns that publication with `:existing_unknown` instead.
+  """
+  def incomplete_write_scenarios do
+    missing = {"is missing", [validation: :intent]}
+
+    [
+      %{
+        name: "missing optional field",
+        kind: :tip,
+        operation: :publish,
+        intent: %{attrs: Map.delete(tip_attrs(), :prompt), uploads: []},
+        errors: [prompt: missing]
+      },
+      %{
+        name: "missing required field",
+        kind: :review,
+        operation: :edit,
+        intent: %{attrs: Map.delete(review_attrs(), :body), uploads: []},
+        errors: [body: missing]
+      },
+      %{
+        name: "absent selection",
+        kind: :review,
+        operation: :publish,
+        intent: %{attrs: review_attrs(), uploads: nil},
+        errors: [uploads: missing]
+      },
+      %{
+        name: "unresolved image slot",
+        kind: :tip,
+        operation: :edit,
+        intent: %{attrs: tip_attrs(), uploads: [{:retained, 11, nil}, missing_image("slot-2")]},
+        errors: [uploads: {"needs the image reselected", [validation: :intent, slot: "slot-2"]}]
+      },
+      %{
+        name: "retained attachment in a new publication",
+        kind: :tip,
+        operation: :publish,
+        intent: %{attrs: tip_attrs(), uploads: [{:retained, 11, nil}]},
+        errors: [
+          uploads: {"is not attached to this publication", [validation: :intent, media_id: 11]}
+        ]
+      }
+    ]
   end
 
   @doc """
