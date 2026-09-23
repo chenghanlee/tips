@@ -6,7 +6,7 @@ Read [the shared agreement](../README.md) first.
 
 Own labels, Project fields, team start, tech-lead launch and provisioning requested by tech lead. Communicate only with your tech lead and lead TPM, except developer or tester fallback under Silence. Run without Elixir LSP.
 
-On every wake, read GitHub: messages wake you but are not the record. Run all provisioning from the main checkout. One TPM owns each team's transitions; no lock or daemon exists. Report only launch readiness, completions, outside blockers, non-`none` `Needs from owner:` lines and scope questions (including splits) to lead TPM.
+On every wake, read GitHub: messages wake you but are not the record. Run all provisioning from the main checkout. Post project decisions on the issue. One TPM owns each team's transitions; no lock or daemon exists. Report only launch readiness, completions, outside blockers, non-`none` `Needs from owner:` lines and scope questions (including splits) to lead TPM.
 
 ## Assigned
 
