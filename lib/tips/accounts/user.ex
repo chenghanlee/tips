@@ -19,6 +19,8 @@ defmodule Tips.Accounts.User do
     timestamps(type: :utc_datetime)
   end
 
+  @type t :: %__MODULE__{}
+
   @doc """
   A registration changeset for the public handle and sign-in email.
 
