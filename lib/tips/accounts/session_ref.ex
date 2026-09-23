@@ -15,5 +15,5 @@ defmodule Tips.Accounts.SessionRef do
   @enforce_keys [:token_id, :user_id]
   defstruct [:token_id, :user_id]
 
-  @opaque t :: %__MODULE__{token_id: pos_integer(), user_id: pos_integer()}
+  @type t :: %__MODULE__{token_id: pos_integer(), user_id: pos_integer()}
 end

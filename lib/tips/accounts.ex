@@ -15,7 +15,11 @@ defmodule Tips.Accounts do
     * Operations take the scope and business attrs as separate arguments.
       Ignore identity in attrs, params, events and job args; never turn it
       into a scope.
-    * Public reads and rendering take no scope and look up no token.
+    * Public read APIs may take `scope | nil` for viewer-aware output. Their
+      truly public projection needs no token lookup, no
+      `Tips.Accounts.SessionRef` and no sign-in. An author- or moderator-only
+      branch inside the same API still requires fresh admission before it
+      returns privileged data; an optional scope alone never authorizes it.
     * Workers take ids in job args, reload committed state and never retain a
       browser scope or `Tips.Accounts.SessionRef`.
 

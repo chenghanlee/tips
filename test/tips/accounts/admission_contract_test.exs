@@ -51,6 +51,16 @@ defmodule Tips.Accounts.AdmissionContractTest do
       end)
     end
 
+    # Privileged read of one's own hidden item. The scope must already have
+    # passed fresh admission (#47 readmit_scope/1); this example does not fake
+    # that step. The owning operation checks ownership/role/visibility, not
+    # check_eligibility/2, so a full ban does not deny it. It chooses :not_found
+    # or :forbidden for non-owners; this example hides existence.
+    def read_own_hidden(nil, _owner_id), do: {:error, :unauthenticated}
+
+    def read_own_hidden(%Scope{user: %User{id: user_id}}, user_id), do: {:ok, :hidden_item}
+    def read_own_hidden(%Scope{}, _owner_id), do: {:error, :not_found}
+
     # Worker: no browser scope or session reference; reload committed state by id.
     def perform_worker(%{"user_id" => user_id}) do
       Repo.transact(fn ->
@@ -131,7 +141,7 @@ defmodule Tips.Accounts.AdmissionContractTest do
       assert Scope.for_user(nil) == nil
     end
 
-    test "a scope cannot be built from client-shaped identity" do
+    test "Scope.for_user/1 rejects client-shaped identity" do
       user = user_fixture()
 
       for payload <- [%{"id" => user.id}, %{id: user.id}, user.id, Map.from_struct(user)] do
@@ -291,6 +301,19 @@ defmodule Tips.Accounts.AdmissionContractTest do
       assert {:ok, :deleted} = CallerExamples.delete_own(scope, user.id)
       assert {:error, :forbidden} = CallerExamples.delete_own(scope, user_fixture().id)
       assert {:error, :unauthenticated} = CallerExamples.delete_own(nil, user.id)
+    end
+
+    test "a full-banned owner may still read their own hidden item; others may not" do
+      user = user_fixture()
+      scope = Scope.for_user(user)
+      ban(user)
+
+      assert {:ok, :hidden_item} = CallerExamples.read_own_hidden(scope, user.id)
+
+      assert {:error, :not_found} =
+               CallerExamples.read_own_hidden(Scope.for_user(user_fixture()), user.id)
+
+      assert {:error, :unauthenticated} = CallerExamples.read_own_hidden(nil, user.id)
     end
 
     test "a full-banned moderator loses moderation actions but keeps the admitted role for reads" do
