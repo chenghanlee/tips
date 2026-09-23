@@ -90,9 +90,25 @@ model = ""
 effort = "high"
 compaction_percent = 35
 """
-FAKE_HERDR = r"""#!/usr/bin/env python3
+# A 40-column pane: "recent" keeps soft wraps; "recent-unwrapped" rejoins each wrapped
+# line, dropping whitespace at wrap points as the worst case for echo protection.
+PANE_SCREEN = r"""
+def pane_screen(text, source, width=40):
+    lines = [
+        [line[i : i + width] for i in range(0, max(len(line), 1), width)]
+        for line in text.splitlines()
+    ]
+    if source == "recent-unwrapped":
+        return "\n".join("".join(row.rstrip() for row in rows) for rows in lines)
+    return "\n".join(row for rows in lines for row in rows)
+"""
+FAKE_HERDR = (
+    r"""#!/usr/bin/env python3
 import json, os, subprocess, sys
 from pathlib import Path
+"""
+    + PANE_SCREEN
+    + r"""
 
 p = Path(os.environ["FAKE_HERDR_STATE"])
 state = json.loads(p.read_text())
@@ -177,17 +193,18 @@ if a[:2] == ["pane", "run"]:
     snap = json.loads(next(x[9:] for x in lines if x.startswith("SNAPSHOT=")))
     state["cwd"] = snap["cwd"]
     state["env"] = snap["env"]
+    state["echo"] = a[3]
     state["output"] = r.stdout
     p.write_text(json.dumps(state))
     sys.exit(0)
 if a[:2] == ["pane", "wait-output"]:
-    import re
-
-    match = (
-        a[a.index("--match") + 1] in state.get("output", "")
-        and a[a.index("--source") + 1] == "detection"
-    )
-    reply({}, 0 if match and not state.get("shell_timeout") else 1)
+    source = a[a.index("--source") + 1]
+    if source not in ("visible", "recent", "recent-unwrapped"):
+        reply({"error": "invalid --source " + source}, 2)
+    # shell_timeout: setup produced no output, so only the typed command echo is on screen.
+    output = "" if state.get("shell_timeout") else state.get("output", "")
+    screen = pane_screen(state.get("echo", "") + "\n" + output, source)
+    reply({}, 0 if a[a.index("--match") + 1] in screen else 1)
 if a[:2] == ["agent", "start"]:
     state["launch_env"] = {
         k: state.get("env", {}).get(k)
@@ -219,6 +236,7 @@ if a[:2] == ["agent", "start"]:
     reply({"agent": agent}, 1 if state.get("start_fails") else 0)
 reply({"error": "unhandled fake Herdr command: " + repr(a)}, 2)
 """
+)
 FAKE_STOP = r"""import json,os,subprocess,sys
 from pathlib import Path
 p=Path(os.environ['FAKE_HERDR_STATE']); s=json.loads(p.read_text())
@@ -476,6 +494,40 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert self.git("-C", str(self.wt), "rev-parse", "HEAD") == new
         assert self.git("-C", str(self.wt), "branch", "--show-current") == ""
 
+    def test_review_ref_pushed_only_to_origin_is_fetched_before_resolution(self) -> None:
+        # A freshly pushed head is absent from main until fetched (#229).
+        remotes = tempfile.TemporaryDirectory(prefix="tips remote ")
+        self.addCleanup(remotes.cleanup)
+        origin, work = Path(remotes.name) / "origin.git", Path(remotes.name) / "work"
+        execute(["git", "clone", "-q", "--bare", self.root, origin], env=self.env, check=True)
+        self.git("remote", "set-url", "origin", str(origin))
+        execute(["git", "clone", "-q", origin, work], env=self.env, check=True)
+
+        def push_commit(message: str) -> str:
+            identity = ["-c", "user.name=Test", "-c", "user.email=test@example.invalid"]
+            git = ["git", "-C", str(work)]
+            execute([*git, *identity, "commit", "-q", "--allow-empty", "-m", message], check=True)
+            execute([*git, "push", "-q", "origin", "HEAD:task/28-fix"], env=self.env, check=True)
+            sha = execute([*git, "rev-parse", "HEAD"], check=True).stdout.strip()
+            unknown = execute(["git", "cat-file", "-e", sha], cwd=self.root, env=self.env)
+            assert unknown.returncode != 0, "commit must exist only on origin"
+            return sha
+
+        first = push_commit("first pushed head")
+        self.call("--start", ref=first)
+        assert self.git("-C", str(self.wt), "rev-parse", "HEAD") == first
+        second = push_commit("repair")
+        p = self.call(ref=second)
+        assert "Advanced team-3-lead in place" in p.stdout
+        assert self.git("-C", str(self.wt), "rev-parse", "HEAD") == second
+
+        p = self.call(ref="0" * 40, ok=False)
+        assert "rev-parse" in p.stderr
+        assert self.git("-C", str(self.wt), "rev-parse", "HEAD") == second
+        assert not any(e[0] == "stop_agent" for e in self.state()["events"])
+        assert [a["name"] for a in self.state()["agents"]] == ["team-3-lead"]
+        assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 1
+
     def test_ui_flag_selects_lead_ui_role_and_is_lead_only(self) -> None:
         self.call("--ui", ok=False)
         (self.root / "agent/teams/config.toml").write_text(
@@ -695,8 +747,10 @@ class WorktreeIntegrationTest(unittest.TestCase):
         wait = next(e for e in s["events"] if e[:2] == ["pane", "wait-output"])
         marker = wait[wait.index("--match") + 1]
         command = next(e[3] for e in s["events"] if e[:2] == ["pane", "run"])
-        assert marker not in command
+        # Unwrapping may drop whitespace at a wrap point; the echo must still not match.
+        assert marker not in "".join(command.split())
         assert marker in s["output"]
+        assert wait[wait.index("--source") + 1] == "recent-unwrapped"
 
     def test_requested_tree_conflicts_refused_before_stop_or_checkout(self) -> None:
         self.call("--start")
