@@ -13,7 +13,8 @@ from typing import cast
 
 from team import command_args, execute, require_git_admin
 
-from .test_task_worktree import CONFIG  # Fixed fixture values, independent of production tuning.
+# Fixed fixture values, independent of production tuning; one 40-column pane model.
+from .test_task_worktree import CONFIG, PANE_SCREEN
 
 SCRIPT = Path(__file__).resolve().parents[1] / "team.py"
 
@@ -125,7 +126,8 @@ while True: time.sleep(.05)
             "import subprocess,sys; p=subprocess.Popen(sys.argv[2:]); open(sys"
             '.argv[1],"w").write(str(p.pid)); sys.exit(p.wait())'
         )
-        p = subprocess.Popen(
+        # Reviewed S603: fixed synthetic argv for an owned test child, no shell.
+        p = subprocess.Popen(  # noqa: S603
             command_args(
                 [
                     "python3",
@@ -255,8 +257,12 @@ class GitAdminGuardTest(unittest.TestCase):
             assert (common / "HEAD").read_text() == "ref: refs/heads/main\n"
 
 
-TEAM_HERDR = r"""#!/usr/bin/env python3
-import json, os, sys
+TEAM_HERDR = (
+    r"""#!/usr/bin/env python3
+import json, os, subprocess, sys
+"""
+    + PANE_SCREEN
+    + r"""
 
 p = os.environ["HERDR_FIXTURE"]
 s = json.load(open(p))
@@ -321,12 +327,22 @@ elif a[:2] == ["agent", "start"]:
 elif a[:2] == ["workspace", "close"]:
     s["workspaces"] = []
     s["panes"] = []
-elif a[:2] not in (["pane", "run"], ["pane", "wait-output"], ["agent", "prompt"]):
+elif a[:2] == ["pane", "run"]:
+    # Execute the setup; a lost setup leaves only the typed command echo on screen.
+    output = subprocess.run(["bash", "-c", a[3]], capture_output=True, text=True).stdout
+    s["screen"] = a[3] + "\n" + ("" if s.get("setup_lost") else output)
+elif a[:2] == ["pane", "wait-output"]:
+    if opt("--source") not in ("visible", "recent", "recent-unwrapped"):
+        sys.exit("invalid --source " + opt("--source"))
+    if opt("--match") not in pane_screen(s.get("screen", ""), opt("--source")):
+        sys.exit("timed out waiting for output match")
+elif a[:2] != ["agent", "prompt"]:
     sys.exit("Unexpected " + repr(a))
 json.dump(s, open(p, "w"))
 if a[:2] != ["pane", "run"]:
     print(json.dumps({"result": result}))
 """
+)
 
 
 class TeamLifecycleTest(unittest.TestCase):
@@ -396,6 +412,23 @@ class TeamLifecycleTest(unittest.TestCase):
         setups = [c[3] for c in self.calls() if c[:2] == ["pane", "run"]]
         assert "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=35" in setups[0]
         assert "--strict-mcp-config" in starts[0]
+
+    def test_narrow_pane_setup_acknowledges_output_but_never_its_echo(self) -> None:
+        r = self.run_team("start", "1")
+        assert r.returncode == 0, r.stderr
+        command = next(c[3] for c in self.calls() if c[:2] == ["pane", "run"])
+        wait = next(c for c in self.calls() if c[:2] == ["pane", "wait-output"])
+        token = wait[wait.index("--match") + 1]
+        assert wait[wait.index("--source") + 1] == "recent-unwrapped"
+        # Unwrapping may drop whitespace at a wrap point; the echo must still not match.
+        assert token not in "".join(command.split())
+
+    def test_lost_setup_output_never_starts_coordinator(self) -> None:
+        self.state.write_text(json.dumps({"workspaces": [], "panes": [], "setup_lost": True}))
+        r = self.run_team("start", "1")
+        assert r.returncode != 0
+        assert "timed out waiting for output match" in r.stderr
+        assert not any(c[:2] == ["agent", "start"] for c in self.calls())
 
     def test_repository_configuration_validates_without_herdr_mutation(self) -> None:
         env = dict(self.env, TIPS_TEAM_CONFIG=str(SCRIPT.parent / "config.toml"))

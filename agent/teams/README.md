@@ -11,7 +11,8 @@ The lead TPM coordinates assigned work in [Project 15](https://github.com/users/
 
 ## Check changes to these scripts
 
-From your task worktree, use Python 3.12 and the installed Ruff and Pyright tools:
+Developers run these four commands in their task worktree before pushing, with
+Python 3.12 and the installed Ruff and Pyright tools:
 
 ```sh
 ruff check agent/teams
@@ -19,6 +20,11 @@ ruff format --check agent/teams
 pyright --project agent/teams/pyproject.toml
 python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
 ```
+
+The required `checks` job runs the same four commands. Reviewers (tester and tech
+lead, Codex or Claude) do not rerun them locally: they open the `checks` run for the
+exact reviewed head, confirm each of these steps ran and passed, and link that run
+in their record.
 
 [Python check settings](pyproject.toml) follow the harness's Python profile: strict
 types, a complexity limit of 10, and the same lint rules. The test assertion
@@ -29,10 +35,12 @@ Tests use disposable Git repositories, a fake Herdr CLI, and owned child process
 They do not operate live teams. Process tests require permission to run `ps` and
 signal their own children.
 
-Ruff's two S603 findings remain unsuppressed: the shared command runner and the
-process-test launcher accept variable argument lists. Review these calls for
-trusted executable selection and argument handling; test success alone does not
-prove subprocess safety.
+Two reviewed S603 exceptions carry inline `# noqa: S603`: the shared command
+runner `team.py:execute` and the process-test launcher `StopAgentTest.client`.
+Both accept variable argument lists but run without a shell, on a resolved
+executable with fixed or test-owned arguments. Suppress nothing else. Review any
+change to these calls for trusted executable selection and argument handling; the
+passing lint does not prove subprocess safety.
 
 ## Roles
 
@@ -64,7 +72,7 @@ Edit [agent/teams/config.toml](config.toml) to change team limits, client/model/
 
 The generated Codex config applies `launch.codex_lsp_approval_mode` only to the four enabled LSP tools. It leaves the overall approval and sandbox policies in place. This uses the [supported per-tool MCP setting](https://developers.openai.com/codex/mcp); `never` otherwise rejects a tool that requires approval.
 
-Database suffixes combine `team.db_suffix_prefix`, the team number and `roles.<role>.db_suffix`. Test ports combine `team.port_base`, team number times `team.port_stride`, and the role's `port_offset`. The launcher exports `PGPORT`, `TIPS_DB_SUFFIX`, `TIPS_TEST_PORT`, `MIX_ENV` and `TIPS_CHECK_TIMEOUT_SECONDS` directly to the coding process. Leave those computed resources in place for tests, including Wallaby.
+Database suffixes combine `team.db_suffix_prefix`, the team number and `roles.<role>.db_suffix`. Test ports combine `team.port_base`, team number times `team.port_stride`, and the role's `port_offset`. The launcher exports `PGPORT`, `TIPS_DB_SUFFIX`, `TIPS_TEST_PORT`, `MIX_ENV` and `TIPS_CHECK_TIMEOUT_SECONDS` directly to the coding process. Leave those computed resources in place for tests, including Wallaby. To check them from a client's shell tool, run `env | grep -E '^(PGPORT|MIX_ENV|TIPS_)'`; macOS `printenv` prints only its first named variable.
 
 ## Task readiness
 
@@ -189,9 +197,9 @@ Brief immediately after confirming the launched client; do not wait for project 
 
 **One comment per role.** The developer, the tester and the tech lead each keep one PR comment and edit it in place, adding a `## <short SHA> <outcome>` round per reviewed head, newest last, with `###` headings inside a round. A handoff links that comment and names the SHA. No new comment per round.
 
-**Tester:** Review the first pushed head in full, then each repair delta, first for local correctness, then callers and related features/tests, then end-to-end behavior. Map acceptance to named tests; trust CI only for commands it ran. Independently run missing relevant checks using the assigned environment. Add the verdict and evidence to the tester comment and send its link and reviewed SHA to the tech lead. Send actionable findings to the developer too; a passing verdict needs no developer acknowledgment. Repairs receive another verdict. Required acceptance failures block completion regardless of severity.
+**Tester:** Review the first pushed head in full, then each repair delta, first for local correctness, then callers and related features/tests, then end-to-end behavior. Map acceptance to named tests; trust CI only for commands it ran. Independently run missing relevant checks using the assigned environment; `agent/teams` Python checks come from CI, not a local rerun. Add the verdict and evidence to the tester comment and send its link and reviewed SHA to the tech lead. Send actionable findings to the developer too; a passing verdict needs no developer acknowledgment. Repairs receive another verdict. Required acceptance failures block completion regardless of severity.
 
-**Tech lead:** After the tester passes the last repair, run `gh pr update-branch "$PR"` and take the resulting head. Read the whole diff of that integrated head against `main` and run the full check suite once on it. Write the review record as the `## <short SHA>` round for that head in the lead comment, with these five `###` headings, spelled exactly, each with substance:
+**Tech lead:** After the tester passes the last repair, run `gh pr update-branch "$PR"` and take the resulting head. Read the whole diff of that integrated head against `main` and run the full check suite once on it, except the `agent/teams` Python checks, which reviewers read from the exact-head `checks` run (see [Check changes to these scripts](#check-changes-to-these-scripts)). Write the review record as the `## <short SHA>` round for that head in the lead comment, with these five `###` headings, spelled exactly, each with substance:
 
 1. `### Local correctness` — the changed functions and modules on their own.
 2. `### Downstream effects` — callers, related modules, features and tests the change touches.

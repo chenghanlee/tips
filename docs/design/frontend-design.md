@@ -49,7 +49,16 @@ An unfinished signup expires seven days after registration. Keep the verificatio
 
 Use dedicated routable pages for creating and editing tips and reviews, with one editor LiveView module per content kind and `:new`/`:edit` actions in the same authenticated live session. The page owns the form lifecycle; function components/helpers share behavior. Do not embed review editors in the tip page or use modal editors. The explicit publication-to-edit handoff patches within that LiveView to preserve page-owned uploads; `handle_params` freshly authorizes the target through Content. Keep upload configuration and relevant DOM identity stable during that transition. Unrelated target/account changes must never inherit its values. After content acknowledgement and safe draft clearing, navigate to the tip or the review’s single-review URL. Hidden content follows authorized presentation. Failed, divergent or uncertain outcomes preserve the editor until resolved.
 
-This is the agreed application of [Phoenix's page-navigation pattern](https://phoenix-live-view.hexdocs.pm/live-navigation.html). Exact route paths and the remaining LiveView boundaries are still to be designed.
+This is the agreed application of [Phoenix's page-navigation pattern](https://phoenix-live-view.hexdocs.pm/live-navigation.html). Content routes:
+
+| Page | Path |
+|---|---|
+| Tip | `/tips/:id/:slug` |
+| Selected review (single-review view) | `/reviews/:id` |
+| New tip / edit tip | `/editor/tips/new` / `/editor/tips/:id/edit` |
+| New review / edit review | `/editor/tips/:tip_id/reviews/new` / `/editor/reviews/:id/edit` |
+
+Editor pages live under `/editor`, so no tip slug (including `edit`, from a tip titled "Edit") can reach an editor, and slugs need no reserved words. TipsWeb derives the tip slug from the current authorized projection, including the neutral placeholders; publication and edit receipts carry identity and state, never redirect URLs. A review destination stays readable under an unavailable parent. The reader routes are wired by the tip-page work and the editor routes, with fresh authorization on handoff, by the editor work. The remaining LiveView boundaries are still to be designed.
 
 ## Navigation and content
 
@@ -315,7 +324,7 @@ Search matches optional Prompt and Result text as well as tip and review bodies,
 
 Search help describes keyword and meaning-based matching. Do not advertise quotation marks as an exact-match operator in the MVP; strict phrase search is deferred pending developer trials.
 
-A review link (`?review=id`) shows the tip context and only that review, headed by its author and dates with its evidence disclosure open and a native anchor, plus a "Show all reviews" link that removes the selected-review parameter, both reviewer setup filters and the review page, returning to the unfiltered normal list at page one with the current or default sort. Selected-review mode shows no list sort, filter or pagination controls; its direct lookup ignores those list parameters. Browser Back still restores the actual prior filtered URL. There is no pinned copy in the ranked list and no dedup rule. When the linked review is unavailable, keep the tip context, show "Review deleted by author" or "Review removed by moderators" when the backend supplies that authorized state, otherwise "Review unavailable," and offer the same Show all reviews link. Do not substitute a different review.
+A review link (`/reviews/:id`) shows the review's current authorized tip context and only that review, headed by its author and dates with its evidence disclosure open and a native anchor, plus a "Show all reviews" link to the current authorized tip permalink (`/tips/:id/:slug`) with both reviewer setup filters and the review page cleared, opening the normal list at page one with the current or default sort. Selected-review mode shows no list sort, filter or pagination controls; its direct lookup ignores those list parameters. Browser Back still restores the actual prior filtered URL. There is no pinned copy in the ranked list and no dedup rule. When the linked review is unavailable, keep the tip context (a placeholder when the tip is unavailable too), show "Review deleted by author" or "Review removed by moderators" when the backend supplies that authorized state, otherwise "Review unavailable," and offer the same Show all reviews link. An unknown or malformed review id has no parent to derive: return not found, without inventing tip context. Do not substitute a different review.
 
 Empty states are one line each, distinct from retrieval errors: "No tips yet" on an empty feed, "No tips match these filters" for a filtered empty result, per-filter copy on an empty profile list with the contribution link shown only when the viewer is eligible, and an inbox line covering helpful votes on tips and reviews and new reviews. No illustrations.
 
