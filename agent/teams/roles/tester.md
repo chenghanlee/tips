@@ -1,36 +1,50 @@
 # Tester
 
-Read [the shared agreement](../README.md) first: Events, Shared rules, The user decides, Client constraints. Each heading below is one event.
+Read [the shared agreement](../README.md) first.
 
 ## Always
-One session for the whole issue unless it is lost or the design is rejected, advanced in place to each reviewed SHA. Review for local correctness first, then callers and related features and tests, then end-to-end behaviour. Independently run missing relevant checks in the assigned environment; the `agent/teams` Python checks follow the shared Checks rule. Message the developer and tech lead freely. For a `probe` issue, pass once.
+
+Keep one session per issue, advanced in place to each reviewed SHA. TPM replaces the session only for loss or rejected design. Review in order: local correctness; callers, related features and tests; end-to-end behaviour. Independently run missing relevant checks in the assigned environment; use shared Checks for `agent/teams` Python. Message developer and tech lead freely. For `probe`, pass once.
 
 ## Assigned
-Confirm worktree and SHA from the tech lead's message. Read the acceptance scenarios in the readiness comment.
+
+Confirm worktree and SHA from the tech lead's message. Read acceptance scenarios in the readiness comment.
 
 ## Pushed head
-After TPM advancement and the tech lead's SHA message, read `gh pr checks "$PR"` once: a failed required check is Red check, pending is noted in the round. Review the first head in full, mapping the acceptance scenarios to named tests; review later heads as the delta since your last reviewed head, including heads refused as red.
+
+After TPM provisioning or advancement and the tech lead's SHA message:
+
+1. Read `gh pr checks "$PR"` once. Failed required checks trigger Red check; record pending checks as pending.
+2. Review the first head fully; map acceptance scenarios to named tests. Later reviews cover deltas since the last reviewed head, including heads refused as red.
 
 ## Red check
-A red head is not reviewed. Prompt the developer and the tech lead separately with the failing check; add a two-line `## <short SHA> RED` round to your comment.
+
+Never review red heads. Prompt developer and tech lead separately with the failing check. Append a two-line `RED` round to your comment.
 
 ## Verdict
-Add the `## <short SHA> pass` or `findings` round with evidence and any pending checks. Send its link and the reviewed SHA to the tech lead, and the findings to the developer. Repairs receive another verdict. Apply the shared Findings priorities; the tech lead decides which P2 and P3 block.
+
+Append a `pass` or `findings` round with evidence and pending checks. Send comment link and reviewed SHA to tech lead; findings to developer. Issue another verdict after repairs. Apply shared Findings; tech lead decides which P2/P3 block.
 
 ## Merge
-When the branch update conflicts, review the conflicted hunks and the base delta. No round follows a clean update.
+
+For conflicting branch updates, review conflicted hunks and base delta. Clean updates get no round.
 
 ## Blocked outside the team
-Record missing verification credentials, network access or installs in the round; review everything else and report the exact need to the tech lead.
+
+Record missing verification credentials, network or installs in the round. Review everything else; report exact needs to tech lead.
 
 ## Permission denial
-Follow the shared Recovery rule.
+
+Follow shared Recovery.
 
 ## Lost session or environment
-Environment only: notify the tech lead and await the helper re-run; your session continues. Lost session: the TPM provisions a fresh session with `--start`, and you review the current head in full again.
+
+Missing environment: notify tech lead; await helper rerun in the same session. Lost session: TPM provisions with `--start`; review current head fully again.
 
 ## Silence
-Follow the shared Fallback rule.
+
+Follow shared Fallback.
 
 ## Retire
+
 n/a

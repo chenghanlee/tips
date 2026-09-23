@@ -1,8 +1,8 @@
 # Agent teams
 
-Operating agreement for the agents that build Tips. Read Events, Shared rules, The user decides, Client constraints, then your role card under `roles/`. [AGENTS.md](../../AGENTS.md) governs engineering. GitHub issues and PRs hold requirements, decisions, review history and evidence. [config.toml](config.toml) defines agent settings; never repeat its defaults in commands or prose. Humans set the machine up once with [SETUP.md](SETUP.md). Run commands from the repository root.
+Agents building Tips: read this agreement, then your role card. [AGENTS.md](../../AGENTS.md) governs engineering. Keep requirements, decisions, review history and evidence in GitHub issues/PRs. Never repeat [config.toml](config.toml) defaults in commands or prose. Humans perform [SETUP.md](SETUP.md) once. Run commands from the repository root.
 
-Role names and flags:
+Team flow: lead TPM assigns → team TPM provisions → tech lead briefs → developer pushes → tester reviews → tech lead merges → team TPM reports → lead TPM retires. Blocking findings return to developer for repair and another tester verdict. Role cards define gates and exceptions.
 
 | Role card | Agent name | Helper flag |
 |---|---|---|
@@ -13,48 +13,80 @@ Role names and flags:
 | [Tester](roles/tester.md) | `team-N-test` | `--role test` |
 
 ## Events
-Each role card lists these events in order. A message belongs to the event it reports; Assigned covers only the first brief and provisioning requests. `n/a`: the event cannot reach this role. "Not defined": no rule exists; post the question on the issue, then prompt the tech lead (a tech lead prompts its team TPM, a team TPM prompts `lead-tpm`, the lead TPM asks the user).
+
+Classify messages by the reported event; Assigned covers only the first brief and provisioning requests. Each card uses this order. `n/a` means the event cannot reach that role. "Not defined" means no rule exists: post the question on the issue, then prompt the next role up: worker (developer or tester) → tech lead → team TPM → lead TPM → user.
 
 1. **Always**: continuous duties.
 2. **Assigned**: the first issue, brief or provisioning request arrives.
-3. **Pushed head**: a review-ready SHA exists on the PR branch; a reviewer reads the first head in full and later heads as a delta.
-4. **Red check**: a required check failed on a head. Pending is not red.
-5. **Verdict**: a tester or tech lead round is complete.
-6. **Merge**: the PR is ready to integrate, or has merged.
+3. **Pushed head**: review-ready PR SHA; reviewers read the first head fully, later heads as deltas.
+4. **Red check**: required check failed; pending is not red.
+5. **Verdict**: tester or tech lead round completed.
+6. **Merge**: PR ready to integrate, or merged.
 7. **Blocked outside the team**: progress needs the user or another team: secrets, credentials, network, installs, purchases, scope.
-8. **Permission denial**: a tool or client refused an action.
-9. **Lost session or environment**: a client, worktree or launch environment is missing or wrong.
-10. **Silence**: a message got no reply, or failed to send.
-11. **Retire**: the issue merged and the team's resources are released.
+8. **Permission denial**: tool or client refused an action.
+9. **Lost session or environment**: client, worktree or launch environment missing or wrong.
+10. **Silence**: message unanswered or failed to send.
+11. **Retire**: issue merged; team resources released.
 
 ## Shared rules
-**Handoff.** For each handoff, record evidence on GitHub, then deliver its link with `herdr agent prompt`. A GitHub comment or a final chat response wakes nobody. Before ending the turn, verify the Herdr command succeeded; if it failed, report the error and do not claim delivery. A handoff is one line: evidence link, SHA, action and owner (the role that acts next); link the existing contract instead of copying it. Every dispatch names the exact recipient and the exact command to run on completion or a blocker; "reply to the lead" alone is insufficient. The same handoff serves readiness, implementation, review, merge and blockers. Provisioning requests and replies, and freeform questions between developer, tester, tech lead and team TPM, are messages, not handoffs; a code question carries a pushed SHA so the reader inspects that revision in its own worktree. Prompt each recipient separately. Example; substitute the team number and evidence:
+
+**Handoff.** Every handoff sender:
+
+1. Record evidence on GitHub.
+2. Send one line via `herdr agent prompt`: evidence link, SHA, action, owner (next acting role). Link the existing contract instead of copying it. Prompt recipients separately.
+3. Before ending the turn, verify the Herdr command succeeded. On failure, report the error; never claim delivery.
+
+GitHub comments and final chat responses wake nobody. Use this handoff for readiness, implementation, review, merge and blockers. Every dispatch must name the exact recipient and completion/blocker command; “reply to the lead” is insufficient. Provisioning requests/replies and freeform questions among developer, tester, tech lead and team TPM are messages, not handoffs. Code questions must include a pushed SHA for inspection in the recipient's own worktree.
+
+Example: substitute team number and evidence.
 
 ```bash
 herdr agent prompt "team-$N-lead" "$EVIDENCE_URL SHA=$SHA; action=dispatch tester; owner=team-$N-lead"
 ```
 
-**Waiting.** Send via Herdr, finish independent work, then end the turn; the reply arrives as a new prompt. No `sleep`, polling loop, monitor, cron, hook or `--wait`. The one exception is the tech lead's timed CI wait before merge. No status-file PRs, merge queue, polling daemon or own-list approval exists.
+**Waiting.** After sending via Herdr, finish independent work and end the turn. Replies arrive as new prompts. Never use `sleep`, polling loops, monitors, cron, hooks or `--wait`; only the tech lead's timed pre-merge CI wait is exempt. No status-file PRs, merge queue, polling daemon or own-list approval.
 
-**Decisions.** Decision-makers post on the issue or PR before proceeding: tech leads for engineering, team TPMs for project state. Only GitHub records are durable. The asker links that post in its next handoff. The approving review round is the closing record; decisions made in chat that are not already in PR threads go in its body. No separate closing note.
+**Decisions.** Before proceeding, tech leads record engineering decisions; team TPMs record project-state decisions. Use an issue or PR: only GitHub records are durable. Askers link the decision in their next handoff. The approving review round closes the record; include chat decisions absent from PR threads in its body. No separate closing note.
 
-**Commands.** Run lifecycle and messaging commands directly and keep their stdout, stderr and exit status; do not pipe them through `tail` or ad hoc JSON formatters. Parse Herdr JSON only when a later step needs a returned field, under `result`. A formatter failure does not prove failed delivery; inspect once with `herdr agent get <name>` before resending. A successful send confirms submission, not completion. Confirm a checkout with `pwd` and `git rev-parse HEAD`.
+**Commands.** Run lifecycle and messaging commands directly; retain stdout, stderr and exit status. Never pipe through `tail` or ad hoc JSON formatters. Parse Herdr's JSON output only when a later step needs a field under `result`. After formatter failure, inspect once with `herdr agent get <name>` before resending: failed formatting does not prove failed delivery. Successful sends confirm submission, not completion. Verify checkouts with `pwd` and `git rev-parse HEAD`.
 
-**Git.** `main` is protected. Work on short-lived `task/<issue>-<slug>` branches in worktrees under `.worktrees/`; keep the slug across title changes. While any team is live the main checkout is read-only for source changes: never switch its branch, edit, commit or run tests there, because running clients and the lifecycle scripts are rooted at it. Repository administration such as fetch and worktree creation runs from main, by the team TPM, or by the lead TPM for `team.py start` and `team.py stop`; the helper fetches for reviewer refs and new developer branches, not when it reuses an existing developer worktree; when freshness matters, ask the TPM for an explicit fetch. Compare against `origin/main`, never local `main`. The developer owns its task worktree; the tester and tech lead have separate detached, read-only review worktrees; no agent edits another's checkout. Open a draft PR early; mark it ready at the first handoff. Commit cohesive changes and run relevant checks before pushing. Unpushed commits may be reorganized; published commits are fixed, so bring `origin/main` in by merge, never rebase. Never force-push or push implementation to `main`. Repository rules block force pushes on `task/**`, require merge commits, strict up-to-date branches, resolved conversations and the `checks`, `release` and `tips/independent-review` contexts, and delete merged remote heads. That gate is an interlock, not credential isolation. A documentation-only PR needs no local test run; the required CI still runs.
+**Git.** Every agent:
 
-**Issue state.** Add `active` when assigned. Add `blocked` when progress needs outside action, with the prerequisite, responsible role and next action in a comment; a waiting dependency is not automatically a user blocker, and `Needs from owner:` alone does not block. The team TPM owns labels; a worker adds only the Fallback `blocked`. Remove stale labels; clear `active` and `blocked` after merge. Do not mirror a workflow state machine into Project fields or keep a separate status document; the Project's Status field tracks Backlog, Ready, Active, In review, Blocked and Done, nothing finer: the lead TPM sets Ready, the team TPM sets the rest. A label change after launch is a scope question. An issue closes only when its required result is integrated and evidenced: partial work uses `Refs #number`, a completing PR uses `Closes #number`. Child issues created during the run count toward the goal. Milestone gates require end-to-end evidence on one integrated revision; closing a package requires its mandatory children and package acceptance evidence. Issues labelled `ui` get the `roles.lead_ui` tech lead, launched with `--ui`; developer and tester settings do not change. Issues labelled `probe` deliver evidence, not a code path: the tester passes once, the tech lead's review round keeps its five headings at one line each, probe code is disposable, and repairs go no further than the evidence needs.
+- Use short-lived `task/<issue>-<slug>` branches in worktrees under `.worktrees/`; retain slugs across title changes. Never push implementation to protected `main`.
+- While any team is live, keep the main checkout read-only for source changes: never switch its branch, edit, commit or test there, because clients and lifecycle scripts are rooted there.
+- Leave repository administration (fetch, worktree creation) to the team TPM in the main checkout; lead TPM runs `team.py start N` and `team.py stop N` there. The helper fetches for reviewer refs and new developer branches, not for a reused developer worktree; whenever freshness matters, request a TPM fetch.
+- Compare against `origin/main`, never local `main`. Developers own task worktrees; testers and tech leads have separate detached, read-only review worktrees. Never edit another agent's checkout.
+- Open draft PRs early; mark ready at first handoff. Commit cohesive changes; run relevant checks before pushing. Reorganize only unpushed commits. Published commits are fixed: merge `origin/main`, never rebase or force-push.
 
-**One comment per role.** The developer, tester and tech lead each keep one PR comment and edit it in place, adding a `## <short SHA> <outcome>` round per reviewed head, newest last, with `###` headings inside a round. Outcomes: `pushed` (developer), `pass`, `findings` or `RED` (tester), `review` (tech lead). A round lists what changed, the checks run or read, and open items, and marks the prior round's findings fixed or open. Handoffs link that comment and name the SHA; never create per-round comments.
+Repository rules block force pushes on `task/**`, require merge commits, strict up-to-date branches, resolved conversations and `checks`, `release`, `tips/independent-review`; merged remote heads are deleted. This gate is an interlock, not credential isolation. Documentation-only PRs skip local tests, never required CI.
 
-**Independence.** Nobody reviews or merges their own implementation. The tester may ask the developer anything, but its verdict cites code, tests and evidence, never the developer's explanation, because the common GitHub identity cannot mechanically prove reviewer independence. The tech lead decides technical disputes with evidence. Scope or product questions go tech lead, team TPM, lead TPM, user. Routine technical choices belong to the responsible role. A role receives only duties its configured launch policy can execute.
+**Issue state.** Team TPMs own labels; workers may add only Fallback `blocked`.
 
-**Findings.** P0 is critical exposure, irreversible loss or inability to operate. P1 is broken required behaviour, an authorization or consistency defect, or missing evidence needed to integrate safely. P2 and P3 are lower-impact defects or improvements; the developer repairs P0 and P1 at once and P2 and P3 unless the tech lead defers them; the tech lead decides which block and files follow-up issues for deferred findings, and a `findings` round whose findings are all deferred counts as a pass. Do not downgrade findings to pass. Required acceptance failures block completion regardless of severity. After repeated failed repairs, investigate the root cause.
+- Assignment: add `active`.
+- Progress needs outside action: add `blocked`; comment with prerequisite, responsible role and next action. A waiting dependency is not automatically a user blocker; a `Needs from owner:` line alone does not block.
+- Remove stale labels; clear `active` and `blocked` after merge.
+- Track workflow only in Project Status: Backlog, Ready, Active, In review, Blocked, Done. Lead TPM sets Ready; team TPM sets the rest. Never add finer workflow states or a separate status document.
+- After launch, escalate scope or role-label changes such as `ui`/`probe` as scope questions. Routine `active` and `blocked` updates remain state changes.
+- Close issues only after their required result is integrated and evidenced. Use `Refs #number` for partial work; `Closes #number` for completing PRs. New child issues count toward the goal.
+- Milestone gates need end-to-end evidence on one integrated revision. Package closure needs mandatory children and package acceptance evidence.
+- Issues labelled `ui` get the `roles.lead_ui` tech lead, launched with `--ui`; developer and tester settings stay unchanged.
+- `probe`: deliver evidence, not a code path. Tester passes once; tech lead keeps five review headings, one line each. Probe code is disposable; repair only as evidence requires.
 
-**Recovery.** For a permission blocker, preserve the work and report the failed operation, exact error and local state in your PR comment (the issue when no PR exists) and to the tech lead (a tech lead reports to its TPM); keep working on what the denial does not touch; do not route around the denial through another application or a remote-only commit. For context recovery, keep the issue and branch open and record base and head SHAs, your PR comment URL, working-tree cleanliness, committed and uncommitted work, unresolved findings, failed or unrun checks and the next action. Reviewers keep scratch output under their worktree's `tmp/` so the checkout stays clean. Transfer ownership explicitly before another writer starts. Never reset or stash someone else's work. Before reassigning an unresponsive client, inspect Git and pane evidence: working, blocked on a dialog (Permission denial), or lost (Lost session).
+**One comment per role.** Developer, tester and tech lead each edit one PR comment. Append `## <short SHA> <outcome>` per reviewed head, newest last, with `###` headings. Outcomes: developer `pushed`; tester `pass`, `findings`, `RED`; tech lead `review`. Each round lists changes, checks run or read and open items; mark prior findings fixed or open. Handoffs link this comment and SHA. Never create per-round comments.
 
-**Environment.** The helper applies the role's configured model, effort, permissions, database suffix and test port in the live target process, exports `PGPORT`, `TIPS_DB_SUFFIX`, `TIPS_TEST_PORT`, `MIX_ENV`, `TIPS_CHECK_TIMEOUT_SECONDS` and `TIPS_PROVIDER_ENV_FILE`, and links the main checkout's `.agents/skills` into each worktree. Leave those computed values in place for tests, including Wallaby. Read provider settings from the main checkout's `.env` by path; never write secrets into worktrees; the user puts a new credential into that `.env`. Check with `env | grep -E '^(PGPORT|MIX_ENV|TIPS_)'`; macOS `printenv` prints only its first named variable. Startup reports client launched, not index ready: Expert indexes in the background, and nobody adds a compile gate or a probe LSP; see the [LSP guide](../lsp/README.md). Agents propose defaults and use synthetic fixtures; they never fabricate firsthand production content. Real-provider tests run only through invocations the user authorized, quoted on the issue by the lead TPM, with scoped secrets, never automatically on PR code.
+**Independence.** Never review or merge your own implementation. Testers may question developers, but the verdict cites code, tests and evidence, never developer explanations, because the shared GitHub identity cannot mechanically prove independence. Tech leads settle technical disputes with evidence. Route scope/product questions through tech lead → team TPM → lead TPM → user. Responsible roles decide routine technical choices. Assign only duties the role's configured launch policy can execute.
 
-**Checks.** Trust CI only for commands it ran. For the `agent/teams` Python scripts, CI is the evidence: open the `checks` run for the exact reviewed head, confirm these four steps passed, and link the run in your round:
+**Findings.** P0: critical exposure, irreversible loss or inability to operate. P1: broken required behaviour, authorization/consistency defects or missing evidence for safe integration. P2/P3: lower-impact defects or improvements. Developers repair P0/P1 immediately, P2/P3 unless deferred by the tech lead. Tech leads decide which findings block and file follow-up issues for deferrals. All findings deferred means the `findings` round passes; never downgrade findings to pass. Acceptance failures block regardless of severity. After repeated failed repairs, investigate the root cause.
+
+**Recovery.** On permission denial, preserve work. Record operation, exact error and local state in your PR comment (issue if no PR); report to the tech lead, or team TPM if you are the tech lead. Continue unaffected work. Never bypass denial through another application or remote-only commit.
+
+For context recovery, keep issue and branch open. Record base and head SHAs, PR comment URL, working-tree cleanliness, committed and uncommitted work, unresolved findings, failed or unrun checks and next action. Reviewers keep scratch output under their worktree's `tmp/` so the checkout stays clean. Explicitly transfer ownership before another writer starts. Never reset or stash another's work. Before reassigning unresponsive clients, inspect Git and pane evidence: working, dialog-blocked (Permission denial), or lost (Lost session or environment).
+
+**Environment.** The helper applies the role’s configured model, effort, permissions, database suffix and test port in the live target process. It exports `PGPORT`, `TIPS_DB_SUFFIX`, `TIPS_TEST_PORT`, `MIX_ENV`, `TIPS_CHECK_TIMEOUT_SECONDS`, `TIPS_PROVIDER_ENV_FILE`, and links main checkout's `.agents/skills` into each worktree. Preserve these values in tests, including Wallaby.
+
+Read provider settings by path from main checkout's `.env`; only the user adds new credentials there. Never write secrets into worktrees. Inspect launch values with `env | grep -E '^(PGPORT|MIX_ENV|TIPS_)'`; macOS `printenv` prints only its first named variable. Startup confirms client launch, not index readiness: Expert indexes in the background. Never add a compile gate or probe LSP; see [LSP guide](../lsp/README.md). Agents propose defaults and use synthetic fixtures; never fabricate firsthand production content. Real-provider tests require user-authorized invocations quoted on the issue by lead TPM, with scoped secrets; never run automatically on PR code.
+
+**Checks.** Trust CI only for commands actually run. For `agent/teams` Python changes, CI is the evidence: open the exact-head `checks` run, verify these four steps passed and link the run in your round.
 
 ```sh
 ruff check agent/teams
@@ -63,23 +95,32 @@ pyright --project agent/teams/pyproject.toml
 python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
 ```
 
-Developers run them in their worktree before pushing when Ruff and Pyright are already on `PATH`; otherwise CI runs them, and nobody installs them. Those scripts use only the standard library; their tests use disposable Git repositories, a fake Herdr CLI and owned child processes, never live teams, and need permission to run `ps` and signal their own children. Two reviewed `# noqa: S603` exceptions exist, on `team.py:execute` and `StopAgentTest.client`: both accept variable argument lists but run without a shell, on a resolved executable with fixed or test-owned arguments. Suppress nothing else. The tech lead reviews trusted executable selection and argument handling whenever those calls change; passing lint cannot prove subprocess safety. Settings live in [pyproject.toml](pyproject.toml). A pending check is reported as pending, not waited for; the tech lead's timed wait before merge is the completion check. The user decides secret rotation; never rewrite history.
+Developers run these before pushing, in their worktree, if Ruff and Pyright are already on `PATH`; otherwise use CI. Agents never install them. Scripts use only standard-library dependencies. Tests use disposable Git repositories, fake Herdr and owned child processes, never live teams. Tests need permission to run `ps` and signal their own children.
+
+Only `team.py:execute` and `StopAgentTest.client` have reviewed `# noqa: S603` exceptions: variable argument lists, no shell, resolved executable, fixed or test-owned arguments. Suppress nothing else. When these calls change, tech leads review trusted executable selection and arguments; passing lint cannot prove subprocess safety. Settings: [pyproject.toml](pyproject.toml). If checks are pending, report them as pending without waiting; the tech lead's timed pre-merge wait checks completion. Users decide secret rotation; never rewrite history.
 
 **Secrets.** Never put credentials in logs, issues, PRs, handoffs or chat. Ordinary PR CI needs no production secrets.
 
-**Fallback.** Developer or tester: if your prompt to the tech lead fails to send, send the same message to the team TPM. If it sent but your work is blocked on an unanswered question, add `blocked` with a comment naming the tech lead and the question, prompt the team TPM with that comment's link, then end the turn.
+**Fallback.** Developers and testers: if a tech-lead prompt fails to send, send the same message to team TPM. If sent but an unanswered question blocks work, add `blocked`, comment with tech lead and question, prompt team TPM with that comment link, then end the turn.
 
 ## The user decides
-Material product changes, purchases, credentials, hosting, public launch and every machine-level install. No budget is fixed; that does not authorize purchases. Only the user starts the lead TPM (`agent/teams/team.py start lead`, never while another live agent owns `lead-tpm`), detects and restarts a silent lead TPM, runs a merge the lead TPM's own client denies, and rotates a leaked secret. With no live teams, the user or the lead TPM may branch in the main checkout; return it to `main` after merge. The intended VPS is the preproduction environment before launch. Inspect every permission dialog and follow the active approval policy; this document is never permission to answer an approval prompt.
 
-**No machine-level installs without the user's explicit approval.** No agent installs packages, tools or software or changes machine, sandbox or client configuration: `brew`, casks, `pip` or `uv tool`, `npm -g`, system or client settings, Docker images outside the compose file. Project dependencies declared in the repository go through the PR like any other change. When a task truly needs an install, the tech lead has the TPM mark the issue `blocked` with the exact command and the team continues unaffected work; the lead TPM asks the user, quotes the answer in an issue comment, the user runs the install, and the agent proceeds only from that link.
+User decisions: material product changes, purchases, credentials, hosting, public launch, all machine-level installs. No budget is fixed; that does not authorize purchases. Only the user starts lead TPM (`agent/teams/team.py start lead`, never while another live agent owns `lead-tpm`), detects/restarts silent lead TPMs, executes merges denied by lead TPM's client, and rotates leaked secrets. With no live teams, user or lead TPM may branch in the main checkout; return that checkout to `main` after merge. The intended VPS is preproduction before launch. Inspect every permission dialog and follow the active approval policy; this agreement never authorizes answering one.
 
-**Owner waiver.** With no live teams, the user may waive the independent review of a change they requested in the session. Only on the user's explicit instruction, the user or the lead TPM runs `publish_review.py --pr "$PR" --sha "$SHA" --owner-waiver "<reason>"` instead of `--record`; it posts a waiver comment on the PR and publishes the status pointing at it. Agents never invoke it on their own, and it does not waive CI. For a waived change that touches code, complete the ad-hoc Codex review in the lead TPM's Merge cell first, apply the accepted fixes, post the agreed outcome on the PR, then publish the waiver on the final head; the waiver covers the lead TPM's own fixes. Documentation-only changes need no Codex review. The lead TPM then merges with the same native command as a tech lead and records the four merge items.
+**Installs.** Agents never install packages, tools or software or change machine, sandbox or client configuration: `brew`, casks, `pip`, `uv tool`, `npm -g`, system or client settings, Docker images outside compose. Only the user installs, after explicit approval. Repository-declared dependencies go through PRs. For a necessary install:
+
+1. Tech lead asks TPM to add `blocked` with the exact command; team continues unaffected work.
+2. Lead TPM asks user and quotes the answer on the issue.
+3. User runs the install; agent proceeds only from the quoted-answer link.
+
+**Owner waiver.** With no live teams, users may waive independent review of changes they requested in the session. Only on explicit user instruction, user or lead TPM runs `publish_review.py --pr "$PR" --sha "$SHA" --owner-waiver "<reason>"` instead of `--record`. The command posts a waiver comment and status linking it. Agents never invoke waivers independently; CI remains required.
+
+For code changes, first complete the [lead TPM's ad-hoc Codex review](roles/lead-tpm.md#merge), apply accepted fixes and post the agreed outcome on the PR. Then publish the waiver on the final head, including lead TPM's fixes. Documentation-only changes need no Codex review. Lead TPM uses the tech lead's native merge command and records the [four merge items](roles/lead-tpm.md#merge).
 
 ## Client constraints
-- A Codex sandbox cannot write main's `.git`, so the team TPM runs all main-checkout Git administration; Claude tech leads follow the same flow. The helper and `team.py stop` refuse a caller that cannot write main's `.git`.
-- A Codex sandbox writes only under its own worktree root, which is why the chavruta file lives under the reviewer's `tmp/`. Codex `never` approval rejects any tool that requires approval, so the generated config sets per-tool approval for the four LSP tools only and leaves the sandbox as the user configured it.
-- A Codex reviewer outside a team cannot post to GitHub.
-- Claude auto mode may deny a tech lead's `gh pr merge`, a developer killing its own LSP child, copying or writing `.env`, and a pilot posting issue comments. Each is a permission denial.
-- `/new`, `/clear` and `cd` inside a running client do not reroot its LSP. A client cannot stop itself through `team.py stop`. `--kind` is optional and must match the role's configured kind.
 
+- Codex sandboxes cannot write main checkout's `.git`, so team TPM runs all Git administration there; Claude tech leads follow the same flow. The helper and `team.py stop` reject callers lacking that write access.
+- Codex writes only within its worktree, so chavruta lives in reviewer's `tmp/`. Codex `never` approval rejects tools needing approval, so generated config sets per-tool approval only for the four LSP tools, preserving the user's sandbox configuration.
+- Codex reviewers outside teams cannot post to GitHub.
+- Claude auto mode may deny tech-lead `gh pr merge`, developers killing their own LSP children, copying/writing `.env`, or pilots posting issue comments. Treat each as Permission denial.
+- `/new`, `/clear` and `cd` cannot reroot a running client's LSP. Clients cannot stop themselves with `team.py stop`. Optional `--kind` must match configured role kind.
