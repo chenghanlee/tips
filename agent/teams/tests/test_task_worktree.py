@@ -709,13 +709,16 @@ class WorktreeIntegrationTest(unittest.TestCase):
                 "name": "team-3-dev",
                 "pane_id": "wA:pD",
                 "agent": "codex",
+                "cwd": str(self.root / ".worktrees/27-other-issue"),
                 "foreground_cwd": str(self.root / ".worktrees/27-other-issue"),
             }
         ]
         self.save(s)
         self.call("--start", ok=False)
         assert not self.wt.exists()
-        s["agents"][0]["foreground_cwd"] = str(self.root / ".worktrees/28-same-issue")
+        s["agents"][0]["cwd"] = str(self.root / ".worktrees/28-same-issue")
+        # A foreground LSP child elsewhere must not change the teammate's root (#227).
+        s["agents"][0]["foreground_cwd"] = "/opt/homebrew/lsp-child"
         self.save(s)
         self.call("--start")
 

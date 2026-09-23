@@ -231,6 +231,11 @@ def descendants(rows: ProcessRows, root: int) -> set[int]:
         owned |= found
 
 
+def client_root(entity: Entity) -> str:
+    """The client's own directory. Foreground children such as LSP servers may run elsewhere."""
+    return entity.get("cwd") or entity.get("foreground_cwd") or ""
+
+
 def stop(pane: str, root: str | Path) -> None:
     root = Path(root)
     if not root.is_absolute():
@@ -295,7 +300,7 @@ def release_name(pane: str, root: Path, current: Entity) -> None:
         if agent.get("pane_id") == pane and agent.get("name"):
             if (
                 agent.get("agent") != current.get("agent")
-                or Path(agent.get("foreground_cwd") or agent.get("cwd", "")).resolve() != root
+                or Path(client_root(agent)).resolve() != root
             ):
                 raise RuntimeError(f"{pane}: owner changed during shutdown; preserved")
             try:
@@ -440,7 +445,7 @@ def coordinator(pane: Entity, name: str, role: str) -> None:
         if (
             agent.get("name") != name
             or agent.get("agent") != spec["kind"]
-            or Path(agent.get("foreground_cwd", "")).resolve() != main
+            or Path(client_root(agent)).resolve() != main
         ):
             raise RuntimeError(f"{pane['pane_id']}: conflicting coordinator; preserved")
         if agent.get("agent_status") in ("blocked", "unknown"):
@@ -522,7 +527,7 @@ def coordinator(pane: Entity, name: str, role: str) -> None:
     if (
         started.get("name") != name
         or started.get("agent") != spec["kind"]
-        or Path(started.get("foreground_cwd", "")).resolve() != main
+        or Path(client_root(started)).resolve() != main
         or started.get("agent_status") in ("blocked", "unknown")
     ):
         raise RuntimeError(
@@ -622,7 +627,7 @@ def stop_team(target: str) -> None:
         git("fetch", "origin")
     check_worktrees(roots)
     for pane in panes.values():
-        stop(pane["pane_id"], pane.get("foreground_cwd", pane["cwd"]))
+        stop(pane["pane_id"], client_root(pane))
     check_worktrees(roots)
     if roots or panes:
         drop_databases(target)
@@ -637,7 +642,7 @@ def owned_worktrees(panes: dict[str, Entity]) -> set[Path]:
     roots: set[Path] = set()
     # Validate every pane before stopping any client.
     for name, pane in panes.items():
-        root = Path(pane.get("foreground_cwd", pane["cwd"])).resolve()
+        root = Path(client_root(pane)).resolve()
         if root != main and (
             root.parent != main / ".worktrees"
             or Path(
