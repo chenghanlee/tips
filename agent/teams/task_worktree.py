@@ -19,9 +19,11 @@ from team import (
     Config,
     Entity,
     HerdrResult,
+    client_root,
     execute,
     load_config,
     parse_herdr,
+    require_git_admin,
     stop_agent,
 )
 
@@ -128,6 +130,7 @@ class WorktreeTask:
         self.root = Path(git("rev-parse", "--path-format=absolute", "--git-common-dir")).parent
         if Path.cwd() != self.root:
             raise RefusalError(f"Run from the main checkout: {self.root}")
+        require_git_admin(self.root / ".git", f"team-{self.args.team}-tpm")
         self.config_path = Path(
             os.environ.get("TIPS_TEAM_CONFIG", str(self.root / "agent/teams/config.toml"))
         ).resolve()
@@ -362,7 +365,7 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
         agents = self.herdr("agent", "list")["agents"]
         self.owner = None
         for agent in agents:
-            agent_root = agent.get("foreground_cwd") or agent.get("cwd")
+            agent_root = client_root(agent)
             self.check_teammate(agent, agent_root)
             relevant = (
                 agent.get("pane_id") == self.args.pane
@@ -561,7 +564,7 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
         )
         started = self.herdr("agent", "get", self.args.pane)["agent"]
         if (
-            (started.get("foreground_cwd") or started.get("cwd")) != str(self.worktree)
+            client_root(started) != str(self.worktree)
             or started.get("agent") != self.kind
             or started.get("name") != self.agent_name
             or (started.get("agent_status") in ("blocked", "unknown"))
