@@ -12,11 +12,11 @@ defmodule TipsWeb.UserLive.Registration do
         <div class="space-y-1 text-center">
           <h1 class="text-2xl font-semibold">Register for an account</h1>
           <p class="text-sm text-muted-foreground">
-            Already registered?
-            <.link navigate={~p"/users/log-in"} class="font-semibold text-foreground underline">
-              Log in
-            </.link>
-            to your account now.
+            Already registered? <.link
+              navigate={~p"/users/log-in"}
+              class="font-semibold text-foreground underline"
+              phx-no-format
+            >Log in</.link> to your account now.
           </p>
         </div>
 
