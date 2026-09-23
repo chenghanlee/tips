@@ -44,8 +44,9 @@ criteria and review evidence in the relevant GitHub issue and PR.
 
 ## Use agents (optional)
 
-- [Agent teams](agent/teams/README.md): prerequisites, configuration, task assignment,
-  handoffs, review and cleanup.
+- [Agent teams](agent/teams/README.md): the shared operating agreement, with one card per
+  role under `agent/teams/roles/`; [setup](agent/teams/SETUP.md) covers prerequisites and
+  configuration.
 - [Elixir language server](agent/lsp/README.md): build the shared tools and run a
   separate server for each coding client's worktree.
 

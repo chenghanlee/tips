@@ -28,7 +28,7 @@ by Git and shared from the main checkout. Per-worktree generated data belongs in
 ## Build and validate
 
 Install the tools listed in the [local development guide](../../docs/development/local-development.md).
-Builds also require Git, Bash, `patch`, Python 3.11+, Go and `unbuffer` (Expect).
+Builds also require Git, Bash, `patch`, Python 3.12, Go and `unbuffer` (Expect).
 Build from a worktree and set the shared installation directory explicitly:
 
 ```bash
@@ -61,8 +61,12 @@ in each worktree. Elixir and Erlang must be on the client's `PATH`.
 
 - Brief agents after client launch. Expert builds and indexes in the background.
 - Do not add a compile-ready gate or start another LSP as a probe.
-- Stop the client and verify all owned descendants exit before advancing a review
-  checkout or deleting its worktree. Conversation reset does not reroot the LSP.
+- A running reviewer's checkout advances in place and its LSP keeps the same
+  root. A client is stopped, with all owned descendants verified to exit, only
+  when a reviewer session is replaced or a worktree is deleted; the team scripts
+  do both (see the Team TPM and Lead TPM cards in the
+  [agent teams guide](../teams/README.md)). Conversation reset does not reroot
+  the LSP.
 - After wrapper path changes, regenerate client configs before their next launch.
   Update standalone client configs when the new path exists in main.
 
@@ -104,4 +108,4 @@ In the same pilot, each client must create a file and use its normal shell to
 stage, commit and push to a disposable remote. Verify clean worktrees, matching
 local/remote SHAs and receipt of the explicit Herdr handoff. Preserve permission
 errors and report them to the TPM; do not use an API workaround. Follow the
-[handoff instructions](../teams/README.md#context-and-handoff). No hooks or `--wait`.
+[handoff instructions](../teams/README.md#shared-rules). No hooks or `--wait`.

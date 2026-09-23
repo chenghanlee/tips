@@ -82,10 +82,11 @@ Search, image and video providers use ten fixed names, listed with empty values 
 `CLOUDFLARE_STREAM_API_TOKEN`, `CLOUDFLARE_STREAM_CUSTOMER_CODE` and
 `CLOUDFLARE_STREAM_SIGNING_KEY`.
 
-In dev and test, `config/runtime.exs` reads these names from the checkout's `.env`
-and from the exported environment. An exported value, even an empty one, wins over
-`.env`. After editing `.env`, re-source it or unset the overriding export. A
-missing `.env` or empty values still boot the app. Other names in `.env` are
+In dev and test, `config/runtime.exs` reads these names from the file named by
+`TIPS_PROVIDER_ENV_FILE` (default: the checkout's `.env`) and from the exported
+environment. An exported value, even an empty one, wins over the file. After
+editing the file, re-source it or unset the overriding export. A missing file or
+empty values still boot the app. Other names in `.env` are
 ignored here. A leading UTF-8 byte-order mark is ignored; a `.env` that exists but
 cannot be read stops startup.
 
@@ -225,9 +226,11 @@ unique `TIPS_DB_SUFFIX`, development HTTP `PORT`, and `TIPS_TEST_PORT`;
 use `PGPORT=5433` for the shared server. Tests start their own endpoint on
 `TIPS_TEST_PORT` (default 4002), including when browser tests are excluded.
 Each checkout already has its own `deps/` and `_build/`, so install dependencies
-in each worktree. Do not share or symlink those directories. Each checkout reads
-provider settings from its own `.env`; export the worktree's database and port
-values in its shell.
+in each worktree. Do not share or symlink those directories. For team-launched
+worktrees, the launcher exports `TIPS_PROVIDER_ENV_FILE` pointing at the main
+checkout's `.env`, so no worktree holds a copy; a manual worktree reads its own
+`.env` unless you export that variable. Export the worktree's
+database and port values in its shell.
 
 For example, after creating two worktrees at the revision to test:
 

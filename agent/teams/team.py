@@ -550,31 +550,12 @@ def coordinator(pane: Entity, name: str, role: str) -> None:
 
 
 def coordinator_brief(name: str, role: str) -> str:
+    card = "lead-tpm" if role == "lead_tpm" else "team-tpm"
+    report_to = "the user" if role == "lead_tpm" else "lead-tpm"
     return (
-        "Read agent/teams/README.md. You are "
-        f"{name}"
-        ". Coordinate from this read-only main checkout; coding agents sta"
-        "rt only in assigned worktrees. Use agent/teams/config.toml for la"
-        "unch settings. "
-        + (
-            "You talk only to team TPMs and the user; you assign issues, sta"
-            "rt and retire teams and resolve cross-team blockers. "
-            if role == "lead_tpm"
-            else "You talk only to the team tech lead, who dispatches the deve"
-            "loper and tester and advances review stages; you own labels, P"
-            "roject fields, the lead's launch and every task_worktree.py ru"
-            "n the lead requests, replying with pane, worktree and SHA. "
-        )
-        + "Each dispatch must in"
-        "clude the exact herdr agent prompt command addressed to its recip"
-        "ient, to execute after posting evidence and before ending the tur"
-        "n, including on a blocker. A GitHub comment or final chat respons"
-        "e is not a delivered handoff. Handoffs are one line: evidence lin"
-        "k, SHA, action, owner. Run commands directly; no hooks, --wait, s"
-        "leep, polling or ad hoc JSON formatters; send a prompt, then end "
-        "the turn and let the reply wake you. Report readiness to "
-        f"{('the user' if role == 'lead_tpm' else 'lead-tpm')}"
-        "; await assignment."
+        f"You are {name}. Read agent/teams/README.md, then your card "
+        f"agent/teams/roles/{card}.md. Coordinate from this read-only main "
+        f"checkout. Report readiness to {report_to}; await assignment."
     )
 
 
