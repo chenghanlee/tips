@@ -78,7 +78,9 @@ An issue closes only when its required result is integrated and evidenced. Parti
 
 ## Git
 
-Use protected `main`, short-lived `task/<issue>-<slug>` branches and worktrees under `.worktrees/`. The main checkout is read-only for source changes: never switch its branch, edit, commit or run tests there. Repository administration such as fetch and worktree creation runs from main. Make every source change in a worktree, including documentation and operational scripts.
+Use protected `main`, short-lived `task/<issue>-<slug>` branches and worktrees under `.worktrees/`. While any team is live, the main checkout is read-only for source changes: never switch its branch, edit, commit or run tests there, because running clients and the lifecycle scripts are rooted at it. Repository administration such as fetch and worktree creation runs from main. Make every source change in a worktree, including documentation and operational scripts.
+
+When no team is live, the user or the lead TPM may branch directly in the main checkout and return it to `main` once the PR merges. A PR that changes only documentation needs no local test run; the required CI checks still run on it.
 
 The TPM uses `agent/teams/task_worktree.py` to provision and start coding clients. Keep the existing task slug when an issue is renamed. The developer owns its task worktree; tester and tech lead have separate detached review worktrees. No agent edits another's checkout. The helper checks reviewer cleanliness even at the same SHA, checks selected-client configuration before changing HEAD, reuses a matching live session, and stops the old client and verifies descendant exit before advancing a reviewer. `/new`, `/clear` and `cd` inside an already-running client do not reroot its LSP.
 
