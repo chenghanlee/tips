@@ -39,7 +39,7 @@ is installed; selection alone does not establish compatibility.
 | Library | Selection and integration requirements |
 |---|---|
 | Background jobs | [Oban 2.24.1](https://hex.pm/packages/oban/2.24.1), using the application's Ecto Repo and PostgreSQL |
-| UI components | [SaladUI 1.0.0](https://hex.pm/packages/salad_ui/1.0.0); verify Phoenix/LiveView/Tailwind compatibility, hooks, form errors, focus, patches and reconnect |
+| UI components | [SaladUI 1.0.0](https://hex.pm/packages/salad_ui/1.0.0) in library mode, [verified](https://github.com/chenghanlee/tips/issues/41) with Phoenix 1.8.14, LiveView 1.2.12, Tailwind 4.3.0 and esbuild 0.25.4; adds `tw_merge` 0.1.1, `igniter` 0.8.4 and `sourceror` 1.12.3. After `mix salad.setup`: delete its prepended bare `@import "tailwindcss";`, register `SaladUI: SaladUI.SaladUIHook` by hand (the patcher skips `const liveSocket`), switch SaladUI's `.dark` tokens with the daisyUI theme (dark mode is unreadable otherwise), gate `form_message` errors with `used_input?/1`, and call components by module to avoid `CoreComponents` name clashes. Native `<details>` needs `JS.ignore_attributes(["open"])` to stay open across patches |
 | Markdown | [MDEx 0.13.5](https://hex.pm/packages/mdex/0.13.5); verify native dependency support on each target platform and the [rendering policy](../design/backend-design.md#markdown-embeds-and-secure-headers) |
 | Browser tests | [Wallaby 0.31.0](https://hex.pm/packages/wallaby/0.31.0), with matching Chrome and ChromeDriver |
 
