@@ -8,49 +8,50 @@ This gate verifies. It does not repair; gaps go back to their P1 owner.
 
 ## Verdict
 
-**Blocked on one returned gap.** Every canonical table, check, FK, index, view, trigger,
-generated column and extension is present and matches the design, apart from the
-accepted deviations below. Migrations run from empty, roll back fully and reapply to an
-identical schema. The report-versus-deletion schedules pass as direct database evidence,
-but no ExUnit fixture covers them yet (returned to #28).
+**Pass on the integrated revision.** Every canonical table, check, FK, index, view,
+trigger, generated column and extension is present and matches the design, apart from
+the accepted deviations below. Migrations run from empty, roll back fully and reapply to
+an identical schema. Report insertion versus author deletion is covered by the #252
+ExUnit fixture and by the direct schedules.
 
 | Acceptance | Result |
 |---|---|
 | No canonical invariant or search extension skipped; versions, revision and test names listed | **Pass.** [Checklist](#schema-checklist). Rows backed only by catalog queries say so. |
-| Report insertion/deletion and review liveness/counter schedules with real trigger/FK locks and deterministic synchronization | **Pass as direct evidence; regression fixture missing.** [Lock schedules](#lock-schedules). |
+| Report insertion/deletion and review liveness/counter schedules with real trigger/FK locks and deterministic synchronization | **Pass.** [Lock schedules](#lock-schedules). |
 | Request timeout stays 2 s after maintenance/migration; no generic deadlock retry | **Pass.** Client timeout per the accepted #31 decision; design wording aligned. [Timeout](#request-timeout). |
 
 ## Revision and versions
 
 | Item | Value |
 |---|---|
-| Source revision | `81501387eb77b220c95693f58076f7f8255da1b0` (`origin/main`) |
+| Source revision | Merge `c59fc2f9bfbde11b47376639b5c5e5f92c14a622` of `origin/main` `eb650f4d06aeae721fc18648d7f470f56adc8aa0` (includes #252) into this branch. No migration changed since the first run on `81501387eb77b220c95693f58076f7f8255da1b0`. |
 | Local database image | `ghcr.io/chenghanlee/tips-postgres:18.6-pgvector0.8.6-textsearch1.4.0`, image ID `sha256:3409e546c7c1646ad211b30cba66070ce2d5c03fde8edcd1432f5dbc854516cd` (local build, no repo digest) |
 | PostgreSQL | 18.6 (Debian 18.6-1.pgdg13+2), aarch64; `shared_preload_libraries = pg_textsearch` |
 | Extensions | `vector` 0.8.6, `pg_textsearch` 1.4.0, `plpgsql` 1.0 |
 | Toolchain | Elixir 1.20.4, OTP 29; ecto 3.14.2, ecto_sql 3.14.0, postgrex 0.22.4, oban 2.24.1, phoenix 1.8.14 |
 | Oban schema | version 14 (`oban_jobs` table comment), equal to Oban 2.24.1's current version |
 | Migrations | `20260920192551` auth, `20260920192753` Oban, `20260920210000` extensions, `20260921150000` content, `20260921160000` votes/counters, `20260921170000` flags/notifications, `20260921190000` media, `20260921200000` search |
-| Local database | `tips_test_team1_dev` on port 5433, created for this run |
+| Local database | `tips_test_team1_dev` on port 5433, dropped and recreated for this run |
 
 ## Migration lifecycle
 
-Local run in the isolated test database:
+Local run in the isolated test database, on the merge revision:
 
-1. `unbuffer mix ecto.create`: database did not exist before (not in `pg_database`); created.
-2. Before migrating: 0 relations in `public`, no `schema_migrations`.
+1. `unbuffer mix ecto.drop`, then confirmed the database was absent from `pg_database`.
+2. `unbuffer mix ecto.create`; 0 relations in `public` before migrating.
 3. `unbuffer mix ecto.migrate`: all 8 migrations applied.
 4. `unbuffer mix ecto.rollback --all`: all 8 reverted. Left only `schema_migrations` (0 rows) and `plpgsql`; no extension, function, type, table, view or index remained.
-5. `unbuffer mix ecto.migrate`: all 8 reapplied. `pg_dump --schema-only` after step 3 and step 5 are identical.
+5. `unbuffer mix ecto.migrate`: all 8 reapplied. `pg_dump --schema-only` after step 3 and step 5 are identical, and identical to the first gate run on `8150138`.
 
-Release migration, from CI on the same revision
-([Checks run 35898350811](https://github.com/chenghanlee/tips/actions/runs/35898350811),
+Release migration, from CI on integrated `main` `eb650f4`
+([Checks run 35911931510](https://github.com/chenghanlee/tips/actions/runs/35911931510),
 `release` job): `scripts/release_smoke.sh --skip-build` against the published database
-image. It printed revision `81501387eb77b220c95693f58076f7f8255da1b0`, release image ID
-`sha256:d1b38c8f3e1933e3960aa69b751917705be9a5431ab7bc7fb2f702e7ef46673a`, ran `bin/migrate`
+image. It printed revision `eb650f4d06aeae721fc18648d7f470f56adc8aa0`, release image ID
+`sha256:00fea2bb0a42617443137c526c6e26d8579f7bbdb2c7f77c3f2f80a7748ed671`, ran `bin/migrate`
 (8 migrations), and passed health, stopped-database 503 and restart-preserves-8-migrations.
-The local smoke was not run: CI evidence on the exact revision is valid, and the fixed
-smoke project must not collide with other teams' runs.
+The same run's `checks` job migrated, rolled back all 8 and reapplied them. This branch
+adds only documentation to that revision; its own PR CI runs the same jobs. The local
+smoke was not run: the fixed smoke project must not collide with other teams' runs.
 
 ## Schema checklist
 
@@ -99,11 +100,19 @@ No generic deadlock retry exists: no `rescue` or retry on `deadlock_detected` in
 
 ### Report insertion versus author deletion
 
-No ExUnit test covers this. [report_delete_schedules.exs](schema-lock-gate/report_delete_schedules.exs)
-runs the database slice of the design's lock sets on real connections:
+`test/tips/content/report_delete_concurrency_test.exs` (#252) runs the database slice of
+the design's lock sets on real independent transactions, with flag FKs and counter
+triggers active and observed `pg_blocking_pids` synchronization:
 
 - Report: lock the reporter `FOR NO KEY UPDATE` and check confirmed, unbanned and undeleted; select the live direct target `FOR SHARE`; insert the flag.
 - Author deletion: lock the author, the tip, then the review if the target is a review; set `deleted_at`. A review deletion fires `reviews_counts`, which writes the tip.
+
+All 8 passed: "tip|review report/delete report_first|delete_first with confirmed|unconfirmed reporter".
+Each asserts the flag outcome, deletion, visibility of the other item, vote and review
+counters, and a clean `Counters.recount!()`.
+
+[report_delete_schedules.exs](schema-lock-gate/report_delete_schedules.exs) repeats the
+schedules directly and adds an FK-only control. It passed again on the merge revision:
 
 | Schedule | Tip | Review |
 |---|---|---|
@@ -126,15 +135,15 @@ The control shows why `FOR SHARE` is required: the flag FK check takes only
 
 ## Returned gaps
 
-| Gap | Owner | Blocks #38 |
+| Gap | Owner | State |
 |---|---|---|
-| No ExUnit regression fixture for report insertion versus author deletion in both lock orders, with unconfirmed reporters. Direct evidence above passes. | #28 ([lead triage](https://github.com/chenghanlee/tips/issues/38#issuecomment-5800458374)) | Yes. After the reviewed repair is integrated, merge `origin/main` and rerun this evidence. |
+| No ExUnit regression fixture for report insertion versus author deletion | #28, repaired by [#252](https://github.com/chenghanlee/tips/issues/252) | Resolved: integrated in `eb650f4`, passed on the merge revision |
 
 ## Checks run
 
-On `81501387eb77b220c95693f58076f7f8255da1b0` plus this evidence:
+On merge `c59fc2f9bfbde11b47376639b5c5e5f92c14a622`:
 
-- `unbuffer mix test --trace`: 508 passed, 4 excluded (3 browser features, 1 real-provider), seed 161743. CI on the same revision ran the browser features: 511 passed, 1 excluded.
+- `unbuffer mix test --trace`: 540 passed, 4 excluded (3 browser features, 1 real-provider), seed 229776. All contract-named tests above passed. CI on `eb650f4` ran the browser features: 543 passed, 1 excluded.
 - `unbuffer mix compile --warnings-as-errors`, `unbuffer mix format --check-formatted`, `unbuffer mix credo --strict`, `python3 scripts/check_docs.py`: pass.
-- `unbuffer mix run --no-start docs/development/schema-lock-gate/report_delete_schedules.exs`: 8 schedules and 2 controls pass; test rows removed.
-- The script is outside `.formatter.exs` inputs and default Credo runs, so it is checked explicitly: `unbuffer mix format --check-formatted docs/development/schema-lock-gate/report_delete_schedules.exs` and `unbuffer mix credo --strict docs/development/schema-lock-gate/report_delete_schedules.exs` both pass. Expert LSP diagnostics: 0, but Expert supplies no document version, so this cannot certify the current file; the rerun above printed no compiler warnings.
+- `unbuffer mix run --no-start docs/development/schema-lock-gate/report_delete_schedules.exs`: 8 schedules and 2 controls pass; test rows removed; no compiler warnings.
+- The script is outside `.formatter.exs` inputs and default Credo runs, so it is checked explicitly: `unbuffer mix format --check-formatted docs/development/schema-lock-gate/report_delete_schedules.exs` and `unbuffer mix credo --strict docs/development/schema-lock-gate/report_delete_schedules.exs` both pass. Expert LSP diagnostics reported 0 without a document version, so they cannot certify the current file.
