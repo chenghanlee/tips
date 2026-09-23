@@ -85,6 +85,22 @@ defmodule Tips.ProviderConfigTest do
     assert results["R2_ENDPOINT"] == {:ok, "from-dotenv"}
   end
 
+  test "TIPS_PROVIDER_ENV_FILE selects another .env file; the checkout's is ignored",
+       %{tmp_dir: tmp_dir} do
+    alternate = Path.join(tmp_dir, "alternate.env")
+    File.write!(alternate, "R2_BUCKET=from-alternate\n")
+
+    results =
+      run!(tmp_dir, :test, @fetch_all,
+        dotenv: "R2_BUCKET=from-dotenv\nR2_ENDPOINT=from-dotenv\n",
+        exported: %{"TIPS_PROVIDER_ENV_FILE" => alternate}
+      )
+
+    assert results["R2_BUCKET"] == {:ok, "from-alternate"}
+    assert {:error, RuntimeError, message} = results["R2_ENDPOINT"]
+    assert message =~ "R2_ENDPOINT"
+  end
+
   test "missing or blank values fail by name only; unrelated values stay usable",
        %{tmp_dir: tmp_dir} do
     {output, 0} =
@@ -199,7 +215,7 @@ defmodule Tips.ProviderConfigTest do
     end
 
     exported =
-      (@names ++ ["TIPS_REAL_PROVIDERS"])
+      (@names ++ ["TIPS_REAL_PROVIDERS", "TIPS_PROVIDER_ENV_FILE"])
       |> Map.new(&{&1, nil})
       |> Map.merge(opts[:exported] || %{})
 
