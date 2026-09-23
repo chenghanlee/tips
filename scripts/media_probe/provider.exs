@@ -1590,28 +1590,32 @@ defmodule MediaProbe.R2Run do
     |> to_string()
   end
 
+  # Origin (S3) and public development URL are separate claims. A public request that
+  # never gets an HTTP response is unproven, not a failure of R2 semantics.
   defp roundtrip(e, key, bin, type) do
+    ext = Path.extname(key)
     Ctx.inventory(%{kind: "r2", key: key, phase: "requested"})
     {put, _} = s3("s3-put", :put, key, body: bin, headers: [{"content-type", type}])
     {get, grec} = s3("s3-get", :get, key)
     {pub1, p1} = Http.request("public-get-1", method: :get, url: public_url(key))
-    {pub2, p2} = Http.request("public-get-2", method: :get, url: public_url(key))
+    {_pub2, p2} = Http.request("public-get-2", method: :get, url: public_url(key))
     body_ok = fn r -> match?({:ok, %{status: 200}}, r) and elem(r, 1).body == bin end
 
     Ctx.assert(
       e,
-      "put_then_s3_and_public_reads_return_trusted_bytes_and_type:#{Path.extname(key)}",
+      "s3_put_then_get_returns_trusted_bytes_and_type:#{ext}",
       true,
-      match?({:ok, %{status: 200}}, put) and body_ok.(get) and body_ok.(pub1) and
-        grec.headers["content-type"] == type and p1.headers["content-type"] == type,
-      %{
-        key: key,
-        sha256: Http.sha(bin),
-        s3_get: Map.take(grec, [:status, :headers]),
-        public_get_1: Map.take(p1, [:status, :headers]),
-        public_get_2: Map.take(p2, [:status, :headers]),
-        public_second_ok: body_ok.(pub2)
-      }
+      match?({:ok, %{status: 200}}, put) and body_ok.(get) and
+        grec.headers["content-type"] == type,
+      %{key: key, sha256: Http.sha(bin), s3_get: Map.take(grec, [:status, :headers])}
+    )
+
+    Ctx.assert(
+      e,
+      "public_url_returns_trusted_bytes_and_type:#{ext}",
+      true,
+      public(p1, body_ok.(pub1) and p1.headers["content-type"] == type),
+      %{public_get_1: public_record(p1), public_get_2: public_record(p2)}
     )
 
     {del1, d1} = s3("s3-delete", :delete, key)
@@ -1627,26 +1631,36 @@ defmodule MediaProbe.R2Run do
 
     Ctx.assert(
       e,
-      "delete_is_immediate_at_origin_and_public_dev_url:#{Path.extname(key)}",
+      "s3_delete_is_immediate_at_origin:#{ext}",
       true,
-      match?({:ok, %{status: 204}}, del1) and match?({:ok, %{status: 404}}, get_after) and
-        match?({:ok, %{status: 404}}, pub_after) and match?({:ok, %{status: 404}}, pub_after2),
-      %{
-        delete: d1.status,
-        s3_get_after: ga.status,
-        public_after: Map.take(pa, [:status, :headers]),
-        public_after_3s: Map.take(pa2, [:status, :headers])
-      }
+      match?({:ok, %{status: 204}}, del1) and match?({:ok, %{status: 404}}, get_after),
+      %{delete: d1.status, s3_get_after: ga.status}
     )
 
     Ctx.assert(
       e,
-      "repeated_delete_is_idempotent:#{Path.extname(key)}",
+      "public_url_404_after_delete:#{ext}",
+      true,
+      public(
+        pa,
+        match?({:ok, %{status: 404}}, pub_after) and match?({:ok, %{status: 404}}, pub_after2)
+      ),
+      %{public_after: public_record(pa), public_after_3s: public_record(pa2)}
+    )
+
+    Ctx.assert(
+      e,
+      "repeated_delete_is_idempotent:#{ext}",
       true,
       match?({:ok, %{status: 204}}, del2),
       %{repeat_delete: d2.status}
     )
   end
+
+  defp public(%{status: nil}, _ok), do: :unproven
+  defp public(_record, ok), do: ok
+
+  defp public_record(r), do: Map.take(r, [:status, :headers, :error, :ms])
 end
 
 defmodule MediaProbe.CleanupRun do
@@ -2000,7 +2014,7 @@ defmodule MediaProbe.Main do
       },
       facts: Ctx.facts() |> Map.new(fn {k, v} -> {inspect(k), v} end),
       assertions: assertions,
-      verdict: if(required_bad == [], do: "pass", else: "fail")
+      verdict: verdict(required_bad)
     }
 
     json = report |> Jason.encode!(pretty: true) |> Redact.text()
@@ -2016,6 +2030,11 @@ defmodule MediaProbe.Main do
 
     System.halt(if report.verdict == "pass" and ok_redaction, do: 0, else: 1)
   end
+
+  defp verdict([]), do: "pass"
+
+  defp verdict(bad),
+    do: if(Enum.any?(bad, &(&1.status == "fail")), do: "fail", else: "unproven")
 
   # Tracked-file edits at run time mean the report does not describe git_sha exactly.
   defp tracked_changes do
