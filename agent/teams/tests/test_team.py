@@ -483,6 +483,17 @@ class TeamLifecycleTest(unittest.TestCase):
         assert self.run_team("start", "1").returncode == 0
         prompt = next(c[3] for c in self.calls() if c[:2] == ["agent", "prompt"])
         assert "Report readiness to lead-tpm" in prompt
+        assert "talk only to the team tech lead" in prompt
+        assert "let the reply wake you" in prompt
+
+    def test_lead_ui_must_share_lead_partition(self) -> None:
+        (self.repo / "agent/teams/config.toml").write_text(
+            CONFIG + '\n[roles.lead_ui]\nkind = "claude"\nmodel = ""\neffort = "high"\n'
+            'db_suffix = "l"\nport_offset = 1\n'
+        )
+        r = self.run_team("start", "1")
+        assert r.returncode != 0
+        assert "roles.lead_ui must share" in r.stderr
 
     def test_lead_start_applies_config_but_has_no_stop_subcommand(self) -> None:
         r = self.run_team("start", "lead")

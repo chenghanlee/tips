@@ -44,6 +44,14 @@ effort = "high"
 db_suffix = "l"
 port_offset = 2
 
+# Lead for issues labelled `ui`; launched with --ui. Shares the lead partition.
+[roles.lead_ui]
+kind = "claude"
+model = "fable"
+effort = "high"
+db_suffix = "l"
+port_offset = 2
+
 [roles.tpm]
 kind = "claude"
 model = ""

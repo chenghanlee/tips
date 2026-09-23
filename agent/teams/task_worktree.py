@@ -55,6 +55,7 @@ class Arguments(argparse.Namespace):
     review_ref: str | None
     start: bool
     force: bool
+    ui: bool
 
 
 def parse_arguments() -> Arguments:
@@ -72,6 +73,11 @@ def parse_arguments() -> Arguments:
         "--kind", choices=["codex", "claude"], help="Must match the configured role kind"
     )
     parser.add_argument("--review-ref")
+    parser.add_argument(
+        "--ui",
+        action="store_true",
+        help="Launch the lead with roles.lead_ui (issues labelled ui); lead role only",
+    )
     parser.add_argument("--start", action="store_true")
     parser.add_argument(
         "--force",
@@ -131,7 +137,7 @@ class WorktreeTask:
             self.config["timeouts"],
             self.config["launch"],
         )
-        self.role = cast(CodingRole, self.config["roles"][self.role_name])
+        self.role = cast(CodingRole, self.config["roles"][self.role_key()])
         self.kind = self.role["kind"]
         self.check_settings()
         self.model, self.effort = (self.role["model"], self.role["effort"])
@@ -158,6 +164,15 @@ class WorktreeTask:
             )
         if os.environ.get("HERDR_ENV") != "1":
             raise RefusalError("Run the worktree helper inside Herdr.")
+
+    def role_key(self) -> str:
+        if not self.args.ui:
+            return self.role_name
+        if self.role_name != "lead":
+            raise RefusalError("--ui applies only to the lead role.")
+        if "lead_ui" not in self.config["roles"]:
+            raise RefusalError("roles.lead_ui is not configured.")
+        return "lead_ui"
 
     def check_settings(self) -> None:
         if self.kind not in ("codex", "claude") or (self.args.kind and self.args.kind != self.kind):
@@ -403,6 +418,8 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
                 f"({self.owner.get('agent_status')})"
             )
             return True
+        if self.role_name == "lead":
+            return self.advance_in_place()
         if not self.args.start:
             raise RefusalError(
                 "A reviewer is running; use --start to stop it safely "
@@ -413,6 +430,18 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
         if git("-C", self.worktree, "status", "--porcelain", "--untracked-files=all"):
             raise RefusalError("Review checkout became dirty during shutdown; preserving it.")
         return False
+
+    def advance_in_place(self) -> bool:
+        """The lead stays through the issue; move its clean detached checkout to the new SHA."""
+        if self.owner is not None and self.owner.get("agent_status") in ("blocked", "unknown"):
+            raise RefusalError(
+                f"Lead session is {self.owner.get('agent_status')}; inspect its pane."
+            )
+        if not self.review_sha:
+            raise RefusalError("A running lead advances only to an explicit --review-ref.")
+        git("-C", self.worktree, "checkout", "--detach", "--no-overwrite-ignore", self.review_sha)
+        print(f"Advanced {self.agent_name} in place: {self.worktree} at {self.review_sha}")
+        return True
 
     def check_shell(self) -> None:
         if self.args.start or (
