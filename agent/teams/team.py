@@ -55,6 +55,7 @@ class Process(TypedDict):
 
 class ProcessInfo(TypedDict):
     shell_pid: int
+    foreground_process_group_id: int
     foreground_processes: list[Process]
 
 
@@ -199,6 +200,7 @@ def parse_herdr(output: str) -> HerdrResult:
 def validate_process_info(value: object) -> None:
     info = object_fields(value, "Herdr process_info")
     require_type(info.get("shell_pid"), int, "Herdr shell_pid")
+    require_type(info.get("foreground_process_group_id"), int, "Herdr foreground_process_group_id")
     for process in object_list(info.get("foreground_processes"), "Herdr foreground_processes"):
         require_type(process.get("pid"), int, "Herdr process pid")
         if "cwd" in process:
@@ -231,9 +233,21 @@ def descendants(rows: ProcessRows, root: int) -> set[int]:
         owned |= found
 
 
-def client_root(entity: Entity) -> str:
-    """The client's own directory. Foreground children such as LSP servers may run elsewhere."""
-    return entity.get("cwd") or entity.get("foreground_cwd") or ""
+def occupant(pane: str, info: ProcessInfo) -> tuple[Path, bool]:
+    """A pane's root and whether a client holds it.
+
+    The client leads the pane's foreground process group; LSP servers and other children
+    share the group but may run elsewhere. A bare shell leads its own group.
+    """
+    leader = info["foreground_process_group_id"]
+    leaders = [p for p in info["foreground_processes"] if p["pid"] == leader and p.get("cwd")]
+    if len(leaders) != 1:
+        raise RuntimeError(f"{pane}: cannot identify the foreground client; preserved")
+    return Path(leaders[0]["cwd"]).resolve(), leader != info["shell_pid"]
+
+
+def pane_occupant(pane: str) -> tuple[Path, bool]:
+    return occupant(pane, herdr("pane", "process-info", "--pane", pane)["process_info"])
 
 
 def stop(pane: str, root: str | Path) -> None:
@@ -256,7 +270,7 @@ def stop(pane: str, root: str | Path) -> None:
     identity = {pid: rows[pid][1] for pid in owned if pid in rows}
     signal_client(pane, current, clients, owned)
     wait_for_exit(pane, shell, identity)
-    release_name(pane, root, current)
+    release_name(pane, current)
     print(f"{pane}: client and owned descendants exited")
 
 
@@ -294,14 +308,12 @@ def wait_for_exit(pane: str, shell: int, identity: dict[int, str]) -> None:
         time.sleep(0.1)
 
 
-def release_name(pane: str, root: Path, current: Entity) -> None:
-    # Process exit can precede Herdr's name release; retire only this stopped owner.
+def release_name(pane: str, current: Entity) -> None:
+    # Process exit can precede Herdr's name release; retire only this stopped owner,
+    # never a replacement client that appeared after the verified exit.
     for agent in herdr("agent", "list")["agents"]:
         if agent.get("pane_id") == pane and agent.get("name"):
-            if (
-                agent.get("agent") != current.get("agent")
-                or Path(client_root(agent)).resolve() != root
-            ):
+            if agent.get("agent") != current.get("agent") or pane_occupant(pane)[1]:
                 raise RuntimeError(f"{pane}: owner changed during shutdown; preserved")
             try:
                 herdr("agent", "rename", pane, "--clear")
@@ -445,14 +457,13 @@ def coordinator(pane: Entity, name: str, role: str) -> None:
         if (
             agent.get("name") != name
             or agent.get("agent") != spec["kind"]
-            or Path(client_root(agent)).resolve() != main
+            or pane_occupant(pane["pane_id"]) != (main, True)
         ):
             raise RuntimeError(f"{pane['pane_id']}: conflicting coordinator; preserved")
         if agent.get("agent_status") in ("blocked", "unknown"):
             raise RuntimeError(f"{pane['pane_id']}: coordinator is not ready; inspect its pane")
         return
-    info = herdr("pane", "process-info", "--pane", pane["pane_id"])["process_info"]
-    if any(p["pid"] != info["shell_pid"] for p in info["foreground_processes"]):
+    if pane_occupant(pane["pane_id"])[1]:
         raise RuntimeError(f"{pane['pane_id']}: not an available shell")
     token = "team-setup-" + uuid.uuid4().hex
     env = {
@@ -527,7 +538,7 @@ def coordinator(pane: Entity, name: str, role: str) -> None:
     if (
         started.get("name") != name
         or started.get("agent") != spec["kind"]
-        or Path(client_root(started)).resolve() != main
+        or pane_occupant(pane["pane_id"]) != (main, True)
         or started.get("agent_status") in ("blocked", "unknown")
     ):
         raise RuntimeError(
@@ -627,7 +638,7 @@ def stop_team(target: str) -> None:
         git("fetch", "origin")
     check_worktrees(roots)
     for pane in panes.values():
-        stop(pane["pane_id"], client_root(pane))
+        stop(pane["pane_id"], pane_occupant(pane["pane_id"])[0])
     check_worktrees(roots)
     if roots or panes:
         drop_databases(target)
@@ -642,7 +653,7 @@ def owned_worktrees(panes: dict[str, Entity]) -> set[Path]:
     roots: set[Path] = set()
     # Validate every pane before stopping any client.
     for name, pane in panes.items():
-        root = Path(client_root(pane)).resolve()
+        root = pane_occupant(pane["pane_id"])[0]
         if root != main and (
             root.parent != main / ".worktrees"
             or Path(
