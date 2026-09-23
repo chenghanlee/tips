@@ -30,6 +30,29 @@ config :tips, Oban,
   repo: Tips.Repo,
   queues: [media: 1, embeddings: 1, maintenance: 1]
 
+# Admission limits (Tips.AdmissionLimiter): {limit, window_ms} per bucket.
+# MVP defaults chosen to allow ordinary use, not measured capacity. Windows are
+# fixed from first admission, so up to twice a budget can pass around a window
+# boundary. Buckets live in memory and reset on restart or deploy.
+config :tips, Tips.AdmissionLimiter,
+  # Sign-in, verification resend and email-change mail per normalized address:
+  # a few retries for a slow inbox, while bounding mail sent to one address.
+  auth_destination: {5, 15 * 60_000},
+  # The same requests per client IP: room for a shared network, while bounding
+  # one client that cycles through addresses.
+  auth_ip: {30, 15 * 60_000},
+  # Writes per account (publish, edit, vote, report): one a second on average,
+  # enough for interactive voting and editing.
+  write: {60, 60_000},
+  # Uploads per account: a few attachments per contribution, while bounding
+  # provider work.
+  upload: {20, 10 * 60_000},
+  # Hard cap on stored buckets. A full table denies new identities rather than
+  # evicting live buckets. Each bucket is one small ETS row with a fixed-size key.
+  max_entries: 10_000,
+  # Sweep for expired buckets; one scan of at most max_entries rows.
+  cleanup_interval_ms: 60_000
+
 # Configure the endpoint
 config :tips, TipsWeb.Endpoint,
   url: [host: "localhost"],

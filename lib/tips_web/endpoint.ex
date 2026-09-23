@@ -15,9 +15,10 @@ defmodule TipsWeb.Endpoint do
     same_site: "Lax"
   ]
 
+  # :peer_data is the trusted client IP for admission limits (TipsWeb.ClientIdentity).
   socket "/live", Phoenix.LiveView.Socket,
-    websocket: [connect_info: [:user_agent, session: @session_options]],
-    longpoll: [connect_info: [:user_agent, session: @session_options]]
+    websocket: [connect_info: [:peer_data, :user_agent, session: @session_options]],
+    longpoll: [connect_info: [:peer_data, :user_agent, session: @session_options]]
 
   # Serve at "/" the static files from "priv/static" directory.
   #
