@@ -3,7 +3,7 @@
 # See docs/development/media-provider-probe.md.
 #
 #   bash scripts/media_probe.sh parser
-#   TIPS_REAL_PROVIDERS=1 bash scripts/media_probe.sh stream|r2|cleanup
+#   TIPS_REAL_PROVIDERS=1 bash scripts/media_probe.sh stream|stream-hour|r2|cleanup|signing-key
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -15,7 +15,7 @@ case "$mode" in
   parser)
     exec elixir scripts/media_probe/parser.exs "$out/parser"
     ;;
-  stream|r2|cleanup|signing-key)
+  stream|stream-hour|r2|cleanup|signing-key)
     if [[ "${TIPS_REAL_PROVIDERS:-}" != "1" ]]; then
       echo "refused: $mode calls real providers; set TIPS_REAL_PROVIDERS=1 to opt in" >&2
       exit 2
@@ -23,7 +23,7 @@ case "$mode" in
     exec elixir scripts/media_probe/provider.exs "$mode" "$out"
     ;;
   *)
-    echo "usage: bash scripts/media_probe.sh parser|stream|r2|cleanup|signing-key" >&2
+    echo "usage: bash scripts/media_probe.sh parser|stream|stream-hour|r2|cleanup|signing-key" >&2
     exit 64
     ;;
 esac
