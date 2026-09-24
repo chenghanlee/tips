@@ -1,0 +1,285 @@
+# Fable adversarial design and code review: Neovim/ElixirLS bundle and release gates
+
+Date: 2026-09-24. Reviewer: Fable (wH:p1). Inputs: `snapshot/` (hashes in `SNAPSHOT.json`),
+installed manifest `9a2fa3ee…5428`, raw `release-gates/` cohort logs, and my own probes under
+`probes/` (isolated copy of the provider worktree; nothing in the experiment, bundle, worktrees,
+configs or evidence was modified). Skills read: `elixir`, `otp`.
+
+## 1. Verdict
+
+**Withhold rollout. Reject the current design as the default path; adopt-with-conditions only if the
+user explicitly decides to own a five-component private fork for one workflow.**
+
+Why, in one line each:
+
+- **The feedback half of the architecture is slower and more complex than a hook that runs
+  `mix compile`.** Measured on the same Tips worktree: ElixirLS-path hook feedback 1.4–2.9 s per
+  edit; plain `mix compile` 0.57–0.64 s including VM boot, race-free by construction, exact
+  compiler output. (§4, `probes/mixtime/`)
+- **The private bundle exists only to make ElixirLS's own build trustworthy for feedback.** If
+  feedback does not come from ElixirLS's build, the Mix patch, the ElixirLS patch, batching,
+  retention, the scanner-as-publisher, the watcher exclusion and the vv-mcp patch are no longer
+  load-bearing. What remains is stock Neovim + stock ElixirLS + release vv-mcp for navigation.
+- **Two reproduced defects would bite an internal user on day one:** every session start blocks
+  ~10.7 s for a warmup that never succeeds (3/3 cohort sessions, live probe), and a Neovim crash
+  silently replaces the session with a second, unowned ElixirLS on the same build directory while
+  hooks return `{}` (§3 D1, D2; `probes/live/results.json`).
+- **The cohort validates the mechanism, not the experience.** For 2 of 3 agents the seeded error
+  was never delivered by a hook; agents saw it only because the prompt told them to poll MCP
+  diagnostics. 7 of the repository agent's 9 builds were Mix no-ops for `.exs` edits that cost
+  ~1.5 s of hook wait each and produced no compiler information. (§5)
+
+Codex's readiness claim ("opt-in internal use on the tested versions") is technically supportable
+for the *narrow* tested path, but it is the wrong thing to be ready with. Details follow.
+
+## 2. Architecture and contract objections
+
+### A1. The correctness contract is built around the wrong observer
+
+The whole chain (scanner → notifications → `--force-path` → pending/in-flight sets → 250 ms timer →
+acknowledgement on `:ok`/`:noop`) exists because Mix records provenance after compiling and ElixirLS
+compiles concurrently with the agent's writes. Every piece is a repair for a race that the agent's
+own tools do not have: a `PostToolUse` hook runs *after* the write and *before* the next tool, so a
+`mix compile` started there reads exactly the bytes the agent wrote. There is no overlap to detect,
+no notification to lose, no A→B→A to miss, and no manifest to distrust.
+
+Seven whys from "the agent may act on stale compiler feedback":
+1. Why stale? ElixirLS's beam can describe bytes older than disk. 2. Why? Mix records the digest
+after compiling. 3. Why does that matter here? The agent writes while ElixirLS compiles. 4. Why does
+ElixirLS compile then? It builds on every save/watch event, asynchronously to the agent. 5. Why do we
+take feedback from that build? Because the design routes compiler feedback through the LSP. 6. Why?
+Because the LSP was already there for navigation. 7. Why must feedback and navigation share one
+build? They need not. Two more whys do not change this: the root is *coupling feedback to an
+asynchronous build that the agent does not control*.
+
+### A2. `.exs` edits are the dominant edit type and get nothing from the build
+
+Mix does not compile `.exs`. Every test-file save still triggers a full ElixirLS build cycle
+(reload project, deps check, `mix compile` no-op, symbols index): 926–1032 ms in the cohort,
+hook wait 1.43–1.53 s. Repository agent: 7 of 9 builds were `mix_compile_noop` for
+`repo_timeout_test.exs`. Provider: both builds for `provider_config_test.exs` were no-ops. The
+hook's `ready()` waits for these builds. This is pure latency with zero information; parser
+diagnostics for `.exs` arrive through `didSave`, not the build.
+
+### A3. Two publishers plus a timer is a workaround for a design choice, not a necessity
+
+`neovim_sync.lua:258-262` re-scans on every native watcher notification and re-publishes the same
+change (`:55-62`). The live probe shows the pair 15 ms apart for every unopened-file edit
+(`probes/live/results.json`, cases A and B), merged only by the 250 ms window. The batching patch
+and the `_poll_exclude_pattern` private-API hook (`neovim_init.lua:11-14`) both exist to manage the
+consequences of having two observers. One observer suffices: either the scanner alone (it runs at
+every hook, every MCP read, every build start/end) or the native watcher alone. Codex's own
+`CORRECTNESS.md` §3 root cause says the same ("overlapping notification ownership"); the fix
+chosen was to add a timer rather than remove an owner.
+
+### A4. Qualification can mislead without a literal false clean
+
+- `neovim_sync.lua:122`: `ready()` is false for 150 ms after *any* `publishDiagnostics`. Opening a
+  file for hover makes ElixirLS publish for that file, so the first hover on a settled project
+  returns `status: pending`, message "Compilation pending" with `building=false, queued=false,
+  completed == generation` (live probe `hover_opens_buffer`). No compilation was pending.
+- `status: current` means "last observed ElixirLS build completed", which after an overlapped
+  build is exactly the case where the beam is stale. The docs say so; an agent reading
+  "compiler diagnostics are available" will not.
+- Hook `quiet` (`''`) is indistinguishable from "hook attached to the wrong instance"
+  (D2: after the crash the hook returned `{}` at generation 0).
+
+### A5. Ownership and maintenance surface
+
+The bundle pins Elixir 1.20.4 (copied from the host, `build_bundle.py:71`, not from the lock),
+Neovim 0.12.5 (private watcher API), ElixirLS commit, vv-mcp commit, Rust 1.97.0 exactly, Python
+3.14.3 exactly (`bundle.py:19`, `build_bundle.py:33`). Each Elixir release changes
+`compilers/elixir.ex`; the Mix patch must be re-ported and the whole bundle rebuilt while the
+agent's Homebrew Elixir may already be newer, so ElixirLS and the agent compile with different
+compilers. Nothing in the gates covers upgrade or rollback. For one user's agents this is a
+disproportionate ownership surface relative to "hook runs `mix compile`".
+
+## 3. Local implementation defects (reproduced unless marked)
+
+### D1. Startup warmup burns 10 s per session and never succeeds — High
+
+- `neovim_launcher.py:51`: `collect(10000)` before starting vv-mcp. Cold ElixirLS builds take
+  57–68 s; a warm worktree still gets a forced startup build. Result: MCP `initialize` answered
+  after 10.68 s (live probe), and all three cohort `environment.startup.json` files show
+  `status: pending` after the full wait.
+- Effect: every session start is 10 s slower for nothing; a client with Codex's default MCP
+  startup timeout (10 s) fails to start the server. The cohort only passed because
+  `neovim_dogfood.py:143` sets `startup_timeout_sec: 90`; `INSTALL.md` does not mention it.
+- Smallest correction: delete the warmup (hooks already handle pending) or cap it at ~1 s. Then
+  the `startup_timeout_sec` note becomes optional.
+- Test: time from `serve` start to `initialize` response < 2 s; a cold hook still returns pending.
+
+### D2. Neovim death silently swaps in an unowned managed instance — High
+
+- `neovim_launcher.py:68` waits only on the bridge; nothing watches Neovim. vv-mcp
+  (`crates/vv-mcp/src/server.rs:68`, `managed.rs:113-135, 276-290`) spawns its own
+  `nvim --headless` when no registered instance matches, inheriting the session's
+  `XDG_CONFIG_HOME`, so it loads the adapter and starts a second ElixirLS on the same
+  `.elixir_ls/build`.
+- Reproduced (`probes/live/`): SIGKILL the launcher's Neovim → next hover returns
+  `elixirls_unavailable` from a *managed* instance (`registry_after.kind = "managed"`), a new
+  ElixirLS cold build starts on the same worktree, and the next hook returns `{}` in 0.147 s at
+  generation 0 (all edit history gone). Nothing tells the agent or the user.
+- Effect: silent loss of feedback after a crash; two builds racing on one directory if the orphan
+  survives (it did exit here; not guaranteed under SIGSTOP/hangs).
+- Smallest correction: launcher polls `nvim.poll()` and exits (Codex then reports a dead MCP
+  server, which is honest), and/or the hook refuses `kind != "interactive"` registry entries.
+- Test: kill Neovim; expect the MCP server to exit and the hook to say unavailable.
+
+### D3. Scan failure inside build callbacks poisons build state — Low
+
+- `neovim_sync.lua:103-114`: `observe()` calls `M.scan()` *before* clearing `building` /
+  setting `completed`. `snapshot()` asserts on `git ls-files` exit code with a 1 s wait
+  (`:10-13`) and on `io.open` (`:19`).
+- Reproduced (`probes/observe/results.txt`): one failing end-of-build scan leaves
+  `building=true`; a later successful scan does not repair it; status stays `pending` until
+  another build completes.
+- Correction: update build flags first, then `pcall` the scan and record a sync error.
+
+### D4. `.exs`-only edits wait for a no-op build — Medium (design, see A2)
+
+Correction within the current design: skip the build wait when the generation change contains
+only `.exs` paths (hook returns parser diagnostics immediately). Better: A1.
+
+### D5. Exact-version prerequisite pins — Low
+
+`bundle.py:19` rejects Python 3.14.4; the only Python-specific artefacts are `cp314` wheels,
+valid for any 3.14.x. `build_bundle.py:69` requires `rustc 1.97.0` exactly. Pin to major.minor.
+
+### D6. Toolchain provenance and integrity coverage — Low
+
+`build_bundle.py:71` copies whatever `which elixir` resolves to; the manifest hashes only
+`toolchain/lib/mix/ebin` (102 files), not `lib/elixir/ebin`. "Clean build from checked upstream
+archives" holds for ElixirLS, Neovim, vv-mcp and Hex, not for the compiler itself.
+
+### D7. Launcher event dump never lands — Low
+
+`neovim_launcher.py:80-85` attaches after closing Neovim's stdin; no cohort session has
+`environment.events.json`, which is why the cohort has only second-resolution timestamps.
+Dump before closing stdin.
+
+## 4. Strongest simpler alternative: feedback from `mix compile` in the hook; stock LSP for navigation
+
+Measured in `probes/mixtime/` (isolated copy of the provider worktree, host Elixir 1.20.4,
+`MIX_ENV=test`, `unbuffer mix`):
+
+| Path | Time |
+|---|---|
+| ElixirLS build → hook return, `.ex` edit (cohort, warm) | 1.43–2.88 s |
+| ElixirLS build → hook return, `.exs` edit (cohort, no-op) | 1.43–1.53 s |
+| `mix compile`, no-op, cold VM | 0.57 s |
+| `mix compile`, one `.ex` edit ("Compiling 1 file") | 0.64 s |
+| `mix compile --warnings-as-errors`, injected error | 0.57 s |
+| `.exs` edit (skip: Mix does not compile it) | 0 s |
+
+Shape:
+- `PostToolUse` hook: `MIX_ENV=test mix compile --warnings-as-errors` in the worktree, 5 s cap,
+  return the compiler's own output (exact, ordered, includes the file:line). Skip when no
+  `.ex`/`.heex`/`.eex`/`config` file changed. The agent's `mix test` reuses the same `_build`,
+  so this *saves* time later. Mix's own build lock serialises against a background `mix test`.
+- Navigation: stock Homebrew ElixirLS + stock Neovim + release vv-mcp with `sync_from_disk`
+  reads. Keep a ~30-line "server is still building" qualification derived from the build log
+  lines if wanted; drop the Rust patch (or keep it: it is the one genuinely small, upstreamable
+  change).
+- No Mix patch, no ElixirLS patch, no scanner-as-publisher, no batching, no retention, no
+  watcher exclusion, no bundle, no version pins beyond what Homebrew already gives.
+
+What it gives up, honestly:
+- ElixirLS's beams can still be stale after an overlapped build, so hover docs/references for
+  *that file* may lag until its next save. Consequence: navigation, not compile feedback. In the
+  cohort every overlapped edit was during the 60 s cold build and every such file was edited
+  again soon after. This is the same class of limitation the current design already accepts for
+  unobserved A→B→A, but it now covers only navigation.
+- `tmp/` fixture notifications trigger ElixirLS builds again (stock behaviour). Cost is CPU in
+  the background, not agent latency, since feedback no longer waits on those builds.
+- Requires sequential tool execution (true for the Codex hook contract).
+
+I accept this alternative as the recommendation. If the user wants the LSP build to be
+trustworthy for navigation as well, the *only* piece worth keeping from the current engine work
+is the 10-line Mix `--force-path` patch plus the original one-line ElixirLS pass-through, and
+that decision can be taken later on evidence.
+
+Discriminating test (decides between the two designs): rerun the three-workload cohort with the
+hook replaced by `mix compile` and stock ElixirLS/Neovim/vv-mcp. Compare: errors delivered by hook
+(current: 1/3), hook latency (current medians 1.4–2.9 s), navigation staleness incidents measured
+by hover after every edit, and session start time (current 10.7 s).
+
+## 5. Evidence gaps and challenges to the gates
+
+- **"Error and repair" gate**: provider and media never received the error through a hook
+  (`hook-audit.jsonl`: pending → pending → … → completed). They saw it via MCP diagnostics
+  because `prompt.md` required inserting a probe error during the cold build and checking. This
+  gate measures a scripted behaviour, not what an unprompted agent would notice.
+- **"Nonempty hook delivery" gate** measures receipts on *any* message, mostly "pending" and
+  "completed"; it does not measure error delivery.
+- **Duplicate builds**: cohort 1 in 12 warm edits (provider `provider_config_test.exs`, second
+  notification arriving after build 1 ended, source not attributable at 1 s log resolution).
+  Live probe: 0 in 3, because the native event lands 15 ms after the scanner's and is batched. So
+  "occasional" is fair for this cohort; the FSEvents latency argument in earlier reports is not
+  (raw libuv/FSEvents latency measured 11–14 ms, `probes/fsevents/results.txt`).
+- **Cold start**: 57–68 s on every fresh worktree because ElixirLS rebuilds deps into
+  `.elixir_ls/build`. Every team worktree pays this. Not a gate, but the largest UX cost observed;
+  seeding `.elixir_ls/build/test` from the worktree's `_build/test` at setup would remove most of it.
+- **Lifecycle**: normal EOF and SIGTERM are covered; Neovim death is not (D2). Blocked RPC is
+  covered by the hook's alarm.
+- **Umbrella/deps leakage of `--force-path`**: by reading, safe. Absolute paths only match the
+  owning project; `OptionParser` in other compilers ignores unknown switches. Untested.
+- **Codex's rejection of direct-plus**: accepted. Deletion (`{0,-1}` with nil digest) is a real
+  gap in my sentinel; preserved-mtime is an edge I would have scoped out but Codex was right to
+  test it. The compiler-side approach is not on the table for this review.
+
+## 6. Must-fix before internal use versus deferred
+
+If the bundle path is kept despite §4:
+
+Must-fix:
+1. D2 — launcher exits when Neovim dies; hook rejects managed instances.
+2. D1 — remove or cap the startup warmup; document `startup_timeout_sec` until then.
+3. `INSTALL.md`/`RELEASE_GATES.md` — state plainly that errors surfacing during a build longer
+   than the budget reach the agent only through a later tool's hook, `Stop`, or MCP diagnostics;
+   the cohort shows 2/3 agents relied on MCP polling.
+
+Acceptable limitations / deferred: D3, D4, D5, D6, D7, A4's 150 ms window (raise to
+`building or queued` only), cold-start seeding, `.po`/non-listed resources outside the scanner.
+
+If the alternative in §4 is chosen: none of the above applies; the work is a ~40-line hook and
+removal of the bundle.
+
+## 7. Answers to the ten questions
+
+1. The agent needs exact compiler results after each edit and reasonably fresh navigation. A
+   contract of "hook returns the compiler's output for the bytes you just wrote" is smaller,
+   exact, and needs no qualification vocabulary.
+2. No. Targeted invalidation plus a private Mix/ElixirLS pair is the right boundary *only* if
+   the LSP build must be the feedback source. It need not be.
+3. Yes, in two ways: the post-publish quiet window reports `pending` with nothing pending; and
+   `current` after an overlapped build is precisely the stale case. Preserving results helps;
+   the status words do not.
+4. Retention and retries are sound by reading and by Codex's tests; the loss case is D2 (crash
+   → generation 0), not the queue.
+5. No. One observer suffices (A3). `tmp/` exclusion is a symptom fix; git-ignore–based
+   enumeration in the scanner already solves it for the scanner path.
+6. Five seconds covers warm `.ex` edits (1.4–2.9 s) with margin and never covers cold builds.
+   With `mix compile` at 0.6 s the budget question mostly disappears.
+7. No. Exact pins on Python/Rust, host-copied compiler, no upgrade/rollback path, `sources/`
+   (58 MB) shipped inside the runtime. Runtime pairing tests are good; upgrade tests absent.
+8. Bounded for EOF/SIGTERM/RPC stall; unbounded and silent for Neovim death (D2).
+9. Partly trained: the probe-error step and MCP polling were prompted. Evidence cannot
+   discriminate "agents get errors from hooks" from "agents get errors because told to poll".
+10. No. I would keep Neovim + vv-mcp + stock ElixirLS for navigation, move compiler feedback to
+    a `mix compile` hook, and delete the engine patches, the scanner-publisher, batching, the
+    watcher exclusion and the bundle.
+
+## Probes and evidence
+
+- `probes/mixtime/run.sh`, `results.txt`, `compile-error.out` — plain Mix timings on an
+  isolated copy of `/private/tmp/tips-lsp-release-provider` (`.elixir_ls` removed).
+- `probes/live/live_probe.py`, `results.json`, `audit.jsonl`, `serve.stderr.log` — installed
+  bundle through real MCP stdio + pynvim: startup 10.68 s, ready after 57.2 s, per-edit event
+  timelines (hrtime), hover-opens-buffer `pending`, Neovim SIGKILL → managed spawn.
+- `probes/cohort-tally/tally.py`, `timeline.txt`, `timeline.json` — builds/notifications per
+  cohort agent from `session/state/nvim/lsp.log`.
+- `probes/fsevents/latency.lua`, `results.txt` — raw watcher latency in the bundled Neovim.
+- `probes/observe/observe.lua`, `results.txt` — D3 reproduction against the snapshot module.
+- Not run: the three-agent rerun in §4 (recommended discriminating test), umbrella leakage,
+  upgrade drill.

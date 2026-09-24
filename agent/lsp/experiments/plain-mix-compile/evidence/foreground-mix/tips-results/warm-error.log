@@ -1,0 +1,12 @@
+Compiling 2 files (.ex)
+    [31merror:[0m undefined function missing_foreground_probe/0 (expected Tips.Health to define such a function or for it to be imported, but none are available)
+    │
+  8 │     repo = missing_foreground_probe()
+    │ [31m           ^^^^^^^^^^^^^^^^^^^^^^^^[0m
+    │
+    └─ lib/tips/health.ex:8:12: Tips.Health.check/0
+
+
+== Compilation error in file lib/tips/health.ex ==
+** (CompileError) lib/tips/health.ex: cannot compile module Tips.Health (errors have been logged)
+

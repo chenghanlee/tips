@@ -1,0 +1,87 @@
+    [33mwarning:[0m comparison between distinct types found:
+
+        left == right
+
+    given types:
+
+        dynamic(:aa) == :bb
+
+    where "left" (context ExUnit.Assertions) was given the type:
+
+        # type: dynamic(:aa)
+        # from: acceptance.exs:7
+        left = MixRaceTarget.answer()
+
+    where "right" (context ExUnit.Assertions) was given the type:
+
+        # type: :bb
+        # from: acceptance.exs:7
+        right = :bb
+
+    While Elixir can compare across all types, you are comparing across types which are always disjoint, and the result is either always true or always false
+
+    type warning found at:
+    │
+  7 │     assert MixRaceTarget.answer() == :bb
+    │ [33m                                  ~[0m
+    │
+    └─ acceptance.exs:7:35: MixRaceAcceptanceTest."test target matches the saved source"/1
+
+    [33mwarning:[0m comparison between distinct types found:
+
+        left == right
+
+    given types:
+
+        dynamic(:aa) == :bb
+
+    where "left" (context ExUnit.Assertions) was given the type:
+
+        # type: dynamic(:aa)
+        # from: acceptance.exs:11
+        left = MixRaceCaller.answer()
+
+    where "right" (context ExUnit.Assertions) was given the type:
+
+        # type: :bb
+        # from: acceptance.exs:11
+        right = :bb
+
+    While Elixir can compare across all types, you are comparing across types which are always disjoint, and the result is either always true or always false
+
+    type warning found at:
+    │
+ 11 │     assert MixRaceCaller.answer() == :bb
+    │ [33m                                  ~[0m
+    │
+    └─ acceptance.exs:11:35: MixRaceAcceptanceTest."test compile-time caller matches the saved source"/1
+
+Running ExUnit with seed: 827133, max_cases: 8
+
+
+
+  1) test compile-time caller matches the saved source (MixRaceAcceptanceTest)
+     [1m[30macceptance.exs:10[0m
+     [31mAssertion with == failed[0m
+     [36mcode:  [0massert MixRaceCaller.answer() == :bb
+     [36mleft:  [0m[31m:aa[0m
+     [36mright: [0m[32m:bb[0m
+     [36mstacktrace:[0m
+       acceptance.exs:11: (test)
+
+
+
+  2) test target matches the saved source (MixRaceAcceptanceTest)
+     [1m[30macceptance.exs:6[0m
+     [31mAssertion with == failed[0m
+     [36mcode:  [0massert MixRaceTarget.answer() == :bb
+     [36mleft:  [0m[31m:aa[0m
+     [36mright: [0m[32m:bb[0m
+     [36mstacktrace:[0m
+       acceptance.exs:7: (test)
+
+
+Finished in 0.01 seconds (0.01s on load, 0.00s async, 0.00s sync)
+
+Result: 0/2 passed
+[31mFailed: 2 tests[0m

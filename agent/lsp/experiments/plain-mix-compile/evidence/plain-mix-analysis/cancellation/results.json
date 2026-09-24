@@ -1,0 +1,81 @@
+[
+  {
+    "attempt": 1,
+    "budget": 4.7,
+    "times": {
+      "spawned": 0.0015847080067032948,
+      "deadline_observed": 4.7736615419999,
+      "final_discovery": 4.811139917001128,
+      "term_discovery": 4.848657249996904,
+      "term_sent": 4.848683167001582,
+      "kill_discovery": 4.993184542006929,
+      "kill_sent": 4.993188332999125,
+      "wait_finished": 4.993220667005517,
+      "survivors_checked": 5.0644582499953685
+    },
+    "max_process_scan_seconds": 0.042810833008843474,
+    "polls": 57,
+    "exit_code": -15,
+    "survivors": {},
+    "compile_phases": [
+      "entered 18038"
+    ],
+    "error_delivered": false,
+    "checkpoints": [
+      "compile.elixir.update.cp"
+    ],
+    "source_unchanged": true
+  },
+  {
+    "attempt": 2,
+    "budget": 4.7,
+    "times": {
+      "spawned": 0.0015646669926354662,
+      "deadline_observed": 4.713406291994033,
+      "final_discovery": 4.750050916991313,
+      "term_discovery": 4.786640874997829,
+      "term_sent": 4.786666749991127,
+      "kill_discovery": 4.927837166993413,
+      "kill_sent": 4.92783974998747,
+      "wait_finished": 4.927853666988085,
+      "survivors_checked": 5.000473084000987
+    },
+    "max_process_scan_seconds": 0.04228045900526922,
+    "polls": 57,
+    "exit_code": -15,
+    "survivors": {},
+    "compile_phases": [
+      "entered 18038",
+      "entered 18144"
+    ],
+    "error_delivered": false,
+    "checkpoints": [
+      "compile.elixir.update.cp"
+    ],
+    "source_unchanged": true
+  },
+  {
+    "attempt": 3,
+    "budget": 20,
+    "times": {
+      "spawned": 0.0017936249932972714,
+      "wait_finished": 8.44025962500018,
+      "survivors_checked": 8.518302582990145
+    },
+    "max_process_scan_seconds": 0.04888116699294187,
+    "polls": 101,
+    "exit_code": 1,
+    "survivors": {},
+    "compile_phases": [
+      "entered 18038",
+      "entered 18144",
+      "entered 18249",
+      "finished 18249"
+    ],
+    "error_delivered": true,
+    "checkpoints": [
+      "compile.elixir.update.cp"
+    ],
+    "source_unchanged": true
+  }
+]

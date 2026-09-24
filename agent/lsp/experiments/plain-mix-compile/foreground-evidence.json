@@ -1,0 +1,687 @@
+{
+  "date": "2026-09-25",
+  "branch": "experiment/plain-mix-compile",
+  "base_commit": "f878459640028a7c607afab4a523c27a6304ceb9",
+  "platform": "macOS arm64; Elixir 1.20.4 / OTP 29.1; MIX_ENV=test",
+  "scope": "Foreground compiler and hook JSON protocol; no active Codex hook installed or new model cohort run.",
+  "private_mix": {
+    "elixir_otp": "1.20.4/29.1",
+    "source_sha256": {
+      "compiler_elixir.ex": "ae323e0d10b14fc55f0a415d53654d8c39e22723bde17138eb8dc78b34067c87",
+      "compile_elixir_task.ex": "d5e29d8ec2adaaef745a79f76cbd6b5d8c3bc1d052ebcf4bf9f8da522112ba7e"
+    },
+    "patch_sha256": "1542a13a429446a04c67dab2e6be9bd636f3c1ef52e54f36b3104f408b831fde",
+    "files": {
+      "lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam": "e9eb50d57690293ea4f46ac2b45eb1f93afc8c5fadf76b3c1eae99ef9c7dec34",
+      "lib/mix/ebin/Elixir.Mix.Tasks.Compile.Elixir.beam": "de7418d6976e70c2f626a2173efa5c7c421c2cf5a93154c3d8e93d09d37c6c55"
+    }
+  },
+  "source_sha256": {
+    "agent/lsp/experiments/plain-mix-compile/build_mix.py": "a13ed8b3df5441b45b6c832c00974e1f4a2829efc35a5f110cc8fabc8e0bb158",
+    "agent/lsp/experiments/plain-mix-compile/targeted_sequential_probe.py": "69f7e3a465b636fefeefa2716d69f0aac65eacd66c5b1a990f923d15fdbcad87",
+    "agent/lsp/experiments/plain-mix-compile/foreground_mix.py": "a378ad95d0c84db5edce5ae3de3c7895cd15b77e663e4101a07b0ffe31f7efed",
+    "agent/lsp/experiments/plain-mix-compile/foreground_probe.py": "0e54c66998c89b59490506550047d1a7477296c3d1c437d6a284a6b5169e4094",
+    "agent/lsp/experiments/plain-mix-compile/tips_probe.py": "e856c784fa6f93c11e79b78459b0643b7af7cd25debbd8b6e27f405c53ba2be8"
+  },
+  "stock_sequential_control": {
+    "mode": "stock",
+    "attempts": [
+      {
+        "same_second": true,
+        "mtime_a_ns": 1790271917025221397,
+        "mtime_b_ns": 1790271917448690509,
+        "same_size": true
+      }
+    ],
+    "exunit_exit": 2,
+    "unrelated_not_rebuilt": true,
+    "unchanged_compile_is_noop": true,
+    "commands": [
+      {
+        "label": "format",
+        "seconds": 0.47163437500421423,
+        "exit_code": 0
+      },
+      {
+        "label": "baseline",
+        "seconds": 0.4728064580122009,
+        "exit_code": 0
+      },
+      {
+        "label": "a-0",
+        "seconds": 0.42330275000131223,
+        "exit_code": 0
+      },
+      {
+        "label": "b-0",
+        "seconds": 0.4013598329911474,
+        "exit_code": 0
+      },
+      {
+        "label": "acceptance",
+        "seconds": 0.41515370798879303,
+        "exit_code": 2
+      },
+      {
+        "label": "unchanged",
+        "seconds": 0.3945366669940995,
+        "exit_code": 0
+      },
+      {
+        "label": "final-format",
+        "seconds": 0.35935891600092873,
+        "exit_code": 0
+      }
+    ]
+  },
+  "targeted_sequential": {
+    "mode": "targeted",
+    "attempts": [
+      {
+        "same_second": true,
+        "mtime_a_ns": 1790272144025766258,
+        "mtime_b_ns": 1790272144464158953,
+        "same_size": true
+      }
+    ],
+    "exunit_exit": 0,
+    "unrelated_not_rebuilt": true,
+    "unchanged_compile_is_noop": true,
+    "commands": [
+      {
+        "label": "format",
+        "seconds": 1.281735791999381,
+        "exit_code": 0
+      },
+      {
+        "label": "baseline",
+        "seconds": 0.5112570410128683,
+        "exit_code": 0
+      },
+      {
+        "label": "a-0",
+        "seconds": 0.4380340409989003,
+        "exit_code": 0
+      },
+      {
+        "label": "b-0",
+        "seconds": 0.40455779200419784,
+        "exit_code": 0
+      },
+      {
+        "label": "acceptance",
+        "seconds": 0.40908537500945386,
+        "exit_code": 0
+      },
+      {
+        "label": "unchanged",
+        "seconds": 0.3914597499970114,
+        "exit_code": 0
+      },
+      {
+        "label": "final-format",
+        "seconds": 0.36349804200290237,
+        "exit_code": 0
+      }
+    ]
+  },
+  "foreground_integration": [
+    {
+      "case": "not-prepared",
+      "seconds": 0.05674087499210145,
+      "hook_output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "Validation unfinished: run foreground_mix.py prepare for this workspace and toolchain first."
+        }
+      }
+    },
+    {
+      "case": "prepare",
+      "seconds": 0.7224245419929503,
+      "hook_output": {
+        "exit_code": 0,
+        "reason": null,
+        "survivors": [],
+        "compile_seconds": 0.6294163749989821,
+        "status": "passed",
+        "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nGenerated foreground app\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log",
+        "changed": [
+          ".gitignore",
+          "lib/caller.ex",
+          "lib/target.ex",
+          "mix.exs"
+        ],
+        "changed_during_compile": [],
+        "targeted": true,
+        "timeout_seconds": 180,
+        "command": [
+          "unbuffer",
+          "mix",
+          "compile",
+          "--warnings-as-errors",
+          "--force-path",
+          "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/fixture/.gitignore",
+          "--force-path",
+          "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/fixture/lib/caller.ex",
+          "--force-path",
+          "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/fixture/lib/target.ex",
+          "--force-path",
+          "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/fixture/mix.exs"
+        ],
+        "total_seconds": 0.6679773329960881
+      },
+      "last_compile_status": "passed"
+    },
+    {
+      "case": "unchanged",
+      "seconds": 0.06432495800254401,
+      "hook_output": {}
+    },
+    {
+      "case": "same-metadata-edit",
+      "seconds": 0.6475879579957109,
+      "hook_output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log"
+        }
+      },
+      "last_compile_status": "passed"
+    },
+    {
+      "case": "eight-second-error",
+      "seconds": 8.644679292003275,
+      "hook_output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "Mix compilation failed.\nCompiling 2 files (.ex)\n    error: undefined function missing_foreground/0 (expected ForegroundTarget to define such a function or for it to be imported, but none are available)\n    \u2502\n  3 \u2502   def answer, do: missing_foreground()\n    \u2502                   ^^^^^^^^^^^^^^^^^^\n    \u2502\n    \u2514\u2500 lib/target.ex:3:19: ForegroundTarget.answer/0\n\n\n== Compilation error in file lib/target.ex ==\n** (CompileError) lib/target.ex: cannot compile module ForegroundTarget (errors have been logged)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log"
+        }
+      },
+      "last_compile_status": "failed"
+    },
+    {
+      "case": "unchanged-after-error",
+      "seconds": 0.06714779199683107,
+      "hook_output": {}
+    },
+    {
+      "case": "repair",
+      "seconds": 0.6469515420030802,
+      "hook_output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log"
+        }
+      },
+      "last_compile_status": "passed"
+    },
+    {
+      "case": "safety-timeout",
+      "seconds": 1.3970423330029007,
+      "hook_output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "Validation unfinished: compilation reached its 1-second safety limit. Run foreground_mix.py check to retry; no background compilation is scheduled.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log"
+        }
+      },
+      "last_compile_status": "unfinished"
+    },
+    {
+      "case": "unchanged-after-timeout",
+      "seconds": 0.0656268330058083,
+      "hook_output": {}
+    },
+    {
+      "case": "stop-after-timeout",
+      "seconds": 0.062060374999418855,
+      "hook_output": {
+        "decision": "block",
+        "reason": "Validation unfinished: compilation reached its 1-second safety limit. Run foreground_mix.py check to retry; no background compilation is scheduled.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log"
+      },
+      "last_compile_status": "unfinished"
+    },
+    {
+      "case": "repeat-stop",
+      "seconds": 0.06304704198555555,
+      "hook_output": {}
+    },
+    {
+      "case": "same-source-longer-retry",
+      "seconds": 8.721544208994601,
+      "hook_output": {
+        "exit_code": 0,
+        "reason": null,
+        "survivors": [],
+        "compile_seconds": 8.631589166994672,
+        "status": "passed",
+        "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log",
+        "changed": [],
+        "changed_during_compile": [],
+        "targeted": true,
+        "timeout_seconds": 15.0,
+        "command": [
+          "unbuffer",
+          "mix",
+          "compile",
+          "--warnings-as-errors",
+          "--force-path",
+          "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/fixture/lib/target.ex"
+        ],
+        "total_seconds": 8.669082332999096
+      },
+      "last_compile_status": "passed"
+    },
+    {
+      "case": "timeout-repair",
+      "seconds": 0.644749375001993,
+      "hook_output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log"
+        }
+      },
+      "last_compile_status": "passed"
+    },
+    {
+      "case": "concurrent-check",
+      "seconds": 0.05684625000867527,
+      "hook_output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "Validation unfinished: another foreground check is active."
+        }
+      },
+      "last_compile_status": "passed"
+    },
+    {
+      "case": "overlapping-write",
+      "seconds": null,
+      "hook_output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "Validation unfinished: files changed during compilation. Results may describe earlier contents; run foreground_mix.py check.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log"
+        }
+      }
+    },
+    {
+      "case": "reconcile-superseded",
+      "seconds": 2.166636791997007,
+      "hook_output": {
+        "exit_code": 0,
+        "reason": null,
+        "survivors": [],
+        "compile_seconds": 2.0727070839930093,
+        "status": "passed",
+        "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log",
+        "changed": [],
+        "changed_during_compile": [],
+        "targeted": true,
+        "timeout_seconds": 60,
+        "command": [
+          "unbuffer",
+          "mix",
+          "compile",
+          "--warnings-as-errors",
+          "--force-path",
+          "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/fixture/lib/target.ex"
+        ],
+        "total_seconds": 2.1094457500003045
+      },
+      "last_compile_status": "passed"
+    },
+    {
+      "case": "interrupted",
+      "seconds": null,
+      "hook_output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "Validation unfinished: compiler feedback was interrupted. Run foreground_mix.py check to retry; no background compilation is scheduled.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log"
+        }
+      },
+      "survivors": {}
+    },
+    {
+      "case": "interrupt-repair",
+      "seconds": 0.6472424590028822,
+      "hook_output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log"
+        }
+      },
+      "last_compile_status": "passed"
+    },
+    {
+      "case": "resource-created",
+      "seconds": 0.6654573329869891,
+      "hook_output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 1 file (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log"
+        }
+      },
+      "last_compile_status": "passed"
+    },
+    {
+      "case": "resource-same-metadata",
+      "seconds": 0.6466320000035921,
+      "hook_output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 1 file (.ex)\nGenerated foreground app\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log"
+        }
+      },
+      "last_compile_status": "passed"
+    },
+    {
+      "case": "resource-deleted",
+      "seconds": 0.6495137500023702,
+      "hook_output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "Mix compilation failed.\nCompiling 1 file (.ex)\n\n== Compilation error in file lib/resource.ex ==\n** (File.Error) could not read file \"answer.txt\": no such file or directory\n    (elixir 1.20.4) lib/file.ex:451: File.read!/2\n    lib/resource.ex:3: (module)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log"
+        }
+      },
+      "last_compile_status": "failed"
+    },
+    {
+      "case": "resource-recreated",
+      "seconds": 0.6542322500026785,
+      "hook_output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 1 file (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log"
+        }
+      },
+      "last_compile_status": "passed"
+    },
+    {
+      "case": "ignored-fixture-noise",
+      "seconds": 0.0649367500009248,
+      "hook_output": {}
+    },
+    {
+      "case": "test-only-edit",
+      "seconds": 0.6405512080091285,
+      "hook_output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log"
+        }
+      },
+      "last_compile_status": "passed"
+    },
+    {
+      "case": "test-only-removal",
+      "seconds": 0.641344207993825,
+      "hook_output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log"
+        }
+      },
+      "last_compile_status": "passed"
+    },
+    {
+      "case": "clean-stop",
+      "seconds": 0.06322150000778493,
+      "hook_output": {}
+    },
+    {
+      "case": "final-checks",
+      "seconds": null,
+      "hook_output": {},
+      "label": "final-checks",
+      "format_compile_exunit_passed": true,
+      "credo_unavailable": true
+    }
+  ],
+  "tips_commit": "5fe1cda1bb16bea97df77c078ca0789ae641f909",
+  "tips": [
+    {
+      "case": "cold-prepare",
+      "seconds": 49.08630875000381,
+      "status": "passed",
+      "compile_seconds": 48.96921900000598
+    },
+    {
+      "case": "unchanged-0",
+      "seconds": 0.06977304200700019
+    },
+    {
+      "case": "unchanged-1",
+      "seconds": 0.06945374999486376
+    },
+    {
+      "case": "unchanged-2",
+      "seconds": 0.06863354099914432
+    },
+    {
+      "case": "warm-check-0",
+      "seconds": 0.7120900000008987,
+      "status": "passed",
+      "compile_seconds": 0.6045356669928879
+    },
+    {
+      "case": "warm-check-1",
+      "seconds": 0.712911708993488,
+      "status": "passed",
+      "compile_seconds": 0.6022850420122268
+    },
+    {
+      "case": "warm-check-2",
+      "seconds": 0.7064275000011548,
+      "status": "passed",
+      "compile_seconds": 0.594675542000914
+    },
+    {
+      "case": "warm-edit",
+      "seconds": 0.8805949170055101,
+      "status": "passed",
+      "compile_seconds": 0.7689579170109937
+    },
+    {
+      "case": "same-metadata-edit",
+      "seconds": 0.9416510000010021,
+      "status": "passed",
+      "compile_seconds": 0.8251554160087835
+    },
+    {
+      "case": "warm-error",
+      "seconds": 0.8409254169964697,
+      "status": "failed",
+      "compile_seconds": 0.7226762919890461
+    },
+    {
+      "case": "warm-repair",
+      "seconds": 0.8924457079992862,
+      "status": "passed",
+      "compile_seconds": 0.7725837089965353
+    },
+    {
+      "case": "checks",
+      "seconds": null,
+      "label": "checks",
+      "fresh_vm_exunit_passed": true,
+      "format_compile_credo_passed": true
+    }
+  ],
+  "cli_boundaries": [
+    {
+      "case": "cli-error",
+      "exit_code": 1,
+      "output": {
+        "exit_code": 1,
+        "reason": null,
+        "survivors": [],
+        "compile_seconds": 0.5019382499885978,
+        "status": "failed",
+        "message": "Mix compilation failed.\nCompiling 1 file (.ex)\n\n== Compilation error in file lib/resource.ex ==\n** (File.Error) could not read file \"answer.txt\": no such file or directory\n    (elixir 1.20.4) lib/file.ex:451: File.read!/2\n    lib/resource.ex:3: (module)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log",
+        "changed": [
+          "answer.txt"
+        ],
+        "changed_during_compile": [],
+        "targeted": true,
+        "timeout_seconds": 60,
+        "command": [
+          "unbuffer",
+          "mix",
+          "compile",
+          "--warnings-as-errors",
+          "--force-path",
+          "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/fixture/answer.txt"
+        ],
+        "total_seconds": 0.5373528329946566
+      }
+    },
+    {
+      "case": "cli-repair",
+      "exit_code": 0,
+      "output": {
+        "exit_code": 0,
+        "reason": null,
+        "survivors": [],
+        "compile_seconds": 0.496790167002473,
+        "status": "passed",
+        "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 1 file (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log",
+        "changed": [
+          "answer.txt"
+        ],
+        "changed_during_compile": [],
+        "targeted": true,
+        "timeout_seconds": 60,
+        "command": [
+          "unbuffer",
+          "mix",
+          "compile",
+          "--warnings-as-errors",
+          "--force-path",
+          "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/fixture/answer.txt"
+        ],
+        "total_seconds": 0.5335378750023665
+      }
+    },
+    {
+      "case": "cli-timeout",
+      "exit_code": 2,
+      "output": {
+        "exit_code": -15,
+        "reason": "compilation reached its 0.001-second safety limit",
+        "survivors": [],
+        "compile_seconds": 0.26888912499998696,
+        "status": "unfinished",
+        "message": "Validation unfinished: compilation reached its 0.001-second safety limit. Run foreground_mix.py check to retry; no background compilation is scheduled.\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log",
+        "changed": [],
+        "changed_during_compile": [],
+        "targeted": true,
+        "timeout_seconds": 0.001,
+        "command": [
+          "unbuffer",
+          "mix",
+          "compile",
+          "--warnings-as-errors"
+        ],
+        "total_seconds": 0.3052209579909686
+      }
+    },
+    {
+      "case": "cli-retry",
+      "exit_code": 0,
+      "output": {
+        "exit_code": 0,
+        "reason": null,
+        "survivors": [],
+        "compile_seconds": 0.5013243749999674,
+        "status": "passed",
+        "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log",
+        "changed": [],
+        "changed_during_compile": [],
+        "targeted": true,
+        "timeout_seconds": 60,
+        "command": [
+          "unbuffer",
+          "mix",
+          "compile",
+          "--warnings-as-errors"
+        ],
+        "total_seconds": 0.5356933340081014
+      }
+    },
+    {
+      "case": "state-ancestor-rejected",
+      "exit_code": 0,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "Validation unfinished: Use a Mix project and a separate private state directory. No successful compiler result was established."
+        }
+      }
+    },
+    {
+      "case": "wrong-workspace-rejected",
+      "exit_code": 0,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "Validation unfinished: Hook workspace differs from assigned workspace. No successful compiler result was established."
+        }
+      }
+    }
+  ],
+  "raw_evidence": {
+    "tmp/foreground-mix/sequential-stock/mix.exs": "a1794cae3baa58e6e581405f4ad5e5a1a2cc818e2aef7c27f53ad51eafa61699",
+    "tmp/foreground-mix/sequential-stock/format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tmp/foreground-mix/sequential-stock/acceptance.log": "2f873a10260c5c15e7bba799a36c0168b2e4a6ddd78dc8ebae4136cd54a05716",
+    "tmp/foreground-mix/sequential-stock/results.json": "3315e429fe2a4709577ce0d0913abbeffc3bec89b26d52982f041e9118903874",
+    "tmp/foreground-mix/sequential-stock/baseline.log": "7e250296d92c8e71f8196cb0daf6fb430249897a0fa697c5d6013640f59bfcf0",
+    "tmp/foreground-mix/sequential-stock/acceptance.exs": "e4742aec39460c0daf7394955d66ff2897310b1ede504850fa5f875c305352f6",
+    "tmp/foreground-mix/sequential-stock/unchanged.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tmp/foreground-mix/sequential-stock/a-0.log": "62ac10239807a71149064330c2cfc045f7688ae6bf5d9baefd67a2452e47789a",
+    "tmp/foreground-mix/sequential-stock/final-format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tmp/foreground-mix/sequential-stock/b-0.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tmp/foreground-mix/sequential-targeted/mix.exs": "a1794cae3baa58e6e581405f4ad5e5a1a2cc818e2aef7c27f53ad51eafa61699",
+    "tmp/foreground-mix/sequential-targeted/format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tmp/foreground-mix/sequential-targeted/acceptance.log": "982912ecfd0851192c4a6258d84b0258e8ef920e1560bd4f52e91f16455e2b39",
+    "tmp/foreground-mix/sequential-targeted/results.json": "ac0812d9e0f2b56b43038fd92b022b7122aaf0ddf0aeb203018d0ad766c2a969",
+    "tmp/foreground-mix/sequential-targeted/baseline.log": "7e250296d92c8e71f8196cb0daf6fb430249897a0fa697c5d6013640f59bfcf0",
+    "tmp/foreground-mix/sequential-targeted/acceptance.exs": "e4742aec39460c0daf7394955d66ff2897310b1ede504850fa5f875c305352f6",
+    "tmp/foreground-mix/sequential-targeted/unchanged.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tmp/foreground-mix/sequential-targeted/a-0.log": "62ac10239807a71149064330c2cfc045f7688ae6bf5d9baefd67a2452e47789a",
+    "tmp/foreground-mix/sequential-targeted/final-format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tmp/foreground-mix/sequential-targeted/b-0.log": "743ac8c87948dc6439a63ee84aee3558de2aa74325714a8ff7b18eab182715f1",
+    "tmp/foreground-mix/integration-boundaries/overlap_acceptance.exs": "3814b212578300a0f7f1eec35e7f23e772f36144d344459fbcea613db9e08edf",
+    "tmp/foreground-mix/integration-boundaries/resource-acceptance.log": "17582e66c03dacbde52c48e418075466ee32b0affba5a1ff92901b240adee8c4",
+    "tmp/foreground-mix/integration-boundaries/acceptance.log": "715434255470d912bd5ba418f6795e733ef2268ab42f04418b50519e7a5eb960",
+    "tmp/foreground-mix/integration-boundaries/resource_acceptance.exs": "b9f0195c3bec3366f295d5b41692afa5a25fd11c7febbe399dd479b4be62c0b7",
+    "tmp/foreground-mix/integration-boundaries/results.json": "d74b138cd3c22c0f0776b7707e79e74e6af0395a63676514de53de8e8e3e46d4",
+    "tmp/foreground-mix/integration-boundaries/overlap-acceptance.log": "cce03f918ba00e18456257820294af60d33564b924994e150eb43a5bd67cd293",
+    "tmp/foreground-mix/integration-boundaries/acceptance.exs": "e48e04c7d028a6fc5a51715bc4765f92ed5993d397e09d3d62740dd4ebd002a9",
+    "tmp/foreground-mix/tips-results/unchanged-2.log": "38f44736f8d0497c2b0ede18b6b4cf77cb595f3f41c8bc1c525b39b0289be8bb",
+    "tmp/foreground-mix/tips-results/unchanged-0.log": "38f44736f8d0497c2b0ede18b6b4cf77cb595f3f41c8bc1c525b39b0289be8bb",
+    "tmp/foreground-mix/tips-results/same-metadata-edit.log": "62ac10239807a71149064330c2cfc045f7688ae6bf5d9baefd67a2452e47789a",
+    "tmp/foreground-mix/tips-results/unchanged-1.log": "38f44736f8d0497c2b0ede18b6b4cf77cb595f3f41c8bc1c525b39b0289be8bb",
+    "tmp/foreground-mix/tips-results/warm-repair.log": "62ac10239807a71149064330c2cfc045f7688ae6bf5d9baefd67a2452e47789a",
+    "tmp/foreground-mix/tips-results/format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tmp/foreground-mix/tips-results/warm-error.log": "08e377ae999ee653343d895f1ccd4ff25ce94014203c2d340afef4aca07407fc",
+    "tmp/foreground-mix/tips-results/results.json": "e646e6a7972b375927850c44b13c77955acfb81a9a1876b946bfb7a1fed9fad0",
+    "tmp/foreground-mix/tips-results/warm-check-0.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tmp/foreground-mix/tips-results/warm-check-1.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tmp/foreground-mix/tips-results/warm-check-2.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tmp/foreground-mix/tips-results/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tmp/foreground-mix/tips-results/fresh-vm-acceptance.log": "bb287697c5687ec4215241d2af3b6606620720c69be2524d708414b278f75807",
+    "tmp/foreground-mix/tips-results/cold-prepare.log": "38f44736f8d0497c2b0ede18b6b4cf77cb595f3f41c8bc1c525b39b0289be8bb",
+    "tmp/foreground-mix/tips-results/acceptance.exs": "18cd7ff8f09c10c309d344c550848b69e379dd127cf1a93751d2e5e31d7158a7",
+    "tmp/foreground-mix/tips-results/credo.log": "15dce0d0cb24e5989d49165ff9635d9dea4451c02c5561c10794541d8a403b3f",
+    "tmp/foreground-mix/tips-results/warm-edit.log": "62ac10239807a71149064330c2cfc045f7688ae6bf5d9baefd67a2452e47789a"
+  },
+  "checks": {
+    "python_ast": true,
+    "fixture_format_compile_exunit": true,
+    "tips_format_compile_credo": true,
+    "tips_fresh_vm_exunit": true,
+    "fixture_credo": "unavailable",
+    "lsp": "unavailable; source/runtime fallback used",
+    "full_tips_suite": "not run; Tips source restored"
+  }
+}

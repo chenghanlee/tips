@@ -1,0 +1,6 @@
+defmodule MixRaceTarget do
+  IO.puts("TRIAGE_aa_STARTED")
+  Process.sleep(6500)
+  @doc "aa documentation."
+  def answer, do: :aa
+end

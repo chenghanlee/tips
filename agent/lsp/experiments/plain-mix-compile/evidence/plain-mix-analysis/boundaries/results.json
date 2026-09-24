@@ -1,0 +1,286 @@
+{
+  "commands": [
+    {
+      "label": "format",
+      "command": [
+        "unbuffer",
+        "mix",
+        "format",
+        "mix.exs",
+        "lib/target.ex",
+        "lib/caller.ex",
+        "lib/resource.ex",
+        "config/config.exs",
+        "test/test_helper.exs",
+        "test/proposal_test.exs",
+        "inspect.exs"
+      ],
+      "exit_code": 0,
+      "seconds": 0.39011829199444037
+    },
+    {
+      "label": "baseline",
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "exit_code": 0,
+      "seconds": 0.4692974579957081
+    },
+    {
+      "label": "baseline-tests",
+      "command": [
+        "unbuffer",
+        "mix",
+        "test"
+      ],
+      "exit_code": 0,
+      "seconds": 0.4337115419912152
+    },
+    {
+      "label": "rapid-0-a",
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "exit_code": 0,
+      "seconds": 0.40698124999471474
+    },
+    {
+      "label": "rapid-0-b",
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "exit_code": 0,
+      "seconds": 0.38456812499498483
+    },
+    {
+      "label": "rapid-0-state",
+      "command": [
+        "unbuffer",
+        "mix",
+        "run",
+        "--no-compile",
+        "inspect.exs"
+      ],
+      "exit_code": 0,
+      "seconds": 0.3806133750040317
+    },
+    {
+      "label": "rapid-later-retry",
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "exit_code": 0,
+      "seconds": 0.38999979200889356
+    },
+    {
+      "label": "rapid-later-state",
+      "command": [
+        "unbuffer",
+        "mix",
+        "run",
+        "--no-compile",
+        "inspect.exs"
+      ],
+      "exit_code": 0,
+      "seconds": 0.383022833004361
+    },
+    {
+      "label": "rapid-metadata-control",
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "exit_code": 0,
+      "seconds": 0.40058899999712594
+    },
+    {
+      "label": "rapid-repaired-state",
+      "command": [
+        "unbuffer",
+        "mix",
+        "run",
+        "--no-compile",
+        "inspect.exs"
+      ],
+      "exit_code": 0,
+      "seconds": 0.3809327500057407
+    },
+    {
+      "label": "test-error-compile",
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "exit_code": 0,
+      "seconds": 0.3842443749890663
+    },
+    {
+      "label": "test-error-test",
+      "command": [
+        "unbuffer",
+        "mix",
+        "test"
+      ],
+      "exit_code": 1,
+      "seconds": 0.41926495800726116
+    },
+    {
+      "label": "resource-edit",
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "exit_code": 0,
+      "seconds": 0.39747391700802837
+    },
+    {
+      "label": "resource-state",
+      "command": [
+        "unbuffer",
+        "mix",
+        "run",
+        "--no-compile",
+        "inspect.exs"
+      ],
+      "exit_code": 0,
+      "seconds": 0.38357808299770113
+    },
+    {
+      "label": "slow-test-format",
+      "command": [
+        "unbuffer",
+        "mix",
+        "format",
+        "test/proposal_test.exs"
+      ],
+      "exit_code": 0,
+      "seconds": 0.3492502919980325
+    },
+    {
+      "label": "compile-during-test",
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "exit_code": 0,
+      "seconds": 0.3833323339931667
+    },
+    {
+      "label": "final-format",
+      "command": [
+        "unbuffer",
+        "mix",
+        "format",
+        "--check-formatted",
+        "mix.exs",
+        "lib/target.ex",
+        "lib/caller.ex",
+        "lib/resource.ex",
+        "config/config.exs",
+        "test/test_helper.exs",
+        "test/proposal_test.exs",
+        "inspect.exs"
+      ],
+      "exit_code": 0,
+      "seconds": 0.39741045799746644
+    },
+    {
+      "label": "final-compile",
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "exit_code": 0,
+      "seconds": 0.4331717080058297
+    },
+    {
+      "label": "final-tests",
+      "command": [
+        "unbuffer",
+        "mix",
+        "test"
+      ],
+      "exit_code": 0,
+      "seconds": 0.45928149999235757
+    },
+    {
+      "label": "credo",
+      "command": [
+        "unbuffer",
+        "mix",
+        "credo",
+        "--strict"
+      ],
+      "exit_code": 1,
+      "seconds": 0.4411638750025304
+    }
+  ],
+  "cases": {
+    "sequential_same_second": [
+      {
+        "same_second": true,
+        "first_mtime_ns": 1790269115025301601,
+        "second_mtime_ns": 1790269115432629921,
+        "same_size": true,
+        "first_compiled": true,
+        "second_compiled": false,
+        "state": {
+          "caller": "aa",
+          "resource": "one",
+          "target": "aa",
+          "manifest_mtime": 1790269115,
+          "disk_mtime": 1790269115,
+          "digest_matches_disk": false
+        }
+      }
+    ],
+    "sequential_metadata_control": {
+      "caller": "bb",
+      "resource": "one",
+      "target": "bb",
+      "manifest_mtime": 1790269117,
+      "disk_mtime": 1790269117,
+      "digest_matches_disk": true
+    },
+    "test_file_not_validated": {
+      "compile_exit": 0,
+      "test_exit": 1
+    },
+    "non_elixir_resource": {
+      "caller": "bb",
+      "resource": "two revised",
+      "target": "bb",
+      "manifest_mtime": 1790269117,
+      "disk_mtime": 1790269117,
+      "digest_matches_disk": true
+    },
+    "build_lock_not_test_lock": {
+      "compile_exit": 0,
+      "test_still_running": true,
+      "compiler_waited_for_lock": false
+    }
+  },
+  "credo_unavailable": true
+}

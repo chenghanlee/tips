@@ -1,0 +1,29 @@
+Running ExUnit with seed: 248499, max_cases: 8
+
+
+
+  1) test compile-time caller matches saved B (SequentialAcceptanceTest)
+     [1m[30macceptance.exs:10[0m
+     [31mmatch (=) failed[0m
+     [36mcode:  [0massert :bb = SequentialCaller.answer()
+     [36mleft:  [0m[31m:bb[0m
+     [36mright: [0m[32m:aa[0m
+     [36mstacktrace:[0m
+       acceptance.exs:11: (test)
+
+
+
+  2) test target matches saved B (SequentialAcceptanceTest)
+     [1m[30macceptance.exs:6[0m
+     [31mmatch (=) failed[0m
+     [36mcode:  [0massert :bb = SequentialTarget.answer()
+     [36mleft:  [0m[31m:bb[0m
+     [36mright: [0m[32m:aa[0m
+     [36mstacktrace:[0m
+       acceptance.exs:7: (test)
+
+
+Finished in 0.01 seconds (0.01s on load, 0.00s async, 0.00s sync)
+
+Result: 0/2 passed
+[31mFailed: 2 tests[0m

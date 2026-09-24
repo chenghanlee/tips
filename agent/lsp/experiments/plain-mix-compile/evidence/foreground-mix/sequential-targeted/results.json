@@ -1,0 +1,51 @@
+{
+  "mode": "targeted",
+  "attempts": [
+    {
+      "same_second": true,
+      "mtime_a_ns": 1790272144025766258,
+      "mtime_b_ns": 1790272144464158953,
+      "same_size": true
+    }
+  ],
+  "exunit_exit": 0,
+  "unrelated_not_rebuilt": true,
+  "unchanged_compile_is_noop": true,
+  "commands": [
+    {
+      "label": "format",
+      "seconds": 1.281735791999381,
+      "exit_code": 0
+    },
+    {
+      "label": "baseline",
+      "seconds": 0.5112570410128683,
+      "exit_code": 0
+    },
+    {
+      "label": "a-0",
+      "seconds": 0.4380340409989003,
+      "exit_code": 0
+    },
+    {
+      "label": "b-0",
+      "seconds": 0.40455779200419784,
+      "exit_code": 0
+    },
+    {
+      "label": "acceptance",
+      "seconds": 0.40908537500945386,
+      "exit_code": 0
+    },
+    {
+      "label": "unchanged",
+      "seconds": 0.3914597499970114,
+      "exit_code": 0
+    },
+    {
+      "label": "final-format",
+      "seconds": 0.36349804200290237,
+      "exit_code": 0
+    }
+  ]
+}

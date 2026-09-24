@@ -1,0 +1,139 @@
+{
+  "stale": {
+    "caller": "aa",
+    "docs": "{:docs_v1, 1, :elixir, \"text/markdown\", :none, %{behaviours: [], source_annos: [{1, 1}], source_path: ~c\"/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/lib/target.ex\"}, [{{:function, :answer, 0}, 4, [\"answer()\"], %{\"en\" => \"aa documentation.\"}, %{source_annos: [{5, 7}]}}]}",
+    "target": "aa",
+    "digest_matches_disk": true,
+    "stored_size": 133,
+    "stored_mtime": 1790265393,
+    "disk_mtime": 1790265399
+  },
+  "fresh": {
+    "caller": "bb",
+    "docs": "{:docs_v1, 1, :elixir, \"text/markdown\", :none, %{behaviours: [], source_annos: [{1, 1}], source_path: ~c\"/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/lib/target.ex\"}, [{{:function, :answer, 0}, 4, [\"answer()\"], %{\"en\" => \"bb documentation.\"}, %{source_annos: [{5, 7}]}}]}",
+    "target": "bb",
+    "digest_matches_disk": true,
+    "stored_size": 133,
+    "stored_mtime": 1790265399,
+    "disk_mtime": 1790265399
+  },
+  "stale_tests_exit": 2,
+  "fresh_tests_exit": 0,
+  "commands": [
+    {
+      "label": "format",
+      "command": [
+        "unbuffer",
+        "mix",
+        "format",
+        "mix.exs",
+        "lib/target.ex",
+        "lib/caller.ex",
+        "acceptance.exs",
+        "inspect.exs"
+      ],
+      "exit_code": 0
+    },
+    {
+      "label": "incremental-0",
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "exit_code": 0
+    },
+    {
+      "label": "incremental-1",
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "exit_code": 0
+    },
+    {
+      "label": "stale-inspect",
+      "command": [
+        "unbuffer",
+        "mix",
+        "run",
+        "--no-compile",
+        "inspect.exs"
+      ],
+      "exit_code": 0
+    },
+    {
+      "label": "stale-acceptance",
+      "command": [
+        "unbuffer",
+        "mix",
+        "run",
+        "--no-compile",
+        "acceptance.exs"
+      ],
+      "exit_code": 2
+    },
+    {
+      "label": "force",
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--force",
+        "--warnings-as-errors"
+      ],
+      "exit_code": 0
+    },
+    {
+      "label": "fresh-inspect",
+      "command": [
+        "unbuffer",
+        "mix",
+        "run",
+        "--no-compile",
+        "inspect.exs"
+      ],
+      "exit_code": 0
+    },
+    {
+      "label": "fresh-acceptance",
+      "command": [
+        "unbuffer",
+        "mix",
+        "run",
+        "--no-compile",
+        "acceptance.exs"
+      ],
+      "exit_code": 0
+    },
+    {
+      "label": "format-check",
+      "command": [
+        "unbuffer",
+        "mix",
+        "format",
+        "--check-formatted",
+        "mix.exs",
+        "lib/target.ex",
+        "lib/caller.ex",
+        "acceptance.exs",
+        "inspect.exs"
+      ],
+      "exit_code": 0
+    },
+    {
+      "label": "credo",
+      "command": [
+        "unbuffer",
+        "mix",
+        "credo",
+        "--strict"
+      ],
+      "exit_code": 1
+    }
+  ],
+  "credo_unavailable": true
+}

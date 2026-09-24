@@ -1,0 +1,12 @@
+Compiling 1 file (.ex)
+    [31merror:[0m undefined function missing_cancellation_trace/0 (expected CancellationTarget to define such a function or for it to be imported, but none are available)
+    │
+  5 │   def answer, do: missing_cancellation_trace()
+    │ [31m                  ^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+    │
+    └─ lib/target.ex:5:19: CancellationTarget.answer/0
+
+
+== Compilation error in file lib/target.ex ==
+** (CompileError) lib/target.ex: cannot compile module CancellationTarget (errors have been logged)
+

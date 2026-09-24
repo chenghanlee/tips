@@ -1,0 +1,122 @@
+[
+  {
+    "label": "cli-error",
+    "exit_code": 1,
+    "output": {
+      "exit_code": 1,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 0.5019382499885978,
+      "status": "failed",
+      "message": "Mix compilation failed.\nCompiling 1 file (.ex)\n\n== Compilation error in file lib/resource.ex ==\n** (File.Error) could not read file \"answer.txt\": no such file or directory\n    (elixir 1.20.4) lib/file.ex:451: File.read!/2\n    lib/resource.ex:3: (module)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log",
+      "changed": [
+        "answer.txt"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 60,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/fixture/answer.txt"
+      ],
+      "total_seconds": 0.5373528329946566
+    }
+  },
+  {
+    "label": "cli-repair",
+    "exit_code": 0,
+    "output": {
+      "exit_code": 0,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 0.496790167002473,
+      "status": "passed",
+      "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 1 file (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log",
+      "changed": [
+        "answer.txt"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 60,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/fixture/answer.txt"
+      ],
+      "total_seconds": 0.5335378750023665
+    }
+  },
+  {
+    "label": "cli-timeout",
+    "exit_code": 2,
+    "output": {
+      "exit_code": -15,
+      "reason": "compilation reached its 0.001-second safety limit",
+      "survivors": [],
+      "compile_seconds": 0.26888912499998696,
+      "status": "unfinished",
+      "message": "Validation unfinished: compilation reached its 0.001-second safety limit. Run foreground_mix.py check to retry; no background compilation is scheduled.\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log",
+      "changed": [],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 0.001,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "total_seconds": 0.3052209579909686
+    }
+  },
+  {
+    "label": "cli-retry",
+    "exit_code": 0,
+    "output": {
+      "exit_code": 0,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 0.5013243749999674,
+      "status": "passed",
+      "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/state/compile.log",
+      "changed": [],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 60,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "total_seconds": 0.5356933340081014
+    }
+  },
+  {
+    "label": "state-ancestor-rejected",
+    "exit_code": 0,
+    "output": {
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "Validation unfinished: Use a Mix project and a separate private state directory. No successful compiler result was established."
+      }
+    }
+  },
+  {
+    "label": "wrong-workspace-rejected",
+    "exit_code": 0,
+    "output": {
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "Validation unfinished: Hook workspace differs from assigned workspace. No successful compiler result was established."
+      }
+    }
+  }
+]

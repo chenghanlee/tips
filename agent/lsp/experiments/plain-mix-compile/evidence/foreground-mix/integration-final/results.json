@@ -1,0 +1,701 @@
+[
+  {
+    "label": "not-prepared",
+    "seconds": 0.05454962501244154,
+    "output": {
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "Validation unfinished: run foreground_mix.py prepare for this workspace and toolchain first."
+      }
+    },
+    "record": null
+  },
+  {
+    "label": "prepare",
+    "seconds": 0.6393487499881303,
+    "output": {
+      "exit_code": 0,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 0.5520023749995744,
+      "status": "passed",
+      "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nGenerated foreground app\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [
+        ".gitignore",
+        "lib/caller.ex",
+        "lib/target.ex",
+        "mix.exs"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 180,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/.gitignore",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/caller.ex",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/target.ex",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/mix.exs"
+      ],
+      "total_seconds": 0.5881378750054864
+    },
+    "record": {
+      "exit_code": 0,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 0.5520023749995744,
+      "status": "passed",
+      "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nGenerated foreground app\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [
+        ".gitignore",
+        "lib/caller.ex",
+        "lib/target.ex",
+        "mix.exs"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 180,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/.gitignore",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/caller.ex",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/target.ex",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/mix.exs"
+      ],
+      "total_seconds": 0.5873641670041252
+    }
+  },
+  {
+    "label": "unchanged",
+    "seconds": 0.05950449999363627,
+    "output": {},
+    "record": {
+      "exit_code": 0,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 0.5520023749995744,
+      "status": "passed",
+      "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nGenerated foreground app\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [
+        ".gitignore",
+        "lib/caller.ex",
+        "lib/target.ex",
+        "mix.exs"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 180,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/.gitignore",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/caller.ex",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/target.ex",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/mix.exs"
+      ],
+      "total_seconds": 0.5873641670041252
+    }
+  },
+  {
+    "label": "same-metadata-edit",
+    "seconds": 0.5851921670109732,
+    "output": {
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log"
+      }
+    },
+    "record": {
+      "exit_code": 0,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 0.4962298330065096,
+      "status": "passed",
+      "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [
+        "lib/target.ex"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 60,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/target.ex"
+      ],
+      "total_seconds": 0.5311160830024164
+    }
+  },
+  {
+    "label": "eight-second-error",
+    "seconds": 8.581421666996903,
+    "output": {
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "Mix compilation failed.\nCompiling 2 files (.ex)\n    error: undefined function missing_foreground/0 (expected ForegroundTarget to define such a function or for it to be imported, but none are available)\n    \u2502\n  3 \u2502   def answer, do: missing_foreground()\n    \u2502                   ^^^^^^^^^^^^^^^^^^\n    \u2502\n    \u2514\u2500 lib/target.ex:3:19: ForegroundTarget.answer/0\n\n\n== Compilation error in file lib/target.ex ==\n** (CompileError) lib/target.ex: cannot compile module ForegroundTarget (errors have been logged)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log"
+      }
+    },
+    "record": {
+      "exit_code": 1,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 8.495100250001997,
+      "status": "failed",
+      "message": "Mix compilation failed.\nCompiling 2 files (.ex)\n    error: undefined function missing_foreground/0 (expected ForegroundTarget to define such a function or for it to be imported, but none are available)\n    \u2502\n  3 \u2502   def answer, do: missing_foreground()\n    \u2502                   ^^^^^^^^^^^^^^^^^^\n    \u2502\n    \u2514\u2500 lib/target.ex:3:19: ForegroundTarget.answer/0\n\n\n== Compilation error in file lib/target.ex ==\n** (CompileError) lib/target.ex: cannot compile module ForegroundTarget (errors have been logged)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [
+        "lib/target.ex"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 60,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/target.ex"
+      ],
+      "total_seconds": 8.530141790994094
+    }
+  },
+  {
+    "label": "unchanged-after-error",
+    "seconds": 0.062008708002395,
+    "output": {},
+    "record": {
+      "exit_code": 1,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 8.495100250001997,
+      "status": "failed",
+      "message": "Mix compilation failed.\nCompiling 2 files (.ex)\n    error: undefined function missing_foreground/0 (expected ForegroundTarget to define such a function or for it to be imported, but none are available)\n    \u2502\n  3 \u2502   def answer, do: missing_foreground()\n    \u2502                   ^^^^^^^^^^^^^^^^^^\n    \u2502\n    \u2514\u2500 lib/target.ex:3:19: ForegroundTarget.answer/0\n\n\n== Compilation error in file lib/target.ex ==\n** (CompileError) lib/target.ex: cannot compile module ForegroundTarget (errors have been logged)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [
+        "lib/target.ex"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 60,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/target.ex"
+      ],
+      "total_seconds": 8.530141790994094
+    }
+  },
+  {
+    "label": "repair",
+    "seconds": 0.6550272080057766,
+    "output": {
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log"
+      }
+    },
+    "record": {
+      "exit_code": 0,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 0.5640612910065101,
+      "status": "passed",
+      "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [
+        "lib/target.ex"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 60,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/target.ex"
+      ],
+      "total_seconds": 0.6006621249980526
+    }
+  },
+  {
+    "label": "safety-timeout",
+    "seconds": 1.4093240829970455,
+    "output": {
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "Validation unfinished: compilation reached its 1-second safety limit. Run foreground_mix.py check to retry; no background compilation is scheduled.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log"
+      }
+    },
+    "record": {
+      "exit_code": -15,
+      "reason": "compilation reached its 1-second safety limit",
+      "survivors": [],
+      "compile_seconds": 1.316174375009723,
+      "status": "unfinished",
+      "message": "Validation unfinished: compilation reached its 1-second safety limit. Run foreground_mix.py check to retry; no background compilation is scheduled.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [
+        "lib/target.ex"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 1.0,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/target.ex"
+      ],
+      "total_seconds": 1.3521771670057205
+    }
+  },
+  {
+    "label": "unchanged-after-timeout",
+    "seconds": 0.06330662500113249,
+    "output": {},
+    "record": {
+      "exit_code": -15,
+      "reason": "compilation reached its 1-second safety limit",
+      "survivors": [],
+      "compile_seconds": 1.316174375009723,
+      "status": "unfinished",
+      "message": "Validation unfinished: compilation reached its 1-second safety limit. Run foreground_mix.py check to retry; no background compilation is scheduled.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [
+        "lib/target.ex"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 1.0,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/target.ex"
+      ],
+      "total_seconds": 1.3521771670057205
+    }
+  },
+  {
+    "label": "stop-after-timeout",
+    "seconds": 0.06409295799676329,
+    "output": {
+      "decision": "block",
+      "reason": "Validation unfinished: compilation reached its 1-second safety limit. Run foreground_mix.py check to retry; no background compilation is scheduled.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log"
+    },
+    "record": {
+      "exit_code": -15,
+      "reason": "compilation reached its 1-second safety limit",
+      "survivors": [],
+      "compile_seconds": 1.316174375009723,
+      "status": "unfinished",
+      "message": "Validation unfinished: compilation reached its 1-second safety limit. Run foreground_mix.py check to retry; no background compilation is scheduled.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [
+        "lib/target.ex"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 1.0,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/target.ex"
+      ],
+      "total_seconds": 1.3521771670057205
+    }
+  },
+  {
+    "label": "repeat-stop",
+    "seconds": 0.06326087500201538,
+    "output": {},
+    "record": {
+      "exit_code": -15,
+      "reason": "compilation reached its 1-second safety limit",
+      "survivors": [],
+      "compile_seconds": 1.316174375009723,
+      "status": "unfinished",
+      "message": "Validation unfinished: compilation reached its 1-second safety limit. Run foreground_mix.py check to retry; no background compilation is scheduled.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [
+        "lib/target.ex"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 1.0,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/target.ex"
+      ],
+      "total_seconds": 1.3521771670057205
+    }
+  },
+  {
+    "label": "same-source-longer-retry",
+    "seconds": 8.640614292002283,
+    "output": {
+      "exit_code": 0,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 8.545927208004287,
+      "status": "passed",
+      "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 15.0,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/target.ex"
+      ],
+      "total_seconds": 8.585295790995588
+    },
+    "record": {
+      "exit_code": 0,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 8.545927208004287,
+      "status": "passed",
+      "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 15.0,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/target.ex"
+      ],
+      "total_seconds": 8.58447183399403
+    }
+  },
+  {
+    "label": "timeout-repair",
+    "seconds": 0.6494709160033381,
+    "output": {
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log"
+      }
+    },
+    "record": {
+      "exit_code": 0,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 0.5559466249978868,
+      "status": "passed",
+      "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [
+        "lib/target.ex"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 60,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/target.ex"
+      ],
+      "total_seconds": 0.5925988329981919
+    }
+  },
+  {
+    "label": "reconcile-superseded",
+    "seconds": 2.191067125007976,
+    "output": {
+      "exit_code": 0,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 2.0971365829900606,
+      "status": "passed",
+      "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 60,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/target.ex"
+      ],
+      "total_seconds": 2.1340966249990743
+    },
+    "record": {
+      "exit_code": 0,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 2.0971365829900606,
+      "status": "passed",
+      "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 60,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/target.ex"
+      ],
+      "total_seconds": 2.133314332997543
+    }
+  },
+  {
+    "label": "interrupted",
+    "output": {
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "Validation unfinished: compiler feedback was interrupted. Run foreground_mix.py check to retry; no background compilation is scheduled.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log"
+      }
+    },
+    "survivors": {}
+  },
+  {
+    "label": "interrupt-repair",
+    "seconds": 0.5903808329894673,
+    "output": {
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log"
+      }
+    },
+    "record": {
+      "exit_code": 0,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 0.49754729100095574,
+      "status": "passed",
+      "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 2 files (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [
+        "lib/target.ex"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 60,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/target.ex"
+      ],
+      "total_seconds": 0.5332646669994574
+    }
+  },
+  {
+    "label": "resource-created",
+    "seconds": 0.6391361249989131,
+    "output": {
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 1 file (.ex)\nGenerated foreground app\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log"
+      }
+    },
+    "record": {
+      "exit_code": 0,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 0.549473457998829,
+      "status": "passed",
+      "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 1 file (.ex)\nGenerated foreground app\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [
+        "answer.txt",
+        "lib/resource.ex"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 60,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/answer.txt",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/lib/resource.ex"
+      ],
+      "total_seconds": 0.585356875002617
+    }
+  },
+  {
+    "label": "resource-same-metadata",
+    "seconds": 0.5805043329892214,
+    "output": {
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 1 file (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log"
+      }
+    },
+    "record": {
+      "exit_code": 0,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 0.49403337499825284,
+      "status": "passed",
+      "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 1 file (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [
+        "answer.txt"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 60,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/answer.txt"
+      ],
+      "total_seconds": 0.5278726670076139
+    }
+  },
+  {
+    "label": "resource-deleted",
+    "seconds": 0.5818430840008659,
+    "output": {
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "Mix compilation failed.\nCompiling 1 file (.ex)\n\n== Compilation error in file lib/resource.ex ==\n** (File.Error) could not read file \"answer.txt\": no such file or directory\n    (elixir 1.20.4) lib/file.ex:451: File.read!/2\n    lib/resource.ex:3: (module)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log"
+      }
+    },
+    "record": {
+      "exit_code": 1,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 0.4933428329968592,
+      "status": "failed",
+      "message": "Mix compilation failed.\nCompiling 1 file (.ex)\n\n== Compilation error in file lib/resource.ex ==\n** (File.Error) could not read file \"answer.txt\": no such file or directory\n    (elixir 1.20.4) lib/file.ex:451: File.read!/2\n    lib/resource.ex:3: (module)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [
+        "answer.txt"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 60,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/answer.txt"
+      ],
+      "total_seconds": 0.5287091670033988
+    }
+  },
+  {
+    "label": "resource-recreated",
+    "seconds": 0.5779934589954792,
+    "output": {
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 1 file (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log"
+      }
+    },
+    "record": {
+      "exit_code": 0,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 0.4928417090122821,
+      "status": "passed",
+      "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 1 file (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [
+        "answer.txt"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 60,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/answer.txt"
+      ],
+      "total_seconds": 0.5265390419954201
+    }
+  },
+  {
+    "label": "clean-stop",
+    "seconds": 0.057823458992061205,
+    "output": {},
+    "record": {
+      "exit_code": 0,
+      "reason": null,
+      "survivors": [],
+      "compile_seconds": 0.4928417090122821,
+      "status": "passed",
+      "message": "Mix compilation passed; no input change was observed during the check. Tests were not run.\nCompiling 1 file (.ex)\nCompiler log: /private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/state/compile.log",
+      "changed": [
+        "answer.txt"
+      ],
+      "changed_during_compile": [],
+      "targeted": true,
+      "timeout_seconds": 60,
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors",
+        "--force-path",
+        "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/fixture/answer.txt"
+      ],
+      "total_seconds": 0.5265390419954201
+    }
+  },
+  {
+    "label": "final-checks",
+    "format_compile_exunit_passed": true,
+    "credo_unavailable": true
+  }
+]

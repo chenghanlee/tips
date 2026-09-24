@@ -1,0 +1,12 @@
+{
+  "elixir_otp": "1.20.4/29.1",
+  "source_sha256": {
+    "compiler_elixir.ex": "ae323e0d10b14fc55f0a415d53654d8c39e22723bde17138eb8dc78b34067c87",
+    "compile_elixir_task.ex": "d5e29d8ec2adaaef745a79f76cbd6b5d8c3bc1d052ebcf4bf9f8da522112ba7e"
+  },
+  "patch_sha256": "1542a13a429446a04c67dab2e6be9bd636f3c1ef52e54f36b3104f408b831fde",
+  "files": {
+    "lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam": "e9eb50d57690293ea4f46ac2b45eb1f93afc8c5fadf76b3c1eae99ef9c7dec34",
+    "lib/mix/ebin/Elixir.Mix.Tasks.Compile.Elixir.beam": "de7418d6976e70c2f626a2173efa5c7c421c2cf5a93154c3d8e93d09d37c6c55"
+  }
+}

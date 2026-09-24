@@ -1,0 +1,608 @@
+[
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/background-test.log",
+    "archive": "plain-mix-analysis/boundaries/background-test.log",
+    "sha256": "0548e3b46f1e434c96ecee1f76e0e03bdce7b9a06087448da71c1879ee825b7e",
+    "bytes": 134
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/baseline-tests.log",
+    "archive": "plain-mix-analysis/boundaries/baseline-tests.log",
+    "sha256": "666ac36a096a60c26bdce3252e8545630cd5e771458bacc05792c4cc3c72d7dd",
+    "bytes": 137
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/baseline.log",
+    "archive": "plain-mix-analysis/boundaries/baseline.log",
+    "sha256": "02151615de75a5812d7bc20183c086e1d37902de25276b70d617fd58b7715f50",
+    "bytes": 47
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/compile-during-test.log",
+    "archive": "plain-mix-analysis/boundaries/compile-during-test.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/credo.log",
+    "archive": "plain-mix-analysis/boundaries/credo.log",
+    "sha256": "2ed03d6ee7c9fd693a87013d1797cf4ea796ea8f4cbce32e471266c13173bcc6",
+    "bytes": 58
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/final-compile.log",
+    "archive": "plain-mix-analysis/boundaries/final-compile.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/final-format.log",
+    "archive": "plain-mix-analysis/boundaries/final-format.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/final-tests.log",
+    "archive": "plain-mix-analysis/boundaries/final-tests.log",
+    "sha256": "053cd297447f23299d163d6c6ca220c4017405bfe09050201bd9158515e97198",
+    "bytes": 137
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/format.log",
+    "archive": "plain-mix-analysis/boundaries/format.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/rapid-0-a.log",
+    "archive": "plain-mix-analysis/boundaries/rapid-0-a.log",
+    "sha256": "62ac10239807a71149064330c2cfc045f7688ae6bf5d9baefd67a2452e47789a",
+    "bytes": 24
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/rapid-0-b.log",
+    "archive": "plain-mix-analysis/boundaries/rapid-0-b.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/rapid-0-state.log",
+    "archive": "plain-mix-analysis/boundaries/rapid-0-state.log",
+    "sha256": "44eddc82da62187276c31f454ce427bbc53c3d3ea7e9822b82cea94cfa18b1ec",
+    "bytes": 141
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/rapid-later-retry.log",
+    "archive": "plain-mix-analysis/boundaries/rapid-later-retry.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/rapid-later-state.log",
+    "archive": "plain-mix-analysis/boundaries/rapid-later-state.log",
+    "sha256": "44eddc82da62187276c31f454ce427bbc53c3d3ea7e9822b82cea94cfa18b1ec",
+    "bytes": 141
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/rapid-metadata-control.log",
+    "archive": "plain-mix-analysis/boundaries/rapid-metadata-control.log",
+    "sha256": "62ac10239807a71149064330c2cfc045f7688ae6bf5d9baefd67a2452e47789a",
+    "bytes": 24
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/rapid-repaired-state.log",
+    "archive": "plain-mix-analysis/boundaries/rapid-repaired-state.log",
+    "sha256": "f08c533430a17ed9f9ab7c492b94943bcefa513aea30ae05924ff5b22f1b48b2",
+    "bytes": 140
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/resource-edit.log",
+    "archive": "plain-mix-analysis/boundaries/resource-edit.log",
+    "sha256": "d9904e527cccaec0e854b323b04ec7f0b408ecb02771ac243d1284fc624b3205",
+    "bytes": 23
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/resource-state.log",
+    "archive": "plain-mix-analysis/boundaries/resource-state.log",
+    "sha256": "b17320592dd21fb491b924a2695eaffa70e16b4b162106bda724cfd55f073add",
+    "bytes": 148
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/results.json",
+    "archive": "plain-mix-analysis/boundaries/results.json",
+    "sha256": "280b39069975e59ceee65bf0d2a093a6287d7525845f614f91a359c7b6a6ffeb",
+    "bytes": 5879
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/slow-test-format.log",
+    "archive": "plain-mix-analysis/boundaries/slow-test-format.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/test-error-compile.log",
+    "archive": "plain-mix-analysis/boundaries/test-error-compile.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/boundaries/test-error-test.log",
+    "archive": "plain-mix-analysis/boundaries/test-error-test.log",
+    "sha256": "fdc3d60ae0f39c152c6e4e4e7a06a67ee4ce9a2587228b3abbd9dea130439831",
+    "bytes": 558
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/cancellation/attempt-0.log",
+    "archive": "plain-mix-analysis/cancellation/attempt-0.log",
+    "sha256": "d9904e527cccaec0e854b323b04ec7f0b408ecb02771ac243d1284fc624b3205",
+    "bytes": 23
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/cancellation/attempt-1.log",
+    "archive": "plain-mix-analysis/cancellation/attempt-1.log",
+    "sha256": "d9904e527cccaec0e854b323b04ec7f0b408ecb02771ac243d1284fc624b3205",
+    "bytes": 23
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/cancellation/attempt-2.log",
+    "archive": "plain-mix-analysis/cancellation/attempt-2.log",
+    "sha256": "d98fa992a67b0adfdc222eaa1a5ebfd9c2fbf112b55d3089739565149ef5d6e4",
+    "bytes": 537
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/cancellation/mix.exs",
+    "archive": "plain-mix-analysis/cancellation/mix.exs",
+    "sha256": "658a25451bc89998324837f63efaa6dab4fdd2d74469a997cfec4f89454c44e1",
+    "bytes": 129
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/cancellation/phases.log",
+    "archive": "plain-mix-analysis/cancellation/phases.log",
+    "sha256": "2f1cdb3c70ec85c1a21fd67769eb7b003f3e1567631eb4ad336f416ee87961d4",
+    "bytes": 57
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/plain-mix-analysis/cancellation/results.json",
+    "archive": "plain-mix-analysis/cancellation/results.json",
+    "sha256": "70a4f561f04c8e52a7a28d3a1de46659acc9f88e1748291e454d495af6248c0c",
+    "bytes": 2038
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-stock/a-0.log",
+    "archive": "foreground-mix/sequential-stock/a-0.log",
+    "sha256": "62ac10239807a71149064330c2cfc045f7688ae6bf5d9baefd67a2452e47789a",
+    "bytes": 24
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-stock/acceptance.exs",
+    "archive": "foreground-mix/sequential-stock/acceptance.exs",
+    "sha256": "e4742aec39460c0daf7394955d66ff2897310b1ede504850fa5f875c305352f6",
+    "bytes": 272
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-stock/acceptance.log",
+    "archive": "foreground-mix/sequential-stock/acceptance.log",
+    "sha256": "2f873a10260c5c15e7bba799a36c0168b2e4a6ddd78dc8ebae4136cd54a05716",
+    "bytes": 805
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-stock/b-0.log",
+    "archive": "foreground-mix/sequential-stock/b-0.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-stock/baseline.log",
+    "archive": "foreground-mix/sequential-stock/baseline.log",
+    "sha256": "7e250296d92c8e71f8196cb0daf6fb430249897a0fa697c5d6013640f59bfcf0",
+    "bytes": 49
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-stock/final-format.log",
+    "archive": "foreground-mix/sequential-stock/final-format.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-stock/format.log",
+    "archive": "foreground-mix/sequential-stock/format.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-stock/mix.exs",
+    "archive": "foreground-mix/sequential-stock/mix.exs",
+    "sha256": "a1794cae3baa58e6e581405f4ad5e5a1a2cc818e2aef7c27f53ad51eafa61699",
+    "bytes": 114
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-stock/results.json",
+    "archive": "foreground-mix/sequential-stock/results.json",
+    "sha256": "3315e429fe2a4709577ce0d0913abbeffc3bec89b26d52982f041e9118903874",
+    "bytes": 983
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-stock/unchanged.log",
+    "archive": "foreground-mix/sequential-stock/unchanged.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-targeted/a-0.log",
+    "archive": "foreground-mix/sequential-targeted/a-0.log",
+    "sha256": "62ac10239807a71149064330c2cfc045f7688ae6bf5d9baefd67a2452e47789a",
+    "bytes": 24
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-targeted/acceptance.exs",
+    "archive": "foreground-mix/sequential-targeted/acceptance.exs",
+    "sha256": "e4742aec39460c0daf7394955d66ff2897310b1ede504850fa5f875c305352f6",
+    "bytes": 272
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-targeted/acceptance.log",
+    "archive": "foreground-mix/sequential-targeted/acceptance.log",
+    "sha256": "982912ecfd0851192c4a6258d84b0258e8ef920e1560bd4f52e91f16455e2b39",
+    "bytes": 162
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-targeted/b-0.log",
+    "archive": "foreground-mix/sequential-targeted/b-0.log",
+    "sha256": "743ac8c87948dc6439a63ee84aee3558de2aa74325714a8ff7b18eab182715f1",
+    "bytes": 70
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-targeted/baseline.log",
+    "archive": "foreground-mix/sequential-targeted/baseline.log",
+    "sha256": "7e250296d92c8e71f8196cb0daf6fb430249897a0fa697c5d6013640f59bfcf0",
+    "bytes": 49
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-targeted/final-format.log",
+    "archive": "foreground-mix/sequential-targeted/final-format.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-targeted/format.log",
+    "archive": "foreground-mix/sequential-targeted/format.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-targeted/mix.exs",
+    "archive": "foreground-mix/sequential-targeted/mix.exs",
+    "sha256": "a1794cae3baa58e6e581405f4ad5e5a1a2cc818e2aef7c27f53ad51eafa61699",
+    "bytes": 114
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-targeted/results.json",
+    "archive": "foreground-mix/sequential-targeted/results.json",
+    "sha256": "ac0812d9e0f2b56b43038fd92b022b7122aaf0ddf0aeb203018d0ad766c2a969",
+    "bytes": 984
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/sequential-targeted/unchanged.log",
+    "archive": "foreground-mix/sequential-targeted/unchanged.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration/acceptance.exs",
+    "archive": "foreground-mix/integration/acceptance.exs",
+    "sha256": "e48e04c7d028a6fc5a51715bc4765f92ed5993d397e09d3d62740dd4ebd002a9",
+    "bytes": 239
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration/acceptance.log",
+    "archive": "foreground-mix/integration/acceptance.log",
+    "sha256": "43addf3b18d396bef23c99585dc5b63617b3a5a0452a76fd9f0692cea20ff99d",
+    "bytes": 151
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration/results.json",
+    "archive": "foreground-mix/integration/results.json",
+    "sha256": "84f13fef68dc23af2b4969ce3cb3f38f9ea1755d3fe182caf5228569d5cfb351",
+    "bytes": 19759
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/acceptance.exs",
+    "archive": "foreground-mix/integration-final/acceptance.exs",
+    "sha256": "e48e04c7d028a6fc5a51715bc4765f92ed5993d397e09d3d62740dd4ebd002a9",
+    "bytes": 239
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/acceptance.log",
+    "archive": "foreground-mix/integration-final/acceptance.log",
+    "sha256": "1e6ef09cc2543292e843ab8e313a18e4eb76356adc2a9cd015836dfbf2d91db3",
+    "bytes": 152
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/resource-acceptance.log",
+    "archive": "foreground-mix/integration-final/resource-acceptance.log",
+    "sha256": "060155d1cb0ef7951b5f9330b4f93a3e11afa289fa183f4d6f1ce91449562886",
+    "bytes": 152
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/resource_acceptance.exs",
+    "archive": "foreground-mix/integration-final/resource_acceptance.exs",
+    "sha256": "b9f0195c3bec3366f295d5b41692afa5a25fd11c7febbe399dd479b4be62c0b7",
+    "bytes": 208
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-final/results.json",
+    "archive": "foreground-mix/integration-final/results.json",
+    "sha256": "59570d8ecbb648d889401846644d0e688bc8084e7c0bfc463b759853c44f3da4",
+    "bytes": 28062
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/acceptance.exs",
+    "archive": "foreground-mix/integration-boundaries/acceptance.exs",
+    "sha256": "e48e04c7d028a6fc5a51715bc4765f92ed5993d397e09d3d62740dd4ebd002a9",
+    "bytes": 239
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/acceptance.log",
+    "archive": "foreground-mix/integration-boundaries/acceptance.log",
+    "sha256": "715434255470d912bd5ba418f6795e733ef2268ab42f04418b50519e7a5eb960",
+    "bytes": 152
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/overlap-acceptance.log",
+    "archive": "foreground-mix/integration-boundaries/overlap-acceptance.log",
+    "sha256": "cce03f918ba00e18456257820294af60d33564b924994e150eb43a5bd67cd293",
+    "bytes": 152
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/overlap_acceptance.exs",
+    "archive": "foreground-mix/integration-boundaries/overlap_acceptance.exs",
+    "sha256": "3814b212578300a0f7f1eec35e7f23e772f36144d344459fbcea613db9e08edf",
+    "bytes": 239
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/resource-acceptance.log",
+    "archive": "foreground-mix/integration-boundaries/resource-acceptance.log",
+    "sha256": "17582e66c03dacbde52c48e418075466ee32b0affba5a1ff92901b240adee8c4",
+    "bytes": 152
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/resource_acceptance.exs",
+    "archive": "foreground-mix/integration-boundaries/resource_acceptance.exs",
+    "sha256": "b9f0195c3bec3366f295d5b41692afa5a25fd11c7febbe399dd479b4be62c0b7",
+    "bytes": 208
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/integration-boundaries/results.json",
+    "archive": "foreground-mix/integration-boundaries/results.json",
+    "sha256": "d74b138cd3c22c0f0776b7707e79e74e6af0395a63676514de53de8e8e3e46d4",
+    "bytes": 33359
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/tips-results/acceptance.exs",
+    "archive": "foreground-mix/tips-results/acceptance.exs",
+    "sha256": "18cd7ff8f09c10c309d344c550848b69e379dd127cf1a93751d2e5e31d7158a7",
+    "bytes": 291
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/tips-results/cold-prepare.log",
+    "archive": "foreground-mix/tips-results/cold-prepare.log",
+    "sha256": "38f44736f8d0497c2b0ede18b6b4cf77cb595f3f41c8bc1c525b39b0289be8bb",
+    "bytes": 10523
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/tips-results/compile.log",
+    "archive": "foreground-mix/tips-results/compile.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/tips-results/credo.log",
+    "archive": "foreground-mix/tips-results/credo.log",
+    "sha256": "15dce0d0cb24e5989d49165ff9635d9dea4451c02c5561c10794541d8a403b3f",
+    "bytes": 322
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/tips-results/format.log",
+    "archive": "foreground-mix/tips-results/format.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/tips-results/fresh-vm-acceptance.log",
+    "archive": "foreground-mix/tips-results/fresh-vm-acceptance.log",
+    "sha256": "bb287697c5687ec4215241d2af3b6606620720c69be2524d708414b278f75807",
+    "bytes": 150
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/tips-results/results.json",
+    "archive": "foreground-mix/tips-results/results.json",
+    "sha256": "e646e6a7972b375927850c44b13c77955acfb81a9a1876b946bfb7a1fed9fad0",
+    "bytes": 255299
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/tips-results/same-metadata-edit.log",
+    "archive": "foreground-mix/tips-results/same-metadata-edit.log",
+    "sha256": "62ac10239807a71149064330c2cfc045f7688ae6bf5d9baefd67a2452e47789a",
+    "bytes": 24
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/tips-results/unchanged-0.log",
+    "archive": "foreground-mix/tips-results/unchanged-0.log",
+    "sha256": "38f44736f8d0497c2b0ede18b6b4cf77cb595f3f41c8bc1c525b39b0289be8bb",
+    "bytes": 10523
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/tips-results/unchanged-1.log",
+    "archive": "foreground-mix/tips-results/unchanged-1.log",
+    "sha256": "38f44736f8d0497c2b0ede18b6b4cf77cb595f3f41c8bc1c525b39b0289be8bb",
+    "bytes": 10523
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/tips-results/unchanged-2.log",
+    "archive": "foreground-mix/tips-results/unchanged-2.log",
+    "sha256": "38f44736f8d0497c2b0ede18b6b4cf77cb595f3f41c8bc1c525b39b0289be8bb",
+    "bytes": 10523
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/tips-results/warm-check-0.log",
+    "archive": "foreground-mix/tips-results/warm-check-0.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/tips-results/warm-check-1.log",
+    "archive": "foreground-mix/tips-results/warm-check-1.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/tips-results/warm-check-2.log",
+    "archive": "foreground-mix/tips-results/warm-check-2.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/tips-results/warm-edit.log",
+    "archive": "foreground-mix/tips-results/warm-edit.log",
+    "sha256": "62ac10239807a71149064330c2cfc045f7688ae6bf5d9baefd67a2452e47789a",
+    "bytes": 24
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/tips-results/warm-error.log",
+    "archive": "foreground-mix/tips-results/warm-error.log",
+    "sha256": "08e377ae999ee653343d895f1ccd4ff25ce94014203c2d340afef4aca07407fc",
+    "bytes": 511
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/tips-results/warm-repair.log",
+    "archive": "foreground-mix/tips-results/warm-repair.log",
+    "sha256": "62ac10239807a71149064330c2cfc045f7688ae6bf5d9baefd67a2452e47789a",
+    "bytes": 24
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/cli-boundaries.json",
+    "archive": "foreground-mix/cli-boundaries.json",
+    "sha256": "e353c932654abd64953bd546265d58d772f468b1518b88cbcb16b110e7d85f28",
+    "bytes": 4093
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/private-mix/build.log",
+    "archive": "foreground-mix/private-mix/build.log",
+    "sha256": "495cb394ae1764633bd9e6ad79b83878205732d73cd9439a6708d13dc961d92a",
+    "bytes": 70
+  },
+  {
+    "source": "/private/tmp/tips-plain-mix-compile/tmp/foreground-mix/private-mix/toolchain/foreground-mix-manifest.json",
+    "archive": "foreground-mix/private-mix/toolchain/foreground-mix-manifest.json",
+    "sha256": "f8cc89d9a38f61d42fa02f9c17b20d3a0aa87c8283cf103994aff360576e1f4b",
+    "bytes": 600
+  },
+  {
+    "source": "/private/tmp/tips-fable-release-review-9xb93ihp/REVIEW.md",
+    "archive": "review/fable-release-review.txt",
+    "sha256": "2a15b71f90f593c8ef5e13ba0c69ed06b3267eb43857ad271af8eceacf11d97a",
+    "bytes": 18738
+  },
+  {
+    "source": "/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/acceptance.exs",
+    "archive": "prior-overlap/acceptance.exs",
+    "sha256": "5de901023ead83918f7e2058052e3d9f19fbfc874048a658bbc8f97c568b8e75",
+    "bytes": 283
+  },
+  {
+    "source": "/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/credo.log",
+    "archive": "prior-overlap/credo.log",
+    "sha256": "2ed03d6ee7c9fd693a87013d1797cf4ea796ea8f4cbce32e471266c13173bcc6",
+    "bytes": 58
+  },
+  {
+    "source": "/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/force.log",
+    "archive": "prior-overlap/force.log",
+    "sha256": "1c420e14764ce7b549593fd9ea96bc78b5cdc2834b83e96601f73caf87d65c29",
+    "bytes": 65
+  },
+  {
+    "source": "/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/format-check.log",
+    "archive": "prior-overlap/format-check.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/format.log",
+    "archive": "prior-overlap/format.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/fresh-acceptance.log",
+    "archive": "prior-overlap/fresh-acceptance.log",
+    "sha256": "1208ac1d1672b049283c7f87be7fcefb79353892f90d18d2a18c1be67ac11eee",
+    "bytes": 162
+  },
+  {
+    "source": "/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/fresh-inspect.log",
+    "archive": "prior-overlap/fresh-inspect.log",
+    "sha256": "1a0718d22fcb00a9420cdb87f81df2e8e6d00f7363395c5677f0b4618f6848df",
+    "bytes": 463
+  },
+  {
+    "source": "/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/incremental-0.log",
+    "archive": "prior-overlap/incremental-0.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/incremental-1.log",
+    "archive": "prior-overlap/incremental-1.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/inspect.exs",
+    "archive": "prior-overlap/inspect.exs",
+    "sha256": "513381e343ae951987d0138f4a0a4e2bd04aa822f3cfe1218a4edc741c739975",
+    "bytes": 627
+  },
+  {
+    "source": "/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/mix.exs",
+    "archive": "prior-overlap/mix.exs",
+    "sha256": "5de6eafbb1c6bff254b0db2dfef957afcce68b112c740eb50b5912effb684de0",
+    "bytes": 128
+  },
+  {
+    "source": "/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/overlap-compile.log",
+    "archive": "prior-overlap/overlap-compile.log",
+    "sha256": "540fbdb0e94359abe0c8289906b7982e662f83aa504710aedb80185613aaf779",
+    "bytes": 65
+  },
+  {
+    "source": "/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/results.json",
+    "archive": "prior-overlap/results.json",
+    "sha256": "33ea8a5da1f41d39e1ae2d7e050e2125dda3df73c8c51ffdb44e0de8a164cb62",
+    "bytes": 3144
+  },
+  {
+    "source": "/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/source-a.txt",
+    "archive": "prior-overlap/source-a.txt",
+    "sha256": "e790b6efdbf7bc9d6ab1628205f595d21c1ead3eeeb068a73cfb243965f2c7fa",
+    "bytes": 133
+  },
+  {
+    "source": "/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/source-b.txt",
+    "archive": "prior-overlap/source-b.txt",
+    "sha256": "a7b81d699405098bba8889c42709beb821d900af9255713b4be4cec0c8754299",
+    "bytes": 133
+  },
+  {
+    "source": "/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/stale-acceptance.log",
+    "archive": "prior-overlap/stale-acceptance.log",
+    "sha256": "6ea27e0e145059c7b7e0733cbc4ba5ab858750fc3eeffe4938920ca6980c6131",
+    "bytes": 2529
+  },
+  {
+    "source": "/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/stale-inspect.log",
+    "archive": "prior-overlap/stale-inspect.log",
+    "sha256": "401988487c93b89ef0586a5c65f180dacbb57768aa249d37b38122ef42599b71",
+    "bytes": 463
+  }
+]

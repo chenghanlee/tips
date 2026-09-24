@@ -1,0 +1,13 @@
+Running ExUnit with seed: 529903, max_cases: 8
+
+    [31merror:[0m undefined function missing_test_function/0 (expected ProposalTest to define such a function or for it to be imported, but none are available)
+    │
+  3 │   def broken, do: missing_test_function()
+    │ [31m                  ^^^^^^^^^^^^^^^^^^^^^[0m
+    │
+    └─ test/proposal_test.exs:3:19: ProposalTest.__info__/1
+
+
+== Compilation error in file test/proposal_test.exs ==
+** (CompileError) test/proposal_test.exs: cannot compile module ProposalTest (errors have been logged)
+
