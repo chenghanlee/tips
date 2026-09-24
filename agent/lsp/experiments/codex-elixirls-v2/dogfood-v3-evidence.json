@@ -1,0 +1,1450 @@
+{
+  "date": "2026-09-24",
+  "branch": "experiment/elixirls-codex-v2",
+  "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/sol-dogfood-v3",
+  "setup": {
+    "application_commit": "81501387eb77b220c95693f58076f7f8255da1b0",
+    "worktrees": [
+      "/private/tmp/tips-lsp-sol-v3-provider",
+      "/private/tmp/tips-lsp-sol-v3-media",
+      "/private/tmp/tips-lsp-sol-v3-health"
+    ],
+    "model": "gpt-6-sol",
+    "cold_elixirls": true,
+    "source_hashes": {
+      "neovim_sync.lua": "121b0498aecb1b4bc82a141db15e03b64b012cf2fafb7636a9dbe24bc9dd71b6",
+      "neovim_feedback.lua": "d9f908ae22f283b122cbe7203e6cd5b97b038301c080415b2e53bdb8d4da32c0",
+      "neovim_init.lua": "8552946f55059a4c1e3cdc84a93fbd950b3a7c0af3317dc22724d487ecd665a5",
+      "neovim_hook.py": "d5150976a6154f573e883e6ddf8f149f3206166748fcbd7e4c5d936c822088f8",
+      "neovim_launcher.py": "3e506065033d0753133a956dce274d22459cd73e54c0122b6d86812afb2be802",
+      "neovim_dogfood.py": "8dd9306e26264547d2c0adf2a189c793114748c246df89216e4c6be2985d8a7b"
+    },
+    "binary_sha256": "10bdd585f2402fd992d07d054b2ca9bc75e9919d2fc496a1d6ee4ce29db5c62b"
+  },
+  "runtime_frozen": true,
+  "workers": {
+    "provider": {
+      "worktree": "/private/tmp/tips-lsp-sol-v3-provider",
+      "branch": "experiment/elixirls-sol-v3-provider",
+      "baseline": [
+        {
+          "command": [
+            "unbuffer",
+            "mix",
+            "compile",
+            "--warnings-as-errors"
+          ],
+          "exit_code": 0,
+          "seconds": 38.246
+        },
+        {
+          "command": [
+            "unbuffer",
+            "mix",
+            "test",
+            "test/tips/provider_config_test.exs",
+            "test/tips/search_probe_test.exs"
+          ],
+          "exit_code": 0,
+          "seconds": 55.365
+        }
+      ],
+      "agent_seconds": 196.131,
+      "agent_exit_code": 0,
+      "observed_descendants": 150,
+      "remaining_before_cleanup": {},
+      "diff_check_exit": 0,
+      "application_patch_sha256": "e4db2670e5c473327857579fc73d1f01ed46d8345c3fa5e3222dcaec2345a768",
+      "changed_files": [
+        "docs/development/local-development.md",
+        "lib/tips/provider_config.ex",
+        "lib/tips/search_probe.ex",
+        "test/test_helper.exs",
+        "test/tips/provider_config_test.exs",
+        "test/tips/search_probe_test.exs"
+      ],
+      "runtime_matches_source": true,
+      "hook_calls": 29,
+      "hook_median_seconds": 0.067,
+      "hook_max_seconds": 2.312,
+      "nonempty_hook_outputs": 0,
+      "edit_hooks": [
+        {
+          "audit_line": 16,
+          "seconds": 1.208,
+          "result": {
+            "generation": 1,
+            "status": "quiet",
+            "completed": 1,
+            "building": false,
+            "message": "",
+            "diagnostic_count": 0
+          }
+        },
+        {
+          "audit_line": 18,
+          "seconds": 2.312,
+          "result": {
+            "generation": 2,
+            "status": "quiet",
+            "completed": 2,
+            "building": false,
+            "message": "",
+            "diagnostic_count": 0
+          }
+        }
+      ],
+      "checks": [
+        {
+          "event_line": 47,
+          "id": "item_24",
+          "command": "/bin/zsh -lc 'unbuffer mix test test/tips/provider_config_test.exs test/tips/search_probe_test.exs'",
+          "exit_code": 2,
+          "summary": [
+            "Result: 24/26 passed, 1 excluded",
+            "Failed: 2 tests"
+          ]
+        },
+        {
+          "event_line": 64,
+          "id": "item_33",
+          "command": "/bin/zsh -lc 'git diff --check'",
+          "exit_code": 0,
+          "summary": []
+        },
+        {
+          "event_line": 66,
+          "id": "item_34",
+          "command": "/bin/zsh -lc 'unbuffer mix format --check-formatted lib/tips/provider_config.ex lib/tips/search_probe.ex test/test_helper.exs test/tips/provider_config_test.exs test/tips/search_probe_test.exs'",
+          "exit_code": 0,
+          "summary": []
+        },
+        {
+          "event_line": 69,
+          "id": "item_36",
+          "command": "/bin/zsh -lc 'unbuffer mix compile --warnings-as-errors'",
+          "exit_code": 0,
+          "summary": []
+        },
+        {
+          "event_line": 71,
+          "id": "item_37",
+          "command": "/bin/zsh -lc 'unbuffer mix test test/tips/provider_config_test.exs test/tips/search_probe_test.exs'",
+          "exit_code": 0,
+          "summary": [
+            "Result: 26 passed, 1 excluded"
+          ]
+        },
+        {
+          "event_line": 73,
+          "id": "item_38",
+          "command": "/bin/zsh -lc 'unbuffer mix credo --strict'",
+          "exit_code": 0,
+          "summary": [
+            "692 mods/funs, found no issues."
+          ]
+        },
+        {
+          "event_line": 76,
+          "id": "item_40",
+          "command": "/bin/zsh -lc 'unbuffer mix test'",
+          "exit_code": 0,
+          "summary": [
+            "Result: 508 passed, 4 excluded"
+          ]
+        },
+        {
+          "event_line": 82,
+          "id": "item_43",
+          "command": "/bin/zsh -lc 'python3 scripts/check_docs.py'",
+          "exit_code": 0,
+          "summary": []
+        }
+      ],
+      "mcp": [
+        {
+          "event_line": 20,
+          "id": "item_10",
+          "arguments": {
+            "operation": "document_symbols",
+            "uri": "/private/tmp/tips-lsp-sol-v3-provider/lib/tips/search_probe.ex"
+          },
+          "response": {
+            "clients": [],
+            "symbols": {}
+          },
+          "error": null
+        },
+        {
+          "event_line": 30,
+          "id": "item_15",
+          "arguments": {
+            "operation": "references",
+            "uri": "/private/tmp/tips-lsp-sol-v3-provider/lib/tips/search_probe.ex",
+            "line": 64,
+            "character": 58,
+            "includeExternal": false
+          },
+          "response": {
+            "errors": {
+              "elixirls": "timeout"
+            },
+            "feedback": {
+              "building": true,
+              "completed": -1,
+              "generation": 0,
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+              "status": "pending"
+            },
+            "locations": {}
+          },
+          "error": null
+        },
+        {
+          "event_line": 40,
+          "id": "item_20",
+          "arguments": {
+            "operation": "references",
+            "uri": "/private/tmp/tips-lsp-sol-v3-provider/lib/tips/search_probe.ex",
+            "line": 64,
+            "character": 58,
+            "includeExternal": false
+          },
+          "response": {
+            "clients": [
+              "elixirls"
+            ],
+            "feedback": {
+              "building": false,
+              "completed": 0,
+              "generation": 0,
+              "message": "Last observed compilation completed; compiler diagnostics are available. Normal compilation/tests remain required.",
+              "status": "current"
+            },
+            "locations": {
+              "/private/tmp/tips-lsp-sol-v3-provider/lib/tips/provider_config.ex": [
+                "56:3-56:90"
+              ],
+              "/private/tmp/tips-lsp-sol-v3-provider/lib/tips/search_probe.ex": [
+                "64:58-64:62"
+              ]
+            }
+          },
+          "error": null
+        },
+        {
+          "event_line": 52,
+          "id": "item_27",
+          "arguments": {
+            "operation": "diagnostics",
+            "uri": "/private/tmp/tips-lsp-sol-v3-provider/lib/tips/provider_config.ex"
+          },
+          "response": {
+            "diagnostics": {},
+            "feedback": {
+              "building": false,
+              "completed": 2,
+              "generation": 2,
+              "message": "Last observed compilation completed; compiler diagnostics are available. Normal compilation/tests remain required.",
+              "status": "current"
+            }
+          },
+          "error": null
+        },
+        {
+          "event_line": 54,
+          "id": "item_28",
+          "arguments": {
+            "operation": "diagnostics",
+            "uri": "/private/tmp/tips-lsp-sol-v3-provider/lib/tips/search_probe.ex"
+          },
+          "response": {
+            "diagnostics": {},
+            "feedback": {
+              "building": false,
+              "completed": 2,
+              "generation": 2,
+              "message": "Last observed compilation completed; compiler diagnostics are available. Normal compilation/tests remain required.",
+              "status": "current"
+            }
+          },
+          "error": null
+        },
+        {
+          "event_line": 56,
+          "id": "item_29",
+          "arguments": {
+            "operation": "diagnostics",
+            "uri": "/private/tmp/tips-lsp-sol-v3-provider/test/test_helper.exs"
+          },
+          "response": {
+            "diagnostics": {},
+            "feedback": {
+              "building": false,
+              "completed": 2,
+              "generation": 2,
+              "message": "Last observed compilation completed; compiler diagnostics are available. Normal compilation/tests remain required.",
+              "status": "current"
+            }
+          },
+          "error": null
+        },
+        {
+          "event_line": 58,
+          "id": "item_30",
+          "arguments": {
+            "operation": "diagnostics",
+            "uri": "/private/tmp/tips-lsp-sol-v3-provider/test/tips/provider_config_test.exs"
+          },
+          "response": {
+            "diagnostics": {},
+            "feedback": {
+              "building": false,
+              "completed": 2,
+              "generation": 2,
+              "message": "Last observed compilation completed; compiler diagnostics are available. Normal compilation/tests remain required.",
+              "status": "current"
+            }
+          },
+          "error": null
+        },
+        {
+          "event_line": 60,
+          "id": "item_31",
+          "arguments": {
+            "operation": "diagnostics",
+            "uri": "/private/tmp/tips-lsp-sol-v3-provider/test/tips/search_probe_test.exs"
+          },
+          "response": {
+            "diagnostics": {},
+            "feedback": {
+              "building": false,
+              "completed": 2,
+              "generation": 2,
+              "message": "Last observed compilation completed; compiler diagnostics are available. Normal compilation/tests remain required.",
+              "status": "current"
+            }
+          },
+          "error": null
+        }
+      ],
+      "mcp_assigned_roots_only": true,
+      "builds": [
+        {
+          "log_line": 455,
+          "time": "2026-09-24 19:04:50",
+          "milliseconds": 64556,
+          "result": "mix_compile_ok"
+        },
+        {
+          "log_line": 471,
+          "time": "2026-09-24 19:04:50",
+          "milliseconds": 400,
+          "result": "mix_compile_noop"
+        },
+        {
+          "log_line": 493,
+          "time": "2026-09-24 19:05:12",
+          "milliseconds": 912,
+          "result": "mix_compile_noop"
+        },
+        {
+          "log_line": 519,
+          "time": "2026-09-24 19:05:32",
+          "milliseconds": 1234,
+          "result": "mix_compile_ok"
+        },
+        {
+          "log_line": 535,
+          "time": "2026-09-24 19:05:33",
+          "milliseconds": 875,
+          "result": "mix_compile_noop"
+        }
+      ],
+      "native_watched_events": [
+        {
+          "log_line": 369,
+          "time": "2026-09-24 19:04:30",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-v3-provider/deps/phoenix/priv/templates/phx.gen.live/core_components.ex.eex"
+          ]
+        },
+        {
+          "log_line": 483,
+          "time": "2026-09-24 19:05:11",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-v3-provider/test/tips/provider_config_test.exs",
+            "file:///private/tmp/tips-lsp-sol-v3-provider/test/tips/search_probe_test.exs"
+          ]
+        },
+        {
+          "log_line": 501,
+          "time": "2026-09-24 19:05:30",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-v3-provider/lib/tips/provider_config.ex",
+            "file:///private/tmp/tips-lsp-sol-v3-provider/lib/tips/search_probe.ex",
+            "file:///private/tmp/tips-lsp-sol-v3-provider/test/test_helper.exs"
+          ]
+        }
+      ],
+      "fixture_event_batches": 0,
+      "didSave": [
+        {
+          "log_line": 507,
+          "time": "2026-09-24 19:05:30",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-v3-provider/lib/tips/search_probe.ex"
+          ]
+        }
+      ],
+      "references_requests": [
+        {
+          "log_line": 403,
+          "time": "2026-09-24 19:04:42",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-v3-provider/lib/tips/search_probe.ex"
+          ],
+          "id": 3
+        },
+        {
+          "log_line": 480,
+          "time": "2026-09-24 19:04:57",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-v3-provider/lib/tips/search_probe.ex"
+          ],
+          "id": 4
+        }
+      ],
+      "cancelled_requests": [
+        {
+          "log_line": 381,
+          "time": "2026-09-24 19:04:34",
+          "uris": [],
+          "id": 2
+        },
+        {
+          "log_line": 416,
+          "time": "2026-09-24 19:04:45",
+          "uris": [],
+          "id": 3
+        }
+      ]
+    },
+    "media": {
+      "worktree": "/private/tmp/tips-lsp-sol-v3-media",
+      "branch": "experiment/elixirls-sol-v3-media",
+      "baseline": [
+        {
+          "command": [
+            "unbuffer",
+            "mix",
+            "compile",
+            "--warnings-as-errors"
+          ],
+          "exit_code": 0,
+          "seconds": 38.811
+        },
+        {
+          "command": [
+            "unbuffer",
+            "mix",
+            "test",
+            "test/tips/content/media_schema_test.exs"
+          ],
+          "exit_code": 0,
+          "seconds": 50.743
+        }
+      ],
+      "agent_seconds": 171.338,
+      "agent_exit_code": 0,
+      "observed_descendants": 84,
+      "remaining_before_cleanup": {},
+      "diff_check_exit": 0,
+      "application_patch_sha256": "dcda8cb25b6724a94cad95c51fd35c1d67f845f052a95ab79f9484411ec013ae",
+      "changed_files": [
+        "lib/tips/content/media/target.ex",
+        "test/tips/content/media_schema_test.exs"
+      ],
+      "runtime_matches_source": true,
+      "hook_calls": 26,
+      "hook_median_seconds": 0.0665,
+      "hook_max_seconds": 1.162,
+      "nonempty_hook_outputs": 0,
+      "edit_hooks": [
+        {
+          "audit_line": 11,
+          "seconds": 1.078,
+          "result": {
+            "generation": 1,
+            "diagnostic_count": 0,
+            "message": "",
+            "status": "quiet",
+            "building": false,
+            "completed": 1
+          }
+        },
+        {
+          "audit_line": 13,
+          "seconds": 1.162,
+          "result": {
+            "generation": 2,
+            "diagnostic_count": 0,
+            "message": "",
+            "status": "quiet",
+            "building": false,
+            "completed": 2
+          }
+        },
+        {
+          "audit_line": 18,
+          "seconds": 1.1,
+          "result": {
+            "generation": 3,
+            "diagnostic_count": 0,
+            "message": "",
+            "status": "quiet",
+            "building": false,
+            "completed": 3
+          }
+        }
+      ],
+      "checks": [
+        {
+          "event_line": 32,
+          "id": "item_16",
+          "command": "/bin/zsh -lc 'unbuffer mix test test/tips/content/media_schema_test.exs'",
+          "exit_code": 0,
+          "summary": [
+            "Result: 30 passed"
+          ]
+        },
+        {
+          "event_line": 38,
+          "id": "item_19",
+          "command": "/bin/zsh -lc 'unbuffer mix test test/tips/content/media_schema_test.exs'",
+          "exit_code": 0,
+          "summary": [
+            "Result: 30 passed"
+          ]
+        },
+        {
+          "event_line": 48,
+          "id": "item_25",
+          "command": "/bin/zsh -lc 'unbuffer mix format --check-formatted lib/tips/content/media/target.ex test/tips/content/media_schema_test.exs'",
+          "exit_code": 0,
+          "summary": []
+        },
+        {
+          "event_line": 50,
+          "id": "item_26",
+          "command": "/bin/zsh -lc 'unbuffer mix compile --warnings-as-errors'",
+          "exit_code": 0,
+          "summary": []
+        },
+        {
+          "event_line": 52,
+          "id": "item_27",
+          "command": "/bin/zsh -lc 'unbuffer mix test test/tips/content/media_schema_test.exs'",
+          "exit_code": 0,
+          "summary": [
+            "Result: 30 passed"
+          ]
+        },
+        {
+          "event_line": 54,
+          "id": "item_28",
+          "command": "/bin/zsh -lc 'unbuffer mix credo --strict'",
+          "exit_code": 0,
+          "summary": [
+            "692 mods/funs, found no issues."
+          ]
+        },
+        {
+          "event_line": 59,
+          "id": "item_31",
+          "command": "/bin/zsh -lc 'unbuffer mix format --check-formatted lib/tips/content/media/target.ex test/tips/content/media_schema_test.exs'",
+          "exit_code": 0,
+          "summary": []
+        },
+        {
+          "event_line": 61,
+          "id": "item_32",
+          "command": "/bin/zsh -lc 'unbuffer mix compile --warnings-as-errors'",
+          "exit_code": 0,
+          "summary": []
+        },
+        {
+          "event_line": 63,
+          "id": "item_33",
+          "command": "/bin/zsh -lc 'unbuffer mix test test/tips/content/media_schema_test.exs'",
+          "exit_code": 0,
+          "summary": [
+            "Result: 30 passed"
+          ]
+        },
+        {
+          "event_line": 65,
+          "id": "item_34",
+          "command": "/bin/zsh -lc 'unbuffer mix credo --strict'",
+          "exit_code": 0,
+          "summary": [
+            "692 mods/funs, found no issues."
+          ]
+        },
+        {
+          "event_line": 69,
+          "id": "item_36",
+          "command": "/bin/zsh -lc 'git diff --check'",
+          "exit_code": 0,
+          "summary": []
+        }
+      ],
+      "mcp": [
+        {
+          "event_line": 26,
+          "id": "item_13",
+          "arguments": {
+            "operation": "document_symbols",
+            "uri": "/private/tmp/tips-lsp-sol-v3-media/lib/tips/content/media/target.ex"
+          },
+          "response": {
+            "clients": [
+              "elixirls"
+            ],
+            "symbols": {
+              "/private/tmp/tips-lsp-sol-v3-media/lib/tips/content/media/target.ex": [
+                {
+                  "detail": "defmodule",
+                  "kind": "Module",
+                  "name": "Tips.Content.Media.Target",
+                  "range": "1:11-1:36"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "kind": "EnumMember",
+                  "name": "@max_id",
+                  "range": "6:3-6:36"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "@type",
+                  "kind": "Class",
+                  "name": "t/0",
+                  "range": "8:9-8:10"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "type/0",
+                  "range": "16:7-16:11"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "cast/1",
+                  "range": "20:7-20:39"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "cast/1",
+                  "range": "26:7-26:50"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "cast/1",
+                  "range": "33:7-33:32"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "cast/1",
+                  "range": "37:7-37:38"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "cast/1",
+                  "range": "41:7-41:19"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "dump/1",
+                  "range": "45:7-45:18"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "load/1",
+                  "range": "51:7-51:18"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "load/1",
+                  "range": "76:7-76:19"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "encode/1",
+                  "range": "78:8-78:42"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "encode/1",
+                  "range": "80:8-80:53"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "encode/1",
+                  "range": "83:8-83:35"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "encode/1",
+                  "range": "84:8-84:41"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "normalize_uuid/1",
+                  "range": "86:8-86:28"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "normalize_uuid/1",
+                  "range": "93:8-93:29"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "canonical_uuid/1",
+                  "range": "95:8-95:28"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "positive_integer/1",
+                  "range": "104:8-104:28"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "positive_integer/1",
+                  "range": "105:8-105:29"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "canonical_integer/1",
+                  "range": "107:8-107:34"
+                }
+              ]
+            }
+          },
+          "error": null
+        },
+        {
+          "event_line": 28,
+          "id": "item_14",
+          "arguments": {
+            "operation": "definition",
+            "uri": "/private/tmp/tips-lsp-sol-v3-media/lib/tips/content/media/target.ex",
+            "line": 27,
+            "character": 34
+          },
+          "response": {
+            "clients": [
+              "elixirls"
+            ],
+            "feedback": {
+              "building": true,
+              "completed": -1,
+              "generation": 0,
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+              "status": "pending"
+            },
+            "locations": {
+              "/private/tmp/tips-lsp-sol-v3-media/lib/tips/content/media/target.ex": [
+                "104:3-104:92"
+              ]
+            }
+          },
+          "error": null
+        },
+        {
+          "event_line": 30,
+          "id": "item_15",
+          "arguments": {
+            "operation": "references",
+            "uri": "/private/tmp/tips-lsp-sol-v3-media/lib/tips/content/media/target.ex",
+            "line": 65,
+            "character": 32,
+            "includeExternal": false
+          },
+          "response": {
+            "errors": {
+              "elixirls": "timeout"
+            },
+            "feedback": {
+              "building": true,
+              "completed": -1,
+              "generation": 0,
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+              "status": "pending"
+            },
+            "locations": {}
+          },
+          "error": null
+        },
+        {
+          "event_line": 39,
+          "id": "item_20",
+          "arguments": {
+            "operation": "diagnostics",
+            "uri": "/private/tmp/tips-lsp-sol-v3-media/test/tips/content/media_schema_test.exs"
+          },
+          "response": {
+            "diagnostics": {},
+            "feedback": {
+              "building": false,
+              "completed": 1,
+              "generation": 1,
+              "message": "Last observed compilation completed; compiler diagnostics are available. Normal compilation/tests remain required.",
+              "status": "current"
+            }
+          },
+          "error": null
+        },
+        {
+          "event_line": 44,
+          "id": "item_23",
+          "arguments": {
+            "operation": "diagnostics",
+            "uri": "/private/tmp/tips-lsp-sol-v3-media/lib/tips/content/media/target.ex"
+          },
+          "response": {
+            "diagnostics": {},
+            "feedback": {
+              "building": false,
+              "completed": 2,
+              "generation": 2,
+              "message": "Last observed compilation completed; compiler diagnostics are available. Normal compilation/tests remain required.",
+              "status": "current"
+            }
+          },
+          "error": null
+        },
+        {
+          "event_line": 46,
+          "id": "item_24",
+          "arguments": {
+            "operation": "diagnostics",
+            "uri": "/private/tmp/tips-lsp-sol-v3-media/test/tips/content/media_schema_test.exs"
+          },
+          "response": {
+            "diagnostics": {},
+            "feedback": {
+              "building": false,
+              "completed": 2,
+              "generation": 2,
+              "message": "Last observed compilation completed; compiler diagnostics are available. Normal compilation/tests remain required.",
+              "status": "current"
+            }
+          },
+          "error": null
+        },
+        {
+          "event_line": 73,
+          "id": "item_38",
+          "arguments": {
+            "operation": "diagnostics",
+            "uri": "/private/tmp/tips-lsp-sol-v3-media/test/tips/content/media_schema_test.exs"
+          },
+          "response": {
+            "diagnostics": {},
+            "feedback": {
+              "building": false,
+              "completed": 3,
+              "generation": 3,
+              "message": "Last observed compilation completed; compiler diagnostics are available. Normal compilation/tests remain required.",
+              "status": "current"
+            }
+          },
+          "error": null
+        },
+        {
+          "event_line": 75,
+          "id": "item_39",
+          "arguments": {
+            "operation": "diagnostics",
+            "uri": "/private/tmp/tips-lsp-sol-v3-media/lib/tips/content/media/target.ex"
+          },
+          "response": {
+            "diagnostics": {},
+            "feedback": {
+              "building": false,
+              "completed": 3,
+              "generation": 3,
+              "message": "Last observed compilation completed; compiler diagnostics are available. Normal compilation/tests remain required.",
+              "status": "current"
+            }
+          },
+          "error": null
+        }
+      ],
+      "mcp_assigned_roots_only": true,
+      "builds": [
+        {
+          "log_line": 452,
+          "time": "2026-09-24 19:04:49",
+          "milliseconds": 63927,
+          "result": "mix_compile_ok"
+        },
+        {
+          "log_line": 469,
+          "time": "2026-09-24 19:04:50",
+          "milliseconds": 387,
+          "result": "mix_compile_noop"
+        },
+        {
+          "log_line": 486,
+          "time": "2026-09-24 19:04:54",
+          "milliseconds": 815,
+          "result": "mix_compile_noop"
+        },
+        {
+          "log_line": 521,
+          "time": "2026-09-24 19:05:15",
+          "milliseconds": 926,
+          "result": "mix_compile_ok"
+        },
+        {
+          "log_line": 549,
+          "time": "2026-09-24 19:05:59",
+          "milliseconds": 847,
+          "result": "mix_compile_noop"
+        }
+      ],
+      "native_watched_events": [
+        {
+          "log_line": 376,
+          "time": "2026-09-24 19:04:30",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-v3-media/deps/phoenix/priv/templates/phx.gen.live/core_components.ex.eex"
+          ]
+        },
+        {
+          "log_line": 476,
+          "time": "2026-09-24 19:04:53",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-v3-media/test/tips/content/media_schema_test.exs"
+          ]
+        },
+        {
+          "log_line": 509,
+          "time": "2026-09-24 19:05:14",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-v3-media/lib/tips/content/media/target.ex"
+          ]
+        },
+        {
+          "log_line": 557,
+          "time": "2026-09-24 19:05:59",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-v3-media/test/tips/content/media_schema_test.exs"
+          ]
+        }
+      ],
+      "fixture_event_batches": 0,
+      "didSave": [
+        {
+          "log_line": 500,
+          "time": "2026-09-24 19:05:14",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-v3-media/lib/tips/content/media/target.ex"
+          ]
+        },
+        {
+          "log_line": 531,
+          "time": "2026-09-24 19:05:58",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-v3-media/test/tips/content/media_schema_test.exs"
+          ]
+        }
+      ],
+      "references_requests": [
+        {
+          "log_line": 384,
+          "time": "2026-09-24 19:04:33",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-v3-media/lib/tips/content/media/target.ex"
+          ],
+          "id": 4
+        }
+      ],
+      "cancelled_requests": [
+        {
+          "log_line": 393,
+          "time": "2026-09-24 19:04:36",
+          "uris": [],
+          "id": 4
+        }
+      ],
+      "independent_full_suite": {
+        "command": [
+          "unbuffer",
+          "mix",
+          "test"
+        ],
+        "exit_code": 0,
+        "seconds": 20.06,
+        "summary": [
+          "Result: 508 passed, 4 excluded"
+        ]
+      }
+    },
+    "health": {
+      "worktree": "/private/tmp/tips-lsp-sol-v3-health",
+      "branch": "experiment/elixirls-sol-v3-health",
+      "baseline": [
+        {
+          "command": [
+            "unbuffer",
+            "mix",
+            "compile",
+            "--warnings-as-errors"
+          ],
+          "exit_code": 0,
+          "seconds": 38.505
+        },
+        {
+          "command": [
+            "unbuffer",
+            "mix",
+            "test",
+            "test/tips_web/controllers/health_controller_test.exs"
+          ],
+          "exit_code": 0,
+          "seconds": 51.083
+        }
+      ],
+      "agent_seconds": 121.445,
+      "agent_exit_code": 0,
+      "observed_descendants": 55,
+      "remaining_before_cleanup": {},
+      "diff_check_exit": 0,
+      "application_patch_sha256": "209dc64783e47c238b33351af0c93d9e94243e58c31c30ea7c5139bb9ebb85c1",
+      "changed_files": [
+        "lib/tips/health.ex"
+      ],
+      "runtime_matches_source": true,
+      "hook_calls": 20,
+      "hook_median_seconds": 0.068,
+      "hook_max_seconds": 2.179,
+      "nonempty_hook_outputs": 0,
+      "edit_hooks": [
+        {
+          "audit_line": 13,
+          "seconds": 2.179,
+          "result": {
+            "completed": 1,
+            "building": false,
+            "diagnostic_count": 0,
+            "status": "quiet",
+            "generation": 1,
+            "message": ""
+          }
+        }
+      ],
+      "checks": [
+        {
+          "event_line": 35,
+          "id": "item_18",
+          "command": "/bin/zsh -lc 'unbuffer mix compile --warnings-as-errors'",
+          "exit_code": 1,
+          "summary": []
+        },
+        {
+          "event_line": 48,
+          "id": "item_25",
+          "command": "/bin/zsh -lc 'unbuffer mix format --check-formatted lib/tips/health.ex'",
+          "exit_code": 0,
+          "summary": []
+        },
+        {
+          "event_line": 55,
+          "id": "item_29",
+          "command": "/bin/zsh -lc 'unbuffer mix compile --warnings-as-errors'",
+          "exit_code": 0,
+          "summary": []
+        },
+        {
+          "event_line": 57,
+          "id": "item_30",
+          "command": "/bin/zsh -lc 'unbuffer mix test test/tips_web/controllers/health_controller_test.exs'",
+          "exit_code": 0,
+          "summary": [
+            "Result: 4 passed"
+          ]
+        },
+        {
+          "event_line": 59,
+          "id": "item_31",
+          "command": "/bin/zsh -lc 'unbuffer mix credo --strict'",
+          "exit_code": 0,
+          "summary": [
+            "692 mods/funs, found no issues."
+          ]
+        }
+      ],
+      "mcp": [
+        {
+          "event_line": 26,
+          "id": "item_13",
+          "arguments": {
+            "operation": "diagnostics",
+            "uri": "/private/tmp/tips-lsp-sol-v3-health/lib/tips/health.ex"
+          },
+          "response": {
+            "diagnostics": {},
+            "feedback": {
+              "building": true,
+              "completed": -1,
+              "generation": 0,
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+              "status": "pending"
+            }
+          },
+          "error": null
+        },
+        {
+          "event_line": 28,
+          "id": "item_14",
+          "arguments": {
+            "operation": "document_symbols",
+            "uri": "/private/tmp/tips-lsp-sol-v3-health/lib/tips/health.ex"
+          },
+          "response": {
+            "clients": [
+              "elixirls"
+            ],
+            "symbols": {
+              "/private/tmp/tips-lsp-sol-v3-health/lib/tips/health.ex": [
+                {
+                  "detail": "defmodule",
+                  "kind": "Module",
+                  "name": "Tips.Health",
+                  "range": "1:11-1:22"
+                },
+                {
+                  "container": "Tips.Health",
+                  "kind": "EnumMember",
+                  "name": "@deadline",
+                  "range": "4:3-4:18"
+                },
+                {
+                  "container": "Tips.Health",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "check/0",
+                  "range": "7:7-7:12"
+                },
+                {
+                  "container": "Tips.Health",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "query_database/0",
+                  "range": "22:8-22:22"
+                }
+              ]
+            }
+          },
+          "error": null
+        },
+        {
+          "event_line": 37,
+          "id": "item_19",
+          "arguments": {
+            "operation": "diagnostics",
+            "uri": "/private/tmp/tips-lsp-sol-v3-health/lib/tips/health.ex"
+          },
+          "response": {
+            "diagnostics": {},
+            "feedback": {
+              "building": true,
+              "completed": -1,
+              "generation": 0,
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+              "status": "pending"
+            }
+          },
+          "error": null
+        },
+        {
+          "event_line": 39,
+          "id": "item_20",
+          "arguments": {
+            "operation": "definition",
+            "uri": "/private/tmp/tips-lsp-sol-v3-health/lib/tips/health.ex",
+            "line": 13,
+            "character": 9
+          },
+          "response": {
+            "feedback": {
+              "building": true,
+              "completed": -1,
+              "generation": 0,
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+              "status": "pending"
+            },
+            "locations": {}
+          },
+          "error": null
+        },
+        {
+          "event_line": 41,
+          "id": "item_21",
+          "arguments": {
+            "operation": "references",
+            "uri": "/private/tmp/tips-lsp-sol-v3-health/lib/tips/health.ex",
+            "line": 22,
+            "character": 8,
+            "includeExternal": false
+          },
+          "response": {
+            "errors": {
+              "elixirls": "timeout"
+            },
+            "feedback": {
+              "building": false,
+              "completed": 0,
+              "generation": 0,
+              "message": "Compilation failed; read diagnostics and fix the errors. Returned results may be incomplete or stale; an empty result does not establish absence.",
+              "status": "failed"
+            },
+            "locations": {}
+          },
+          "error": null
+        },
+        {
+          "event_line": 43,
+          "id": "item_22",
+          "arguments": {
+            "operation": "diagnostics",
+            "uri": "/private/tmp/tips-lsp-sol-v3-health/lib/tips/health.ex"
+          },
+          "response": {
+            "diagnostics": {
+              "/private/tmp/tips-lsp-sol-v3-health/lib/tips/health.ex": [
+                {
+                  "message": "** (CompileError) lib/tips/health.ex: cannot compile module Tips.Health (errors have been logged)\n\n",
+                  "range": "1:1-1:1",
+                  "severity": "error",
+                  "source": "Elixir"
+                },
+                {
+                  "message": "undefined function probe/0 (expected Tips.Health to define such a function or for it to be imported, but none are available)",
+                  "range": "13:9-13:14",
+                  "severity": "error",
+                  "source": "Elixir"
+                },
+                {
+                  "message": "function query_database/0 is unused",
+                  "range": "22:8-22:8",
+                  "severity": "warning",
+                  "source": "Elixir"
+                }
+              ]
+            },
+            "feedback": {
+              "building": false,
+              "completed": 0,
+              "generation": 0,
+              "message": "Compilation failed; read diagnostics and fix the errors. Returned results may be incomplete or stale; an empty result does not establish absence.",
+              "status": "failed"
+            }
+          },
+          "error": null
+        },
+        {
+          "event_line": 50,
+          "id": "item_26",
+          "arguments": {
+            "operation": "diagnostics",
+            "uri": "/private/tmp/tips-lsp-sol-v3-health/lib/tips/health.ex"
+          },
+          "response": {
+            "diagnostics": {},
+            "feedback": {
+              "building": false,
+              "completed": 1,
+              "generation": 1,
+              "message": "Last observed compilation completed; compiler diagnostics are available. Normal compilation/tests remain required.",
+              "status": "current"
+            }
+          },
+          "error": null
+        },
+        {
+          "event_line": 61,
+          "id": "item_32",
+          "arguments": {
+            "operation": "definition",
+            "uri": "/private/tmp/tips-lsp-sol-v3-health/lib/tips/health.ex",
+            "line": 13,
+            "character": 9
+          },
+          "response": {
+            "clients": [
+              "elixirls"
+            ],
+            "feedback": {
+              "building": false,
+              "completed": 1,
+              "generation": 1,
+              "message": "Last observed compilation completed; compiler diagnostics are available. Normal compilation/tests remain required.",
+              "status": "current"
+            },
+            "locations": {
+              "/private/tmp/tips-lsp-sol-v3-health/lib/tips/health.ex": [
+                "22:3-31:6"
+              ]
+            }
+          },
+          "error": null
+        },
+        {
+          "event_line": 63,
+          "id": "item_33",
+          "arguments": {
+            "operation": "diagnostics",
+            "uri": "/private/tmp/tips-lsp-sol-v3-health/lib/tips/health.ex"
+          },
+          "response": {
+            "diagnostics": {},
+            "feedback": {
+              "building": false,
+              "completed": 1,
+              "generation": 1,
+              "message": "Last observed compilation completed; compiler diagnostics are available. Normal compilation/tests remain required.",
+              "status": "current"
+            }
+          },
+          "error": null
+        }
+      ],
+      "mcp_assigned_roots_only": true,
+      "builds": [
+        {
+          "log_line": 457,
+          "time": "2026-09-24 19:04:47",
+          "milliseconds": 61909,
+          "result": "mix_compile_error"
+        },
+        {
+          "log_line": 481,
+          "time": "2026-09-24 19:04:48",
+          "milliseconds": 667,
+          "result": "mix_compile_error"
+        },
+        {
+          "log_line": 514,
+          "time": "2026-09-24 19:05:00",
+          "milliseconds": 1931,
+          "result": "mix_compile_ok"
+        }
+      ],
+      "native_watched_events": [
+        {
+          "log_line": 376,
+          "time": "2026-09-24 19:04:30",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-v3-health/deps/phoenix/priv/templates/phx.gen.live/core_components.ex.eex"
+          ]
+        },
+        {
+          "log_line": 501,
+          "time": "2026-09-24 19:04:58",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-v3-health/lib/tips/health.ex"
+          ]
+        }
+      ],
+      "fixture_event_batches": 0,
+      "didSave": [
+        {
+          "log_line": 494,
+          "time": "2026-09-24 19:04:58",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-v3-health/lib/tips/health.ex"
+          ]
+        }
+      ],
+      "references_requests": [
+        {
+          "log_line": 434,
+          "time": "2026-09-24 19:04:45",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-v3-health/lib/tips/health.ex"
+          ],
+          "id": 4
+        }
+      ],
+      "cancelled_requests": [
+        {
+          "log_line": 489,
+          "time": "2026-09-24 19:04:48",
+          "uris": [],
+          "id": 4
+        }
+      ],
+      "independent_full_suite": {
+        "command": [
+          "unbuffer",
+          "mix",
+          "test"
+        ],
+        "exit_code": 0,
+        "seconds": 18.455,
+        "summary": [
+          "Result: 508 passed, 4 excluded"
+        ]
+      }
+    }
+  },
+  "coverage_limits": [
+    "No post-launch edit overlapped the first cold build in this cohort; separate boundary tests cover that case.",
+    "No hook emitted a message: edited builds were clean and no preceding diagnostics/pending message had been delivered by the hook. This cohort does not prove additionalContext receipt.",
+    "No retryable synchronization failure or five-second compiler wait was induced here; previously retained boundary probes cover these.",
+    "Compiler generation/build observations do not prove the exact bytes consumed by Mix; the known overlapping-write invalidation defect remains.",
+    "Provider reported approximately 17 seconds for a diagnostics call. events.jsonl has no elapsed timestamps; this perception is not a measured per-request latency.",
+    "document_symbols is outside the readiness wrapper; provider received an unqualified empty result during startup."
+  ]
+}

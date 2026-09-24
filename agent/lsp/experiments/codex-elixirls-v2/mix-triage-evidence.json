@@ -1,0 +1,183 @@
+{
+  "date": "2026-09-24",
+  "toolchain": {
+    "elixir": "1.20.4",
+    "otp": "29.1"
+  },
+  "retained_manifest_inspections": [
+    {
+      "root": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/plain-mix-overlap",
+      "manifest_version": 35,
+      "stored_mtime": 1790229561,
+      "stored_size": 137,
+      "actual_mtime": 1790229562,
+      "digest_matches_a": false,
+      "digest_matches_b": true,
+      "beam_docs": "{:docs_v1, 1, :elixir, \"text/markdown\", :none, %{behaviours: [], source_annos: [{1, 1}], source_path: ~c\"/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/plain-mix-overlap/lib/target.ex\"}, [{{:function, :answer, 0}, 4, [\"answer()\"], %{\"en\" => \"MIX_A documentation.\"}, %{source_annos: [{5, 7}]}}]}"
+    },
+    {
+      "root": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/plain-mix-overlap-2",
+      "manifest_version": 35,
+      "stored_mtime": 1790229651,
+      "stored_size": 137,
+      "actual_mtime": 1790229653,
+      "digest_matches_a": false,
+      "digest_matches_b": true,
+      "beam_docs": "{:docs_v1, 1, :elixir, \"text/markdown\", :none, %{behaviours: [], source_annos: [{1, 1}], source_path: ~c\"/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/plain-mix-overlap-2/lib/target.ex\"}, [{{:function, :answer, 0}, 4, [\"answer()\"], %{\"en\" => \"MIX_A documentation.\"}, %{source_annos: [{5, 7}]}}]}"
+    }
+  ],
+  "new_plain_mix_behavior_probe": {
+    "directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/mix-triage-1",
+    "result": {
+      "stale": {
+        "caller": "aa",
+        "docs": "{:docs_v1, 1, :elixir, \"text/markdown\", :none, %{behaviours: [], source_annos: [{1, 1}], source_path: ~c\"/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/mix-triage-1/lib/target.ex\"}, [{{:function, :answer, 0}, 4, [\"answer()\"], %{\"en\" => \"aa documentation.\"}, %{source_annos: [{5, 7}]}}]}",
+        "target": "aa",
+        "digest_matches_disk": true,
+        "stored_size": 133,
+        "stored_mtime": 1790248637,
+        "disk_mtime": 1790248639
+      },
+      "fresh": {
+        "caller": "bb",
+        "docs": "{:docs_v1, 1, :elixir, \"text/markdown\", :none, %{behaviours: [], source_annos: [{1, 1}], source_path: ~c\"/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/mix-triage-1/lib/target.ex\"}, [{{:function, :answer, 0}, 4, [\"answer()\"], %{\"en\" => \"bb documentation.\"}, %{source_annos: [{5, 7}]}}]}",
+        "target": "bb",
+        "digest_matches_disk": true,
+        "stored_size": 133,
+        "stored_mtime": 1790248639,
+        "disk_mtime": 1790248639
+      },
+      "stale_tests_exit": 2,
+      "fresh_tests_exit": 0,
+      "commands": [
+        {
+          "label": "format",
+          "command": [
+            "unbuffer",
+            "mix",
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ],
+          "exit_code": 0
+        },
+        {
+          "label": "incremental-0",
+          "command": [
+            "unbuffer",
+            "mix",
+            "compile",
+            "--warnings-as-errors"
+          ],
+          "exit_code": 0
+        },
+        {
+          "label": "incremental-1",
+          "command": [
+            "unbuffer",
+            "mix",
+            "compile",
+            "--warnings-as-errors"
+          ],
+          "exit_code": 0
+        },
+        {
+          "label": "stale-inspect",
+          "command": [
+            "unbuffer",
+            "mix",
+            "run",
+            "--no-compile",
+            "inspect.exs"
+          ],
+          "exit_code": 0
+        },
+        {
+          "label": "stale-acceptance",
+          "command": [
+            "unbuffer",
+            "mix",
+            "run",
+            "--no-compile",
+            "acceptance.exs"
+          ],
+          "exit_code": 2
+        },
+        {
+          "label": "force",
+          "command": [
+            "unbuffer",
+            "mix",
+            "compile",
+            "--force",
+            "--warnings-as-errors"
+          ],
+          "exit_code": 0
+        },
+        {
+          "label": "fresh-inspect",
+          "command": [
+            "unbuffer",
+            "mix",
+            "run",
+            "--no-compile",
+            "inspect.exs"
+          ],
+          "exit_code": 0
+        },
+        {
+          "label": "fresh-acceptance",
+          "command": [
+            "unbuffer",
+            "mix",
+            "run",
+            "--no-compile",
+            "acceptance.exs"
+          ],
+          "exit_code": 0
+        },
+        {
+          "label": "format-check",
+          "command": [
+            "unbuffer",
+            "mix",
+            "format",
+            "--check-formatted",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ],
+          "exit_code": 0
+        },
+        {
+          "label": "credo",
+          "command": [
+            "unbuffer",
+            "mix",
+            "credo",
+            "--strict"
+          ],
+          "exit_code": 1
+        }
+      ],
+      "credo_unavailable": true
+    }
+  },
+  "compiler_source": {
+    "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/mix_compiler_elixir.ex",
+    "sha256": "ae323e0d10b14fc55f0a415d53654d8c39e22723bde17138eb8dc78b34067c87",
+    "source_url": "https://github.com/elixir-lang/elixir/blob/v1.20.4/lib/mix/lib/mix/compilers/elixir.ex"
+  },
+  "probe_sha256": "6ae235bcf5c384559737bc8a21979654995ee4fd110e17a80594aa5b413bcf3b",
+  "limits": [
+    "Artificial 1500 ms module-body sleep widens the race; this does not measure production frequency.",
+    "Runtime and compile-time caller demonstrated in plain Mix, not the Neovim adapter.",
+    "No overlapping edit during force recovery in the new probe; the earlier ElixirLS clean-overlap probe demonstrated re-racing.",
+    "No upstream or installed compiler changes, integration runtime changes, or application changes."
+  ]
+}

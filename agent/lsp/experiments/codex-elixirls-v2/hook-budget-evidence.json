@@ -1,0 +1,567 @@
+{
+  "date": "2026-09-24",
+  "branch": "experiment/elixirls-codex-v2",
+  "scope": "Five-second synchronous feedback on synthetic projects; no active configuration changed.",
+  "versions_manifest": "neovim-versions.json",
+  "source_sha256": {
+    "neovim_hook.py": "e5e2bc88e012ed2724302d30eb13dfbb9ca3eda2f20b2095f78d388081947d7a",
+    "neovim_sync.lua": "7b20a50edab8cfcf5abbccd7b87d09054286e90298a6b511be1ebf0adb9879c3",
+    "neovim_launcher.py": "3e506065033d0753133a956dce274d22459cd73e54c0122b6d86812afb2be802",
+    "neovim_init.lua": "d8696205e441292ed586fdeb23557a168e2e052508294654c8a33692f1f5639f",
+    "neovim_hook_budget_probe.py": "9106a61b19690b0db45b364115a34845906447c0119cd230ab073289d29b3828",
+    "neovim_hook_codex_probe.py": "a6f39abe2ae7ad0f1e9a06349488ff886dd34c86c717c9e1e3bfe3ee6644560f",
+    "neovim_hook_probe.py": "0b676872e2ce65a4ecbf21affae2bf44425d8f354f16ebad6ae34c5ef1ad7c75",
+    "neovim_hook_inversion_probe.py": "ff678ecd75e9845760123f28ff0e47987e6ed48d5087b4d57ec3384c274f4596"
+  },
+  "policy": {
+    "feedback_budget_ms": 5000,
+    "host_timeout_seconds": 6,
+    "async": false,
+    "stop": "One bounded final check for an edit left pending; unchanged tools cannot re-arm it.",
+    "timing": "Feedback deadline excludes Python process startup/OS scheduling; wall timings include them."
+  },
+  "runs": {
+    "red": "tmp/elixirls-v2/hook-budget-red",
+    "budget": "tmp/elixirls-v2/hook-budget-final",
+    "regression": "tmp/elixirls-v2/hook-budget-regression-2",
+    "inversion": "tmp/elixirls-v2/hook-budget-inversion-2",
+    "actual_codex": "tmp/elixirls-v2/hook-codex-budget-final",
+    "fixture_checks": "tmp/elixirls-v2/hook-codex-budget/validation.json"
+  },
+  "budget": {
+    "initial_stop": {
+      "seconds": 0.085,
+      "output": {}
+    },
+    "three_second_error": {
+      "seconds": 3.335,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: lib/target.ex:1:1: error: ** (CompileError) lib/target.ex: cannot compile module V2Target (errors have been logged)  \nlib/target.ex:5:19: error: undefined function missing_budget/0 (expected V2Target to define such a function or for it to be imported, but none are available)"
+        }
+      }
+    },
+    "fast_repair": {
+      "seconds": 0.318,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Previously reported compiler diagnostics cleared after compilation."
+        }
+      }
+    },
+    "eight_second_pending": {
+      "seconds": 5.034,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Compilation pending; diagnostics are not yet current. This is not a clean result."
+        }
+      }
+    },
+    "unchanged_tool_does_not_wait": {
+      "seconds": 0.101,
+      "output": {}
+    },
+    "final_edit_stop_feedback": {
+      "seconds": 3.23,
+      "output": {
+        "decision": "block",
+        "reason": "ElixirLS: lib/target.ex:1:1: error: ** (CompileError) lib/target.ex: cannot compile module V2Target (errors have been logged)  \nlib/target.ex:5:19: error: undefined function missing_budget/0 (expected V2Target to define such a function or for it to be imported, but none are available)"
+      }
+    },
+    "stop_not_repeated": {
+      "seconds": 0.096,
+      "output": {}
+    },
+    "very_slow_pending": {
+      "seconds": 5.045,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Compilation pending; diagnostics are not yet current. This is not a clean result."
+        }
+      }
+    },
+    "stop_budget_exhausted": {
+      "seconds": 5.041,
+      "output": {
+        "decision": "block",
+        "reason": "ElixirLS: Compilation pending; diagnostics are not yet current. This is not a clean result."
+      }
+    },
+    "stalled_rpc": {
+      "seconds": 5.067,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS feedback unavailable: Neovim did not answer within the feedback budget. This does not mean the source is error-free."
+        }
+      }
+    },
+    "cleanup": {
+      "matched": true,
+      "samples": [
+        {
+          "seconds": 0.041,
+          "value": {}
+        }
+      ]
+    },
+    "completed": true
+  },
+  "regression": {
+    "automatic_buffer_refresh_without_query": {
+      "matched": true,
+      "samples": [
+        {
+          "seconds": 0.028,
+          "value": [
+            {
+              "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/hook-budget-regression-2/alpha/lib/caller.ex",
+              "text": [
+                "defmodule V2Caller do",
+                "  def call_1, do: V2Target.answer()",
+                "  def call_2, do: V2Target.answer()",
+                "end"
+              ],
+              "modified": false
+            }
+          ]
+        },
+        {
+          "seconds": 0.284,
+          "value": [
+            {
+              "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/hook-budget-regression-2/alpha/lib/caller.ex",
+              "text": [
+                "defmodule V2Caller do",
+                "  def call_1, do: missing_local()",
+                "  def call_2, do: V2Target.answer()",
+                "end"
+              ],
+              "modified": false
+            }
+          ]
+        }
+      ]
+    },
+    "codex_error": {
+      "seconds": 0.096,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: lib/caller.ex:1:1: error: ** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)  \nlib/caller.ex:2:19: error: undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)"
+        }
+      }
+    },
+    "unchanged_error": {
+      "seconds": 0.096,
+      "output": {}
+    },
+    "beta_unaffected": {
+      "seconds": 0.097,
+      "output": {}
+    },
+    "claude_atomic_repair": {
+      "seconds": 0.307,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Previously reported compiler diagnostics cleared after compilation."
+        }
+      }
+    },
+    "claude_failed_shell": {
+      "seconds": 0.323,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUseFailure",
+          "additionalContext": "ElixirLS: lib/caller.ex:1:1: error: ** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)  \nlib/caller.ex:2:19: error: undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)"
+        }
+      }
+    },
+    "slow_pending": {
+      "seconds": 0.471,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Compilation pending; diagnostics are not yet current. This is not a clean result."
+        }
+      }
+    },
+    "slow_later_feedback": {
+      "matched": true,
+      "samples": [
+        {
+          "seconds": 0.095,
+          "value": {
+            "seconds": 0.095,
+            "output": {}
+          }
+        },
+        {
+          "seconds": 0.45,
+          "value": {
+            "seconds": 0.1,
+            "output": {}
+          }
+        },
+        {
+          "seconds": 0.798,
+          "value": {
+            "seconds": 0.097,
+            "output": {}
+          }
+        },
+        {
+          "seconds": 1.152,
+          "value": {
+            "seconds": 0.099,
+            "output": {}
+          }
+        },
+        {
+          "seconds": 1.513,
+          "value": {
+            "seconds": 0.106,
+            "output": {}
+          }
+        },
+        {
+          "seconds": 1.863,
+          "value": {
+            "seconds": 0.098,
+            "output": {}
+          }
+        },
+        {
+          "seconds": 2.215,
+          "value": {
+            "seconds": 0.1,
+            "output": {}
+          }
+        },
+        {
+          "seconds": 2.564,
+          "value": {
+            "seconds": 0.095,
+            "output": {}
+          }
+        },
+        {
+          "seconds": 2.919,
+          "value": {
+            "seconds": 0.1,
+            "output": {
+              "hookSpecificOutput": {
+                "hookEventName": "PostToolUse",
+                "additionalContext": "ElixirLS: Compilation completed; no compiler diagnostics are currently reported."
+              }
+            }
+          }
+        }
+      ]
+    },
+    "overlap_uncertain": {
+      "seconds": 0.093,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build."
+        }
+      }
+    },
+    "overlap_latch": {
+      "seconds": 0.093,
+      "output": {}
+    },
+    "alpha_cleanup": {
+      "matched": true,
+      "samples": [
+        {
+          "seconds": 0.037,
+          "value": {}
+        }
+      ]
+    },
+    "beta_cleanup": {
+      "matched": true,
+      "samples": [
+        {
+          "seconds": 0.037,
+          "value": {}
+        }
+      ]
+    },
+    "completed": true
+  },
+  "inversion": {
+    "eof": {
+      "exit_code": 0,
+      "cleanup": {
+        "matched": true,
+        "samples": [
+          {
+            "seconds": 0.038,
+            "value": {}
+          }
+        ]
+      }
+    },
+    "parent_kill": {
+      "exit_code": -9,
+      "cleanup": {
+        "matched": true,
+        "samples": [
+          {
+            "seconds": 0.039,
+            "value": {
+              "8714": {
+                "parent": 8567,
+                "state": "Ss",
+                "command": "(erl_child_setup)"
+              },
+              "8567": {
+                "parent": 1,
+                "state": "?Es",
+                "command": "(beam.smp)"
+              }
+            }
+          },
+          {
+            "seconds": 0.334,
+            "value": {}
+          }
+        ]
+      }
+    },
+    "new_file": {
+      "seconds": 0.326,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: lib/new_error.ex:1:1: error: ** (CompileError) lib/new_error.ex: cannot compile module V2NewError (errors have been logged)  \nlib/new_error.ex:2:17: error: undefined function missing_new/0 (expected V2NewError to define such a function or for it to be imported, but none are available)"
+        }
+      }
+    },
+    "deleted_file": {
+      "seconds": 0.325,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Previously reported compiler diagnostics cleared after compilation."
+        }
+      }
+    },
+    "unsaved_conflict": {
+      "seconds": 0.089,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Neovim has unsaved changes; automatic reload was refused."
+        }
+      }
+    },
+    "unsaved_buffer_preserved": true,
+    "language_server_stopped": {
+      "seconds": 5.012,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Compiler feedback unavailable: ElixirLS is still starting or has stopped. This is not a clean result."
+        }
+      }
+    },
+    "failure_session_cleanup": {
+      "matched": true,
+      "samples": [
+        {
+          "seconds": 0.037,
+          "value": {}
+        }
+      ]
+    },
+    "server_unavailable": {
+      "seconds": 0.076,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS feedback unavailable: Expected one Neovim for the assigned workspace; found 0. This does not mean the source is error-free."
+        }
+      }
+    },
+    "completed": true
+  },
+  "actual_codex": {
+    "assertions": {
+      "normal_edits_only": true,
+      "repair_receipt_after_repair": "4de7db8796f6",
+      "source_restored": true,
+      "hook_seconds": [
+        4.969,
+        0.381
+      ],
+      "pending_receipt_before_stop": "2e97463c0919",
+      "stop_error_receipt_before_repair": "7b9223066ec2",
+      "stop_seconds": 0.238
+    },
+    "audit": [
+      {
+        "event": "PostToolUse",
+        "tool": "apply_patch",
+        "result": {
+          "status": "pending",
+          "generation": 1,
+          "completed": 0,
+          "building": true,
+          "uncertain": false,
+          "diagnostic_count": 0,
+          "message": "ElixirLS: Compilation pending; diagnostics are not yet current. This is not a clean result."
+        },
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Compilation pending; diagnostics are not yet current. This is not a clean result.\nFeedback receipt: 2e97463c0919"
+          }
+        },
+        "seconds": 4.969
+      },
+      {
+        "event": "Stop",
+        "tool": null,
+        "result": {
+          "status": "diagnostics",
+          "generation": 1,
+          "completed": 1,
+          "building": false,
+          "uncertain": false,
+          "diagnostic_count": 2,
+          "message": "ElixirLS: lib/caller.ex:1:1: error: ** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)  \nlib/caller.ex:3:19: error: undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)"
+        },
+        "output": {
+          "decision": "block",
+          "reason": "ElixirLS: lib/caller.ex:1:1: error: ** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)  \nlib/caller.ex:3:19: error: undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)\nFeedback receipt: 7b9223066ec2"
+        },
+        "seconds": 0.238
+      },
+      {
+        "event": "PostToolUse",
+        "tool": "apply_patch",
+        "result": {
+          "status": "cleared",
+          "generation": 2,
+          "completed": 2,
+          "building": false,
+          "uncertain": false,
+          "diagnostic_count": 0,
+          "message": "ElixirLS: Previously reported compiler diagnostics cleared after compilation."
+        },
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Previously reported compiler diagnostics cleared after compilation.\nFeedback receipt: 4de7db8796f6"
+          }
+        },
+        "seconds": 0.381
+      },
+      {
+        "event": "Stop",
+        "tool": null,
+        "result": {
+          "status": "quiet",
+          "message": "",
+          "generation": 2
+        },
+        "output": {},
+        "seconds": 0.032
+      }
+    ],
+    "agent_messages": [
+      "I\u2019ll apply the test edit once, then quote any automatic feedback and receipt that appears.\n",
+      "> ElixirLS: Compilation pending; diagnostics are not yet current. This is not a clean result.\n> Feedback receipt: 2e97463c0919",
+      "> ElixirLS: lib/caller.ex:1:1: error: ** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)  \n> lib/caller.ex:3:19: error: undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)\n> Feedback receipt: 7b9223066ec2\n",
+      "Restored `lib/caller.ex` exactly.\n\n> ElixirLS: Previously reported compiler diagnostics cleared after compilation.\n> Feedback receipt: 4de7db8796f6"
+    ],
+    "lifecycle": {
+      "exit_code": 0,
+      "remaining": {},
+      "observed_owned_count": 13
+    }
+  },
+  "fixture_checks": [
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "format",
+        "mix.exs",
+        "lib/caller.ex",
+        "lib/target.ex",
+        "test/test_helper.exs",
+        "test/fixture_test.exs"
+      ],
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "format",
+        "--check-formatted",
+        "mix.exs",
+        "lib/caller.ex",
+        "lib/target.ex",
+        "test/test_helper.exs",
+        "test/fixture_test.exs"
+      ],
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "test"
+      ],
+      "exit_code": 0,
+      "output": "Running ExUnit with seed: 72676, max_cases: 20\n\n\u001b[32m.\u001b[0m\nFinished in 0.01 seconds (0.01s async, 0.00s sync)\n\u001b[32m\nResult: 1 passed\u001b[0m\n"
+    },
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "credo",
+        "--strict"
+      ],
+      "exit_code": 1,
+      "output": "\u001b[31m\u001b[1m** (Mix) The task \"credo\" could not be found\u001b[0m\n"
+    }
+  ],
+  "static_checks": [
+    "Python syntax passed",
+    "Documentation links passed",
+    "git diff --check passed",
+    "Whitespace scan of untracked experiment source passed"
+  ],
+  "corrected_regression": "Unchanged hooks briefly reported pending after late diagnostic publications; now silent until new information settles.",
+  "limits": [
+    "Compiler overlap uncertainty remains; five seconds is not a freshness guarantee.",
+    "Both edit and Stop budgets can expire; remaining work stays explicitly unverified.",
+    "No async delivery or idle-session wakeup.",
+    "Actual Claude model delivery and full Tips editing not validated.",
+    "Credo unavailable in dependency-free fixture."
+  ]
+}

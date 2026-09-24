@@ -1,0 +1,53 @@
+diff --git a/apps/language_server/lib/language_server/server.ex b/apps/language_server/lib/language_server/server.ex
+index 9e0ec008..291533d7 100644
+--- a/apps/language_server/lib/language_server/server.ex
++++ b/apps/language_server/lib/language_server/server.ex
+@@ -1,4 +1,5 @@
+ defmodule ElixirLS.LanguageServer.Server do
++  @rebuild_grace_ms 1000
+   @moduledoc """
+   Language Server Protocol server
+ 
+@@ -68,6 +69,7 @@ defmodule ElixirLS.LanguageServer.Server do
+     build_diagnostics: [],
+     dialyzer_diagnostics: [],
+     needs_build?: false,
++    last_build_finished_at: nil,
+     full_build_done?: false,
+     build_running?: false,
+     analysis_ready?: false,
+@@ -407,7 +409,11 @@ defmodule ElixirLS.LanguageServer.Server do
+         {:DOWN, ref, _, _pid, reason},
+         %__MODULE__{build_ref: ref, build_running?: true} = state
+       ) do
+-    state = %{state | build_running?: false}
++    state = %{
++      state
++      | build_running?: false,
++        last_build_finished_at: System.monotonic_time(:millisecond)
++    }
+ 
+     # in case the build was interrupted make sure that cwd is reset to project dir
+     case File.cd(state.project_dir) do
+@@ -1981,7 +1987,7 @@ defmodule ElixirLS.LanguageServer.Server do
+         opts = [
+           fetch_deps?: Map.get(state.settings || %{}, "fetchDeps", false),
+           compile?: Map.get(state.settings || %{}, "autoBuild", true),
+-          force?: not full_build_done?
++          force?: not full_build_done? or recent_build?(state)
+         ]
+ 
+         {_pid, build_ref} =
+@@ -2049,6 +2055,12 @@ defmodule ElixirLS.LanguageServer.Server do
+     end
+   end
+ 
++  defp recent_build?(%__MODULE__{last_build_finished_at: nil}), do: false
++
++  defp recent_build?(%__MODULE__{last_build_finished_at: finished_at}) do
++    System.monotonic_time(:millisecond) - finished_at < @rebuild_grace_ms
++  end
++
+   defp dialyze(state = %__MODULE__{}) do
+     warn_opts =
+       (state.settings["dialyzerWarnOpts"] || [])

@@ -1,0 +1,901 @@
+{
+  "date": "2026-09-24",
+  "raw_root": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/batching",
+  "candidate": "existing pending/in-flight sets with one fixed 250 ms idle timer",
+  "baseline_hook_ms": 5000,
+  "checks": [
+    {
+      "check": "format",
+      "exit": 0
+    },
+    {
+      "check": "warnings-as-errors",
+      "exit": 1
+    },
+    {
+      "check": "credo",
+      "exit": 1
+    }
+  ],
+  "server_suite": {
+    "passed": 80,
+    "log": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/batching/server-tests-final.log"
+  },
+  "additional_late_duplicate_boundary": {
+    "passed": true,
+    "suite_passed": 3,
+    "log": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/batching/late-boundary-tests.log"
+  },
+  "strict_modified_production_modules": "passed",
+  "lua_boundaries": {
+    "startup_unavailability_allows_retry": {
+      "passed": true,
+      "detail": true
+    },
+    "queued_work_stays_pending_across_old_build_completion": {
+      "passed": true,
+      "detail": {
+        "old_completion_pending": true,
+        "successor_current": true
+      }
+    },
+    "hook_retries_within_budget": {
+      "passed": true,
+      "detail": {
+        "milliseconds": 229.810542,
+        "status": "quiet"
+      }
+    },
+    "reload_retries_without_new_edit": {
+      "passed": true,
+      "detail": {
+        "attempts": 2,
+        "saves": 1,
+        "generation": 1
+      }
+    },
+    "persistent_failure_is_bounded_and_recoverable": {
+      "passed": true,
+      "detail": {
+        "milliseconds": 455.448583,
+        "status": "sync_error"
+      }
+    },
+    "qualified_results_and_superseded_request": {
+      "passed": true,
+      "detail": {
+        "superseded": {
+          "status": "superseded",
+          "generation": 1,
+          "completed": 0,
+          "queued": false,
+          "building": false,
+          "message": "Files changed during this request. Returned results may be stale; retry the query."
+        },
+        "calls": 3,
+        "pending": {
+          "status": "pending",
+          "generation": 0,
+          "completed": -1,
+          "queued": false,
+          "building": false,
+          "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence."
+        },
+        "failed": {
+          "status": "failed",
+          "generation": 0,
+          "completed": 0,
+          "queued": false,
+          "building": false,
+          "message": "Compilation failed; read diagnostics and fix the errors. Returned results may be incomplete or stale; an empty result does not establish absence."
+        }
+      }
+    },
+    "conflict_preserves_buffer_and_diagnostic_access": {
+      "passed": true,
+      "detail": {
+        "qualified_diagnostics": true,
+        "preserved": true
+      }
+    },
+    "partial_success_is_not_resent": {
+      "passed": true,
+      "detail": {
+        "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/batching/lua-boundaries/partial/lib/target.ex": 1,
+        "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/batching/lua-boundaries/partial/lib/second.ex": 2
+      }
+    },
+    "save_retries_without_new_edit": {
+      "passed": true,
+      "detail": {
+        "attempts": 2
+      }
+    },
+    "overlap_does_not_disable_later_wait": {
+      "passed": true,
+      "detail": {
+        "milliseconds": 245.20525
+      }
+    },
+    "opened_deletion_retries_after_buffer_is_gone": {
+      "passed": true,
+      "detail": {
+        "attempts": 2
+      }
+    }
+  },
+  "results": {
+    "hook-budget-ready": {
+      "initial_stop": {
+        "seconds": 0.085,
+        "output": {}
+      },
+      "three_second_error": {
+        "seconds": 3.541,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: lib/target.ex:1:1: error: ** (CompileError) lib/target.ex: cannot compile module V2Target (errors have been logged)  \nlib/target.ex:5:19: error: undefined function missing_budget/0 (expected V2Target to define such a function or for it to be imported, but none are available)"
+          }
+        }
+      },
+      "fast_repair": {
+        "seconds": 0.555,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Previously reported compiler diagnostics cleared after compilation."
+          }
+        }
+      },
+      "eight_second_pending": {
+        "seconds": 4.773,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result."
+          }
+        }
+      },
+      "unchanged_tool_does_not_wait": {
+        "seconds": 0.091,
+        "output": {}
+      },
+      "final_edit_stop_feedback": {
+        "seconds": 3.67,
+        "output": {
+          "decision": "block",
+          "reason": "ElixirLS: lib/target.ex:1:1: error: ** (CompileError) lib/target.ex: cannot compile module V2Target (errors have been logged)  \nlib/target.ex:5:19: error: undefined function missing_budget/0 (expected V2Target to define such a function or for it to be imported, but none are available)"
+        }
+      },
+      "stop_not_repeated": {
+        "seconds": 0.09,
+        "output": {}
+      },
+      "very_slow_pending": {
+        "seconds": 4.77,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result."
+          }
+        }
+      },
+      "stop_budget_exhausted": {
+        "seconds": 4.772,
+        "output": {
+          "decision": "block",
+          "reason": "ElixirLS: Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result."
+        }
+      },
+      "stalled_rpc": {
+        "seconds": 4.942,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS feedback unavailable: hook deadline reached while waiting for feedback. This does not mean the source is error-free."
+          }
+        }
+      },
+      "cleanup": {
+        "matched": true,
+        "samples": [
+          {
+            "seconds": 0.037,
+            "value": {}
+          }
+        ]
+      },
+      "completed": true,
+      "three_second_compile_starts": 1
+    },
+    "baseline-hook": {
+      "initial_stop": {
+        "seconds": 0.084,
+        "output": {}
+      },
+      "three_second_error": {
+        "seconds": 4.771,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result."
+          }
+        }
+      },
+      "three_second_compile_starts": 2
+    },
+    "reconcile": {
+      "baseline": {
+        "exit": 0,
+        "expected": "aa"
+      },
+      "unopened_preserved_hook": {
+        "seconds": 1.552010125000379,
+        "feedback": {}
+      },
+      "unopened_preserved_acceptance": {
+        "exit": 0,
+        "expected": "bb"
+      },
+      "retry_attempts": 2,
+      "delete_hook": {
+        "seconds": 1.3480695829930482,
+        "feedback": {}
+      },
+      "delete_acceptance": {
+        "exit": 0,
+        "expected": "missing"
+      },
+      "recreate_hook": {
+        "seconds": 1.3431602500058943,
+        "feedback": {}
+      },
+      "recreate_acceptance": {
+        "exit": 0,
+        "expected": "cc"
+      },
+      "edit_during_build_hook": {
+        "seconds": 1.8347342920023948,
+        "feedback": {}
+      },
+      "edit_during_build_acceptance": {
+        "exit": 0,
+        "expected": "ee"
+      },
+      "slow_hook": {
+        "seconds": 4.778128292004112,
+        "feedback": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result."
+          }
+        }
+      },
+      "unchanged_hook": {
+        "seconds": 0.08872283299569972,
+        "feedback": {}
+      },
+      "later_hook": {
+        "seconds": 0.09252979200391565,
+        "feedback": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Compilation completed; no compiler diagnostics are currently reported."
+          }
+        }
+      },
+      "slow_acceptance": {
+        "exit": 0,
+        "expected": "ff"
+      },
+      "completed": true
+    },
+    "mcp-boundaries": {
+      "real_queued_status": {
+        "state": {
+          "generation": 0,
+          "status": "pending",
+          "completed": 0,
+          "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+          "queued": true,
+          "building": false
+        },
+        "before": 0
+      },
+      "real_queued_diagnostics": {
+        "isError": false,
+        "data": {
+          "diagnostics": {},
+          "feedback": {
+            "building": false,
+            "completed": 0,
+            "generation": 0,
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+            "queued": true,
+            "status": "pending"
+          }
+        }
+      },
+      "pending_hover": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "feedback": {
+            "building": false,
+            "completed": -1,
+            "generation": 0,
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+            "queued": false,
+            "status": "pending"
+          },
+          "items": [
+            "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+          ]
+        }
+      },
+      "pending_definition": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "feedback": {
+            "building": false,
+            "completed": -1,
+            "generation": 0,
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+            "queued": false,
+            "status": "pending"
+          },
+          "locations": {
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/batching/mcp-boundaries/alpha/lib/target.ex": [
+              "3:3-3:25"
+            ]
+          }
+        }
+      },
+      "pending_references": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "feedback": {
+            "building": false,
+            "completed": -1,
+            "generation": 0,
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+            "queued": false,
+            "status": "pending"
+          },
+          "locations": {
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/batching/mcp-boundaries/alpha/lib/caller.ex": [
+              "2:28-2:34",
+              "3:28-3:34"
+            ],
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/batching/mcp-boundaries/alpha/lib/target.ex": [
+              "3:3-3:25"
+            ]
+          }
+        }
+      },
+      "pending_diagnostics": {
+        "isError": false,
+        "data": {
+          "diagnostics": {},
+          "feedback": {
+            "building": false,
+            "completed": -1,
+            "generation": 0,
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+            "queued": false,
+            "status": "pending"
+          }
+        }
+      },
+      "failed_hover": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "feedback": {
+            "building": false,
+            "completed": 0,
+            "generation": 0,
+            "message": "Compilation failed; read diagnostics and fix the errors. Returned results may be incomplete or stale; an empty result does not establish absence.",
+            "queued": false,
+            "status": "failed"
+          },
+          "items": [
+            "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+          ]
+        }
+      },
+      "fixture_filter": {
+        "notifications": [],
+        "new_builds": 0,
+        "hook": {
+          "seconds": 0.09308712500205729,
+          "output": {}
+        }
+      },
+      "positive_watcher_controls": true,
+      "queried_file_error": {
+        "seconds": 0.5607887500082143,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: lib/caller.ex:1:1: error: ** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)  \nlib/caller.ex:2:19: error: undefined function missing_revision/0 (expected V2Caller to define such a function or for it to be imported, but none are available)"
+          }
+        }
+      },
+      "failed_definition": {
+        "isError": false,
+        "data": {
+          "feedback": {
+            "building": false,
+            "completed": 4,
+            "generation": 4,
+            "message": "Compilation failed; read diagnostics and fix the errors. Returned results may be incomplete or stale; an empty result does not establish absence.",
+            "queued": false,
+            "status": "failed"
+          },
+          "locations": {}
+        }
+      },
+      "queried_file_repair": {
+        "seconds": 0.5627494159998605,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Previously reported compiler diagnostics cleared after compilation."
+          }
+        }
+      },
+      "repaired_diagnostics": {
+        "isError": false,
+        "data": {
+          "diagnostics": {},
+          "feedback": {
+            "building": false,
+            "completed": 5,
+            "generation": 5,
+            "message": "Last observed compilation completed; compiler diagnostics are available. Normal compilation/tests remain required.",
+            "queued": false,
+            "status": "current"
+          }
+        }
+      },
+      "retried_real_save": {
+        "seconds": 0.5719738329935353,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: lib/caller.ex:1:1: error: ** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)  \nlib/caller.ex:2:19: error: undefined function missing_retry/0 (expected V2Caller to define such a function or for it to be imported, but none are available)"
+          }
+        }
+      },
+      "real_save_attempts": 2,
+      "completed": true
+    },
+    "reload-failure": {
+      "case": "reload-failure",
+      "server_source": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/batching/server/elixir-ls",
+      "commands": [
+        {
+          "label": "format",
+          "argv": [
+            "unbuffer",
+            "mix",
+            "format",
+            "mix.exs",
+            "lib/caller.ex",
+            "lib/query.ex",
+            "lib/target.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ],
+          "exit": 0
+        },
+        {
+          "label": "inspect",
+          "argv": [
+            "unbuffer",
+            "mix",
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ],
+          "exit": 0
+        },
+        {
+          "label": "acceptance",
+          "argv": [
+            "unbuffer",
+            "mix",
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ],
+          "exit": 0
+        }
+      ],
+      "baseline_hover": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\nzz documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "injected_build_result": "mixfile_error",
+      "unexpected_builds_after_settle": 0,
+      "hover": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\nbb documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "hover_fresh": true,
+      "expected": "bb",
+      "behavior": {
+        "caller": "bb",
+        "target": "bb"
+      },
+      "acceptance_exit": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        2
+      ],
+      "toolchain_loaded": true,
+      "passed": true,
+      "server_exit": 0
+    },
+    "compile-failure": {
+      "case": "compile-failure",
+      "server_source": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/batching/server/elixir-ls",
+      "commands": [
+        {
+          "label": "format",
+          "argv": [
+            "unbuffer",
+            "mix",
+            "format",
+            "mix.exs",
+            "lib/caller.ex",
+            "lib/query.ex",
+            "lib/target.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ],
+          "exit": 0
+        },
+        {
+          "label": "inspect",
+          "argv": [
+            "unbuffer",
+            "mix",
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ],
+          "exit": 0
+        },
+        {
+          "label": "acceptance",
+          "argv": [
+            "unbuffer",
+            "mix",
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ],
+          "exit": 0
+        }
+      ],
+      "baseline_hover": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\nzz documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "injected_build_result": "mix_compile_error",
+      "unexpected_builds_after_settle": 0,
+      "hover": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\nbb documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "hover_fresh": true,
+      "expected": "bb",
+      "behavior": {
+        "caller": "bb",
+        "target": "bb"
+      },
+      "acceptance_exit": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        3,
+        2
+      ],
+      "toolchain_loaded": true,
+      "passed": true,
+      "server_exit": 0
+    },
+    "disabled": {
+      "case": "disabled",
+      "server_source": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/batching/server/elixir-ls",
+      "commands": [
+        {
+          "label": "format",
+          "argv": [
+            "unbuffer",
+            "mix",
+            "format",
+            "mix.exs",
+            "lib/caller.ex",
+            "lib/query.ex",
+            "lib/target.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ],
+          "exit": 0
+        },
+        {
+          "label": "inspect",
+          "argv": [
+            "unbuffer",
+            "mix",
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ],
+          "exit": 0
+        },
+        {
+          "label": "acceptance",
+          "argv": [
+            "unbuffer",
+            "mix",
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ],
+          "exit": 0
+        }
+      ],
+      "baseline_hover": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\nzz documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "injected_build_result": "mix_compile_disabled",
+      "unexpected_builds_after_settle": 0,
+      "hover": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\nbb documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "hover_fresh": true,
+      "expected": "bb",
+      "behavior": {
+        "caller": "bb",
+        "target": "bb"
+      },
+      "acceptance_exit": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        2
+      ],
+      "toolchain_loaded": true,
+      "passed": true,
+      "server_exit": 0
+    },
+    "recovery-edit": {
+      "case": "recovery-edit",
+      "server_source": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/batching/server/elixir-ls",
+      "commands": [
+        {
+          "label": "format",
+          "argv": [
+            "unbuffer",
+            "mix",
+            "format",
+            "mix.exs",
+            "lib/caller.ex",
+            "lib/query.ex",
+            "lib/target.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ],
+          "exit": 0
+        },
+        {
+          "label": "inspect",
+          "argv": [
+            "unbuffer",
+            "mix",
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ],
+          "exit": 0
+        },
+        {
+          "label": "acceptance",
+          "argv": [
+            "unbuffer",
+            "mix",
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ],
+          "exit": 0
+        }
+      ],
+      "baseline_hover": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\nzz documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "unexpected_builds_after_settle": 0,
+      "hover": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\ncc documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "hover_fresh": true,
+      "expected": "cc",
+      "behavior": {
+        "caller": "cc",
+        "target": "cc"
+      },
+      "acceptance_exit": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        2,
+        2
+      ],
+      "toolchain_loaded": true,
+      "passed": true,
+      "server_exit": 0
+    }
+  },
+  "files_sha256": {
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/build_targeted_server.py": "3b92805cf737aa1b20685ce89220959a29d218a28eb9f767eb5a5d94e2da2674",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/elixirls-targeted-invalidation.patch": "fbd7211e1dbdb6958012d2a49e62baa9af2a1e832fa2e49a541b12c42ae7a7c0",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/build_batching_test.exs": "e95486c848abf79f7396561ea417aabde208e27340322fe0fa69843d3a36d470",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/invalidation_worker_test.exs": "b3586cc85f737d43781b8c4e6b86ee462cf747256a7b0623143ddfb3fcc5f14c",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/neovim_sync.lua": "4a30a2d281e185619494453890a1f51fc5415a4d0e9cf51091a410cf979e3043",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/neovim_patch_boundaries.lua": "c83613753d8561a8c19ebe9b48f5052308776bf73dfa5964c9be270e64eab3ae",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/neovim_patch_probe.py": "2009b754804debf88ea8aa73d84a16b416ff7156410ef63a5205f146c15fca88",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/neovim_hook_budget_probe.py": "843ba416d60063014f1575ab3404eae3a8e9a5ab4d0ea61a1b7b0ba64699add7"
+  }
+}

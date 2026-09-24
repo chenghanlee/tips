@@ -1,0 +1,65 @@
+--- a/crates/vv-mcp/src/output/mod.rs
++++ b/crates/vv-mcp/src/output/mod.rs
+@@ -28,7 +28,8 @@
+             };
+         }
+ 
+-        match operation {
++        let feedback = raw.get("feedback").cloned();
++        let output = match operation {
+             "prepare_call_hierarchy" | "incoming_calls" | "outgoing_calls" => {
+                 call_hierarchy::format(operation, raw, self.max_results, self.format)
+             }
+@@ -62,6 +63,22 @@
+                     OutputFormat::Markdown => markdown::format_locations(operation, &flattened),
+                 }
+             }
++        };
++        match feedback {
++            None => output,
++            Some(feedback) => match self.format {
++                OutputFormat::Json => {
++                    // Every compact JSON formatter above returns a JSON object.
++                    let mut result: Value = serde_json::from_str(&output)
++                        .expect("LSP formatter must return valid JSON");
++                    result["feedback"] = feedback;
++                    to_json(&result)
++                }
++                OutputFormat::Markdown => format!(
++                    "Feedback: {}\n\n{output}",
++                    feedback["message"].as_str().unwrap_or("See feedback status.")
++                ),
++            },
+         }
+     }
+ 
+@@ -129,6 +146,29 @@
+         assert!(output.contains("Clients: `tsgo`"));
+         assert!(output.contains("`/code/a.ts`: 1:2-1:8, 3:4-3:9"));
+         assert!(output.contains("Showing 2 of 3 results"));
++    }
++
++    #[test]
++    fn preserves_feedback_alongside_compact_results() {
++        let feedback = serde_json::json!({"status": "pending", "generation": 2,
++            "message": "Compilation pending; empty results do not establish absence."});
++        for operation in ["hover", "references", "diagnostics"] {
++            let mut raw = fixture();
++            raw["feedback"] = feedback.clone();
++            let output = OutputConfig::default().format_lsp(operation, raw.clone());
++            let output: Value = serde_json::from_str(&output).unwrap();
++            assert_eq!(output["feedback"], feedback);
++            let unqualified: Value = serde_json::from_str(
++                &OutputConfig::default().format_lsp(operation, fixture())
++            ).unwrap();
++            for (key, value) in unqualified.as_object().unwrap() {
++                assert_eq!(&output[key], value);
++            }
++            let markdown = OutputConfig { format: OutputFormat::Markdown, max_results: 2 }
++                .format_lsp(operation, raw);
++            assert!(markdown.starts_with("Feedback: "));
++            assert!(markdown.contains("empty results do not establish absence"));
++        }
+     }
+ 
+     #[test]

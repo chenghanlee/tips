@@ -1,0 +1,1248 @@
+{
+  "raw_root": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/correctness",
+  "checks": [
+    {
+      "check": "format",
+      "exit": 0
+    },
+    {
+      "check": "warnings-as-errors",
+      "exit": 1
+    },
+    {
+      "check": "credo",
+      "exit": 1
+    }
+  ],
+  "server_tests": 78,
+  "python_syntax": "passed",
+  "files_sha256": {
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/build_compiler_comparison.py": "7b52aa3611bc7c9916329bc03919600231a9cefa9957b57aeeddf0182a43347d",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/build_targeted_server.py": "19ec7e01d43cc495b12c8bec571dd1b6428b6ff916cb4decb36f2e03d2fc175c",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/build_resource_candidate.py": "43c4a9ce2cbb12a0b2e33679842c09436d917c311a051b48d5589ef60d9ef71c",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/compiler_comparison_probe.py": "21148bdca67d611a82432f23d96193584a8c2569758d7af1a71805c8cc22eba4",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/compiler_lsp_probe.py": "a8f8254fe84e6b57ffdc5db67573fff5e71779631e8fc92510af3bbb6c044f2e",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/resource_aba_probe.py": "05e681267c3a93826719b22074456a169c5918277aa635b29cab9eb3fcc0fa72",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/resource_rapid_probe.py": "55815d7ef7bcefc3988aed23956a2b1241efd4d0adcfc96e2d4e8c2e795af9a4",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/neovim_reconcile_probe.py": "ad466189dfa8998a59c3b3817f712c3e32eeb70e13e49e3cac6edee53e294eca",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/neovim_sync.lua": "33bcd70a02d98ef89a568218b6242e167408ca3caf33daf0ab5d97be4d3b85ab",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/neovim_patch_boundaries.lua": "ce09a5d8d4f747f9a6322182288c07a3fea847718bd55d4181daf16f7417dbca",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/invalidation_worker_test.exs": "ad7a3a243a7f42d930395dfc499850f00fc936a13c227a975b6c3b50b8a34313",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/elixirls-targeted-invalidation.patch": "1e433f0d7033ada4724a896d46841a94fc738843d3ae6b693c4d6c1efca3137b",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/mix-targeted-invalidation.patch": "1542a13a429446a04c67dab2e6be9bd636f3c1ef52e54f36b3104f408b831fde",
+    "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/correctness/resource-candidate/resource-only.patch": "63df69d296d2ebcce442669806a084c562d3e8371fa42c43cea48267e0c0ae53",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/CORRECTNESS.md": "bbc30a12053af8b503efd3c7c74e7e3467b4b62e15b0a15e920e83894fb21bd5",
+    "/private/tmp/tips-elixirls-codex-v2/agent/lsp/experiments/codex-elixirls-v2/README.md": "4c6a4d62e82bafe7f5403b1d3d67f155efad24a2118be0375aec752ef510bc90"
+  },
+  "results": {
+    "buffer-boundaries": {
+      "partial_success_is_not_resent": {
+        "passed": true,
+        "detail": {
+          "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/correctness/buffer-boundaries/partial/lib/second.ex": 2,
+          "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/correctness/buffer-boundaries/partial/lib/target.ex": 1
+        }
+      },
+      "qualified_results_and_superseded_request": {
+        "passed": true,
+        "detail": {
+          "calls": 3,
+          "superseded": {
+            "building": false,
+            "message": "Files changed during this request. Returned results may be stale; retry the query.",
+            "status": "superseded",
+            "generation": 1,
+            "completed": 0
+          },
+          "pending": {
+            "building": false,
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+            "status": "pending",
+            "generation": 0,
+            "completed": -1
+          },
+          "failed": {
+            "building": false,
+            "message": "Compilation failed; read diagnostics and fix the errors. Returned results may be incomplete or stale; an empty result does not establish absence.",
+            "status": "failed",
+            "generation": 0,
+            "completed": 0
+          }
+        }
+      },
+      "conflict_preserves_buffer_and_diagnostic_access": {
+        "passed": true,
+        "detail": {
+          "preserved": true,
+          "qualified_diagnostics": true
+        }
+      },
+      "reload_retries_without_new_edit": {
+        "passed": true,
+        "detail": {
+          "generation": 1,
+          "saves": 1,
+          "attempts": 2
+        }
+      },
+      "overlap_does_not_disable_later_wait": {
+        "passed": true,
+        "detail": {
+          "milliseconds": 245.646208
+        }
+      },
+      "hook_retries_within_budget": {
+        "passed": true,
+        "detail": {
+          "milliseconds": 221.847875,
+          "status": "quiet"
+        }
+      },
+      "startup_unavailability_allows_retry": {
+        "passed": true,
+        "detail": true
+      },
+      "persistent_failure_is_bounded_and_recoverable": {
+        "passed": true,
+        "detail": {
+          "milliseconds": 452.789917,
+          "status": "sync_error"
+        }
+      },
+      "save_retries_without_new_edit": {
+        "passed": true,
+        "detail": {
+          "attempts": 2
+        }
+      }
+    },
+    "buffer-boundaries-v2": {
+      "qualified_results_and_superseded_request": {
+        "detail": {
+          "calls": 3,
+          "pending": {
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+            "building": false,
+            "generation": 0,
+            "status": "pending",
+            "completed": -1
+          },
+          "superseded": {
+            "message": "Files changed during this request. Returned results may be stale; retry the query.",
+            "building": false,
+            "generation": 1,
+            "status": "superseded",
+            "completed": 0
+          },
+          "failed": {
+            "message": "Compilation failed; read diagnostics and fix the errors. Returned results may be incomplete or stale; an empty result does not establish absence.",
+            "building": false,
+            "generation": 0,
+            "status": "failed",
+            "completed": 0
+          }
+        },
+        "passed": true
+      },
+      "conflict_preserves_buffer_and_diagnostic_access": {
+        "detail": {
+          "preserved": true,
+          "qualified_diagnostics": true
+        },
+        "passed": true
+      },
+      "partial_success_is_not_resent": {
+        "detail": {
+          "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/correctness/buffer-boundaries-v2/partial/lib/target.ex": 1,
+          "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/correctness/buffer-boundaries-v2/partial/lib/second.ex": 2
+        },
+        "passed": true
+      },
+      "save_retries_without_new_edit": {
+        "detail": {
+          "attempts": 2
+        },
+        "passed": true
+      },
+      "overlap_does_not_disable_later_wait": {
+        "detail": {
+          "milliseconds": 246.112625
+        },
+        "passed": true
+      },
+      "opened_deletion_retries_after_buffer_is_gone": {
+        "detail": {
+          "attempts": 2
+        },
+        "passed": true
+      },
+      "startup_unavailability_allows_retry": {
+        "detail": true,
+        "passed": true
+      },
+      "hook_retries_within_budget": {
+        "detail": {
+          "status": "quiet",
+          "milliseconds": 230.3315
+        },
+        "passed": true
+      },
+      "reload_retries_without_new_edit": {
+        "detail": {
+          "attempts": 2,
+          "generation": 1,
+          "saves": 1
+        },
+        "passed": true
+      },
+      "persistent_failure_is_bounded_and_recoverable": {
+        "detail": {
+          "status": "sync_error",
+          "milliseconds": 459.177583
+        },
+        "passed": true
+      }
+    },
+    "existing-mcp-boundaries": {
+      "pending_hover": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "feedback": {
+            "building": false,
+            "completed": -1,
+            "generation": 0,
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+            "status": "pending"
+          },
+          "items": [
+            "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+          ]
+        }
+      },
+      "pending_definition": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "feedback": {
+            "building": false,
+            "completed": -1,
+            "generation": 0,
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+            "status": "pending"
+          },
+          "locations": {
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/correctness/existing-mcp-boundaries/alpha/lib/target.ex": [
+              "3:3-3:25"
+            ]
+          }
+        }
+      },
+      "pending_references": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "feedback": {
+            "building": false,
+            "completed": -1,
+            "generation": 0,
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+            "status": "pending"
+          },
+          "locations": {
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/correctness/existing-mcp-boundaries/alpha/lib/caller.ex": [
+              "2:28-2:34",
+              "3:28-3:34"
+            ],
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/correctness/existing-mcp-boundaries/alpha/lib/target.ex": [
+              "3:3-3:25"
+            ]
+          }
+        }
+      },
+      "pending_diagnostics": {
+        "isError": false,
+        "data": {
+          "diagnostics": {},
+          "feedback": {
+            "building": false,
+            "completed": -1,
+            "generation": 0,
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+            "status": "pending"
+          }
+        }
+      },
+      "failed_hover": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "feedback": {
+            "building": false,
+            "completed": 0,
+            "generation": 0,
+            "message": "Compilation failed; read diagnostics and fix the errors. Returned results may be incomplete or stale; an empty result does not establish absence.",
+            "status": "failed"
+          },
+          "items": [
+            "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+          ]
+        }
+      },
+      "fixture_filter": {
+        "notifications": [],
+        "new_builds": 0,
+        "hook": {
+          "seconds": 0.08764312499260996,
+          "output": {}
+        }
+      },
+      "positive_watcher_controls": true,
+      "queried_file_error": {
+        "seconds": 0.3015419169969391,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: lib/caller.ex:1:1: error: ** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)  \nlib/caller.ex:2:19: error: undefined function missing_revision/0 (expected V2Caller to define such a function or for it to be imported, but none are available)"
+          }
+        }
+      },
+      "failed_definition": {
+        "isError": false,
+        "data": {
+          "feedback": {
+            "building": false,
+            "completed": 4,
+            "generation": 4,
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+            "status": "pending"
+          },
+          "locations": {}
+        }
+      },
+      "queried_file_repair": {
+        "seconds": 0.29501879200688563,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Previously reported compiler diagnostics cleared after compilation."
+          }
+        }
+      },
+      "repaired_diagnostics": {
+        "isError": false,
+        "data": {
+          "diagnostics": {},
+          "feedback": {
+            "building": false,
+            "completed": 5,
+            "generation": 5,
+            "message": "Last observed compilation completed; compiler diagnostics are available. Normal compilation/tests remain required.",
+            "status": "current"
+          }
+        }
+      },
+      "retried_real_save": {
+        "seconds": 0.32564179199107457,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: lib/caller.ex:1:1: error: ** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)  \nlib/caller.ex:2:19: error: undefined function missing_retry/0 (expected V2Caller to define such a function or for it to be imported, but none are available)"
+          }
+        }
+      },
+      "real_save_attempts": 2,
+      "completed": true
+    },
+    "hook-budget": {
+      "initial_stop": {
+        "seconds": 0.079,
+        "output": {}
+      },
+      "three_second_error": {
+        "seconds": 4.773,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result."
+          }
+        }
+      }
+    },
+    "reconcile": {
+      "baseline": {
+        "exit": 0,
+        "expected": "aa"
+      },
+      "unopened_preserved_hook": {
+        "seconds": 1.3069264590012608,
+        "feedback": {}
+      },
+      "unopened_preserved_acceptance": {
+        "exit": 0,
+        "expected": "bb"
+      },
+      "retry_attempts": 2,
+      "delete_hook": {
+        "seconds": 1.0930507919983938,
+        "feedback": {}
+      },
+      "delete_acceptance": {
+        "exit": 0,
+        "expected": "missing"
+      },
+      "recreate_hook": {
+        "seconds": 1.0951116670039482,
+        "feedback": {}
+      },
+      "recreate_acceptance": {
+        "exit": 0,
+        "expected": "cc"
+      },
+      "edit_during_build_hook": {
+        "seconds": 1.602717332993052,
+        "feedback": {}
+      },
+      "edit_during_build_acceptance": {
+        "exit": 0,
+        "expected": "ee"
+      },
+      "completed": true
+    },
+    "reconcile-budget": {
+      "baseline": {
+        "exit": 0,
+        "expected": "aa"
+      },
+      "unopened_preserved_hook": {
+        "seconds": 1.362370542003191,
+        "feedback": {}
+      },
+      "unopened_preserved_acceptance": {
+        "exit": 0,
+        "expected": "bb"
+      },
+      "retry_attempts": 2,
+      "delete_hook": {
+        "seconds": 1.1172051670000656,
+        "feedback": {}
+      },
+      "delete_acceptance": {
+        "exit": 0,
+        "expected": "missing"
+      },
+      "recreate_hook": {
+        "seconds": 1.1162752090021968,
+        "feedback": {}
+      },
+      "recreate_acceptance": {
+        "exit": 0,
+        "expected": "cc"
+      },
+      "edit_during_build_hook": {
+        "seconds": 1.6205107080022572,
+        "feedback": {}
+      },
+      "edit_during_build_acceptance": {
+        "exit": 0,
+        "expected": "ee"
+      },
+      "slow_hook": {
+        "seconds": 4.802858041002764,
+        "feedback": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result."
+          }
+        }
+      },
+      "unchanged_hook": {
+        "seconds": 0.10053083299135324,
+        "feedback": {}
+      },
+      "later_hook": {
+        "seconds": 0.10932987500564195,
+        "feedback": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Compilation completed; no compiler diagnostics are currently reported."
+          }
+        }
+      },
+      "slow_acceptance": {
+        "exit": 0,
+        "expected": "ff"
+      },
+      "completed": true
+    },
+    "red-delete": {
+      "mode": "direct",
+      "case": "external-delete",
+      "expected": "missing",
+      "observed": {
+        "caller": "aa",
+        "target": "aa",
+        "parallel_compiler": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/probes/direct-plus/direct-plus/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/probes/direct-plus/direct-plus/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 2,
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "parallel_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        },
+        {
+          "label": "patched parallel compiler loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": false
+    },
+    "red-preserved": {
+      "mode": "direct",
+      "case": "external-preserved",
+      "expected": "bb",
+      "observed": {
+        "caller": "aa",
+        "target": "aa",
+        "parallel_compiler": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/probes/direct-plus/direct-plus/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/probes/direct-plus/direct-plus/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 2,
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "parallel_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        },
+        {
+          "label": "patched parallel compiler loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": false
+    },
+    "red-reconcile-v2": {
+      "baseline": {
+        "exit": 0,
+        "expected": "aa"
+      },
+      "unopened_preserved_hook": {
+        "seconds": 4.772117041997262,
+        "feedback": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result."
+          }
+        }
+      },
+      "unopened_preserved_acceptance": {
+        "exit": 2,
+        "expected": "bb"
+      }
+    },
+    "red-retention": {
+      "case": "reload-failure",
+      "server_source": "tmp/elixirls-v2/invalidation-comparison/targeted-server/elixir-ls",
+      "baseline_hover": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\nzz documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "injected_build_result": "mixfile_error",
+      "unexpected_builds_after_settle": 0,
+      "hover": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\naa documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "hover_fresh": false,
+      "expected": "bb",
+      "behavior": {
+        "caller": "aa",
+        "target": "aa"
+      },
+      "acceptance_exit": 2,
+      "compiled_file_counts_after_startup": [
+        2
+      ],
+      "toolchain_loaded": true,
+      "passed": false,
+      "server_exit": 0
+    },
+    "resource-aba": {
+      "markers": [
+        "bb",
+        "aa"
+      ],
+      "followup_exit": 0,
+      "followup_compiled": false,
+      "acceptance_exit": 2,
+      "passed": false
+    },
+    "resource-delete": {
+      "mode": "direct",
+      "case": "external-delete",
+      "expected": "missing",
+      "observed": {
+        "caller": "missing",
+        "target": "missing",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/correctness/resource-candidate/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/correctness/resource-candidate/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "parallel_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        },
+        {
+          "label": "patched parallel compiler loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true
+    },
+    "resource-preserved": {
+      "mode": "direct",
+      "case": "external-preserved",
+      "expected": "bb",
+      "observed": {
+        "caller": "bb",
+        "target": "bb",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/correctness/resource-candidate/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/correctness/resource-candidate/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "parallel_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        },
+        {
+          "label": "patched parallel compiler loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true
+    },
+    "resource-rapid": {
+      "exit": 0,
+      "rows": [
+        {
+          "value": "bb",
+          "i": 1,
+          "result": "{:ok, []}",
+          "start_us": 1790257010006602,
+          "end_us": 1790257010035387,
+          "owner_compiled": true,
+          "other_compiled": false
+        },
+        {
+          "value": "bb",
+          "i": 2,
+          "result": "{:noop, []}",
+          "start_us": 1790257010039957,
+          "end_us": 1790257010058339,
+          "owner_compiled": false,
+          "other_compiled": false
+        },
+        {
+          "value": "bb",
+          "i": 3,
+          "result": "{:noop, []}",
+          "start_us": 1790257010059486,
+          "end_us": 1790257010079307,
+          "owner_compiled": false,
+          "other_compiled": false
+        },
+        {
+          "value": "bb",
+          "i": 4,
+          "result": "{:noop, []}",
+          "start_us": 1790257010080640,
+          "end_us": 1790257010100194,
+          "owner_compiled": false,
+          "other_compiled": false
+        },
+        {
+          "value": "bb",
+          "i": 5,
+          "result": "{:noop, []}",
+          "start_us": 1790257010101229,
+          "end_us": 1790257010120911,
+          "owner_compiled": false,
+          "other_compiled": false
+        },
+        {
+          "value": "bb",
+          "i": 6,
+          "result": "{:noop, []}",
+          "start_us": 1790257010122032,
+          "end_us": 1790257010141648,
+          "owner_compiled": false,
+          "other_compiled": false
+        },
+        {
+          "value": "bb",
+          "i": 7,
+          "result": "{:noop, []}",
+          "start_us": 1790257010142950,
+          "end_us": 1790257010161637,
+          "owner_compiled": false,
+          "other_compiled": false
+        },
+        {
+          "value": "bb",
+          "i": 8,
+          "result": "{:noop, []}",
+          "start_us": 1790257010162653,
+          "end_us": 1790257010182313,
+          "owner_compiled": false,
+          "other_compiled": false
+        },
+        {
+          "value": "bb",
+          "i": 9,
+          "result": "{:noop, []}",
+          "owner_compiled": false,
+          "other_compiled": false
+        },
+        {
+          "value": "bb",
+          "i": 10,
+          "result": "{:noop, []}",
+          "owner_compiled": false,
+          "other_compiled": false
+        }
+      ],
+      "loaded": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/correctness/resource-candidate/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam",
+      "candidate_hash_matches": true
+    },
+    "resource-repair": {
+      "mode": "direct",
+      "case": "external-repair",
+      "expected": "cc",
+      "observed": {
+        "caller": "cc",
+        "target": "cc",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/correctness/resource-candidate/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/correctness/resource-candidate/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "revert-overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "parallel_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        },
+        {
+          "label": "patched parallel compiler loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true
+    },
+    "retention-compile-failure": {
+      "case": "compile-failure",
+      "server_source": "tmp/elixirls-v2/correctness/targeted-server/elixir-ls",
+      "baseline_hover": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\nzz documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "injected_build_result": "mix_compile_error",
+      "unexpected_builds_after_settle": 0,
+      "hover": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\nbb documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "hover_fresh": true,
+      "expected": "bb",
+      "behavior": {
+        "caller": "bb",
+        "target": "bb"
+      },
+      "acceptance_exit": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        3,
+        2
+      ],
+      "toolchain_loaded": true,
+      "passed": true,
+      "server_exit": 0
+    },
+    "retention-disabled": {
+      "case": "disabled",
+      "server_source": "tmp/elixirls-v2/correctness/targeted-server/elixir-ls",
+      "baseline_hover": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\nzz documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "injected_build_result": "mix_compile_disabled",
+      "unexpected_builds_after_settle": 0,
+      "hover": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\nbb documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "hover_fresh": true,
+      "expected": "bb",
+      "behavior": {
+        "caller": "bb",
+        "target": "bb"
+      },
+      "acceptance_exit": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        2
+      ],
+      "toolchain_loaded": true,
+      "passed": true,
+      "server_exit": 0
+    },
+    "retention-ordinary": {
+      "case": "ordinary",
+      "server_source": "tmp/elixirls-v2/correctness/targeted-server/elixir-ls",
+      "baseline_hover": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\nzz documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "unexpected_builds_after_settle": 0,
+      "hover": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\nd9 documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "hover_fresh": true,
+      "expected": "d9",
+      "behavior": {
+        "caller": "d9",
+        "target": "d9"
+      },
+      "acceptance_exit": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "incremental_preserved": true,
+      "toolchain_loaded": true,
+      "passed": true,
+      "server_exit": 0
+    },
+    "retention-recovery-edit": {
+      "case": "recovery-edit",
+      "server_source": "tmp/elixirls-v2/correctness/targeted-server/elixir-ls",
+      "baseline_hover": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\nzz documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "unexpected_builds_after_settle": 0,
+      "hover": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\ncc documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "hover_fresh": true,
+      "expected": "cc",
+      "behavior": {
+        "caller": "cc",
+        "target": "cc"
+      },
+      "acceptance_exit": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        2,
+        2
+      ],
+      "toolchain_loaded": true,
+      "passed": true,
+      "server_exit": 0
+    },
+    "retention-reload": {
+      "case": "reload-failure",
+      "server_source": "tmp/elixirls-v2/correctness/targeted-server/elixir-ls",
+      "baseline_hover": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\nzz documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "injected_build_result": "mixfile_error",
+      "unexpected_builds_after_settle": 0,
+      "hover": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\nbb documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "hover_fresh": true,
+      "expected": "bb",
+      "behavior": {
+        "caller": "bb",
+        "target": "bb"
+      },
+      "acceptance_exit": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        2
+      ],
+      "toolchain_loaded": true,
+      "passed": true,
+      "server_exit": 0
+    },
+    "retention-revert": {
+      "case": "revert",
+      "server_source": "tmp/elixirls-v2/correctness/targeted-server/elixir-ls",
+      "baseline_hover": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\nzz documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "unexpected_builds_after_settle": 0,
+      "hover": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "```elixir\nGraceTarget.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/grace_probe/0.1.0/GraceTarget.html#answer/0)\n\n\n\n**Application** grace_probe\n\n\n\n\n\n### Documentation\n\naa documentation.\n"
+          },
+          "range": {
+            "end": {
+              "character": 34,
+              "line": 1
+            },
+            "start": {
+              "character": 16,
+              "line": 1
+            }
+          }
+        }
+      },
+      "hover_fresh": true,
+      "expected": "aa",
+      "behavior": {
+        "caller": "aa",
+        "target": "aa"
+      },
+      "acceptance_exit": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        2,
+        2
+      ],
+      "toolchain_loaded": true,
+      "passed": true,
+      "server_exit": 0
+    },
+    "targeted-aba-notified": {
+      "markers": [
+        "bb",
+        "aa"
+      ],
+      "notification_hint": true,
+      "followup_exit": 0,
+      "followup_compiled": true,
+      "acceptance_exit": 0,
+      "passed": true
+    },
+    "targeted-aba-unobserved": {
+      "markers": [
+        "bb",
+        "aa"
+      ],
+      "notification_hint": false,
+      "followup_exit": 0,
+      "followup_compiled": false,
+      "acceptance_exit": 2,
+      "passed": false
+    }
+  }
+}

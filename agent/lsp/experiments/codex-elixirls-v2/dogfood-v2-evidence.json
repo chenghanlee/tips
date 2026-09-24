@@ -1,0 +1,1181 @@
+{
+  "application_commit": "81501387eb77b220c95693f58076f7f8255da1b0",
+  "branch": "experiment/elixirls-codex-v2",
+  "source_hashes": {
+    "neovim_sync.lua": "133a9fc1b48578c2620f860ed546ff729c42ac73b1e2d908ca8357fc0e414763",
+    "neovim_feedback.lua": "0b9cabc4f84eadcfdf92930cba37804acaff95a777b90471fcac63aebd39a141",
+    "neovim_hook.py": "d5150976a6154f573e883e6ddf8f149f3206166748fcbd7e4c5d936c822088f8",
+    "neovim_init.lua": "5d063e55082a1a8f1fae21f172840230e8ad22bf3f3846f20505017836714c26",
+    "neovim_launcher.py": "3e506065033d0753133a956dce274d22459cd73e54c0122b6d86812afb2be802",
+    "neovim_dogfood.py": "8dd9306e26264547d2c0adf2a189c793114748c246df89216e4c6be2985d8a7b"
+  },
+  "agents": {
+    "provider": {
+      "seconds": 208.399,
+      "exit_code": 0,
+      "survivors": {},
+      "runtime_matches": {
+        "neovim_init.lua": true,
+        "neovim_feedback.lua": true,
+        "neovim_sync.lua": true
+      },
+      "hook_count": 29,
+      "hook_median_seconds": 0.067,
+      "hook_max_seconds": 2.366,
+      "hook_status_counts": {
+        "pending": 14,
+        "quiet": 15
+      },
+      "hook_nonempty": 0,
+      "receipts_emitted": [],
+      "receipts_quoted": [],
+      "edit_hooks": [
+        {
+          "tool": "apply_patch",
+          "status": "quiet",
+          "generation": 1,
+          "completed": 1,
+          "seconds": 1.16,
+          "delivered": false
+        },
+        {
+          "tool": "apply_patch",
+          "status": "quiet",
+          "generation": 2,
+          "completed": 2,
+          "seconds": 2.366,
+          "delivered": false
+        }
+      ],
+      "mcp_count": 8,
+      "mcp_error_count": 2,
+      "mcp_calls": [
+        {
+          "operation": "document_symbols",
+          "uri": "/private/tmp/tips-lsp-sol-v2-provider/lib/tips/search_probe.ex",
+          "error": null,
+          "result": {
+            "clients": [],
+            "symbols": {}
+          }
+        },
+        {
+          "operation": "references",
+          "uri": "/private/tmp/tips-lsp-sol-v2-provider/lib/tips/search_probe.ex",
+          "error": {
+            "code": "elixirls_not_ready",
+            "feedback": {
+              "building": true,
+              "completed": -1,
+              "generation": 0,
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+              "status": "pending",
+              "uncertain": false
+            },
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+            "retryAfterMs": 1000,
+            "retryable": true
+          },
+          "result": {
+            "error": {
+              "code": "elixirls_not_ready",
+              "feedback": {
+                "building": true,
+                "completed": -1,
+                "generation": 0,
+                "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+                "status": "pending",
+                "uncertain": false
+              },
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+              "retryAfterMs": 1000,
+              "retryable": true
+            }
+          }
+        },
+        {
+          "operation": "references",
+          "uri": "/private/tmp/tips-lsp-sol-v2-provider/lib/tips/search_probe.ex",
+          "error": {
+            "code": "elixirls_not_ready",
+            "feedback": {
+              "building": true,
+              "completed": -1,
+              "generation": 0,
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+              "status": "pending",
+              "uncertain": false
+            },
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+            "retryAfterMs": 1000,
+            "retryable": true
+          },
+          "result": {
+            "error": {
+              "code": "elixirls_not_ready",
+              "feedback": {
+                "building": true,
+                "completed": -1,
+                "generation": 0,
+                "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+                "status": "pending",
+                "uncertain": false
+              },
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+              "retryAfterMs": 1000,
+              "retryable": true
+            }
+          }
+        },
+        {
+          "operation": "references",
+          "uri": "/private/tmp/tips-lsp-sol-v2-provider/lib/tips/search_probe.ex",
+          "error": null,
+          "result": {
+            "clients": [
+              "elixirls"
+            ],
+            "locations": {
+              "/private/tmp/tips-lsp-sol-v2-provider/lib/tips/provider_config.ex": [
+                "56:3-56:90"
+              ],
+              "/private/tmp/tips-lsp-sol-v2-provider/lib/tips/search_probe.ex": [
+                "64:58-64:62"
+              ]
+            }
+          }
+        },
+        {
+          "operation": "diagnostics",
+          "uri": "/private/tmp/tips-lsp-sol-v2-provider/lib/tips/provider_config.ex",
+          "error": null,
+          "result": {
+            "diagnostics": {}
+          }
+        },
+        {
+          "operation": "diagnostics",
+          "uri": "/private/tmp/tips-lsp-sol-v2-provider/lib/tips/search_probe.ex",
+          "error": null,
+          "result": {
+            "diagnostics": {}
+          }
+        },
+        {
+          "operation": "diagnostics",
+          "uri": "/private/tmp/tips-lsp-sol-v2-provider/test/tips/provider_config_test.exs",
+          "error": null,
+          "result": {
+            "diagnostics": {}
+          }
+        },
+        {
+          "operation": "diagnostics",
+          "uri": "/private/tmp/tips-lsp-sol-v2-provider/test/test_helper.exs",
+          "error": null,
+          "result": {
+            "diagnostics": {}
+          }
+        }
+      ],
+      "all_mcp_uris_assigned": true,
+      "build_start_lines": [
+        48,
+        450,
+        473,
+        491,
+        503,
+        521,
+        539,
+        557,
+        575,
+        593,
+        609,
+        635,
+        649,
+        670,
+        683,
+        702,
+        721,
+        740,
+        759,
+        778,
+        797,
+        815,
+        845,
+        859,
+        878,
+        898,
+        919,
+        940,
+        961,
+        983,
+        1004,
+        1024
+      ],
+      "builds": [
+        {
+          "line": 446,
+          "milliseconds": 64129,
+          "result": "mix_compile_ok"
+        },
+        {
+          "line": 463,
+          "milliseconds": 470,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 481,
+          "milliseconds": 895,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 499,
+          "milliseconds": 920,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 517,
+          "milliseconds": 930,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 535,
+          "milliseconds": 904,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 553,
+          "milliseconds": 907,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 571,
+          "milliseconds": 909,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 589,
+          "milliseconds": 941,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 605,
+          "milliseconds": 920,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 621,
+          "milliseconds": 914,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 645,
+          "milliseconds": 1256,
+          "result": "mix_compile_ok"
+        },
+        {
+          "line": 662,
+          "milliseconds": 864,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 679,
+          "milliseconds": 947,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 698,
+          "milliseconds": 960,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 717,
+          "milliseconds": 965,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 736,
+          "milliseconds": 958,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 755,
+          "milliseconds": 957,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 774,
+          "milliseconds": 940,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 793,
+          "milliseconds": 923,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 811,
+          "milliseconds": 919,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 829,
+          "milliseconds": 917,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 855,
+          "milliseconds": 937,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 874,
+          "milliseconds": 1015,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 894,
+          "milliseconds": 1339,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 915,
+          "milliseconds": 1069,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 936,
+          "milliseconds": 984,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 957,
+          "milliseconds": 955,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 979,
+          "milliseconds": 963,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 1000,
+          "milliseconds": 931,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 1020,
+          "milliseconds": 905,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 1040,
+          "milliseconds": 867,
+          "result": "mix_compile_noop"
+        }
+      ],
+      "save_lines": [
+        629
+      ],
+      "full_suite": [
+        "508",
+        "4"
+      ],
+      "validation": {
+        "command": [
+          "unbuffer",
+          "mix",
+          "test"
+        ],
+        "exit_code": 0,
+        "source": "agent",
+        "diff_check": 0
+      },
+      "final": "Renamed `Tips.ProviderConfig.mode/0` to `provider_mode/0` across the application caller, tests, test helper, and documentation. There is no compatibility alias; the runtime configuration key remains `:mode`.\n\nThe updated acceptance test first failed with `UndefinedFunctionError` for the new name. After the rename, formatting, warnings-as-errors compilation, strict Credo, and the documentation check passed. The targeted tests passed (26 passed, 1 excluded), as did the full non-browser suite (508 passed, 4 excluded).\n\nAutomatic compiler feedback initially said compilation was pending, then LSP references resolved and diagnostics returned no messages. The pending response caused a brief retry; it did not identify an error. I saw no feedback receipt."
+    },
+    "media": {
+      "seconds": 178.202,
+      "exit_code": 0,
+      "survivors": {},
+      "runtime_matches": {
+        "neovim_init.lua": true,
+        "neovim_feedback.lua": true,
+        "neovim_sync.lua": true
+      },
+      "hook_count": 27,
+      "hook_median_seconds": 0.066,
+      "hook_max_seconds": 0.098,
+      "hook_status_counts": {
+        "pending": 9,
+        "uncertain": 17,
+        "quiet": 1
+      },
+      "hook_nonempty": 4,
+      "receipts_emitted": [
+        "442d89d06b82",
+        "269de59bbb9b",
+        "0e8db9c0655c",
+        "bc750aa2fb44"
+      ],
+      "receipts_quoted": [
+        "bc750aa2fb44"
+      ],
+      "edit_hooks": [
+        {
+          "tool": "apply_patch",
+          "status": "uncertain",
+          "generation": 1,
+          "completed": -1,
+          "seconds": 0.069,
+          "delivered": true
+        },
+        {
+          "tool": "apply_patch",
+          "status": "uncertain",
+          "generation": 2,
+          "completed": 1,
+          "seconds": 0.061,
+          "delivered": true
+        },
+        {
+          "tool": "apply_patch",
+          "status": "uncertain",
+          "generation": 3,
+          "completed": 2,
+          "seconds": 0.066,
+          "delivered": true
+        },
+        {
+          "tool": "apply_patch",
+          "status": "uncertain",
+          "generation": 4,
+          "completed": 3,
+          "seconds": 0.066,
+          "delivered": true
+        }
+      ],
+      "mcp_count": 7,
+      "mcp_error_count": 6,
+      "mcp_calls": [
+        {
+          "operation": "document_symbols",
+          "uri": "/private/tmp/tips-lsp-sol-v2-media/lib/tips/content/media/target.ex",
+          "error": null,
+          "result": {
+            "clients": [
+              "elixirls"
+            ],
+            "symbols": {
+              "/private/tmp/tips-lsp-sol-v2-media/lib/tips/content/media/target.ex": [
+                {
+                  "detail": "defmodule",
+                  "kind": "Module",
+                  "name": "Tips.Content.Media.Target",
+                  "range": "1:11-1:36"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "kind": "EnumMember",
+                  "name": "@max_id",
+                  "range": "6:3-6:36"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "@type",
+                  "kind": "Class",
+                  "name": "t/0",
+                  "range": "8:9-8:10"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "type/0",
+                  "range": "16:7-16:11"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "cast/1",
+                  "range": "20:7-20:39"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "cast/1",
+                  "range": "26:7-26:50"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "cast/1",
+                  "range": "33:7-33:32"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "cast/1",
+                  "range": "37:7-37:38"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "cast/1",
+                  "range": "41:7-41:19"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "dump/1",
+                  "range": "45:7-45:18"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "load/1",
+                  "range": "51:7-51:18"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "load/1",
+                  "range": "76:7-76:19"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "encode/1",
+                  "range": "78:8-78:42"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "encode/1",
+                  "range": "80:8-80:53"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "encode/1",
+                  "range": "83:8-83:35"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "encode/1",
+                  "range": "84:8-84:41"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "normalize_uuid/1",
+                  "range": "86:8-86:28"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "normalize_uuid/1",
+                  "range": "93:8-93:29"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "canonical_uuid/1",
+                  "range": "95:8-95:28"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "positive_integer/1",
+                  "range": "104:8-104:28"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "positive_integer/1",
+                  "range": "105:8-105:29"
+                },
+                {
+                  "container": "Tips.Content.Media.Target",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "canonical_integer/1",
+                  "range": "107:8-107:34"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "operation": "definition",
+          "uri": "/private/tmp/tips-lsp-sol-v2-media/lib/tips/content/media/target.ex",
+          "error": {
+            "code": "elixirls_not_ready",
+            "feedback": {
+              "building": true,
+              "completed": -1,
+              "generation": 0,
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+              "status": "pending",
+              "uncertain": false
+            },
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+            "retryAfterMs": 1000,
+            "retryable": true
+          },
+          "result": {
+            "error": {
+              "code": "elixirls_not_ready",
+              "feedback": {
+                "building": true,
+                "completed": -1,
+                "generation": 0,
+                "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+                "status": "pending",
+                "uncertain": false
+              },
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+              "retryAfterMs": 1000,
+              "retryable": true
+            }
+          }
+        },
+        {
+          "operation": "hover",
+          "uri": "/private/tmp/tips-lsp-sol-v2-media/lib/tips/content/media/target.ex",
+          "error": {
+            "code": "elixirls_not_ready",
+            "feedback": {
+              "building": true,
+              "completed": -1,
+              "generation": 0,
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+              "status": "pending",
+              "uncertain": false
+            },
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+            "retryAfterMs": 1000,
+            "retryable": true
+          },
+          "result": {
+            "error": {
+              "code": "elixirls_not_ready",
+              "feedback": {
+                "building": true,
+                "completed": -1,
+                "generation": 0,
+                "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+                "status": "pending",
+                "uncertain": false
+              },
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+              "retryAfterMs": 1000,
+              "retryable": true
+            }
+          }
+        },
+        {
+          "operation": "definition",
+          "uri": "/private/tmp/tips-lsp-sol-v2-media/lib/tips/content/media/target.ex",
+          "error": {
+            "code": "elixirls_uncertain",
+            "feedback": {
+              "building": false,
+              "completed": 1,
+              "generation": 1,
+              "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+              "status": "uncertain",
+              "uncertain": true
+            },
+            "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+            "retryable": false
+          },
+          "result": {
+            "error": {
+              "code": "elixirls_uncertain",
+              "feedback": {
+                "building": false,
+                "completed": 1,
+                "generation": 1,
+                "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+                "status": "uncertain",
+                "uncertain": true
+              },
+              "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+              "retryable": false
+            }
+          }
+        },
+        {
+          "operation": "diagnostics",
+          "uri": "/private/tmp/tips-lsp-sol-v2-media/test/tips/content/media_schema_test.exs",
+          "error": {
+            "code": "elixirls_uncertain",
+            "diagnostics": [],
+            "feedback": {
+              "building": false,
+              "completed": 1,
+              "generation": 1,
+              "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+              "status": "uncertain",
+              "uncertain": true
+            },
+            "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+            "retryable": false
+          },
+          "result": {
+            "error": {
+              "code": "elixirls_uncertain",
+              "diagnostics": [],
+              "feedback": {
+                "building": false,
+                "completed": 1,
+                "generation": 1,
+                "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+                "status": "uncertain",
+                "uncertain": true
+              },
+              "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+              "retryable": false
+            }
+          }
+        },
+        {
+          "operation": "definition",
+          "uri": "/private/tmp/tips-lsp-sol-v2-media/lib/tips/content/media/target.ex",
+          "error": {
+            "code": "elixirls_uncertain",
+            "feedback": {
+              "building": false,
+              "completed": 3,
+              "generation": 3,
+              "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+              "status": "uncertain",
+              "uncertain": true
+            },
+            "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+            "retryable": false
+          },
+          "result": {
+            "error": {
+              "code": "elixirls_uncertain",
+              "feedback": {
+                "building": false,
+                "completed": 3,
+                "generation": 3,
+                "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+                "status": "uncertain",
+                "uncertain": true
+              },
+              "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+              "retryable": false
+            }
+          }
+        },
+        {
+          "operation": "diagnostics",
+          "uri": "/private/tmp/tips-lsp-sol-v2-media/lib/tips/content/media/target.ex",
+          "error": {
+            "code": "elixirls_uncertain",
+            "diagnostics": [],
+            "feedback": {
+              "building": false,
+              "completed": 3,
+              "generation": 3,
+              "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+              "status": "uncertain",
+              "uncertain": true
+            },
+            "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+            "retryable": false
+          },
+          "result": {
+            "error": {
+              "code": "elixirls_uncertain",
+              "diagnostics": [],
+              "feedback": {
+                "building": false,
+                "completed": 3,
+                "generation": 3,
+                "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+                "status": "uncertain",
+                "uncertain": true
+              },
+              "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+              "retryable": false
+            }
+          }
+        }
+      ],
+      "all_mcp_uris_assigned": true,
+      "build_start_lines": [
+        43,
+        448,
+        477,
+        511,
+        540
+      ],
+      "builds": [
+        {
+          "line": 444,
+          "milliseconds": 63527,
+          "result": "mix_compile_ok"
+        },
+        {
+          "line": 461,
+          "milliseconds": 459,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 494,
+          "milliseconds": 918,
+          "result": "mix_compile_ok"
+        },
+        {
+          "line": 523,
+          "milliseconds": 877,
+          "result": "mix_compile_noop"
+        },
+        {
+          "line": 553,
+          "milliseconds": 915,
+          "result": "mix_compile_noop"
+        }
+      ],
+      "save_lines": [
+        474,
+        505,
+        534
+      ],
+      "full_suite": [
+        "508",
+        "4"
+      ],
+      "validation": {
+        "command": [
+          "unbuffer",
+          "mix",
+          "test"
+        ],
+        "exit_code": 0,
+        "source": "parent",
+        "seconds": 18.252,
+        "diff_check": 0
+      },
+      "final": "Updated [Target](/private/tmp/tips-lsp-sol-v2-media/lib/tips/content/media/target.ex:107) so `canonical_integer/1` reuses `positive_integer/1` for PostgreSQL bigint validation. The [media schema tests](/private/tmp/tips-lsp-sol-v2-media/test/tips/content/media_schema_test.exs:428) now cover the maximum and overflow through cast, dump, and load for `new_review`, `edit_tip`, and `edit_review`, plus noncanonical strings. Existing database persistence coverage remains.\n\nThe targeted tests passed before and after the refactor (30 passed each time). Formatting, warnings-as-errors compilation, and strict Credo also passed.\n\nAutomatic compiler feedback repeatedly said the result was **uncertain** because source changed during compilation; it gave no usable diagnostic. LSP symbol discovery worked, but definition and diagnostics remained unavailable under that uncertainty. The synchronous feedback arrived within a few seconds but did not help verify this change, so I used the explicit checks above. Feedback receipt: `bc750aa2fb44`."
+    },
+    "health": {
+      "seconds": 152.672,
+      "exit_code": 0,
+      "survivors": {},
+      "runtime_matches": {
+        "neovim_init.lua": true,
+        "neovim_feedback.lua": true,
+        "neovim_sync.lua": true
+      },
+      "hook_count": 22,
+      "hook_median_seconds": 0.0685,
+      "hook_max_seconds": 2.232,
+      "hook_status_counts": {
+        "pending": 12,
+        "quiet": 10
+      },
+      "hook_nonempty": 0,
+      "receipts_emitted": [],
+      "receipts_quoted": [],
+      "edit_hooks": [
+        {
+          "tool": "apply_patch",
+          "status": "quiet",
+          "generation": 1,
+          "completed": 1,
+          "seconds": 2.232,
+          "delivered": false
+        }
+      ],
+      "mcp_count": 8,
+      "mcp_error_count": 4,
+      "mcp_calls": [
+        {
+          "operation": "diagnostics",
+          "uri": "/private/tmp/tips-lsp-sol-v2-health/lib/tips/health.ex",
+          "error": {
+            "code": "elixirls_not_ready",
+            "diagnostics": [],
+            "feedback": {
+              "building": true,
+              "completed": -1,
+              "generation": 0,
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+              "status": "pending",
+              "uncertain": false
+            },
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+            "retryAfterMs": 1000,
+            "retryable": true
+          },
+          "result": {
+            "error": {
+              "code": "elixirls_not_ready",
+              "diagnostics": [],
+              "feedback": {
+                "building": true,
+                "completed": -1,
+                "generation": 0,
+                "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+                "status": "pending",
+                "uncertain": false
+              },
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+              "retryAfterMs": 1000,
+              "retryable": true
+            }
+          }
+        },
+        {
+          "operation": "document_symbols",
+          "uri": "/private/tmp/tips-lsp-sol-v2-health/lib/tips/health.ex",
+          "error": null,
+          "result": {
+            "clients": [
+              "elixirls"
+            ],
+            "symbols": {
+              "/private/tmp/tips-lsp-sol-v2-health/lib/tips/health.ex": [
+                {
+                  "detail": "defmodule",
+                  "kind": "Module",
+                  "name": "Tips.Health",
+                  "range": "1:11-1:22"
+                },
+                {
+                  "container": "Tips.Health",
+                  "kind": "EnumMember",
+                  "name": "@deadline",
+                  "range": "4:3-4:18"
+                },
+                {
+                  "container": "Tips.Health",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "check/0",
+                  "range": "7:7-7:12"
+                },
+                {
+                  "container": "Tips.Health",
+                  "detail": "defp",
+                  "kind": "Function",
+                  "name": "query_database/0",
+                  "range": "22:8-22:22"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "operation": "definition",
+          "uri": "/private/tmp/tips-lsp-sol-v2-health/lib/tips/health.ex",
+          "error": {
+            "code": "elixirls_not_ready",
+            "feedback": {
+              "building": true,
+              "completed": -1,
+              "generation": 0,
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+              "status": "pending",
+              "uncertain": false
+            },
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+            "retryAfterMs": 1000,
+            "retryable": true
+          },
+          "result": {
+            "error": {
+              "code": "elixirls_not_ready",
+              "feedback": {
+                "building": true,
+                "completed": -1,
+                "generation": 0,
+                "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+                "status": "pending",
+                "uncertain": false
+              },
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+              "retryAfterMs": 1000,
+              "retryable": true
+            }
+          }
+        },
+        {
+          "operation": "references",
+          "uri": "/private/tmp/tips-lsp-sol-v2-health/lib/tips/health.ex",
+          "error": {
+            "code": "elixirls_not_ready",
+            "feedback": {
+              "building": true,
+              "completed": -1,
+              "generation": 0,
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+              "status": "pending",
+              "uncertain": false
+            },
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+            "retryAfterMs": 1000,
+            "retryable": true
+          },
+          "result": {
+            "error": {
+              "code": "elixirls_not_ready",
+              "feedback": {
+                "building": true,
+                "completed": -1,
+                "generation": 0,
+                "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+                "status": "pending",
+                "uncertain": false
+              },
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+              "retryAfterMs": 1000,
+              "retryable": true
+            }
+          }
+        },
+        {
+          "operation": "diagnostics",
+          "uri": "/private/tmp/tips-lsp-sol-v2-health/lib/tips/health.ex",
+          "error": {
+            "code": "elixirls_not_ready",
+            "diagnostics": [],
+            "feedback": {
+              "building": true,
+              "completed": -1,
+              "generation": 0,
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+              "status": "pending",
+              "uncertain": false
+            },
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+            "retryAfterMs": 1000,
+            "retryable": true
+          },
+          "result": {
+            "error": {
+              "code": "elixirls_not_ready",
+              "diagnostics": [],
+              "feedback": {
+                "building": true,
+                "completed": -1,
+                "generation": 0,
+                "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+                "status": "pending",
+                "uncertain": false
+              },
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+              "retryAfterMs": 1000,
+              "retryable": true
+            }
+          }
+        },
+        {
+          "operation": "diagnostics",
+          "uri": "/private/tmp/tips-lsp-sol-v2-health/lib/tips/health.ex",
+          "error": null,
+          "result": {
+            "diagnostics": {}
+          }
+        },
+        {
+          "operation": "definition",
+          "uri": "/private/tmp/tips-lsp-sol-v2-health/lib/tips/health.ex",
+          "error": null,
+          "result": {
+            "clients": [
+              "elixirls"
+            ],
+            "locations": {
+              "/private/tmp/tips-lsp-sol-v2-health/lib/tips/health.ex": [
+                "22:3-31:6"
+              ]
+            }
+          }
+        },
+        {
+          "operation": "references",
+          "uri": "/private/tmp/tips-lsp-sol-v2-health/lib/tips/health.ex",
+          "error": null,
+          "result": {
+            "clients": [
+              "elixirls"
+            ],
+            "locations": {
+              "/private/tmp/tips-lsp-sol-v2-health/lib/tips/health.ex": [
+                "13:9-13:23",
+                "22:3-31:6"
+              ]
+            }
+          }
+        }
+      ],
+      "all_mcp_uris_assigned": true,
+      "build_start_lines": [
+        48,
+        454,
+        488
+      ],
+      "builds": [
+        {
+          "line": 450,
+          "milliseconds": 63999,
+          "result": "mix_compile_error"
+        },
+        {
+          "line": 474,
+          "milliseconds": 643,
+          "result": "mix_compile_error"
+        },
+        {
+          "line": 504,
+          "milliseconds": 1990,
+          "result": "mix_compile_ok"
+        }
+      ],
+      "save_lines": [
+        484
+      ],
+      "full_suite": [
+        "508",
+        "4"
+      ],
+      "validation": {
+        "command": [
+          "unbuffer",
+          "mix",
+          "test"
+        ],
+        "exit_code": 0,
+        "source": "parent",
+        "seconds": 18.779,
+        "diff_check": 0
+      },
+      "final": "Finished the private function rename in [health.ex](/private/tmp/tips-lsp-sol-v2-health/lib/tips/health.ex:13): `check/0` now calls `query_database/0`. The one-second deadline, dynamic repository handling, and health endpoint behavior remain unchanged.\n\nI reproduced the failure first: compilation reported undefined `probe/0`. After the edit, formatting, warnings-as-errors compilation, all 4 health controller integration tests, and strict Credo passed.\n\nThe LSP initially reported \u201cCompilation pending,\u201d then resolved the call to `query_database/0` and returned clear diagnostics. The pending response caused a short delay; I saw no feedback receipt."
+    }
+  }
+}

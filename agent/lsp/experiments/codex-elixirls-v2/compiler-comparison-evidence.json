@@ -1,0 +1,4622 @@
+{
+  "date": "2026-09-24",
+  "toolchain": "Erlang/OTP 29 [erts-17.1] [source] [64-bit] [smp:4:4] [ds:4:4:10] [async-threads:1] [jit] [dtrace]\n\nElixir 1.20.4 (compiled with Erlang/OTP 29)\n",
+  "source_provenance": {
+    "parallel_compiler.ex": {
+      "url": "https://raw.githubusercontent.com/elixir-lang/elixir/v1.20.4/lib/elixir/lib/kernel/parallel_compiler.ex",
+      "sha256": "86f5f4747527de3bcea8c89dff027ba2d520701d2f51530d23b64311efa47d8d"
+    },
+    "compiler_elixir.ex": {
+      "url": "https://raw.githubusercontent.com/elixir-lang/elixir/v1.20.4/lib/mix/lib/mix/compilers/elixir.ex",
+      "sha256": "ae323e0d10b14fc55f0a415d53654d8c39e22723bde17138eb8dc78b34067c87"
+    },
+    "compile_elixir_task.ex": {
+      "url": "https://raw.githubusercontent.com/elixir-lang/elixir/v1.20.4/lib/mix/lib/mix/tasks/compile.elixir.ex",
+      "sha256": "d5e29d8ec2adaaef745a79f76cbd6b5d8c3bc1d052ebcf4bf9f8da522112ba7e"
+    }
+  },
+  "patches": {
+    "compiler-direct.patch": {
+      "added": 34,
+      "removed": 22,
+      "sha256": "c2fb910af9848f1ee8f2c55478d0834bd44f8921dc648a5bdab437e2c71c167d"
+    },
+    "mix-targeted-invalidation.patch": {
+      "added": 10,
+      "removed": 3,
+      "sha256": "1542a13a429446a04c67dab2e6be9bd636f3c1ef52e54f36b3104f408b831fde"
+    },
+    "elixirls-targeted-invalidation.patch": {
+      "added": 22,
+      "removed": 9,
+      "sha256": "942d1ad7cd3ccb5ecdb5355fa11824a36f6ecd3f76351dadc06ea88c67600f3c"
+    }
+  },
+  "plain_mix": [
+    {
+      "mode": "baseline",
+      "case": "external",
+      "expected": "bb",
+      "observed": {
+        "caller": "aa",
+        "target": "aa",
+        "parallel_compiler": "/opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 2,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 89467.9747015,
+          "size": 2,
+          "mtime_ns": 1790253240980653844
+        },
+        {
+          "marker": "bb",
+          "time": 89468.922588708,
+          "size": 2,
+          "mtime_ns": 1790253241928497826
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 518,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1844,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 540,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 515,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 2,
+          "ms": 546,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 529,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": false,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/baseline-external-matrix"
+    },
+    {
+      "mode": "baseline",
+      "case": "ordinary",
+      "expected": "bb",
+      "observed": {
+        "caller": "bb",
+        "target": "bb",
+        "parallel_compiler": "/opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "bb",
+          "time": 89468.15596625,
+          "size": 134,
+          "mtime_ns": 1790253241161930117
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 481,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1790,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "ordinary",
+          "exit": 0,
+          "ms": 1736,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 468,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 490,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 475,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/baseline-ordinary-matrix"
+    },
+    {
+      "mode": "baseline",
+      "case": "same-stat",
+      "expected": "bb",
+      "observed": {
+        "caller": "aa",
+        "target": "aa",
+        "parallel_compiler": "/opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 2,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 89467.967808583,
+          "size": 134,
+          "mtime_ns": 1790253240973758440
+        },
+        {
+          "marker": "bb",
+          "time": 89468.922628958,
+          "size": 134,
+          "mtime_ns": 1790253240973758440
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 519,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1837,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 542,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 518,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 2,
+          "ms": 546,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 529,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": false,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/baseline-same-stat-matrix"
+    },
+    {
+      "mode": "direct",
+      "case": "create-delete",
+      "expected": "bb",
+      "observed": {
+        "caller": "bb",
+        "target": "bb",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "bb",
+          "time": 89723.77531975,
+          "size": 134,
+          "mtime_ns": 1790253496785308435
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 496,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1798,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "created",
+          "exit": 0,
+          "ms": 522,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "deleted",
+          "exit": 0,
+          "ms": 501,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 1685,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 482,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 507,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 476,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "created source compiled",
+          "observed": true
+        },
+        {
+          "label": "deleted source artifact removed",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "parallel_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        },
+        {
+          "label": "patched parallel compiler loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct-create-delete-matrix"
+    },
+    {
+      "mode": "direct",
+      "case": "external",
+      "expected": "bb",
+      "observed": {
+        "caller": "aa",
+        "target": "aa",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 2,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 89442.66190875,
+          "size": 2,
+          "mtime_ns": 1790253215667428693
+        },
+        {
+          "marker": "bb",
+          "time": 89443.585481416,
+          "size": 2,
+          "mtime_ns": 1790253216590956028
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 500,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1831,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 530,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 481,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 2,
+          "ms": 517,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 488,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "parallel_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        },
+        {
+          "label": "patched parallel compiler loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": false,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct-external-matrix"
+    },
+    {
+      "mode": "direct",
+      "case": "failure-repair",
+      "expected": "bb",
+      "observed": {
+        "caller": "bb",
+        "target": "bb",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "bb",
+          "time": 89723.267189041,
+          "size": 134,
+          "mtime_ns": 1790253496277189973
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 496,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1798,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "failed-compile",
+          "exit": 1,
+          "ms": 515,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 1724,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 455,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 515,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 483,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "compiler rejected invalid input",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "parallel_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        },
+        {
+          "label": "patched parallel compiler loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct-failure-repair-matrix"
+    },
+    {
+      "mode": "direct",
+      "case": "missing-event",
+      "expected": "bb",
+      "observed": {
+        "caller": "bb",
+        "target": "bb",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 89442.661936333,
+          "size": 134,
+          "mtime_ns": 1790253215667456569
+        },
+        {
+          "marker": "bb",
+          "time": 89443.589560041,
+          "size": 134,
+          "mtime_ns": 1790253216595080476
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 495,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1836,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 1749,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 481,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 501,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 491,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "parallel_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        },
+        {
+          "label": "patched parallel compiler loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct-missing-event-matrix"
+    },
+    {
+      "mode": "direct",
+      "case": "ordinary",
+      "expected": "bb",
+      "observed": {
+        "caller": "bb",
+        "target": "bb",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "bb",
+          "time": 89444.11243925,
+          "size": 134,
+          "mtime_ns": 1790253217117999332
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 424,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1762,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "ordinary",
+          "exit": 0,
+          "ms": 1682,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 444,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 495,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 489,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "parallel_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        },
+        {
+          "label": "patched parallel compiler loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct-ordinary-matrix"
+    },
+    {
+      "mode": "direct",
+      "case": "overlap",
+      "expected": "bb",
+      "observed": {
+        "caller": "bb",
+        "target": "bb",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 89433.152017333,
+          "size": 134,
+          "mtime_ns": 1790253206157345795
+        },
+        {
+          "marker": "bb",
+          "time": 89434.128229375,
+          "size": 134,
+          "mtime_ns": 1790253207133586126
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 518,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1877,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 1759,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 527,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 517,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 509,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "parallel_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        },
+        {
+          "label": "patched parallel compiler loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct-overlap-matrix"
+    },
+    {
+      "mode": "direct",
+      "case": "revert",
+      "expected": "aa",
+      "observed": {
+        "caller": "aa",
+        "target": "aa",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 89433.152148333,
+          "size": 134,
+          "mtime_ns": 1790253206157491256
+        },
+        {
+          "marker": "bb",
+          "time": 89434.124125791,
+          "size": 134,
+          "mtime_ns": 1790253207129438796
+        },
+        {
+          "marker": "aa",
+          "time": 89435.817488333,
+          "size": 134,
+          "mtime_ns": 1790253208822825787
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 518,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1877,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "revert-overlap",
+          "exit": 0
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 1751,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 491,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 526,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 454,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "revert-overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "parallel_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        },
+        {
+          "label": "patched parallel compiler loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct-revert-matrix"
+    },
+    {
+      "mode": "direct",
+      "case": "same-stat",
+      "expected": "bb",
+      "observed": {
+        "caller": "bb",
+        "target": "bb",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 89433.152366375,
+          "size": 134,
+          "mtime_ns": 1790253206157724761
+        },
+        {
+          "marker": "bb",
+          "time": 89434.125260083,
+          "size": 134,
+          "mtime_ns": 1790253206157724761
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 518,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1878,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 1758,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 527,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 520,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 506,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "parallel_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        },
+        {
+          "label": "patched parallel compiler loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct-same-stat-matrix"
+    },
+    {
+      "mode": "targeted",
+      "case": "create-delete",
+      "expected": "bb",
+      "observed": {
+        "caller": "bb",
+        "target": "bb",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "bb",
+          "time": 89730.130340166,
+          "size": 134,
+          "mtime_ns": 1790253503140420004
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 452,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1731,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "created",
+          "exit": 0,
+          "ms": 498,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "deleted",
+          "exit": 0,
+          "ms": 466,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 1676,
+          "args": [
+            "compile",
+            "--warnings-as-errors",
+            "--force-path",
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-create-delete-matrix/lib/target.ex"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 485,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 482,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 451,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "created source compiled",
+          "observed": true
+        },
+        {
+          "label": "deleted source artifact removed",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-create-delete-matrix"
+    },
+    {
+      "mode": "targeted",
+      "case": "external",
+      "expected": "bb",
+      "observed": {
+        "caller": "bb",
+        "target": "bb",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 89458.584888125,
+          "size": 2,
+          "mtime_ns": 1790253231590688836
+        },
+        {
+          "marker": "bb",
+          "time": 89459.435640708,
+          "size": 2,
+          "mtime_ns": 1790253232441421886
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 445,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1756,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors",
+            "--force-path",
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-external-matrix/lib/value.heex"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 1707,
+          "args": [
+            "compile",
+            "--warnings-as-errors",
+            "--force-path",
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-external-matrix/lib/value.heex"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 486,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 557,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 547,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-external-matrix"
+    },
+    {
+      "mode": "targeted",
+      "case": "failure-repair",
+      "expected": "bb",
+      "observed": {
+        "caller": "bb",
+        "target": "bb",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "bb",
+          "time": 89729.189660041,
+          "size": 134,
+          "mtime_ns": 1790253502199759613
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 449,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1766,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "failed-compile",
+          "exit": 1,
+          "ms": 472,
+          "args": [
+            "compile",
+            "--warnings-as-errors",
+            "--force-path",
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-failure-repair-matrix/lib/target.ex"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 1705,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 451,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 478,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 486,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "compiler rejected invalid input",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-failure-repair-matrix"
+    },
+    {
+      "mode": "targeted",
+      "case": "missing-event",
+      "expected": "bb",
+      "observed": {
+        "caller": "aa",
+        "target": "aa",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 2,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 89459.764961083,
+          "size": 134,
+          "mtime_ns": 1790253232770779273
+        },
+        {
+          "marker": "bb",
+          "time": 89460.659708125,
+          "size": 134,
+          "mtime_ns": 1790253233665502002
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 451,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1749,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors",
+            "--force-path",
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-missing-event-matrix/lib/target.ex"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 467,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 499,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 2,
+          "ms": 563,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 541,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": false,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-missing-event-matrix"
+    },
+    {
+      "mode": "targeted",
+      "case": "ordinary",
+      "expected": "bb",
+      "observed": {
+        "caller": "bb",
+        "target": "bb",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "bb",
+          "time": 89462.604164541,
+          "size": 134,
+          "mtime_ns": 1790253235610033948
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 421,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1734,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "ordinary",
+          "exit": 0,
+          "ms": 1692,
+          "args": [
+            "compile",
+            "--warnings-as-errors",
+            "--force-path",
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-ordinary-matrix/lib/target.ex"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 498,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 523,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 510,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-ordinary-matrix"
+    },
+    {
+      "mode": "targeted",
+      "case": "overlap",
+      "expected": "bb",
+      "observed": {
+        "caller": "bb",
+        "target": "bb",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 89449.513311125,
+          "size": 134,
+          "mtime_ns": 1790253222518962210
+        },
+        {
+          "marker": "bb",
+          "time": 89450.398802458,
+          "size": 134,
+          "mtime_ns": 1790253223404418146
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 452,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1781,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors",
+            "--force-path",
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-overlap-matrix/lib/target.ex"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 1703,
+          "args": [
+            "compile",
+            "--warnings-as-errors",
+            "--force-path",
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-overlap-matrix/lib/target.ex"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 449,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 473,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 478,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-overlap-matrix"
+    },
+    {
+      "mode": "targeted",
+      "case": "revert",
+      "expected": "aa",
+      "observed": {
+        "caller": "aa",
+        "target": "aa",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 89451.865210333,
+          "size": 134,
+          "mtime_ns": 1790253224870903810
+        },
+        {
+          "marker": "bb",
+          "time": 89452.72701325,
+          "size": 134,
+          "mtime_ns": 1790253225732546732
+        },
+        {
+          "marker": "aa",
+          "time": 89454.415293166,
+          "size": 134,
+          "mtime_ns": 1790253227420966101
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 444,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1728,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors",
+            "--force-path",
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-revert-matrix/lib/target.ex"
+          ]
+        },
+        {
+          "label": "revert-overlap",
+          "exit": 0
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 1729,
+          "args": [
+            "compile",
+            "--warnings-as-errors",
+            "--force-path",
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-revert-matrix/lib/target.ex"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 460,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 493,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 477,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "revert-overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-revert-matrix"
+    },
+    {
+      "mode": "targeted",
+      "case": "same-stat",
+      "expected": "bb",
+      "observed": {
+        "caller": "bb",
+        "target": "bb",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 89450.67807425,
+          "size": 134,
+          "mtime_ns": 1790253223683749434
+        },
+        {
+          "marker": "bb",
+          "time": 89451.535874125,
+          "size": 134,
+          "mtime_ns": 1790253223683749434
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 447,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1748,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors",
+            "--force-path",
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-same-stat-matrix/lib/target.ex"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 1682,
+          "args": [
+            "compile",
+            "--warnings-as-errors",
+            "--force-path",
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-same-stat-matrix/lib/target.ex"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 483,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 490,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 498,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-same-stat-matrix"
+    },
+    {
+      "mode": "baseline",
+      "case": "overlap",
+      "expected": "bb",
+      "observed": {
+        "caller": "aa",
+        "target": "aa",
+        "parallel_compiler": "/opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 2,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 88866.68570575,
+          "size": 134,
+          "mtime_ns": 1790252639668743693
+        },
+        {
+          "marker": "bb",
+          "time": 88867.558115916,
+          "size": 134,
+          "mtime_ns": 1790252640541102794
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 432,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1742,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 481,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 454,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 2,
+          "ms": 480,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 466,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": false,
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/baseline-overlap"
+    }
+  ],
+  "live_lsp": [
+    {
+      "case": "late-2000",
+      "expected": "bb",
+      "passed": true,
+      "toolchain_loaded": true,
+      "hover_fresh": true,
+      "behavior": {
+        "caller": "bb",
+        "target": "bb"
+      },
+      "acceptance_exit": 0,
+      "unexpected_builds_after_settle": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        2
+      ],
+      "server_exit": 0,
+      "mode": "direct",
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct-lsp-late-2000",
+      "builds": [
+        {
+          "time": 89621.915076041,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 46
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89624.790846458,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 1534
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89628.338619416,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 1540
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "case": "ordinary",
+      "expected": "d9",
+      "passed": true,
+      "toolchain_loaded": true,
+      "hover_fresh": true,
+      "behavior": {
+        "caller": "d9",
+        "target": "d9"
+      },
+      "acceptance_exit": 0,
+      "unexpected_builds_after_settle": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "incremental_preserved": true,
+      "server_exit": 0,
+      "mode": "direct",
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct-lsp-ordinary",
+      "builds": [
+        {
+          "time": 89790.209105625,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 47
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89791.559892833,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 27
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89792.904597458,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 37
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89794.242162666,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 32
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89795.5820295,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 33
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89796.921980916,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 32
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89798.264602708,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 36
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89799.60203475,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 31
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89800.941375083,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 32
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89802.282339916,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 36
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89803.618503791,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 33
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "case": "recovery-edit",
+      "expected": "cc",
+      "passed": true,
+      "toolchain_loaded": true,
+      "hover_fresh": true,
+      "behavior": {
+        "caller": "cc",
+        "target": "cc"
+      },
+      "acceptance_exit": 0,
+      "unexpected_builds_after_settle": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        2,
+        2
+      ],
+      "server_exit": 0,
+      "mode": "direct",
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct-lsp-recovery-edit",
+      "builds": [
+        {
+          "time": 89761.391465583,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 45
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89764.245385625,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 1530
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89765.781163125,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 1534
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89767.320239875,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 1537
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "case": "revert",
+      "expected": "aa",
+      "passed": true,
+      "toolchain_loaded": true,
+      "hover_fresh": true,
+      "behavior": {
+        "caller": "aa",
+        "target": "aa"
+      },
+      "acceptance_exit": 0,
+      "unexpected_builds_after_settle": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        2,
+        2
+      ],
+      "server_exit": 0,
+      "mode": "direct",
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct-lsp-revert",
+      "builds": [
+        {
+          "time": 89775.733713583,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 43
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89778.586300666,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 1529
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89780.122395375,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 1535
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89781.662300041,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 1538
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "case": "late-2000",
+      "expected": "bb",
+      "passed": true,
+      "toolchain_loaded": true,
+      "hover_fresh": true,
+      "behavior": {
+        "caller": "bb",
+        "target": "bb"
+      },
+      "acceptance_exit": 0,
+      "unexpected_builds_after_settle": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        2
+      ],
+      "server_exit": 0,
+      "mode": "targeted",
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-lsp-late-2000",
+      "builds": [
+        {
+          "time": 89616.377628291,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 53
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89619.23754175,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 1538
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89622.787466208,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 1543
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "case": "ordinary",
+      "expected": "d9",
+      "passed": true,
+      "toolchain_loaded": true,
+      "hover_fresh": true,
+      "behavior": {
+        "caller": "d9",
+        "target": "d9"
+      },
+      "acceptance_exit": 0,
+      "unexpected_builds_after_settle": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "incremental_preserved": true,
+      "server_exit": 0,
+      "mode": "targeted",
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-lsp-ordinary",
+      "builds": [
+        {
+          "time": 89790.137693125,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 51
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89791.496539333,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 30
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89792.84171375,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 38
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89794.184674833,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 35
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89795.530455916,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 38
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89796.873225375,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 35
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89798.218632,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 38
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89799.565572458,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 42
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89800.911341083,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 38
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89802.255203208,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 38
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89803.598490083,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 36
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "case": "recovery-edit",
+      "expected": "cc",
+      "passed": true,
+      "toolchain_loaded": true,
+      "hover_fresh": true,
+      "behavior": {
+        "caller": "cc",
+        "target": "cc"
+      },
+      "acceptance_exit": 0,
+      "unexpected_builds_after_settle": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        2,
+        2
+      ],
+      "server_exit": 0,
+      "mode": "targeted",
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-lsp-recovery-edit",
+      "builds": [
+        {
+          "time": 89761.322406625,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 51
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89764.192727458,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 1537
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89765.734977,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 1540
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89767.279353666,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 1543
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "case": "revert",
+      "expected": "aa",
+      "passed": true,
+      "toolchain_loaded": true,
+      "hover_fresh": true,
+      "behavior": {
+        "caller": "aa",
+        "target": "aa"
+      },
+      "acceptance_exit": 0,
+      "unexpected_builds_after_settle": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        2,
+        2
+      ],
+      "server_exit": 0,
+      "mode": "targeted",
+      "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-lsp-revert",
+      "builds": [
+        {
+          "time": 89775.679236708,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 51
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89778.544120583,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 1535
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89780.085803916,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 1540
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        },
+        {
+          "time": 89781.625312583,
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "telemetry/event",
+            "params": {
+              "name": "build",
+              "measurements": {
+                "elixir_ls.build_time": 1537
+              },
+              "properties": {
+                "elixir_ls.build_result": "mix_compile_ok",
+                "elixir_ls.elixir_release": "1.20",
+                "elixir_ls.elixir_version": "1.20.4",
+                "elixir_ls.erts_version": "17.1",
+                "elixir_ls.mix_env": "test",
+                "elixir_ls.mix_target": "host",
+                "elixir_ls.otp_release": "29"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "benchmark": [
+    {
+      "files": 49,
+      "source_bytes": 387853,
+      "mode": "baseline",
+      "median_ms": {
+        "noop": 19.87,
+        "edit": 31.3,
+        "duplicate": 20.45,
+        "force": 125.62
+      },
+      "samples": [
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 1,
+          "us": 18019
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 2,
+          "us": 18212
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 3,
+          "us": 19903
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 4,
+          "us": 19687
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 5,
+          "us": 19334
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 6,
+          "us": 20641
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 7,
+          "us": 20223
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 8,
+          "us": 20570
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 9,
+          "us": 20018
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 10,
+          "us": 19844
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 1,
+          "us": 31154
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 2,
+          "us": 32093
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 3,
+          "us": 31301
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 4,
+          "us": 31448
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 5,
+          "us": 31242
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 1,
+          "us": 20452
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 2,
+          "us": 20676
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 3,
+          "us": 20615
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 4,
+          "us": 19660
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 5,
+          "us": 19683
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 1,
+          "us": 143560
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 2,
+          "us": 125194
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 3,
+          "us": 127243
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 4,
+          "us": 125621
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 5,
+          "us": 125423
+        }
+      ]
+    },
+    {
+      "files": 49,
+      "source_bytes": 387853,
+      "mode": "direct",
+      "median_ms": {
+        "noop": 23.95,
+        "edit": 34.74,
+        "duplicate": 24.41,
+        "force": 128.83
+      },
+      "samples": [
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 1,
+          "us": 21695
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 2,
+          "us": 22285
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 3,
+          "us": 23988
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 4,
+          "us": 26015
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 5,
+          "us": 24219
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 6,
+          "us": 23904
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 7,
+          "us": 23106
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 8,
+          "us": 23455
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 9,
+          "us": 24047
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 10,
+          "us": 25784
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 1,
+          "us": 33703
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 2,
+          "us": 35938
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 3,
+          "us": 34194
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 4,
+          "us": 36593
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 5,
+          "us": 34739
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 1,
+          "us": 24408
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 2,
+          "us": 23537
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 3,
+          "us": 25508
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 4,
+          "us": 24628
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 5,
+          "us": 23991
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 1,
+          "us": 126535
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 2,
+          "us": 128447
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 3,
+          "us": 132656
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 4,
+          "us": 131962
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 5,
+          "us": 128832
+        }
+      ]
+    },
+    {
+      "files": 49,
+      "source_bytes": 387853,
+      "mode": "targeted",
+      "median_ms": {
+        "noop": 20.7,
+        "edit": 32.47,
+        "duplicate": 33.14,
+        "force": 128.53
+      },
+      "samples": [
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 1,
+          "us": 18933
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 2,
+          "us": 18999
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 3,
+          "us": 20722
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 4,
+          "us": 21201
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 5,
+          "us": 19685
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 6,
+          "us": 20682
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 7,
+          "us": 21107
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 8,
+          "us": 20938
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 9,
+          "us": 20570
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 10,
+          "us": 20990
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 1,
+          "us": 30906
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 2,
+          "us": 31889
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 3,
+          "us": 32466
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 4,
+          "us": 35713
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 5,
+          "us": 33999
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "duplicate",
+          "iteration": 1,
+          "us": 32923
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "duplicate",
+          "iteration": 2,
+          "us": 33227
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "duplicate",
+          "iteration": 3,
+          "us": 33546
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "duplicate",
+          "iteration": 4,
+          "us": 32629
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "duplicate",
+          "iteration": 5,
+          "us": 33141
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 1,
+          "us": 133285
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 2,
+          "us": 126629
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 3,
+          "us": 126354
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 4,
+          "us": 128532
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 5,
+          "us": 139717
+        }
+      ]
+    },
+    {
+      "files": 1000,
+      "source_bytes": 8234448,
+      "mode": "baseline",
+      "median_ms": {
+        "noop": 54.73,
+        "edit": 70.75,
+        "duplicate": 54.15,
+        "force": 1151.91
+      },
+      "samples": [
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 1,
+          "us": 57024
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 2,
+          "us": 56850
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 3,
+          "us": 59349
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 4,
+          "us": 54773
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 5,
+          "us": 53691
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 6,
+          "us": 60204
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 7,
+          "us": 54696
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 8,
+          "us": 53530
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 9,
+          "us": 53109
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 10,
+          "us": 53041
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 1,
+          "us": 70104
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 2,
+          "us": 69645
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 3,
+          "us": 71563
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 4,
+          "us": 70747
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 5,
+          "us": 73506
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 1,
+          "us": 55703
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 2,
+          "us": 57152
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 3,
+          "us": 53718
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 4,
+          "us": 54152
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 5,
+          "us": 53927
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 1,
+          "us": 1047136
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 2,
+          "us": 1098997
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 3,
+          "us": 1151911
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 4,
+          "us": 1178936
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 5,
+          "us": 1258895
+        }
+      ]
+    },
+    {
+      "files": 1000,
+      "source_bytes": 8234448,
+      "mode": "direct",
+      "median_ms": {
+        "noop": 141.5,
+        "edit": 151.29,
+        "duplicate": 133.95,
+        "force": 1121.56
+      },
+      "samples": [
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 1,
+          "us": 143224
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 2,
+          "us": 130830
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 3,
+          "us": 138779
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 4,
+          "us": 141973
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 5,
+          "us": 143328
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 6,
+          "us": 141036
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 7,
+          "us": 143005
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 8,
+          "us": 130575
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 9,
+          "us": 130210
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 10,
+          "us": 154191
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 1,
+          "us": 151201
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 2,
+          "us": 159920
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 3,
+          "us": 151295
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 4,
+          "us": 147174
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 5,
+          "us": 160405
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 1,
+          "us": 131002
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 2,
+          "us": 133950
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 3,
+          "us": 145220
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 4,
+          "us": 129501
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "duplicate",
+          "iteration": 5,
+          "us": 144738
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 1,
+          "us": 1037515
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 2,
+          "us": 1081612
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 3,
+          "us": 1121560
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 4,
+          "us": 1179147
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 5,
+          "us": 1258995
+        }
+      ]
+    },
+    {
+      "files": 1000,
+      "source_bytes": 8234448,
+      "mode": "targeted",
+      "median_ms": {
+        "noop": 76.72,
+        "edit": 94.25,
+        "duplicate": 93.9,
+        "force": 1148.18
+      },
+      "samples": [
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 1,
+          "us": 76243
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 2,
+          "us": 74509
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 3,
+          "us": 74748
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 4,
+          "us": 77306
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 5,
+          "us": 77206
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 6,
+          "us": 79367
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 7,
+          "us": 78209
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 8,
+          "us": 75556
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 9,
+          "us": 75474
+        },
+        {
+          "result": "{:noop, []}",
+          "phase": "noop",
+          "iteration": 10,
+          "us": 84777
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 1,
+          "us": 110141
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 2,
+          "us": 92960
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 3,
+          "us": 96059
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 4,
+          "us": 92199
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "edit",
+          "iteration": 5,
+          "us": 94248
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "duplicate",
+          "iteration": 1,
+          "us": 95197
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "duplicate",
+          "iteration": 2,
+          "us": 99729
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "duplicate",
+          "iteration": 3,
+          "us": 93896
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "duplicate",
+          "iteration": 4,
+          "us": 92019
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "duplicate",
+          "iteration": 5,
+          "us": 91349
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 1,
+          "us": 1040514
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 2,
+          "us": 1102017
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 3,
+          "us": 1148181
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 4,
+          "us": 1212073
+        },
+        {
+          "result": "{:ok, []}",
+          "phase": "force",
+          "iteration": 5,
+          "us": 1260010
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "check": "format",
+      "exit": 0,
+      "log": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-server/format.log"
+    },
+    {
+      "check": "compile",
+      "exit": 1,
+      "log": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-server/compile.log"
+    },
+    {
+      "check": "server-tests",
+      "exit": 0,
+      "log": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-server/server-tests.log"
+    },
+    {
+      "check": "credo",
+      "exit": 1,
+      "log": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted-server/credo.log"
+    },
+    {
+      "check": "core modules formatted and compiled with warnings as errors",
+      "results": [
+        {
+          "mode": "direct",
+          "file": "parallel_compiler.ex",
+          "format_exit": 0,
+          "build_exit": 0
+        },
+        {
+          "mode": "direct",
+          "file": "compiler_elixir.ex",
+          "format_exit": 0,
+          "build_exit": 0
+        },
+        {
+          "mode": "targeted",
+          "file": "compile_elixir_task.ex",
+          "format_exit": 0,
+          "build_exit": 0
+        },
+        {
+          "mode": "targeted",
+          "file": "compiler_elixir.ex",
+          "format_exit": 0,
+          "build_exit": 0
+        }
+      ]
+    }
+  ],
+  "excluded_setup_runs": [
+    "direct-overlap",
+    "targeted-overlap",
+    "direct-overlap-loaded",
+    "targeted-overlap-loaded",
+    "direct-overlap-v3",
+    "targeted-overlap-v3",
+    "direct-overlap-private",
+    "targeted-overlap-private"
+  ],
+  "limitations": [
+    "Private experimental patches only; active configuration unchanged.",
+    "No full Tips workload rerun, umbrella or path-dependency acceptance suite for these patches.",
+    "Targeted pending paths currently consumed at build launch; pre-compiler failure retention unimplemented.",
+    "Direct correction covers compiler-owned .ex source; external-resource overlap still fails.",
+    "Synthetic timings are warm local medians, not measured Tips latency."
+  ]
+}

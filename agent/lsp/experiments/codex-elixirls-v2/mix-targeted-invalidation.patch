@@ -1,0 +1,45 @@
+--- a/compile_elixir_task.ex
++++ b/compile_elixir_task.ex
+@@ -104,6 +104,7 @@
+ 
+   @switches [
+     force: :boolean,
++    force_path: :keep,
+     docs: :boolean,
+     consolidate_protocols: :boolean,
+     warnings_as_errors: :boolean,
+--- a/compiler_elixir.ex
++++ b/compiler_elixir.ex
+@@ -163,7 +163,8 @@
+           removed,
+           Map.merge(stale_modules, removed_modules),
+           Map.merge(stale_exports, removed_modules),
+-          dest
++          dest,
++          MapSet.new(Keyword.get_values(opts, :force_path), &Path.expand/1)
+         )
+       end
+ 
+@@ -393,7 +394,8 @@
+          removed,
+          stale_modules,
+          stale_exports,
+-         dest
++         dest,
++         forced_paths
+        ) do
+     {checkpoint_stale_modules, checkpoint_stale_exports, checkpoint_changed} =
+       case parse_checkpoint(:update, manifest) do
+@@ -442,7 +444,11 @@
+           {last_mtime, last_size} = Map.fetch!(sources_stats, source)
+ 
+           cond do
+-            Enum.any?(external, &stale_external?(&1, sources_stats)) or
++            MapSet.member?(forced_paths, Path.expand(source)) or
++              Enum.any?(external, fn {path, _, _} ->
++                MapSet.member?(forced_paths, Path.expand(path))
++              end) or
++              Enum.any?(external, &stale_external?(&1, sources_stats)) or
+                 has_any_key?(modules_to_recompile, modules) ->
+               Map.put(acc, source, true)
+ 

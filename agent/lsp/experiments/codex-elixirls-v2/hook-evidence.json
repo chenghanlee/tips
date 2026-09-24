@@ -1,0 +1,471 @@
+{
+  "date": "2026-09-24",
+  "branch": "experiment/elixirls-codex-v2",
+  "versions": {
+    "date": "2026-09-24",
+    "platform": "macOS arm64",
+    "downloads": [
+      {
+        "name": "neovim",
+        "version_or_commit": "v0.12.5",
+        "archive": "nvim.tar.gz",
+        "url": "https://github.com/neovim/neovim/releases/download/v0.12.5/nvim-macos-arm64.tar.gz",
+        "sha256": "65fb000099e47ca1b762584c484cc833f40e30851a0ec450d4174e16317c1f9b"
+      },
+      {
+        "name": "vv-mcp",
+        "version_or_commit": "v0.3.4",
+        "archive": "vv-mcp",
+        "url": "https://github.com/beixiyo/vv-mcp.nvim/releases/download/v0.3.4/vv-mcp-aarch64-apple-darwin",
+        "sha256": "7dc4fb34e6969665b4cd2f89d1fabb9de4f9dd1af346f76d0959c08eace65fd7"
+      },
+      {
+        "name": "vv-mcp-source",
+        "version_or_commit": "b64e27e1d0f1a95984512c11a1ca7ad31208e8dd",
+        "archive": "vv-source.tar.gz",
+        "url": "https://api.github.com/repos/beixiyo/vv-mcp.nvim/tarball/v0.3.4",
+        "sha256": "76624b88c36539602376759ab4ae2917a1e8cba216f7b7344127a34de6dc9526"
+      },
+      {
+        "name": "vv-utils.nvim",
+        "version_or_commit": "13e73d5174b37af24ca475dc39b61667432aaebc",
+        "archive": "vv-utils.tar.gz",
+        "url": "https://api.github.com/repos/beixiyo/vv-utils.nvim/tarball/13e73d5174b37af24ca475dc39b61667432aaebc",
+        "sha256": "37fa7539a72e1b7a83eab5e0509f87ce08e47ecd91a9a90a532cefa395ba9030"
+      },
+      {
+        "name": "elixir-tools.nvim (source review only)",
+        "version_or_commit": "defb94618c8cd7a8de5943bf09b25ec055263c19",
+        "archive": "elixir-tools.tar.gz",
+        "url": "https://api.github.com/repos/elixir-tools/elixir-tools.nvim/tarball/defb94618c8cd7a8de5943bf09b25ec055263c19",
+        "sha256": "1bcb3f2d0bc9e7bdc6d53e34a8404e12ff161cbe13341c08cee19dd0ec7b894d"
+      }
+    ],
+    "python_packages": {
+      "pynvim": "0.6.0",
+      "msgpack": "1.2.2",
+      "greenlet": "3.5.6"
+    },
+    "installed_tools": {
+      "elixir_ls": "0.31.1",
+      "elixir": "1.20.4",
+      "otp": "29.1",
+      "codex_cli": "0.156.1"
+    },
+    "isolation": "Temporary vendor directory; no system installation or active agent configuration changed."
+  },
+  "tested_source_sha256": {
+    "neovim_sync.lua": "76a59dea0180584fe8ee64b2b711397e937107f1491d65f10ae1f76c71c245da",
+    "neovim_feedback.lua": "e59ee41c20921bdabae6abdb7588d3455090fa93428f157aa8ece205f8214603",
+    "neovim_init.lua": "d8696205e441292ed586fdeb23557a168e2e052508294654c8a33692f1f5639f",
+    "neovim_launcher.py": "3e506065033d0753133a956dce274d22459cd73e54c0122b6d86812afb2be802",
+    "neovim_hook.py": "db500053e365fd31e4fad28e21ba11ff8c25590c9d0df8cecfee4856424c4657",
+    "neovim_probe.py": "df775576082ab0e1c5e5b19cae3fd843f398a441d87f161bf6f2e0ddaf339791",
+    "neovim_hook_probe.py": "2f4375967160240bb88c284b196aa78880142ca378862e6fa95705a3550a8268",
+    "neovim_hook_codex_probe.py": "f4ed61e73fa5cb62773803a80e7b9a08aad747a5070e17fdc1350f13f1275948",
+    "neovim_hook_inversion_probe.py": "efa0a7392b7e8d835ae18653732bdbfeb2ad1a3aa8ebf4274ef280e044629b1c"
+  },
+  "scope": "Generated synthetic Mix projects. Actual Codex; local Claude hook-contract inputs only. No active configuration changed.",
+  "raw_runs": {
+    "acceptance": "tmp/elixirls-v2/hook-final",
+    "inversion": "tmp/elixirls-v2/hook-inversion-final-2",
+    "actual_codex": "tmp/elixirls-v2/hook-codex-final"
+  },
+  "acceptance": {
+    "automatic_buffer_refresh_without_query": {
+      "matched": true,
+      "samples": [
+        {
+          "seconds": 0.029,
+          "value": [
+            {
+              "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/hook-final/alpha/lib/caller.ex",
+              "modified": false,
+              "text": [
+                "defmodule V2Caller do",
+                "  def call_1, do: V2Target.answer()",
+                "  def call_2, do: V2Target.answer()",
+                "end"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.281,
+          "value": [
+            {
+              "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/hook-final/alpha/lib/caller.ex",
+              "modified": false,
+              "text": [
+                "defmodule V2Caller do",
+                "  def call_1, do: missing_local()",
+                "  def call_2, do: V2Target.answer()",
+                "end"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "codex_error": {
+      "seconds": 0.107,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: lib/caller.ex:1:1: error: ** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)  \nlib/caller.ex:2:19: error: undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)"
+        }
+      }
+    },
+    "unchanged_error": {
+      "seconds": 0.202,
+      "output": {}
+    },
+    "beta_unaffected": {
+      "seconds": 0.09,
+      "output": {}
+    },
+    "claude_atomic_repair": {
+      "seconds": 0.333,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Previously reported compiler diagnostics cleared after compilation."
+        }
+      }
+    },
+    "claude_failed_shell": {
+      "seconds": 0.347,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUseFailure",
+          "additionalContext": "ElixirLS: lib/caller.ex:1:1: error: ** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)  \nlib/caller.ex:2:19: error: undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)"
+        }
+      }
+    },
+    "slow_pending": {
+      "seconds": 0.653,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Compilation pending; diagnostics are not yet current. This is not a clean result."
+        }
+      }
+    },
+    "slow_later_feedback": {
+      "matched": true,
+      "samples": [
+        {
+          "seconds": 1.331,
+          "value": {
+            "seconds": 1.331,
+            "output": {}
+          }
+        },
+        {
+          "seconds": 2.67,
+          "value": {
+            "seconds": 1.088,
+            "output": {
+              "hookSpecificOutput": {
+                "hookEventName": "PostToolUse",
+                "additionalContext": "ElixirLS: Compilation completed; no compiler diagnostics are currently reported."
+              }
+            }
+          }
+        }
+      ]
+    },
+    "overlap_uncertain": {
+      "seconds": 0.102,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build."
+        }
+      }
+    },
+    "overlap_latch": {
+      "seconds": 0.09,
+      "output": {}
+    },
+    "alpha_cleanup": {
+      "matched": true,
+      "samples": [
+        {
+          "seconds": 0.039,
+          "value": {}
+        }
+      ]
+    },
+    "beta_cleanup": {
+      "matched": true,
+      "samples": [
+        {
+          "seconds": 0.038,
+          "value": {}
+        }
+      ]
+    },
+    "completed": true
+  },
+  "inversion": {
+    "eof": {
+      "exit_code": 0,
+      "cleanup": {
+        "matched": true,
+        "samples": [
+          {
+            "seconds": 0.039,
+            "value": {}
+          }
+        ]
+      }
+    },
+    "parent_kill": {
+      "exit_code": -9,
+      "cleanup": {
+        "matched": true,
+        "samples": [
+          {
+            "seconds": 0.042,
+            "value": {
+              "99503": {
+                "parent": 1,
+                "state": "?s",
+                "command": "(nvim)"
+              },
+              "99506": {
+                "parent": 99503,
+                "state": "Rs",
+                "command": "(beam.smp)"
+              },
+              "99647": {
+                "parent": 99506,
+                "state": "Ss",
+                "command": "(erl_child_setup)"
+              }
+            }
+          },
+          {
+            "seconds": 0.349,
+            "value": {}
+          }
+        ]
+      }
+    },
+    "new_file": {
+      "seconds": 0.322,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: lib/new_error.ex:1:1: error: ** (CompileError) lib/new_error.ex: cannot compile module V2NewError (errors have been logged)  \nlib/new_error.ex:2:17: error: undefined function missing_new/0 (expected V2NewError to define such a function or for it to be imported, but none are available)"
+        }
+      }
+    },
+    "deleted_file": {
+      "seconds": 0.307,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Previously reported compiler diagnostics cleared after compilation."
+        }
+      }
+    },
+    "unsaved_conflict": {
+      "seconds": 0.089,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Neovim has unsaved changes; automatic reload was refused."
+        }
+      }
+    },
+    "unsaved_buffer_preserved": true,
+    "language_server_stopped": {
+      "seconds": 1.314,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Compiler feedback unavailable: ElixirLS is still starting or has stopped. This is not a clean result."
+        }
+      }
+    },
+    "failure_session_cleanup": {
+      "matched": true,
+      "samples": [
+        {
+          "seconds": 0.041,
+          "value": {}
+        }
+      ]
+    },
+    "server_unavailable": {
+      "seconds": 0.083,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS feedback unavailable: Expected one Neovim for the assigned workspace; found 0. This does not mean the source is error-free."
+        }
+      }
+    },
+    "completed": true
+  },
+  "actual_codex": {
+    "feedback_assertions": {
+      "normal_edits_only": true,
+      "error_receipt_before_repair": "a14dd97b21e4",
+      "repair_receipt_after_repair": "a94d3444608e",
+      "source_restored": true,
+      "hook_seconds": [
+        0.277,
+        0.253
+      ]
+    },
+    "audit": [
+      {
+        "event": "PostToolUse",
+        "tool": "apply_patch",
+        "result": {
+          "building": false,
+          "message": "ElixirLS: lib/caller.ex:1:1: error: ** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)  \nlib/caller.ex:2:19: error: undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)",
+          "diagnostic_count": 2,
+          "uncertain": false,
+          "status": "diagnostics",
+          "generation": 1,
+          "completed": 1
+        },
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: lib/caller.ex:1:1: error: ** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)  \nlib/caller.ex:2:19: error: undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)\nFeedback receipt: a14dd97b21e4"
+          }
+        },
+        "seconds": 0.277
+      },
+      {
+        "event": "PostToolUse",
+        "tool": "apply_patch",
+        "result": {
+          "building": false,
+          "message": "ElixirLS: Previously reported compiler diagnostics cleared after compilation.",
+          "diagnostic_count": 0,
+          "uncertain": false,
+          "status": "cleared",
+          "generation": 2,
+          "completed": 2
+        },
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Previously reported compiler diagnostics cleared after compilation.\nFeedback receipt: a94d3444608e"
+          }
+        },
+        "seconds": 0.253
+      }
+    ],
+    "agent_messages": [
+      "I\u2019ll make the temporary change with apply_patch, report any automatic feedback, then restore the original line.\n",
+      "Automatic compiler feedback:\n\n```text\nElixirLS: lib/caller.ex:1:1: error: ** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)  \nlib/caller.ex:2:19: error: undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)\nFeedback receipt: a14dd97b21e4\n```\n",
+      "Restored `call_1` exactly to `def call_1, do: V2Target.answer()`.\n\nAutomatic repair feedback:\n```text\nElixirLS: Previously reported compiler diagnostics cleared after compilation.\nFeedback receipt: a94d3444608e\n```"
+    ],
+    "lifecycle": {
+      "exit_code": 0,
+      "observed_owned_count": 14,
+      "remaining": {}
+    }
+  },
+  "fixture_validation": [
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "format",
+        "mix.exs",
+        "lib/caller.ex",
+        "lib/target.ex",
+        "test/test_helper.exs",
+        "test/fixture_test.exs"
+      ],
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "format",
+        "--check-formatted",
+        "mix.exs",
+        "lib/caller.ex",
+        "lib/target.ex",
+        "test/test_helper.exs",
+        "test/fixture_test.exs"
+      ],
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "test"
+      ],
+      "exit_code": 0,
+      "output": "Running ExUnit with seed: 354452, max_cases: 20\n\n\u001b[32m.\u001b[0m\nFinished in 0.01 seconds (0.01s async, 0.00s sync)\n\u001b[32m\nResult: 1 passed\u001b[0m\n"
+    },
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "credo",
+        "--strict"
+      ],
+      "exit_code": 1,
+      "output": "\u001b[31m\u001b[1m** (Mix) The task \"credo\" could not be found\u001b[0m\n"
+    }
+  ],
+  "corrected_failures": [
+    {
+      "run": "hook-red",
+      "finding": "Acceptance failed before implementation: automatic flag unsupported."
+    },
+    {
+      "run": "hook-green-1",
+      "finding": "Uncertainty was not explicit in user text; corrected."
+    },
+    {
+      "run": "hook-codex-1",
+      "finding": "Feedback succeeded, eager Neovim lifecycle leaked; corrected using --embed ownership."
+    },
+    {
+      "run": "hook-lifecycle-embed",
+      "finding": "Hard-killed launcher left vv-mcp on inherited stdin; corrected with a private input pipe."
+    },
+    {
+      "run": "hook-inversion-stopped-red",
+      "finding": "Stopped ElixirLS was reported as pending; added explicit availability detection."
+    },
+    {
+      "run": "hook-inversion-final",
+      "finding": "First availability fix skipped startup wait; corrected by preserving bounded initialization wait."
+    }
+  ],
+  "limits": [
+    "Warm tiny-fixture hook times are not model/UI latency or a Tips performance guarantee.",
+    "Long-build completion needs a subsequent matching tool hook; no idle-agent push.",
+    "Observed overlapping source changes latch uncertainty; the underlying Mix/ElixirLS bug is unresolved.",
+    "Build logs/telemetry and vv-mcp operation metadata are version-specific/internal APIs.",
+    "Actual Claude model delivery and full Tips model-driven editing remain untested.",
+    "Dialyzer disabled; HEEx, umbrella, dependency changes, symlinked source, other operating systems and concurrent hooks unvalidated."
+  ]
+}

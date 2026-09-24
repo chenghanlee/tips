@@ -1,0 +1,72 @@
+{
+  "date": "2026-09-24",
+  "branch": "experiment/elixirls-codex-v2",
+  "raw_root": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/minimal-patch",
+  "checks": {
+    "boundaries": {
+      "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/minimal-patch/boundaries-final/results.json",
+      "sha256": "f60367e7dc83eb309f06a8c429e3d4c786b289d80364be8eb43f33341dbafb50",
+      "passed": true
+    },
+    "real_mcp": {
+      "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/minimal-patch/neovim_patch_probe-final/results.json",
+      "sha256": "b81ee6f269a4e59cba499ff22458d67785463bf9bd0296c0eeb0c9ebde651c09",
+      "passed": true
+    },
+    "cold_and_concurrent": {
+      "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/minimal-patch/neovim_cold_probe-2/results.json",
+      "sha256": "831966453154e9c414faa5562e54593042699f775d7eb25e9a7f2ac8c0b5a5cf",
+      "passed": true
+    },
+    "budget": {
+      "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/minimal-patch/neovim_hook_budget_probe-1/results.json",
+      "sha256": "3c465e2819ea228c2c83f0a00dae7ba48a55cd687076ba36e53cd160e5b3a17b",
+      "passed": true
+    },
+    "delivery": {
+      "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/minimal-patch/neovim_revision_probe-1/results.json",
+      "sha256": "f75208c646e70896f33eb28afba2f48426ccf2b4ebd52a40d76c1371b6253384",
+      "passed": true
+    },
+    "lifecycle": {
+      "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/minimal-patch/neovim_hook_inversion_probe-1/results.json",
+      "sha256": "41aa44b1ad60a91274d85aefc5afe9a05e65a9da62e5a3b65df9c02ee53f83ff",
+      "passed": true
+    },
+    "two_worktrees": {
+      "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/minimal-patch/neovim_hook_probe-final/results.json",
+      "sha256": "e941ad20cf5933d9b36bd19a9ef70e7bbffe3650b6ced59ea8edfa4486dbce7e",
+      "passed": true
+    },
+    "editor_and_startup": {
+      "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/minimal-patch/feedback-final/results.json",
+      "sha256": "a0c4e58ab9d68f9e744812a228ed109876743f22b20011de3e7413f470c43f65",
+      "passed": true
+    },
+    "tips_workloads": {
+      "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/minimal-patch/tips-workloads/results.json",
+      "sha256": "48ab59bf37b68e18578b527b38c571d5efb2bca16a219f6eb434699f901de50d",
+      "passed": true
+    }
+  },
+  "tips_test_results": {
+    "provider": "Result: 26 passed, 1 excluded",
+    "media": "Result: 30 passed",
+    "health": "Result: 4 passed"
+  },
+  "rust_tests": 58,
+  "clippy": "passed with -D warnings",
+  "source_hashes": {
+    "neovim_sync.lua": "121b0498aecb1b4bc82a141db15e03b64b012cf2fafb7636a9dbe24bc9dd71b6",
+    "neovim_feedback.lua": "d9f908ae22f283b122cbe7203e6cd5b97b038301c080415b2e53bdb8d4da32c0",
+    "neovim_init.lua": "8552946f55059a4c1e3cdc84a93fbd950b3a7c0af3317dc22724d487ecd665a5",
+    "neovim_hook.py": "d5150976a6154f573e883e6ddf8f149f3206166748fcbd7e4c5d936c822088f8",
+    "neovim_launcher.py": "3e506065033d0753133a956dce274d22459cd73e54c0122b6d86812afb2be802",
+    "vv-mcp-feedback.patch": "758148e7de92055da48d6996a50e5a8ac92a5921cbf51eaf81acb9874e9832a1"
+  },
+  "notes": [
+    "Actual MCP red case lost feedback with the unpatched binary.",
+    "No model requests in this revision; Tips workload test suites replayed locally.",
+    "Build observations are not exact source-byte freshness proofs."
+  ]
+}

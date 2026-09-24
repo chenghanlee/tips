@@ -1,0 +1,456 @@
+{
+  "date": "2026-09-24",
+  "model": "gpt-6-sol",
+  "application_commit": "81501387eb77b220c95693f58076f7f8255da1b0",
+  "raw_directory": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/sol-dogfood-run",
+  "application_workflows_passed": true,
+  "adapter_ready_for_rollout": false,
+  "runtime_adapter_modified_during_run": false,
+  "workers": {
+    "provider": {
+      "root": "/private/tmp/tips-lsp-sol-provider",
+      "branch": "experiment/elixirls-sol-provider",
+      "seconds": 237.228,
+      "exit_code": 0,
+      "observed_process_count": 211,
+      "remaining_before_cleanup": {},
+      "cold_build_seconds": 73.215,
+      "full_suite": {
+        "passed": 508,
+        "excluded": 4,
+        "verified_by": "agent transcript"
+      },
+      "baseline": [
+        {
+          "command": [
+            "unbuffer",
+            "mix",
+            "compile",
+            "--warnings-as-errors"
+          ],
+          "exit_code": 0,
+          "seconds": 38.6
+        },
+        {
+          "command": [
+            "unbuffer",
+            "mix",
+            "test",
+            "test/tips/provider_config_test.exs",
+            "test/tips/search_probe_test.exs"
+          ],
+          "exit_code": 0,
+          "seconds": 56.39
+        }
+      ],
+      "mcp_calls": 11,
+      "mcp_operations": {
+        "document_symbols": 1,
+        "references": 3,
+        "definition": 1,
+        "hover": 1,
+        "diagnostics": 5
+      },
+      "all_requested_uris_in_assigned_root": true,
+      "hook_count": 26,
+      "hook_status_counts": {
+        "pending": 8,
+        "uncertain": 17,
+        "quiet": 1
+      },
+      "hook_median_seconds": 0.0665,
+      "hook_max_seconds": 0.134,
+      "edit_hooks": [
+        {
+          "seconds": 0.073,
+          "status": "uncertain",
+          "output_delivered": true,
+          "generation": 1
+        },
+        {
+          "seconds": 0.097,
+          "status": "uncertain",
+          "output_delivered": false,
+          "generation": 2
+        },
+        {
+          "seconds": 0.066,
+          "status": "uncertain",
+          "output_delivered": false,
+          "generation": 3
+        }
+      ],
+      "stop_hooks": [
+        {
+          "seconds": 0.033,
+          "status": "quiet",
+          "output_delivered": false
+        }
+      ],
+      "receipts": [
+        {
+          "id": "3213f6d90244",
+          "quoted_by_agent": true,
+          "status": "uncertain"
+        }
+      ],
+      "checks": [
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix test test/tips/provider_config_test.exs:132'",
+          "exit_code": 2,
+          "output_tail": "/7\\n    (stdlib 8.1) erl_eval.erl:792: :erl_eval.expr/6\\n    (stdlib 8.1) erl_eval.erl:276: :erl_eval.exprs/6\\n\",\n          1}\n     \n     code: assert run!(tmp_dir, :test, mode, dotenv: dotenv) == :stub\n     stacktrace:\n       test/tips/provider_config_test.exs:193: Tips.ProviderConfigTest.run!/4\n       test/tips/provider_config_test.exs:137: (test)\n\n\nFinished in 0.4 seconds (0.4s async, 0.00s sync)\n\nResult: 0/1 passed, 8 excluded\nFailed: 1 test\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix format lib/tips/provider_config.ex lib/tips/search_probe.ex test/tips/provider_config_test.exs test/test_helper.exs'",
+          "exit_code": 0,
+          "output_tail": ""
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix format --check-formatted'",
+          "exit_code": 0,
+          "output_tail": ""
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix compile --warnings-as-errors'",
+          "exit_code": 0,
+          "output_tail": "Compiling 2 files (.ex)\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix test test/tips/provider_config_test.exs test/tips/search_probe_test.exs'",
+          "exit_code": 0,
+          "output_tail": "s: [:browser, :real_provider]\n\n     warning: Tips.ProviderConfig.mode/0 is undefined or private\n     \u2502\n 189 \u2502     assert Tips.ProviderConfig.mode() == :real\n     \u2502                                ~\n     \u2502\n     \u2514\u2500 test/tips/provider_config_test.exs:189:32: Tips.ProviderConfigTest.\"test real-provider tests run only after an explicit opt-in\"/1\n\n..........................\nFinished in 8.1 seconds (8.1s async, 0.00s sync)\n\nResult: 26 passed, 1 excluded\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix test test/tips/provider_config_test.exs test/tips/search_probe_test.exs'",
+          "exit_code": 0,
+          "output_tail": "Running ExUnit with seed: 742807, max_cases: 8\nExcluding tags: [:browser, :real_provider]\n\n..........................\nFinished in 8.1 seconds (8.1s async, 0.00s sync)\n\nResult: 26 passed, 1 excluded\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix credo --strict'",
+          "exit_code": 0,
+          "output_tail": "Checking 93 source files (this might take a while) ...\n\nPlease report incorrect results: https://github.com/rrrene/credo/issues\n\nAnalysis took 0.7 seconds (0.04s to load, 0.6s running 69 checks on 93 files)\n692 mods/funs, found no issues.\n\nUse `mix credo explain` to explain issues, `mix credo --help` for options.\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'python3 scripts/check_docs.py'",
+          "exit_code": 0,
+          "output_tail": "PASS: local documentation links valid; role cards complete\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix test'",
+          "exit_code": 0,
+          "output_tail": "...............................................................................................................................................................................................................................................................................................................................................................................\nFinished in 18.7 seconds (10.0s async, 8.7s sync)\n\nResult: 508 passed, 4 excluded\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix format --check-formatted'",
+          "exit_code": 0,
+          "output_tail": ""
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix compile --warnings-as-errors'",
+          "exit_code": 0,
+          "output_tail": ""
+        }
+      ],
+      "final_message": "Renamed `Tips.ProviderConfig.mode/0` to `provider_mode/0` across the application caller, tests, test helper, and development guide. There is no compatibility alias; the runtime configuration key remains `:mode`. No provider credentials or external provider requests were used.\n\nThe updated acceptance test first failed with `UndefinedFunctionError`, then passed after the rename. Final checks passed: formatting, warnings-as-errors compilation, strict Credo, documentation links, targeted tests (26 passed, 1 excluded), and the full suite (508 passed, 4 excluded).\n\nAutomatic feedback reported that a source change occurred during compilation and its result might be stale (receipt `3213f6d90244`). LSP references initially returned \u201ccompiling\u201d twice, then worked; diagnostics showed no errors. Normal compilation and tests confirmed the result.",
+      "patch_sha256": "ed68207343b29976b5ad6e4300a08b0f365a29fbba4afe0735cc0a74d53aaa0c"
+    },
+    "media": {
+      "root": "/private/tmp/tips-lsp-sol-media",
+      "branch": "experiment/elixirls-sol-media",
+      "seconds": 224.872,
+      "exit_code": 0,
+      "observed_process_count": 77,
+      "remaining_before_cleanup": {},
+      "cold_build_seconds": 72.203,
+      "full_suite": {
+        "passed": 509,
+        "excluded": 4,
+        "verified_by": "parent full-suite.log"
+      },
+      "baseline": [
+        {
+          "command": [
+            "unbuffer",
+            "mix",
+            "compile",
+            "--warnings-as-errors"
+          ],
+          "exit_code": 0,
+          "seconds": 38.936
+        },
+        {
+          "command": [
+            "unbuffer",
+            "mix",
+            "test",
+            "test/tips/content/media_schema_test.exs"
+          ],
+          "exit_code": 0,
+          "seconds": 51.498
+        }
+      ],
+      "mcp_calls": 13,
+      "mcp_operations": {
+        "document_symbols": 1,
+        "definition": 2,
+        "references": 2,
+        "hover": 2,
+        "diagnostics": 6
+      },
+      "all_requested_uris_in_assigned_root": true,
+      "hook_count": 21,
+      "hook_status_counts": {
+        "pending": 17,
+        "completed": 1,
+        "quiet": 2,
+        "unavailable": 1
+      },
+      "hook_median_seconds": 0.069,
+      "hook_max_seconds": 5.003,
+      "edit_hooks": [
+        {
+          "seconds": 1.178,
+          "status": "completed",
+          "output_delivered": true,
+          "generation": 1
+        },
+        {
+          "seconds": 4.978,
+          "status": "pending",
+          "output_delivered": true,
+          "generation": 2
+        },
+        {
+          "seconds": 4.993,
+          "status": "pending",
+          "output_delivered": false,
+          "generation": 3
+        }
+      ],
+      "stop_hooks": [
+        {
+          "seconds": 5.003,
+          "status": "unavailable",
+          "output_delivered": true
+        },
+        {
+          "seconds": 0.035,
+          "status": "quiet",
+          "output_delivered": false
+        }
+      ],
+      "receipts": [
+        {
+          "id": "92f8cc449ec6",
+          "quoted_by_agent": true,
+          "status": "completed"
+        },
+        {
+          "id": "6f7a0a4448e1",
+          "quoted_by_agent": true,
+          "status": "pending"
+        },
+        {
+          "id": "2486dedc5f09",
+          "quoted_by_agent": true,
+          "status": "unavailable"
+        }
+      ],
+      "checks": [
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix test test/tips/content/media_schema_test.exs'",
+          "exit_code": 0,
+          "output_tail": "Running ExUnit with seed: 141648, max_cases: 8\nExcluding tags: [:browser, :real_provider]\n\n..............................\nFinished in 0.7 seconds (0.7s async, 0.00s sync)\n\nResult: 30 passed\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix test test/tips/content/media_schema_test.exs'",
+          "exit_code": 0,
+          "output_tail": "Running ExUnit with seed: 457508, max_cases: 8\nExcluding tags: [:browser, :real_provider]\n\n...............................\nFinished in 0.6 seconds (0.6s async, 0.00s sync)\n\nResult: 31 passed\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix format lib/tips/content/media/target.ex test/tips/content/media_schema_test.exs'",
+          "exit_code": 0,
+          "output_tail": ""
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix format --check-formatted lib/tips/content/media/target.ex test/tips/content/media_schema_test.exs'",
+          "exit_code": 0,
+          "output_tail": ""
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix compile --warnings-as-errors'",
+          "exit_code": 0,
+          "output_tail": "Compiling 2 files (.ex)\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix format --check-formatted lib/tips/content/media/target.ex test/tips/content/media_schema_test.exs'",
+          "exit_code": 0,
+          "output_tail": ""
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix credo --strict'",
+          "exit_code": 0,
+          "output_tail": "Checking 93 source files (this might take a while) ...\n\nPlease report incorrect results: https://github.com/rrrene/credo/issues\n\nAnalysis took 0.8 seconds (0.05s to load, 0.7s running 69 checks on 93 files)\n692 mods/funs, found no issues.\n\nUse `mix credo explain` to explain issues, `mix credo --help` for options.\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix test test/tips/content/media_schema_test.exs'",
+          "exit_code": 0,
+          "output_tail": "Compiling 2 files (.ex)\nRunning ExUnit with seed: 623758, max_cases: 8\nExcluding tags: [:browser, :real_provider]\n\n...............................\nFinished in 0.7 seconds (0.7s async, 0.00s sync)\n\nResult: 31 passed\n"
+        }
+      ],
+      "final_message": "Receipt `2486dedc5f09` means the automatic feedback timed out; it is not a clean compiler result. I rechecked both edited files through the LSP, which returned no diagnostics. The earlier warnings-as-errors compilation and 31 targeted tests also passed. No further changes were needed.",
+      "patch_sha256": "d8402b914c3f9033b13f2eed9d427c19b9d82eb14ba298c0886588d20988723c"
+    },
+    "health": {
+      "root": "/private/tmp/tips-lsp-sol-health",
+      "branch": "experiment/elixirls-sol-health",
+      "seconds": 179.289,
+      "exit_code": 0,
+      "observed_process_count": 56,
+      "remaining_before_cleanup": {},
+      "cold_build_seconds": 73.024,
+      "full_suite": {
+        "passed": 508,
+        "excluded": 4,
+        "verified_by": "parent full-suite.log"
+      },
+      "baseline": [
+        {
+          "command": [
+            "unbuffer",
+            "mix",
+            "compile",
+            "--warnings-as-errors"
+          ],
+          "exit_code": 0,
+          "seconds": 38.462
+        },
+        {
+          "command": [
+            "unbuffer",
+            "mix",
+            "test",
+            "test/tips_web/controllers/health_controller_test.exs"
+          ],
+          "exit_code": 0,
+          "seconds": 50.949
+        }
+      ],
+      "mcp_calls": 14,
+      "mcp_operations": {
+        "diagnostics": 6,
+        "document_symbols": 1,
+        "definition": 3,
+        "references": 3,
+        "hover": 1
+      },
+      "all_requested_uris_in_assigned_root": true,
+      "hook_count": 21,
+      "hook_status_counts": {
+        "pending": 20,
+        "quiet": 1
+      },
+      "hook_median_seconds": 0.072,
+      "hook_max_seconds": 4.986,
+      "edit_hooks": [
+        {
+          "seconds": 4.986,
+          "status": "pending",
+          "output_delivered": false,
+          "generation": 1
+        }
+      ],
+      "stop_hooks": [
+        {
+          "seconds": 4.986,
+          "status": "pending",
+          "output_delivered": true
+        },
+        {
+          "seconds": 0.032,
+          "status": "quiet",
+          "output_delivered": false
+        }
+      ],
+      "receipts": [
+        {
+          "id": "a2ecc6e92107",
+          "quoted_by_agent": true,
+          "status": "pending"
+        }
+      ],
+      "checks": [
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix compile --warnings-as-errors'",
+          "exit_code": 1,
+          "output_tail": "\u2502\n    \u2514\u2500 lib/tips/health.ex:22:8: Tips.Health (module)\n\n    error: undefined function probe/0 (expected Tips.Health to define such a function or for it to be imported, but none are available)\n    \u2502\n 13 \u2502         probe()\n    \u2502         ^^^^^\n    \u2502\n    \u2514\u2500 lib/tips/health.ex:13:9: Tips.Health.check/0\n\n\n== Compilation error in file lib/tips/health.ex ==\n** (CompileError) lib/tips/health.ex: cannot compile module Tips.Health (errors have been logged)\n\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix format --check-formatted lib/tips/health.ex'",
+          "exit_code": 0,
+          "output_tail": ""
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix compile --warnings-as-errors'",
+          "exit_code": 0,
+          "output_tail": "Compiling 2 files (.ex)\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix test test/tips_web/controllers/health_controller_test.exs'",
+          "exit_code": 0,
+          "output_tail": "Compiling 2 files (.ex)\nRunning ExUnit with seed: 87488, max_cases: 8\nExcluding tags: [:browser, :real_provider]\n\n....\nFinished in 1.0 seconds (0.00s async, 1.0s sync)\n\nResult: 4 passed\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'unbuffer mix credo --strict'",
+          "exit_code": 0,
+          "output_tail": "Checking 93 source files (this might take a while) ...\n\nPlease report incorrect results: https://github.com/rrrene/credo/issues\n\nAnalysis took 0.8 seconds (0.04s to load, 0.8s running 69 checks on 93 files)\n692 mods/funs, found no issues.\n\nUse `mix credo explain` to explain issues, `mix credo --help` for options.\n"
+        }
+      ],
+      "final_message": "The repair is complete: [health.ex](/private/tmp/tips-lsp-sol-health/lib/tips/health.ex:13) now calls `query_database/0`. The one-second deadline and dynamic repository handling are unchanged.\n\nBefore the edit, compilation failed on `probe/0`. Afterward, formatting, warnings as errors compilation, strict Credo, and all four health controller integration tests passed.\n\nThe stop hook reported pending ElixirLS feedback with receipt `a2ecc6e92107`. Two later LSP diagnostics calls still showed the pre-edit error, so I cannot report clean LSP diagnostics; the passing Mix checks are the verification.",
+      "patch_sha256": "209dc64783e47c238b33351af0c93d9e94243e58c31c30ea7c5139bb9ebb85c1"
+    }
+  },
+  "sha256": {
+    "neovim_init.lua": "d8696205e441292ed586fdeb23557a168e2e052508294654c8a33692f1f5639f",
+    "neovim_hook_budget_probe.py": "9106a61b19690b0db45b364115a34845906447c0119cd230ab073289d29b3828",
+    "neovim_hook_probe.py": "0b676872e2ce65a4ecbf21affae2bf44425d8f354f16ebad6ae34c5ef1ad7c75",
+    "neovim_dogfood.py": "65661b42d17a6fff0154033ff33f9b4d1b4656468dad2301efe9ac3d65aeef32",
+    "neovim_hook_codex_probe.py": "a6f39abe2ae7ad0f1e9a06349488ff886dd34c86c717c9e1e3bfe3ee6644560f",
+    "neovim_hook_inversion_probe.py": "ff678ecd75e9845760123f28ff0e47987e6ed48d5087b4d57ec3384c274f4596",
+    "neovim_launcher.py": "3e506065033d0753133a956dce274d22459cd73e54c0122b6d86812afb2be802",
+    "neovim_feedback_probe.py": "dc66b896f1419a4c88aca7878c43551293ed136bde29bb172d950966b76014e0",
+    "neovim_feedback.lua": "e59ee41c20921bdabae6abdb7588d3455090fa93428f157aa8ece205f8214603",
+    "neovim_tips_probe.py": "e6df0605f0b2a13968962f9ee05a7db8d350445f3a27e0d582d9f03083df1655",
+    "neovim_sync.lua": "7b20a50edab8cfcf5abbccd7b87d09054286e90298a6b511be1ebf0adb9879c3",
+    "neovim_probe.py": "df775576082ab0e1c5e5b19cae3fd843f398a441d87f161bf6f2e0ddaf339791",
+    "neovim_codex_probe.py": "b60cccbb226def3478b4489ab9027d3b25b1e43cbef1ca732efd300a55f67224",
+    "neovim_hook.py": "e5e2bc88e012ed2724302d30eb13dfbb9ca3eda2f20b2095f78d388081947d7a"
+  },
+  "findings": [
+    {
+      "id": "saved_reload_does_not_build",
+      "severity": "blocking",
+      "evidence": "Health: didClose/didOpen with repaired text preceded watched-file notification; no new build or didSave followed. Post-repair diagnostics still reported undefined probe/0. Installed ElixirLS ignores changed-file build triggers for open clean documents."
+    },
+    {
+      "id": "pending_feedback_suppressed",
+      "severity": "blocking",
+      "evidence": "Health apply_patch waited 4.986 seconds but returned {}; its pending text matched the startup collector result, which was logged privately. A Stop continuation was the first delivered pending message."
+    },
+    {
+      "id": "cold_build_uncertainty_latched",
+      "severity": "design_limit",
+      "evidence": "Provider edited an acceptance test during cold compilation; uncertain stayed latched through all subsequent edits despite later successful semantic queries and Mix checks."
+    },
+    {
+      "id": "stop_rpc_timeout",
+      "severity": "reliability_limit",
+      "evidence": "Media Stop returned unavailable at 5.003 seconds. The agent acknowledged the receipt and queried diagnostics. The response bounded the wait but did not establish a completed build."
+    },
+    {
+      "id": "unqualified_diagnostics",
+      "severity": "blocking",
+      "evidence": "Early health diagnostics returned {} during compilation; later empty media diagnostics did not explain that the collector still lacked a completed build for the latest generation."
+    }
+  ]
+}

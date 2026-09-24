@@ -1,0 +1,1272 @@
+{
+  "date": "2026-09-24",
+  "review": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/REVIEW.md",
+  "review_sha256": "9ba3318ea7bee00ee0cdfb3aa488e6215bd358462a73b241806d6e5774b87eac",
+  "candidate_source": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/probes/direct-plus/direct-plus/compiler_elixir.ex",
+  "candidate_source_sha256": "fafdde5bf283cefba8c4fde6dd2a5a338af46e0bbfeafbec35b3482a70f9a8e3",
+  "plain_mix_cases": [
+    {
+      "mode": "baseline",
+      "case": "external-delete",
+      "expected": "missing",
+      "observed": {
+        "caller": "aa",
+        "target": "aa",
+        "parallel_compiler": "/opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 2,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 92283.237254833,
+          "size": 2,
+          "mtime_ns": 1790256056248142746
+        },
+        {
+          "marker": "deleted",
+          "time": 92284.146402083
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 460,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1765,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 497,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 495,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 2,
+          "ms": 537,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 517,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": false,
+      "directory": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/codex-verification/baseline-external-delete-v2"
+    },
+    {
+      "mode": "baseline",
+      "case": "external-preserved",
+      "expected": "bb",
+      "observed": {
+        "caller": "aa",
+        "target": "aa",
+        "parallel_compiler": "/opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 2,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 92273.953053125,
+          "size": 2,
+          "mtime_ns": 1790256036000000000
+        },
+        {
+          "marker": "bb",
+          "time": 92274.876458541,
+          "size": 2,
+          "mtime_ns": 1790256036000000000
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 488,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1825,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 567,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 512,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 2,
+          "ms": 548,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 499,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": false,
+      "directory": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/codex-verification/baseline-external-preserved-v2"
+    },
+    {
+      "mode": "baseline",
+      "case": "external",
+      "expected": "bb",
+      "observed": {
+        "caller": "aa",
+        "target": "aa",
+        "parallel_compiler": "/opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 2,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 92264.317085916,
+          "size": 2,
+          "mtime_ns": 1790256037328880887
+        },
+        {
+          "marker": "bb",
+          "time": 92265.278448291,
+          "size": 2,
+          "mtime_ns": 1790256038290133171
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 542,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1874,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 598,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 478,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 2,
+          "ms": 505,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 515,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": false,
+      "directory": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/codex-verification/baseline-external-v2"
+    },
+    {
+      "mode": "direct",
+      "case": "external-delete",
+      "expected": "missing",
+      "observed": {
+        "caller": "aa",
+        "target": "aa",
+        "parallel_compiler": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/probes/direct-plus/direct-plus/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/probes/direct-plus/direct-plus/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 2,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 92280.576669458,
+          "size": 2,
+          "mtime_ns": 1790256053587612607
+        },
+        {
+          "marker": "deleted",
+          "time": 92281.478406416
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 461,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1795,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 505,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 459,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 2,
+          "ms": 478,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 484,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "parallel_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        },
+        {
+          "label": "patched parallel compiler loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": false,
+      "directory": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/codex-verification/direct-plus-external-delete-v2"
+    },
+    {
+      "mode": "direct",
+      "case": "external-preserved",
+      "expected": "bb",
+      "observed": {
+        "caller": "aa",
+        "target": "aa",
+        "parallel_compiler": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/probes/direct-plus/direct-plus/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/probes/direct-plus/direct-plus/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 2,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 92272.535390458,
+          "size": 2,
+          "mtime_ns": 1790256035000000000
+        },
+        {
+          "marker": "bb",
+          "time": 92273.424545041,
+          "size": 2,
+          "mtime_ns": 1790256035000000000
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 470,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1802,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 487,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 474,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 2,
+          "ms": 510,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 544,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "parallel_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        },
+        {
+          "label": "patched parallel compiler loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": false,
+      "directory": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/codex-verification/direct-plus-external-preserved-v2"
+    },
+    {
+      "mode": "direct",
+      "case": "external",
+      "expected": "bb",
+      "observed": {
+        "caller": "bb",
+        "target": "bb",
+        "parallel_compiler": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/probes/direct-plus/direct-plus/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/probes/direct-plus/direct-plus/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 92264.301557041,
+          "size": 2,
+          "mtime_ns": 1790256037313355308
+        },
+        {
+          "marker": "bb",
+          "time": 92265.27537725,
+          "size": 2,
+          "mtime_ns": 1790256038287056775
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 534,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1867,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 1820,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 554,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 565,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 541,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "parallel_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        },
+        {
+          "label": "patched parallel compiler loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "directory": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/codex-verification/direct-plus-external-v2"
+    },
+    {
+      "mode": "targeted",
+      "case": "external-delete",
+      "expected": "missing",
+      "observed": {
+        "caller": "missing",
+        "target": "missing",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 92282.133600375,
+          "size": 2,
+          "mtime_ns": 1790256055144512893
+        },
+        {
+          "marker": "deleted",
+          "time": 92283.006504958
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 463,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1787,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors",
+            "--force-path",
+            "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/codex-verification/targeted-external-delete-v2/lib/value.heex"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 1708,
+          "args": [
+            "compile",
+            "--warnings-as-errors",
+            "--force-path",
+            "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/codex-verification/targeted-external-delete-v2/lib/value.heex"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 481,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 509,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 499,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "directory": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/codex-verification/targeted-external-delete-v2"
+    },
+    {
+      "mode": "targeted",
+      "case": "external-preserved",
+      "expected": "bb",
+      "observed": {
+        "caller": "bb",
+        "target": "bb",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 92273.940080833,
+          "size": 2,
+          "mtime_ns": 1790256036000000000
+        },
+        {
+          "marker": "bb",
+          "time": 92274.846274375,
+          "size": 2,
+          "mtime_ns": 1790256036000000000
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 470,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1830,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors",
+            "--force-path",
+            "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/codex-verification/targeted-external-preserved-v2/lib/value.heex"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 1767,
+          "args": [
+            "compile",
+            "--warnings-as-errors",
+            "--force-path",
+            "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/codex-verification/targeted-external-preserved-v2/lib/value.heex"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 479,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 520,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 499,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "directory": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/codex-verification/targeted-external-preserved-v2"
+    },
+    {
+      "mode": "targeted",
+      "case": "external",
+      "expected": "bb",
+      "observed": {
+        "caller": "bb",
+        "target": "bb",
+        "parallel_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/elixir/ebin/Elixir.Kernel.ParallelCompiler.beam",
+        "mix_compiler": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/targeted/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam"
+      },
+      "acceptance_exit": 0,
+      "writes": [
+        {
+          "marker": "aa",
+          "time": 92264.303156166,
+          "size": 2,
+          "mtime_ns": 1790256037314957491
+        },
+        {
+          "marker": "bb",
+          "time": 92265.27082725,
+          "size": 2,
+          "mtime_ns": 1790256038282496924
+        }
+      ],
+      "commands": [
+        {
+          "label": "format",
+          "exit": 0,
+          "ms": 534,
+          "args": [
+            "format",
+            "mix.exs",
+            "lib/target.ex",
+            "lib/caller.ex",
+            "lib/unrelated.ex",
+            "acceptance.exs",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "warmup",
+          "exit": 0,
+          "ms": 1868,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        {
+          "label": "overlap",
+          "exit": 0,
+          "args": [
+            "compile",
+            "--warnings-as-errors",
+            "--force-path",
+            "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/codex-verification/targeted-external-v2/lib/value.heex"
+          ]
+        },
+        {
+          "label": "followup",
+          "exit": 0,
+          "ms": 1819,
+          "args": [
+            "compile",
+            "--warnings-as-errors",
+            "--force-path",
+            "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/codex-verification/targeted-external-v2/lib/value.heex"
+          ]
+        },
+        {
+          "label": "inspect",
+          "exit": 0,
+          "ms": 554,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "inspect.exs"
+          ]
+        },
+        {
+          "label": "acceptance",
+          "exit": 0,
+          "ms": 565,
+          "args": [
+            "run",
+            "--no-start",
+            "--no-compile",
+            "acceptance.exs"
+          ]
+        },
+        {
+          "label": "settled",
+          "exit": 0,
+          "ms": 541,
+          "args": [
+            "compile",
+            "--warnings-as-errors"
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "label": "overlap",
+          "observed": true
+        },
+        {
+          "label": "mix_compiler bytecode matches candidate",
+          "observed": true
+        },
+        {
+          "label": "patched Mix loaded",
+          "observed": true
+        }
+      ],
+      "settled_noop": true,
+      "unrelated_recompiled": false,
+      "passed": true,
+      "directory": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/codex-verification/targeted-external-v2"
+    }
+  ],
+  "rapid_direct_plus": {
+    "exit": 0,
+    "rows": [
+      {
+        "value": "bb",
+        "i": 1,
+        "result": "{:ok, []}",
+        "start_us": 1790255997006957,
+        "end_us": 1790255997043402,
+        "owner_compiled": true,
+        "other_compiled": false
+      },
+      {
+        "value": "bb",
+        "i": 2,
+        "result": "{:ok, []}",
+        "start_us": 1790255997049434,
+        "end_us": 1790255997080466,
+        "owner_compiled": true,
+        "other_compiled": false
+      },
+      {
+        "value": "bb",
+        "i": 3,
+        "result": "{:ok, []}",
+        "start_us": 1790255997081851,
+        "end_us": 1790255997111056,
+        "owner_compiled": true,
+        "other_compiled": false
+      },
+      {
+        "value": "bb",
+        "i": 4,
+        "result": "{:ok, []}",
+        "start_us": 1790255997112205,
+        "end_us": 1790255997141675,
+        "owner_compiled": true,
+        "other_compiled": false
+      },
+      {
+        "value": "bb",
+        "i": 5,
+        "result": "{:ok, []}",
+        "start_us": 1790255997143016,
+        "end_us": 1790255997172481,
+        "owner_compiled": true,
+        "other_compiled": false
+      },
+      {
+        "value": "bb",
+        "i": 6,
+        "result": "{:ok, []}",
+        "start_us": 1790255997173725,
+        "end_us": 1790255997202226,
+        "owner_compiled": true,
+        "other_compiled": false
+      },
+      {
+        "value": "bb",
+        "i": 7,
+        "result": "{:ok, []}",
+        "start_us": 1790255997203431,
+        "end_us": 1790255997231678,
+        "owner_compiled": true,
+        "other_compiled": false
+      },
+      {
+        "value": "bb",
+        "i": 8,
+        "result": "{:ok, []}",
+        "start_us": 1790255997233031,
+        "end_us": 1790255997260882,
+        "owner_compiled": true,
+        "other_compiled": false
+      },
+      {
+        "value": "bb",
+        "i": 9,
+        "result": "{:ok, []}",
+        "owner_compiled": true,
+        "other_compiled": false
+      },
+      {
+        "value": "bb",
+        "i": 10,
+        "result": "{:noop, []}",
+        "owner_compiled": false,
+        "other_compiled": false
+      }
+    ],
+    "loaded": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/probes/direct-plus/direct-plus/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam",
+    "candidate_hash_matches": true
+  },
+  "rapid_direct_control": {
+    "exit": 0,
+    "rows": [
+      {
+        "value": "bb",
+        "i": 1,
+        "result": "{:ok, []}",
+        "start_us": 1790256038006021,
+        "end_us": 1790256038034644,
+        "owner_compiled": true,
+        "other_compiled": false
+      },
+      {
+        "value": "bb",
+        "i": 2,
+        "result": "{:noop, []}",
+        "start_us": 1790256038039308,
+        "end_us": 1790256038056617,
+        "owner_compiled": false,
+        "other_compiled": false
+      },
+      {
+        "value": "bb",
+        "i": 3,
+        "result": "{:noop, []}",
+        "start_us": 1790256038057743,
+        "end_us": 1790256038075882,
+        "owner_compiled": false,
+        "other_compiled": false
+      },
+      {
+        "value": "bb",
+        "i": 4,
+        "result": "{:noop, []}",
+        "start_us": 1790256038077012,
+        "end_us": 1790256038095529,
+        "owner_compiled": false,
+        "other_compiled": false
+      },
+      {
+        "value": "bb",
+        "i": 5,
+        "result": "{:noop, []}",
+        "start_us": 1790256038096401,
+        "end_us": 1790256038114507,
+        "owner_compiled": false,
+        "other_compiled": false
+      },
+      {
+        "value": "bb",
+        "i": 6,
+        "result": "{:noop, []}",
+        "start_us": 1790256038115817,
+        "end_us": 1790256038133622,
+        "owner_compiled": false,
+        "other_compiled": false
+      },
+      {
+        "value": "bb",
+        "i": 7,
+        "result": "{:noop, []}",
+        "start_us": 1790256038134889,
+        "end_us": 1790256038152477,
+        "owner_compiled": false,
+        "other_compiled": false
+      },
+      {
+        "value": "bb",
+        "i": 8,
+        "result": "{:noop, []}",
+        "start_us": 1790256038153483,
+        "end_us": 1790256038171207,
+        "owner_compiled": false,
+        "other_compiled": false
+      },
+      {
+        "value": "bb",
+        "i": 9,
+        "result": "{:noop, []}",
+        "owner_compiled": false,
+        "other_compiled": false
+      },
+      {
+        "value": "bb",
+        "i": 10,
+        "result": "{:noop, []}",
+        "owner_compiled": false,
+        "other_compiled": false
+      }
+    ],
+    "loaded": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/invalidation-comparison/direct/toolchain/bin/../lib/mix/ebin/Elixir.Mix.Compilers.Elixir.beam",
+    "candidate_hash_matches": true
+  },
+  "checks": [
+    {
+      "check": "format",
+      "exit": 0,
+      "log": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/codex-verification/format.log"
+    },
+    {
+      "check": "credo",
+      "exit": 1,
+      "log": "/private/tmp/tips-fable-compiler-choice-review-z4qi6hdb/codex-verification/credo.log"
+    },
+    {
+      "check": "Python syntax and evidence assertions",
+      "exit": 0
+    }
+  ],
+  "excluded_setup_runs": "The first nine unversioned external-* output directories failed fixture compilation because of a missing module-attribute parenthesis. They are not candidate results. Final runs have -v2 suffix.",
+  "scope": "No core or adapter changes; independent fixture tests only. No live ElixirLS, actual Phoenix resource or model workload run in this review."
+}

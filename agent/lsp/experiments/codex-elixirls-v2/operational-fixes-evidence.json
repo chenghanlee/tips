@@ -1,0 +1,942 @@
+{
+  "date": "2026-09-25",
+  "branch": "experiment/elixirls-codex-v2",
+  "bundle": "/private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v2",
+  "manifest_sha256": "80f20594670350ae2f1a3355a7c3b196adf82891ad1de9935e2aa76811e13f16",
+  "baseline_failures": {
+    "cold_start": {
+      "passed": false,
+      "error": "AssertionError({'initialize_seconds': 10.508390208007768, 'reply': {'isError': False, 'data': {'clients': ['elixirls'], 'feedback': {'building': True, 'completed': -1, 'generation': 0, 'message': 'Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.', 'queued': False, 'status': 'pending'}, 'symbols': {'/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/operational-fixes/red/cold/alpha/lib/target.ex': [{'detail': 'defmodule', 'kind': 'Module', 'name': 'V2Target', 'range': '1:11-1:19'}, {'container': 'V2Target', 'detail': 'def', 'kind': 'Function', 'name': 'answer/0', 'range': '4:7-4:13'}]}}}})"
+    },
+    "neovim_death": {
+      "passed": false,
+      "error": "AssertionError({'exited': {'matched': False, 'samples': [{'seconds': 0.0, 'value': None}, {'seconds': 0.253, 'value': None}, {'seconds': 0.504, 'value': None}, {'seconds': 0.756, 'value': None}, {'seconds': 1.008, 'value': None}, {'seconds': 1.262, 'value': None}, {'seconds': 1.514, 'value': None}, {'seconds': 1.768, 'value': None}, {'seconds': 2.023, 'value': None}, {'seconds': 2.277, 'value': None}, {'seconds': 2.531, 'value': None}, {'seconds': 2.786, 'value': None}, {'seconds': 3.042, 'value': None}]}, 'reply': {'content': [{'type': 'text', 'text': '{\"clients\":[\"elixirls\"],\"feedback\":{\"building\":false,\"completed\":-1,\"generation\":0,\"message\":\"Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.\",\"queued\":true,\"status\":\"pending\"},\"symbols\":{\"/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/operational-fixes/red/death/alpha/lib/target.ex\":[{\"detail\":\"defmodule\",\"kind\":\"Module\",\"name\":\"V2Target\",\"range\":\"1:11-1:19\"},{\"container\":\"V2Target\",\"detail\":\"def\",\"kind\":\"Function\",\"name\":\"answer/0\",\"range\":\"3:7-3:13\"}]}}'}], 'isError': False}, 'hook': {'seconds': 0.14102520799497142, 'output': {}}, 'registry': [{'updatedAt': 1790266037, 'kind': 'managed', 'pid': 2138, 'instanceId': 'alpha-04f2628e:2138', 'projectId': 'alpha-04f2628e', 'socket': '/var/folders/26/15tlmtc55wggjp8xt79bh5n40000gn/T/vv-mcp-2135-0.sock', 'roots': ['/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/operational-fixes/red/death/alpha'], 'lspClients': ['elixirls'], 'cwd': '/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/operational-fixes/red/death/alpha'}]})"
+    },
+    "stalled_shutdown": {
+      "passed": false,
+      "error": "AssertionError({'exited': False, 'seconds': 6.003564708007616, 'survivors': {2417: {'parent': 2390, 'state': 'Ts', 'command': '/private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v1/vendor/nvim-macos-arm64/bin/nvim --embed --headless --listen /var/folders/26/15tlmtc55wggjp8xt79bh5n40000gn/T/elixir-nvim-i99ah7fh.sock /private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/operational-fixes/red/stalled/alpha/mix.exs'}, 2450: {'parent': 2421, 'state': 'Ss', 'command': 'erl_child_setup 8192'}, 2421: {'parent': 2417, 'state': 'Ss', 'command': '/opt/homebrew/Cellar/erlang/29.1/lib/erlang/erts-17.1/bin/beam.smp -S 4:4 -- -root /opt/homebrew/Cellar/erlang/29.1/lib/erlang -bindir /opt/homebrew/Cellar/erlang/29.1/lib/erlang/erts-17.1/bin -progname erl -- -home /Users/chenghanlee -- -noshell -elixir_root /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v1/toolchain/bin/../lib -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v1/toolchain/bin/../lib/elixir/ebin -s elixir start_cli -- -- -- -extra -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v1/server/lib/debug_adapter/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v1/server/lib/dialyxir_vendored/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v1/server/lib/elixir_ls_utils/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v1/server/lib/elixir_sense/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v1/server/lib/erl2ex_vendored/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v1/server/lib/erlex_vendored/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v1/server/lib/jason_v/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v1/server/lib/language_server/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v1/server/lib/nimble_parsec/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v1/server/lib/path_glob_vendored/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v1/server/lib/schematic_v/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v1/server/lib/typed_struct/ebin -e Application.put_env(:elixir, :ansi_enabled, false); ElixirLS.LanguageServer.main()'}, 2390: {'parent': 1602, 'state': 'Ss', 'command': '/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v1/adapter/neovim_launcher.py --vendor /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v1/vendor --workspace /private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/operational-fixes/red/stalled/alpha --environment /private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/operational-fixes/red/stalled/stalled-session/environment.json'}}})"
+    },
+    "bound_instance": {
+      "passed": false,
+      "error": "AssertionError('a bound MCP request spawned a managed instance')"
+    },
+    "scan_failure_recovery": {
+      "passed": false,
+      "error": "AssertionError({'at_failure': {'error': '...es/red/scan/scan-session/config/nvim/lua/neovim_sync.lua:13: Cannot enumerate project source files', 'state': {'message': 'Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.', 'status': 'pending', 'completed': 0, 'building': True, 'queued': False, 'generation': 1}, 'ok': False}, 'retry_hook': {'seconds': 4.8157247500057565, 'output': {'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext': 'ElixirLS: Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.\\nCached diagnostics (may be stale):\\nlib/target.ex:1:1: error: ** (CompileError) lib/target.ex: cannot compile module V2Target (errors have been logged)  \\nlib/target.ex:3:20: error: undefined function missing_scan_probe/0 (expected V2Target to define such a function or for it to be imported, but none are available)'}}}, 'after_retry': {'message': 'Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.', 'status': 'pending', 'completed': 0, 'building': True, 'queued': False, 'generation': 1}})"
+    }
+  },
+  "operational_acceptance": {
+    "cold_start": {
+      "passed": true,
+      "detail": {
+        "initialize_seconds": 0.441838041995652,
+        "reply": {
+          "isError": false,
+          "data": {
+            "error": {
+              "code": "no_lsp",
+              "message": "No LSP client attached to buffer",
+              "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/operational-fixes/acceptance/cold/alpha/lib/target.ex"
+            },
+            "feedback": {
+              "building": false,
+              "completed": -1,
+              "generation": 0,
+              "message": "Compiler feedback unavailable: ElixirLS is still starting or has stopped. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+              "queued": false,
+              "status": "unavailable"
+            }
+          }
+        }
+      }
+    },
+    "neovim_death": {
+      "passed": true,
+      "detail": {
+        "exited": {
+          "matched": true,
+          "samples": [
+            {
+              "seconds": 0.0,
+              "value": null
+            },
+            {
+              "seconds": 0.255,
+              "value": 1
+            }
+          ]
+        },
+        "reply": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"error\":{\"code\":\"request_failed\",\"message\":\"Neovim instance not found: alpha-2426a3b1:12328\"}}"
+            }
+          ],
+          "isError": false
+        },
+        "hook": {
+          "seconds": 0.13196133299788926,
+          "output": {
+            "hookSpecificOutput": {
+              "hookEventName": "PostToolUse",
+              "additionalContext": "ElixirLS feedback unavailable: [Errno 2] No such file or directory: '/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/operational-fixes/acceptance/death/death-session/owner.json'. This does not mean the source is error-free."
+            }
+          }
+        },
+        "registry": []
+      }
+    },
+    "stalled_shutdown": {
+      "passed": true,
+      "detail": {
+        "exited": true,
+        "seconds": 2.0301694579975447,
+        "survivors": {}
+      }
+    },
+    "bound_instance": {
+      "passed": true,
+      "detail": {
+        "reply": {
+          "isError": false,
+          "data": {
+            "error": {
+              "code": "request_failed",
+              "message": "Neovim instance not found: deliberately-absent-instance"
+            }
+          }
+        },
+        "registry_files": [],
+        "owned": {
+          "12800": {
+            "parent": 11533,
+            "state": "Ss",
+            "command": "/private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v2/vendor/vv-mcp --instance-id deliberately-absent-instance"
+          }
+        }
+      }
+    },
+    "scan_failure_recovery": {
+      "passed": true,
+      "detail": {
+        "at_failure": {
+          "error": "nil",
+          "state": {
+            "completed": 1,
+            "building": false,
+            "queued": false,
+            "message": "External-edit synchronization is pending after a scan/reload/save failure; it will retry on the next hook or LSP read. Cached results may be stale.",
+            "generation": 1,
+            "status": "sync_error"
+          },
+          "ok": true
+        },
+        "retry_hook": {
+          "seconds": 0.16207554200082086,
+          "output": {
+            "hookSpecificOutput": {
+              "hookEventName": "PostToolUse",
+              "additionalContext": "ElixirLS: lib/target.ex:1:1: error: ** (CompileError) lib/target.ex: cannot compile module V2Target (errors have been logged)  \nlib/target.ex:3:20: error: undefined function missing_scan_probe/0 (expected V2Target to define such a function or for it to be imported, but none are available)"
+            }
+          }
+        },
+        "after_retry": {
+          "completed": 1,
+          "building": false,
+          "queued": false,
+          "message": "Compilation failed; read diagnostics and fix the errors.",
+          "generation": 1,
+          "status": "failed"
+        }
+      }
+    },
+    "hook_identity": {
+      "passed": true,
+      "detail": {
+        "seconds": 0.1407909169938648,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS feedback unavailable: Neovim instance differs from the session owner; restart the session. This does not mean the source is error-free."
+          }
+        }
+      }
+    },
+    "stalled_sigterm": {
+      "passed": true,
+      "detail": {
+        "exited": true,
+        "seconds": 2.029958250001073,
+        "survivors": {}
+      }
+    }
+  },
+  "active_compiler_cleanup": {
+    "cold_start": {
+      "passed": true,
+      "detail": {
+        "initialize_seconds": 0.3938890830031596,
+        "reply": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "elixirls"
+            ],
+            "feedback": {
+              "building": false,
+              "completed": -1,
+              "generation": 0,
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+              "queued": true,
+              "status": "pending"
+            },
+            "symbols": {
+              "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/operational-fixes/active-compiler/cold/alpha/lib/target.ex": [
+                {
+                  "detail": "defmodule",
+                  "kind": "Module",
+                  "name": "V2Target",
+                  "range": "1:11-1:19"
+                },
+                {
+                  "container": "V2Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "answer/0",
+                  "range": "5:7-5:13"
+                }
+              ]
+            }
+          }
+        },
+        "compiler_entered_slow_module_before_shutdown": true
+      }
+    }
+  },
+  "tips_startup": {
+    "initialize_seconds": 0.4172337920026621,
+    "cold_symbols": {
+      "isError": false,
+      "data": {
+        "clients": [
+          "elixirls"
+        ],
+        "feedback": {
+          "building": false,
+          "completed": -1,
+          "generation": 0,
+          "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+          "queued": true,
+          "status": "pending"
+        },
+        "symbols": {
+          "/private/tmp/tips-lsp-operational-gate/lib/tips/provider_config.ex": [
+            {
+              "detail": "defmodule",
+              "kind": "Module",
+              "name": "Tips.ProviderConfig",
+              "range": "1:11-1:30"
+            },
+            {
+              "container": "Tips.ProviderConfig",
+              "kind": "EnumMember",
+              "name": "@names",
+              "range": "11:3-22:4"
+            },
+            {
+              "container": "Tips.ProviderConfig",
+              "kind": "EnumMember",
+              "name": "@assignment",
+              "range": "26:3-26:66"
+            },
+            {
+              "container": "Tips.ProviderConfig",
+              "kind": "EnumMember",
+              "name": "@value",
+              "range": "27:3-27:84"
+            },
+            {
+              "container": "Tips.ProviderConfig",
+              "detail": "def",
+              "kind": "Function",
+              "name": "fetch!/1",
+              "range": "34:7-34:19"
+            },
+            {
+              "container": "Tips.ProviderConfig",
+              "detail": "def",
+              "kind": "Function",
+              "name": "fetch!/1",
+              "range": "49:7-49:20"
+            },
+            {
+              "container": "Tips.ProviderConfig",
+              "detail": "def",
+              "kind": "Function",
+              "name": "mode/0",
+              "range": "56:7-56:11"
+            },
+            {
+              "container": "Tips.ProviderConfig",
+              "detail": "def",
+              "kind": "Function",
+              "name": "load/2",
+              "range": "64:7-64:22"
+            },
+            {
+              "container": "Tips.ProviderConfig",
+              "detail": "defp",
+              "kind": "Function",
+              "name": "read_dotenv/1",
+              "range": "68:8-68:25"
+            },
+            {
+              "container": "Tips.ProviderConfig",
+              "detail": "defp",
+              "kind": "Function",
+              "name": "parse/2",
+              "range": "76:8-76:29"
+            },
+            {
+              "container": "Tips.ProviderConfig",
+              "detail": "defp",
+              "kind": "Function",
+              "name": "value!/4",
+              "range": "91:8-91:40"
+            }
+          ]
+        }
+      }
+    },
+    "build_started": {
+      "matched": true,
+      "samples": [
+        {
+          "seconds": 0.0,
+          "value": {
+            "completed": -1,
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+            "queued": true,
+            "status": "pending",
+            "generation": 0,
+            "building": false
+          }
+        },
+        {
+          "seconds": 0.256,
+          "value": {
+            "completed": -1,
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+            "queued": false,
+            "status": "pending",
+            "generation": 0,
+            "building": true
+          }
+        }
+      ]
+    },
+    "cleanup": {
+      "matched": true,
+      "samples": [
+        {
+          "seconds": 0.042,
+          "value": {}
+        }
+      ]
+    },
+    "shutdown_seconds": 0.11760845899698325,
+    "passed": true
+  },
+  "long_build_contract": {
+    "initial_stop": {
+      "seconds": 0.146,
+      "output": {}
+    },
+    "three_second_error": {
+      "seconds": 3.568,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: lib/target.ex:1:1: error: ** (CompileError) lib/target.ex: cannot compile module V2Target (errors have been logged)  \nlib/target.ex:5:19: error: undefined function missing_budget/0 (expected V2Target to define such a function or for it to be imported, but none are available)"
+        }
+      }
+    },
+    "fast_repair": {
+      "seconds": 0.57,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Previously reported compiler diagnostics cleared after compilation."
+        }
+      }
+    },
+    "eight_second_pending": {
+      "seconds": 4.848,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Compilation is still pending. Feedback will be checked after the next eligible tool or at Stop. This is not a clean result."
+        }
+      }
+    },
+    "unchanged_tool_does_not_wait": {
+      "seconds": 0.152,
+      "output": {}
+    },
+    "final_edit_stop_feedback": {
+      "seconds": 3.569,
+      "output": {
+        "decision": "block",
+        "reason": "ElixirLS: lib/target.ex:1:1: error: ** (CompileError) lib/target.ex: cannot compile module V2Target (errors have been logged)  \nlib/target.ex:5:19: error: undefined function missing_budget/0 (expected V2Target to define such a function or for it to be imported, but none are available)"
+      }
+    },
+    "stop_not_repeated": {
+      "seconds": 0.144,
+      "output": {}
+    },
+    "very_slow_pending": {
+      "seconds": 4.837,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Compilation is still pending. Feedback will be checked after the next eligible tool or at Stop. This is not a clean result."
+        }
+      }
+    },
+    "stop_budget_exhausted": {
+      "seconds": 4.851,
+      "output": {
+        "decision": "block",
+        "reason": "ElixirLS: Compilation is still pending. Feedback will be checked after the next eligible tool or at Stop. This is not a clean result."
+      }
+    },
+    "stalled_rpc": {
+      "seconds": 4.995,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS feedback unavailable: hook deadline reached while waiting for feedback. This does not mean the source is error-free."
+        }
+      }
+    },
+    "cleanup": {
+      "matched": true,
+      "samples": [
+        {
+          "seconds": 0.045,
+          "value": {}
+        }
+      ]
+    },
+    "completed": true
+  },
+  "late_agents": {
+    "stop": {
+      "delivery": "stop",
+      "error_receipt_before_repair": "d35344e5b56f",
+      "source_restored": true,
+      "no_diagnostic_requests": true,
+      "hook_seconds": [
+        4.743,
+        0.056,
+        0.491,
+        0.047
+      ],
+      "remaining": {}
+    },
+    "tool": {
+      "delivery": "tool",
+      "error_receipt_before_repair": "14a263c6f651",
+      "source_restored": true,
+      "no_diagnostic_requests": true,
+      "hook_seconds": [
+        4.738,
+        0.054,
+        0.513,
+        0.044
+      ],
+      "remaining": {}
+    }
+  },
+  "reconciliation": {
+    "baseline": {
+      "exit": 0,
+      "expected": "aa"
+    },
+    "unopened_preserved_hook": {
+      "seconds": 1.575946708995616,
+      "feedback": {}
+    },
+    "unopened_preserved_acceptance": {
+      "exit": 0,
+      "expected": "bb"
+    },
+    "retry_attempts": 2,
+    "delete_hook": {
+      "seconds": 1.364395084005082,
+      "feedback": {}
+    },
+    "delete_acceptance": {
+      "exit": 0,
+      "expected": "missing"
+    },
+    "recreate_hook": {
+      "seconds": 1.3556979580025654,
+      "feedback": {}
+    },
+    "recreate_acceptance": {
+      "exit": 0,
+      "expected": "cc"
+    },
+    "edit_during_build_hook": {
+      "seconds": 1.8647476250043837,
+      "feedback": {}
+    },
+    "edit_during_build_acceptance": {
+      "exit": 0,
+      "expected": "ee"
+    },
+    "slow_hook": {
+      "seconds": 4.77595116700104,
+      "feedback": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Compilation is still pending. Feedback will be checked after the next eligible tool or at Stop. This is not a clean result."
+        }
+      }
+    },
+    "unchanged_hook": {
+      "seconds": 0.09106904199870769,
+      "feedback": {}
+    },
+    "later_hook": {
+      "seconds": 0.09769966700696386,
+      "feedback": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Compilation completed; no compiler diagnostics are currently reported."
+        }
+      }
+    },
+    "slow_acceptance": {
+      "exit": 0,
+      "expected": "ff"
+    },
+    "completed": true
+  },
+  "lua_boundaries": {
+    "qualified_results_and_superseded_request": {
+      "detail": {
+        "failed": {
+          "status": "failed",
+          "generation": 0,
+          "queued": false,
+          "completed": 0,
+          "building": false,
+          "message": "Compilation failed; read diagnostics and fix the errors. Returned results may be incomplete or stale; an empty result does not establish absence."
+        },
+        "superseded": {
+          "status": "superseded",
+          "generation": 1,
+          "queued": false,
+          "completed": 0,
+          "building": false,
+          "message": "Files changed during this request. Returned results may be stale; retry the query."
+        },
+        "calls": 3,
+        "pending": {
+          "status": "pending",
+          "generation": 0,
+          "queued": false,
+          "completed": -1,
+          "building": false,
+          "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence."
+        }
+      },
+      "passed": true
+    },
+    "conflict_preserves_buffer_and_diagnostic_access": {
+      "detail": {
+        "preserved": true,
+        "qualified_diagnostics": true
+      },
+      "passed": true
+    },
+    "partial_success_is_not_resent": {
+      "detail": {
+        "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/operational-fixes/lua-acceptance/partial/lib/target.ex": 1,
+        "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/operational-fixes/lua-acceptance/partial/lib/second.ex": 2
+      },
+      "passed": true
+    },
+    "save_retries_without_new_edit": {
+      "detail": {
+        "attempts": 2
+      },
+      "passed": true
+    },
+    "overlap_does_not_disable_later_wait": {
+      "detail": {
+        "milliseconds": 245.841292
+      },
+      "passed": true
+    },
+    "opened_deletion_retries_after_buffer_is_gone": {
+      "detail": {
+        "attempts": 2
+      },
+      "passed": true
+    },
+    "symbol_results_are_qualified_during_startup": {
+      "detail": true,
+      "passed": true
+    },
+    "queued_work_stays_pending_across_old_build_completion": {
+      "detail": {
+        "successor_current": true,
+        "old_completion_pending": true
+      },
+      "passed": true
+    },
+    "hook_retries_within_budget": {
+      "detail": {
+        "status": "quiet",
+        "milliseconds": 224.274584
+      },
+      "passed": true
+    },
+    "reload_retries_without_new_edit": {
+      "detail": {
+        "saves": 1,
+        "attempts": 2,
+        "generation": 1
+      },
+      "passed": true
+    },
+    "persistent_failure_is_bounded_and_recoverable": {
+      "detail": {
+        "status": "sync_error",
+        "milliseconds": 455.943792
+      },
+      "passed": true
+    },
+    "early_symbol_error_preserves_startup_feedback": {
+      "detail": true,
+      "passed": true
+    },
+    "startup_unavailability_allows_retry": {
+      "detail": true,
+      "passed": true
+    }
+  },
+  "rust_tests": {
+    "passed": 58,
+    "failed": 0,
+    "command": "cargo test --locked -p vv-mcp",
+    "note": "Bundled Neovim and pinned Rust on PATH; initial missing-Neovim failures corrected."
+  },
+  "plain_mix_tips_cold_preparation": {
+    "command": [
+      "unbuffer",
+      "mix",
+      "compile",
+      "--warnings-as-errors"
+    ],
+    "seconds": 50.19747175001248,
+    "timed_out": false,
+    "exit_code": 0,
+    "survivors": {},
+    "cancellation_policy": false
+  },
+  "plain_mix_tips": {
+    "tips_build_existed_before_preparation": true,
+    "tips_preparation": {
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "seconds": 0.6567952910118038,
+      "timed_out": false,
+      "exit_code": 0,
+      "survivors": {},
+      "cancellation_policy": false
+    },
+    "tips_warm_noop_0": {
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "seconds": 0.6605510830122512,
+      "timed_out": false,
+      "exit_code": 0,
+      "survivors": {},
+      "cancellation_policy": false
+    },
+    "tips_warm_noop_1": {
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "seconds": 0.6887981250038138,
+      "timed_out": false,
+      "exit_code": 0,
+      "survivors": {},
+      "cancellation_policy": false
+    },
+    "tips_warm_noop_2": {
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "seconds": 0.6567349999968428,
+      "timed_out": false,
+      "exit_code": 0,
+      "survivors": {},
+      "cancellation_policy": false
+    },
+    "tips_one_source_edit": {
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "seconds": 0.7419893340120325,
+      "timed_out": false,
+      "exit_code": 0,
+      "survivors": {},
+      "cancellation_policy": false
+    },
+    "tips_compiler_error": {
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "seconds": 0.6533563749981113,
+      "timed_out": false,
+      "exit_code": 1,
+      "survivors": {},
+      "cancellation_policy": false
+    },
+    "tips_repair": {
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "seconds": 0.7420162920025177,
+      "timed_out": false,
+      "exit_code": 0,
+      "survivors": {},
+      "cancellation_policy": false
+    },
+    "tips_format": {
+      "command": [
+        "unbuffer",
+        "mix",
+        "format",
+        "--check-formatted",
+        "/private/tmp/tips-lsp-operational-gate/lib/tips/provider_config.ex"
+      ],
+      "seconds": 0.6704104999953415,
+      "timed_out": false,
+      "exit_code": 0,
+      "survivors": {},
+      "cancellation_policy": false
+    },
+    "tips_credo": {
+      "command": [
+        "unbuffer",
+        "mix",
+        "credo",
+        "--strict",
+        "--files-included",
+        "/private/tmp/tips-lsp-operational-gate/lib/tips/provider_config.ex"
+      ],
+      "seconds": 1.7504881670029135,
+      "timed_out": false,
+      "exit_code": 0,
+      "survivors": {},
+      "cancellation_policy": false
+    }
+  },
+  "plain_mix_deadlines": {
+    "fixture_baseline": {
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "seconds": 0.5651448339922354,
+      "timed_out": false,
+      "exit_code": 0,
+      "survivors": {},
+      "cancellation_policy": false
+    },
+    "cancel_at_budget_0": {
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "seconds": 4.981837999992422,
+      "timed_out": true,
+      "exit_code": -15,
+      "survivors": {},
+      "cancellation_policy": true
+    },
+    "cancel_at_budget_1": {
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "seconds": 5.054508416011231,
+      "timed_out": true,
+      "exit_code": -15,
+      "survivors": {},
+      "cancellation_policy": true
+    },
+    "wait_to_completion": {
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "seconds": 8.500660624995362,
+      "timed_out": false,
+      "exit_code": 1,
+      "survivors": {},
+      "cancellation_policy": false
+    },
+    "repair_after_cancellation": {
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "seconds": 0.5538200410082936,
+      "timed_out": false,
+      "exit_code": 0,
+      "survivors": {},
+      "cancellation_policy": false
+    },
+    "fixture_format": {
+      "command": [
+        "unbuffer",
+        "mix",
+        "format",
+        "--check-formatted",
+        "lib/target.ex",
+        "lib/caller.ex",
+        "acceptance.exs"
+      ],
+      "seconds": 0.4791057499969611,
+      "timed_out": false,
+      "exit_code": 0,
+      "survivors": {},
+      "cancellation_policy": false
+    },
+    "fresh_vm_acceptance": {
+      "command": [
+        "unbuffer",
+        "mix",
+        "run",
+        "--no-compile",
+        "acceptance.exs"
+      ],
+      "seconds": 0.5543838330049766,
+      "timed_out": false,
+      "exit_code": 0,
+      "survivors": {},
+      "cancellation_policy": false
+    },
+    "fixture_credo": {
+      "command": [
+        "unbuffer",
+        "mix",
+        "credo",
+        "--strict"
+      ],
+      "seconds": 0.5588812079950003,
+      "timed_out": false,
+      "exit_code": 1,
+      "survivors": {},
+      "cancellation_policy": false
+    },
+    "conclusion": {
+      "warm_tips_feedback_checked_in_this_run": false,
+      "repeated_cancellation_never_delivered_the_slow_error": true,
+      "waiting_delivered_error_but_exceeded_feedback_budget": true,
+      "normal_incremental_repair_after_cancellation": true,
+      "fixture_credo_unavailable": true
+    }
+  },
+  "continuing_plain_mix_counterexample": "/private/tmp/tips-fable-release-review-9xb93ihp/codex-verification/long-compile/results.json",
+  "adapter_install_update": {
+    "neovim_init.lua": {
+      "before": "049b053c8ea3dd7786cbd0396de75b1e64fccdb213ec6a11b8df9fcedbeb4f5d",
+      "after": "2babf79e7b12bf62157be92ef802c7d60e96eef4ccabe6dd23ac88688e810fff"
+    },
+    "neovim_feedback.lua": {
+      "before": "de1a151ca440d9b8658a36686edb771a1f1670a6024ab404594d308559de017d",
+      "after": "443595c90a726998bb8c8da3f14a03b7158574c3ca551654e27a8820a094650b"
+    },
+    "neovim_launcher.py": {
+      "before": "ec0d90b03fd3343acced3f513570527bcd12265546a1f14398fd88bfe4d2cca5",
+      "after": "1cda9d773640f6a0c40ee619d023c4f5b1140a8997642c82aa1d3461905aba7d"
+    }
+  },
+  "source_sha256": {
+    "neovim_launcher.py": "1cda9d773640f6a0c40ee619d023c4f5b1140a8997642c82aa1d3461905aba7d",
+    "neovim_hook.py": "ab3bce50da505a13ad16c0dd6dad85b02c43cb949d98219940bcd22ab1ecdce1",
+    "neovim_sync.lua": "19f7689d3a96f15a1cb7911e0e519f4180de1ac75e7762ba3472dae316dda563",
+    "neovim_init.lua": "2babf79e7b12bf62157be92ef802c7d60e96eef4ccabe6dd23ac88688e810fff",
+    "neovim_feedback.lua": "443595c90a726998bb8c8da3f14a03b7158574c3ca551654e27a8820a094650b",
+    "build_bundle.py": "ecadb9489c7e6e21c32bb0a64a85ace80a247d25563ef318467b47ffe28bbb6c",
+    "bundle.py": "d50c6949a18e74325ab11de81676e36bf12d319aed79965f773a7650bd3fdf6d",
+    "vv-mcp-owner.patch": "bdbc3ffa9e2101d5fd9a288820c58db52a1a356ddd775d097ffb9648afed3d8e",
+    "operational_probe.py": "e22c903ad0d254302a558d21fdda49c318019900cf85d6d3efcf146e24e8bbd8",
+    "late_feedback_probe.py": "bea00f0e2f723e79747a7d8f101a2513c94b771b57e85309bb9db294c0815b22",
+    "tips_startup_probe.py": "fe60ff816a627e0b9c1f10c4e4a1960177b20a0eefc4380b1cc7a5865a9d1747",
+    "plain_mix_feedback_probe.py": "2fbd65596869a2acdf9b7bd8a31356b61c9ce91e1568c23faad15887f68a70d6",
+    "neovim_patch_boundaries.lua": "599437944d711c295bbe87ea6c414297796860712360f6afe436f0e3a9f1977c",
+    "neovim_hook_budget_probe.py": "e9e0b474e661bf0b7f2384fd22f6bc102bfd82e4702138d821a68109367306ea",
+    "neovim_reconcile_probe.py": "a404c14d3562d9fb5d01f418977e42618dc9084aafffc1f80ae2acf959511708",
+    "neovim_dogfood.py": "2dad18b00ce916618ba07bcc6e56c5c933fff10434f9a7beb9fbac002cbee7b5"
+  },
+  "earlier_failed_probe_cleanup": {
+    "cause": "Earlier green/cold probe before detached=false fix",
+    "cwd": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/operational-fixes/green/cold/alpha",
+    "owned": {
+      "4921": {
+        "parent": 4891,
+        "state": "Ss",
+        "command": "erl_child_setup 8192"
+      },
+      "4891": {
+        "parent": 1,
+        "state": "Ss",
+        "command": "/opt/homebrew/Cellar/erlang/29.1/lib/erlang/erts-17.1/bin/beam.smp -S 4:4 -- -root /opt/homebrew/Cellar/erlang/29.1/lib/erlang -bindir /opt/homebrew/Cellar/erlang/29.1/lib/erlang/erts-17.1/bin -progname erl -- -home /Users/chenghanlee -- -noshell -elixir_root /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v2/toolchain/bin/../lib -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v2/toolchain/bin/../lib/elixir/ebin -s elixir start_cli -- -- -- -extra -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v2/server/lib/debug_adapter/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v2/server/lib/dialyxir_vendored/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v2/server/lib/elixir_ls_utils/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v2/server/lib/elixir_sense/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v2/server/lib/erl2ex_vendored/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v2/server/lib/erlex_vendored/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v2/server/lib/jason_v/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v2/server/lib/language_server/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v2/server/lib/nimble_parsec/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v2/server/lib/path_glob_vendored/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v2/server/lib/schematic_v/ebin -pa /private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v2/server/lib/typed_struct/ebin -e Application.put_env(:elixir, :ansi_enabled, false); ElixirLS.LanguageServer.main()"
+      }
+    },
+    "remaining": {}
+  }
+}

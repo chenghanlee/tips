@@ -1,0 +1,212 @@
+--- a/apps/language_server/lib/language_server/server.ex
++++ b/apps/language_server/lib/language_server/server.ex
+@@ -67,6 +67,10 @@
+     document_versions_on_build: %{},
+     build_diagnostics: [],
+     dialyzer_diagnostics: [],
++    pending_changed_files: MapSet.new(),
++    in_flight_changed_files: MapSet.new(),
++    build_pid: nil,
++    build_timer: nil,
+     needs_build?: false,
+     full_build_done?: false,
+     build_running?: false,
+@@ -133,6 +137,10 @@
+     GenServer.cast(server, {:build_finished, result})
+   end
+ 
++  def compilation_finished(server) do
++    GenServer.cast(server, {:compilation_finished, self()})
++  end
++
+   def dialyzer_finished(server \\ __MODULE__, diagnostics, build_ref) do
+     GenServer.cast(server, {:dialyzer_finished, diagnostics, build_ref})
+   end
+@@ -306,6 +314,13 @@
+   end
+ 
+   @impl GenServer
++  def handle_cast({:compilation_finished, pid}, state = %__MODULE__{build_pid: pid}) do
++    {:noreply, %{state | in_flight_changed_files: MapSet.new()}}
++  end
++
++  def handle_cast({:compilation_finished, _pid}, state), do: {:noreply, state}
++
++  @impl GenServer
+   def handle_cast({:build_finished, {status, diagnostics}}, state = %__MODULE__{})
+       when status in [:ok, :noop, :error, :no_mixfile] and is_list(diagnostics) do
+     {:noreply, handle_build_result(status, diagnostics, state)}
+@@ -387,6 +402,11 @@
+   end
+ 
+   @impl GenServer
++  def handle_info({:timeout, ref, :start_build}, state = %__MODULE__{build_timer: ref}) do
++    {:noreply, start_build(%{state | build_timer: nil})}
++  end
++
++  @impl GenServer
+   def handle_info(:default_config, state = %__MODULE__{settings: nil}) do
+     Logger.warning(
+       "Did not receive workspace/didChangeConfiguration notification after #{@default_config_timeout} seconds. " <>
+@@ -407,7 +427,17 @@
+         {:DOWN, ref, _, _pid, reason},
+         %__MODULE__{build_ref: ref, build_running?: true} = state
+       ) do
+-    state = %{state | build_running?: false}
++    # A successful Mix compilation acknowledges only its own batch. Any
++    # unacknowledged paths survive failure, skipped compilation, or worker exit.
++    # Retention alone does not schedule another build and cannot spin on errors.
++    state = %{
++      state
++      | build_running?: false,
++        build_pid: nil,
++        pending_changed_files:
++          MapSet.union(state.pending_changed_files, state.in_flight_changed_files),
++        in_flight_changed_files: MapSet.new()
++    }
+ 
+     # in case the build was interrupted make sure that cwd is reset to project dir
+     case File.cd(state.project_dir) do
+@@ -766,7 +796,7 @@
+     else
+       WorkspaceSymbols.notify_uris_modified([uri])
+       state = update_in(state.source_files[uri], &%{&1 | dirty?: false})
+-      trigger_build(state)
++      trigger_build(state, [SourceFile.Path.from_uri(uri)])
+     end
+   end
+ 
+@@ -785,8 +815,8 @@
+     additional_watched_extensions =
+       Map.get(state.settings || %{}, "additionalWatchedExtensions", [])
+ 
+-    needs_build =
+-      Enum.any?(changes, fn %GenLSP.Structures.FileEvent{uri: uri, type: type} ->
++    build_changes =
++      Enum.filter(changes, fn %GenLSP.Structures.FileEvent{uri: uri, type: type} ->
+         path = SourceFile.Path.from_uri(uri)
+ 
+         relative_path = Path.relative_to(path, state.project_dir)
+@@ -848,8 +878,8 @@
+     |> Enum.map(& &1.uri)
+     |> WorkspaceSymbols.notify_uris_modified()
+ 
+-    if needs_build do
+-      trigger_build(state)
++    if build_changes != [] do
++      trigger_build(state, Enum.map(build_changes, &SourceFile.Path.from_uri(&1.uri)))
+     else
+       state
+     end
+@@ -1971,6 +2001,34 @@
+   # Build
+ 
+   defp trigger_build(
++         state = %__MODULE__{project_dir: project_dir},
++         changed_files \\ []
++       ) do
++    state = %{
++      state
++      | pending_changed_files:
++          MapSet.union(state.pending_changed_files, MapSet.new(changed_files))
++    }
++
++    if is_binary(project_dir) do
++      # A fixed window, not a sliding debounce. Later notifications cannot
++      # postpone the scheduled build. Events during compilation form its successor.
++      unless state.needs_build?, do: JsonRpc.telemetry("build_queued", %{}, %{})
++
++      timer =
++        if state.build_running? or state.build_timer do
++          state.build_timer
++        else
++          :erlang.start_timer(250, self(), :start_build)
++        end
++
++      %{state | build_timer: timer, needs_build?: true, analysis_ready?: false}
++    else
++      state
++    end
++  end
++
++  defp start_build(
+          state = %__MODULE__{project_dir: project_dir, full_build_done?: full_build_done?}
+        ) do
+     cond do
+@@ -1981,10 +2039,11 @@
+         opts = [
+           fetch_deps?: Map.get(state.settings || %{}, "fetchDeps", false),
+           compile?: Map.get(state.settings || %{}, "autoBuild", true),
+-          force?: not full_build_done?
++          force?: not full_build_done?,
++          changed_files: MapSet.to_list(state.pending_changed_files)
+         ]
+ 
+-        {_pid, build_ref} =
++        {build_pid, build_ref} =
+           case File.cwd() do
+             {:ok, cwd} ->
+               if Path.absname(cwd) == Path.absname(project_dir) do
+@@ -2033,6 +2092,9 @@
+           %__MODULE__{
+             state
+             | build_ref: build_ref,
++              build_pid: build_pid,
++              in_flight_changed_files: state.pending_changed_files,
++              pending_changed_files: MapSet.new(),
+               needs_build?: false,
+               build_running?: true,
+               analysis_ready?: false,
+--- a/apps/language_server/lib/language_server/build.ex
++++ b/apps/language_server/lib/language_server/build.ex
+@@ -194,7 +194,10 @@
+          opts
+        ) do
+     if Keyword.get(opts, :compile?) do
+-      {status, compile_raw_diagnostics} = run_mix_compile(Keyword.get(opts, :force?, false))
++      {status, compile_raw_diagnostics} =
++        run_mix_compile(Keyword.get(opts, :force?, false), Keyword.get(opts, :changed_files, []))
++
++      if status in [:ok, :noop], do: Server.compilation_finished(parent)
+ 
+       compile_diagnostics =
+         Enum.map(compile_raw_diagnostics, fn diag ->
+@@ -520,7 +523,7 @@
+ 
+   ## Compilation and Cleaning
+ 
+-  defp run_mix_compile(force?) do
++  defp run_mix_compile(force?, changed_files) do
+     opts = [
+       "--return-errors",
+       "--ignore-module-conflict",
+@@ -533,6 +536,8 @@
+       else
+         opts
+       end
++
++    opts = opts ++ Enum.flat_map(changed_files, &["--force-path", &1])
+ 
+     case Mix.Task.run("compile", opts) do
+       {status, diagnostics} when status in [:ok, :error, :noop] and is_list(diagnostics) ->
+--- a/apps/language_server/test/support/server_test_helpers.ex
++++ b/apps/language_server/test/support/server_test_helpers.ex
+@@ -122,7 +122,7 @@
+   def wait_until_compiled(pid) do
+     state = :sys.get_state(pid)
+ 
+-    if state.build_running? do
++    if state.build_running? or state.build_timer != nil do
+       Process.sleep(500)
+       wait_until_compiled(pid)
+     end
+--- a/apps/language_server/test/server_test.exs
++++ b/apps/language_server/test/server_test.exs
+@@ -2179,6 +2179,7 @@
+         uri = SourceFile.Path.to_uri("a.ex")
+         Server.receive_packet(server, did_open(uri, "elixir", 1, ""))
+         Server.receive_packet(server, did_save(uri))
++        wait_until_compiled(server)
+ 
+         assert_receive notification("window/logMessage", %{
+                          "message" => "Compile took" <> _

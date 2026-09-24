@@ -1,0 +1,2083 @@
+{
+  "source_hashes": {
+    "neovim_sync.lua": "133a9fc1b48578c2620f860ed546ff729c42ac73b1e2d908ca8357fc0e414763",
+    "neovim_feedback.lua": "0b9cabc4f84eadcfdf92930cba37804acaff95a777b90471fcac63aebd39a141",
+    "neovim_hook.py": "d5150976a6154f573e883e6ddf8f149f3206166748fcbd7e4c5d936c822088f8",
+    "neovim_init.lua": "5d063e55082a1a8f1fae21f172840230e8ad22bf3f3846f20505017836714c26",
+    "neovim_launcher.py": "3e506065033d0753133a956dce274d22459cd73e54c0122b6d86812afb2be802",
+    "neovim_dogfood.py": "8dd9306e26264547d2c0adf2a189c793114748c246df89216e4c6be2985d8a7b"
+  },
+  "suites": {
+    "green-3": {
+      "queried_file_error": {
+        "seconds": 0.3287561250035651,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: lib/caller.ex:1:1: error: ** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)  \nlib/caller.ex:2:19: error: undefined function missing_revision/0 (expected V2Caller to define such a function or for it to be imported, but none are available)\nFeedback receipt: d85013b9e0d5"
+          }
+        }
+      },
+      "queried_file_repair": {
+        "seconds": 0.3248172090097796,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Previously reported compiler diagnostics cleared after compilation.\nFeedback receipt: 31b396b932ad"
+          }
+        }
+      },
+      "diagnostics_after_repair": {
+        "isError": false,
+        "data": {
+          "diagnostics": {}
+        }
+      },
+      "save_notifications": [
+        {
+          "data": {
+            "textDocument": {
+              "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/green-3/alpha/lib/caller.ex"
+            },
+            "text": "defmodule V2Caller do\n  def call_1, do: missing_revision()\n  def call_2, do: V2Target.answer()\nend\n"
+          },
+          "time": 79160.200994625,
+          "method": "sent:textDocument/didSave"
+        },
+        {
+          "data": {
+            "textDocument": {
+              "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/green-3/alpha/lib/caller.ex"
+            },
+            "text": "defmodule V2Caller do\n  def call_1, do: V2Target.answer()\n  def call_2, do: V2Target.answer()\nend\n"
+          },
+          "time": 79161.730582416,
+          "method": "sent:textDocument/didSave"
+        }
+      ],
+      "logic_boundaries": {
+        "failed_stop_preserved": true,
+        "delayed_start_guarded": true,
+        "scan_budget_ms": 200.462875,
+        "private_read": true,
+        "first_edit": true,
+        "next_edit": true
+      },
+      "pending_hover": {
+        "isError": false,
+        "data": {
+          "error": {
+            "code": "elixirls_not_ready",
+            "feedback": {
+              "building": false,
+              "completed": -1,
+              "generation": 2,
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+              "status": "pending",
+              "uncertain": false
+            },
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+            "retryAfterMs": 1000,
+            "retryable": true
+          }
+        }
+      },
+      "pending_diagnostics": {
+        "isError": false,
+        "data": {
+          "error": {
+            "code": "elixirls_not_ready",
+            "diagnostics": [],
+            "feedback": {
+              "building": false,
+              "completed": -1,
+              "generation": 2,
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+              "status": "pending",
+              "uncertain": false
+            },
+            "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+            "retryAfterMs": 1000,
+            "retryable": true
+          }
+        }
+      },
+      "uncertain_diagnostics": {
+        "isError": false,
+        "data": {
+          "error": {
+            "code": "elixirls_uncertain",
+            "diagnostics": [],
+            "feedback": {
+              "building": false,
+              "completed": -1,
+              "generation": 2,
+              "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+              "status": "uncertain",
+              "uncertain": true
+            },
+            "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+            "retryable": false
+          }
+        }
+      },
+      "completed": true
+    },
+    "budget-1": {
+      "initial_stop": {
+        "seconds": 0.086,
+        "output": {}
+      },
+      "three_second_error": {
+        "seconds": 3.317,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: lib/target.ex:1:1: error: ** (CompileError) lib/target.ex: cannot compile module V2Target (errors have been logged)  \nlib/target.ex:5:19: error: undefined function missing_budget/0 (expected V2Target to define such a function or for it to be imported, but none are available)"
+          }
+        }
+      },
+      "fast_repair": {
+        "seconds": 0.322,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Previously reported compiler diagnostics cleared after compilation."
+          }
+        }
+      },
+      "eight_second_pending": {
+        "seconds": 4.775,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result."
+          }
+        }
+      },
+      "unchanged_tool_does_not_wait": {
+        "seconds": 0.094,
+        "output": {}
+      },
+      "final_edit_stop_feedback": {
+        "seconds": 3.464,
+        "output": {
+          "decision": "block",
+          "reason": "ElixirLS: lib/target.ex:1:1: error: ** (CompileError) lib/target.ex: cannot compile module V2Target (errors have been logged)  \nlib/target.ex:5:19: error: undefined function missing_budget/0 (expected V2Target to define such a function or for it to be imported, but none are available)"
+        }
+      },
+      "stop_not_repeated": {
+        "seconds": 0.084,
+        "output": {}
+      },
+      "very_slow_pending": {
+        "seconds": 4.772,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result."
+          }
+        }
+      },
+      "stop_budget_exhausted": {
+        "seconds": 4.77,
+        "output": {
+          "decision": "block",
+          "reason": "ElixirLS: Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result."
+        }
+      },
+      "stalled_rpc": {
+        "seconds": 4.945,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS feedback unavailable: hook deadline reached while waiting for feedback. This does not mean the source is error-free."
+          }
+        }
+      },
+      "cleanup": {
+        "matched": true,
+        "samples": [
+          {
+            "seconds": 0.042,
+            "value": {}
+          }
+        ]
+      },
+      "completed": true
+    },
+    "hooks-1": {
+      "automatic_buffer_refresh_without_query": {
+        "matched": true,
+        "samples": [
+          {
+            "seconds": 0.03,
+            "value": [
+              {
+                "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+                "text": [
+                  "defmodule V2Caller do",
+                  "  def call_1, do: V2Target.answer()",
+                  "  def call_2, do: V2Target.answer()",
+                  "end"
+                ],
+                "modified": false
+              }
+            ]
+          },
+          {
+            "seconds": 0.285,
+            "value": [
+              {
+                "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+                "text": [
+                  "defmodule V2Caller do",
+                  "  def call_1, do: missing_local()",
+                  "  def call_2, do: V2Target.answer()",
+                  "end"
+                ],
+                "modified": false
+              }
+            ]
+          }
+        ]
+      },
+      "codex_error": {
+        "seconds": 0.089,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: lib/caller.ex:1:1: error: ** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)  \nlib/caller.ex:2:19: error: undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)"
+          }
+        }
+      },
+      "unchanged_error": {
+        "seconds": 0.094,
+        "output": {}
+      },
+      "beta_unaffected": {
+        "seconds": 0.09,
+        "output": {}
+      },
+      "claude_atomic_repair": {
+        "seconds": 0.306,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Previously reported compiler diagnostics cleared after compilation."
+          }
+        }
+      },
+      "claude_failed_shell": {
+        "seconds": 0.305,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUseFailure",
+            "additionalContext": "ElixirLS: lib/caller.ex:1:1: error: ** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)  \nlib/caller.ex:2:19: error: undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)"
+          }
+        }
+      },
+      "slow_pending": {
+        "seconds": 0.243,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result."
+          }
+        }
+      },
+      "slow_later_feedback": {
+        "matched": true,
+        "samples": [
+          {
+            "seconds": 0.091,
+            "value": {
+              "seconds": 0.091,
+              "output": {}
+            }
+          },
+          {
+            "seconds": 0.443,
+            "value": {
+              "seconds": 0.098,
+              "output": {}
+            }
+          },
+          {
+            "seconds": 0.785,
+            "value": {
+              "seconds": 0.091,
+              "output": {}
+            }
+          },
+          {
+            "seconds": 1.13,
+            "value": {
+              "seconds": 0.091,
+              "output": {}
+            }
+          },
+          {
+            "seconds": 1.479,
+            "value": {
+              "seconds": 0.096,
+              "output": {}
+            }
+          },
+          {
+            "seconds": 1.825,
+            "value": {
+              "seconds": 0.091,
+              "output": {}
+            }
+          },
+          {
+            "seconds": 2.169,
+            "value": {
+              "seconds": 0.09,
+              "output": {}
+            }
+          },
+          {
+            "seconds": 2.515,
+            "value": {
+              "seconds": 0.092,
+              "output": {}
+            }
+          },
+          {
+            "seconds": 2.857,
+            "value": {
+              "seconds": 0.091,
+              "output": {}
+            }
+          },
+          {
+            "seconds": 3.204,
+            "value": {
+              "seconds": 0.092,
+              "output": {
+                "hookSpecificOutput": {
+                  "hookEventName": "PostToolUse",
+                  "additionalContext": "ElixirLS: Compilation completed; no compiler diagnostics are currently reported."
+                }
+              }
+            }
+          }
+        ]
+      },
+      "overlap_uncertain": {
+        "seconds": 0.091,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build."
+          }
+        }
+      },
+      "overlap_latch": {
+        "seconds": 0.087,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build."
+          }
+        }
+      },
+      "events": [
+        {
+          "data": {
+            "message": "Started ElixirLS v0.31.1",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79102.735175208
+        },
+        {
+          "data": {
+            "message": "Running in /private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79102.737360833
+        },
+        {
+          "data": {
+            "message": "ElixirLS built with elixir 1.20.4 on OTP 29",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79102.737423708
+        },
+        {
+          "data": {
+            "message": "Running on elixir 1.20.4 (compiled with Erlang/OTP 29) on OTP 29",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79102.737459208
+        },
+        {
+          "data": {
+            "message": "Protocols are not consolidated",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79102.737508291
+        },
+        {
+          "data": {
+            "name": "eep48",
+            "measurements": {},
+            "properties": {
+              "elixir_ls.otp_release": "29",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.mix_env": "dev",
+              "elixir_ls.eep48": "true",
+              "elixir_ls.elixir_release": "1.20"
+            }
+          },
+          "method": "telemetry/event",
+          "time": 79102.738270833
+        },
+        {
+          "data": {
+            "message": "Elixir sources not found (checking in /private/tmp/elixir-20260828-4709-q6w1ex/elixir-1.20.4). Code navigation to Elixir modules disabled.",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79102.745723541
+        },
+        {
+          "data": {
+            "name": "elixir_sources",
+            "measurements": {},
+            "properties": {
+              "elixir_ls.otp_release": "29",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.elixir_sources": "false",
+              "elixir_ls.mix_env": "dev",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.elixir_release": "1.20"
+            }
+          },
+          "method": "telemetry/event",
+          "time": 79102.745805416
+        },
+        {
+          "data": {
+            "name": "otp_sources",
+            "measurements": {},
+            "properties": {
+              "elixir_ls.otp_release": "29",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.otp_sources": "true",
+              "elixir_ls.mix_env": "dev",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.elixir_release": "1.20"
+            }
+          },
+          "method": "telemetry/event",
+          "time": 79102.745820416
+        },
+        {
+          "data": {
+            "name": "dialyzer_support",
+            "measurements": {},
+            "properties": {
+              "elixir_ls.otp_release": "29",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "dev",
+              "elixir_ls.dialyzer_support": "true",
+              "elixir_ls.dialyzer_support_reason": "",
+              "elixir_ls.elixir_release": "1.20"
+            }
+          },
+          "method": "telemetry/event",
+          "time": 79102.831855833
+        },
+        {
+          "data": {
+            "settings": {
+              "elixirLS": {
+                "suggestSpecs": false,
+                "fetchDeps": false,
+                "dialyzerEnabled": false
+              }
+            }
+          },
+          "method": "sent:workspace/didChangeConfiguration",
+          "time": 79102.866135416
+        },
+        {
+          "data": {
+            "textDocument": {
+              "languageId": "elixir",
+              "text": "defmodule V2Caller do\n  def call_1, do: V2Target.answer()\n  def call_2, do: V2Target.answer()\nend\n",
+              "version": 0,
+              "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex"
+            }
+          },
+          "method": "sent:textDocument/didOpen",
+          "time": 79102.866159916
+        },
+        {
+          "data": {
+            "name": "lsp_request",
+            "measurements": {
+              "elixir_ls.lsp_request_time": 80
+            },
+            "properties": {
+              "elixir_ls.otp_release": "29",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.mix_env": "dev",
+              "elixir_ls.lsp_command": "initialize",
+              "elixir_ls.elixir_release": "1.20"
+            }
+          },
+          "method": "telemetry/event",
+          "time": 79102.874618458
+        },
+        {
+          "data": {
+            "message": "Received client configuration via workspace/configuration\n%{\"dialyzerEnabled\" => false, \"fetchDeps\" => false, \"suggestSpecs\" => false}",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79102.877307666
+        },
+        {
+          "data": {
+            "name": "lsp_config",
+            "measurements": {},
+            "properties": {
+              "elixir_ls.otp_release": "29",
+              "elixir_ls.autoBuild": "true",
+              "elixir_ls.autoInsertRequiredAlias": "true",
+              "elixir_ls.dialyzerEnabled": "false",
+              "elixir_ls.dialyzerFormat": "",
+              "elixir_ls.enableTestLenses": "false",
+              "elixir_ls.envVariables": "false",
+              "elixir_ls.fetchDeps": "false",
+              "elixir_ls.languageServerOverridePath": "false",
+              "elixir_ls.mcpEnabled": "false",
+              "elixir_ls.mcpPort": "3830",
+              "elixir_ls.mixEnv": "test",
+              "elixir_ls.mixTarget": "host",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.signatureAfterComplete": "true",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.suggestSpecs": "false",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.stdlibSrcDir": "/opt/homebrew/Cellar/elixir/1.20.4/lib/elixir",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.projectDir": "false"
+            }
+          },
+          "method": "telemetry/event",
+          "time": 79102.888187416
+        },
+        {
+          "data": {
+            "message": "Client does not support workspace/didChangeConfiguration dynamic registration",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79102.888432041
+        },
+        {
+          "data": {
+            "message": "Registering for workspace/didChangeWatchedFiles notifications",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79102.8886925
+        },
+        {
+          "data": {
+            "message": "Starting build with MIX_ENV: test MIX_TARGET: host",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79102.88976775
+        },
+        {
+          "data": {
+            "message": "client/registerCapability succeeded",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79102.909419666
+        },
+        {
+          "data": {
+            "message": "Received workspace/didChangeConfiguration",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79102.9118005
+        },
+        {
+          "data": {
+            "message": "Received client configuration via workspace/didChangeConfiguration\n%{\"dialyzerEnabled\" => false, \"fetchDeps\" => false, \"suggestSpecs\" => false}",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79102.912391125
+        },
+        {
+          "data": {
+            "message": "Compiling 2 files (.ex)",
+            "type": 4
+          },
+          "method": "window/logMessage",
+          "time": 79102.912520458
+        },
+        {
+          "data": {
+            "message": "Generated v2_fixture app",
+            "type": 4
+          },
+          "method": "window/logMessage",
+          "time": 79102.924896166
+        },
+        {
+          "data": {
+            "message": "Compile took 37 milliseconds",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79102.927799333
+        },
+        {
+          "data": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 37
+            },
+            "properties": {
+              "elixir_ls.otp_release": "29",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.build_result": "mix_compile_ok",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.elixir_release": "1.20"
+            }
+          },
+          "method": "telemetry/event",
+          "time": 79102.928139
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex"
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79102.935422
+        },
+        {
+          "data": {
+            "message": "[ElixirLS WorkspaceSymbols] Indexing...",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79102.935674625
+        },
+        {
+          "data": {
+            "message": "[ElixirLS WorkspaceSymbols] Module discovery complete",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79102.935736291
+        },
+        {
+          "data": {
+            "message": "[ElixirLS WorkspaceSymbols] 5 symbols added to index in 3ms",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79102.936269166
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79103.23168325
+        },
+        {
+          "data": {
+            "name": "lsp_request",
+            "measurements": {
+              "elixir_ls.lsp_request_time": 15
+            },
+            "properties": {
+              "elixir_ls.otp_release": "29",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.lsp_command": "textDocument_hover",
+              "elixir_ls.elixir_release": "1.20"
+            }
+          },
+          "method": "telemetry/event",
+          "time": 79103.558657958
+        },
+        {
+          "data": {
+            "changes": [
+              {
+                "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+                "type": 1
+              }
+            ]
+          },
+          "method": "sent:workspace/didChangeWatchedFiles",
+          "time": 79106.072766416
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79106.083576083
+        },
+        {
+          "data": {
+            "message": "Starting build with MIX_ENV: test MIX_TARGET: host",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.083870166
+        },
+        {
+          "data": {
+            "textDocument": {
+              "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex"
+            }
+          },
+          "method": "sent:textDocument/didClose",
+          "time": 79106.092254791
+        },
+        {
+          "data": {
+            "textDocument": {
+              "languageId": "elixir",
+              "text": "defmodule V2Caller do\n  def call_1, do: missing_local()\n  def call_2, do: V2Target.answer()\nend\n",
+              "version": 0,
+              "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex"
+            }
+          },
+          "method": "sent:textDocument/didOpen",
+          "time": 79106.092279708
+        },
+        {
+          "data": {
+            "textDocument": {
+              "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex"
+            },
+            "text": "defmodule V2Caller do\n  def call_1, do: missing_local()\n  def call_2, do: V2Target.answer()\nend\n"
+          },
+          "method": "sent:textDocument/didSave",
+          "time": 79106.09232475
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79106.092354541
+        },
+        {
+          "data": {
+            "message": "Compiling 1 file (.ex)",
+            "type": 4
+          },
+          "method": "window/logMessage",
+          "time": 79106.096050333
+        },
+        {
+          "data": {
+            "message": "    error: undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)\n    \u2502\n  2 \u2502   def call_1, do: missing_local()\n    \u2502                   ^^^^^^^^^^^^^\n    \u2502\n    \u2514\u2500 lib/caller.ex:2:19: V2Caller.call_1/0\n",
+            "type": 2
+          },
+          "method": "window/logMessage",
+          "time": 79106.103581125
+        },
+        {
+          "data": {
+            "message": "\n== Compilation error in file lib/caller.ex ==\n** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)\n",
+            "type": 2
+          },
+          "method": "window/logMessage",
+          "time": 79106.103995
+        },
+        {
+          "data": {
+            "message": "Compile took 28 milliseconds",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.105281458
+        },
+        {
+          "data": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 28
+            },
+            "properties": {
+              "elixir_ls.otp_release": "29",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.build_result": "mix_compile_error",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.elixir_release": "1.20"
+            }
+          },
+          "method": "telemetry/event",
+          "time": 79106.105530416
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79106.11292
+        },
+        {
+          "data": {
+            "message": "[ElixirLS WorkspaceSymbols] Updating index...",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.11317925
+        },
+        {
+          "data": {
+            "message": "Starting build with MIX_ENV: test MIX_TARGET: host",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.11322875
+        },
+        {
+          "data": {
+            "message": "[ElixirLS WorkspaceSymbols] 0 modules need reindexing",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.120456291
+        },
+        {
+          "data": {
+            "message": "[ElixirLS WorkspaceSymbols] 0 symbols added to index in 0ms",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.120526166
+        },
+        {
+          "data": {
+            "message": "Compiling 1 file (.ex)",
+            "type": 4
+          },
+          "method": "window/logMessage",
+          "time": 79106.122695708
+        },
+        {
+          "data": {
+            "message": "    error: undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)\n    \u2502\n  2 \u2502   def call_1, do: missing_local()\n    \u2502                   ^^^^^^^^^^^^^\n    \u2502\n    \u2514\u2500 lib/caller.ex:2:19: V2Caller.call_1/0\n",
+            "type": 2
+          },
+          "method": "window/logMessage",
+          "time": 79106.125523333
+        },
+        {
+          "data": {
+            "message": "\n== Compilation error in file lib/caller.ex ==\n** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)\n",
+            "type": 2
+          },
+          "method": "window/logMessage",
+          "time": 79106.125902791
+        },
+        {
+          "data": {
+            "message": "Compile took 20 milliseconds",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.12686475
+        },
+        {
+          "data": {
+            "diagnostics": [
+              {
+                "data": null,
+                "relatedInformation": [],
+                "tags": [],
+                "message": "** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)\n\n",
+                "range": {
+                  "start": {
+                    "line": 0,
+                    "character": 0
+                  },
+                  "end": {
+                    "line": 0,
+                    "character": 0
+                  }
+                },
+                "severity": 1,
+                "source": "Elixir"
+              },
+              {
+                "data": null,
+                "relatedInformation": [],
+                "tags": [],
+                "message": "undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)",
+                "range": {
+                  "start": {
+                    "line": 1,
+                    "character": 18
+                  },
+                  "end": {
+                    "line": 1,
+                    "character": 31
+                  }
+                },
+                "severity": 1,
+                "source": "Elixir"
+              }
+            ],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79106.12723425
+        },
+        {
+          "data": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 20
+            },
+            "properties": {
+              "elixir_ls.otp_release": "29",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.build_result": "mix_compile_error",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.elixir_release": "1.20"
+            }
+          },
+          "method": "telemetry/event",
+          "time": 79106.128285041
+        },
+        {
+          "data": {
+            "diagnostics": [
+              {
+                "data": null,
+                "relatedInformation": [],
+                "tags": [],
+                "message": "** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)\n\n",
+                "range": {
+                  "start": {
+                    "line": 0,
+                    "character": 0
+                  },
+                  "end": {
+                    "line": 0,
+                    "character": 0
+                  }
+                },
+                "severity": 1,
+                "source": "Elixir"
+              },
+              {
+                "data": null,
+                "relatedInformation": [],
+                "tags": [],
+                "message": "undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)",
+                "range": {
+                  "start": {
+                    "line": 1,
+                    "character": 18
+                  },
+                  "end": {
+                    "line": 1,
+                    "character": 31
+                  }
+                },
+                "severity": 1,
+                "source": "Elixir"
+              }
+            ],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79106.388454708
+        },
+        {
+          "data": {
+            "textDocument": {
+              "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex"
+            }
+          },
+          "method": "sent:textDocument/didClose",
+          "time": 79106.605383708
+        },
+        {
+          "data": {
+            "textDocument": {
+              "languageId": "elixir",
+              "text": "defmodule V2Caller do\n  def call_1, do: V2Target.answer()\n  def call_2, do: V2Target.answer()\nend\n",
+              "version": 0,
+              "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex"
+            }
+          },
+          "method": "sent:textDocument/didOpen",
+          "time": 79106.605390583
+        },
+        {
+          "data": {
+            "textDocument": {
+              "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex"
+            },
+            "text": "defmodule V2Caller do\n  def call_1, do: V2Target.answer()\n  def call_2, do: V2Target.answer()\nend\n"
+          },
+          "method": "sent:textDocument/didSave",
+          "time": 79106.605623166
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79106.607109
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79106.607558458
+        },
+        {
+          "data": {
+            "message": "Starting build with MIX_ENV: test MIX_TARGET: host",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.607718583
+        },
+        {
+          "data": {
+            "message": "Compiling 1 file (.ex)",
+            "type": 4
+          },
+          "method": "window/logMessage",
+          "time": 79106.622297625
+        },
+        {
+          "data": {
+            "changes": [
+              {
+                "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+                "type": 1
+              }
+            ]
+          },
+          "method": "sent:workspace/didChangeWatchedFiles",
+          "time": 79106.622445541
+        },
+        {
+          "data": {
+            "message": "Compile took 24 milliseconds",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.631663541
+        },
+        {
+          "data": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 24
+            },
+            "properties": {
+              "elixir_ls.otp_release": "29",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.build_result": "mix_compile_ok",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.elixir_release": "1.20"
+            }
+          },
+          "method": "telemetry/event",
+          "time": 79106.631851708
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79106.63878275
+        },
+        {
+          "data": {
+            "message": "[ElixirLS WorkspaceSymbols] Updating index...",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.639000875
+        },
+        {
+          "data": {
+            "message": "Starting build with MIX_ENV: test MIX_TARGET: host",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.639055833
+        },
+        {
+          "data": {
+            "message": "[ElixirLS WorkspaceSymbols] 1 modules need reindexing",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.646026625
+        },
+        {
+          "data": {
+            "message": "[ElixirLS WorkspaceSymbols] 3 symbols added to index in 0ms",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.646046333
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79106.648401916
+        },
+        {
+          "data": {
+            "message": "Compile took 15 milliseconds",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.648721375
+        },
+        {
+          "data": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 15
+            },
+            "properties": {
+              "elixir_ls.otp_release": "29",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.build_result": "mix_compile_noop",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.elixir_release": "1.20"
+            }
+          },
+          "method": "telemetry/event",
+          "time": 79106.648737083
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79106.9156615
+        },
+        {
+          "data": {
+            "textDocument": {
+              "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex"
+            }
+          },
+          "method": "sent:textDocument/didClose",
+          "time": 79106.91583425
+        },
+        {
+          "data": {
+            "textDocument": {
+              "languageId": "elixir",
+              "text": "defmodule V2Caller do\n  def call_1, do: missing_local()\n  def call_2, do: V2Target.answer()\nend\n",
+              "version": 0,
+              "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex"
+            }
+          },
+          "method": "sent:textDocument/didOpen",
+          "time": 79106.915842166
+        },
+        {
+          "data": {
+            "textDocument": {
+              "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex"
+            },
+            "text": "defmodule V2Caller do\n  def call_1, do: missing_local()\n  def call_2, do: V2Target.answer()\nend\n"
+          },
+          "method": "sent:textDocument/didSave",
+          "time": 79106.915888041
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79106.916869416
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79106.917282791
+        },
+        {
+          "data": {
+            "message": "Starting build with MIX_ENV: test MIX_TARGET: host",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.917546791
+        },
+        {
+          "data": {
+            "message": "Compiling 1 file (.ex)",
+            "type": 4
+          },
+          "method": "window/logMessage",
+          "time": 79106.933547625
+        },
+        {
+          "data": {
+            "message": "    error: undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)\n    \u2502\n  2 \u2502   def call_1, do: missing_local()\n    \u2502                   ^^^^^^^^^^^^^\n    \u2502\n    \u2514\u2500 lib/caller.ex:2:19: V2Caller.call_1/0\n",
+            "type": 2
+          },
+          "method": "window/logMessage",
+          "time": 79106.937642583
+        },
+        {
+          "data": {
+            "changes": [
+              {
+                "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+                "type": 1
+              }
+            ]
+          },
+          "method": "sent:workspace/didChangeWatchedFiles",
+          "time": 79106.937754583
+        },
+        {
+          "data": {
+            "message": "\n== Compilation error in file lib/caller.ex ==\n** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)\n",
+            "type": 2
+          },
+          "method": "window/logMessage",
+          "time": 79106.944955791
+        },
+        {
+          "data": {
+            "message": "Compile took 22 milliseconds",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.945005
+        },
+        {
+          "data": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 22
+            },
+            "properties": {
+              "elixir_ls.otp_release": "29",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.build_result": "mix_compile_error",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.elixir_release": "1.20"
+            }
+          },
+          "method": "telemetry/event",
+          "time": 79106.945062583
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79106.951666625
+        },
+        {
+          "data": {
+            "message": "[ElixirLS WorkspaceSymbols] Updating index...",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.951905
+        },
+        {
+          "data": {
+            "message": "Starting build with MIX_ENV: test MIX_TARGET: host",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.951943833
+        },
+        {
+          "data": {
+            "message": "[ElixirLS WorkspaceSymbols] 0 modules need reindexing",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.958350958
+        },
+        {
+          "data": {
+            "message": "[ElixirLS WorkspaceSymbols] 0 symbols added to index in 0ms",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.958369416
+        },
+        {
+          "data": {
+            "message": "Compiling 1 file (.ex)",
+            "type": 4
+          },
+          "method": "window/logMessage",
+          "time": 79106.958410166
+        },
+        {
+          "data": {
+            "message": "    error: undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)\n    \u2502\n  2 \u2502   def call_1, do: missing_local()\n    \u2502                   ^^^^^^^^^^^^^\n    \u2502\n    \u2514\u2500 lib/caller.ex:2:19: V2Caller.call_1/0\n",
+            "type": 2
+          },
+          "method": "window/logMessage",
+          "time": 79106.958428833
+        },
+        {
+          "data": {
+            "message": "\n== Compilation error in file lib/caller.ex ==\n** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)\n",
+            "type": 2
+          },
+          "method": "window/logMessage",
+          "time": 79106.958476541
+        },
+        {
+          "data": {
+            "message": "Compile took 17 milliseconds",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79106.958491458
+        },
+        {
+          "data": {
+            "diagnostics": [
+              {
+                "data": null,
+                "relatedInformation": [],
+                "tags": [],
+                "message": "** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)\n\n",
+                "range": {
+                  "start": {
+                    "line": 0,
+                    "character": 0
+                  },
+                  "end": {
+                    "line": 0,
+                    "character": 0
+                  }
+                },
+                "severity": 1,
+                "source": "Elixir"
+              },
+              {
+                "data": null,
+                "relatedInformation": [],
+                "tags": [],
+                "message": "undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)",
+                "range": {
+                  "start": {
+                    "line": 1,
+                    "character": 18
+                  },
+                  "end": {
+                    "line": 1,
+                    "character": 31
+                  }
+                },
+                "severity": 1,
+                "source": "Elixir"
+              }
+            ],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79106.958502041
+        },
+        {
+          "data": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 17
+            },
+            "properties": {
+              "elixir_ls.otp_release": "29",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.build_result": "mix_compile_error",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.elixir_release": "1.20"
+            }
+          },
+          "method": "telemetry/event",
+          "time": 79106.958935583
+        },
+        {
+          "data": {
+            "textDocument": {
+              "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex"
+            }
+          },
+          "method": "sent:textDocument/didClose",
+          "time": 79107.215412583
+        },
+        {
+          "data": {
+            "textDocument": {
+              "languageId": "elixir",
+              "text": "defmodule V2Caller do\n  def call_1, do: V2Target.answer()\n  def call_2, do: V2Target.answer()\nend\n",
+              "version": 0,
+              "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex"
+            }
+          },
+          "method": "sent:textDocument/didOpen",
+          "time": 79107.215420416
+        },
+        {
+          "data": {
+            "textDocument": {
+              "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex"
+            },
+            "text": "defmodule V2Caller do\n  def call_1, do: V2Target.answer()\n  def call_2, do: V2Target.answer()\nend\n"
+          },
+          "method": "sent:textDocument/didSave",
+          "time": 79107.215746
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79107.216630208
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79107.217101166
+        },
+        {
+          "data": {
+            "message": "Starting build with MIX_ENV: test MIX_TARGET: host",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79107.217340916
+        },
+        {
+          "data": {
+            "message": "Compiling 1 file (.ex)",
+            "type": 4
+          },
+          "method": "window/logMessage",
+          "time": 79107.232027708
+        },
+        {
+          "data": {
+            "changes": [
+              {
+                "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+                "type": 1
+              }
+            ]
+          },
+          "method": "sent:workspace/didChangeWatchedFiles",
+          "time": 79107.241138541
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79107.248551916
+        },
+        {
+          "data": {
+            "message": "Compile took 24 milliseconds",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79107.248955
+        },
+        {
+          "data": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 24
+            },
+            "properties": {
+              "elixir_ls.otp_release": "29",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.build_result": "mix_compile_ok",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.elixir_release": "1.20"
+            }
+          },
+          "method": "telemetry/event",
+          "time": 79107.249049083
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79107.256463291
+        },
+        {
+          "data": {
+            "message": "[ElixirLS WorkspaceSymbols] Updating index...",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79107.256969208
+        },
+        {
+          "data": {
+            "message": "Starting build with MIX_ENV: test MIX_TARGET: host",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79107.257047166
+        },
+        {
+          "data": {
+            "message": "[ElixirLS WorkspaceSymbols] 1 modules need reindexing",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79107.264264583
+        },
+        {
+          "data": {
+            "message": "[ElixirLS WorkspaceSymbols] 3 symbols added to index in 0ms",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79107.264355541
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79107.264389083
+        },
+        {
+          "data": {
+            "message": "Compile took 16 milliseconds",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79107.264651958
+        },
+        {
+          "data": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 16
+            },
+            "properties": {
+              "elixir_ls.otp_release": "29",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.build_result": "mix_compile_noop",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.elixir_release": "1.20"
+            }
+          },
+          "method": "telemetry/event",
+          "time": 79107.264675791
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79107.517282541
+        },
+        {
+          "data": {
+            "changes": [
+              {
+                "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/target.ex",
+                "type": 1
+              }
+            ]
+          },
+          "method": "sent:workspace/didChangeWatchedFiles",
+          "time": 79107.545679958
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79107.553108833
+        },
+        {
+          "data": {
+            "message": "Starting build with MIX_ENV: test MIX_TARGET: host",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79107.553462166
+        },
+        {
+          "data": {
+            "message": "Compiling 1 file (.ex)",
+            "type": 4
+          },
+          "method": "window/logMessage",
+          "time": 79107.562809833
+        },
+        {
+          "data": {
+            "message": "INVERSION_HOOK_SLOW_STARTED",
+            "type": 4
+          },
+          "method": "window/logMessage",
+          "time": 79107.564967208
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79110.573261541
+        },
+        {
+          "data": {
+            "message": "Compile took 3026 milliseconds",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79110.573714583
+        },
+        {
+          "data": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 3026
+            },
+            "properties": {
+              "elixir_ls.otp_release": "29",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.build_result": "mix_compile_ok",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.elixir_release": "1.20"
+            }
+          },
+          "method": "telemetry/event",
+          "time": 79110.5737565
+        },
+        {
+          "data": {
+            "message": "[ElixirLS WorkspaceSymbols] Updating index...",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79110.580785166
+        },
+        {
+          "data": {
+            "message": "[ElixirLS WorkspaceSymbols] 1 modules need reindexing",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79110.580849916
+        },
+        {
+          "data": {
+            "message": "[ElixirLS WorkspaceSymbols] 2 symbols added to index in 0ms",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79110.580880875
+        },
+        {
+          "data": {
+            "changes": [
+              {
+                "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/target.ex",
+                "type": 1
+              }
+            ]
+          },
+          "method": "sent:workspace/didChangeWatchedFiles",
+          "time": 79110.989208458
+        },
+        {
+          "data": {
+            "diagnostics": [],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/caller.ex",
+            "version": 0
+          },
+          "method": "textDocument/publishDiagnostics",
+          "time": 79110.9969025
+        },
+        {
+          "data": {
+            "message": "Starting build with MIX_ENV: test MIX_TARGET: host",
+            "type": 3
+          },
+          "method": "window/logMessage",
+          "time": 79110.997175458
+        },
+        {
+          "data": {
+            "message": "Compiling 1 file (.ex)",
+            "type": 4
+          },
+          "method": "window/logMessage",
+          "time": 79111.007736416
+        },
+        {
+          "data": {
+            "message": "INVERSION_HOOK_OVERLAP_A_STARTED",
+            "type": 4
+          },
+          "method": "window/logMessage",
+          "time": 79111.009615
+        },
+        {
+          "data": {
+            "changes": [
+              {
+                "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/hooks-1/alpha/lib/target.ex",
+                "type": 1
+              }
+            ]
+          },
+          "method": "sent:workspace/didChangeWatchedFiles",
+          "time": 79111.249655541
+        }
+      ],
+      "alpha_cleanup": {
+        "matched": true,
+        "samples": [
+          {
+            "seconds": 0.04,
+            "value": {}
+          }
+        ]
+      },
+      "beta_cleanup": {
+        "matched": true,
+        "samples": [
+          {
+            "seconds": 0.04,
+            "value": {}
+          }
+        ]
+      },
+      "completed": true
+    },
+    "inversion-1": {
+      "eof": {
+        "exit_code": 0,
+        "cleanup": {
+          "matched": true,
+          "samples": [
+            {
+              "seconds": 0.042,
+              "value": {}
+            }
+          ]
+        }
+      },
+      "parent_kill": {
+        "exit_code": -9,
+        "cleanup": {
+          "matched": true,
+          "samples": [
+            {
+              "seconds": 0.042,
+              "value": {
+                "56849": {
+                  "parent": 1,
+                  "state": "?Es",
+                  "command": "(beam.smp)"
+                },
+                "56986": {
+                  "parent": 56849,
+                  "state": "Ss",
+                  "command": "(erl_child_setup)"
+                }
+              }
+            },
+            {
+              "seconds": 0.344,
+              "value": {}
+            }
+          ]
+        }
+      },
+      "new_file": {
+        "seconds": 0.321,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: lib/new_error.ex:1:1: error: ** (CompileError) lib/new_error.ex: cannot compile module V2NewError (errors have been logged)  \nlib/new_error.ex:2:17: error: undefined function missing_new/0 (expected V2NewError to define such a function or for it to be imported, but none are available)"
+          }
+        }
+      },
+      "deleted_file": {
+        "seconds": 0.305,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Previously reported compiler diagnostics cleared after compilation."
+          }
+        }
+      },
+      "unsaved_conflict": {
+        "seconds": 0.09,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Neovim has unsaved changes; automatic reload was refused."
+          }
+        }
+      },
+      "unsaved_buffer_preserved": true,
+      "language_server_stopped": {
+        "seconds": 4.758,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Compiler feedback unavailable: ElixirLS is still starting or has stopped. This is not a clean result."
+          }
+        }
+      },
+      "failure_session_cleanup": {
+        "matched": true,
+        "samples": [
+          {
+            "seconds": 0.04,
+            "value": {}
+          }
+        ]
+      },
+      "server_unavailable": {
+        "seconds": 0.075,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS feedback unavailable: Expected one Neovim for the assigned workspace; found 0. This does not mean the source is error-free."
+          }
+        }
+      },
+      "completed": true
+    },
+    "cold-1": {
+      "cold_start": {
+        "uncertain": false,
+        "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.",
+        "status": "pending",
+        "building": true,
+        "completed": -1,
+        "generation": 0
+      },
+      "cold_edit": {
+        "seconds": 0.09269104200939182,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build."
+          }
+        }
+      },
+      "cold_diagnostics": {
+        "isError": false,
+        "data": {
+          "error": {
+            "code": "elixirls_uncertain",
+            "diagnostics": [
+              {
+                "message": "** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)\n\n",
+                "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/cold-1/alpha/lib/caller.ex",
+                "range": {
+                  "end": {
+                    "character": 1,
+                    "line": 1
+                  },
+                  "start": {
+                    "character": 1,
+                    "line": 1
+                  }
+                },
+                "severity": 1,
+                "source": "Elixir"
+              },
+              {
+                "message": "undefined function missing_cold/0 (expected V2Caller to define such a function or for it to be imported, but none are available)",
+                "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/four-fixes/cold-1/alpha/lib/caller.ex",
+                "range": {
+                  "end": {
+                    "character": 31,
+                    "line": 2
+                  },
+                  "start": {
+                    "character": 19,
+                    "line": 2
+                  }
+                },
+                "severity": 1,
+                "source": "Elixir"
+              }
+            ],
+            "feedback": {
+              "building": false,
+              "completed": 1,
+              "generation": 1,
+              "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+              "status": "uncertain",
+              "uncertain": true
+            },
+            "message": "Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+            "retryable": false
+          }
+        }
+      },
+      "cold_late_hook": {
+        "seconds": 0.08840962499380112,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS: Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.\nCached diagnostics (may be stale):\nlib/caller.ex:1:1: error: ** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)  \nlib/caller.ex:2:19: error: undefined function missing_cold/0 (expected V2Caller to define such a function or for it to be imported, but none are available)"
+          }
+        }
+      },
+      "concurrent_hooks": [
+        {
+          "seconds": 4.785511292007868,
+          "output": {
+            "hookSpecificOutput": {
+              "hookEventName": "PostToolUse",
+              "additionalContext": "ElixirLS: Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result."
+            }
+          }
+        },
+        {
+          "seconds": 4.784807542004273,
+          "output": {}
+        }
+      ],
+      "expired_stop": {
+        "seconds": 4.950380041991593,
+        "output": {
+          "decision": "block",
+          "reason": "ElixirLS feedback unavailable: hook deadline reached while waiting for feedback. This does not mean the source is error-free."
+        }
+      },
+      "stop_preserved": true,
+      "stop_retry": {
+        "seconds": 2.287935624990496,
+        "output": {
+          "decision": "block",
+          "reason": "ElixirLS: Compilation completed; no compiler diagnostics are currently reported."
+        }
+      },
+      "completed": true
+    }
+  }
+}

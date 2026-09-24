@@ -1,0 +1,101 @@
+--- a/crates/vv-mcp/src/main.rs
++++ b/crates/vv-mcp/src/main.rs
+@@ -149,7 +149,8 @@
+             format: resolve_format(args.output_format, args.command.is_some()),
+             max_results: args.max_results,
+         },
+-    )?;
++    )?
++    .with_instance_id(args.instance_id.clone());
+ 
+     // --instance-id 与 --timeout-ms 是全局选项：三个子命令都要路由到实例、都要发 RPC，
+     // 所以它们在每个子命令下都真实生效，而不是「用不上就忽略」
+--- a/crates/vv-mcp/src/server.rs
++++ b/crates/vv-mcp/src/server.rs
+@@ -34,6 +34,7 @@
+     registry: Registry,
+     managed: ManagedPool,
+     output: OutputConfig,
++    instance_id: Option<String>,
+ }
+ 
+ #[tool_router]
+@@ -55,6 +56,7 @@
+         uri: &str,
+         instance_id: Option<&str>,
+     ) -> Result<Instance, String> {
++        let instance_id = instance_id.or(self.instance_id.as_deref());
+         let instances = self.instances().await.map_err(|error| error.to_string())?;
+         match resolve_instance(&instances.instances, instance_id, Some(uri)).cloned() {
+             Ok(instance) => {
+@@ -90,11 +92,24 @@
+             managed: ManagedPool::new(registry.clone()),
+             registry,
+             output,
++            instance_id: None,
+         })
+     }
+ 
++    /// Bind a stdio session to an externally owned Neovim; never adopt a replacement.
++    pub fn with_instance_id(mut self, instance_id: Option<String>) -> Self {
++        self.instance_id = instance_id;
++        self
++    }
++
+     pub async fn instances(&self) -> Result<InstanceList> {
+-        self.registry.list().await
++        let mut instances = self.registry.list().await?;
++        if let Some(id) = &self.instance_id {
++            instances
++                .instances
++                .retain(|instance| &instance.instance_id == id);
++        }
++        Ok(instances)
+     }
+ 
+     pub async fn shutdown(&self) {
+@@ -284,22 +299,8 @@
+     }
+ 
+     async fn select_instance(&self, params: &LspParams) -> Result<Instance, String> {
+-        match self
+-            .resolve_active_instance(&params.uri, params.instance_id.as_deref())
++        self.resolve_active_instance(&params.uri, params.instance_id.as_deref())
+             .await
+-        {
+-            Ok(instance) => {
+-                self.managed.touch(&instance).await;
+-                Ok(instance)
+-            }
+-            Err(error)
+-                if params.instance_id.is_none()
+-                    && error.starts_with("Neovim instance not found:") =>
+-            {
+-                self.managed.ensure(&params.uri).await
+-            }
+-            Err(error) => Err(error),
+-        }
+     }
+ 
+     async fn request_lsp(
+@@ -363,14 +364,18 @@
+         .cloned();
+         let instance = match instance {
+             Ok(instance) => instance,
+-            Err(ResolveError::NotFound(_)) if params.instance_id.is_none() => {
++            Err(ResolveError::NotFound(_))
++                if params.instance_id.is_none() && self.instance_id.is_none() =>
++            {
+                 return read_file(params);
+             }
+             Err(error) => return Err(error.to_string()),
+         };
+         let mut client = match NvimClient::connect(&instance.socket).await {
+             Ok(client) => client,
+-            Err(error) if error.proves_instance_is_stale() => return read_file(params),
++            Err(error) if error.proves_instance_is_stale() && self.instance_id.is_none() => {
++                return read_file(params);
++            }
+             Err(error) => return Err(error.to_string()),
+         };
+         let value = serde_json::to_value(params).map_err(|error| error.to_string())?;

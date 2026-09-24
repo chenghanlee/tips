@@ -1,0 +1,134 @@
+--- a/parallel_compiler.ex
++++ b/parallel_compiler.ex
+@@ -378,12 +378,13 @@
+     outcome
+   end
+ 
+-  defp each_file(fun) when is_function(fun, 1), do: fn file, _ -> fun.(file) end
+-  defp each_file(fun) when is_function(fun, 2), do: fun
+-
+-  defp each_file(file, lexical, parent) do
++  defp each_file(fun) when is_function(fun, 1), do: fn file, _, _ -> fun.(file) end
++  defp each_file(fun) when is_function(fun, 2), do: fn file, lexical, _ -> fun.(file, lexical) end
++  defp each_file(fun) when is_function(fun, 3), do: fun
++
++  defp each_file(file, lexical, source, parent) do
+     ref = Process.monitor(parent)
+-    send(parent, {:file_ok, self(), ref, file, lexical})
++    send(parent, {:file_ok, self(), ref, file, lexical, source})
+ 
+     receive do
+       ^ref -> :ok
+@@ -655,7 +656,17 @@
+   defp compile_file(file, path, force_load?, parent) do
+     :erlang.process_flag(:error_handler, Kernel.ErrorHandler)
+     :erlang.put(:elixir_compiler_dest, {path, force_load?})
+-    :elixir_compiler.file(file, &each_file(&1, &2, parent))
++    compile_file_contents(file, parent)
++  end
++
++  defp compile_file_contents(file, parent) do
++    {:ok, source} = :file.read_file(file)
++
++    :elixir_compiler.string(
++      :elixir_utils.characters_to_list(source),
++      file,
++      &each_file(&1, &2, source, parent)
++    )
+   end
+ 
+   defp require_file(file, parent) do
+@@ -664,7 +675,7 @@
+         send(parent, {:file_cancel, self()})
+ 
+       :proceed ->
+-        :elixir_compiler.file(file, &each_file(&1, &2, parent))
++        compile_file_contents(file, parent)
+         :elixir_code_server.cast({:required, file})
+     end
+   end
+@@ -853,8 +864,8 @@
+         errors = [{diagnostic, read_snippet} | errors]
+         wait_for_messages(queue, spawned, waiting, files, result, warnings, errors, state)
+ 
+-      {:file_ok, child_pid, ref, file, lexical} ->
+-        state.each_file.(file, lexical)
++      {:file_ok, child_pid, ref, file, lexical, source} ->
++        state.each_file.(file, lexical, source)
+         send(child_pid, ref)
+ 
+         {file, new_spawned, new_files} = discard_file_pid(spawned, files, child_pid)
+--- a/compiler_elixir.ex
++++ b/compiler_elixir.ex
+@@ -436,10 +436,8 @@
+     # any modules associated with them need to be recompiled
+     changed =
+       Enum.reduce(all_sources, checkpoint_changed, fn
+-        {source,
+-         source(external: external, size: size, mtime: mtime, digest: digest, modules: modules)},
+-        acc ->
+-          {last_mtime, last_size} = Map.fetch!(sources_stats, source)
++        {source, source(external: external, size: size, digest: digest, modules: modules)}, acc ->
++          {_last_mtime, last_size} = Map.fetch!(sources_stats, source)
+ 
+           cond do
+             Enum.any?(external, &stale_external?(&1, sources_stats)) or
+@@ -448,8 +446,7 @@
+ 
+             size != last_size or
+               has_any_key?(stale_modules, modules) or
+-                (last_mtime != mtime and
+-                   (missing_beam_file?(dest, modules) or digest_changed?(source, digest))) ->
++              missing_beam_file?(dest, modules) or digest_changed?(source, digest) ->
+               Map.put(acc, source, true)
+ 
+             true ->
+@@ -1072,8 +1069,12 @@
+           each_cycle: fn ->
+             compiler_call(parent, ref, {:each_cycle, stale_modules, dest, timestamp, reinfer?})
+           end,
+-          each_file: fn file, lexical ->
+-            compiler_call(parent, ref, {:each_file, file, lexical, verbose})
++          each_file: fn file, lexical, contents ->
++            compiler_call(
++              parent,
++              ref,
++              {:each_file, file, lexical, digest_contents(contents), verbose}
++            )
+           end,
+           each_module: fn file, module, _binary ->
+             compiler_call(parent, ref, {:each_module, file, module, System.os_time(:second)})
+@@ -1126,11 +1127,11 @@
+         send(pid, {ref, response})
+         compiler_loop(ref, pid, state, cwd)
+ 
+-      {^ref, {:each_file, file, lexical, verbose}} ->
++      {^ref, {:each_file, file, lexical, digest, verbose}} ->
+         # Read the relevant file information and unblock the compiler
+         references = Kernel.LexicalTracker.references(lexical)
+         send(pid, {ref, :ok})
+-        state = each_file(file, references, verbose, state, cwd)
++        state = each_file(file, references, digest, verbose, state, cwd)
+         compiler_loop(ref, pid, state, cwd)
+ 
+       {^ref, {:each_module, file, module, timestamp}} ->
+@@ -1268,7 +1269,7 @@
+     end
+   end
+ 
+-  defp each_file(file, references, verbose, state, cwd) do
++  defp each_file(file, references, digest, verbose, state, cwd) do
+     {compile_references, export_references, runtime_references, compile_env} = references
+     %{sources: sources} = state
+ 
+@@ -1289,8 +1290,8 @@
+     source =
+       source(
+         source,
+-        # We preserve the digest if the file is recompiled but not changed
+-        digest: source(source, :digest) || file |> File.read!() |> digest_contents(),
++        # Fingerprint the exact buffer parsed by the compiler.
++        digest: digest,
+         compile_references: compile_references,
+         export_references: export_references,
+         runtime_references: runtime_references,

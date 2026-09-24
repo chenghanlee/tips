@@ -1,8 +1,81 @@
 # Codex + ElixirLS experiment v2
 
-Date: 2026-09-24. Branch: `experiment/elixirls-codex-v2`.
+Updated: 2026-09-25. Branch: `experiment/elixirls-codex-v2`.
 
-**Result: MCP interoperability works. Do not roll out this bridge unchanged.**
+The stack remains provisional. [Operational fixes and comparison](OPERATIONAL_FIXES.md)
+supersede the earlier internal-rollout readiness claim. The new bundle fixes
+startup, exact-instance ownership, failed-scan recovery, and bounded shutdown.
+Two actual Sol sessions receive late compiler errors through hooks without
+requesting diagnostics. [Long-build behavior](LONG_BUILDS.md) defines the limits.
+
+The earlier [installed-stack release gates](RELEASE_GATES.md) record the private
+compiler/server pairing and three real Tips workloads; they do not independently
+establish production readiness. Active client configuration remains unchanged.
+[Build and launch instructions](INSTALL.md) describe the prerequisites and scope.
+
+Earlier stages below record their findings at the time of each experiment.
+
+The earlier [fixed 250 ms batching experiment](BATCHING.md) merges nearby build
+triggers in the existing pending set and exposes queued work immediately. The
+three-second edit now returns its error in 3.54 seconds with one compile, versus
+two compiles and pending feedback in the old-server control. Failure retention,
+overlapping edits, and actual MCP synchronization boundaries pass. The hook
+budget remains five seconds for comparison and can be revisited using workload
+measurements. This is synthetic validation, not a new agent cohort.
+
+Previous agent cohort: [three actual Codex Sol agents](DOGFOOD_V3.md) completed the provider,
+media and health workloads with the minimal patch. All full suites passed;
+edit hooks took 1.08–2.31 seconds, and no fixture events reached ElixirLS.
+Cold-start references still timed out with qualifications. This cohort's clean
+edits did not emit hook messages or overlap the initial build; those boundaries
+retain their separate test evidence.
+
+Follow-up [Mix race triage](MIX_TRIAGE.md) directly verified mismatched manifest
+and BEAM revisions, then reproduced stale executable behavior in both the edited
+module and a compile-time caller. Stable-source force compilation repaired the
+isolated fixture; real-workload frequency and automatic recovery remain open.
+
+The [grace-window recovery experiment](GRACE_RECOVERY.md) tested a small local
+ElixirLS scheduler patch. Prompt overlaps recovered and ordinary edits remained
+incremental, but a notification delayed by two seconds preserved stale hover
+and executable behavior. The candidate is retained as evidence and rejected for
+adoption; its timing cutoff does not meet the recovery contract.
+
+[Combined root analysis and search space](MIX_SEARCH_SPACE.md) compares a local
+compiler fix, targeted invalidation, stable inputs, and recovery policies before
+choosing another implementation.
+
+The [compiler versus targeted-invalidation comparison](COMPILER_COMPARISON.md)
+now tests both private prototypes. Both repair the source race through real
+ElixirLS, including delayed notifications. Targeted invalidation also repairs
+the external-resource fixture and costs less in the synthetic benchmark; it
+requires reliable changed-path delivery and retention. Neither candidate was
+installed.
+
+The [critical verification of Fable's direct-plus proposal](FABLE_COMPILER_REVIEW.md)
+confirms that a small compiler-side extension handles the original resource
+overwrite, but reproduces stale output for resource deletion and preserved
+timestamps. Rapid builds also exceed its claimed one-extra-compile bound.
+The [correctness follow-up](CORRECTNESS.md) now repairs targeted-path retention
+through failed/skipped builds and worker death, and reconciles unopened files
+through the actual Neovim/MCP hook. The combined 78-test server suite passes.
+A content-based compiler resource candidate fixes deletion and preserved times,
+but fails an A→B→A adversarial case. Targeted invalidation is preferred under its
+explicit observed-change contract; completely missed transient edits and duplicate
+native/scanner publications remain limitations. The report includes nine whys for
+each unresolved finding. Neither candidate is installed or ready for rollout.
+
+The [minimal local patch](MINIMAL_PATCH.md) makes synchronization retryable,
+preserves qualified results, removes the permanent uncertainty restriction, and
+filters disposable fixtures through Neovim's existing watcher. The five-second
+hook and normal incremental builds remain. Boundary tests and local replays of
+the provider, media and health workload tests passed. The reproduced Mix overlap
+defect remains a limitation; these results do not certify compiler freshness.
+
+Earlier: [four concrete fixes](FOUR_FIXES.md), [second Codex Sol cohort](DOGFOOD_V2.md),
+and [first cohort](DOGFOOD.md) preserve the evidence that motivated this revision.
+
+**Earlier bridge result: MCP interoperability works. Do not roll out that bridge unchanged.**
 The unmodified published `lsp-mcp-server@1.1.24` works with a real Codex client
 and ElixirLS 0.31.1. It can return stale documentation after an ordinary edit by
 the sole agent in a worktree. Requiring the agent to restart servers or open and
@@ -11,6 +84,11 @@ refresh files in a particular order is not an acceptable integration.
 This experiment uses no code from the discarded bridge prototype. It changes no
 active client configuration or team launcher. The existing checkout's unrelated
 Claude integration work was left alone.
+
+Follow-up: [inversion of the watcher proposal](INVERSION.md) reproduced stale
+hover even with file notifications delivered, and an overlapping equal-size edit
+that remained stale after a queued build reported no changes. Automatic watching
+is necessary, but has not been established as a sufficient freshness fix.
 
 ## Root problem and decision
 
@@ -144,7 +222,11 @@ passes a temporary server definition through CLI overrides; it makes model
 requests. Without `--fixture`, it queries Tips source. That latter run requires
 the explicit data-transfer approval described below.
 
-## Validation and limits
+## Earlier bridge validation and limits
+
+Follow-up: [reuse existing LSP clients and conventions](REUSE.md), including
+Neovim/ElixirLS, before extending bridge synchronization. [Inversion results](INVERSION.md)
+include the compiler overlap reproduction and existing clean/rebuild controls.
 
 - Synthetic Mix projects compiled with warnings as errors and their ExUnit tests
   passed. A fixture formatting issue was corrected; its formatting check and test
@@ -160,8 +242,10 @@ the explicit data-transfer approval described below.
   also required outer-sandbox approval for its app server.
 - Automatic approval review rejected running Codex on Tips because its tool
   responses would send source-derived data to the Codex service without explicit
-  approval. The actual Codex run used only synthetic source. Full Tips was tested
-  locally through MCP. Full Tips-to-Codex validation remains unrun pending approval.
+  approval. That earlier Codex run used only synthetic source; full Tips was tested
+  locally through MCP. The user's later explicit request authorized the
+  [three-agent Tips dogfood run](DOGFOOD.md), which now supplies real-source model
+  evidence for the Neovim adapter.
 
 Raw transcripts, server logs and results remain under
 `/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/`. The durable summary is

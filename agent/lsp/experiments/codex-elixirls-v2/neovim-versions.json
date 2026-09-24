@@ -1,0 +1,53 @@
+{
+  "date": "2026-09-24",
+  "platform": "macOS arm64",
+  "downloads": [
+    {
+      "name": "neovim",
+      "version_or_commit": "v0.12.5",
+      "archive": "nvim.tar.gz",
+      "url": "https://github.com/neovim/neovim/releases/download/v0.12.5/nvim-macos-arm64.tar.gz",
+      "sha256": "65fb000099e47ca1b762584c484cc833f40e30851a0ec450d4174e16317c1f9b"
+    },
+    {
+      "name": "vv-mcp",
+      "version_or_commit": "v0.3.4",
+      "archive": "vv-mcp",
+      "url": "https://github.com/beixiyo/vv-mcp.nvim/releases/download/v0.3.4/vv-mcp-aarch64-apple-darwin",
+      "sha256": "7dc4fb34e6969665b4cd2f89d1fabb9de4f9dd1af346f76d0959c08eace65fd7"
+    },
+    {
+      "name": "vv-mcp-source",
+      "version_or_commit": "b64e27e1d0f1a95984512c11a1ca7ad31208e8dd",
+      "archive": "vv-source.tar.gz",
+      "url": "https://api.github.com/repos/beixiyo/vv-mcp.nvim/tarball/v0.3.4",
+      "sha256": "76624b88c36539602376759ab4ae2917a1e8cba216f7b7344127a34de6dc9526"
+    },
+    {
+      "name": "vv-utils.nvim",
+      "version_or_commit": "13e73d5174b37af24ca475dc39b61667432aaebc",
+      "archive": "vv-utils.tar.gz",
+      "url": "https://api.github.com/repos/beixiyo/vv-utils.nvim/tarball/13e73d5174b37af24ca475dc39b61667432aaebc",
+      "sha256": "37fa7539a72e1b7a83eab5e0509f87ce08e47ecd91a9a90a532cefa395ba9030"
+    },
+    {
+      "name": "elixir-tools.nvim (source review only)",
+      "version_or_commit": "defb94618c8cd7a8de5943bf09b25ec055263c19",
+      "archive": "elixir-tools.tar.gz",
+      "url": "https://api.github.com/repos/elixir-tools/elixir-tools.nvim/tarball/defb94618c8cd7a8de5943bf09b25ec055263c19",
+      "sha256": "1bcb3f2d0bc9e7bdc6d53e34a8404e12ff161cbe13341c08cee19dd0ec7b894d"
+    }
+  ],
+  "python_packages": {
+    "pynvim": "0.6.0",
+    "msgpack": "1.2.2",
+    "greenlet": "3.5.6"
+  },
+  "installed_tools": {
+    "elixir_ls": "0.31.1",
+    "elixir": "1.20.4",
+    "otp": "29.1",
+    "codex_cli": "0.156.1"
+  },
+  "isolation": "Temporary vendor directory; no system installation or active agent configuration changed."
+}

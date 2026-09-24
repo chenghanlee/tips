@@ -1,0 +1,2324 @@
+{
+  "date": "2026-09-24",
+  "scope": "Isolated experiment, no rollout. Poll timing is observational, not a guarantee. Empty diagnostics do not prove build completion.",
+  "runs": {
+    "neovim-baseline": {
+      "fixture_commits": {
+        "alpha": "d7b8af054d8bc3a6443e4f3067f7348a6c26288e",
+        "beta": "209fd54dc8744bac77c0929aad977920cd3ffb0a"
+      },
+      "alpha_first_hover": {
+        "seconds": 1.495,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "elixirls"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+            ]
+          }
+        }
+      },
+      "alpha_baseline": {
+        "matched": true,
+        "sample_count": 1,
+        "first": {
+          "seconds": 0.002,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.002,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        }
+      },
+      "alpha_definition": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "locations": {
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-baseline/alpha/lib/target.ex": [
+              "3:3-3:25"
+            ]
+          }
+        }
+      },
+      "alpha_references": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "locations": {
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-baseline/alpha/lib/caller.ex": [
+              "2:28-2:34",
+              "3:28-3:34"
+            ]
+          }
+        }
+      },
+      "beta_first_hover": {
+        "seconds": 1.457,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "elixirls"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nBETA documentation for the worktree experiment.\n"
+            ]
+          }
+        }
+      },
+      "beta_baseline": {
+        "matched": true,
+        "sample_count": 1,
+        "first": {
+          "seconds": 0.002,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nBETA documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.002,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nBETA documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        }
+      },
+      "beta_definition": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "locations": {
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-baseline/beta/lib/target.ex": [
+              "3:3-3:24"
+            ]
+          }
+        }
+      },
+      "beta_references": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "locations": {
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-baseline/beta/lib/caller.ex": [
+              "2:28-2:34",
+              "3:28-3:34",
+              "4:28-4:34"
+            ]
+          }
+        }
+      },
+      "unopened_edit": {
+        "matched": true,
+        "sample_count": 2,
+        "first": {
+          "seconds": 0.003,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.261,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nUNOPENED_NEW documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        }
+      },
+      "beta_after_alpha_edit": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "items": [
+            "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nBETA documentation for the worktree experiment.\n"
+          ]
+        }
+      },
+      "atomic_replacement": {
+        "matched": true,
+        "sample_count": 2,
+        "first": {
+          "seconds": 0.002,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nUNOPENED_NEW documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.258,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nATOMIC_NEW documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        }
+      },
+      "created_file_references": {
+        "matched": true,
+        "sample_count": 2,
+        "first": {
+          "seconds": 0.004,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "locations": {
+                "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-baseline/alpha/lib/caller.ex": [
+                  "2:28-2:34",
+                  "3:28-3:34"
+                ]
+              }
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.261,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "locations": {
+                "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-baseline/alpha/lib/caller.ex": [
+                  "2:28-2:34",
+                  "3:28-3:34"
+                ],
+                "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-baseline/alpha/lib/extra.ex": [
+                  "2:26-2:32"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "deleted_file_references": {
+        "matched": true,
+        "sample_count": 1,
+        "first": {
+          "seconds": 0.005,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "locations": {
+                "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-baseline/alpha/lib/caller.ex": [
+                  "2:28-2:34",
+                  "3:28-3:34"
+                ]
+              }
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.005,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "locations": {
+                "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-baseline/alpha/lib/caller.ex": [
+                  "2:28-2:34",
+                  "3:28-3:34"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "open_file_external_error": {
+        "matched": true,
+        "sample_count": 2,
+        "first": {
+          "seconds": 0.001,
+          "value": {
+            "isError": false,
+            "data": {
+              "diagnostics": {}
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.257,
+          "value": {
+            "isError": false,
+            "data": {
+              "diagnostics": {
+                "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-baseline/alpha/lib/caller.ex": [
+                  {
+                    "range": "2:28-2:28",
+                    "severity": "warning",
+                    "message": "V2Target.missing/0 is undefined or private",
+                    "source": "Elixir"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "open_file_hover_after_error": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "items": [
+            "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nATOMIC_NEW documentation for the worktree experiment.\n"
+          ]
+        }
+      },
+      "open_file_repeated_hover": {
+        "matched": false,
+        "sample_count": 32,
+        "first": {
+          "seconds": 0.003,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nATOMIC_NEW documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        },
+        "last": {
+          "seconds": 8.079,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nATOMIC_NEW documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        }
+      },
+      "open_file_external_repair": {
+        "matched": true,
+        "sample_count": 2,
+        "first": {
+          "seconds": 0.001,
+          "value": {
+            "isError": false,
+            "data": {
+              "diagnostics": {
+                "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-baseline/alpha/lib/caller.ex": [
+                  {
+                    "range": "2:28-2:28",
+                    "severity": "warning",
+                    "message": "V2Target.missing/0 is undefined or private",
+                    "source": "Elixir"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.256,
+          "value": {
+            "isError": false,
+            "data": {
+              "diagnostics": {}
+            }
+          }
+        }
+      },
+      "open_file_repaired_hover": {
+        "matched": false,
+        "sample_count": 32,
+        "first": {
+          "seconds": 0.002,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [],
+              "items": []
+            }
+          }
+        },
+        "last": {
+          "seconds": 8.066,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [],
+              "items": []
+            }
+          }
+        }
+      },
+      "overlap_builds": {
+        "matched": true,
+        "sample_count": 7,
+        "first": {
+          "seconds": 0.003,
+          "value": []
+        },
+        "last": {
+          "seconds": 1.561,
+          "value": [
+            {
+              "time": 68341.572884208,
+              "method": "telemetry/event",
+              "data": {
+                "properties": {
+                  "elixir_ls.erts_version": "17.1",
+                  "elixir_ls.mix_env": "test",
+                  "elixir_ls.mix_target": "host",
+                  "elixir_ls.elixir_release": "1.20",
+                  "elixir_ls.build_result": "mix_compile_ok",
+                  "elixir_ls.elixir_version": "1.20.4",
+                  "elixir_ls.otp_release": "29"
+                },
+                "name": "build",
+                "measurements": {
+                  "elixir_ls.build_time": 1549
+                }
+              }
+            },
+            {
+              "time": 68341.59861525,
+              "method": "telemetry/event",
+              "data": {
+                "properties": {
+                  "elixir_ls.erts_version": "17.1",
+                  "elixir_ls.mix_env": "test",
+                  "elixir_ls.mix_target": "host",
+                  "elixir_ls.elixir_release": "1.20",
+                  "elixir_ls.build_result": "mix_compile_noop",
+                  "elixir_ls.elixir_version": "1.20.4",
+                  "elixir_ls.otp_release": "29"
+                },
+                "name": "build",
+                "measurements": {
+                  "elixir_ls.build_time": 24
+                }
+              }
+            }
+          ]
+        }
+      },
+      "overlap_repeated_hover": {
+        "matched": false,
+        "sample_count": 17,
+        "first": {
+          "seconds": 0.005,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nNV_OVERLAP_A documentation.\n"
+              ]
+            }
+          }
+        },
+        "last": {
+          "seconds": 4.179,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nNV_OVERLAP_A documentation.\n"
+              ]
+            }
+          }
+        }
+      },
+      "overlap_repair": {
+        "matched": true,
+        "sample_count": 2,
+        "first": {
+          "seconds": 0.004,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nNV_OVERLAP_A documentation.\n"
+              ]
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.26,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nAFTER_OVERLAP documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        }
+      },
+      "checkout_hover": {
+        "matched": true,
+        "sample_count": 2,
+        "first": {
+          "seconds": 0.004,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nBETA documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.259,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        }
+      },
+      "checkout_references": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "locations": {
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-baseline/beta/lib/caller.ex": [
+              "2:28-2:34",
+              "3:28-3:34",
+              "4:28-4:34"
+            ]
+          }
+        }
+      },
+      "separate_build_directories": {
+        "alpha": true,
+        "beta": true
+      },
+      "alpha_eof_cleanup": {
+        "matched": true,
+        "sample_count": 1,
+        "first": {
+          "seconds": 0.037,
+          "value": {}
+        },
+        "last": {
+          "seconds": 0.037,
+          "value": {}
+        }
+      },
+      "beta_survives_alpha_exit": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "items": [
+            "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+          ]
+        }
+      },
+      "beta_eof_cleanup": {
+        "matched": true,
+        "sample_count": 1,
+        "first": {
+          "seconds": 0.052,
+          "value": {}
+        },
+        "last": {
+          "seconds": 0.052,
+          "value": {}
+        }
+      },
+      "completed": true,
+      "notification_counts": {
+        "window/logMessage": 68,
+        "telemetry/event": 110,
+        "sent:workspace/didChangeConfiguration": 1,
+        "sent:textDocument/didOpen": 3,
+        "sent:workspace/didChangeWatchedFiles": 8,
+        "sent:textDocument/didClose": 2,
+        "sent:textDocument/didSave": 1
+      }
+    },
+    "neovim-sync-reads": {
+      "fixture_commits": {
+        "alpha": "8bbbfbbc3818059d3ea174e6e0f812354800b22a",
+        "beta": "eac9058e7728a3494f941bf0fe1b695af136c7f8"
+      },
+      "alpha_first_hover": {
+        "seconds": 1.661,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "elixirls"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+            ]
+          }
+        }
+      },
+      "alpha_baseline": {
+        "matched": true,
+        "sample_count": 1,
+        "first": {
+          "seconds": 0.003,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.003,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        }
+      },
+      "alpha_definition": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "locations": {
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-sync-reads/alpha/lib/target.ex": [
+              "3:3-3:25"
+            ]
+          }
+        }
+      },
+      "alpha_references": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "locations": {
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-sync-reads/alpha/lib/caller.ex": [
+              "2:28-2:34",
+              "3:28-3:34"
+            ]
+          }
+        }
+      },
+      "beta_first_hover": {
+        "seconds": 1.626,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "elixirls"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nBETA documentation for the worktree experiment.\n"
+            ]
+          }
+        }
+      },
+      "beta_baseline": {
+        "matched": true,
+        "sample_count": 1,
+        "first": {
+          "seconds": 0.002,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nBETA documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.002,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nBETA documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        }
+      },
+      "beta_definition": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "locations": {
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-sync-reads/beta/lib/target.ex": [
+              "3:3-3:24"
+            ]
+          }
+        }
+      },
+      "beta_references": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "locations": {
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-sync-reads/beta/lib/caller.ex": [
+              "2:28-2:34",
+              "3:28-3:34",
+              "4:28-4:34"
+            ]
+          }
+        }
+      },
+      "unopened_edit": {
+        "matched": true,
+        "sample_count": 2,
+        "first": {
+          "seconds": 0.003,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.261,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nUNOPENED_NEW documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        }
+      },
+      "beta_after_alpha_edit": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "items": [
+            "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nBETA documentation for the worktree experiment.\n"
+          ]
+        }
+      },
+      "atomic_replacement": {
+        "matched": true,
+        "sample_count": 2,
+        "first": {
+          "seconds": 0.002,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nUNOPENED_NEW documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.268,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nATOMIC_NEW documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        }
+      },
+      "created_file_references": {
+        "matched": true,
+        "sample_count": 2,
+        "first": {
+          "seconds": 0.009,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "locations": {
+                "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-sync-reads/alpha/lib/caller.ex": [
+                  "2:28-2:34",
+                  "3:28-3:34"
+                ]
+              }
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.285,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "locations": {
+                "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-sync-reads/alpha/lib/caller.ex": [
+                  "2:28-2:34",
+                  "3:28-3:34"
+                ],
+                "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-sync-reads/alpha/lib/extra.ex": [
+                  "2:26-2:32"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "deleted_file_references": {
+        "matched": true,
+        "sample_count": 1,
+        "first": {
+          "seconds": 0.009,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "locations": {
+                "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-sync-reads/alpha/lib/caller.ex": [
+                  "2:28-2:34",
+                  "3:28-3:34"
+                ]
+              }
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.009,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "locations": {
+                "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-sync-reads/alpha/lib/caller.ex": [
+                  "2:28-2:34",
+                  "3:28-3:34"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "open_file_external_error": {
+        "matched": true,
+        "sample_count": 2,
+        "first": {
+          "seconds": 0.008,
+          "value": {
+            "isError": false,
+            "data": {
+              "diagnostics": {}
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.26,
+          "value": {
+            "isError": false,
+            "data": {
+              "diagnostics": {
+                "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-sync-reads/alpha/lib/caller.ex": [
+                  {
+                    "range": "2:28-2:28",
+                    "severity": "warning",
+                    "message": "V2Target.missing/0 is undefined or private",
+                    "source": "Elixir"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "open_file_hover_after_error": {
+        "isError": false,
+        "data": {
+          "clients": [],
+          "items": []
+        }
+      },
+      "open_file_repeated_hover": {
+        "matched": true,
+        "sample_count": 1,
+        "first": {
+          "seconds": 0.003,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [],
+              "items": []
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.003,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [],
+              "items": []
+            }
+          }
+        }
+      },
+      "open_file_external_repair": {
+        "matched": true,
+        "sample_count": 2,
+        "first": {
+          "seconds": 0.007,
+          "value": {
+            "isError": false,
+            "data": {
+              "diagnostics": {
+                "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-sync-reads/alpha/lib/caller.ex": [
+                  {
+                    "range": "2:28-2:28",
+                    "severity": "warning",
+                    "message": "V2Target.missing/0 is undefined or private",
+                    "source": "Elixir"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.263,
+          "value": {
+            "isError": false,
+            "data": {
+              "diagnostics": {}
+            }
+          }
+        }
+      },
+      "open_file_repaired_hover": {
+        "matched": true,
+        "sample_count": 1,
+        "first": {
+          "seconds": 0.006,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nATOMIC_NEW documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.006,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nATOMIC_NEW documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        }
+      },
+      "overlap_builds": {
+        "matched": true,
+        "sample_count": 7,
+        "first": {
+          "seconds": 0.002,
+          "value": []
+        },
+        "last": {
+          "seconds": 1.546,
+          "value": [
+            {
+              "data": {
+                "properties": {
+                  "elixir_ls.erts_version": "17.1",
+                  "elixir_ls.build_result": "mix_compile_ok",
+                  "elixir_ls.mix_env": "test",
+                  "elixir_ls.mix_target": "host",
+                  "elixir_ls.elixir_release": "1.20",
+                  "elixir_ls.otp_release": "29",
+                  "elixir_ls.elixir_version": "1.20.4"
+                },
+                "name": "build",
+                "measurements": {
+                  "elixir_ls.build_time": 1552
+                }
+              },
+              "time": 68371.352836416,
+              "method": "telemetry/event"
+            },
+            {
+              "data": {
+                "properties": {
+                  "elixir_ls.erts_version": "17.1",
+                  "elixir_ls.build_result": "mix_compile_noop",
+                  "elixir_ls.mix_env": "test",
+                  "elixir_ls.mix_target": "host",
+                  "elixir_ls.elixir_release": "1.20",
+                  "elixir_ls.otp_release": "29",
+                  "elixir_ls.elixir_version": "1.20.4"
+                },
+                "name": "build",
+                "measurements": {
+                  "elixir_ls.build_time": 28
+                }
+              },
+              "time": 68371.383287791,
+              "method": "telemetry/event"
+            }
+          ]
+        }
+      },
+      "overlap_repeated_hover": {
+        "matched": false,
+        "sample_count": 17,
+        "first": {
+          "seconds": 0.009,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nNV_OVERLAP_A documentation.\n"
+              ]
+            }
+          }
+        },
+        "last": {
+          "seconds": 4.262,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nNV_OVERLAP_A documentation.\n"
+              ]
+            }
+          }
+        }
+      },
+      "overlap_repair": {
+        "matched": true,
+        "sample_count": 2,
+        "first": {
+          "seconds": 0.006,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nNV_OVERLAP_A documentation.\n"
+              ]
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.271,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nAFTER_OVERLAP documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        }
+      },
+      "checkout_hover": {
+        "matched": true,
+        "sample_count": 2,
+        "first": {
+          "seconds": 0.007,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nBETA documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        },
+        "last": {
+          "seconds": 0.27,
+          "value": {
+            "isError": false,
+            "data": {
+              "clients": [
+                "elixirls"
+              ],
+              "items": [
+                "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+              ]
+            }
+          }
+        }
+      },
+      "checkout_references": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "locations": {
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-sync-reads/beta/lib/caller.ex": [
+              "2:28-2:34",
+              "3:28-3:34"
+            ]
+          }
+        }
+      },
+      "separate_build_directories": {
+        "alpha": true,
+        "beta": true
+      },
+      "alpha_eof_cleanup": {
+        "matched": true,
+        "sample_count": 1,
+        "first": {
+          "seconds": 0.043,
+          "value": {}
+        },
+        "last": {
+          "seconds": 0.043,
+          "value": {}
+        }
+      },
+      "beta_survives_alpha_exit": {
+        "isError": false,
+        "data": {
+          "clients": [
+            "elixirls"
+          ],
+          "items": [
+            "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+          ]
+        }
+      },
+      "beta_eof_cleanup": {
+        "matched": true,
+        "sample_count": 1,
+        "first": {
+          "seconds": 0.04,
+          "value": {}
+        },
+        "last": {
+          "seconds": 0.04,
+          "value": {}
+        }
+      },
+      "completed": true,
+      "notification_counts": {
+        "window/logMessage": 66,
+        "telemetry/event": 48,
+        "sent:workspace/didChangeConfiguration": 1,
+        "sent:textDocument/didOpen": 3,
+        "sent:workspace/didChangeWatchedFiles": 8,
+        "sent:textDocument/didClose": 2,
+        "sent:textDocument/didSave": 1
+      }
+    }
+  },
+  "actual_codex": {
+    "exit_code": 0,
+    "remaining": {},
+    "completed_calls": [
+      {
+        "tool": "lsp",
+        "arguments": {
+          "uri": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-codex/alpha/lib/caller.ex",
+          "line": 2,
+          "character": 29,
+          "timeoutMs": 10000,
+          "operation": "hover"
+        },
+        "status": "completed",
+        "error": null,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"clients\":[\"elixirls\"],\"items\":[\"```elixir\\nV2Target.answer()\\n```\\n\\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\\n\\n\\n\\n**Application** v2_fixture\\n\\n\\n\\n\\n\\n### Documentation\\n\\nALPHA documentation for the worktree experiment.\\n\"]}"
+            }
+          ],
+          "structured_content": null
+        }
+      },
+      {
+        "tool": "lsp",
+        "arguments": {
+          "uri": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-codex/alpha/lib/caller.ex",
+          "line": 2,
+          "character": 29,
+          "timeoutMs": 10000,
+          "operation": "definition"
+        },
+        "status": "completed",
+        "error": null,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"clients\":[\"elixirls\"],\"locations\":{\"/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-codex/alpha/lib/target.ex\":[\"3:3-3:25\"]}}"
+            }
+          ],
+          "structured_content": null
+        }
+      },
+      {
+        "tool": "lsp",
+        "arguments": {
+          "uri": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-codex/alpha/lib/caller.ex",
+          "line": 2,
+          "character": 29,
+          "timeoutMs": 10000,
+          "operation": "references",
+          "includeDeclaration": false
+        },
+        "status": "completed",
+        "error": null,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"clients\":[\"elixirls\"],\"locations\":{\"/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-codex/alpha/lib/caller.ex\":[\"2:28-2:34\",\"3:28-3:34\"]}}"
+            }
+          ],
+          "structured_content": null
+        }
+      },
+      {
+        "tool": "lsp",
+        "arguments": {
+          "uri": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-codex/alpha/lib/caller.ex",
+          "line": 2,
+          "character": 29,
+          "timeoutMs": 10000,
+          "operation": "diagnostics"
+        },
+        "status": "completed",
+        "error": null,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"diagnostics\":{}}"
+            }
+          ],
+          "structured_content": null
+        }
+      },
+      {
+        "tool": "list_instances",
+        "arguments": {},
+        "status": "completed",
+        "error": null,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"instances\":[{\"instanceId\":\"alpha-5740a35d:88130\",\"projectId\":\"alpha-5740a35d\",\"pid\":88130,\"socket\":\"/var/folders/26/15tlmtc55wggjp8xt79bh5n40000gn/T/vv-mcp-88060-0.sock\",\"cwd\":\"/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-codex/alpha\",\"roots\":[\"/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-codex/alpha\"],\"lspClients\":[\"elixirls\"],\"kind\":\"managed\",\"updatedAt\":1790232335}]}"
+            }
+          ],
+          "structured_content": null
+        }
+      }
+    ]
+  },
+  "local_tips": {
+    "first_hover": {
+      "isError": false,
+      "data": {
+        "clients": [],
+        "items": []
+      }
+    },
+    "first_hover_seconds": 1.643,
+    "hover": {
+      "matched": true,
+      "sample_count": 3,
+      "first": {
+        "seconds": 0.061,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      "last": {
+        "seconds": 0.678,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "elixirls"
+            ],
+            "items": [
+              "```elixir\nTips.ProviderConfig.mode()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/tips/0.1.0/Tips.ProviderConfig.html#mode/0)\n\n\n\n**Application** tips\n\n\n\n\n\n### Documentation\n\nReturns `:real` or `:stub`.\n\nTest runs use `:stub` unless `TIPS_REAL_PROVIDERS=1`; development uses `:real`.\n"
+            ]
+          }
+        }
+      }
+    },
+    "definition": {
+      "isError": false,
+      "data": {
+        "clients": [
+          "elixirls"
+        ],
+        "locations": {
+          "/private/tmp/tips-elixirls-codex-v2/lib/tips/provider_config.ex": [
+            "56:3-56:90"
+          ]
+        }
+      }
+    },
+    "references": {
+      "isError": false,
+      "data": {
+        "clients": [
+          "elixirls"
+        ],
+        "locations": {
+          "/private/tmp/tips-elixirls-codex-v2/lib/tips/search_probe.ex": [
+            "64:58-64:62"
+          ]
+        }
+      }
+    },
+    "diagnostics": {
+      "isError": false,
+      "data": {
+        "diagnostics": {}
+      }
+    },
+    "instances": {
+      "isError": false,
+      "data": {
+        "instances": [
+          {
+            "instanceId": "tips-elixirls-codex-v2-81e03170:88469",
+            "projectId": "tips-elixirls-codex-v2-81e03170",
+            "pid": 88469,
+            "socket": "/var/folders/26/15tlmtc55wggjp8xt79bh5n40000gn/T/vv-mcp-88468-0.sock",
+            "cwd": "/private/tmp/tips-elixirls-codex-v2",
+            "roots": [
+              "/private/tmp/tips-elixirls-codex-v2"
+            ],
+            "lspClients": [
+              "elixirls"
+            ],
+            "kind": "managed",
+            "updatedAt": 1790232372
+          }
+        ]
+      }
+    },
+    "eof_cleanup": {
+      "matched": true,
+      "sample_count": 1,
+      "first": {
+        "seconds": 0.037,
+        "value": {}
+      },
+      "last": {
+        "seconds": 0.037,
+        "value": {}
+      }
+    },
+    "completed": true,
+    "observed_builds": [
+      {
+        "method": "telemetry/event",
+        "data": {
+          "name": "build",
+          "measurements": {
+            "elixir_ls.build_time": 788
+          },
+          "properties": {
+            "elixir_ls.build_result": "mix_compile_ok",
+            "elixir_ls.otp_release": "29",
+            "elixir_ls.elixir_version": "1.20.4",
+            "elixir_ls.erts_version": "17.1",
+            "elixir_ls.elixir_release": "1.20",
+            "elixir_ls.mix_env": "test",
+            "elixir_ls.mix_target": "host"
+          }
+        },
+        "time": 68600.183054791
+      }
+    ]
+  },
+  "fixture_validation": [
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "format",
+        "mix.exs",
+        "lib/caller.ex",
+        "lib/target.ex",
+        "test/test_helper.exs",
+        "test/fixture_test.exs"
+      ],
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "format",
+        "--check-formatted",
+        "mix.exs",
+        "lib/caller.ex",
+        "lib/target.ex",
+        "test/test_helper.exs",
+        "test/fixture_test.exs"
+      ],
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "exit_code": 0,
+      "output": "Compiling 1 file (.ex)\n"
+    },
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "test"
+      ],
+      "exit_code": 0,
+      "output": "Compiling 1 file (.ex)\nRunning ExUnit with seed: 666206, max_cases: 20\n\n\u001b[32m.\u001b[0m\nFinished in 0.00 seconds (0.00s async, 0.00s sync)\n\u001b[32m\nResult: 1 passed\u001b[0m\n"
+    },
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "credo",
+        "--strict",
+        "mix.exs",
+        "lib/caller.ex",
+        "lib/target.ex",
+        "test/test_helper.exs",
+        "test/fixture_test.exs"
+      ],
+      "exit_code": 1,
+      "output": "\u001b[31m\u001b[1m** (Mix) The task \"credo\" could not be found\u001b[0m\n"
+    }
+  ],
+  "evidence_consistency_checks": {
+    "neovim-baseline": {
+      "initial_reference_counts": true,
+      "definitions_in_own_roots": true,
+      "unopened_and_atomic_edits_refresh": true,
+      "open_buffer_result_matches_expected": true,
+      "checkout_reference_count_matches_observation": true,
+      "compiler_overlap_still_fails": true,
+      "separate_builds": true,
+      "both_sessions_cleaned_up": true,
+      "other_session_survives": true
+    },
+    "neovim-sync-reads": {
+      "initial_reference_counts": true,
+      "definitions_in_own_roots": true,
+      "unopened_and_atomic_edits_refresh": true,
+      "open_buffer_result_matches_expected": true,
+      "checkout_reference_count_matches_observation": true,
+      "compiler_overlap_still_fails": true,
+      "separate_builds": true,
+      "both_sessions_cleaned_up": true,
+      "other_session_survives": true
+    }
+  },
+  "editor_feedback": {
+    "startup_response": {
+      "isError": false,
+      "data": {
+        "error": {
+          "code": "elixirls_not_ready",
+          "message": "ElixirLS is compiling the project. Retry in about 1 second; this is not a no-result answer.",
+          "phase": "compiling",
+          "retryAfterMs": 1000,
+          "retryable": true
+        }
+      }
+    },
+    "startup_eventual_hover": {
+      "matched": true,
+      "sample_count": 13,
+      "first": {
+        "seconds": 0.002,
+        "value": {
+          "isError": false,
+          "data": {
+            "error": {
+              "code": "elixirls_not_ready",
+              "message": "ElixirLS is compiling the project. Retry in about 1 second; this is not a no-result answer.",
+              "phase": "compiling",
+              "retryAfterMs": 1000,
+              "retryable": true
+            }
+          }
+        }
+      },
+      "last": {
+        "seconds": 3.201,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "elixirls"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nFEEDBACK_STARTUP documentation.\n"
+            ]
+          }
+        }
+      }
+    },
+    "restore_target": {
+      "matched": true,
+      "elapsed_ms": 14.047707998543046,
+      "save_ms": 8.068708004429936,
+      "diagnostic_after_save_ms": 5.871624991414137,
+      "publication": {
+        "data": {
+          "version": 3,
+          "diagnostics": [],
+          "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-feedback-final/alpha/lib/target.ex"
+        },
+        "time": 69387.799688958,
+        "method": "textDocument/publishDiagnostics"
+      },
+      "modified": false
+    },
+    "valid_empty_hover": {
+      "isError": false,
+      "data": {
+        "clients": [],
+        "items": []
+      }
+    },
+    "edit_save_error_0": {
+      "matched": true,
+      "elapsed_ms": 43.228750000707805,
+      "save_ms": 8.934291006880812,
+      "diagnostic_after_save_ms": 33.12433400424197,
+      "publication": {
+        "data": {
+          "version": 4,
+          "diagnostics": [
+            {
+              "severity": 1,
+              "message": "** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)\n\n",
+              "relatedInformation": [],
+              "data": null,
+              "source": "Elixir",
+              "tags": [],
+              "range": {
+                "end": {
+                  "character": 0,
+                  "line": 0
+                },
+                "start": {
+                  "character": 0,
+                  "line": 0
+                }
+              }
+            },
+            {
+              "severity": 1,
+              "message": "undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)",
+              "relatedInformation": [],
+              "data": null,
+              "source": "Elixir",
+              "tags": [],
+              "range": {
+                "end": {
+                  "character": 31,
+                  "line": 1
+                },
+                "start": {
+                  "character": 18,
+                  "line": 1
+                }
+              }
+            }
+          ],
+          "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-feedback-final/alpha/lib/caller.ex"
+        },
+        "time": 69388.107438,
+        "method": "textDocument/publishDiagnostics"
+      },
+      "modified": false
+    },
+    "failed_build_response_0": {
+      "matched": true,
+      "sample_count": 1,
+      "first": {
+        "seconds": 0.004,
+        "value": {
+          "isError": false,
+          "data": {
+            "error": {
+              "code": "elixirls_build_failed",
+              "message": "ElixirLS compilation failed. Read diagnostics and fix the errors before retrying.",
+              "phase": "failed",
+              "retryable": false
+            }
+          }
+        }
+      },
+      "last": {
+        "seconds": 0.004,
+        "value": {
+          "isError": false,
+          "data": {
+            "error": {
+              "code": "elixirls_build_failed",
+              "message": "ElixirLS compilation failed. Read diagnostics and fix the errors before retrying.",
+              "phase": "failed",
+              "retryable": false
+            }
+          }
+        }
+      }
+    },
+    "error_diagnostics_0": {
+      "isError": false,
+      "data": {
+        "diagnostics": {
+          "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-feedback-final/alpha/lib/caller.ex": [
+            {
+              "range": "1:1-1:1",
+              "severity": "error",
+              "message": "** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)\n\n",
+              "source": "Elixir"
+            },
+            {
+              "range": "2:19-2:32",
+              "severity": "error",
+              "message": "undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)",
+              "source": "Elixir"
+            }
+          ]
+        }
+      }
+    },
+    "edit_save_repair_0": {
+      "matched": true,
+      "elapsed_ms": 7.60574999731034,
+      "save_ms": 6.393832998583093,
+      "diagnostic_after_save_ms": 0.9417080000275746,
+      "publication": {
+        "data": {
+          "version": 6,
+          "diagnostics": [],
+          "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-feedback-final/alpha/lib/caller.ex"
+        },
+        "time": 69388.123220416,
+        "method": "textDocument/publishDiagnostics"
+      },
+      "modified": false
+    },
+    "repaired_hover_0": {
+      "matched": true,
+      "sample_count": 2,
+      "first": {
+        "seconds": 0.004,
+        "value": {
+          "isError": false,
+          "data": {
+            "error": {
+              "code": "elixirls_not_ready",
+              "message": "ElixirLS is compiling the project. Retry in about 1 second; this is not a no-result answer.",
+              "phase": "compiling",
+              "retryAfterMs": 1000,
+              "retryable": true
+            }
+          }
+        }
+      },
+      "last": {
+        "seconds": 0.272,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "elixirls"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+            ]
+          }
+        }
+      }
+    },
+    "edit_save_error_1": {
+      "matched": true,
+      "elapsed_ms": 36.77595799672417,
+      "save_ms": 7.434875005856156,
+      "diagnostic_after_save_ms": 28.448249999200925,
+      "publication": {
+        "data": {
+          "version": 8,
+          "diagnostics": [
+            {
+              "severity": 1,
+              "message": "** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)\n\n",
+              "relatedInformation": [],
+              "data": null,
+              "source": "Elixir",
+              "tags": [],
+              "range": {
+                "end": {
+                  "character": 0,
+                  "line": 0
+                },
+                "start": {
+                  "character": 0,
+                  "line": 0
+                }
+              }
+            },
+            {
+              "severity": 1,
+              "message": "undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)",
+              "relatedInformation": [],
+              "data": null,
+              "source": "Elixir",
+              "tags": [],
+              "range": {
+                "end": {
+                  "character": 31,
+                  "line": 1
+                },
+                "start": {
+                  "character": 18,
+                  "line": 1
+                }
+              }
+            }
+          ],
+          "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-feedback-final/alpha/lib/caller.ex"
+        },
+        "time": 69388.438524625,
+        "method": "textDocument/publishDiagnostics"
+      },
+      "modified": false
+    },
+    "failed_build_response_1": {
+      "matched": true,
+      "sample_count": 1,
+      "first": {
+        "seconds": 0.005,
+        "value": {
+          "isError": false,
+          "data": {
+            "error": {
+              "code": "elixirls_build_failed",
+              "message": "ElixirLS compilation failed. Read diagnostics and fix the errors before retrying.",
+              "phase": "failed",
+              "retryable": false
+            }
+          }
+        }
+      },
+      "last": {
+        "seconds": 0.005,
+        "value": {
+          "isError": false,
+          "data": {
+            "error": {
+              "code": "elixirls_build_failed",
+              "message": "ElixirLS compilation failed. Read diagnostics and fix the errors before retrying.",
+              "phase": "failed",
+              "retryable": false
+            }
+          }
+        }
+      }
+    },
+    "error_diagnostics_1": {
+      "isError": false,
+      "data": {
+        "diagnostics": {
+          "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-feedback-final/alpha/lib/caller.ex": [
+            {
+              "range": "1:1-1:1",
+              "severity": "error",
+              "message": "** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)\n\n",
+              "source": "Elixir"
+            },
+            {
+              "range": "2:19-2:32",
+              "severity": "error",
+              "message": "undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)",
+              "source": "Elixir"
+            }
+          ]
+        }
+      }
+    },
+    "edit_save_repair_1": {
+      "matched": true,
+      "elapsed_ms": 7.654832996195182,
+      "save_ms": 6.539415990118869,
+      "diagnostic_after_save_ms": 0.8624590118415654,
+      "publication": {
+        "data": {
+          "version": 10,
+          "diagnostics": [],
+          "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-feedback-final/alpha/lib/caller.ex"
+        },
+        "time": 69388.45487825,
+        "method": "textDocument/publishDiagnostics"
+      },
+      "modified": false
+    },
+    "repaired_hover_1": {
+      "matched": true,
+      "sample_count": 2,
+      "first": {
+        "seconds": 0.003,
+        "value": {
+          "isError": false,
+          "data": {
+            "error": {
+              "code": "elixirls_not_ready",
+              "message": "ElixirLS is compiling the project. Retry in about 1 second; this is not a no-result answer.",
+              "phase": "compiling",
+              "retryAfterMs": 1000,
+              "retryable": true
+            }
+          }
+        }
+      },
+      "last": {
+        "seconds": 0.27,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "elixirls"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+            ]
+          }
+        }
+      }
+    },
+    "edit_save_error_2": {
+      "matched": true,
+      "elapsed_ms": 37.015750000136904,
+      "save_ms": 7.168916999944486,
+      "diagnostic_after_save_ms": 29.348208001465537,
+      "publication": {
+        "data": {
+          "version": 12,
+          "diagnostics": [
+            {
+              "severity": 1,
+              "message": "** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)\n\n",
+              "relatedInformation": [],
+              "data": null,
+              "source": "Elixir",
+              "tags": [],
+              "range": {
+                "end": {
+                  "character": 0,
+                  "line": 0
+                },
+                "start": {
+                  "character": 0,
+                  "line": 0
+                }
+              }
+            },
+            {
+              "severity": 1,
+              "message": "undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)",
+              "relatedInformation": [],
+              "data": null,
+              "source": "Elixir",
+              "tags": [],
+              "range": {
+                "end": {
+                  "character": 31,
+                  "line": 1
+                },
+                "start": {
+                  "character": 18,
+                  "line": 1
+                }
+              }
+            }
+          ],
+          "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-feedback-final/alpha/lib/caller.ex"
+        },
+        "time": 69388.768701083,
+        "method": "textDocument/publishDiagnostics"
+      },
+      "modified": false
+    },
+    "failed_build_response_2": {
+      "matched": true,
+      "sample_count": 1,
+      "first": {
+        "seconds": 0.004,
+        "value": {
+          "isError": false,
+          "data": {
+            "error": {
+              "code": "elixirls_build_failed",
+              "message": "ElixirLS compilation failed. Read diagnostics and fix the errors before retrying.",
+              "phase": "failed",
+              "retryable": false
+            }
+          }
+        }
+      },
+      "last": {
+        "seconds": 0.004,
+        "value": {
+          "isError": false,
+          "data": {
+            "error": {
+              "code": "elixirls_build_failed",
+              "message": "ElixirLS compilation failed. Read diagnostics and fix the errors before retrying.",
+              "phase": "failed",
+              "retryable": false
+            }
+          }
+        }
+      }
+    },
+    "error_diagnostics_2": {
+      "isError": false,
+      "data": {
+        "diagnostics": {
+          "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-feedback-final/alpha/lib/caller.ex": [
+            {
+              "range": "1:1-1:1",
+              "severity": "error",
+              "message": "** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)\n\n",
+              "source": "Elixir"
+            },
+            {
+              "range": "2:19-2:32",
+              "severity": "error",
+              "message": "undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)",
+              "source": "Elixir"
+            }
+          ]
+        }
+      }
+    },
+    "edit_save_repair_2": {
+      "matched": true,
+      "elapsed_ms": 7.803708998835646,
+      "save_ms": 6.723458995111287,
+      "diagnostic_after_save_ms": 0.7717499975115061,
+      "publication": {
+        "data": {
+          "version": 14,
+          "diagnostics": [],
+          "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-feedback-final/alpha/lib/caller.ex"
+        },
+        "time": 69388.784078125,
+        "method": "textDocument/publishDiagnostics"
+      },
+      "modified": false
+    },
+    "repaired_hover_2": {
+      "matched": true,
+      "sample_count": 2,
+      "first": {
+        "seconds": 0.004,
+        "value": {
+          "isError": false,
+          "data": {
+            "error": {
+              "code": "elixirls_not_ready",
+              "message": "ElixirLS is compiling the project. Retry in about 1 second; this is not a no-result answer.",
+              "phase": "compiling",
+              "retryAfterMs": 1000,
+              "retryable": true
+            }
+          }
+        }
+      },
+      "last": {
+        "seconds": 0.265,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "elixirls"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n"
+            ]
+          }
+        }
+      }
+    },
+    "slow_edit_save": {
+      "matched": false,
+      "elapsed_ms": 1044.0215420094319,
+      "save_ms": 8.790542007773183,
+      "modified": false
+    },
+    "slow_build_response": {
+      "isError": false,
+      "data": {
+        "error": {
+          "code": "elixirls_not_ready",
+          "message": "ElixirLS is compiling the project. Retry in about 1 second; this is not a no-result answer.",
+          "phase": "compiling",
+          "retryAfterMs": 1000,
+          "retryable": true
+        }
+      }
+    },
+    "slow_eventual_hover": {
+      "matched": true,
+      "sample_count": 9,
+      "first": {
+        "seconds": 0.004,
+        "value": {
+          "isError": false,
+          "data": {
+            "error": {
+              "code": "elixirls_not_ready",
+              "message": "ElixirLS is compiling the project. Retry in about 1 second; this is not a no-result answer.",
+              "phase": "compiling",
+              "retryAfterMs": 1000,
+              "retryable": true
+            }
+          }
+        }
+      },
+      "last": {
+        "seconds": 2.11,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "elixirls"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nFEEDBACK_SLOW documentation.\n"
+            ]
+          }
+        }
+      }
+    },
+    "final_restore": {
+      "matched": true,
+      "elapsed_ms": 11.423208998166956,
+      "save_ms": 8.544042007997632,
+      "diagnostic_after_save_ms": 2.5104999949689955,
+      "publication": {
+        "data": {
+          "version": 7,
+          "diagnostics": [],
+          "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-feedback-final/alpha/lib/target.ex"
+        },
+        "time": 69392.236304583,
+        "method": "textDocument/publishDiagnostics"
+      },
+      "modified": false
+    },
+    "eof_cleanup": {
+      "matched": true,
+      "sample_count": 1,
+      "first": {
+        "seconds": 0.038,
+        "value": {}
+      },
+      "last": {
+        "seconds": 0.038,
+        "value": {}
+      }
+    },
+    "completed": true,
+    "edit_notification_methods": [
+      [
+        "sent:textDocument/didChange",
+        "sent:textDocument/didSave",
+        "sent:textDocument/didChange",
+        "sent:textDocument/didSave"
+      ],
+      [
+        "sent:textDocument/didChange",
+        "sent:textDocument/didSave",
+        "sent:textDocument/didChange",
+        "sent:textDocument/didSave"
+      ],
+      [
+        "sent:textDocument/didChange",
+        "sent:textDocument/didSave",
+        "sent:textDocument/didChange",
+        "sent:textDocument/didSave"
+      ]
+    ],
+    "limitations": [
+      "Readiness hints use version-specific log text and telemetry, not a stable readiness API or freshness barrier.",
+      "MCP returns the explicit error inside tool text; vv-mcp 0.3.4 still sets isError=false.",
+      "Edit/save uses Neovim RPC, not an existing vv-mcp arbitrary-edit tool or Codex apply_patch integration.",
+      "An empty diagnostic publication after repair can precede compilation; it does not certify a clean build.",
+      "First prototype cleared failure state on index completion; corrected and regression-tested.",
+      "Second run completed assertions and process cleanup but observation after shutdown raised BrokenPipeError; final run fixes the harness and exits zero."
+    ]
+  },
+  "feedback_fixture_validation": [
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "format",
+        "mix.exs",
+        "lib/caller.ex",
+        "lib/target.ex",
+        "test/test_helper.exs",
+        "test/fixture_test.exs"
+      ],
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "format",
+        "--check-formatted",
+        "mix.exs",
+        "lib/caller.ex",
+        "lib/target.ex",
+        "test/test_helper.exs",
+        "test/fixture_test.exs"
+      ],
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "test"
+      ],
+      "exit_code": 0,
+      "output": "Running ExUnit with seed: 824578, max_cases: 20\n\n\u001b[32m.\u001b[0m\nFinished in 0.01 seconds (0.01s async, 0.00s sync)\n\u001b[32m\nResult: 1 passed\u001b[0m\n"
+    },
+    {
+      "command": [
+        "unbuffer",
+        "mix",
+        "credo",
+        "--strict",
+        "mix.exs",
+        "lib/caller.ex",
+        "lib/target.ex",
+        "test/test_helper.exs",
+        "test/fixture_test.exs"
+      ],
+      "exit_code": 1,
+      "output": "\u001b[31m\u001b[1m** (Mix) The task \"credo\" could not be found\u001b[0m\n"
+    }
+  ]
+}

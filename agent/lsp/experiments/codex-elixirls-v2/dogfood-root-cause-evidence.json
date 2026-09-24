@@ -1,0 +1,1400 @@
+{
+  "scope": "Read-only review of preserved three-agent dogfood evidence; no adapter changes or new model sessions.",
+  "runtime_hashes_verified": {
+    "health": {
+      "neovim_sync.lua": true,
+      "neovim_feedback.lua": true
+    },
+    "provider": {
+      "neovim_sync.lua": true,
+      "neovim_feedback.lua": true
+    },
+    "media": {
+      "neovim_sync.lua": true,
+      "neovim_feedback.lua": true
+    }
+  },
+  "workers": {
+    "health": {
+      "startup": {
+        "message": "ElixirLS: Compilation pending; diagnostics are not yet current. This is not a clean result.",
+        "generation": 0,
+        "completed": -1,
+        "building": true,
+        "uncertain": false,
+        "status": "pending",
+        "diagnostic_count": 0
+      },
+      "audit": [
+        {
+          "line": 12,
+          "event": "PostToolUse",
+          "tool": "apply_patch",
+          "result": {
+            "message": "",
+            "generation": 1,
+            "completed": 0,
+            "building": false,
+            "uncertain": false,
+            "status": "pending",
+            "diagnostic_count": 3
+          },
+          "output": {},
+          "seconds": 4.986
+        },
+        {
+          "line": 20,
+          "event": "Stop",
+          "tool": null,
+          "result": {
+            "message": "ElixirLS: Compilation pending; diagnostics are not yet current. This is not a clean result.",
+            "generation": 1,
+            "completed": 0,
+            "building": false,
+            "uncertain": false,
+            "status": "pending",
+            "diagnostic_count": 3
+          },
+          "output": {
+            "decision": "block",
+            "reason": "ElixirLS: Compilation pending; diagnostics are not yet current. This is not a clean result.\nFeedback receipt: a2ecc6e92107"
+          },
+          "seconds": 4.986
+        },
+        {
+          "line": 21,
+          "event": "Stop",
+          "tool": null,
+          "result": {
+            "message": "",
+            "status": "quiet",
+            "generation": 1
+          },
+          "output": {},
+          "seconds": 0.032
+        }
+      ],
+      "lsp_events": [
+        {
+          "line": 43,
+          "time": "2026-09-24 16:28:44",
+          "event": "build_start"
+        },
+        {
+          "line": 263,
+          "time": "2026-09-24 16:29:21",
+          "event": "textDocument/didOpen",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-health/lib/tips/health.ex"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 377,
+          "time": "2026-09-24 16:29:36",
+          "event": "textDocument/didOpen",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-health/lib/tips_web/controllers/health_controller.ex"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 469,
+          "time": "2026-09-24 16:29:57",
+          "event": "mix_compile_error"
+        },
+        {
+          "line": 472,
+          "time": "2026-09-24 16:29:57",
+          "event": "build_start"
+        },
+        {
+          "line": 494,
+          "time": "2026-09-24 16:29:58",
+          "event": "mix_compile_error"
+        },
+        {
+          "line": 507,
+          "time": "2026-09-24 16:30:04",
+          "event": "textDocument/didClose",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-health/lib/tips/health.ex"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 508,
+          "time": "2026-09-24 16:30:04",
+          "event": "textDocument/didOpen",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-health/lib/tips/health.ex"
+          ],
+          "repaired_health_caller_in_open": true
+        },
+        {
+          "line": 510,
+          "time": "2026-09-24 16:30:04",
+          "event": "workspace/didChangeWatchedFiles",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-health/lib/tips/health.ex"
+          ],
+          "repaired_health_caller_in_open": false
+        }
+      ],
+      "agent_events": [
+        {
+          "line": 25,
+          "item": {
+            "id": "item_12",
+            "type": "mcp_tool_call",
+            "server": "elixir_neovim",
+            "tool": "lsp",
+            "arguments": {
+              "operation": "diagnostics",
+              "uri": "/private/tmp/tips-lsp-sol-health/lib/tips/health.ex"
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"diagnostics\":{}}"
+                }
+              ],
+              "structured_content": null
+            },
+            "error": null,
+            "status": "completed"
+          }
+        },
+        {
+          "line": 38,
+          "item": {
+            "id": "item_19",
+            "type": "mcp_tool_call",
+            "server": "elixir_neovim",
+            "tool": "lsp",
+            "arguments": {
+              "operation": "diagnostics",
+              "uri": "/private/tmp/tips-lsp-sol-health/lib/tips/health.ex"
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"diagnostics\":{}}"
+                }
+              ],
+              "structured_content": null
+            },
+            "error": null,
+            "status": "completed"
+          }
+        },
+        {
+          "line": 47,
+          "item": {
+            "id": "item_24",
+            "type": "file_change",
+            "changes": [
+              {
+                "path": "/private/tmp/tips-lsp-sol-health/lib/tips/health.ex",
+                "kind": "update"
+              }
+            ],
+            "status": "completed"
+          }
+        },
+        {
+          "line": 49,
+          "item": {
+            "id": "item_25",
+            "type": "mcp_tool_call",
+            "server": "elixir_neovim",
+            "tool": "lsp",
+            "arguments": {
+              "operation": "diagnostics",
+              "uri": "/private/tmp/tips-lsp-sol-health/lib/tips/health.ex"
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"diagnostics\":{\"/private/tmp/tips-lsp-sol-health/lib/tips/health.ex\":[{\"range\":\"1:1-1:1\",\"severity\":\"error\",\"message\":\"** (CompileError) lib/tips/health.ex: cannot compile module Tips.Health (errors have been logged)\\n\\n\",\"source\":\"Elixir\"},{\"range\":\"13:9-13:14\",\"severity\":\"error\",\"message\":\"undefined function probe/0 (expected Tips.Health to define such a function or for it to be imported, but none are available)\",\"source\":\"Elixir\"},{\"range\":\"22:8-22:8\",\"severity\":\"warning\",\"message\":\"function query_database/0 is unused\",\"source\":\"Elixir\"}]}}"
+                }
+              ],
+              "structured_content": null
+            },
+            "error": null,
+            "status": "completed"
+          }
+        },
+        {
+          "line": 64,
+          "item": {
+            "id": "item_33",
+            "type": "mcp_tool_call",
+            "server": "elixir_neovim",
+            "tool": "lsp",
+            "arguments": {
+              "operation": "diagnostics",
+              "uri": "/private/tmp/tips-lsp-sol-health/lib/tips/health.ex"
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"diagnostics\":{\"/private/tmp/tips-lsp-sol-health/lib/tips/health.ex\":[{\"range\":\"1:1-1:1\",\"severity\":\"error\",\"message\":\"** (CompileError) lib/tips/health.ex: cannot compile module Tips.Health (errors have been logged)\\n\\n\",\"source\":\"Elixir\"},{\"range\":\"13:9-13:14\",\"severity\":\"error\",\"message\":\"undefined function probe/0 (expected Tips.Health to define such a function or for it to be imported, but none are available)\",\"source\":\"Elixir\"},{\"range\":\"22:8-22:8\",\"severity\":\"warning\",\"message\":\"function query_database/0 is unused\",\"source\":\"Elixir\"}]}}"
+                }
+              ],
+              "structured_content": null
+            },
+            "error": null,
+            "status": "completed"
+          }
+        },
+        {
+          "line": 74,
+          "item": {
+            "id": "item_39",
+            "type": "mcp_tool_call",
+            "server": "elixir_neovim",
+            "tool": "lsp",
+            "arguments": {
+              "operation": "diagnostics",
+              "uri": "/private/tmp/tips-lsp-sol-health/lib/tips/health.ex"
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"diagnostics\":{\"/private/tmp/tips-lsp-sol-health/lib/tips/health.ex\":[{\"range\":\"1:1-1:1\",\"severity\":\"error\",\"message\":\"** (CompileError) lib/tips/health.ex: cannot compile module Tips.Health (errors have been logged)\\n\\n\",\"source\":\"Elixir\"},{\"range\":\"13:9-13:14\",\"severity\":\"error\",\"message\":\"undefined function probe/0 (expected Tips.Health to define such a function or for it to be imported, but none are available)\",\"source\":\"Elixir\"},{\"range\":\"22:8-22:8\",\"severity\":\"warning\",\"message\":\"function query_database/0 is unused\",\"source\":\"Elixir\"}]}}"
+                }
+              ],
+              "structured_content": null
+            },
+            "error": null,
+            "status": "completed"
+          }
+        },
+        {
+          "line": 76,
+          "item": {
+            "id": "item_40",
+            "type": "mcp_tool_call",
+            "server": "elixir_neovim",
+            "tool": "lsp",
+            "arguments": {
+              "operation": "diagnostics",
+              "uri": "/private/tmp/tips-lsp-sol-health/lib/tips/health.ex"
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"diagnostics\":{\"/private/tmp/tips-lsp-sol-health/lib/tips/health.ex\":[{\"range\":\"1:1-1:1\",\"severity\":\"error\",\"message\":\"** (CompileError) lib/tips/health.ex: cannot compile module Tips.Health (errors have been logged)\\n\\n\",\"source\":\"Elixir\"},{\"range\":\"13:9-13:14\",\"severity\":\"error\",\"message\":\"undefined function probe/0 (expected Tips.Health to define such a function or for it to be imported, but none are available)\",\"source\":\"Elixir\"},{\"range\":\"22:8-22:8\",\"severity\":\"warning\",\"message\":\"function query_database/0 is unused\",\"source\":\"Elixir\"}]}}"
+                }
+              ],
+              "structured_content": null
+            },
+            "error": null,
+            "status": "completed"
+          }
+        }
+      ],
+      "lsp_log": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/sol-dogfood-run/health/codex-environment/state/nvim/lsp.log"
+    },
+    "provider": {
+      "startup": {
+        "diagnostic_count": 0,
+        "generation": 0,
+        "completed": -1,
+        "building": true,
+        "message": "ElixirLS: Compilation pending; diagnostics are not yet current. This is not a clean result.",
+        "uncertain": false,
+        "status": "pending"
+      },
+      "audit": [
+        {
+          "line": 9,
+          "event": "PostToolUse",
+          "tool": "apply_patch",
+          "result": {
+            "diagnostic_count": 0,
+            "generation": 1,
+            "completed": -1,
+            "building": true,
+            "message": "ElixirLS: Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.",
+            "uncertain": true,
+            "status": "uncertain"
+          },
+          "output": {
+            "hookSpecificOutput": {
+              "hookEventName": "PostToolUse",
+              "additionalContext": "ElixirLS: Compiler feedback uncertain: source changed during compilation. Results may be stale; verify with normal compilation/tests. Automatic feedback cannot certify this build.\nFeedback receipt: 3213f6d90244"
+            }
+          },
+          "seconds": 0.073
+        },
+        {
+          "line": 12,
+          "event": "PostToolUse",
+          "tool": "Bash",
+          "result": {
+            "diagnostic_count": 0,
+            "generation": 2,
+            "completed": 2,
+            "building": false,
+            "message": "",
+            "uncertain": true,
+            "status": "uncertain"
+          },
+          "output": {},
+          "seconds": 0.064
+        },
+        {
+          "line": 18,
+          "event": "PostToolUse",
+          "tool": "Bash",
+          "result": {
+            "diagnostic_count": 0,
+            "generation": 3,
+            "completed": 3,
+            "building": false,
+            "message": "",
+            "uncertain": true,
+            "status": "uncertain"
+          },
+          "output": {},
+          "seconds": 0.054
+        },
+        {
+          "line": 25,
+          "event": "PostToolUse",
+          "tool": "Bash",
+          "result": {
+            "diagnostic_count": 0,
+            "generation": 3,
+            "completed": 3,
+            "building": false,
+            "message": "",
+            "uncertain": true,
+            "status": "uncertain"
+          },
+          "output": {},
+          "seconds": 0.065
+        }
+      ],
+      "lsp_events": [
+        {
+          "line": 44,
+          "time": "2026-09-24 16:28:44",
+          "event": "build_start"
+        },
+        {
+          "line": 264,
+          "time": "2026-09-24 16:29:21",
+          "event": "textDocument/didOpen",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-provider/lib/tips/search_probe.ex"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 410,
+          "time": "2026-09-24 16:29:50",
+          "event": "workspace/didChangeWatchedFiles",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-provider/test/tips/provider_config_test.exs"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 456,
+          "time": "2026-09-24 16:29:57",
+          "event": "mix_compile_ok"
+        },
+        {
+          "line": 460,
+          "time": "2026-09-24 16:29:57",
+          "event": "build_start"
+        },
+        {
+          "line": 473,
+          "time": "2026-09-24 16:29:58",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 492,
+          "time": "2026-09-24 16:30:21",
+          "event": "workspace/didChangeWatchedFiles",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-provider/lib/tips/provider_config.ex",
+            "file:///private/tmp/tips-lsp-sol-provider/lib/tips/search_probe.ex",
+            "file:///private/tmp/tips-lsp-sol-provider/test/test_helper.exs"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 495,
+          "time": "2026-09-24 16:30:21",
+          "event": "build_start"
+        },
+        {
+          "line": 496,
+          "time": "2026-09-24 16:30:21",
+          "event": "textDocument/didClose",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-provider/lib/tips/search_probe.ex"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 497,
+          "time": "2026-09-24 16:30:21",
+          "event": "textDocument/didOpen",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-provider/lib/tips/search_probe.ex"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 510,
+          "time": "2026-09-24 16:30:23",
+          "event": "mix_compile_ok"
+        },
+        {
+          "line": 518,
+          "time": "2026-09-24 16:30:39",
+          "event": "textDocument/didOpen",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-provider/lib/tips/provider_config.ex"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 522,
+          "time": "2026-09-24 16:30:46",
+          "event": "textDocument/didOpen",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-provider/test/tips/provider_config_test.exs"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 527,
+          "time": "2026-09-24 16:30:49",
+          "event": "textDocument/didOpen",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-provider/test/test_helper.exs"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 536,
+          "time": "2026-09-24 16:31:02",
+          "event": "build_start"
+        },
+        {
+          "line": 548,
+          "time": "2026-09-24 16:31:03",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 552,
+          "time": "2026-09-24 16:31:03",
+          "event": "build_start"
+        },
+        {
+          "line": 568,
+          "time": "2026-09-24 16:31:04",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 573,
+          "time": "2026-09-24 16:31:04",
+          "event": "build_start"
+        },
+        {
+          "line": 589,
+          "time": "2026-09-24 16:31:05",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 593,
+          "time": "2026-09-24 16:31:05",
+          "event": "build_start"
+        },
+        {
+          "line": 610,
+          "time": "2026-09-24 16:31:06",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 614,
+          "time": "2026-09-24 16:31:06",
+          "event": "build_start"
+        },
+        {
+          "line": 631,
+          "time": "2026-09-24 16:31:07",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 635,
+          "time": "2026-09-24 16:31:07",
+          "event": "build_start"
+        },
+        {
+          "line": 652,
+          "time": "2026-09-24 16:31:08",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 656,
+          "time": "2026-09-24 16:31:08",
+          "event": "build_start"
+        },
+        {
+          "line": 673,
+          "time": "2026-09-24 16:31:09",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 677,
+          "time": "2026-09-24 16:31:09",
+          "event": "build_start"
+        },
+        {
+          "line": 693,
+          "time": "2026-09-24 16:31:10",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 697,
+          "time": "2026-09-24 16:31:10",
+          "event": "build_start"
+        },
+        {
+          "line": 713,
+          "time": "2026-09-24 16:31:12",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 717,
+          "time": "2026-09-24 16:31:16",
+          "event": "textDocument/didClose",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-provider/test/tips/provider_config_test.exs"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 718,
+          "time": "2026-09-24 16:31:16",
+          "event": "textDocument/didOpen",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-provider/test/tips/provider_config_test.exs"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 724,
+          "time": "2026-09-24 16:31:16",
+          "event": "workspace/didChangeWatchedFiles",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-provider/test/tips/provider_config_test.exs"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 733,
+          "time": "2026-09-24 16:31:21",
+          "event": "build_start"
+        },
+        {
+          "line": 744,
+          "time": "2026-09-24 16:31:22",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 748,
+          "time": "2026-09-24 16:31:22",
+          "event": "build_start"
+        },
+        {
+          "line": 765,
+          "time": "2026-09-24 16:31:24",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 769,
+          "time": "2026-09-24 16:31:24",
+          "event": "build_start"
+        },
+        {
+          "line": 786,
+          "time": "2026-09-24 16:31:25",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 790,
+          "time": "2026-09-24 16:31:25",
+          "event": "build_start"
+        },
+        {
+          "line": 807,
+          "time": "2026-09-24 16:31:26",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 811,
+          "time": "2026-09-24 16:31:26",
+          "event": "build_start"
+        },
+        {
+          "line": 828,
+          "time": "2026-09-24 16:31:27",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 832,
+          "time": "2026-09-24 16:31:27",
+          "event": "build_start"
+        },
+        {
+          "line": 850,
+          "time": "2026-09-24 16:31:28",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 854,
+          "time": "2026-09-24 16:31:28",
+          "event": "build_start"
+        },
+        {
+          "line": 871,
+          "time": "2026-09-24 16:31:29",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 875,
+          "time": "2026-09-24 16:31:29",
+          "event": "build_start"
+        },
+        {
+          "line": 890,
+          "time": "2026-09-24 16:31:30",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 894,
+          "time": "2026-09-24 16:31:30",
+          "event": "build_start"
+        },
+        {
+          "line": 910,
+          "time": "2026-09-24 16:31:31",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 917,
+          "time": "2026-09-24 16:31:54",
+          "event": "build_start"
+        },
+        {
+          "line": 928,
+          "time": "2026-09-24 16:31:56",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 932,
+          "time": "2026-09-24 16:31:56",
+          "event": "build_start"
+        },
+        {
+          "line": 949,
+          "time": "2026-09-24 16:31:57",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 953,
+          "time": "2026-09-24 16:31:57",
+          "event": "build_start"
+        },
+        {
+          "line": 970,
+          "time": "2026-09-24 16:31:58",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 974,
+          "time": "2026-09-24 16:31:58",
+          "event": "build_start"
+        },
+        {
+          "line": 991,
+          "time": "2026-09-24 16:31:59",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 995,
+          "time": "2026-09-24 16:31:59",
+          "event": "build_start"
+        },
+        {
+          "line": 1012,
+          "time": "2026-09-24 16:32:00",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 1016,
+          "time": "2026-09-24 16:32:00",
+          "event": "build_start"
+        },
+        {
+          "line": 1033,
+          "time": "2026-09-24 16:32:01",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 1037,
+          "time": "2026-09-24 16:32:01",
+          "event": "build_start"
+        },
+        {
+          "line": 1054,
+          "time": "2026-09-24 16:32:01",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 1058,
+          "time": "2026-09-24 16:32:01",
+          "event": "build_start"
+        },
+        {
+          "line": 1074,
+          "time": "2026-09-24 16:32:02",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 1078,
+          "time": "2026-09-24 16:32:02",
+          "event": "build_start"
+        },
+        {
+          "line": 1094,
+          "time": "2026-09-24 16:32:03",
+          "event": "mix_compile_noop"
+        }
+      ],
+      "agent_events": [
+        {
+          "line": 30,
+          "item": {
+            "id": "item_15",
+            "type": "file_change",
+            "changes": [
+              {
+                "path": "/private/tmp/tips-lsp-sol-provider/test/tips/provider_config_test.exs",
+                "kind": "update"
+              }
+            ],
+            "status": "completed"
+          }
+        },
+        {
+          "line": 41,
+          "item": {
+            "id": "item_21",
+            "type": "file_change",
+            "changes": [
+              {
+                "path": "/private/tmp/tips-lsp-sol-provider/docs/development/local-development.md",
+                "kind": "update"
+              },
+              {
+                "path": "/private/tmp/tips-lsp-sol-provider/lib/tips/provider_config.ex",
+                "kind": "update"
+              },
+              {
+                "path": "/private/tmp/tips-lsp-sol-provider/lib/tips/search_probe.ex",
+                "kind": "update"
+              },
+              {
+                "path": "/private/tmp/tips-lsp-sol-provider/test/test_helper.exs",
+                "kind": "update"
+              }
+            ],
+            "status": "completed"
+          }
+        },
+        {
+          "line": 45,
+          "item": {
+            "id": "item_23",
+            "type": "mcp_tool_call",
+            "server": "elixir_neovim",
+            "tool": "lsp",
+            "arguments": {
+              "operation": "diagnostics",
+              "uri": "/private/tmp/tips-lsp-sol-provider/lib/tips/provider_config.ex"
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"diagnostics\":{}}"
+                }
+              ],
+              "structured_content": null
+            },
+            "error": null,
+            "status": "completed"
+          }
+        },
+        {
+          "line": 47,
+          "item": {
+            "id": "item_24",
+            "type": "mcp_tool_call",
+            "server": "elixir_neovim",
+            "tool": "lsp",
+            "arguments": {
+              "operation": "diagnostics",
+              "uri": "/private/tmp/tips-lsp-sol-provider/lib/tips/search_probe.ex"
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"diagnostics\":{}}"
+                }
+              ],
+              "structured_content": null
+            },
+            "error": null,
+            "status": "completed"
+          }
+        },
+        {
+          "line": 49,
+          "item": {
+            "id": "item_25",
+            "type": "mcp_tool_call",
+            "server": "elixir_neovim",
+            "tool": "lsp",
+            "arguments": {
+              "operation": "diagnostics",
+              "uri": "/private/tmp/tips-lsp-sol-provider/test/tips/provider_config_test.exs"
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"diagnostics\":{}}"
+                }
+              ],
+              "structured_content": null
+            },
+            "error": null,
+            "status": "completed"
+          }
+        },
+        {
+          "line": 51,
+          "item": {
+            "id": "item_26",
+            "type": "mcp_tool_call",
+            "server": "elixir_neovim",
+            "tool": "lsp",
+            "arguments": {
+              "operation": "diagnostics",
+              "uri": "/private/tmp/tips-lsp-sol-provider/test/test_helper.exs"
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"diagnostics\":{}}"
+                }
+              ],
+              "structured_content": null
+            },
+            "error": null,
+            "status": "completed"
+          }
+        },
+        {
+          "line": 61,
+          "item": {
+            "id": "item_32",
+            "type": "file_change",
+            "changes": [
+              {
+                "path": "/private/tmp/tips-lsp-sol-provider/test/tips/provider_config_test.exs",
+                "kind": "update"
+              }
+            ],
+            "status": "completed"
+          }
+        },
+        {
+          "line": 71,
+          "item": {
+            "id": "item_37",
+            "type": "mcp_tool_call",
+            "server": "elixir_neovim",
+            "tool": "lsp",
+            "arguments": {
+              "operation": "diagnostics",
+              "uri": "/private/tmp/tips-lsp-sol-provider/test/tips/provider_config_test.exs"
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"diagnostics\":{}}"
+                }
+              ],
+              "structured_content": null
+            },
+            "error": null,
+            "status": "completed"
+          }
+        }
+      ],
+      "lsp_log": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/sol-dogfood-run/provider/codex-environment/state/nvim/lsp.log"
+    },
+    "media": {
+      "startup": {
+        "diagnostic_count": 0,
+        "uncertain": false,
+        "generation": 0,
+        "message": "ElixirLS: Compilation pending; diagnostics are not yet current. This is not a clean result.",
+        "completed": -1,
+        "building": true,
+        "status": "pending"
+      },
+      "audit": [
+        {
+          "line": 7,
+          "event": "PostToolUse",
+          "tool": "apply_patch",
+          "result": {
+            "diagnostic_count": 0,
+            "uncertain": false,
+            "generation": 1,
+            "message": "ElixirLS: Compilation completed; no compiler diagnostics are currently reported.",
+            "completed": 1,
+            "building": false,
+            "status": "completed"
+          },
+          "output": {
+            "hookSpecificOutput": {
+              "hookEventName": "PostToolUse",
+              "additionalContext": "ElixirLS: Compilation completed; no compiler diagnostics are currently reported.\nFeedback receipt: 92f8cc449ec6"
+            }
+          },
+          "seconds": 1.178
+        },
+        {
+          "line": 9,
+          "event": "PostToolUse",
+          "tool": "apply_patch",
+          "result": {
+            "diagnostic_count": 0,
+            "uncertain": false,
+            "generation": 2,
+            "message": "ElixirLS: Compilation pending; diagnostics are not yet current. This is not a clean result.",
+            "completed": 1,
+            "building": false,
+            "status": "pending"
+          },
+          "output": {
+            "hookSpecificOutput": {
+              "hookEventName": "PostToolUse",
+              "additionalContext": "ElixirLS: Compilation pending; diagnostics are not yet current. This is not a clean result.\nFeedback receipt: 6f7a0a4448e1"
+            }
+          },
+          "seconds": 4.978
+        },
+        {
+          "line": 13,
+          "event": "PostToolUse",
+          "tool": "apply_patch",
+          "result": {
+            "diagnostic_count": 0,
+            "uncertain": false,
+            "generation": 3,
+            "message": "",
+            "completed": 1,
+            "building": false,
+            "status": "pending"
+          },
+          "output": {},
+          "seconds": 4.993
+        },
+        {
+          "line": 18,
+          "event": "PostToolUse",
+          "tool": "Bash",
+          "result": {
+            "diagnostic_count": 0,
+            "uncertain": false,
+            "generation": 3,
+            "message": "",
+            "completed": 1,
+            "building": false,
+            "status": "pending"
+          },
+          "output": {},
+          "seconds": 0.086
+        },
+        {
+          "line": 19,
+          "event": "Stop",
+          "tool": null,
+          "result": {
+            "status": "unavailable",
+            "message": "ElixirLS feedback unavailable: Neovim did not answer within the feedback budget. This does not mean the source is error-free."
+          },
+          "output": {
+            "decision": "block",
+            "reason": "ElixirLS feedback unavailable: Neovim did not answer within the feedback budget. This does not mean the source is error-free.\nFeedback receipt: 2486dedc5f09"
+          },
+          "seconds": 5.003
+        },
+        {
+          "line": 20,
+          "event": "PostToolUse",
+          "tool": "Bash",
+          "result": {
+            "diagnostic_count": 0,
+            "uncertain": false,
+            "generation": 3,
+            "message": "",
+            "completed": 1,
+            "building": false,
+            "status": "pending"
+          },
+          "output": {},
+          "seconds": 0.058
+        },
+        {
+          "line": 21,
+          "event": "Stop",
+          "tool": null,
+          "result": {
+            "message": "",
+            "generation": 3,
+            "status": "quiet"
+          },
+          "output": {},
+          "seconds": 0.035
+        }
+      ],
+      "lsp_events": [
+        {
+          "line": 47,
+          "time": "2026-09-24 16:28:44",
+          "event": "build_start"
+        },
+        {
+          "line": 305,
+          "time": "2026-09-24 16:29:29",
+          "event": "textDocument/didOpen",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-media/lib/tips/content/media/target.ex"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 460,
+          "time": "2026-09-24 16:29:56",
+          "event": "mix_compile_ok"
+        },
+        {
+          "line": 464,
+          "time": "2026-09-24 16:29:56",
+          "event": "build_start"
+        },
+        {
+          "line": 476,
+          "time": "2026-09-24 16:29:57",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 484,
+          "time": "2026-09-24 16:30:09",
+          "event": "workspace/didChangeWatchedFiles",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-media/test/tips/content/media_schema_test.exs"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 487,
+          "time": "2026-09-24 16:30:09",
+          "event": "build_start"
+        },
+        {
+          "line": 495,
+          "time": "2026-09-24 16:30:10",
+          "event": "mix_compile_noop"
+        },
+        {
+          "line": 514,
+          "time": "2026-09-24 16:30:41",
+          "event": "textDocument/didClose",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-media/lib/tips/content/media/target.ex"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 515,
+          "time": "2026-09-24 16:30:41",
+          "event": "textDocument/didOpen",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-media/lib/tips/content/media/target.ex"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 518,
+          "time": "2026-09-24 16:30:41",
+          "event": "workspace/didChangeWatchedFiles",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-media/lib/tips/content/media/target.ex"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 521,
+          "time": "2026-09-24 16:31:03",
+          "event": "textDocument/didOpen",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-media/test/tips/content/media_schema_test.exs"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 525,
+          "time": "2026-09-24 16:31:14",
+          "event": "textDocument/didClose",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-media/test/tips/content/media_schema_test.exs"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 526,
+          "time": "2026-09-24 16:31:14",
+          "event": "textDocument/didOpen",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-media/test/tips/content/media_schema_test.exs"
+          ],
+          "repaired_health_caller_in_open": false
+        },
+        {
+          "line": 533,
+          "time": "2026-09-24 16:31:14",
+          "event": "workspace/didChangeWatchedFiles",
+          "uris": [
+            "file:///private/tmp/tips-lsp-sol-media/test/tips/content/media_schema_test.exs"
+          ],
+          "repaired_health_caller_in_open": false
+        }
+      ],
+      "agent_events": [
+        {
+          "line": 29,
+          "item": {
+            "id": "item_15",
+            "type": "file_change",
+            "changes": [
+              {
+                "path": "/private/tmp/tips-lsp-sol-media/test/tips/content/media_schema_test.exs",
+                "kind": "update"
+              }
+            ],
+            "status": "completed"
+          }
+        },
+        {
+          "line": 40,
+          "item": {
+            "id": "item_21",
+            "type": "file_change",
+            "changes": [
+              {
+                "path": "/private/tmp/tips-lsp-sol-media/lib/tips/content/media/target.ex",
+                "kind": "update"
+              }
+            ],
+            "status": "completed"
+          }
+        },
+        {
+          "line": 46,
+          "item": {
+            "id": "item_24",
+            "type": "mcp_tool_call",
+            "server": "elixir_neovim",
+            "tool": "lsp",
+            "arguments": {
+              "operation": "diagnostics",
+              "uri": "/private/tmp/tips-lsp-sol-media/lib/tips/content/media/target.ex"
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"diagnostics\":{}}"
+                }
+              ],
+              "structured_content": null
+            },
+            "error": null,
+            "status": "completed"
+          }
+        },
+        {
+          "line": 48,
+          "item": {
+            "id": "item_25",
+            "type": "mcp_tool_call",
+            "server": "elixir_neovim",
+            "tool": "lsp",
+            "arguments": {
+              "operation": "diagnostics",
+              "uri": "/private/tmp/tips-lsp-sol-media/test/tips/content/media_schema_test.exs"
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"diagnostics\":{}}"
+                }
+              ],
+              "structured_content": null
+            },
+            "error": null,
+            "status": "completed"
+          }
+        },
+        {
+          "line": 52,
+          "item": {
+            "id": "item_27",
+            "type": "file_change",
+            "changes": [
+              {
+                "path": "/private/tmp/tips-lsp-sol-media/test/tips/content/media_schema_test.exs",
+                "kind": "update"
+              }
+            ],
+            "status": "completed"
+          }
+        },
+        {
+          "line": 63,
+          "item": {
+            "id": "item_33",
+            "type": "mcp_tool_call",
+            "server": "elixir_neovim",
+            "tool": "lsp",
+            "arguments": {
+              "operation": "diagnostics",
+              "uri": "/private/tmp/tips-lsp-sol-media/lib/tips/content/media/target.ex"
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"diagnostics\":{}}"
+                }
+              ],
+              "structured_content": null
+            },
+            "error": null,
+            "status": "completed"
+          }
+        },
+        {
+          "line": 65,
+          "item": {
+            "id": "item_34",
+            "type": "mcp_tool_call",
+            "server": "elixir_neovim",
+            "tool": "lsp",
+            "arguments": {
+              "operation": "diagnostics",
+              "uri": "/private/tmp/tips-lsp-sol-media/test/tips/content/media_schema_test.exs"
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"diagnostics\":{}}"
+                }
+              ],
+              "structured_content": null
+            },
+            "error": null,
+            "status": "completed"
+          }
+        },
+        {
+          "line": 71,
+          "item": {
+            "id": "item_38",
+            "type": "mcp_tool_call",
+            "server": "elixir_neovim",
+            "tool": "lsp",
+            "arguments": {
+              "operation": "diagnostics",
+              "uri": "/private/tmp/tips-lsp-sol-media/lib/tips/content/media/target.ex"
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"diagnostics\":{}}"
+                }
+              ],
+              "structured_content": null
+            },
+            "error": null,
+            "status": "completed"
+          }
+        },
+        {
+          "line": 73,
+          "item": {
+            "id": "item_39",
+            "type": "mcp_tool_call",
+            "server": "elixir_neovim",
+            "tool": "lsp",
+            "arguments": {
+              "operation": "diagnostics",
+              "uri": "/private/tmp/tips-lsp-sol-media/test/tips/content/media_schema_test.exs"
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"diagnostics\":{}}"
+                }
+              ],
+              "structured_content": null
+            },
+            "error": null,
+            "status": "completed"
+          }
+        }
+      ],
+      "lsp_log": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/sol-dogfood-run/media/codex-environment/state/nvim/lsp.log"
+    }
+  }
+}

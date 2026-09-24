@@ -1,0 +1,377 @@
+--- a/neovim_launcher.py
++++ b/neovim_launcher.py
+@@ -24,12 +24,12 @@
+     args = parser.parse_args()
+     vendor, root = args.vendor.resolve(), args.workspace.resolve()
+     env = os.environ | json.loads(args.environment.read_text())
+-    sys.path.insert(0, str(vendor / 'python'))
+-    import pynvim
+     fd, socket = tempfile.mkstemp(prefix='elixir-nvim-', suffix='.sock')
+     os.close(fd)
+     os.unlink(socket)
+     nvim, bridge = None, None
++    owner_path = Path(env['VV_MCP_REGISTRY']).parent / 'owner.json'
++    published_owner = False
+ 
+     def terminate(*_):
+         raise SystemExit(143)
+@@ -40,19 +40,28 @@
+             nvim = subprocess.Popen([str(vendor / 'nvim-macos-arm64/bin/nvim'), '--embed', '--headless',
+                                      '--listen', socket, str(root / 'mix.exs')], cwd=root, env=env,
+                                     stdin=subprocess.PIPE, stdout=log, stderr=log, start_new_session=True)
+-            deadline = time.monotonic() + 15
+-            while not Path(socket).exists():
++            # Wait for this instance's registry entry, not compiler readiness.
++            deadline = time.monotonic() + 5
++            entry_path = Path(env['VV_MCP_REGISTRY']) / f'{nvim.pid}.json'
++            while True:
+                 if nvim.poll() is not None or time.monotonic() > deadline:
+-                    raise RuntimeError('Headless Neovim failed to start')
++                    raise RuntimeError('Owned Neovim failed to register within five seconds')
++                try:
++                    entry = json.loads(entry_path.read_text())
++                    if (entry['pid'] == nvim.pid and entry['socket'] == socket
++                            and entry['kind'] == 'interactive'):
++                        break
++                except (OSError, ValueError, KeyError):
++                    pass  # Registration may not exist yet.
+                 time.sleep(0.02)
+-            client = pynvim.attach('socket', path=socket)
+-            try:
+-                # Bounded automatic warmup. Larger projects can remain pending.
+-                warmup = client.exec_lua("return require('neovim_sync').collect(...)", 10000)
+-                args.environment.with_suffix('.startup.json').write_text(json.dumps(warmup) + '\n')
+-            finally:
+-                client.close()
+-            bridge = subprocess.Popen([str(vendor / 'vv-mcp')], cwd=root, env=env, stdin=subprocess.PIPE)
++            owner_path.write_text(json.dumps(entry) + '\n')
++            published_owner = True
++            args.environment.with_suffix('.startup.json').write_text(json.dumps({
++                'status': 'registered', 'instanceId': entry['instanceId'],
++                'message': 'Compiler readiness is reported by hooks and MCP tools.'}) + '\n')
++            # The bound server never falls back to a managed replacement.
++            bridge = subprocess.Popen([str(vendor / 'vv-mcp'), '--instance-id',
++                                       entry['instanceId']], cwd=root, env=env, stdin=subprocess.PIPE)
+             def forward_stdin():
+                 try:
+                     while data := os.read(sys.stdin.fileno(), 65536):
+@@ -65,7 +74,11 @@
+             # A private pipe gives vv-mcp EOF even if this launcher is killed.
+             # Forward raw bytes; vv-mcp remains the only MCP implementation.
+             threading.Thread(target=forward_stdin, daemon=True).start()
+-            raise SystemExit(bridge.wait())
++            while bridge.poll() is None:
++                if nvim.poll() is not None:
++                    raise RuntimeError('Owned Neovim exited; this MCP session is unavailable')
++                time.sleep(0.05)
++            raise SystemExit(bridge.returncode)
+     finally:
+         if bridge is not None and bridge.poll() is None:
+             bridge.terminate()
+@@ -75,19 +88,8 @@
+                 bridge.kill()
+                 bridge.wait()
+         if nvim is not None:
+-            nvim.stdin.close()  # Standard --embed ownership: parent EOF exits Neovim.
+-            try:
+-                client = pynvim.attach('socket', path=socket)
+-                args.environment.with_suffix('.events.json').write_text(
+-                    json.dumps(client.exec_lua('return _G.v2_events')) + '\n')
+-                client.command('qa!')
+-            except Exception:
+-                pass  # Neovim normally closes RPC before answering qa!.
+-            try:
+-                nvim.wait(timeout=3)
+-            except subprocess.TimeoutExpired:
+-                pass
+-            # Only this launcher's private process group is eligible for cleanup.
++            # No RPC here: cleanup must work when the peer cannot answer.
++            nvim.stdin.close()
+             try:
+                 os.killpg(nvim.pid, signal.SIGTERM)
+             except ProcessLookupError:
+@@ -95,8 +97,16 @@
+             try:
+                 nvim.wait(timeout=2)
+             except subprocess.TimeoutExpired:
++                pass
++            # A compiler can outlive the editor's graceful exit. Both share our
++            # private group (ElixirLS detached=false), so reap the remainder too.
++            try:
+                 os.killpg(nvim.pid, signal.SIGKILL)
+-                nvim.wait()
++            except ProcessLookupError:
++                pass
++            nvim.wait(timeout=2)
++        if published_owner:
++            owner_path.unlink(missing_ok=True)
+         Path(socket).unlink(missing_ok=True)
+ 
+ 
+--- a/neovim_hook.py
++++ b/neovim_hook.py
+@@ -39,12 +39,17 @@
+         # Leave a small output allowance even when Neovim never answers.
+         signal.setitimer(signal.ITIMER_REAL, max(0.001, deadline - time.monotonic() - 0.1))
+         import pynvim
++        owner = json.loads((args.registry.parent / 'owner.json').read_text())
+         entries = [json.loads(p.read_text()) for p in args.registry.glob('*.json')]
+         entries = [e for e in entries if any(Path(r).resolve() == root for r in e.get('roots', []))
+                    or Path(e['cwd']).resolve() == root]
+         if len(entries) != 1:
+             raise RuntimeError(f'Expected one Neovim for the assigned workspace; found {len(entries)}')
+-        client = pynvim.attach('socket', path=entries[0]['socket'])
++        entry = entries[0]
++        if entry.get('kind') != 'interactive' or any(
++                entry.get(key) != owner.get(key) for key in ('instanceId', 'pid', 'socket')):
++            raise RuntimeError('Neovim instance differs from the session owner; restart the session')
++        client = pynvim.attach('socket', path=entry['socket'])
+         phases['attached_ms'] = round((time.monotonic() - start) * 1000, 3)
+         # Budget covers scan + wait, with 300 ms for RPC, teardown and output.
+         # Unix expiry also rejects a request queued behind another RPC. Lua uses
+--- a/neovim_sync.lua
++++ b/neovim_sync.lua
+@@ -34,7 +34,7 @@
+   end
+ end
+ 
+-function M.scan()
++local function scan()
+   local files, changed = snapshot(), {}
+   for path, hash in pairs(files) do
+     if M.files[path] ~= hash then changed[path] = M.files[path] and 2 or 1 end
+@@ -96,29 +96,34 @@
+   end
+ end
+ 
++function M.scan()
++  local ok, err = pcall(scan)
++  M.scan_error = not ok and tostring(err) or nil
++  return ok
++end
++
+ function M.observe(method, data)
+   if method == 'telemetry/event' and data.name == 'build_queued' then
+     M.queued = true
+     M.activity = now()
+   elseif method == 'window/logMessage' and (data.message or ''):find('Starting build with MIX_ENV:', 1, true) then
+     -- Build events are observations, not acknowledgements of exact source bytes.
+-    M.building, M.queued = true, false
+-    M.scan()
+-    M.building, M.started = true, M.generation
++    M.building, M.queued, M.started = true, false, M.generation
++    if M.scan() then M.started = M.generation end
+     M.activity = now()
+   elseif method == 'telemetry/event' and data.name == 'build' then
+-    M.scan()
+     M.building = false
+     M.completed = M.started or -1
+     M.result = data.properties and data.properties['elixir_ls.build_result']
+     M.activity = now()
++    M.scan()
+   elseif method == 'textDocument/publishDiagnostics' then
+     M.activity = now()
+   end
+ end
+ 
+ function M.ready()
+-  return next(M.pending) == nil and next(M.conflicts) == nil
++  return not M.scan_error and next(M.pending) == nil and next(M.conflicts) == nil
+     and not M.building and not M.queued and M.completed == M.generation and now() - M.activity >= 0.15
+ end
+ 
+@@ -137,8 +142,8 @@
+     status, message = 'unavailable', 'Compiler feedback unavailable: ElixirLS is still starting or has stopped. This is not a clean result.'
+   elseif next(M.conflicts) then
+     status, message = 'conflict', 'Neovim has unsaved changes; automatic reload was refused.'
+-  elseif next(M.sync_errors) then
+-    status, message = 'sync_error', 'External-edit synchronization is pending after a reload/save failure; it will retry on the next hook or LSP read. Cached results may be stale.'
++  elseif M.scan_error or next(M.sync_errors) then
++    status, message = 'sync_error', 'External-edit synchronization is pending after a scan/reload/save failure; it will retry on the next hook or LSP read. Cached results may be stale.'
+   elseif not M.ready() then
+     status, message = 'pending', 'Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result.'
+   elseif M.result ~= 'mix_compile_ok' and M.result ~= 'mix_compile_noop' then
+@@ -175,7 +180,7 @@
+   if budget_ms > 0 then
+     local retry_at = now() + 0.2
+     vim.wait(remaining(), function()
+-      if next(M.pending) and now() >= retry_at then
++      if (M.scan_error or next(M.pending)) and now() >= retry_at then
+         M.scan()
+         retry_at = now() + 0.2
+       end
+@@ -195,6 +200,9 @@
+   table.sort(lines)
+   local observed = M.status()
+   local message, status = observed.message, observed.status
++  if event and status == 'pending' then
++    message = 'Compilation is still pending. Feedback will be checked after the next eligible tool or at Stop. This is not a clean result.'
++  end
+   if status == 'current' or status == 'failed' then
+     if #lines > 0 then
+       status, message = 'diagnostics', table.concat(vim.list_slice(lines, 1, 8), '\n')
+@@ -238,7 +246,7 @@
+   if status == 'pending' or status == 'sync_error' then M.reported_pending = true end
+   if M.ready() then M.reported_pending = false end
+   if event and not stopping then
+-    if edited then
++    if edited or status == 'sync_error' then
+       M.stop_pending = status == 'pending' or status == 'sync_error'
+     elseif status ~= 'pending' and status ~= 'sync_error' then
+       M.stop_pending = false
+--- a/neovim_init.lua
++++ b/neovim_init.lua
+@@ -33,6 +33,8 @@
+ 
+ vim.lsp.config('elixirls', {
+   cmd = { vim.env.V2_ELIXIR_LS or '/opt/homebrew/bin/elixir-ls' },
++  -- The launcher owns this process group, including a compiler that is still busy.
++  detached = false,
+   filetypes = { 'elixir', 'eelixir', 'heex', 'surface' },
+   root_dir = root,
+   settings = {
+--- a/neovim_feedback.lua
++++ b/neovim_feedback.lua
+@@ -24,7 +24,6 @@
+     if semantic and (before.status == 'conflict' or before.status == 'unavailable'
+         or before.status == 'sync_error') then return unavailable(before) end
+     local result = request(params)
+-    if result.error then return result end
+     sync.scan()
+     local after = sync.status()
+     if after.generation ~= before.generation then
+--- a/build_bundle.py
++++ b/build_bundle.py
+@@ -103,7 +103,8 @@
+     extract('nvim.tar.gz', vendor / 'nvim-macos-arm64')
+     extract('vv-mcp.tar.gz', vendor / 'beixiyo-vv-mcp.nvim')
+     extract('vv-utils.tar.gz', vendor / 'beixiyo-vv-utils.nvim')
+-    run(['patch', '-p1', '-i', HERE / 'vv-mcp-feedback.patch'], vendor / 'beixiyo-vv-mcp.nvim')
++    for patch in ('vv-mcp-feedback.patch', 'vv-mcp-owner.patch'):
++        run(['patch', '-p1', '-i', HERE / patch], vendor / 'beixiyo-vv-mcp.nvim')
+     run(['cargo', 'build', '--release', '--locked', '-p', 'vv-mcp'], vendor / 'beixiyo-vv-mcp.nvim')
+     shutil.copy2(vendor / 'beixiyo-vv-mcp.nvim/target/release/vv-mcp', vendor / 'vv-mcp')
+     wheels = [fetch(name) for name in lock['downloads'] if name.endswith('.whl')]
+@@ -116,7 +117,7 @@
+     launcher = root / 'elixir-ls'
+     launcher.write_text('#!/bin/sh\nexec python3 "$(dirname "$0")/bundle.py" server\n')
+     launcher.chmod(0o755)
+-    for name in ('bundle-lock.json', 'mix-targeted-invalidation.patch', 'elixirls-targeted-invalidation.patch', 'vv-mcp-feedback.patch'):
++    for name in ('bundle-lock.json', 'mix-targeted-invalidation.patch', 'elixirls-targeted-invalidation.patch', 'vv-mcp-feedback.patch', 'vv-mcp-owner.patch'):
+         shutil.copy2(HERE / name, root / name)
+     # Keep provenance sources but discard build-only Rust output and dependency Git data.
+     shutil.rmtree(vendor / 'beixiyo-vv-mcp.nvim/target')
+--- a/neovim_dogfood.py
++++ b/neovim_dogfood.py
+@@ -140,7 +140,6 @@
+         'mcp_servers.elixir_neovim.cwd': str(root),
+         'mcp_servers.elixir_neovim.enabled_tools': ['lsp'],
+         'mcp_servers.elixir_neovim.required': True,
+-        'mcp_servers.elixir_neovim.startup_timeout_sec': 90,
+         'sandbox_workspace_write.network_access': True,
+         'shell_environment_policy.set': values,
+         'hooks.PostToolUse': [{'matcher': '^(apply_patch|Bash)$', 'hooks': [
+--- /dev/null
++++ b/vv-mcp-owner.patch
+@@ -0,0 +1,101 @@
++--- a/crates/vv-mcp/src/main.rs
+++++ b/crates/vv-mcp/src/main.rs
++@@ -149,7 +149,8 @@
++             format: resolve_format(args.output_format, args.command.is_some()),
++             max_results: args.max_results,
++         },
++-    )?;
+++    )?
+++    .with_instance_id(args.instance_id.clone());
++ 
++     // --instance-id 与 --timeout-ms 是全局选项：三个子命令都要路由到实例、都要发 RPC，
++     // 所以它们在每个子命令下都真实生效，而不是「用不上就忽略」
++--- a/crates/vv-mcp/src/server.rs
+++++ b/crates/vv-mcp/src/server.rs
++@@ -34,6 +34,7 @@
++     registry: Registry,
++     managed: ManagedPool,
++     output: OutputConfig,
+++    instance_id: Option<String>,
++ }
++ 
++ #[tool_router]
++@@ -55,6 +56,7 @@
++         uri: &str,
++         instance_id: Option<&str>,
++     ) -> Result<Instance, String> {
+++        let instance_id = instance_id.or(self.instance_id.as_deref());
++         let instances = self.instances().await.map_err(|error| error.to_string())?;
++         match resolve_instance(&instances.instances, instance_id, Some(uri)).cloned() {
++             Ok(instance) => {
++@@ -90,11 +92,24 @@
++             managed: ManagedPool::new(registry.clone()),
++             registry,
++             output,
+++            instance_id: None,
++         })
++     }
++ 
+++    /// Bind a stdio session to an externally owned Neovim; never adopt a replacement.
+++    pub fn with_instance_id(mut self, instance_id: Option<String>) -> Self {
+++        self.instance_id = instance_id;
+++        self
+++    }
+++
++     pub async fn instances(&self) -> Result<InstanceList> {
++-        self.registry.list().await
+++        let mut instances = self.registry.list().await?;
+++        if let Some(id) = &self.instance_id {
+++            instances
+++                .instances
+++                .retain(|instance| &instance.instance_id == id);
+++        }
+++        Ok(instances)
++     }
++ 
++     pub async fn shutdown(&self) {
++@@ -284,22 +299,8 @@
++     }
++ 
++     async fn select_instance(&self, params: &LspParams) -> Result<Instance, String> {
++-        match self
++-            .resolve_active_instance(&params.uri, params.instance_id.as_deref())
+++        self.resolve_active_instance(&params.uri, params.instance_id.as_deref())
++             .await
++-        {
++-            Ok(instance) => {
++-                self.managed.touch(&instance).await;
++-                Ok(instance)
++-            }
++-            Err(error)
++-                if params.instance_id.is_none()
++-                    && error.starts_with("Neovim instance not found:") =>
++-            {
++-                self.managed.ensure(&params.uri).await
++-            }
++-            Err(error) => Err(error),
++-        }
++     }
++ 
++     async fn request_lsp(
++@@ -363,14 +364,18 @@
++         .cloned();
++         let instance = match instance {
++             Ok(instance) => instance,
++-            Err(ResolveError::NotFound(_)) if params.instance_id.is_none() => {
+++            Err(ResolveError::NotFound(_))
+++                if params.instance_id.is_none() && self.instance_id.is_none() =>
+++            {
++                 return read_file(params);
++             }
++             Err(error) => return Err(error.to_string()),
++         };
++         let mut client = match NvimClient::connect(&instance.socket).await {
++             Ok(client) => client,
++-            Err(error) if error.proves_instance_is_stale() => return read_file(params),
+++            Err(error) if error.proves_instance_is_stale() && self.instance_id.is_none() => {
+++                return read_file(params);
+++            }
++             Err(error) => return Err(error.to_string()),
++         };
++         let value = serde_json::to_value(params).map_err(|error| error.to_string())?;

@@ -1,0 +1,14 @@
+{
+  "source_commit": "b64e27e1d0f1a95984512c11a1ca7ad31208e8dd",
+  "source_url": "https://api.github.com/repos/beixiyo/vv-mcp.nvim/tarball/b64e27e1d0f1a95984512c11a1ca7ad31208e8dd",
+  "source_archive_sha256": "0b8dbb62261f5400ad06c52edcdb80eda4e1bca419b54a3c75075be3503f0409",
+  "source_tree_matches_existing_vendor": true,
+  "source_file": "crates/vv-mcp/src/output/mod.rs",
+  "source_file_sha256": "5e28c481794cd6284bbc4ba3e32b2979db7188efd281aaf67b593347ed41a8a6",
+  "patch_sha256": "758148e7de92055da48d6996a50e5a8ac92a5921cbf51eaf81acb9874e9832a1",
+  "patched_binary_sha256": "10bdd585f2402fd992d07d054b2ca9bc75e9919d2fc496a1d6ee4ce29db5c62b",
+  "rust": "1.97.0",
+  "vv_mcp": "0.3.4",
+  "neovim": "0.12.5",
+  "elixirls": "0.31.1"
+}

@@ -1,0 +1,44 @@
+{
+  "downloads": {
+    "elixirls.tar.gz": {
+      "url": "https://api.github.com/repos/elixir-lsp/elixir-ls/tarball/256ec7787dc14fa666817199ec6aa5dc64787e37",
+      "sha256": "d82a8e8f424a812b90be2a0d57b7b794dc4fafe29f57b0778d064f796b7b56eb"
+    },
+    "nvim.tar.gz": {
+      "url": "https://github.com/neovim/neovim/releases/download/v0.12.5/nvim-macos-arm64.tar.gz",
+      "sha256": "65fb000099e47ca1b762584c484cc833f40e30851a0ec450d4174e16317c1f9b"
+    },
+    "vv-mcp.tar.gz": {
+      "url": "https://api.github.com/repos/beixiyo/vv-mcp.nvim/tarball/b64e27e1d0f1a95984512c11a1ca7ad31208e8dd",
+      "sha256": "0b8dbb62261f5400ad06c52edcdb80eda4e1bca419b54a3c75075be3503f0409"
+    },
+    "vv-utils.tar.gz": {
+      "url": "https://api.github.com/repos/beixiyo/vv-utils.nvim/tarball/13e73d5174b37af24ca475dc39b61667432aaebc",
+      "sha256": "37fa7539a72e1b7a83eab5e0509f87ce08e47ecd91a9a90a532cefa395ba9030"
+    },
+    "compiler_elixir.ex": {
+      "url": "https://raw.githubusercontent.com/elixir-lang/elixir/v1.20.4/lib/mix/lib/mix/compilers/elixir.ex",
+      "sha256": "ae323e0d10b14fc55f0a415d53654d8c39e22723bde17138eb8dc78b34067c87"
+    },
+    "compile_elixir_task.ex": {
+      "url": "https://raw.githubusercontent.com/elixir-lang/elixir/v1.20.4/lib/mix/lib/mix/tasks/compile.elixir.ex",
+      "sha256": "d5e29d8ec2adaaef745a79f76cbd6b5d8c3bc1d052ebcf4bf9f8da522112ba7e"
+    },
+    "msgpack-1.2.2-cp314-cp314-macosx_11_0_arm64.whl": {
+      "url": "https://files.pythonhosted.org/packages/b6/dc/8efe6dd96a12ab043930cb4cffb40b6e7f061491d6ec7a3d2b75ef1fda42/msgpack-1.2.2-cp314-cp314-macosx_11_0_arm64.whl",
+      "sha256": "0dd9173c5ebaf5ecc5ca86e7ae1db92934e1d57b856f3dd90698941431f4fd77"
+    },
+    "greenlet-3.5.6-cp314-cp314-macosx_11_0_universal2.whl": {
+      "url": "https://files.pythonhosted.org/packages/66/c0/d254544ae2b8bdd311aef000fafc02828c2771b17d994b3075620ea7cc6e/greenlet-3.5.6-cp314-cp314-macosx_11_0_universal2.whl",
+      "sha256": "8cddea1b8339451c2fb3388e138347b6126744f33b611bdb55b7357361cfef46"
+    },
+    "pynvim-0.6.0-py3-none-any.whl": {
+      "url": "https://files.pythonhosted.org/packages/54/2d/c28b9293975ed9ee05e52f1d316cb402ba6edb232baa0497754a70182ca2/pynvim-0.6.0-py3-none-any.whl",
+      "sha256": "29f92ff3fde9e52c263e6bfd7f30345be05bfc7b5c21484da1cc38a8d8e5e98f"
+    },
+    "hex-source.tar.gz": {
+      "url": "https://api.github.com/repos/hexpm/hex/tarball/v2.5.1",
+      "sha256": "6e79233a2a7441a7d43b18b8d3f3e393393ea0fc18d96f6489f4bc46c1d7f81d"
+    }
+  }
+}

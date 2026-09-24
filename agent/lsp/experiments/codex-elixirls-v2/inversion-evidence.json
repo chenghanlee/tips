@@ -1,0 +1,1889 @@
+{
+  "scope": "Direct LSP with injected notifications; no watcher or MCP fix implemented",
+  "runs": {
+    "inversion-2": {
+      "baseline": {
+        "elapsed_ms": 28.34,
+        "response": {
+          "id": 2,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nBASELINE documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "perfect_event_immediate_hover": {
+        "elapsed_ms": 3.29,
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* \n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nBASELINE documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "slow_a_build": {
+        "time": 65539.717791083,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 1526
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_ok",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "perfect_event_after_build": {
+        "elapsed_ms": 1.71,
+        "response": {
+          "id": 4,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nSLOW_A documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "broken_build": {
+        "time": 65539.746702541,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 25
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_error",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "broken_diagnostics": {
+        "time": 65539.746536458,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "textDocument/publishDiagnostics",
+          "params": {
+            "diagnostics": [
+              {
+                "data": null,
+                "message": "** (MismatchedDelimiterError) mismatched delimiter found on lib/target.ex:4:1:\n    error: unexpected reserved word: end\n    \u2502\n  3 \u2502   def answer(, do: :ok\n    \u2502             \u2514 unclosed delimiter\n  4 \u2502 end\n    \u2502 \u2514 mismatched closing delimiter (expected \")\")\n    \u2502\n    \u2514\u2500 lib/target.ex:4:1",
+                "range": {
+                  "end": {
+                    "character": 0,
+                    "line": 3
+                  },
+                  "start": {
+                    "character": 12,
+                    "line": 2
+                  }
+                },
+                "relatedInformation": [],
+                "severity": 1,
+                "source": "Elixir",
+                "tags": []
+              }
+            ],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/inversion-2/fixture/lib/target.ex"
+          }
+        }
+      },
+      "hover_after_failed_build": {
+        "elapsed_ms": 0.81,
+        "response": {
+          "id": 5,
+          "jsonrpc": "2.0",
+          "result": null
+        }
+      },
+      "overlap_a_started": {
+        "time": 65539.769036375,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "window/logMessage",
+          "params": {
+            "message": "INVERSION_OVERLAP_A_STARTED",
+            "type": 4
+          }
+        }
+      },
+      "overlap_disk_edits": {
+        "a": {
+          "size": 145,
+          "mtime_ns": 1790229312634374668
+        },
+        "b": {
+          "size": 145,
+          "mtime_ns": 1790229312655366090
+        },
+        "b_source": "defmodule V2Target do\n  IO.puts(\"INVERSION_OVERLAP_B_STARTED\")\n  Process.sleep(1500)\n  @doc \"OVERLAP_B documentation.\"\n  def answer, do: :ok\nend\n"
+      },
+      "overlap_first_build": {
+        "time": 65541.279062625,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 1529
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_ok",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "hover_after_first_overlapping_build": {
+        "elapsed_ms": 4.8,
+        "response": {
+          "id": 6,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* \n\n**Application** \n\n\n\n\n\n### Documentation\n\nOVERLAP_A documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "overlap_second_build": {
+        "time": 65541.299438666,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 19
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_noop",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "hover_after_second_overlapping_build": {
+        "elapsed_ms": 1.07,
+        "response": {
+          "id": 7,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nOVERLAP_A documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "open_file_watch_only": {
+        "elapsed_ms": 1.31,
+        "response": {
+          "id": 8,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nOVERLAP_A documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "open_file_watch_only_build_count": 0,
+      "open_file_after_change_save": {
+        "elapsed_ms": 1.76,
+        "response": {
+          "id": 9,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nOPEN_UPDATED documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "standard_progress_event_count": 0,
+      "observations": {
+        "immediate_hover_stale": true,
+        "unopened_file_eventually_fresh": true,
+        "failed_compile_hover_null": true,
+        "first_overlap_completion_stale": true,
+        "second_overlap_completion_fresh": false,
+        "open_file_change_save_fresh": true
+      },
+      "completed": true,
+      "server_exit_code": 0
+    },
+    "inversion-size-control": {
+      "baseline": {
+        "elapsed_ms": 31.24,
+        "response": {
+          "id": 2,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nBASELINE documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "perfect_event_immediate_hover": {
+        "elapsed_ms": 5.01,
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* \n\n**Application** \n\n\n\n\n\n### Documentation\n\nBASELINE documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "slow_a_build": {
+        "time": 65560.574362375,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 1529
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_ok",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "perfect_event_after_build": {
+        "elapsed_ms": 1.99,
+        "response": {
+          "id": 4,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nSLOW_A documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "broken_build": {
+        "time": 65560.608696666,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 30
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_error",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "broken_diagnostics": {
+        "time": 65560.608629875,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "textDocument/publishDiagnostics",
+          "params": {
+            "diagnostics": [
+              {
+                "data": null,
+                "message": "** (MismatchedDelimiterError) mismatched delimiter found on lib/target.ex:4:1:\n    error: unexpected reserved word: end\n    \u2502\n  3 \u2502   def answer(, do: :ok\n    \u2502             \u2514 unclosed delimiter\n  4 \u2502 end\n    \u2502 \u2514 mismatched closing delimiter (expected \")\")\n    \u2502\n    \u2514\u2500 lib/target.ex:4:1",
+                "range": {
+                  "end": {
+                    "character": 0,
+                    "line": 3
+                  },
+                  "start": {
+                    "character": 12,
+                    "line": 2
+                  }
+                },
+                "relatedInformation": [],
+                "severity": 1,
+                "source": "Elixir",
+                "tags": []
+              }
+            ],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/inversion-size-control/fixture/lib/target.ex"
+          }
+        }
+      },
+      "hover_after_failed_build": {
+        "elapsed_ms": 0.9,
+        "response": {
+          "id": 5,
+          "jsonrpc": "2.0",
+          "result": null
+        }
+      },
+      "overlap_a_started": {
+        "time": 65560.631639416,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "window/logMessage",
+          "params": {
+            "message": "INVERSION_OVERLAP_A_STARTED",
+            "type": 4
+          }
+        }
+      },
+      "overlap_disk_edits": {
+        "a": {
+          "size": 145,
+          "mtime_ns": 1790229333496269584
+        },
+        "b": {
+          "size": 159,
+          "mtime_ns": 1790229333517845042
+        },
+        "b_source": "defmodule V2Target do\n  IO.puts(\"INVERSION_OVERLAP_B_LONGER_STARTED\")\n  Process.sleep(1500)\n  @doc \"OVERLAP_B_LONGER documentation.\"\n  def answer, do: :ok\nend\n"
+      },
+      "overlap_first_build": {
+        "time": 65562.142214333,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 1530
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_ok",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "hover_after_first_overlapping_build": {
+        "elapsed_ms": 4.77,
+        "response": {
+          "id": 6,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* \n\n**Application** \n\n\n\n\n\n### Documentation\n\nOVERLAP_A documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "overlap_second_build": {
+        "time": 65563.675687166,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 1532
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_ok",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "hover_after_second_overlapping_build": {
+        "elapsed_ms": 1.92,
+        "response": {
+          "id": 7,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nOVERLAP_B_LONGER documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "open_file_watch_only": {
+        "elapsed_ms": 1.58,
+        "response": {
+          "id": 8,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nOVERLAP_B_LONGER documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "open_file_watch_only_build_count": 0,
+      "open_file_after_change_save": {
+        "elapsed_ms": 1.77,
+        "response": {
+          "id": 9,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nOPEN_UPDATED documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "standard_progress_event_count": 0,
+      "observations": {
+        "immediate_hover_stale": true,
+        "unopened_file_eventually_fresh": true,
+        "failed_compile_hover_null": true,
+        "first_overlap_completion_stale": true,
+        "second_overlap_completion_fresh": true,
+        "open_file_change_save_fresh": true
+      },
+      "completed": true,
+      "server_exit_code": 0
+    },
+    "inversion-time-control": {
+      "baseline": {
+        "elapsed_ms": 31.36,
+        "response": {
+          "id": 2,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nBASELINE documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "perfect_event_immediate_hover": {
+        "elapsed_ms": 4.12,
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* \n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nBASELINE documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "slow_a_build": {
+        "time": 65560.556616625,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 1532
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_ok",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "perfect_event_after_build": {
+        "elapsed_ms": 2.44,
+        "response": {
+          "id": 4,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nSLOW_A documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "broken_build": {
+        "time": 65560.591865208,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 30
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_error",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "broken_diagnostics": {
+        "time": 65560.591572541,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "textDocument/publishDiagnostics",
+          "params": {
+            "diagnostics": [
+              {
+                "data": null,
+                "message": "** (MismatchedDelimiterError) mismatched delimiter found on lib/target.ex:4:1:\n    error: unexpected reserved word: end\n    \u2502\n  3 \u2502   def answer(, do: :ok\n    \u2502             \u2514 unclosed delimiter\n  4 \u2502 end\n    \u2502 \u2514 mismatched closing delimiter (expected \")\")\n    \u2502\n    \u2514\u2500 lib/target.ex:4:1",
+                "range": {
+                  "end": {
+                    "character": 0,
+                    "line": 3
+                  },
+                  "start": {
+                    "character": 12,
+                    "line": 2
+                  }
+                },
+                "relatedInformation": [],
+                "severity": 1,
+                "source": "Elixir",
+                "tags": []
+              }
+            ],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/inversion-time-control/fixture/lib/target.ex"
+          }
+        }
+      },
+      "hover_after_failed_build": {
+        "elapsed_ms": 0.87,
+        "response": {
+          "id": 5,
+          "jsonrpc": "2.0",
+          "result": null
+        }
+      },
+      "overlap_a_started": {
+        "time": 65560.618302666,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "window/logMessage",
+          "params": {
+            "message": "INVERSION_OVERLAP_A_STARTED",
+            "type": 4
+          }
+        }
+      },
+      "overlap_disk_edits": {
+        "a": {
+          "size": 145,
+          "mtime_ns": 1790229333479595629
+        },
+        "b": {
+          "size": 145,
+          "mtime_ns": 1790229334609734300
+        },
+        "b_source": "defmodule V2Target do\n  IO.puts(\"INVERSION_OVERLAP_B_STARTED\")\n  Process.sleep(1500)\n  @doc \"OVERLAP_B documentation.\"\n  def answer, do: :ok\nend\n"
+      },
+      "overlap_first_build": {
+        "time": 65562.128657583,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 1533
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_ok",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "hover_after_first_overlapping_build": {
+        "elapsed_ms": 4.91,
+        "response": {
+          "id": 6,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* \n\n**Application** \n\n\n\n\n\n### Documentation\n\nOVERLAP_A documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "overlap_second_build": {
+        "time": 65562.152323958,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 22
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_noop",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "hover_after_second_overlapping_build": {
+        "elapsed_ms": 1.3,
+        "response": {
+          "id": 7,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nOVERLAP_A documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "open_file_watch_only": {
+        "elapsed_ms": 1.79,
+        "response": {
+          "id": 8,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nOVERLAP_A documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "open_file_watch_only_build_count": 0,
+      "open_file_after_change_save": {
+        "elapsed_ms": 1.67,
+        "response": {
+          "id": 9,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nOPEN_UPDATED documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "standard_progress_event_count": 0,
+      "observations": {
+        "immediate_hover_stale": true,
+        "unopened_file_eventually_fresh": true,
+        "failed_compile_hover_null": true,
+        "first_overlap_completion_stale": true,
+        "second_overlap_completion_fresh": false,
+        "open_file_change_save_fresh": true
+      },
+      "completed": true,
+      "server_exit_code": 0
+    }
+  },
+  "plain_mix_runs": {
+    "plain-mix-overlap": {
+      "first_compile_exit": 0,
+      "first_compile_output": "Compiling 1 file (.ex)\nINVERSION_MIX_A_STARTED\nGenerated v2_inversion app\n",
+      "second_compile_exit": 0,
+      "second_compile_output": "",
+      "docs_exit": 0,
+      "docs": "{:docs_v1, 1, :elixir, \"text/markdown\", :none,\n %{\n   behaviours: [],\n   source_annos: [{1, 1}],\n   source_path: ~c\"/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/plain-mix-overlap/lib/target.ex\"\n },\n [\n   {{:function, :answer, 0}, 4, [\"answer()\"], %{\"en\" => \"MIX_A documentation.\"},\n    %{source_annos: [{5, 7}]}}\n ]}\n",
+      "a_stat": {
+        "size": 137,
+        "mtime_ns": 1790229561378156513
+      },
+      "b_stat": {
+        "size": 137,
+        "mtime_ns": 1790229562981848120
+      },
+      "disk_source": "defmodule V2Target do\n  IO.puts(\"INVERSION_MIX_B_STARTED\")\n  Process.sleep(1500)\n  @doc \"MIX_B documentation.\"\n  def answer, do: :ok\nend\n",
+      "stale_after_second_compile": true
+    },
+    "plain-mix-overlap-2": {
+      "first_compile_exit": 0,
+      "first_compile_output": "Compiling 1 file (.ex)\nINVERSION_MIX_A_STARTED\nGenerated v2_inversion app\n",
+      "second_compile_exit": 0,
+      "second_compile_output": "",
+      "docs_exit": 0,
+      "docs": "{:docs_v1, 1, :elixir, \"text/markdown\", :none,\n %{\n   behaviours: [],\n   source_annos: [{1, 1}],\n   source_path: ~c\"/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/plain-mix-overlap-2/lib/target.ex\"\n },\n [\n   {{:function, :answer, 0}, 4, [\"answer()\"], %{\"en\" => \"MIX_A documentation.\"},\n    %{source_annos: [{5, 7}]}}\n ]}\n",
+      "a_stat": {
+        "size": 137,
+        "mtime_ns": 1790229651474652551
+      },
+      "b_stat": {
+        "size": 137,
+        "mtime_ns": 1790229653066080211
+      },
+      "disk_source": "defmodule V2Target do\n  IO.puts(\"INVERSION_MIX_B_STARTED\")\n  Process.sleep(1500)\n  @doc \"MIX_B documentation.\"\n  def answer, do: :ok\nend\n",
+      "stale_after_second_compile": true
+    }
+  },
+  "recovery_runs": {
+    "inversion-clean-recovery": {
+      "baseline": {
+        "elapsed_ms": 30.77,
+        "response": {
+          "id": 2,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nBASELINE documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "perfect_event_immediate_hover": {
+        "elapsed_ms": 6.0,
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* \n\n**Application** \n\n\n\n\n\n### Documentation\n\nBASELINE documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "slow_a_build": {
+        "time": 66933.713152916,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 1531
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_ok",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "perfect_event_after_build": {
+        "elapsed_ms": 3.04,
+        "response": {
+          "id": 4,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nSLOW_A documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "broken_build": {
+        "time": 66933.746853833,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 27
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_error",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "broken_diagnostics": {
+        "time": 66933.746620208,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "textDocument/publishDiagnostics",
+          "params": {
+            "diagnostics": [
+              {
+                "data": null,
+                "message": "** (MismatchedDelimiterError) mismatched delimiter found on lib/target.ex:4:1:\n    error: unexpected reserved word: end\n    \u2502\n  3 \u2502   def answer(, do: :ok\n    \u2502             \u2514 unclosed delimiter\n  4 \u2502 end\n    \u2502 \u2514 mismatched closing delimiter (expected \")\")\n    \u2502\n    \u2514\u2500 lib/target.ex:4:1",
+                "range": {
+                  "end": {
+                    "character": 0,
+                    "line": 3
+                  },
+                  "start": {
+                    "character": 12,
+                    "line": 2
+                  }
+                },
+                "relatedInformation": [],
+                "severity": 1,
+                "source": "Elixir",
+                "tags": []
+              }
+            ],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/inversion-clean-recovery/fixture/lib/target.ex"
+          }
+        }
+      },
+      "hover_after_failed_build": {
+        "elapsed_ms": 0.79,
+        "response": {
+          "id": 5,
+          "jsonrpc": "2.0",
+          "result": null
+        }
+      },
+      "overlap_a_started": {
+        "time": 66933.76672075,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "window/logMessage",
+          "params": {
+            "message": "INVERSION_OVERLAP_A_STARTED",
+            "type": 4
+          }
+        }
+      },
+      "overlap_disk_edits": {
+        "a": {
+          "size": 145,
+          "mtime_ns": 1790230706637403693
+        },
+        "b": {
+          "size": 145,
+          "mtime_ns": 1790230706656073466
+        },
+        "b_source": "defmodule V2Target do\n  IO.puts(\"INVERSION_OVERLAP_B_STARTED\")\n  Process.sleep(1500)\n  @doc \"OVERLAP_B documentation.\"\n  def answer, do: :ok\nend\n"
+      },
+      "overlap_first_build": {
+        "time": 66935.282772333,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 1532
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_ok",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "hover_after_first_overlapping_build": {
+        "elapsed_ms": 7.45,
+        "response": {
+          "id": 6,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* \n\n**Application** \n\n\n\n\n\n### Documentation\n\nOVERLAP_A documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "overlap_second_build": {
+        "time": 66935.309082333,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 25
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_noop",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "hover_after_second_overlapping_build": {
+        "elapsed_ms": 1.09,
+        "response": {
+          "id": 7,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nOVERLAP_A documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "application_clean": {
+        "id": 8,
+        "jsonrpc": "2.0",
+        "result": {}
+      },
+      "recovery_build": {
+        "time": 66936.860433541,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 1530
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_ok",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "hover_after_application_clean_rebuild": {
+        "elapsed_ms": 1.59,
+        "response": {
+          "id": 9,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nOVERLAP_B documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "recovery_elapsed_seconds": 1.552,
+      "open_file_watch_only": {
+        "elapsed_ms": 2.38,
+        "response": {
+          "id": 10,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nOVERLAP_B documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "open_file_watch_only_build_count": 0,
+      "open_file_after_change_save": {
+        "elapsed_ms": 1.7,
+        "response": {
+          "id": 11,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nOPEN_UPDATED documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "standard_progress_event_count": 0,
+      "observations": {
+        "immediate_hover_stale": true,
+        "unopened_file_eventually_fresh": true,
+        "failed_compile_hover_null": true,
+        "first_overlap_completion_stale": true,
+        "second_overlap_completion_fresh": false,
+        "open_file_change_save_fresh": true
+      },
+      "completed": true,
+      "server_exit_code": 0
+    },
+    "inversion-clean-overlap": {
+      "baseline": {
+        "elapsed_ms": 33.7,
+        "response": {
+          "id": 2,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nBASELINE documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "perfect_event_immediate_hover": {
+        "elapsed_ms": 4.04,
+        "response": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nBASELINE documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "slow_a_build": {
+        "time": 67453.382159791,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 1529
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_ok",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "perfect_event_after_build": {
+        "elapsed_ms": 2.39,
+        "response": {
+          "id": 4,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nSLOW_A documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "broken_build": {
+        "time": 67453.412378666,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 25
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_error",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "broken_diagnostics": {
+        "time": 67453.412207833,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "textDocument/publishDiagnostics",
+          "params": {
+            "diagnostics": [
+              {
+                "data": null,
+                "message": "** (MismatchedDelimiterError) mismatched delimiter found on lib/target.ex:4:1:\n    error: unexpected reserved word: end\n    \u2502\n  3 \u2502   def answer(, do: :ok\n    \u2502             \u2514 unclosed delimiter\n  4 \u2502 end\n    \u2502 \u2514 mismatched closing delimiter (expected \")\")\n    \u2502\n    \u2514\u2500 lib/target.ex:4:1",
+                "range": {
+                  "end": {
+                    "character": 0,
+                    "line": 3
+                  },
+                  "start": {
+                    "character": 12,
+                    "line": 2
+                  }
+                },
+                "relatedInformation": [],
+                "severity": 1,
+                "source": "Elixir",
+                "tags": []
+              }
+            ],
+            "uri": "file:///private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/inversion-clean-overlap/fixture/lib/target.ex"
+          }
+        }
+      },
+      "hover_after_failed_build": {
+        "elapsed_ms": 0.63,
+        "response": {
+          "id": 5,
+          "jsonrpc": "2.0",
+          "result": null
+        }
+      },
+      "overlap_a_started": {
+        "time": 67453.432245,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "window/logMessage",
+          "params": {
+            "message": "INVERSION_OVERLAP_A_STARTED",
+            "type": 4
+          }
+        }
+      },
+      "overlap_disk_edits": {
+        "a": {
+          "size": 145,
+          "mtime_ns": 1790231226276445596
+        },
+        "b": {
+          "size": 145,
+          "mtime_ns": 1790231226295249210
+        },
+        "b_source": "defmodule V2Target do\n  IO.puts(\"INVERSION_OVERLAP_B_STARTED\")\n  Process.sleep(1500)\n  @doc \"OVERLAP_B documentation.\"\n  def answer, do: :ok\nend\n"
+      },
+      "overlap_first_build": {
+        "time": 67454.947101166,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 1531
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_ok",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "hover_after_first_overlapping_build": {
+        "elapsed_ms": 5.63,
+        "response": {
+          "id": 6,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* \n\n**Application** \n\n\n\n\n\n### Documentation\n\nOVERLAP_A documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "overlap_second_build": {
+        "time": 67454.971135,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 22
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_noop",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "hover_after_second_overlapping_build": {
+        "elapsed_ms": 1.14,
+        "response": {
+          "id": 7,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nOVERLAP_A documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "application_clean": {
+        "id": 8,
+        "jsonrpc": "2.0",
+        "result": {}
+      },
+      "recovery_concurrent_source": "defmodule V2Target do\n  IO.puts(\"INVERSION_OVERLAP_C_STARTED\")\n  Process.sleep(1500)\n  @doc \"OVERLAP_C documentation.\"\n  def answer, do: :ok\nend\n",
+      "recovery_build": {
+        "time": 67456.527459958,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 1535
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_ok",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "recovery_queued_build": {
+        "time": 67456.551817041,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 22
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_noop",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "hover_after_application_clean_rebuild": {
+        "elapsed_ms": 1.27,
+        "response": {
+          "id": 9,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nOVERLAP_B documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "recovery_elapsed_seconds": 1.581,
+      "concurrent_recovery_fresh": false,
+      "application_clean_retry": {
+        "id": 10,
+        "jsonrpc": "2.0",
+        "result": {}
+      },
+      "recovery_retry_build": {
+        "time": 67458.102781166,
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "telemetry/event",
+          "params": {
+            "name": "build",
+            "measurements": {
+              "elixir_ls.build_time": 1531
+            },
+            "properties": {
+              "elixir_ls.build_result": "mix_compile_ok",
+              "elixir_ls.elixir_release": "1.20",
+              "elixir_ls.elixir_version": "1.20.4",
+              "elixir_ls.erts_version": "17.1",
+              "elixir_ls.mix_env": "test",
+              "elixir_ls.mix_target": "host",
+              "elixir_ls.otp_release": "29"
+            }
+          }
+        }
+      },
+      "hover_after_quiet_recovery_retry": {
+        "elapsed_ms": 1.73,
+        "response": {
+          "id": 11,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nOVERLAP_C documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "open_file_watch_only": {
+        "elapsed_ms": 3.73,
+        "response": {
+          "id": 12,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nOVERLAP_C documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "open_file_watch_only_build_count": 0,
+      "open_file_after_change_save": {
+        "elapsed_ms": 1.59,
+        "response": {
+          "id": 13,
+          "jsonrpc": "2.0",
+          "result": {
+            "contents": {
+              "kind": "markdown",
+              "value": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_inversion/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_inversion\n\n\n\n\n\n### Documentation\n\nOPEN_UPDATED documentation.\n"
+            },
+            "range": {
+              "end": {
+                "character": 33,
+                "line": 1
+              },
+              "start": {
+                "character": 18,
+                "line": 1
+              }
+            }
+          }
+        }
+      },
+      "standard_progress_event_count": 0,
+      "observations": {
+        "immediate_hover_stale": true,
+        "unopened_file_eventually_fresh": true,
+        "failed_compile_hover_null": true,
+        "first_overlap_completion_stale": true,
+        "second_overlap_completion_fresh": false,
+        "open_file_change_save_fresh": true
+      },
+      "completed": true,
+      "server_exit_code": 0
+    }
+  },
+  "performance_samples": {
+    "results.json": [
+      {
+        "case": "unchanged",
+        "seconds": 0.648,
+        "exit_code": 0,
+        "command": [
+          "unbuffer",
+          "mix",
+          "compile",
+          "--warnings-as-errors"
+        ],
+        "output_tail": ""
+      },
+      {
+        "case": "force_application",
+        "seconds": 1.357,
+        "exit_code": 0,
+        "command": [
+          "unbuffer",
+          "mix",
+          "compile",
+          "--force",
+          "--warnings-as-errors"
+        ],
+        "output_tail": "Compiling 49 files (.ex)\nGenerated tips app\n"
+      }
+    ],
+    "scan.json": {
+      "scope": [
+        "lib",
+        "config",
+        "test",
+        "priv",
+        "mix.exs",
+        "mix.lock",
+        ".formatter.exs"
+      ],
+      "file_count": 113,
+      "bytes": 579164,
+      "durations_ms": [
+        12.469,
+        6.084,
+        5.765,
+        5.942,
+        5.631,
+        5.923,
+        5.637
+      ],
+      "median_ms": 5.923,
+      "limitations": "Warm local cache; these extensions do not describe every possible external resource or path dependency."
+    }
+  }
+}

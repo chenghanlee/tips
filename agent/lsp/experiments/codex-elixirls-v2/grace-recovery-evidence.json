@@ -1,0 +1,311 @@
+{
+  "verdict": "Rejected as an eventual-recovery solution: 2-second delayed notification leaves stale behavior and hover.",
+  "root": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/grace-recovery",
+  "source_commit": "256ec7787dc14fa666817199ec6aa5dc64787e37",
+  "grace_ms": 1000,
+  "patch_sha256": "bcd03fbbd4cb374379161e11c32bbb6f85846ab311b8a6efe99bd4cc78bee34b",
+  "server_sha256": "bffe8a107381e429c0c50d2ba99c5ae45bc398200e05fc5a299266ce0845d7e6",
+  "cases": {
+    "baseline-overlap-2": {
+      "case": "overlap",
+      "passed": false,
+      "expected": "bb",
+      "hover_fresh": false,
+      "behavior": {
+        "caller": "aa",
+        "target": "aa"
+      },
+      "acceptance_exit": 2,
+      "compiled_file_counts_after_startup": null,
+      "unexpected_builds_after_settle": 0,
+      "incremental_preserved": null,
+      "server_exit": 0,
+      "builds": [
+        {
+          "result": "mix_compile_ok",
+          "ms": 41
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 1534
+        },
+        {
+          "result": "mix_compile_noop",
+          "ms": 21
+        }
+      ],
+      "raw": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/grace-recovery/baseline-overlap-2/results.json"
+    },
+    "patched-late-2000": {
+      "case": "late-2000",
+      "passed": false,
+      "expected": "bb",
+      "hover_fresh": false,
+      "behavior": {
+        "caller": "aa",
+        "target": "aa"
+      },
+      "acceptance_exit": 2,
+      "compiled_file_counts_after_startup": [
+        2
+      ],
+      "unexpected_builds_after_settle": 0,
+      "incremental_preserved": null,
+      "server_exit": 0,
+      "builds": [
+        {
+          "result": "mix_compile_ok",
+          "ms": 44
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 1533
+        },
+        {
+          "result": "mix_compile_noop",
+          "ms": 22
+        }
+      ],
+      "raw": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/grace-recovery/patched-late-2000/results.json"
+    },
+    "patched-late-300": {
+      "case": "late-300",
+      "passed": true,
+      "expected": "bb",
+      "hover_fresh": true,
+      "behavior": {
+        "caller": "bb",
+        "target": "bb"
+      },
+      "acceptance_exit": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        3
+      ],
+      "unexpected_builds_after_settle": 0,
+      "incremental_preserved": null,
+      "server_exit": 0,
+      "builds": [
+        {
+          "result": "mix_compile_ok",
+          "ms": 46
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 1532
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 1543
+        }
+      ],
+      "raw": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/grace-recovery/patched-late-300/results.json"
+    },
+    "patched-ordinary": {
+      "case": "ordinary",
+      "passed": true,
+      "expected": "d9",
+      "hover_fresh": true,
+      "behavior": {
+        "caller": "d9",
+        "target": "d9"
+      },
+      "acceptance_exit": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "unexpected_builds_after_settle": 0,
+      "incremental_preserved": true,
+      "server_exit": 0,
+      "builds": [
+        {
+          "result": "mix_compile_ok",
+          "ms": 44
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 30
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 40
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 36
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 40
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 39
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 35
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 39
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 38
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 38
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 38
+        }
+      ],
+      "raw": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/grace-recovery/patched-ordinary/results.json"
+    },
+    "patched-overlap": {
+      "case": "overlap",
+      "passed": true,
+      "expected": "bb",
+      "hover_fresh": true,
+      "behavior": {
+        "caller": "bb",
+        "target": "bb"
+      },
+      "acceptance_exit": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        3
+      ],
+      "unexpected_builds_after_settle": 0,
+      "incremental_preserved": null,
+      "server_exit": 0,
+      "builds": [
+        {
+          "result": "mix_compile_ok",
+          "ms": 44
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 1533
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 1554
+        }
+      ],
+      "raw": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/grace-recovery/patched-overlap/results.json"
+    },
+    "patched-recovery-edit": {
+      "case": "recovery-edit",
+      "passed": true,
+      "expected": "cc",
+      "hover_fresh": true,
+      "behavior": {
+        "caller": "cc",
+        "target": "cc"
+      },
+      "acceptance_exit": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        3,
+        3
+      ],
+      "unexpected_builds_after_settle": 0,
+      "incremental_preserved": null,
+      "server_exit": 0,
+      "builds": [
+        {
+          "result": "mix_compile_ok",
+          "ms": 47
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 1536
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 1541
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 1549
+        }
+      ],
+      "raw": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/grace-recovery/patched-recovery-edit/results.json"
+    },
+    "patched-revert": {
+      "case": "revert",
+      "passed": true,
+      "expected": "aa",
+      "hover_fresh": true,
+      "behavior": {
+        "caller": "aa",
+        "target": "aa"
+      },
+      "acceptance_exit": 0,
+      "compiled_file_counts_after_startup": [
+        2,
+        3,
+        3
+      ],
+      "unexpected_builds_after_settle": 0,
+      "incremental_preserved": null,
+      "server_exit": 0,
+      "builds": [
+        {
+          "result": "mix_compile_ok",
+          "ms": 43
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 1533
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 1553
+        },
+        {
+          "result": "mix_compile_ok",
+          "ms": 1550
+        }
+      ],
+      "raw": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/grace-recovery/patched-revert/results.json"
+    }
+  },
+  "delayed_manifest": {
+    "caller": "aa",
+    "target": "aa",
+    "disk_b": true,
+    "digest_matches_disk": true
+  },
+  "checks": {
+    "upstream_server_tests": {
+      "passed": 77,
+      "exit": 0
+    },
+    "format_check_exit": 0,
+    "compile_test_warnings_as_errors_exit": 1,
+    "compile_prod_warnings_as_errors_exit": 1,
+    "credo": "Task unavailable"
+  },
+  "harness_correction": "First baseline used MIX_BUILD_PATH without /test and could not load BEAMs. Excluded; baseline-overlap-2 reran with correct path and failed on aa != bb.",
+  "limits": [
+    "Direct LSP and fresh-VM ExUnit, not model-driven Codex/Claude or full Tips workload",
+    "Controlled notification delay; natural occurrence frequency not measured",
+    "No crash/path-dependency/noise test of this candidate; timing counterexample already rejects the design",
+    "5-second hook and live adapters unchanged",
+    "No active launcher or installed ElixirLS changed"
+  ]
+}
