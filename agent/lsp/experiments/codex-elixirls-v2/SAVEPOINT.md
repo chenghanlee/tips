@@ -38,3 +38,24 @@ git worktree add --detach /private/tmp/tips-neovim-savepoint \
 
 Plain-Mix exploration uses a separate branch and worktree. Active Codex and
 Claude configuration is unchanged.
+
+## Direction selected after the foreground Mix experiment
+
+On 2026-09-25 the user chose this Neovim + ElixirLS route for its combined compiler
+feedback, hover, definitions, references, and other language features.
+
+The foreground Mix alternative is archived separately at commit
+`1ec4c6fb6e9545c184452e147530f929173d6e46` on `experiment/plain-mix-compile`, tagged
+`archive/plain-mix-compile-2026-09-25`. Its code, research, structured results and
+101 copied evidence files remain in Git after its disposable worktrees are removed.
+Read its decision with:
+
+```sh
+git show archive/plain-mix-compile-2026-09-25:agent/lsp/experiments/plain-mix-compile/DECISION.md
+```
+
+The foreground archive is not merged into this branch or main. The original
+Neovim savepoint tag is unchanged. The retained bundle passed `doctor` again when
+this decision was recorded. This selects the route for continued integration;
+the documented rollout limitations remain and no active client configuration was
+changed by the archival operation.
