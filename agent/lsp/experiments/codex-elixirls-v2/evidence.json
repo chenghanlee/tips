@@ -1,0 +1,1009 @@
+{
+  "decision": "Do not roll out unchanged: saved edits must synchronize automatically.",
+  "scope": "Actual Codex on synthetic code; full Tips through local MCP only.",
+  "basic_checks": {
+    "alpha_mcp": {
+      "passed": true,
+      "details": {
+        "name": "lsp-mcp-server",
+        "version": "1.1.24"
+      }
+    },
+    "alpha_hover": {
+      "passed": true,
+      "details": {
+        "isError": false,
+        "data": {
+          "contents": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n",
+          "range": {
+            "start": {
+              "line": 2,
+              "column": 19
+            },
+            "end": {
+              "line": 2,
+              "column": 34
+            }
+          }
+        }
+      }
+    },
+    "alpha_definition": {
+      "passed": true,
+      "details": {
+        "isError": false,
+        "data": {
+          "definitions": [
+            {
+              "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/run-2/alpha/lib/target.ex",
+              "line": 3,
+              "column": 3,
+              "end_line": 3,
+              "end_column": 25,
+              "context": "def answer, do: :alpha"
+            }
+          ]
+        }
+      }
+    },
+    "alpha_references": {
+      "passed": true,
+      "details": {
+        "isError": false,
+        "data": {
+          "references": [
+            {
+              "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/run-2/alpha/lib/caller.ex",
+              "line": 2,
+              "column": 28,
+              "end_line": 2,
+              "end_column": 34,
+              "context": "def call_1, do: V2Target.answer()",
+              "symbol_name": "answer"
+            },
+            {
+              "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/run-2/alpha/lib/caller.ex",
+              "line": 3,
+              "column": 28,
+              "end_line": 3,
+              "end_column": 34,
+              "context": "def call_2, do: V2Target.answer()",
+              "symbol_name": "answer"
+            }
+          ],
+          "total_count": 2,
+          "returned_count": 2,
+          "offset": 0,
+          "has_more": false
+        }
+      }
+    },
+    "beta_mcp": {
+      "passed": true,
+      "details": {
+        "name": "lsp-mcp-server",
+        "version": "1.1.24"
+      }
+    },
+    "beta_hover": {
+      "passed": true,
+      "details": {
+        "isError": false,
+        "data": {
+          "contents": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nBETA documentation for the worktree experiment.\n",
+          "range": {
+            "start": {
+              "line": 2,
+              "column": 19
+            },
+            "end": {
+              "line": 2,
+              "column": 34
+            }
+          }
+        }
+      }
+    },
+    "beta_definition": {
+      "passed": true,
+      "details": {
+        "isError": false,
+        "data": {
+          "definitions": [
+            {
+              "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/run-2/beta/lib/target.ex",
+              "line": 3,
+              "column": 3,
+              "end_line": 3,
+              "end_column": 24,
+              "context": "def answer, do: :beta"
+            }
+          ]
+        }
+      }
+    },
+    "beta_references": {
+      "passed": true,
+      "details": {
+        "isError": false,
+        "data": {
+          "references": [
+            {
+              "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/run-2/beta/lib/caller.ex",
+              "line": 2,
+              "column": 28,
+              "end_line": 2,
+              "end_column": 34,
+              "context": "def call_1, do: V2Target.answer()",
+              "symbol_name": "answer"
+            },
+            {
+              "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/run-2/beta/lib/caller.ex",
+              "line": 3,
+              "column": 28,
+              "end_line": 3,
+              "end_column": 34,
+              "context": "def call_2, do: V2Target.answer()",
+              "symbol_name": "answer"
+            },
+            {
+              "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/run-2/beta/lib/caller.ex",
+              "line": 4,
+              "column": 28,
+              "end_line": 4,
+              "end_column": 34,
+              "context": "def call_3, do: V2Target.answer()",
+              "symbol_name": "answer"
+            }
+          ],
+          "total_count": 3,
+          "returned_count": 3,
+          "offset": 0,
+          "has_more": false
+        }
+      }
+    },
+    "saved_error_diagnostic": {
+      "passed": true,
+      "details": [
+        {
+          "isError": false,
+          "data": {
+            "diagnostics": [
+              {
+                "range": {
+                  "start": {
+                    "line": 1,
+                    "column": 1
+                  },
+                  "end": {
+                    "line": 1,
+                    "column": 1
+                  }
+                },
+                "severity": "error",
+                "message": "** (CompileError) lib/caller.ex: cannot compile module V2Caller (errors have been logged)\n\n",
+                "context": "defmodule V2Caller do",
+                "source": "Elixir"
+              },
+              {
+                "range": {
+                  "start": {
+                    "line": 2,
+                    "column": 19
+                  },
+                  "end": {
+                    "line": 2,
+                    "column": 32
+                  }
+                },
+                "severity": "error",
+                "message": "undefined function missing_local/0 (expected V2Caller to define such a function or for it to be imported, but none are available)",
+                "context": "def call_1, do: missing_local()",
+                "source": "Elixir"
+              }
+            ],
+            "summary": {
+              "errors": 2,
+              "warnings": 0,
+              "info": 0,
+              "hints": 0
+            },
+            "note": "Diagnostics are cached from language server notifications. Edits made on disk are sent to the server on every call; after an open or a change this call waits briefly for fresh diagnostics."
+          }
+        }
+      ]
+    },
+    "diagnostic_isolation": {
+      "passed": true,
+      "details": {
+        "isError": false,
+        "data": {
+          "diagnostics": [],
+          "summary": {
+            "errors": 0,
+            "warnings": 0,
+            "info": 0,
+            "hints": 0
+          },
+          "note": "Diagnostics are cached from language server notifications. Edits made on disk are sent to the server on every call; after an open or a change this call waits briefly for fresh diagnostics."
+        }
+      }
+    },
+    "repair_clears_diagnostic": {
+      "passed": true,
+      "details": [
+        {
+          "isError": false,
+          "data": {
+            "diagnostics": [],
+            "summary": {
+              "errors": 0,
+              "warnings": 0,
+              "info": 0,
+              "hints": 0
+            },
+            "note": "Diagnostics are cached from language server notifications. Edits made on disk are sent to the server on every call; after an open or a change this call waits briefly for fresh diagnostics."
+          }
+        }
+      ]
+    },
+    "reviewer_revision_advance": {
+      "passed": false,
+      "details": {
+        "hover": {
+          "isError": false,
+          "data": {
+            "contents": "```elixir\nV2Target.answer()\n```\n\n*function* \n\n**Application** \n\n\n\n\n\n### Documentation\n\nBETA documentation for the worktree experiment.\n",
+            "range": {
+              "start": {
+                "line": 2,
+                "column": 19
+              },
+              "end": {
+                "line": 2,
+                "column": 34
+              }
+            }
+          }
+        },
+        "references": {
+          "isError": false,
+          "data": {
+            "references": [
+              {
+                "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/run-2/beta/lib/caller.ex",
+                "line": 2,
+                "column": 28,
+                "end_line": 2,
+                "end_column": 34,
+                "context": "def call_1, do: V2Target.answer()",
+                "symbol_name": "answer"
+              },
+              {
+                "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/run-2/beta/lib/caller.ex",
+                "line": 3,
+                "column": 28,
+                "end_line": 3,
+                "end_column": 34,
+                "context": "def call_2, do: V2Target.answer()",
+                "symbol_name": "answer"
+              }
+            ],
+            "total_count": 2,
+            "returned_count": 2,
+            "offset": 0,
+            "has_more": false
+          }
+        }
+      }
+    },
+    "separate_builds": {
+      "passed": true,
+      "details": [
+        "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/run-2/alpha",
+        "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/run-2/beta"
+      ]
+    },
+    "outside_worktree_rejected": {
+      "passed": false,
+      "details": {
+        "isError": false,
+        "data": null
+      }
+    },
+    "other_session_survives": {
+      "passed": true,
+      "details": {
+        "isError": false,
+        "data": {
+          "contents": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n",
+          "range": {
+            "start": {
+              "line": 2,
+              "column": 19
+            },
+            "end": {
+              "line": 2,
+              "column": 34
+            }
+          }
+        }
+      }
+    }
+  },
+  "strict_check_interpretation": {
+    "outside_worktree_rejected": "Not a final requirement; user accepted explicit file-root routing.",
+    "reviewer_revision_advance": "First-call failure; stress test recovered on the second iteration."
+  },
+  "eof_remaining_pids": {
+    "alpha_stdin_cleanup": [
+      "38860",
+      "38724",
+      "38725",
+      "39170",
+      "39035"
+    ],
+    "beta_stdin_cleanup": [
+      "38880",
+      "39015",
+      "38879"
+    ]
+  },
+  "freshness": {
+    "unqueried_callee_samples": {
+      "sample_count": 6,
+      "fresh_marker_seen": false,
+      "first": {
+        "isError": false,
+        "data": {
+          "contents": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n",
+          "range": {
+            "start": {
+              "line": 2,
+              "column": 19
+            },
+            "end": {
+              "line": 2,
+              "column": 34
+            }
+          }
+        }
+      },
+      "last": {
+        "isError": false,
+        "data": {
+          "contents": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n",
+          "range": {
+            "start": {
+              "line": 2,
+              "column": 19
+            },
+            "end": {
+              "line": 2,
+              "column": 34
+            }
+          }
+        }
+      }
+    },
+    "samples_after_first_target_open": {
+      "sample_count": 6,
+      "fresh_marker_seen": false,
+      "first": {
+        "isError": false,
+        "data": {
+          "contents": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n",
+          "range": {
+            "start": {
+              "line": 2,
+              "column": 19
+            },
+            "end": {
+              "line": 2,
+              "column": 34
+            }
+          }
+        }
+      },
+      "last": {
+        "isError": false,
+        "data": {
+          "contents": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n",
+          "range": {
+            "start": {
+              "line": 2,
+              "column": 19
+            },
+            "end": {
+              "line": 2,
+              "column": 34
+            }
+          }
+        }
+      }
+    },
+    "restart_control": {
+      "before": {
+        "isError": false,
+        "data": {
+          "contents": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n",
+          "range": {
+            "start": {
+              "line": 2,
+              "column": 19
+            },
+            "end": {
+              "line": 2,
+              "column": 34
+            }
+          }
+        }
+      },
+      "after_edit": {
+        "isError": false,
+        "data": {
+          "contents": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n",
+          "range": {
+            "start": {
+              "line": 2,
+              "column": 19
+            },
+            "end": {
+              "line": 2,
+              "column": 34
+            }
+          }
+        }
+      },
+      "stop": {
+        "isError": false,
+        "data": {
+          "status": "stopped",
+          "server_id": "elixir",
+          "was_running": true,
+          "workspace_root": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/stress/alpha"
+        }
+      },
+      "after_restart": {
+        "isError": false,
+        "data": {
+          "contents": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nCHANGED_CALLEE documentation for the worktree experiment.\n",
+          "range": {
+            "start": {
+              "line": 2,
+              "column": 19
+            },
+            "end": {
+              "line": 2,
+              "column": 34
+            }
+          }
+        }
+      }
+    },
+    "index_before_and_after_control": {
+      "before": {
+        "isError": false,
+        "data": {
+          "contents": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n",
+          "range": {
+            "start": {
+              "line": 2,
+              "column": 19
+            },
+            "end": {
+              "line": 2,
+              "column": 34
+            }
+          }
+        }
+      },
+      "preopen": {
+        "isError": false,
+        "data": {
+          "opened": [
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/stress/alpha/lib/target.ex"
+          ],
+          "failed": [],
+          "opened_count": 1,
+          "failed_count": 0
+        }
+      },
+      "sync_after_edit": {
+        "isError": false,
+        "data": {
+          "opened": [
+            "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/stress/alpha/lib/target.ex"
+          ],
+          "failed": [],
+          "opened_count": 1,
+          "failed_count": 0
+        }
+      },
+      "after": [
+        {
+          "isError": false,
+          "data": {
+            "contents": "```elixir\nV2Target.answer()\n```\n\n*function* \n\n**Application** \n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n",
+            "range": {
+              "start": {
+                "line": 2,
+                "column": 19
+              },
+              "end": {
+                "line": 2,
+                "column": 34
+              }
+            }
+          }
+        },
+        {
+          "isError": false,
+          "data": {
+            "contents": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nINDEX_REFRESHED documentation for the worktree experiment.\n",
+            "range": {
+              "start": {
+                "line": 2,
+                "column": 19
+              },
+              "end": {
+                "line": 2,
+                "column": 34
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "revision_advance": [
+    {
+      "hover": {
+        "isError": false,
+        "data": {
+          "contents": "```elixir\nV2Target.answer()\n```\n\n*function* \n\n**Application** \n\n\n\n\n\n### Documentation\n\nBETA documentation for the worktree experiment.\n",
+          "range": {
+            "start": {
+              "line": 2,
+              "column": 19
+            },
+            "end": {
+              "line": 2,
+              "column": 34
+            }
+          }
+        }
+      },
+      "references": {
+        "isError": false,
+        "data": {
+          "references": [
+            {
+              "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/stress/beta/lib/caller.ex",
+              "line": 2,
+              "column": 28,
+              "end_line": 2,
+              "end_column": 34,
+              "context": "def call_1, do: V2Target.answer()",
+              "symbol_name": "answer"
+            },
+            {
+              "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/stress/beta/lib/caller.ex",
+              "line": 3,
+              "column": 28,
+              "end_line": 3,
+              "end_column": 34,
+              "context": "def call_2, do: V2Target.answer()",
+              "symbol_name": "answer"
+            }
+          ],
+          "total_count": 2,
+          "returned_count": 2,
+          "offset": 0,
+          "has_more": false
+        }
+      }
+    },
+    {
+      "hover": {
+        "isError": false,
+        "data": {
+          "contents": "```elixir\nV2Target.answer()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\n\n\n\n**Application** v2_fixture\n\n\n\n\n\n### Documentation\n\nALPHA documentation for the worktree experiment.\n",
+          "range": {
+            "start": {
+              "line": 2,
+              "column": 19
+            },
+            "end": {
+              "line": 2,
+              "column": 34
+            }
+          }
+        }
+      },
+      "references": {
+        "isError": false,
+        "data": {
+          "references": [
+            {
+              "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/stress/beta/lib/caller.ex",
+              "line": 2,
+              "column": 28,
+              "end_line": 2,
+              "end_column": 34,
+              "context": "def call_1, do: V2Target.answer()",
+              "symbol_name": "answer"
+            },
+            {
+              "path": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/stress/beta/lib/caller.ex",
+              "line": 3,
+              "column": 28,
+              "end_line": 3,
+              "end_column": 34,
+              "context": "def call_2, do: V2Target.answer()",
+              "symbol_name": "answer"
+            }
+          ],
+          "total_count": 2,
+          "returned_count": 2,
+          "offset": 0,
+          "has_more": false
+        }
+      }
+    }
+  ],
+  "cross_root_server_status": {
+    "isError": false,
+    "data": {
+      "servers": [
+        {
+          "id": "elixir",
+          "status": "running",
+          "pid": 42822,
+          "workspace_root": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/stress/alpha",
+          "capabilities": [
+            "definition",
+            "references",
+            "implementation",
+            "hover",
+            "signatureHelp",
+            "documentSymbols",
+            "workspaceSymbols",
+            "completion",
+            "codeAction",
+            "formatting"
+          ],
+          "uptime_seconds": 17
+        },
+        {
+          "id": "elixir",
+          "status": "running",
+          "pid": 43358,
+          "workspace_root": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/stress/beta",
+          "capabilities": [
+            "definition",
+            "references",
+            "implementation",
+            "hover",
+            "signatureHelp",
+            "documentSymbols",
+            "workspaceSymbols",
+            "completion",
+            "codeAction",
+            "formatting"
+          ],
+          "uptime_seconds": 0
+        }
+      ]
+    }
+  },
+  "sigterm_remaining": {
+    "alpha_sigterm_remaining": {},
+    "beta_sigterm_remaining": {}
+  },
+  "tips_local": {
+    "lsp_hover": {
+      "isError": false,
+      "data": null
+    },
+    "lsp_goto_definition": {
+      "isError": false,
+      "data": {
+        "definitions": []
+      }
+    },
+    "lsp_find_references": {
+      "isError": false,
+      "data": {
+        "references": [
+          {
+            "path": "/private/tmp/tips-elixirls-codex-v2/lib/tips/search_probe.ex",
+            "line": 64,
+            "column": 58,
+            "end_line": 64,
+            "end_column": 62,
+            "context": "Keyword.get_lazy(opts, :mode, &Tips.ProviderConfig.mode/0) != :real ->",
+            "symbol_name": "mode"
+          },
+          {
+            "path": "/private/tmp/tips-elixirls-codex-v2/lib/tips/provider_config.ex",
+            "line": 56,
+            "column": 3,
+            "end_line": 56,
+            "end_column": 90,
+            "context": "def mode, do: :tips |> Application.get_env(__MODULE__, []) |> Keyword.get(:mode, :real)"
+          }
+        ],
+        "total_count": 2,
+        "returned_count": 2,
+        "offset": 0,
+        "has_more": false
+      }
+    },
+    "server_status": {
+      "isError": false,
+      "data": {
+        "servers": [
+          {
+            "id": "elixir",
+            "status": "running",
+            "pid": 45321,
+            "workspace_root": "/private/tmp/tips-elixirls-codex-v2",
+            "capabilities": [
+              "definition",
+              "references",
+              "implementation",
+              "hover",
+              "signatureHelp",
+              "documentSymbols",
+              "workspaceSymbols",
+              "completion",
+              "codeAction",
+              "formatting"
+            ],
+            "uptime_seconds": 1
+          }
+        ]
+      }
+    },
+    "baseline_diagnostics": {
+      "isError": false,
+      "data": {
+        "diagnostics": [],
+        "summary": {
+          "errors": 0,
+          "warnings": 0,
+          "info": 0,
+          "hints": 0
+        },
+        "note": "Diagnostics are cached from language server notifications. Edits made on disk are sent to the server on every call; after an open or a change this call waits briefly for fresh diagnostics."
+      }
+    },
+    "after_initial_build_lsp_hover": {
+      "isError": false,
+      "data": {
+        "contents": "```elixir\nTips.ProviderConfig.mode()\n```\n\n*function* [View on hexdocs](https://hexdocs.pm/tips/0.1.0/Tips.ProviderConfig.html#mode/0)\n\n\n\n**Application** tips\n\n\n\n\n\n### Documentation\n\nReturns `:real` or `:stub`.\n\nTest runs use `:stub` unless `TIPS_REAL_PROVIDERS=1`; development uses `:real`.\n",
+        "range": {
+          "start": {
+            "line": 64,
+            "column": 38
+          },
+          "end": {
+            "line": 64,
+            "column": 62
+          }
+        }
+      }
+    },
+    "after_initial_build_lsp_goto_definition": {
+      "isError": false,
+      "data": {
+        "definitions": [
+          {
+            "path": "/private/tmp/tips-elixirls-codex-v2/lib/tips/provider_config.ex",
+            "line": 56,
+            "column": 3,
+            "end_line": 56,
+            "end_column": 90,
+            "context": "def mode, do: :tips |> Application.get_env(__MODULE__, []) |> Keyword.get(:mode, :real)"
+          }
+        ]
+      }
+    },
+    "new_file_diagnostics": {
+      "isError": false,
+      "data": {
+        "diagnostics": [],
+        "summary": {
+          "errors": 0,
+          "warnings": 0,
+          "info": 0,
+          "hints": 0
+        },
+        "note": "Diagnostics are cached from language server notifications. Edits made on disk are sent to the server on every call; after an open or a change this call waits briefly for fresh diagnostics."
+      }
+    },
+    "saved_error": [
+      {
+        "isError": false,
+        "data": {
+          "diagnostics": [],
+          "summary": {
+            "errors": 0,
+            "warnings": 0,
+            "info": 0,
+            "hints": 0
+          },
+          "note": "Diagnostics are cached from language server notifications. Edits made on disk are sent to the server on every call; after an open or a change this call waits briefly for fresh diagnostics."
+        }
+      },
+      {
+        "isError": false,
+        "data": {
+          "diagnostics": [
+            {
+              "range": {
+                "start": {
+                  "line": 1,
+                  "column": 1
+                },
+                "end": {
+                  "line": 1,
+                  "column": 1
+                }
+              },
+              "severity": "error",
+              "message": "** (CompileError) lib/codex_elixirls_v2_probe.ex: cannot compile module Tips.CodexElixirLSV2Probe (errors have been logged)\n\n",
+              "context": "defmodule Tips.CodexElixirLSV2Probe do",
+              "source": "Elixir"
+            },
+            {
+              "range": {
+                "start": {
+                  "line": 2,
+                  "column": 18
+                },
+                "end": {
+                  "line": 2,
+                  "column": 31
+                }
+              },
+              "severity": "error",
+              "message": "undefined function missing_local/0 (expected Tips.CodexElixirLSV2Probe to define such a function or for it to be imported, but none are available)",
+              "context": "def value, do: missing_local()",
+              "source": "Elixir"
+            }
+          ],
+          "summary": {
+            "errors": 2,
+            "warnings": 0,
+            "info": 0,
+            "hints": 0
+          },
+          "note": "Diagnostics are cached from language server notifications. Edits made on disk are sent to the server on every call; after an open or a change this call waits briefly for fresh diagnostics."
+        }
+      }
+    ],
+    "repaired": [
+      {
+        "isError": false,
+        "data": {
+          "diagnostics": [],
+          "summary": {
+            "errors": 0,
+            "warnings": 0,
+            "info": 0,
+            "hints": 0
+          },
+          "note": "Diagnostics are cached from language server notifications. Edits made on disk are sent to the server on every call; after an open or a change this call waits briefly for fresh diagnostics."
+        }
+      }
+    ]
+  },
+  "codex_synthetic": {
+    "calls": [
+      {
+        "tool": "lsp_hover",
+        "arguments": {
+          "file_path": "/private/tmp/codex-elixirls-v2-synthetic/lib/caller.ex",
+          "line": 2,
+          "column": 29
+        },
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"contents\": \"```elixir\\nV2Target.answer()\\n```\\n\\n*function* [View on hexdocs](https://hexdocs.pm/v2_fixture/0.1.0/V2Target.html#answer/0)\\n\\n\\n\\n**Application** v2_fixture\\n\\n\\n\\n\\n\\n### Documentation\\n\\nALPHA documentation for the worktree experiment.\\n\",\n  \"range\": {\n    \"start\": {\n      \"line\": 2,\n      \"column\": 19\n    },\n    \"end\": {\n      \"line\": 2,\n      \"column\": 34\n    }\n  }\n}"
+            }
+          ],
+          "structured_content": null
+        },
+        "error": null,
+        "status": "completed"
+      },
+      {
+        "tool": "lsp_goto_definition",
+        "arguments": {
+          "file_path": "/private/tmp/codex-elixirls-v2-synthetic/lib/caller.ex",
+          "line": 2,
+          "column": 29
+        },
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"definitions\": [\n    {\n      \"path\": \"/private/tmp/codex-elixirls-v2-synthetic/lib/target.ex\",\n      \"line\": 3,\n      \"column\": 3,\n      \"end_line\": 3,\n      \"end_column\": 25,\n      \"context\": \"def answer, do: :alpha\"\n    }\n  ]\n}"
+            }
+          ],
+          "structured_content": null
+        },
+        "error": null,
+        "status": "completed"
+      },
+      {
+        "tool": "lsp_find_references",
+        "arguments": {
+          "file_path": "/private/tmp/codex-elixirls-v2-synthetic/lib/caller.ex",
+          "line": 2,
+          "column": 29,
+          "include_declaration": false
+        },
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"references\": [\n    {\n      \"path\": \"/private/tmp/codex-elixirls-v2-synthetic/lib/caller.ex\",\n      \"line\": 2,\n      \"column\": 28,\n      \"end_line\": 2,\n      \"end_column\": 34,\n      \"context\": \"def call_1, do: V2Target.answer()\",\n      \"symbol_name\": \"answer\"\n    },\n    {\n      \"path\": \"/private/tmp/codex-elixirls-v2-synthetic/lib/caller.ex\",\n      \"line\": 3,\n      \"column\": 28,\n      \"end_line\": 3,\n      \"end_column\": 34,\n      \"context\": \"def call_2, do: V2Target.answer()\",\n      \"symbol_name\": \"answer\"\n    }\n  ],\n  \"total_count\": 2,\n  \"returned_count\": 2,\n  \"offset\": 0,\n  \"has_more\": false\n}"
+            }
+          ],
+          "structured_content": null
+        },
+        "error": null,
+        "status": "completed"
+      },
+      {
+        "tool": "lsp_diagnostics",
+        "arguments": {
+          "file_path": "/private/tmp/codex-elixirls-v2-synthetic/lib/caller.ex"
+        },
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"diagnostics\": [],\n  \"summary\": {\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0,\n    \"hints\": 0\n  },\n  \"note\": \"Diagnostics are cached from language server notifications. Edits made on disk are sent to the server on every call; after an open or a change this call waits briefly for fresh diagnostics.\"\n}"
+            }
+          ],
+          "structured_content": null
+        },
+        "error": null,
+        "status": "completed"
+      },
+      {
+        "tool": "lsp_server_status",
+        "arguments": {},
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"servers\": [\n    {\n      \"id\": \"elixir\",\n      \"status\": \"running\",\n      \"pid\": 40481,\n      \"workspace_root\": \"/private/tmp/codex-elixirls-v2-synthetic\",\n      \"capabilities\": [\n        \"definition\",\n        \"references\",\n        \"implementation\",\n        \"hover\",\n        \"signatureHelp\",\n        \"documentSymbols\",\n        \"workspaceSymbols\",\n        \"completion\",\n        \"codeAction\",\n        \"formatting\"\n      ],\n      \"uptime_seconds\": 22\n    }\n  ]\n}"
+            }
+          ],
+          "structured_content": null
+        },
+        "error": null,
+        "status": "completed"
+      }
+    ],
+    "exit_code": 0,
+    "timed_out": false,
+    "remaining_processes": {},
+    "call_counts": {
+      "lsp_hover": 1,
+      "lsp_goto_definition": 1,
+      "lsp_find_references": 1,
+      "lsp_diagnostics": 3,
+      "lsp_server_status": 1
+    }
+  },
+  "full_tips_codex": "Not run: automatic approval review requires explicit authorization for source-derived tool results to be sent to Codex service."
+}

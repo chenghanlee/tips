@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "lsp-mcp-server": "1.1.24"
+  }
+}
