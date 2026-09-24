@@ -1,0 +1,1688 @@
+*DBG* 'Elixir.XPEngine.Supervisor' got {'EXIT',<0.5430.0>,normal}
+*DBG* 'Elixir.XPEngine.Supervisor' new state {state,
+                                              {local,
+                                               'Elixir.XPEngine.Supervisor'},
+                                              one_for_one,
+                                              {['Elixir.XPEngine.Search.Store',
+                                                'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                'Elixir.XPEngine.Plugin.Runner.Supervisor',
+                                                'Elixir.XPEngine.Build.CaptureServer',
+                                                'Elixir.XPEngine.ModuleStore',
+                                                'Elixir.XPEngine.Build',
+                                                'Elixir.XPEngine.ModuleMappings',
+                                                {'Elixir.XPEngine.Dispatch',
+                                                 dispatch},
+                                                'Elixir.XPEngine.Module.Loader',
+                                                'Elixir.XPEngine.Commands.Reindex',
+                                                'Elixir.XPEngine.Api.Proxy',
+                                                'Elixir.XPEngine.ApplicationCache'],
+                                               #{'Elixir.XPEngine.Api.Proxy' =>
+                                                  {child,<0.212.0>,
+                                                   'Elixir.XPEngine.Api.Proxy',
+                                                   {'Elixir.XPEngine.Api.Proxy',
+                                                    start_link,[]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Api.Proxy']},
+                                                 'Elixir.XPEngine.ApplicationCache' =>
+                                                  {child,<0.211.0>,
+                                                   'Elixir.XPEngine.ApplicationCache',
+                                                   {'Elixir.XPEngine.ApplicationCache',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.ApplicationCache']},
+                                                 'Elixir.XPEngine.Build' =>
+                                                  {child,<0.217.0>,
+                                                   'Elixir.XPEngine.Build',
+                                                   {'Elixir.XPEngine.Build',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Build']},
+                                                 'Elixir.XPEngine.Build.CaptureServer' =>
+                                                  {child,<0.219.0>,
+                                                   'Elixir.XPEngine.Build.CaptureServer',
+                                                   {'Elixir.XPEngine.Build.CaptureServer',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Build.CaptureServer']},
+                                                 'Elixir.XPEngine.Commands.Reindex' =>
+                                                  {child,<0.213.0>,
+                                                   'Elixir.XPEngine.Commands.Reindex',
+                                                   {'Elixir.XPEngine.Commands.Reindex',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Commands.Reindex']},
+                                                 'Elixir.XPEngine.Module.Loader' =>
+                                                  {child,<0.214.0>,
+                                                   'Elixir.XPEngine.Module.Loader',
+                                                   {'Elixir.XPEngine.Module.Loader',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Module.Loader']},
+                                                 'Elixir.XPEngine.ModuleMappings' =>
+                                                  {child,<0.216.0>,
+                                                   'Elixir.XPEngine.ModuleMappings',
+                                                   {'Elixir.XPEngine.ModuleMappings',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.ModuleMappings']},
+                                                 'Elixir.XPEngine.ModuleStore' =>
+                                                  {child,<0.5571.0>,
+                                                   'Elixir.XPEngine.ModuleStore',
+                                                   {'Elixir.XPEngine.ModuleStore',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.ModuleStore']},
+                                                 'Elixir.XPEngine.Plugin.Runner.Coordinator' =>
+                                                  {child,<0.221.0>,
+                                                   'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                   {'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Plugin.Runner.Coordinator']},
+                                                 'Elixir.XPEngine.Plugin.Runner.Supervisor' =>
+                                                  {child,<0.220.0>,
+                                                   'Elixir.XPEngine.Plugin.Runner.Supervisor',
+                                                   {'Elixir.Task.Supervisor',
+                                                    start_link,
+                                                    [[{name,
+                                                       'Elixir.XPEngine.Plugin.Runner.Supervisor.TaskSupervisor'}]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.Task.Supervisor']},
+                                                 'Elixir.XPEngine.Search.Store' =>
+                                                  {child,<0.223.0>,
+                                                   'Elixir.XPEngine.Search.Store',
+                                                   {'Elixir.XPEngine.Search.Store',
+                                                    start_link,
+                                                    [#{'__struct__' =>
+                                                        'Elixir.XPForge.Project',
+                                                       'mix_project?' => true,
+                                                       entropy => 57323,
+                                                       root_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                       project_module =>
+                                                        'Elixir.Tips.MixProject',
+                                                       mix_exs_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                       env_variables => #{},
+                                                       mix_env => nil,
+                                                       mix_target => nil},
+                                                     fun 'Elixir.XPEngine.Search.Indexer':create_index/1,
+                                                     fun 'Elixir.XPEngine.Search.Indexer':update_index/2,
+                                                     'Elixir.XPEngine.Search.Store.Backends.Ets']},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Search.Store']},
+                                                 'Elixir.XPEngine.Search.Store.Backends.Ets' =>
+                                                  {child,<0.222.0>,
+                                                   'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                   {'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                    start_link,
+                                                    [#{'__struct__' =>
+                                                        'Elixir.XPForge.Project',
+                                                       'mix_project?' => true,
+                                                       entropy => 57323,
+                                                       root_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                       project_module =>
+                                                        'Elixir.Tips.MixProject',
+                                                       mix_exs_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                       env_variables => #{},
+                                                       mix_env => nil,
+                                                       mix_target => nil}]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Search.Store.Backends.Ets']},
+                                                 {'Elixir.XPEngine.Dispatch',
+                                                  dispatch} =>
+                                                  {child,<0.215.0>,
+                                                   {'Elixir.XPEngine.Dispatch',
+                                                    dispatch},
+                                                   {'Elixir.XPEngine.Dispatch',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Dispatch']}}},
+                                              undefined,3,5,
+                                              [-576460739,-576460744],
+                                              2,0,never,1000,false,
+                                              #Ref<0.2696741169.4155768834.112019>,
+                                              'Elixir.Supervisor.Default',
+                                              {ok,
+                                               {#{intensity => 3,period => 5,
+                                                  strategy => one_for_one,
+                                                  auto_shutdown => never},
+                                                [#{id =>
+                                                    'Elixir.XPEngine.ApplicationCache',
+                                                   start =>
+                                                    {'Elixir.XPEngine.ApplicationCache',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Api.Proxy',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Api.Proxy',
+                                                     start_link,[]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Commands.Reindex',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Commands.Reindex',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Module.Loader',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Module.Loader',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    {'Elixir.XPEngine.Dispatch',
+                                                     dispatch},
+                                                   start =>
+                                                    {'Elixir.XPEngine.Dispatch',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.ModuleMappings',
+                                                   start =>
+                                                    {'Elixir.XPEngine.ModuleMappings',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Build',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Build',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.ModuleStore',
+                                                   start =>
+                                                    {'Elixir.XPEngine.ModuleStore',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Build.CaptureServer',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Build.CaptureServer',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Plugin.Runner.Supervisor',
+                                                   start =>
+                                                    {'Elixir.Task.Supervisor',
+                                                     start_link,
+                                                     [[{name,
+                                                        'Elixir.XPEngine.Plugin.Runner.Supervisor.TaskSupervisor'}]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                     start_link,
+                                                     [#{'__struct__' =>
+                                                         'Elixir.XPForge.Project',
+                                                        'mix_project?' => true,
+                                                        entropy => 57323,
+                                                        root_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                        project_module =>
+                                                         'Elixir.Tips.MixProject',
+                                                        mix_exs_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                        env_variables => #{},
+                                                        mix_env => nil,
+                                                        mix_target => nil}]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Search.Store',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Search.Store',
+                                                     start_link,
+                                                     [#{'__struct__' =>
+                                                         'Elixir.XPForge.Project',
+                                                        'mix_project?' => true,
+                                                        entropy => 57323,
+                                                        root_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                        project_module =>
+                                                         'Elixir.Tips.MixProject',
+                                                        mix_exs_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                        env_variables => #{},
+                                                        mix_env => nil,
+                                                        mix_target => nil},
+                                                      fun 'Elixir.XPEngine.Search.Indexer':create_index/1,
+                                                      fun 'Elixir.XPEngine.Search.Indexer':update_index/2,
+                                                      'Elixir.XPEngine.Search.Store.Backends.Ets']}}]}}}
+*DBG* 'Elixir.XPEngine.Supervisor' got {hibernate,
+                                        #Ref<0.2696741169.4155768834.112019>}
+*DBG* 'Elixir.XPEngine.Supervisor' new state {state,
+                                              {local,
+                                               'Elixir.XPEngine.Supervisor'},
+                                              one_for_one,
+                                              {['Elixir.XPEngine.Search.Store',
+                                                'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                'Elixir.XPEngine.Plugin.Runner.Supervisor',
+                                                'Elixir.XPEngine.Build.CaptureServer',
+                                                'Elixir.XPEngine.ModuleStore',
+                                                'Elixir.XPEngine.Build',
+                                                'Elixir.XPEngine.ModuleMappings',
+                                                {'Elixir.XPEngine.Dispatch',
+                                                 dispatch},
+                                                'Elixir.XPEngine.Module.Loader',
+                                                'Elixir.XPEngine.Commands.Reindex',
+                                                'Elixir.XPEngine.Api.Proxy',
+                                                'Elixir.XPEngine.ApplicationCache'],
+                                               #{'Elixir.XPEngine.Api.Proxy' =>
+                                                  {child,<0.212.0>,
+                                                   'Elixir.XPEngine.Api.Proxy',
+                                                   {'Elixir.XPEngine.Api.Proxy',
+                                                    start_link,[]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Api.Proxy']},
+                                                 'Elixir.XPEngine.ApplicationCache' =>
+                                                  {child,<0.211.0>,
+                                                   'Elixir.XPEngine.ApplicationCache',
+                                                   {'Elixir.XPEngine.ApplicationCache',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.ApplicationCache']},
+                                                 'Elixir.XPEngine.Build' =>
+                                                  {child,<0.217.0>,
+                                                   'Elixir.XPEngine.Build',
+                                                   {'Elixir.XPEngine.Build',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Build']},
+                                                 'Elixir.XPEngine.Build.CaptureServer' =>
+                                                  {child,<0.219.0>,
+                                                   'Elixir.XPEngine.Build.CaptureServer',
+                                                   {'Elixir.XPEngine.Build.CaptureServer',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Build.CaptureServer']},
+                                                 'Elixir.XPEngine.Commands.Reindex' =>
+                                                  {child,<0.213.0>,
+                                                   'Elixir.XPEngine.Commands.Reindex',
+                                                   {'Elixir.XPEngine.Commands.Reindex',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Commands.Reindex']},
+                                                 'Elixir.XPEngine.Module.Loader' =>
+                                                  {child,<0.214.0>,
+                                                   'Elixir.XPEngine.Module.Loader',
+                                                   {'Elixir.XPEngine.Module.Loader',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Module.Loader']},
+                                                 'Elixir.XPEngine.ModuleMappings' =>
+                                                  {child,<0.216.0>,
+                                                   'Elixir.XPEngine.ModuleMappings',
+                                                   {'Elixir.XPEngine.ModuleMappings',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.ModuleMappings']},
+                                                 'Elixir.XPEngine.ModuleStore' =>
+                                                  {child,<0.5571.0>,
+                                                   'Elixir.XPEngine.ModuleStore',
+                                                   {'Elixir.XPEngine.ModuleStore',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.ModuleStore']},
+                                                 'Elixir.XPEngine.Plugin.Runner.Coordinator' =>
+                                                  {child,<0.221.0>,
+                                                   'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                   {'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Plugin.Runner.Coordinator']},
+                                                 'Elixir.XPEngine.Plugin.Runner.Supervisor' =>
+                                                  {child,<0.220.0>,
+                                                   'Elixir.XPEngine.Plugin.Runner.Supervisor',
+                                                   {'Elixir.Task.Supervisor',
+                                                    start_link,
+                                                    [[{name,
+                                                       'Elixir.XPEngine.Plugin.Runner.Supervisor.TaskSupervisor'}]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.Task.Supervisor']},
+                                                 'Elixir.XPEngine.Search.Store' =>
+                                                  {child,<0.223.0>,
+                                                   'Elixir.XPEngine.Search.Store',
+                                                   {'Elixir.XPEngine.Search.Store',
+                                                    start_link,
+                                                    [#{'__struct__' =>
+                                                        'Elixir.XPForge.Project',
+                                                       'mix_project?' => true,
+                                                       entropy => 57323,
+                                                       root_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                       project_module =>
+                                                        'Elixir.Tips.MixProject',
+                                                       mix_exs_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                       env_variables => #{},
+                                                       mix_env => nil,
+                                                       mix_target => nil},
+                                                     fun 'Elixir.XPEngine.Search.Indexer':create_index/1,
+                                                     fun 'Elixir.XPEngine.Search.Indexer':update_index/2,
+                                                     'Elixir.XPEngine.Search.Store.Backends.Ets']},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Search.Store']},
+                                                 'Elixir.XPEngine.Search.Store.Backends.Ets' =>
+                                                  {child,<0.222.0>,
+                                                   'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                   {'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                    start_link,
+                                                    [#{'__struct__' =>
+                                                        'Elixir.XPForge.Project',
+                                                       'mix_project?' => true,
+                                                       entropy => 57323,
+                                                       root_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                       project_module =>
+                                                        'Elixir.Tips.MixProject',
+                                                       mix_exs_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                       env_variables => #{},
+                                                       mix_env => nil,
+                                                       mix_target => nil}]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Search.Store.Backends.Ets']},
+                                                 {'Elixir.XPEngine.Dispatch',
+                                                  dispatch} =>
+                                                  {child,<0.215.0>,
+                                                   {'Elixir.XPEngine.Dispatch',
+                                                    dispatch},
+                                                   {'Elixir.XPEngine.Dispatch',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Dispatch']}}},
+                                              undefined,3,5,
+                                              [-576460739,-576460744],
+                                              2,0,never,1000,true,
+                                              #Ref<0.2696741169.4155768834.112019>,
+                                              'Elixir.Supervisor.Default',
+                                              {ok,
+                                               {#{intensity => 3,period => 5,
+                                                  strategy => one_for_one,
+                                                  auto_shutdown => never},
+                                                [#{id =>
+                                                    'Elixir.XPEngine.ApplicationCache',
+                                                   start =>
+                                                    {'Elixir.XPEngine.ApplicationCache',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Api.Proxy',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Api.Proxy',
+                                                     start_link,[]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Commands.Reindex',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Commands.Reindex',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Module.Loader',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Module.Loader',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    {'Elixir.XPEngine.Dispatch',
+                                                     dispatch},
+                                                   start =>
+                                                    {'Elixir.XPEngine.Dispatch',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.ModuleMappings',
+                                                   start =>
+                                                    {'Elixir.XPEngine.ModuleMappings',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Build',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Build',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.ModuleStore',
+                                                   start =>
+                                                    {'Elixir.XPEngine.ModuleStore',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Build.CaptureServer',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Build.CaptureServer',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Plugin.Runner.Supervisor',
+                                                   start =>
+                                                    {'Elixir.Task.Supervisor',
+                                                     start_link,
+                                                     [[{name,
+                                                        'Elixir.XPEngine.Plugin.Runner.Supervisor.TaskSupervisor'}]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                     start_link,
+                                                     [#{'__struct__' =>
+                                                         'Elixir.XPForge.Project',
+                                                        'mix_project?' => true,
+                                                        entropy => 57323,
+                                                        root_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                        project_module =>
+                                                         'Elixir.Tips.MixProject',
+                                                        mix_exs_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                        env_variables => #{},
+                                                        mix_env => nil,
+                                                        mix_target => nil}]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Search.Store',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Search.Store',
+                                                     start_link,
+                                                     [#{'__struct__' =>
+                                                         'Elixir.XPForge.Project',
+                                                        'mix_project?' => true,
+                                                        entropy => 57323,
+                                                        root_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                        project_module =>
+                                                         'Elixir.Tips.MixProject',
+                                                        mix_exs_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                        env_variables => #{},
+                                                        mix_env => nil,
+                                                        mix_target => nil},
+                                                      fun 'Elixir.XPEngine.Search.Indexer':create_index/1,
+                                                      fun 'Elixir.XPEngine.Search.Indexer':update_index/2,
+                                                      'Elixir.XPEngine.Search.Store.Backends.Ets']}}]}}}
+*DBG* 'Elixir.XPEngine.Supervisor' got {'EXIT',<0.5571.0>,normal}
+*DBG* 'Elixir.XPEngine.Supervisor' new state {state,
+                                              {local,
+                                               'Elixir.XPEngine.Supervisor'},
+                                              one_for_one,
+                                              {['Elixir.XPEngine.Search.Store',
+                                                'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                'Elixir.XPEngine.Plugin.Runner.Supervisor',
+                                                'Elixir.XPEngine.Build.CaptureServer',
+                                                'Elixir.XPEngine.ModuleStore',
+                                                'Elixir.XPEngine.Build',
+                                                'Elixir.XPEngine.ModuleMappings',
+                                                {'Elixir.XPEngine.Dispatch',
+                                                 dispatch},
+                                                'Elixir.XPEngine.Module.Loader',
+                                                'Elixir.XPEngine.Commands.Reindex',
+                                                'Elixir.XPEngine.Api.Proxy',
+                                                'Elixir.XPEngine.ApplicationCache'],
+                                               #{'Elixir.XPEngine.Api.Proxy' =>
+                                                  {child,<0.212.0>,
+                                                   'Elixir.XPEngine.Api.Proxy',
+                                                   {'Elixir.XPEngine.Api.Proxy',
+                                                    start_link,[]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Api.Proxy']},
+                                                 'Elixir.XPEngine.ApplicationCache' =>
+                                                  {child,<0.211.0>,
+                                                   'Elixir.XPEngine.ApplicationCache',
+                                                   {'Elixir.XPEngine.ApplicationCache',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.ApplicationCache']},
+                                                 'Elixir.XPEngine.Build' =>
+                                                  {child,<0.217.0>,
+                                                   'Elixir.XPEngine.Build',
+                                                   {'Elixir.XPEngine.Build',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Build']},
+                                                 'Elixir.XPEngine.Build.CaptureServer' =>
+                                                  {child,<0.219.0>,
+                                                   'Elixir.XPEngine.Build.CaptureServer',
+                                                   {'Elixir.XPEngine.Build.CaptureServer',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Build.CaptureServer']},
+                                                 'Elixir.XPEngine.Commands.Reindex' =>
+                                                  {child,<0.213.0>,
+                                                   'Elixir.XPEngine.Commands.Reindex',
+                                                   {'Elixir.XPEngine.Commands.Reindex',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Commands.Reindex']},
+                                                 'Elixir.XPEngine.Module.Loader' =>
+                                                  {child,<0.214.0>,
+                                                   'Elixir.XPEngine.Module.Loader',
+                                                   {'Elixir.XPEngine.Module.Loader',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Module.Loader']},
+                                                 'Elixir.XPEngine.ModuleMappings' =>
+                                                  {child,<0.216.0>,
+                                                   'Elixir.XPEngine.ModuleMappings',
+                                                   {'Elixir.XPEngine.ModuleMappings',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.ModuleMappings']},
+                                                 'Elixir.XPEngine.ModuleStore' =>
+                                                  {child,<0.5687.0>,
+                                                   'Elixir.XPEngine.ModuleStore',
+                                                   {'Elixir.XPEngine.ModuleStore',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.ModuleStore']},
+                                                 'Elixir.XPEngine.Plugin.Runner.Coordinator' =>
+                                                  {child,<0.221.0>,
+                                                   'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                   {'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Plugin.Runner.Coordinator']},
+                                                 'Elixir.XPEngine.Plugin.Runner.Supervisor' =>
+                                                  {child,<0.220.0>,
+                                                   'Elixir.XPEngine.Plugin.Runner.Supervisor',
+                                                   {'Elixir.Task.Supervisor',
+                                                    start_link,
+                                                    [[{name,
+                                                       'Elixir.XPEngine.Plugin.Runner.Supervisor.TaskSupervisor'}]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.Task.Supervisor']},
+                                                 'Elixir.XPEngine.Search.Store' =>
+                                                  {child,<0.223.0>,
+                                                   'Elixir.XPEngine.Search.Store',
+                                                   {'Elixir.XPEngine.Search.Store',
+                                                    start_link,
+                                                    [#{'__struct__' =>
+                                                        'Elixir.XPForge.Project',
+                                                       'mix_project?' => true,
+                                                       entropy => 57323,
+                                                       root_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                       project_module =>
+                                                        'Elixir.Tips.MixProject',
+                                                       mix_exs_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                       env_variables => #{},
+                                                       mix_env => nil,
+                                                       mix_target => nil},
+                                                     fun 'Elixir.XPEngine.Search.Indexer':create_index/1,
+                                                     fun 'Elixir.XPEngine.Search.Indexer':update_index/2,
+                                                     'Elixir.XPEngine.Search.Store.Backends.Ets']},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Search.Store']},
+                                                 'Elixir.XPEngine.Search.Store.Backends.Ets' =>
+                                                  {child,<0.222.0>,
+                                                   'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                   {'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                    start_link,
+                                                    [#{'__struct__' =>
+                                                        'Elixir.XPForge.Project',
+                                                       'mix_project?' => true,
+                                                       entropy => 57323,
+                                                       root_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                       project_module =>
+                                                        'Elixir.Tips.MixProject',
+                                                       mix_exs_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                       env_variables => #{},
+                                                       mix_env => nil,
+                                                       mix_target => nil}]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Search.Store.Backends.Ets']},
+                                                 {'Elixir.XPEngine.Dispatch',
+                                                  dispatch} =>
+                                                  {child,<0.215.0>,
+                                                   {'Elixir.XPEngine.Dispatch',
+                                                    dispatch},
+                                                   {'Elixir.XPEngine.Dispatch',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Dispatch']}}},
+                                              undefined,3,5,
+                                              [-576460738,-576460739,
+                                               -576460744],
+                                              3,0,never,1000,false,
+                                              #Ref<0.2696741169.4155768834.112019>,
+                                              'Elixir.Supervisor.Default',
+                                              {ok,
+                                               {#{intensity => 3,period => 5,
+                                                  strategy => one_for_one,
+                                                  auto_shutdown => never},
+                                                [#{id =>
+                                                    'Elixir.XPEngine.ApplicationCache',
+                                                   start =>
+                                                    {'Elixir.XPEngine.ApplicationCache',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Api.Proxy',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Api.Proxy',
+                                                     start_link,[]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Commands.Reindex',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Commands.Reindex',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Module.Loader',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Module.Loader',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    {'Elixir.XPEngine.Dispatch',
+                                                     dispatch},
+                                                   start =>
+                                                    {'Elixir.XPEngine.Dispatch',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.ModuleMappings',
+                                                   start =>
+                                                    {'Elixir.XPEngine.ModuleMappings',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Build',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Build',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.ModuleStore',
+                                                   start =>
+                                                    {'Elixir.XPEngine.ModuleStore',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Build.CaptureServer',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Build.CaptureServer',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Plugin.Runner.Supervisor',
+                                                   start =>
+                                                    {'Elixir.Task.Supervisor',
+                                                     start_link,
+                                                     [[{name,
+                                                        'Elixir.XPEngine.Plugin.Runner.Supervisor.TaskSupervisor'}]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                     start_link,
+                                                     [#{'__struct__' =>
+                                                         'Elixir.XPForge.Project',
+                                                        'mix_project?' => true,
+                                                        entropy => 57323,
+                                                        root_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                        project_module =>
+                                                         'Elixir.Tips.MixProject',
+                                                        mix_exs_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                        env_variables => #{},
+                                                        mix_env => nil,
+                                                        mix_target => nil}]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Search.Store',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Search.Store',
+                                                     start_link,
+                                                     [#{'__struct__' =>
+                                                         'Elixir.XPForge.Project',
+                                                        'mix_project?' => true,
+                                                        entropy => 57323,
+                                                        root_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                        project_module =>
+                                                         'Elixir.Tips.MixProject',
+                                                        mix_exs_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                        env_variables => #{},
+                                                        mix_env => nil,
+                                                        mix_target => nil},
+                                                      fun 'Elixir.XPEngine.Search.Indexer':create_index/1,
+                                                      fun 'Elixir.XPEngine.Search.Indexer':update_index/2,
+                                                      'Elixir.XPEngine.Search.Store.Backends.Ets']}}]}}}
+*DBG* 'Elixir.XPEngine.Supervisor' got {hibernate,
+                                        #Ref<0.2696741169.4155768834.112019>}
+*DBG* 'Elixir.XPEngine.Supervisor' new state {state,
+                                              {local,
+                                               'Elixir.XPEngine.Supervisor'},
+                                              one_for_one,
+                                              {['Elixir.XPEngine.Search.Store',
+                                                'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                'Elixir.XPEngine.Plugin.Runner.Supervisor',
+                                                'Elixir.XPEngine.Build.CaptureServer',
+                                                'Elixir.XPEngine.ModuleStore',
+                                                'Elixir.XPEngine.Build',
+                                                'Elixir.XPEngine.ModuleMappings',
+                                                {'Elixir.XPEngine.Dispatch',
+                                                 dispatch},
+                                                'Elixir.XPEngine.Module.Loader',
+                                                'Elixir.XPEngine.Commands.Reindex',
+                                                'Elixir.XPEngine.Api.Proxy',
+                                                'Elixir.XPEngine.ApplicationCache'],
+                                               #{'Elixir.XPEngine.Api.Proxy' =>
+                                                  {child,<0.212.0>,
+                                                   'Elixir.XPEngine.Api.Proxy',
+                                                   {'Elixir.XPEngine.Api.Proxy',
+                                                    start_link,[]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Api.Proxy']},
+                                                 'Elixir.XPEngine.ApplicationCache' =>
+                                                  {child,<0.211.0>,
+                                                   'Elixir.XPEngine.ApplicationCache',
+                                                   {'Elixir.XPEngine.ApplicationCache',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.ApplicationCache']},
+                                                 'Elixir.XPEngine.Build' =>
+                                                  {child,<0.217.0>,
+                                                   'Elixir.XPEngine.Build',
+                                                   {'Elixir.XPEngine.Build',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Build']},
+                                                 'Elixir.XPEngine.Build.CaptureServer' =>
+                                                  {child,<0.219.0>,
+                                                   'Elixir.XPEngine.Build.CaptureServer',
+                                                   {'Elixir.XPEngine.Build.CaptureServer',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Build.CaptureServer']},
+                                                 'Elixir.XPEngine.Commands.Reindex' =>
+                                                  {child,<0.213.0>,
+                                                   'Elixir.XPEngine.Commands.Reindex',
+                                                   {'Elixir.XPEngine.Commands.Reindex',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Commands.Reindex']},
+                                                 'Elixir.XPEngine.Module.Loader' =>
+                                                  {child,<0.214.0>,
+                                                   'Elixir.XPEngine.Module.Loader',
+                                                   {'Elixir.XPEngine.Module.Loader',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Module.Loader']},
+                                                 'Elixir.XPEngine.ModuleMappings' =>
+                                                  {child,<0.216.0>,
+                                                   'Elixir.XPEngine.ModuleMappings',
+                                                   {'Elixir.XPEngine.ModuleMappings',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.ModuleMappings']},
+                                                 'Elixir.XPEngine.ModuleStore' =>
+                                                  {child,<0.5687.0>,
+                                                   'Elixir.XPEngine.ModuleStore',
+                                                   {'Elixir.XPEngine.ModuleStore',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.ModuleStore']},
+                                                 'Elixir.XPEngine.Plugin.Runner.Coordinator' =>
+                                                  {child,<0.221.0>,
+                                                   'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                   {'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Plugin.Runner.Coordinator']},
+                                                 'Elixir.XPEngine.Plugin.Runner.Supervisor' =>
+                                                  {child,<0.220.0>,
+                                                   'Elixir.XPEngine.Plugin.Runner.Supervisor',
+                                                   {'Elixir.Task.Supervisor',
+                                                    start_link,
+                                                    [[{name,
+                                                       'Elixir.XPEngine.Plugin.Runner.Supervisor.TaskSupervisor'}]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.Task.Supervisor']},
+                                                 'Elixir.XPEngine.Search.Store' =>
+                                                  {child,<0.223.0>,
+                                                   'Elixir.XPEngine.Search.Store',
+                                                   {'Elixir.XPEngine.Search.Store',
+                                                    start_link,
+                                                    [#{'__struct__' =>
+                                                        'Elixir.XPForge.Project',
+                                                       'mix_project?' => true,
+                                                       entropy => 57323,
+                                                       root_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                       project_module =>
+                                                        'Elixir.Tips.MixProject',
+                                                       mix_exs_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                       env_variables => #{},
+                                                       mix_env => nil,
+                                                       mix_target => nil},
+                                                     fun 'Elixir.XPEngine.Search.Indexer':create_index/1,
+                                                     fun 'Elixir.XPEngine.Search.Indexer':update_index/2,
+                                                     'Elixir.XPEngine.Search.Store.Backends.Ets']},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Search.Store']},
+                                                 'Elixir.XPEngine.Search.Store.Backends.Ets' =>
+                                                  {child,<0.222.0>,
+                                                   'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                   {'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                    start_link,
+                                                    [#{'__struct__' =>
+                                                        'Elixir.XPForge.Project',
+                                                       'mix_project?' => true,
+                                                       entropy => 57323,
+                                                       root_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                       project_module =>
+                                                        'Elixir.Tips.MixProject',
+                                                       mix_exs_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                       env_variables => #{},
+                                                       mix_env => nil,
+                                                       mix_target => nil}]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Search.Store.Backends.Ets']},
+                                                 {'Elixir.XPEngine.Dispatch',
+                                                  dispatch} =>
+                                                  {child,<0.215.0>,
+                                                   {'Elixir.XPEngine.Dispatch',
+                                                    dispatch},
+                                                   {'Elixir.XPEngine.Dispatch',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Dispatch']}}},
+                                              undefined,3,5,
+                                              [-576460738,-576460739,
+                                               -576460744],
+                                              3,0,never,1000,true,
+                                              #Ref<0.2696741169.4155768834.112019>,
+                                              'Elixir.Supervisor.Default',
+                                              {ok,
+                                               {#{intensity => 3,period => 5,
+                                                  strategy => one_for_one,
+                                                  auto_shutdown => never},
+                                                [#{id =>
+                                                    'Elixir.XPEngine.ApplicationCache',
+                                                   start =>
+                                                    {'Elixir.XPEngine.ApplicationCache',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Api.Proxy',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Api.Proxy',
+                                                     start_link,[]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Commands.Reindex',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Commands.Reindex',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Module.Loader',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Module.Loader',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    {'Elixir.XPEngine.Dispatch',
+                                                     dispatch},
+                                                   start =>
+                                                    {'Elixir.XPEngine.Dispatch',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.ModuleMappings',
+                                                   start =>
+                                                    {'Elixir.XPEngine.ModuleMappings',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Build',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Build',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.ModuleStore',
+                                                   start =>
+                                                    {'Elixir.XPEngine.ModuleStore',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Build.CaptureServer',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Build.CaptureServer',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Plugin.Runner.Supervisor',
+                                                   start =>
+                                                    {'Elixir.Task.Supervisor',
+                                                     start_link,
+                                                     [[{name,
+                                                        'Elixir.XPEngine.Plugin.Runner.Supervisor.TaskSupervisor'}]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                     start_link,
+                                                     [#{'__struct__' =>
+                                                         'Elixir.XPForge.Project',
+                                                        'mix_project?' => true,
+                                                        entropy => 57323,
+                                                        root_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                        project_module =>
+                                                         'Elixir.Tips.MixProject',
+                                                        mix_exs_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                        env_variables => #{},
+                                                        mix_env => nil,
+                                                        mix_target => nil}]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Search.Store',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Search.Store',
+                                                     start_link,
+                                                     [#{'__struct__' =>
+                                                         'Elixir.XPForge.Project',
+                                                        'mix_project?' => true,
+                                                        entropy => 57323,
+                                                        root_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                        project_module =>
+                                                         'Elixir.Tips.MixProject',
+                                                        mix_exs_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                        env_variables => #{},
+                                                        mix_env => nil,
+                                                        mix_target => nil},
+                                                      fun 'Elixir.XPEngine.Search.Indexer':create_index/1,
+                                                      fun 'Elixir.XPEngine.Search.Indexer':update_index/2,
+                                                      'Elixir.XPEngine.Search.Store.Backends.Ets']}}]}}}
+*DBG* 'Elixir.XPEngine.Supervisor' got {'EXIT',<0.5687.0>,normal}
+*DBG* 'Elixir.XPEngine.Supervisor' new state {state,
+                                              {local,
+                                               'Elixir.XPEngine.Supervisor'},
+                                              one_for_one,
+                                              {['Elixir.XPEngine.Search.Store',
+                                                'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                'Elixir.XPEngine.Plugin.Runner.Supervisor',
+                                                'Elixir.XPEngine.Build.CaptureServer',
+                                                'Elixir.XPEngine.ModuleStore',
+                                                'Elixir.XPEngine.Build',
+                                                'Elixir.XPEngine.ModuleMappings',
+                                                {'Elixir.XPEngine.Dispatch',
+                                                 dispatch},
+                                                'Elixir.XPEngine.Module.Loader',
+                                                'Elixir.XPEngine.Commands.Reindex',
+                                                'Elixir.XPEngine.Api.Proxy',
+                                                'Elixir.XPEngine.ApplicationCache'],
+                                               #{'Elixir.XPEngine.Api.Proxy' =>
+                                                  {child,<0.212.0>,
+                                                   'Elixir.XPEngine.Api.Proxy',
+                                                   {'Elixir.XPEngine.Api.Proxy',
+                                                    start_link,[]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Api.Proxy']},
+                                                 'Elixir.XPEngine.ApplicationCache' =>
+                                                  {child,<0.211.0>,
+                                                   'Elixir.XPEngine.ApplicationCache',
+                                                   {'Elixir.XPEngine.ApplicationCache',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.ApplicationCache']},
+                                                 'Elixir.XPEngine.Build' =>
+                                                  {child,<0.217.0>,
+                                                   'Elixir.XPEngine.Build',
+                                                   {'Elixir.XPEngine.Build',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Build']},
+                                                 'Elixir.XPEngine.Build.CaptureServer' =>
+                                                  {child,<0.219.0>,
+                                                   'Elixir.XPEngine.Build.CaptureServer',
+                                                   {'Elixir.XPEngine.Build.CaptureServer',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Build.CaptureServer']},
+                                                 'Elixir.XPEngine.Commands.Reindex' =>
+                                                  {child,<0.213.0>,
+                                                   'Elixir.XPEngine.Commands.Reindex',
+                                                   {'Elixir.XPEngine.Commands.Reindex',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Commands.Reindex']},
+                                                 'Elixir.XPEngine.Module.Loader' =>
+                                                  {child,<0.214.0>,
+                                                   'Elixir.XPEngine.Module.Loader',
+                                                   {'Elixir.XPEngine.Module.Loader',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Module.Loader']},
+                                                 'Elixir.XPEngine.ModuleMappings' =>
+                                                  {child,<0.216.0>,
+                                                   'Elixir.XPEngine.ModuleMappings',
+                                                   {'Elixir.XPEngine.ModuleMappings',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.ModuleMappings']},
+                                                 'Elixir.XPEngine.ModuleStore' =>
+                                                  {child,<0.5806.0>,
+                                                   'Elixir.XPEngine.ModuleStore',
+                                                   {'Elixir.XPEngine.ModuleStore',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.ModuleStore']},
+                                                 'Elixir.XPEngine.Plugin.Runner.Coordinator' =>
+                                                  {child,<0.221.0>,
+                                                   'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                   {'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Plugin.Runner.Coordinator']},
+                                                 'Elixir.XPEngine.Plugin.Runner.Supervisor' =>
+                                                  {child,<0.220.0>,
+                                                   'Elixir.XPEngine.Plugin.Runner.Supervisor',
+                                                   {'Elixir.Task.Supervisor',
+                                                    start_link,
+                                                    [[{name,
+                                                       'Elixir.XPEngine.Plugin.Runner.Supervisor.TaskSupervisor'}]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.Task.Supervisor']},
+                                                 'Elixir.XPEngine.Search.Store' =>
+                                                  {child,<0.223.0>,
+                                                   'Elixir.XPEngine.Search.Store',
+                                                   {'Elixir.XPEngine.Search.Store',
+                                                    start_link,
+                                                    [#{'__struct__' =>
+                                                        'Elixir.XPForge.Project',
+                                                       'mix_project?' => true,
+                                                       entropy => 57323,
+                                                       root_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                       project_module =>
+                                                        'Elixir.Tips.MixProject',
+                                                       mix_exs_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                       env_variables => #{},
+                                                       mix_env => nil,
+                                                       mix_target => nil},
+                                                     fun 'Elixir.XPEngine.Search.Indexer':create_index/1,
+                                                     fun 'Elixir.XPEngine.Search.Indexer':update_index/2,
+                                                     'Elixir.XPEngine.Search.Store.Backends.Ets']},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Search.Store']},
+                                                 'Elixir.XPEngine.Search.Store.Backends.Ets' =>
+                                                  {child,<0.222.0>,
+                                                   'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                   {'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                    start_link,
+                                                    [#{'__struct__' =>
+                                                        'Elixir.XPForge.Project',
+                                                       'mix_project?' => true,
+                                                       entropy => 57323,
+                                                       root_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                       project_module =>
+                                                        'Elixir.Tips.MixProject',
+                                                       mix_exs_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                       env_variables => #{},
+                                                       mix_env => nil,
+                                                       mix_target => nil}]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Search.Store.Backends.Ets']},
+                                                 {'Elixir.XPEngine.Dispatch',
+                                                  dispatch} =>
+                                                  {child,<0.215.0>,
+                                                   {'Elixir.XPEngine.Dispatch',
+                                                    dispatch},
+                                                   {'Elixir.XPEngine.Dispatch',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Dispatch']}}},
+                                              undefined,3,5,
+                                              [-576460736,-576460738,
+                                               -576460739],
+                                              3,0,never,1000,false,
+                                              #Ref<0.2696741169.4155768834.112019>,
+                                              'Elixir.Supervisor.Default',
+                                              {ok,
+                                               {#{intensity => 3,period => 5,
+                                                  strategy => one_for_one,
+                                                  auto_shutdown => never},
+                                                [#{id =>
+                                                    'Elixir.XPEngine.ApplicationCache',
+                                                   start =>
+                                                    {'Elixir.XPEngine.ApplicationCache',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Api.Proxy',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Api.Proxy',
+                                                     start_link,[]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Commands.Reindex',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Commands.Reindex',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Module.Loader',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Module.Loader',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    {'Elixir.XPEngine.Dispatch',
+                                                     dispatch},
+                                                   start =>
+                                                    {'Elixir.XPEngine.Dispatch',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.ModuleMappings',
+                                                   start =>
+                                                    {'Elixir.XPEngine.ModuleMappings',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Build',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Build',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.ModuleStore',
+                                                   start =>
+                                                    {'Elixir.XPEngine.ModuleStore',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Build.CaptureServer',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Build.CaptureServer',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Plugin.Runner.Supervisor',
+                                                   start =>
+                                                    {'Elixir.Task.Supervisor',
+                                                     start_link,
+                                                     [[{name,
+                                                        'Elixir.XPEngine.Plugin.Runner.Supervisor.TaskSupervisor'}]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                     start_link,
+                                                     [#{'__struct__' =>
+                                                         'Elixir.XPForge.Project',
+                                                        'mix_project?' => true,
+                                                        entropy => 57323,
+                                                        root_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                        project_module =>
+                                                         'Elixir.Tips.MixProject',
+                                                        mix_exs_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                        env_variables => #{},
+                                                        mix_env => nil,
+                                                        mix_target => nil}]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Search.Store',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Search.Store',
+                                                     start_link,
+                                                     [#{'__struct__' =>
+                                                         'Elixir.XPForge.Project',
+                                                        'mix_project?' => true,
+                                                        entropy => 57323,
+                                                        root_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                        project_module =>
+                                                         'Elixir.Tips.MixProject',
+                                                        mix_exs_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                        env_variables => #{},
+                                                        mix_env => nil,
+                                                        mix_target => nil},
+                                                      fun 'Elixir.XPEngine.Search.Indexer':create_index/1,
+                                                      fun 'Elixir.XPEngine.Search.Indexer':update_index/2,
+                                                      'Elixir.XPEngine.Search.Store.Backends.Ets']}}]}}}
+*DBG* 'Elixir.XPEngine.Supervisor' got {hibernate,
+                                        #Ref<0.2696741169.4155768834.112019>}
+*DBG* 'Elixir.XPEngine.Supervisor' new state {state,
+                                              {local,
+                                               'Elixir.XPEngine.Supervisor'},
+                                              one_for_one,
+                                              {['Elixir.XPEngine.Search.Store',
+                                                'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                'Elixir.XPEngine.Plugin.Runner.Supervisor',
+                                                'Elixir.XPEngine.Build.CaptureServer',
+                                                'Elixir.XPEngine.ModuleStore',
+                                                'Elixir.XPEngine.Build',
+                                                'Elixir.XPEngine.ModuleMappings',
+                                                {'Elixir.XPEngine.Dispatch',
+                                                 dispatch},
+                                                'Elixir.XPEngine.Module.Loader',
+                                                'Elixir.XPEngine.Commands.Reindex',
+                                                'Elixir.XPEngine.Api.Proxy',
+                                                'Elixir.XPEngine.ApplicationCache'],
+                                               #{'Elixir.XPEngine.Api.Proxy' =>
+                                                  {child,<0.212.0>,
+                                                   'Elixir.XPEngine.Api.Proxy',
+                                                   {'Elixir.XPEngine.Api.Proxy',
+                                                    start_link,[]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Api.Proxy']},
+                                                 'Elixir.XPEngine.ApplicationCache' =>
+                                                  {child,<0.211.0>,
+                                                   'Elixir.XPEngine.ApplicationCache',
+                                                   {'Elixir.XPEngine.ApplicationCache',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.ApplicationCache']},
+                                                 'Elixir.XPEngine.Build' =>
+                                                  {child,<0.217.0>,
+                                                   'Elixir.XPEngine.Build',
+                                                   {'Elixir.XPEngine.Build',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Build']},
+                                                 'Elixir.XPEngine.Build.CaptureServer' =>
+                                                  {child,<0.219.0>,
+                                                   'Elixir.XPEngine.Build.CaptureServer',
+                                                   {'Elixir.XPEngine.Build.CaptureServer',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Build.CaptureServer']},
+                                                 'Elixir.XPEngine.Commands.Reindex' =>
+                                                  {child,<0.213.0>,
+                                                   'Elixir.XPEngine.Commands.Reindex',
+                                                   {'Elixir.XPEngine.Commands.Reindex',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Commands.Reindex']},
+                                                 'Elixir.XPEngine.Module.Loader' =>
+                                                  {child,<0.214.0>,
+                                                   'Elixir.XPEngine.Module.Loader',
+                                                   {'Elixir.XPEngine.Module.Loader',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Module.Loader']},
+                                                 'Elixir.XPEngine.ModuleMappings' =>
+                                                  {child,<0.216.0>,
+                                                   'Elixir.XPEngine.ModuleMappings',
+                                                   {'Elixir.XPEngine.ModuleMappings',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.ModuleMappings']},
+                                                 'Elixir.XPEngine.ModuleStore' =>
+                                                  {child,<0.5806.0>,
+                                                   'Elixir.XPEngine.ModuleStore',
+                                                   {'Elixir.XPEngine.ModuleStore',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.ModuleStore']},
+                                                 'Elixir.XPEngine.Plugin.Runner.Coordinator' =>
+                                                  {child,<0.221.0>,
+                                                   'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                   {'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Plugin.Runner.Coordinator']},
+                                                 'Elixir.XPEngine.Plugin.Runner.Supervisor' =>
+                                                  {child,<0.220.0>,
+                                                   'Elixir.XPEngine.Plugin.Runner.Supervisor',
+                                                   {'Elixir.Task.Supervisor',
+                                                    start_link,
+                                                    [[{name,
+                                                       'Elixir.XPEngine.Plugin.Runner.Supervisor.TaskSupervisor'}]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.Task.Supervisor']},
+                                                 'Elixir.XPEngine.Search.Store' =>
+                                                  {child,<0.223.0>,
+                                                   'Elixir.XPEngine.Search.Store',
+                                                   {'Elixir.XPEngine.Search.Store',
+                                                    start_link,
+                                                    [#{'__struct__' =>
+                                                        'Elixir.XPForge.Project',
+                                                       'mix_project?' => true,
+                                                       entropy => 57323,
+                                                       root_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                       project_module =>
+                                                        'Elixir.Tips.MixProject',
+                                                       mix_exs_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                       env_variables => #{},
+                                                       mix_env => nil,
+                                                       mix_target => nil},
+                                                     fun 'Elixir.XPEngine.Search.Indexer':create_index/1,
+                                                     fun 'Elixir.XPEngine.Search.Indexer':update_index/2,
+                                                     'Elixir.XPEngine.Search.Store.Backends.Ets']},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Search.Store']},
+                                                 'Elixir.XPEngine.Search.Store.Backends.Ets' =>
+                                                  {child,<0.222.0>,
+                                                   'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                   {'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                    start_link,
+                                                    [#{'__struct__' =>
+                                                        'Elixir.XPForge.Project',
+                                                       'mix_project?' => true,
+                                                       entropy => 57323,
+                                                       root_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                       project_module =>
+                                                        'Elixir.Tips.MixProject',
+                                                       mix_exs_uri =>
+                                                        <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                       env_variables => #{},
+                                                       mix_env => nil,
+                                                       mix_target => nil}]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Search.Store.Backends.Ets']},
+                                                 {'Elixir.XPEngine.Dispatch',
+                                                  dispatch} =>
+                                                  {child,<0.215.0>,
+                                                   {'Elixir.XPEngine.Dispatch',
+                                                    dispatch},
+                                                   {'Elixir.XPEngine.Dispatch',
+                                                    start_link,
+                                                    [[]]},
+                                                   permanent,false,5000,
+                                                   worker,
+                                                   ['Elixir.XPEngine.Dispatch']}}},
+                                              undefined,3,5,
+                                              [-576460736,-576460738,
+                                               -576460739],
+                                              3,0,never,1000,true,
+                                              #Ref<0.2696741169.4155768834.112019>,
+                                              'Elixir.Supervisor.Default',
+                                              {ok,
+                                               {#{intensity => 3,period => 5,
+                                                  strategy => one_for_one,
+                                                  auto_shutdown => never},
+                                                [#{id =>
+                                                    'Elixir.XPEngine.ApplicationCache',
+                                                   start =>
+                                                    {'Elixir.XPEngine.ApplicationCache',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Api.Proxy',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Api.Proxy',
+                                                     start_link,[]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Commands.Reindex',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Commands.Reindex',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Module.Loader',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Module.Loader',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    {'Elixir.XPEngine.Dispatch',
+                                                     dispatch},
+                                                   start =>
+                                                    {'Elixir.XPEngine.Dispatch',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.ModuleMappings',
+                                                   start =>
+                                                    {'Elixir.XPEngine.ModuleMappings',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Build',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Build',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.ModuleStore',
+                                                   start =>
+                                                    {'Elixir.XPEngine.ModuleStore',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Build.CaptureServer',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Build.CaptureServer',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Plugin.Runner.Supervisor',
+                                                   start =>
+                                                    {'Elixir.Task.Supervisor',
+                                                     start_link,
+                                                     [[{name,
+                                                        'Elixir.XPEngine.Plugin.Runner.Supervisor.TaskSupervisor'}]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Plugin.Runner.Coordinator',
+                                                     start_link,
+                                                     [[]]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Search.Store.Backends.Ets',
+                                                     start_link,
+                                                     [#{'__struct__' =>
+                                                         'Elixir.XPForge.Project',
+                                                        'mix_project?' => true,
+                                                        entropy => 57323,
+                                                        root_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                        project_module =>
+                                                         'Elixir.Tips.MixProject',
+                                                        mix_exs_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                        env_variables => #{},
+                                                        mix_env => nil,
+                                                        mix_target => nil}]}},
+                                                 #{id =>
+                                                    'Elixir.XPEngine.Search.Store',
+                                                   start =>
+                                                    {'Elixir.XPEngine.Search.Store',
+                                                     start_link,
+                                                     [#{'__struct__' =>
+                                                         'Elixir.XPForge.Project',
+                                                        'mix_project?' => true,
+                                                        entropy => 57323,
+                                                        root_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation">>,
+                                                        project_module =>
+                                                         'Elixir.Tips.MixProject',
+                                                        mix_exs_uri =>
+                                                         <<"file:///private/tmp/tips-expert-neovim-validation/mix.exs">>,
+                                                        env_variables => #{},
+                                                        mix_env => nil,
+                                                        mix_target => nil},
+                                                      fun 'Elixir.XPEngine.Search.Indexer':create_index/1,
+                                                      fun 'Elixir.XPEngine.Search.Indexer':update_index/2,
+                                                      'Elixir.XPEngine.Search.Store.Backends.Ets']}}]}}}
+*DBG* 'Elixir.XPEngine.Supervisor' got {'EXIT',<0.5806.0>,normal}

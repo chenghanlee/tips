@@ -1,0 +1,10 @@
+Compiling 2 files (.ex)
+Generated v2_fixture app
+Compiling 2 files (.ex)
+Generated v2_fixture app
+Running ExUnit with seed: 981712, max_cases: 20
+
+[32m.[0m
+Finished in 0.00 seconds (0.00s async, 0.00s sync)
+[32m
+Result: 1 passed[0m

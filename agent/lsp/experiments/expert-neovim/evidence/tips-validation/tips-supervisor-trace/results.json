@@ -1,0 +1,3557 @@
+{
+  "created_path": "/private/tmp/tips-expert-neovim-validation/lib/tips/expert_probe_52de2fd417.ex",
+  "first_hover": {
+    "isError": false,
+    "data": {
+      "clients": [],
+      "items": []
+    }
+  },
+  "baseline_hover": {
+    "matched": true,
+    "samples": [
+      {
+        "seconds": 0.002,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 0.504,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 1.009,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 1.516,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 2.019,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 2.524,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 3.197,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 3.833,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 4.473,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 5.092,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 5.716,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 6.331,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 6.949,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 7.567,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 8.197,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 9.713,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "items": [
+              "```elixir\nTips.ProviderConfig.mode()\n```\n\nReturns `:real` or `:stub`.\n\nTest runs use `:stub` unless `TIPS_REAL_PROVIDERS=1`; development uses `:real`.\n"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "state": {
+    "autoread": true,
+    "buffers": [
+      {
+        "text": [
+          "defmodule Tips.SearchProbe do",
+          "  @moduledoc \"\"\"",
+          "  Ten-query relevance gate for the hosted embedding candidate (issues #54 and #234).",
+          "",
+          "  The corpus, queries, judgments and numeric gates live in `test/fixtures/search_probe/`",
+          "  and are frozen before any model comparison. Each gate version is its own file:",
+          "  `v1` is `gate.json` (#54, head/tail truncation) and `v2` is `gate-v2.json` (#234, full",
+          "  documents up to a byte bound, with its run protocol). `scripts/search_probe.exs` is the",
+          "  entry point:",
+          "",
+          "      mix run scripts/search_probe.exs --validate [--gate v2]",
+          "      TIPS_REAL_PROVIDERS=1 mix run scripts/search_probe.exs --real --gate v2 --output PATH",
+          "",
+          "  `--validate` (the default) checks the fixtures and the offline request/token bound of",
+          "  every gate, or of the selected one, without HTTP. `--real` needs an explicit gate, real",
+          "  provider mode and an output path that does not exist yet; it embeds eligible documents",
+          "  and the instructed queries through OpenRouter with retries disabled and concurrency 1,",
+          "  then writes an allowlisted JSON report. The exit status is 0 only when every gate passes.",
+          "",
+          "  This is an isolated probe, not the application's search implementation.",
+          "  \"\"\"",
+          "",
+          "  @fixtures_dir Path.expand(\"../../test/fixtures/search_probe\", __DIR__)",
+          "  @gates %{\"v1\" => \"gate.json\", \"v2\" => \"gate-v2.json\"}",
+          "  @gate_names @gates |> Map.keys() |> Enum.sort()",
+          "  @categories ~w(scoped_change setup_environment long_output punctuation_error)",
+          "  # Byte-level BPE emits at most one token per byte; this margin covers special tokens.",
+          "  @tokens_per_input_margin 8",
+          "  # Endpoint listing and key check before any embedding request.",
+          "  @preflight_requests 2",
+          "",
+          "  def fixtures_dir, do: @fixtures_dir",
+          "",
+          "  ## Command line",
+          "",
+          "  @doc \"Runs the command line and returns its exit status.\"",
+          "  def main(argv, opts \\\\ []) do",
+          "    strict = [validate: :boolean, real: :boolean, gate: :string, output: :string]",
+          "",
+          "    case OptionParser.parse(argv, strict: strict) do",
+          "      {parsed, [], []} -> command(parsed, opts)",
+          "      _invalid -> usage()",
+          "    end",
+          "  end",
+          "",
+          "  defp command(parsed, opts) do",
+          "    case {parsed[:real], parsed[:validate], parsed[:gate], parsed[:output]} do",
+          "      {true, nil, gate, output} when gate in @gate_names and is_binary(output) ->",
+          "        live_if_real(gate, output, opts)",
+          "",
+          "      {nil, _validate, nil, nil} ->",
+          "        validate_only(@gate_names, opts)",
+          "",
+          "      {nil, _validate, gate, nil} when gate in @gate_names ->",
+          "        validate_only([gate], opts)",
+          "",
+          "      _other ->",
+          "        usage()",
+          "    end",
+          "  end",
+          "",
+          "  defp live_if_real(gate, output, opts) do",
+          "    cond do",
+          "      Keyword.get_lazy(opts, :mode, &Tips.ProviderConfig.mode/0) != :real ->",
+          "        refuse(\"set TIPS_REAL_PROVIDERS=1 (or use MIX_ENV=dev) with --real\")",
+          "",
+          "      File.exists?(output) ->",
+          "        refuse(\"#{output} exists; each live run writes a new report\")",
+          "",
+          "      true ->",
+          "        live(gate, output, opts)",
+          "    end",
+          "  end",
+          "",
+          "  defp usage do",
+          "    IO.puts(\"\"\"",
+          "    usage: mix run scripts/search_probe.exs [--validate] [--gate v1|v2]",
+          "           TIPS_REAL_PROVIDERS=1 mix run scripts/search_probe.exs --real --gate v1|v2 --output PATH\\",
+          "    \"\"\")",
+          "",
+          "    2",
+          "  end",
+          "",
+          "  defp refuse(reason) do",
+          "    IO.puts(\"refusing live probe: #{reason}\")",
+          "    2",
+          "  end",
+          "",
+          "  defp validate_only(gates, opts) do",
+          "    gates",
+          "    |> Enum.map(&validate_gate(&1, opts))",
+          "    |> Enum.max()",
+          "  end",
+          "",
+          "  defp validate_gate(gate, opts) do",
+          "    with {:ok, fixtures} <- fixtures(gate, opts),",
+          "         {:ok, plan} <- plan(fixtures) do",
+          "      IO.puts(\"fixtures valid: #{fixtures.gate[\"version\"]}\")",
+          "      Enum.each(fixtures.hashes, fn {name, hash} -> IO.puts(\"  #{name} sha256 #{hash}\") end)",
+          "",
+          "      IO.puts(",
+          "        \"  eligible documents #{plan.documents}, long #{plan.long_documents}, \" <>",
+          "          \"planned requests #{plan.requests}, input token bound #{plan.token_bound}, \" <>",
+          "          \"max document bytes #{plan.max_full_document_bytes}\"",
+          "      )",
+          "",
+          "      0",
+          "    else",
+          "      {:error, errors} ->",
+          "        Enum.each(List.wrap(errors), &IO.puts(\"invalid #{gate}: #{&1}\"))",
+          "        1",
+          "    end",
+          "  end",
+          "",
+          "  defp live(gate, output, opts) do",
+          "    report =",
+          "      case fixtures(gate, opts) do",
+          "        {:ok, fixtures} -> run(fixtures, opts)",
+          "        {:error, errors} -> %{status: \"failed\", blocker: nil, errors: errors}",
+          "      end",
+          "",
+          "    File.mkdir_p!(Path.dirname(output))",
+          "    File.write!(output, Jason.encode_to_iodata!(report, pretty: true))",
+          "    IO.puts(\"search probe #{report.status}: #{output}\")",
+          "",
+          "    Enum.each(Map.get(report, :gates, []), fn gate ->",
+          "      IO.puts(\"  #{if gate.passed, do: \"pass\", else: \"FAIL\"} #{gate.name} #{inspect(gate.value)}\")",
+          "    end)",
+          "",
+          "    if report.status == \"passed\", do: 0, else: 1",
+          "  end",
+          "",
+          "  # Tests may pass loaded `fixtures`, which replace the selected gate's files.",
+          "  defp fixtures(gate, opts) do",
+          "    case opts[:fixtures] do",
+          "      nil -> load(opts[:fixtures_dir] || @fixtures_dir, gate)",
+          "      fixtures -> {:ok, fixtures}",
+          "    end",
+          "  end",
+          "",
+          "  ## Fixtures",
+          "",
+          "  @doc \"\"\"",
+          "  Loads and validates the frozen fixtures for gate `v1` or `v2`, with a SHA-256 hash of",
+          "  each file. Both gates share the corpus and queries.",
+          "  \"\"\"",
+          "  def load(dir, gate \\\\ \"v1\") do",
+          "    files = %{\"corpus\" => \"corpus.json\", \"queries\" => \"queries.json\", \"gate\" => @gates[gate]}",
+          "    raw = Map.new(files, fn {name, file} -> {name, File.read!(Path.join(dir, file))} end)",
+          "",
+          "    fixtures = %{",
+          "      corpus: Jason.decode!(raw[\"corpus\"])[\"documents\"],",
+          "      queries: Jason.decode!(raw[\"queries\"])[\"queries\"],",
+          "      gate: Jason.decode!(raw[\"gate\"]),",
+          "      hashes: Map.new(raw, fn {name, bytes} -> {name, sha256(bytes)} end)",
+          "    }",
+          "",
+          "    with :ok <- validate(fixtures), do: {:ok, fixtures}",
+          "  end",
+          "",
+          "  @doc \"Checks fixture shape and judgments; returns every problem found.\"",
+          "  def validate(%{corpus: corpus, queries: queries, gate: gate}) do",
+          "    eligible = corpus |> eligible() |> MapSet.new(& &1[\"id\"])",
+          "    ids = Enum.map(corpus, & &1[\"id\"])",
+          "    tips = for %{\"kind\" => \"tip\", \"id\" => id} <- corpus, into: MapSet.new(), do: id",
+          "",
+          "    errors =",
+          "      [",
+          "        {length(queries) != 10, \"expected exactly ten queries, got #{length(queries)}\"},",
+          "        {MapSet.size(eligible) not in 30..50,",
+          "         \"expected 30-50 eligible documents, got #{MapSet.size(eligible)}\"},",
+          "        {length(ids) != length(Enum.uniq(ids)), \"document ids are not unique\"},",
+          "        {queries |> Enum.map(& &1[\"id\"]) |> Enum.uniq() |> length() != length(queries),",
+          "         \"query ids are not unique\"},",
+          "        {gate[\"dimensions\"] != 1024, \"gate dimensions must be 1024\"},",
+          "        {gate[\"preparation\"][\"document_max_bytes\"] + @tokens_per_input_margin >",
+          "           gate[\"model\"][\"context_tokens\"], \"document bound exceeds the model context\"}",
+          "      ] ++",
+          "        for(",
+          "          id <- Map.get(gate[\"preparation\"], \"long_input_cohort\", []),",
+          "          id not in eligible,",
+          "          do: {true, \"long-input cohort #{id} is not an eligible document\"}",
+          "        ) ++",
+          "        Enum.flat_map(corpus, &document_errors(&1, tips)) ++",
+          "        Enum.flat_map(queries, &query_errors(&1, eligible, gate))",
+          "",
+          "    case for({true, message} <- errors, do: message) do",
+          "      [] -> :ok",
+          "      messages -> {:error, messages}",
+          "    end",
+          "  end",
+          "",
+          "  defp document_errors(doc, tips) do",
+          "    id = doc[\"id\"]",
+          "",
+          "    [",
+          "      {doc[\"kind\"] not in [\"tip\", \"review\"], \"#{id}: unknown kind\"},",
+          "      {doc[\"state\"] not in ~w(published hidden deleted private draft), \"#{id}: unknown state\"},",
+          "      {doc[\"kind\"] == \"review\" and doc[\"parent_id\"] not in tips,",
+          "       \"#{id}: review needs a tip parent\"},",
+          "      {doc[\"kind\"] == \"tip\" and not is_binary(doc[\"title\"]), \"#{id}: tip needs a title\"},",
+          "      {not String.valid?(doc[\"body\"] || <<0xFF>>) or String.trim(doc[\"body\"]) == \"\",",
+          "       \"#{id}: body must be non-blank UTF-8\"}",
+          "    ]",
+          "  end",
+          "",
+          "  defp query_errors(query, eligible, gate) do",
+          "    id = query[\"id\"]",
+          "    relevant = query[\"relevant\"] || []",
+          "",
+          "    [",
+          "      {query[\"category\"] not in @categories, \"#{id}: unknown category\"},",
+          "      {relevant == [], \"#{id}: needs relevant documents\"},",
+          "      {not is_binary(query[\"rationale\"]) or String.trim(query[\"rationale\"]) == \"\",",
+          "       \"#{id}: needs a judgment rationale\"},",
+          "      {match?({:error, _}, prepare_query(query[\"text\"] || \"\", gate)), \"#{id}: invalid query text\"}",
+          "    ] ++",
+          "      for doc_id <- relevant,",
+          "          doc_id not in eligible,",
+          "          do: {true, \"#{id}: relevant #{doc_id} is not an eligible document\"}",
+          "  end",
+          "",
+          "  @doc \"\"\"",
+          "  Returns documents that may reach the provider: published tips, and published reviews",
+          "  whose parent tip is published. Hidden, deleted, private and draft text never leaves.",
+          "  \"\"\"",
+          "  def eligible(corpus) do",
+          "    live_tips =",
+          "      for %{\"kind\" => \"tip\", \"state\" => \"published\", \"id\" => id} <- corpus,",
+          "          into: MapSet.new(),",
+          "          do: id",
+          "",
+          "    Enum.filter(corpus, fn",
+          "      %{\"kind\" => \"tip\", \"state\" => \"published\"} -> true",
+          "      %{\"kind\" => \"review\", \"state\" => \"published\", \"parent_id\" => parent} -> parent in live_tips",
+          "      _ineligible -> false",
+          "    end)",
+          "  end",
+          "",
+          "  ## Preparation",
+          "",
+          "  @doc \"Plain document text: a tip's title, a blank line and its body; a review's body.\"",
+          "  def document_text(%{\"kind\" => \"tip\", \"title\" => title, \"body\" => body}),",
+          "    do: title <> \"\\n\\n\" <> body",
+          "",
+          "  def document_text(%{\"kind\" => \"review\", \"body\" => body}), do: body",
+          "",
+          "  @doc \"\"\"",
+          "  Prepares a document for embedding. A gate with a truncation separator (v1) bounds the",
+          "  text to its byte cap; otherwise (v2) the full text is kept and `plan/1` rejects a",
+          "  document over the cap before any request.",
+          "  \"\"\"",
+          "  def prepare_document(doc, gate) do",
+          "    full = document_text(doc)",
+          "",
+          "    text =",
+          "      case gate[\"preparation\"] do",
+          "        %{\"document_max_bytes\" => max, \"truncation_separator\" => separator} ->",
+          "          bound(full, max, separator)",
+          "",
+          "        %{\"document_max_bytes\" => _max} ->",
+          "          full",
+          "      end",
+          "",
+          "    %{id: doc[\"id\"], text: text, full_bytes: byte_size(full), truncated: text != full}",
+          "  end",
+          "",
+          "  @doc \"\"\"",
+          "  Eligible documents whose full text is compared against their prepared text: the gate's",
+          "  frozen cohort in its order, or in v1 the documents truncated by preparation.",
+          "  \"\"\"",
+          "  def long_cohort(%{corpus: corpus, gate: gate}) do",
+          "    documents = eligible(corpus)",
+          "",
+          "    case Map.fetch(gate[\"preparation\"], \"long_input_cohort\") do",
+          "      {:ok, ids} ->",
+          "        by_id = Map.new(documents, &{&1[\"id\"], &1})",
+          "        Enum.map(ids, &Map.fetch!(by_id, &1))",
+          "",
+          "      :error ->",
+          "        Enum.filter(documents, &prepare_document(&1, gate).truncated)",
+          "    end",
+          "  end",
+          "",
+          "  @doc \"Prefixes a reader query with the model card's retrieval instruction.\"",
+          "  def prepare_query(text, gate) do",
+          "    %{\"query_instruction\" => instruction, \"query_max_bytes\" => max} = gate[\"preparation\"]",
+          "",
+          "    cond do",
+          "      not String.valid?(text) or String.trim(text) == \"\" -> {:error, :blank_query}",
+          "      byte_size(text) > max -> {:error, :query_too_long}",
+          "      true -> {:ok, instruction <> text}",
+          "    end",
+          "  end",
+          "",
+          "  @doc \"\"\"",
+          "  Bounds valid UTF-8 `text` to `max` bytes. Longer text keeps equal head and tail byte",
+          "  budgets, each cut back to a character boundary, joined by `separator`.",
+          "  \"\"\"",
+          "  def bound(text, max, _separator) when byte_size(text) <= max, do: text",
+          "",
+          "  def bound(text, max, separator) do",
+          "    budget = max - byte_size(separator)",
+          "    head = head_bytes(text, div(budget, 2))",
+          "    tail = tail_bytes(text, budget - div(budget, 2))",
+          "    head <> separator <> tail",
+          "  end",
+          "",
+          "  defp head_bytes(text, n) do",
+          "    n = back_to_boundary(text, n)",
+          "    binary_part(text, 0, n)",
+          "  end",
+          "",
+          "  defp back_to_boundary(text, n) when n > 0 and n < byte_size(text) do",
+          "    if continuation?(:binary.at(text, n)), do: back_to_boundary(text, n - 1), else: n",
+          "  end",
+          "",
+          "  defp back_to_boundary(_text, n), do: n",
+          "",
+          "  defp tail_bytes(text, n) do",
+          "    start = forward_to_boundary(text, byte_size(text) - n)",
+          "    binary_part(text, start, byte_size(text) - start)",
+          "  end",
+          "",
+          "  defp forward_to_boundary(text, start) when start < byte_size(text) do",
+          "    if continuation?(:binary.at(text, start)),",
+          "      do: forward_to_boundary(text, start + 1),",
+          "      else: start",
+          "  end",
+          "",
+          "  defp forward_to_boundary(_text, start), do: start",
+          "",
+          "  defp continuation?(byte), do: Bitwise.band(byte, 0xC0) == 0x80",
+          "",
+          "  ## Scoring",
+          "",
+          "  @doc \"Ranks unit document vectors by cosine similarity, ties broken by id.\"",
+          "  def rank(query, documents) do",
+          "    documents",
+          "    |> Enum.map(fn {id, vector} -> {id, dot(query, vector)} end)",
+          "    |> Enum.sort_by(fn {id, score} -> {-score, id} end)",
+          "  end",
+          "",
+          "  @doc \"Fraction of `relevant` ids within the first `k` ranked ids.\"",
+          "  def recall(ranked_ids, relevant, k) do",
+          "    top = ranked_ids |> Enum.take(k) |> MapSet.new()",
+          "    Enum.count(relevant, &(&1 in top)) / length(relevant)",
+          "  end",
+          "",
+          "  @doc \"Nearest-rank 95th percentile.\"",
+          "  def p95(values) do",
+          "    sorted = Enum.sort(values)",
+          "    Enum.at(sorted, ceil(0.95 * length(sorted)) - 1)",
+          "  end",
+          "",
+          "  defp dot(a, b), do: a |> Enum.zip_with(b, &(&1 * &2)) |> Enum.sum()",
+          "",
+          "  ## Provider",
+          "",
+          "  @doc \"\"\"",
+          "  Embeds `inputs` in one request. Returns unit vectors of the gate's dimensions.",
+          "",
+          "  Every response must name the requested model and the pinned upstream, compared without",
+          "  case (OpenRouter reports `Qwen/Qwen3-Embedding-8B` from `DeepInfra` for",
+          "  `qwen/qwen3-embedding-8b` pinned to `deepinfra`). A 4096-value response is cut to its",
+          "  first 1024 values and renormalized (Matryoshka truncation). Once `expected_length` is",
+          "  set, any other length is an error. Errors are atoms or tuples of atoms and status codes;",
+          "  bodies and headers never leave this function.",
+          "  \"\"\"",
+          "  def embed(inputs, provider) do",
+          "    body =",
+          "      %{model: provider.model, input: inputs}",
+          "      |> put_if(provider.send_dimensions, :dimensions, provider.dimensions)",
+          "      |> put_if(map_size(provider.routing) > 0, :provider, provider.routing)",
+          "",
+          "    with {:ok, response} <-",
+          "           request(provider, method: :post, url: \"/embeddings\", json: body, auth: true),",
+          "         {:ok, data} <- response_data(response, length(inputs)),",
+          "         :ok <- identity(response, provider),",
+          "         {:ok, vectors, length} <- vectors(data, provider) do",
+          "      {:ok,",
+          "       %{",
+          "         vectors: vectors,",
+          "         returned_length: length,",
+          "         model: response[\"model\"],",
+          "         provider: response[\"provider\"],",
+          "         prompt_tokens: get_in(response, [\"usage\", \"prompt_tokens\"]),",
+          "         cost_usd: get_in(response, [\"usage\", \"cost\"])",
+          "       }}",
+          "    end",
+          "  end",
+          "",
+          "  defp identity(%{\"model\" => model, \"provider\" => upstream}, provider)",
+          "       when is_binary(model) and is_binary(upstream) do",
+          "    cond do",
+          "      String.downcase(model) != String.downcase(provider.model) ->",
+          "        {:error, :model_mismatch}",
+          "",
+          "      String.downcase(upstream) != String.downcase(provider.upstream) ->",
+          "        {:error, :upstream_mismatch}",
+          "",
+          "      true ->",
+          "        :ok",
+          "    end",
+          "  end",
+          "",
+          "  defp identity(_response, _provider), do: {:error, :missing_identity}",
+          "",
+          "  defp put_if(map, true, key, value), do: Map.put(map, key, value)",
+          "  defp put_if(map, false, _key, _value), do: map",
+          "",
+          "  # One monotonic deadline covers pool checkout, connect, send, receive and JSON decode:",
+          "  # Finch's own timeouts each cover one phase. The receive and connect limits match the",
+          "  # deadline so Req's shorter defaults (15 s receive) never cut a 30 s document request;",
+          "  # Finch's default pool wait can only end a request earlier. On expiry the request",
+          "  # process is killed, so no late response is used; a request the provider already",
+          "  # accepted cannot be recalled.",
+          "  defp request(provider, opts) do",
+          "    {auth?, opts} = Keyword.pop(opts, :auth, false)",
+          "    deadline = provider.timeout_ms",
+          "",
+          "    opts =",
+          "      [",
+          "        base_url: provider.base_url,",
+          "        retry: false,",
+          "        receive_timeout: deadline,",
+          "        connect_options: [timeout: deadline]",
+          "      ]",
+          "      |> Keyword.merge(if auth?, do: [auth: {:bearer, provider.api_key}], else: [])",
+          "      |> Keyword.merge(opts)",
+          "      |> Keyword.merge(provider.req_options)",
+          "",
+          "    task = Task.async(fn -> Req.request(opts) end)",
+          "",
+          "    case Task.yield(task, deadline) || Task.shutdown(task, :brutal_kill) do",
+          "      {:ok, result} -> response(result)",
+          "      nil -> {:error, :timeout}",
+          "    end",
+          "  end",
+          "",
+          "  defp response(result) do",
+          "    case result do",
+          "      {:ok, %Req.Response{status: 200, body: %{} = body}} -> {:ok, body}",
+          "      {:ok, %Req.Response{status: 200}} -> {:error, :malformed_response}",
+          "      {:ok, %Req.Response{status: status}} -> {:error, {:http_status, status}}",
+          "      {:error, %Req.TransportError{reason: :timeout}} -> {:error, :timeout}",
+          "      {:error, %Req.TransportError{}} -> {:error, :transport}",
+          "      {:error, _exception} -> {:error, :request_failed}",
+          "    end",
+          "  end",
+          "",
+          "  defp response_data(%{\"data\" => data}, count) when is_list(data) do",
+          "    indices = Enum.map(data, &(is_map(&1) && &1[\"index\"]))",
+          "",
+          "    if Enum.sort(indices) == Enum.to_list(0..(count - 1)//1),",
+          "      do: {:ok, Enum.sort_by(data, & &1[\"index\"])},",
+          "      else: {:error, :bad_indices}",
+          "  end",
+          "",
+          "  defp response_data(_response, _count), do: {:error, :malformed_response}",
+          "",
+          "  defp vectors(data, provider) do",
+          "    Enum.reduce_while(data, {:ok, [], nil}, fn item, {:ok, acc, _length} ->",
+          "      case vector(item[\"embedding\"], provider) do",
+          "        {:ok, vector} -> {:cont, {:ok, [vector | acc], length(item[\"embedding\"])}}",
+          "        error -> {:halt, error}",
+          "      end",
+          "    end)",
+          "    |> case do",
+          "      {:ok, acc, length} -> {:ok, Enum.reverse(acc), length}",
+          "      error -> error",
+          "    end",
+          "  end",
+          "",
+          "  defp vector(values, _provider) when not is_list(values), do: {:error, :malformed_response}",
+          "",
+          "  defp vector(values, %{expected_length: expected}) when expected not in [nil, length(values)],",
+          "    do: {:error, {:vector_length, length(values)}}",
+          "",
+          "  defp vector(values, %{dimensions: dims}) when length(values) in [dims, 4096] do",
+          "    values = Enum.take(values, dims)",
+          "    norm = values |> Enum.map(&square/1) |> Enum.sum() |> :math.sqrt()",
+          "",
+          "    cond do",
+          "      not Enum.all?(values, &is_number/1) -> {:error, :non_numeric_vector}",
+          "      norm == 0 -> {:error, :zero_vector}",
+          "      true -> {:ok, Enum.map(values, &(&1 / norm))}",
+          "    end",
+          "  end",
+          "",
+          "  defp vector(values, _provider), do: {:error, {:vector_length, length(values)}}",
+          "",
+          "  defp square(value) when is_number(value), do: value * value",
+          "  defp square(_value), do: 0",
+          "",
+          "  ## Live run",
+          "",
+          "  @doc \"\"\"",
+          "  Offline request and input-token bound for one live run. Rejects a prepared document",
+          "  over the gate's byte cap or not valid UTF-8.",
+          "  \"\"\"",
+          "  def plan(%{corpus: corpus, queries: queries, gate: gate} = fixtures) do",
+          "    docs = corpus |> eligible() |> Enum.map(&prepare_document(&1, gate))",
+          "    long = long_cohort(fixtures)",
+          "    passes = gate[\"gate\"][\"query_passes\"]",
+          "    max = gate[\"preparation\"][\"document_max_bytes\"]",
+          "    unfit = for doc <- docs, byte_size(doc.text) > max or not String.valid?(doc.text), do: doc.id",
+          "    # The first document may be sent twice when a rejected dimensions parameter is retried.",
+          "    retry = if retry_rejected_dimensions?(gate), do: 1, else: 0",
+          "",
+          "    query_bytes =",
+          "      Enum.sum_by(queries, fn query ->",
+          "        {:ok, text} = prepare_query(query[\"text\"], gate)",
+          "        byte_size(text)",
+          "      end)",
+          "",
+          "    inputs = length(docs) + length(long) + passes * length(queries) + retry",
+          "",
+          "    bytes =",
+          "      Enum.sum_by(docs, &byte_size(&1.text)) + retry * byte_size(hd(docs).text) +",
+          "        Enum.sum_by(long, &byte_size(document_text(&1))) + passes * query_bytes",
+          "",
+          "    plan = %{",
+          "      documents: length(docs),",
+          "      long_documents: length(long),",
+          "      requests: @preflight_requests + inputs,",
+          "      token_bound: bytes + inputs * @tokens_per_input_margin,",
+          "      max_full_document_bytes: docs |> Enum.map(& &1.full_bytes) |> Enum.max()",
+          "    }",
+          "",
+          "    budget = gate[\"budget\"]",
+          "",
+          "    cond do",
+          "      unfit != [] ->",
+          "        {:error, \"documents over #{max} bytes or not UTF-8: #{Enum.join(unfit, \", \")}\"}",
+          "",
+          "      plan.requests > budget[\"max_requests\"] ->",
+          "        {:error, \"planned requests exceed the budget\"}",
+          "",
+          "      plan.token_bound > budget[\"max_input_tokens\"] ->",
+          "        {:error, \"token bound exceeds the budget\"}",
+          "",
+          "      true ->",
+          "        {:ok, plan}",
+          "    end",
+          "  end",
+          "",
+          "  # v1 retried a dimensions HTTP 400 once without the parameter; v2 stops on it.",
+          "  defp retry_rejected_dimensions?(gate),",
+          "    do: get_in(gate, [\"protocol\", \"retry_rejected_dimensions\"]) != false",
+          "",
+          "  @doc \"Runs the live probe and returns the report. Never raises on provider failures.\"",
+          "  def run(fixtures, opts \\\\ []) do",
+          "    %{gate: gate} = fixtures",
+          "    baseline = rss_kib()",
+          "",
+          "    state = %{",
+          "      fixtures: fixtures,",
+          "      started_at: now(),",
+          "      requests: [],",
+          "      rss_peak: baseline,",
+          "      docs: %{},",
+          "      full: %{},",
+          "      queries: %{},",
+          "      query_ms: [],",
+          "      dimensions_mode: nil,",
+          "      preflight: %{}",
+          "    }",
+          "",
+          "    steps = [",
+          "      &check_plan/1,",
+          "      &check_endpoint/1,",
+          "      &check_key/1,",
+          "      &embed_documents/1,",
+          "      &embed_full_documents/1,",
+          "      &embed_queries/1",
+          "    ]",
+          "",
+          "    result =",
+          "      case provider(gate, opts) do",
+          "        {:ok, provider} -> reduce_ok(steps, Map.put(state, :provider, provider), & &1.(&2))",
+          "        {:error, reason} -> {:error, reason, state}",
+          "      end",
+          "",
+          "    report(result, baseline)",
+          "  end",
+          "",
+          "  defp provider(gate, opts) do",
+          "    key = Keyword.get_lazy(opts, :api_key, &fetch_api_key/0)",
+          "",
+          "    if is_binary(key) and String.trim(key) != \"\" do",
+          "      provider = gate[\"provider\"]",
+          "",
+          "      {:ok,",
+          "       %{",
+          "         api_key: key,",
+          "         base_url: provider[\"base_url\"],",
+          "         model: gate[\"model\"][\"id\"],",
+          "         routing: provider[\"routing\"],",
+          "         upstream: hd(provider[\"routing\"][\"only\"]),",
+          "         dimensions: gate[\"dimensions\"],",
+          "         send_dimensions: true,",
+          "         retry_rejected_dimensions: retry_rejected_dimensions?(gate),",
+          "         expected_length: nil,",
+          "         timeout_ms: gate[\"gate\"][\"document_deadline_ms\"],",
+          "         req_options: Keyword.get(opts, :req_options, [])",
+          "       }}",
+          "    else",
+          "      {:error, :missing_credentials}",
+          "    end",
+          "  end",
+          "",
+          "  defp fetch_api_key do",
+          "    Tips.ProviderConfig.fetch!(\"OPENROUTER_API_KEY\")",
+          "  rescue",
+          "    RuntimeError -> nil",
+          "  end",
+          "",
+          "  defp check_plan(state) do",
+          "    case plan(state.fixtures) do",
+          "      {:ok, plan} -> {:ok, put_in(state.preflight[:plan], plan)}",
+          "      {:error, message} -> {:error, {:budget, message}, state}",
+          "    end",
+          "  end",
+          "",
+          "  # Current price and context for the pinned upstream; no bound, no run.",
+          "  defp check_endpoint(state) do",
+          "    %{gate: gate} = state.fixtures",
+          "    [pinned] = gate[\"provider\"][\"routing\"][\"only\"]",
+          "    url = \"/models/#{gate[\"model\"][\"id\"]}/endpoints\"",
+          "",
+          "    {result, state} =",
+          "      timed(state, %{phase: \"endpoints\"}, fn ->",
+          "        request(state.provider, method: :get, url: url)",
+          "      end)",
+          "",
+          "    with {:ok, body} <- result,",
+          "         {:ok, endpoint} <- pinned_endpoint(body, pinned),",
+          "         {:ok, preflight} <- price_bound(endpoint, state.preflight.plan, gate) do",
+          "      {:ok, %{state | preflight: Map.merge(state.preflight, preflight)}}",
+          "    else",
+          "      {:error, reason} -> {:error, reason, state}",
+          "    end",
+          "  end",
+          "",
+          "  defp pinned_endpoint(%{\"data\" => %{\"endpoints\" => endpoints}}, pinned)",
+          "       when is_list(endpoints) do",
+          "    case Enum.find(endpoints, &(&1[\"tag\"] == pinned)) do",
+          "      nil -> {:error, :pinned_provider_unlisted}",
+          "      endpoint -> {:ok, endpoint}",
+          "    end",
+          "  end",
+          "",
+          "  defp pinned_endpoint(_body, _pinned), do: {:error, :malformed_response}",
+          "",
+          "  defp price_bound(endpoint, plan, gate) do",
+          "    with %{\"context_length\" => context, \"pricing\" => %{\"prompt\" => price}} <- endpoint,",
+          "         true <- is_integer(context),",
+          "         {price, \"\"} <- Float.parse(price) do",
+          "      preflight = %{",
+          "        endpoint: %{",
+          "          provider: endpoint[\"provider_name\"],",
+          "          tag: endpoint[\"tag\"],",
+          "          status: endpoint[\"status\"],",
+          "          context_tokens: context,",
+          "          prompt_price_usd_per_token: price",
+          "        },",
+          "        estimated_max_cost_usd: plan.token_bound * price",
+          "      }",
+          "",
+          "      instruction = byte_size(gate[\"preparation\"][\"query_instruction\"])",
+          "      largest = max(plan.max_full_document_bytes, gate[\"preparation\"][\"document_max_bytes\"])",
+          "",
+          "      cond do",
+          "        preflight.estimated_max_cost_usd > gate[\"budget\"][\"max_cost_usd\"] ->",
+          "          {:error, {:budget, \"estimated cost bound exceeds the budget\"}}",
+          "",
+          "        largest + @tokens_per_input_margin > context ->",
+          "          {:error, {:budget, \"largest allowed input may exceed the context\"}}",
+          "",
+          "        instruction + gate[\"preparation\"][\"query_max_bytes\"] > context ->",
+          "          {:error, {:budget, \"query instruction and cap exceed the context\"}}",
+          "",
+          "        true ->",
+          "          {:ok, preflight}",
+          "      end",
+          "    else",
+          "      _missing -> {:error, :price_unavailable}",
+          "    end",
+          "  end",
+          "",
+          "  # Confirms the credential and records the key's limits without the label or usage.",
+          "  defp check_key(state) do",
+          "    {result, state} =",
+          "      timed(state, %{phase: \"key\"}, fn ->",
+          "        request(state.provider, method: :get, url: \"/key\", auth: true)",
+          "      end)",
+          "",
+          "    case result do",
+          "      {:ok, %{\"data\" => %{} = data}} ->",
+          "        remaining = data[\"limit_remaining\"]",
+          "",
+          "        key = %{",
+          "          is_free_tier: data[\"is_free_tier\"],",
+          "          limit_usd: data[\"limit\"],",
+          "          limit_covers_estimate:",
+          "            not is_number(remaining) or remaining >= state.preflight.estimated_max_cost_usd,",
+          "          rate_limit:",
+          "            if(is_map(data[\"rate_limit\"]),",
+          "              do: Map.take(data[\"rate_limit\"], ~w(requests interval))",
+          "            )",
+          "        }",
+          "",
+          "        if key.limit_covers_estimate,",
+          "          do: {:ok, put_in(state.preflight[:key], key)},",
+          "          else: {:error, :key_limit_too_low, state}",
+          "",
+          "      {:ok, _body} ->",
+          "        {:error, :malformed_response, state}",
+          "",
+          "      {:error, reason} ->",
+          "        {:error, reason, state}",
+          "    end",
+          "  end",
+          "",
+          "  defp embed_documents(state) do",
+          "    %{corpus: corpus, gate: gate} = state.fixtures",
+          "",
+          "    corpus",
+          "    |> eligible()",
+          "    |> Enum.map(&prepare_document(&1, gate))",
+          "    |> reduce_ok(state, fn doc, st ->",
+          "      with {:ok, vector, st} <- embed_one(st, %{phase: \"document\", id: doc.id}, doc.text) do",
+          "        {:ok, put_in(st.docs[doc.id], vector)}",
+          "      end",
+          "    end)",
+          "  end",
+          "",
+          "  defp embed_full_documents(state) do",
+          "    state.fixtures",
+          "    |> long_cohort()",
+          "    |> reduce_ok(state, fn doc, st ->",
+          "      entry = %{phase: \"document_full\", id: doc[\"id\"]}",
+          "",
+          "      with {:ok, vector, st} <- embed_one(st, entry, document_text(doc)) do",
+          "        {:ok, put_in(st.full[doc[\"id\"]], vector)}",
+          "      end",
+          "    end)",
+          "  end",
+          "",
+          "  # Sequential measured passes; every attempt counts, with no warm-up exclusion.",
+          "  defp embed_queries(state) do",
+          "    %{queries: queries, gate: gate} = state.fixtures",
+          "    provider = %{state.provider | timeout_ms: gate[\"gate\"][\"query_deadline_ms\"]}",
+          "    state = %{state | provider: provider}",
+          "",
+          "    for pass <- 1..gate[\"gate\"][\"query_passes\"], query <- queries do",
+          "      {pass, query}",
+          "    end",
+          "    |> reduce_ok(state, fn {pass, query}, st ->",
+          "      {:ok, text} = prepare_query(query[\"text\"], gate)",
+          "      entry = %{phase: \"query\", id: query[\"id\"], pass: pass}",
+          "",
+          "      with {:ok, vector, st} <- embed_one(st, entry, text) do",
+          "        [%{elapsed_ms: ms} | _] = st.requests",
+          "        st = %{st | query_ms: [ms | st.query_ms]}",
+          "        {:ok, if(pass == 1, do: put_in(st.queries[query[\"id\"]], vector), else: st)}",
+          "      end",
+          "    end)",
+          "  end",
+          "",
+          "  defp reduce_ok(items, state, fun) do",
+          "    Enum.reduce_while(items, {:ok, state}, fn item, {:ok, st} ->",
+          "      case fun.(item, st) do",
+          "        {:ok, st} -> {:cont, {:ok, st}}",
+          "        {:error, reason, st} -> {:halt, {:error, reason, st}}",
+          "      end",
+          "    end)",
+          "  end",
+          "",
+          "  # The first embedding settles the dimension mode: 1024 values means the parameter was",
+          "  # honored; 4096 means it was ignored. Under v1 a 400 is retried once without the",
+          "  # parameter, and only a 4096-value success then establishes that it is unsupported.",
+          "  defp embed_one(state, entry, text) do",
+          "    entry = Map.put(entry, :input_bytes, byte_size(text))",
+          "    {result, state} = timed(state, entry, fn -> embed([text], state.provider) end)",
+          "",
+          "    case {result, state.dimensions_mode} do",
+          "      {{:error, {:http_status, 400}}, nil} when state.provider.retry_rejected_dimensions ->",
+          "        provider = %{state.provider | send_dimensions: false, expected_length: 4096}",
+          "",
+          "        {retry, state} =",
+          "          timed(%{state | provider: provider}, entry, fn -> embed([text], provider) end)",
+          "",
+          "        with {:ok, vector, state} <- settle(retry, state, \"unsupported\") do",
+          "          {:ok, vector, confirm_rejection(state)}",
+          "        end",
+          "",
+          "      {result, nil} ->",
+          "        settle(result, state, nil)",
+          "",
+          "      {{:ok, %{vectors: [vector]}}, _mode} ->",
+          "        {:ok, vector, state}",
+          "",
+          "      {{:error, reason}, _mode} ->",
+          "        {:error, reason, state}",
+          "    end",
+          "  end",
+          "",
+          "  # The 400 counts as a dimensions rejection only after the retry without the parameter",
+          "  # returned 4096 values; until then it keeps its HTTP label.",
+          "  defp confirm_rejection(%{requests: [retry, rejected | rest]} = state) do",
+          "    %{state | requests: [retry, %{rejected | outcome: \"dimensions_rejected\"} | rest]}",
+          "  end",
+          "",
+          "  defp settle({:ok, %{vectors: [vector], returned_length: length}}, state, mode) do",
+          "    mode = mode || if(length == 1024, do: \"requested\", else: \"ignored\")",
+          "    provider = %{state.provider | expected_length: length}",
+          "    {:ok, vector, %{state | dimensions_mode: mode, provider: provider}}",
+          "  end",
+          "",
+          "  defp settle({:error, reason}, state, _mode), do: {:error, reason, state}",
+          "",
+          "  # Runs one request, records its allowlisted outcome and samples client RSS.",
+          "  defp timed(state, entry, fun) do",
+          "    entry = Map.put(entry, :started_at, now())",
+          "    started = System.monotonic_time(:millisecond)",
+          "    result = fun.()",
+          "    elapsed = System.monotonic_time(:millisecond) - started",
+          "",
+          "    outcome =",
+          "      case result do",
+          "        {:ok, %{vectors: _} = ok} ->",
+          "          %{",
+          "            outcome: \"ok\",",
+          "            returned_length: ok.returned_length,",
+          "            prompt_tokens: ok.prompt_tokens,",
+          "            cost_usd: ok.cost_usd,",
+          "            model: ok.model,",
+          "            provider: ok.provider",
+          "          }",
+          "",
+          "        {:ok, _body} ->",
+          "          %{outcome: \"ok\"}",
+          "",
+          "        {:error, reason} ->",
+          "          %{outcome: error_label(reason)}",
+          "      end",
+          "",
+          "    entry = entry |> Map.merge(outcome) |> Map.put(:elapsed_ms, elapsed)",
+          "    rss = rss_kib()",
+          "    {result, %{state | requests: [entry | state.requests], rss_peak: max(rss, state.rss_peak)}}",
+          "  end",
+          "",
+          "  ## Report",
+          "",
+          "  defp report({:error, reason, state}, baseline) do",
+          "    state",
+          "    |> base_report(baseline)",
+          "    |> Map.merge(%{",
+          "      status: if(blocker(reason), do: \"blocked\", else: \"failed\"),",
+          "      blocker: blocker(reason),",
+          "      error: error_label(reason),",
+          "      gates: [gate(\"provider_calls\", \"all requests succeed\", error_label(reason), false)]",
+          "    })",
+          "  end",
+          "",
+          "  defp report({:ok, state}, baseline) do",
+          "    %{gate: gate, queries: queries} = state.fixtures",
+          "    results = Enum.map(queries, &query_result(&1, state))",
+          "    long = Enum.filter(results, & &1.long_input)",
+          "    requests = Enum.reverse(state.requests)",
+          "    query_ms = Enum.reverse(state.query_ms)",
+          "",
+          "    measured = %{",
+          "      macro_recall: mean(Enum.map(results, & &1.recall)),",
+          "      long_recall_bounded: mean(Enum.map(long, & &1.recall)),",
+          "      long_recall_full: mean(Enum.map(long, & &1.recall_full)),",
+          "      query_p95_ms: p95(state.query_ms),",
+          "      query_max_ms: Enum.max(state.query_ms),",
+          "      document_max_ms:",
+          "        Enum.max(for %{phase: \"document\" <> _, elapsed_ms: ms} <- requests, do: ms),",
+          "      incremental_rss_mib: (state.rss_peak - baseline) / 1024,",
+          "      models: distinct(requests, :model),",
+          "      upstreams: distinct(requests, :provider),",
+          "      usage: usage(requests, state)",
+          "    }",
+          "",
+          "    gates = gates(results, long, measured, gate)",
+          "",
+          "    state",
+          "    |> base_report(baseline)",
+          "    |> Map.merge(%{",
+          "      status: if(Enum.all?(gates, & &1.passed), do: \"passed\", else: \"failed\"),",
+          "      blocker: nil,",
+          "      summary: %{",
+          "        macro_recall_at_k: measured.macro_recall,",
+          "        long_input_queries: Enum.map(long, & &1.id),",
+          "        long_input_recall_bounded: measured.long_recall_bounded,",
+          "        long_input_recall_full: measured.long_recall_full",
+          "      },",
+          "      queries: Enum.map(results, &Map.drop(&1, [:scores, :scores_full])),",
+          "      scores: %{",
+          "        bounded: Map.new(results, &{&1.id, &1.scores}),",
+          "        full_long_documents: Map.new(results, &{&1.id, &1.scores_full})",
+          "      },",
+          "      latency: %{",
+          "        query_ms: query_ms,",
+          "        passes: passes(query_ms, length(queries)),",
+          "        query_p95_ms: measured.query_p95_ms,",
+          "        query_max_ms: measured.query_max_ms,",
+          "        document_max_ms: measured.document_max_ms,",
+          "        queries_per_second: length(state.query_ms) * 1000 / max(Enum.sum(state.query_ms), 1),",
+          "        concurrency: 1,",
+          "        http_retries: false",
+          "      },",
+          "      gates: gates",
+          "    })",
+          "  end",
+          "",
+          "  defp passes(query_ms, per_pass) do",
+          "    query_ms",
+          "    |> Enum.chunk_every(per_pass)",
+          "    |> Enum.with_index(1)",
+          "    |> Enum.map(fn {ms, pass} ->",
+          "      %{pass: pass, query_ms: ms, p95_ms: p95(ms), max_ms: Enum.max(ms), mean_ms: mean(ms)}",
+          "    end)",
+          "  end",
+          "",
+          "  defp query_result(query, state) do",
+          "    k = state.fixtures.gate[\"gate\"][\"k\"]",
+          "    relevant = query[\"relevant\"]",
+          "    vector = state.queries[query[\"id\"]]",
+          "    ranked = rank(vector, state.docs)",
+          "    ranked_full = rank(vector, Map.merge(state.docs, state.full))",
+          "    top = ranked |> Enum.take(k) |> Enum.map(&elem(&1, 0))",
+          "    hits = Enum.filter(top, &(&1 in relevant))",
+          "    tip_of = Map.new(state.fixtures.corpus, &{&1[\"id\"], &1[\"parent_id\"] || &1[\"id\"]})",
+          "",
+          "    %{",
+          "      id: query[\"id\"],",
+          "      category: query[\"category\"],",
+          "      relevant: relevant,",
+          "      top_k: top,",
+          "      hits: hits,",
+          "      recall: recall(Enum.map(ranked, &elem(&1, 0)), relevant, k),",
+          "      recall_full: recall(Enum.map(ranked_full, &elem(&1, 0)), relevant, k),",
+          "      long_input: Enum.any?(relevant, &Map.has_key?(state.full, &1)),",
+          "      top_k_tips: top |> Enum.map(&tip_of[&1]) |> Enum.uniq(),",
+          "      relevant_tips_matched: hits |> Enum.map(&tip_of[&1]) |> Enum.uniq(),",
+          "      scores: Map.new(ranked),",
+          "      scores_full: Map.take(Map.new(ranked_full), Map.keys(state.full))",
+          "    }",
+          "  end",
+          "",
+          "  defp gates(results, long, measured, gate) do",
+          "    %{\"k\" => k} = g = gate[\"gate\"]",
+          "    budget = gate[\"budget\"]",
+          "    usage = measured.usage",
+          "    loss = measured.long_recall_full - measured.long_recall_bounded",
+          "    every_hit = &Enum.all?(&1, fn result -> result.hits != [] end)",
+          "    hit_count = &Enum.count(&1, fn result -> result.hits != [] end)",
+          "",
+          "    [",
+          "      gate(",
+          "        \"provider_calls\",",
+          "        \"all requests succeed\",",
+          "        usage.failed_requests,",
+          "        usage.failed_requests == 0",
+          "      ),",
+          "      gate(",
+          "        \"every_query_top_k_hit\",",
+          "        \"each query has a relevant top-#{k} hit\",",
+          "        hit_count.(results),",
+          "        every_hit.(results)",
+          "      ),",
+          "      gate(",
+          "        \"macro_recall_at_k\",",
+          "        \">= #{g[\"min_macro_recall\"]}\",",
+          "        measured.macro_recall,",
+          "        measured.macro_recall >= g[\"min_macro_recall\"]",
+          "      ),",
+          "      gate(",
+          "        \"long_input_top_k_hit\",",
+          "        \"each long-input query keeps a top-#{k} hit\",",
+          "        hit_count.(long),",
+          "        every_hit.(long)",
+          "      ),",
+          "      gate(",
+          "        \"long_input_recall_loss\",",
+          "        \"<= #{g[\"long_input_max_recall_loss\"]}\",",
+          "        loss,",
+          "        loss <= g[\"long_input_max_recall_loss\"] + 1.0e-9",
+          "      ),",
+          "      gate(",
+          "        \"query_p95_ms\",",
+          "        \"<= #{g[\"query_p95_ms\"]}\",",
+          "        measured.query_p95_ms,",
+          "        measured.query_p95_ms <= g[\"query_p95_ms\"]",
+          "      ),",
+          "      gate(",
+          "        \"query_deadline_ms\",",
+          "        \"<= #{g[\"query_deadline_ms\"]}\",",
+          "        measured.query_max_ms,",
+          "        measured.query_max_ms <= g[\"query_deadline_ms\"]",
+          "      ),",
+          "      gate(",
+          "        \"document_deadline_ms\",",
+          "        \"<= #{g[\"document_deadline_ms\"]}\",",
+          "        measured.document_max_ms,",
+          "        measured.document_max_ms <= g[\"document_deadline_ms\"]",
+          "      ),",
+          "      gate(",
+          "        \"incremental_rss_mib\",",
+          "        \"<= #{g[\"max_incremental_rss_mib\"]}\",",
+          "        measured.incremental_rss_mib,",
+          "        measured.incremental_rss_mib <= g[\"max_incremental_rss_mib\"]",
+          "      ),",
+          "      gate(",
+          "        \"candidate_identity\",",
+          "        \"every response names the requested model and pinned upstream\",",
+          "        %{models: measured.models, upstreams: measured.upstreams},",
+          "        match?([_], measured.models) and match?([_], measured.upstreams)",
+          "      ),",
+          "      gate(",
+          "        \"request_budget\",",
+          "        \"<= #{budget[\"max_requests\"]} requests\",",
+          "        usage.requests,",
+          "        usage.requests <= budget[\"max_requests\"]",
+          "      ),",
+          "      gate(",
+          "        \"token_budget\",",
+          "        \"<= #{budget[\"max_input_tokens\"]} prompt tokens\",",
+          "        usage.prompt_tokens,",
+          "        usage.prompt_tokens <= budget[\"max_input_tokens\"]",
+          "      ),",
+          "      gate(",
+          "        \"cost_budget\",",
+          "        \"<= US$#{budget[\"max_cost_usd\"]}\",",
+          "        usage.cost_usd,",
+          "        usage.cost_usd <= budget[\"max_cost_usd\"]",
+          "      )",
+          "    ]",
+          "  end",
+          "",
+          "  defp distinct(requests, key) do",
+          "    requests |> Enum.map(& &1[key]) |> Enum.reject(&is_nil/1) |> Enum.uniq()",
+          "  end",
+          "",
+          "  defp base_report(state, baseline) do",
+          "    %{gate: gate, hashes: hashes} = state.fixtures",
+          "    requests = Enum.reverse(state.requests)",
+          "",
+          "    long_inputs =",
+          "      for doc <- long_cohort(state.fixtures) do",
+          "        prepared = prepare_document(doc, gate)",
+          "",
+          "        %{",
+          "          id: doc[\"id\"],",
+          "          full_bytes: prepared.full_bytes,",
+          "          bounded_bytes: byte_size(prepared.text),",
+          "          dropped_bytes: prepared.full_bytes - byte_size(prepared.text),",
+          "          reference: \"full text embedded separately\"",
+          "        }",
+          "      end",
+          "",
+          "    %{",
+          "      probe: \"search embedding gate\",",
+          "      started_at: state.started_at,",
+          "      generated_at: now(),",
+          "      code: code_identity(),",
+          "      fixtures: %{gate_version: gate[\"version\"], hashes: hashes},",
+          "      model: gate[\"model\"],",
+          "      provider: Map.take(gate[\"provider\"], [\"name\", \"base_url\", \"routing\"]),",
+          "      preparation: gate[\"preparation\"],",
+          "      dimensions: %{",
+          "        requested: gate[\"dimensions\"],",
+          "        mode: state.dimensions_mode,",
+          "        returned_lengths: distinct(requests, :returned_length)",
+          "      },",
+          "      preflight: state.preflight,",
+          "      requests: requests,",
+          "      usage: usage(requests, state),",
+          "      memory: %{",
+          "        baseline_rss_kib: baseline,",
+          "        peak_rss_kib: state.rss_peak,",
+          "        incremental_mib: (state.rss_peak - baseline) / 1024,",
+          "        method: \"client OS RSS sampled after every request; hosted GPU memory is not observable\"",
+          "      },",
+          "      long_inputs: long_inputs",
+          "    }",
+          "  end",
+          "",
+          "  defp usage(requests, state) do",
+          "    tokens = requests |> Enum.map(&(&1[:prompt_tokens] || 0)) |> Enum.sum()",
+          "    reported = requests |> Enum.map(& &1[:cost_usd]) |> Enum.reject(&is_nil/1)",
+          "    price = get_in(state.preflight, [:endpoint, :prompt_price_usd_per_token])",
+          "",
+          "    %{",
+          "      requests: length(requests),",
+          "      failed_requests: Enum.count(requests, &(&1.outcome not in [\"ok\", \"dimensions_rejected\"])),",
+          "      prompt_tokens: tokens,",
+          "      cost_usd: Enum.sum(reported),",
+          "      cost_source: if(reported == [], do: \"none reported\", else: \"provider-reported usage.cost\"),",
+          "      estimated_cost_usd: price && tokens * price",
+          "    }",
+          "  end",
+          "",
+          "  defp gate(name, threshold, value, passed),",
+          "    do: %{name: name, threshold: threshold, value: value, passed: passed}",
+          "",
+          "  defp mean([]), do: 1.0",
+          "  defp mean(values), do: Enum.sum(values) / length(values)",
+          "",
+          "  defp blocker(:missing_credentials), do: \"missing_credentials\"",
+          "  defp blocker({:http_status, status}) when status in [401, 402, 403, 429], do: \"http_#{status}\"",
+          "  defp blocker(:transport), do: \"transport\"",
+          "  defp blocker(:pinned_provider_unlisted), do: \"pinned_provider_unlisted\"",
+          "  defp blocker(:price_unavailable), do: \"price_unavailable\"",
+          "  defp blocker(:key_limit_too_low), do: \"key_limit_too_low\"",
+          "  defp blocker({:budget, _message}), do: \"budget\"",
+          "  defp blocker(_reason), do: nil",
+          "",
+          "  defp error_label({:http_status, status}), do: \"http_#{status}\"",
+          "  defp error_label({:vector_length, length}), do: \"vector_length_#{length}\"",
+          "  defp error_label({:budget, message}), do: \"budget: #{message}\"",
+          "  defp error_label(reason) when is_atom(reason), do: Atom.to_string(reason)",
+          "",
+          "  defp now, do: DateTime.utc_now() |> DateTime.truncate(:millisecond)",
+          "",
+          "  defp code_identity do",
+          "    sha = git([\"rev-parse\", \"HEAD\"])",
+          "    %{sha: sha, dirty: git([\"status\", \"--porcelain\"]) != \"\"}",
+          "  end",
+          "",
+          "  defp git(args) do",
+          "    case System.cmd(\"git\", args, stderr_to_stdout: true) do",
+          "      {out, 0} -> String.trim(out)",
+          "      _error -> \"unknown\"",
+          "    end",
+          "  end",
+          "",
+          "  defp rss_kib do",
+          "    case System.cmd(\"ps\", [\"-o\", \"rss=\", \"-p\", System.pid()]) do",
+          "      {out, 0} -> out |> String.trim() |> String.to_integer()",
+          "      _error -> 0",
+          "    end",
+          "  end",
+          "",
+          "  defp sha256(bytes), do: :sha256 |> :crypto.hash(bytes) |> Base.encode16(case: :lower)",
+          "end"
+        ],
+        "path": "/private/tmp/tips-expert-neovim-validation/lib/tips/search_probe.ex",
+        "modified": false
+      }
+    ],
+    "clients": [
+      {
+        "root": "/private/tmp/tips-expert-neovim-validation",
+        "name": "expert",
+        "cmd": [
+          "/opt/homebrew/bin/expert",
+          "--stdio"
+        ],
+        "server_capabilities": {
+          "definitionProvider": true,
+          "documentFormattingProvider": true,
+          "workspace": {
+            "workspaceFolders": {
+              "supported": true,
+              "changeNotifications": true
+            }
+          },
+          "referencesProvider": true,
+          "workspaceSymbolProvider": true,
+          "documentSymbolProvider": true,
+          "executeCommandProvider": {
+            "commands": [
+              "Reindex",
+              "connectionDetails"
+            ]
+          },
+          "textDocumentSync": {
+            "save": true,
+            "openClose": true,
+            "change": 2
+          },
+          "experimental": null,
+          "hoverProvider": true,
+          "codeActionProvider": {
+            "resolveProvider": false,
+            "codeActionKinds": [
+              "quickfix",
+              "refactor",
+              "refactor.extract",
+              "refactor.inline",
+              "refactor.rewrite",
+              "source",
+              "source.fixAll",
+              "source.organizeImports"
+            ]
+          },
+          "codeLensProvider": {
+            "resolveProvider": false
+          },
+          "completionProvider": {
+            "triggerCharacters": [
+              ".",
+              "@",
+              "&",
+              "%",
+              "^",
+              ":",
+              "!",
+              "-",
+              "~"
+            ]
+          }
+        },
+        "initialized": true
+      }
+    ]
+  },
+  "definition": {
+    "isError": false,
+    "data": {
+      "clients": [
+        "expert"
+      ],
+      "locations": {
+        "/private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex": [
+          "56:7-56:11"
+        ]
+      }
+    }
+  },
+  "references": {
+    "matched": true,
+    "samples": [
+      {
+        "seconds": 0.042,
+        "value": {
+          "isError": false,
+          "data": {
+            "locations": {}
+          }
+        }
+      },
+      {
+        "seconds": 0.591,
+        "value": {
+          "isError": false,
+          "data": {
+            "locations": {}
+          }
+        }
+      },
+      {
+        "seconds": 1.119,
+        "value": {
+          "isError": false,
+          "data": {
+            "locations": {}
+          }
+        }
+      },
+      {
+        "seconds": 1.643,
+        "value": {
+          "isError": false,
+          "data": {
+            "locations": {}
+          }
+        }
+      },
+      {
+        "seconds": 2.173,
+        "value": {
+          "isError": false,
+          "data": {
+            "locations": {}
+          }
+        }
+      },
+      {
+        "seconds": 3.216,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/tips-expert-neovim-validation/lib/tips/search_probe.ex": [
+                "64:38-64:64"
+              ],
+              "/private/tmp/tips-expert-neovim-validation/test/test_helper.exs": [
+                "4:20-4:46"
+              ],
+              "/private/tmp/tips-expert-neovim-validation/test/tips/provider_config_test.exs": [
+                "189:12-189:38"
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  "supervisor_trace": {
+    "trace": "/private/tmp/expert-neovim-validation-runs/tips-supervisor-trace/engine-supervisor.trace",
+    "setup_exit_code": 0
+  },
+  "unopened_doc_edit": {
+    "matched": true,
+    "samples": [
+      {
+        "seconds": 0.026,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "items": [
+              "```elixir\nTips.ProviderConfig.mode()\n```\n\nReturns `:real` or `:stub`.\n\nTest runs use `:stub` unless `TIPS_REAL_PROVIDERS=1`; development uses `:real`.\n"
+            ]
+          }
+        }
+      },
+      {
+        "seconds": 0.558,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "items": [
+              "```elixir\nTips.ProviderConfig.mode()\n```\n\nReturns `:real` or `:stub`.\n\nTest runs use `:stub` unless `TIPS_REAL_PROVIDERS=1`; development uses `:real`.\n"
+            ]
+          }
+        }
+      },
+      {
+        "seconds": 1.089,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "items": [
+              "```elixir\nTips.ProviderConfig.mode()\n```\n\nReturns `:real` or `:stub`.\n\nTest runs use `:stub` unless `TIPS_REAL_PROVIDERS=1`; development uses `:real`.\n"
+            ]
+          }
+        }
+      },
+      {
+        "seconds": 1.62,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "items": [
+              "```elixir\nTips.ProviderConfig.mode()\n```\n\nEXPERT_TIPS_DOC: Returns `:real` or `:stub`.\n\nTest runs use `:stub` unless `TIPS_REAL_PROVIDERS=1`; development uses `:real`.\n"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "compiler_error": {
+    "matched": true,
+    "samples": [
+      {
+        "seconds": 0.001,
+        "value": {
+          "isError": false,
+          "data": {
+            "diagnostics": {}
+          }
+        }
+      },
+      {
+        "seconds": 0.506,
+        "value": {
+          "isError": false,
+          "data": {
+            "diagnostics": {}
+          }
+        }
+      },
+      {
+        "seconds": 1.009,
+        "value": {
+          "isError": false,
+          "data": {
+            "diagnostics": {}
+          }
+        }
+      },
+      {
+        "seconds": 1.511,
+        "value": {
+          "isError": false,
+          "data": {
+            "diagnostics": {
+              "/private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex": [
+                {
+                  "range": "56:17-57:1",
+                  "severity": "error",
+                  "message": "undefined function expert_probe_missing/0",
+                  "source": "Elixir"
+                },
+                {
+                  "range": "56:17-56:37",
+                  "severity": "error",
+                  "message": "undefined function expert_probe_missing/0",
+                  "source": "Elixir"
+                }
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  "repair": {
+    "matched": true,
+    "samples": [
+      {
+        "seconds": 0.001,
+        "value": {
+          "isError": false,
+          "data": {
+            "diagnostics": {
+              "/private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex": [
+                {
+                  "range": "56:17-57:1",
+                  "severity": "error",
+                  "message": "undefined function expert_probe_missing/0",
+                  "source": "Elixir"
+                },
+                {
+                  "range": "56:17-56:37",
+                  "severity": "error",
+                  "message": "undefined function expert_probe_missing/0",
+                  "source": "Elixir"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 0.504,
+        "value": {
+          "isError": false,
+          "data": {
+            "diagnostics": {
+              "/private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex": [
+                {
+                  "range": "56:17-57:1",
+                  "severity": "error",
+                  "message": "undefined function expert_probe_missing/0",
+                  "source": "Elixir"
+                },
+                {
+                  "range": "56:17-56:37",
+                  "severity": "error",
+                  "message": "undefined function expert_probe_missing/0",
+                  "source": "Elixir"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 1.011,
+        "value": {
+          "isError": false,
+          "data": {
+            "diagnostics": {
+              "/private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex": [
+                {
+                  "range": "56:17-57:1",
+                  "severity": "error",
+                  "message": "undefined function expert_probe_missing/0",
+                  "source": "Elixir"
+                },
+                {
+                  "range": "56:17-56:37",
+                  "severity": "error",
+                  "message": "undefined function expert_probe_missing/0",
+                  "source": "Elixir"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 1.516,
+        "value": {
+          "isError": false,
+          "data": {
+            "diagnostics": {}
+          }
+        }
+      }
+    ]
+  },
+  "repair_validated": true,
+  "created_reference": {
+    "matched": false,
+    "samples": [
+      {
+        "seconds": 0.027,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/tips-expert-neovim-validation/lib/tips/search_probe.ex": [
+                "64:38-64:64"
+              ],
+              "/private/tmp/tips-expert-neovim-validation/test/test_helper.exs": [
+                "4:20-4:46"
+              ],
+              "/private/tmp/tips-expert-neovim-validation/test/tips/provider_config_test.exs": [
+                "189:12-189:38"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 0.552,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/tips-expert-neovim-validation/lib/tips/search_probe.ex": [
+                "64:38-64:64"
+              ],
+              "/private/tmp/tips-expert-neovim-validation/test/test_helper.exs": [
+                "4:20-4:46"
+              ],
+              "/private/tmp/tips-expert-neovim-validation/test/tips/provider_config_test.exs": [
+                "189:12-189:38"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 1.083,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/tips-expert-neovim-validation/lib/tips/search_probe.ex": [
+                "64:38-64:64"
+              ],
+              "/private/tmp/tips-expert-neovim-validation/test/test_helper.exs": [
+                "4:20-4:46"
+              ],
+              "/private/tmp/tips-expert-neovim-validation/test/tips/provider_config_test.exs": [
+                "189:12-189:38"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 11.741,
+        "value": {
+          "isError": false,
+          "data": {
+            "locations": {},
+            "errors": {
+              "expert": "timeout"
+            }
+          }
+        }
+      },
+      {
+        "seconds": 22.409,
+        "value": {
+          "isError": false,
+          "data": {
+            "locations": {},
+            "errors": {
+              "expert": "timeout"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "deleted_reference": {
+    "matched": false,
+    "samples": [
+      {
+        "seconds": 10.173,
+        "value": {
+          "isError": false,
+          "data": {
+            "locations": {},
+            "errors": {
+              "expert": "timeout"
+            }
+          }
+        }
+      },
+      {
+        "seconds": 20.836,
+        "value": {
+          "isError": false,
+          "data": {
+            "locations": {},
+            "errors": {
+              "expert": "timeout"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "deletion_validated": false,
+  "events": [
+    {
+      "time": 79526.5465565,
+      "data": {
+        "textDocument": {
+          "version": 0,
+          "languageId": "elixir",
+          "text": "defmodule Tips.SearchProbe do\n  @moduledoc \"\"\"\n  Ten-query relevance gate for the hosted embedding candidate (issues #54 and #234).\n\n  The corpus, queries, judgments and numeric gates live in `test/fixtures/search_probe/`\n  and are frozen before any model comparison. Each gate version is its own file:\n  `v1` is `gate.json` (#54, head/tail truncation) and `v2` is `gate-v2.json` (#234, full\n  documents up to a byte bound, with its run protocol). `scripts/search_probe.exs` is the\n  entry point:\n\n      mix run scripts/search_probe.exs --validate [--gate v2]\n      TIPS_REAL_PROVIDERS=1 mix run scripts/search_probe.exs --real --gate v2 --output PATH\n\n  `--validate` (the default) checks the fixtures and the offline request/token bound of\n  every gate, or of the selected one, without HTTP. `--real` needs an explicit gate, real\n  provider mode and an output path that does not exist yet; it embeds eligible documents\n  and the instructed queries through OpenRouter with retries disabled and concurrency 1,\n  then writes an allowlisted JSON report. The exit status is 0 only when every gate passes.\n\n  This is an isolated probe, not the application's search implementation.\n  \"\"\"\n\n  @fixtures_dir Path.expand(\"../../test/fixtures/search_probe\", __DIR__)\n  @gates %{\"v1\" => \"gate.json\", \"v2\" => \"gate-v2.json\"}\n  @gate_names @gates |> Map.keys() |> Enum.sort()\n  @categories ~w(scoped_change setup_environment long_output punctuation_error)\n  # Byte-level BPE emits at most one token per byte; this margin covers special tokens.\n  @tokens_per_input_margin 8\n  # Endpoint listing and key check before any embedding request.\n  @preflight_requests 2\n\n  def fixtures_dir, do: @fixtures_dir\n\n  ## Command line\n\n  @doc \"Runs the command line and returns its exit status.\"\n  def main(argv, opts \\\\ []) do\n    strict = [validate: :boolean, real: :boolean, gate: :string, output: :string]\n\n    case OptionParser.parse(argv, strict: strict) do\n      {parsed, [], []} -> command(parsed, opts)\n      _invalid -> usage()\n    end\n  end\n\n  defp command(parsed, opts) do\n    case {parsed[:real], parsed[:validate], parsed[:gate], parsed[:output]} do\n      {true, nil, gate, output} when gate in @gate_names and is_binary(output) ->\n        live_if_real(gate, output, opts)\n\n      {nil, _validate, nil, nil} ->\n        validate_only(@gate_names, opts)\n\n      {nil, _validate, gate, nil} when gate in @gate_names ->\n        validate_only([gate], opts)\n\n      _other ->\n        usage()\n    end\n  end\n\n  defp live_if_real(gate, output, opts) do\n    cond do\n      Keyword.get_lazy(opts, :mode, &Tips.ProviderConfig.mode/0) != :real ->\n        refuse(\"set TIPS_REAL_PROVIDERS=1 (or use MIX_ENV=dev) with --real\")\n\n      File.exists?(output) ->\n        refuse(\"#{output} exists; each live run writes a new report\")\n\n      true ->\n        live(gate, output, opts)\n    end\n  end\n\n  defp usage do\n    IO.puts(\"\"\"\n    usage: mix run scripts/search_probe.exs [--validate] [--gate v1|v2]\n           TIPS_REAL_PROVIDERS=1 mix run scripts/search_probe.exs --real --gate v1|v2 --output PATH\\\n    \"\"\")\n\n    2\n  end\n\n  defp refuse(reason) do\n    IO.puts(\"refusing live probe: #{reason}\")\n    2\n  end\n\n  defp validate_only(gates, opts) do\n    gates\n    |> Enum.map(&validate_gate(&1, opts))\n    |> Enum.max()\n  end\n\n  defp validate_gate(gate, opts) do\n    with {:ok, fixtures} <- fixtures(gate, opts),\n         {:ok, plan} <- plan(fixtures) do\n      IO.puts(\"fixtures valid: #{fixtures.gate[\"version\"]}\")\n      Enum.each(fixtures.hashes, fn {name, hash} -> IO.puts(\"  #{name} sha256 #{hash}\") end)\n\n      IO.puts(\n        \"  eligible documents #{plan.documents}, long #{plan.long_documents}, \" <>\n          \"planned requests #{plan.requests}, input token bound #{plan.token_bound}, \" <>\n          \"max document bytes #{plan.max_full_document_bytes}\"\n      )\n\n      0\n    else\n      {:error, errors} ->\n        Enum.each(List.wrap(errors), &IO.puts(\"invalid #{gate}: #{&1}\"))\n        1\n    end\n  end\n\n  defp live(gate, output, opts) do\n    report =\n      case fixtures(gate, opts) do\n        {:ok, fixtures} -> run(fixtures, opts)\n        {:error, errors} -> %{status: \"failed\", blocker: nil, errors: errors}\n      end\n\n    File.mkdir_p!(Path.dirname(output))\n    File.write!(output, Jason.encode_to_iodata!(report, pretty: true))\n    IO.puts(\"search probe #{report.status}: #{output}\")\n\n    Enum.each(Map.get(report, :gates, []), fn gate ->\n      IO.puts(\"  #{if gate.passed, do: \"pass\", else: \"FAIL\"} #{gate.name} #{inspect(gate.value)}\")\n    end)\n\n    if report.status == \"passed\", do: 0, else: 1\n  end\n\n  # Tests may pass loaded `fixtures`, which replace the selected gate's files.\n  defp fixtures(gate, opts) do\n    case opts[:fixtures] do\n      nil -> load(opts[:fixtures_dir] || @fixtures_dir, gate)\n      fixtures -> {:ok, fixtures}\n    end\n  end\n\n  ## Fixtures\n\n  @doc \"\"\"\n  Loads and validates the frozen fixtures for gate `v1` or `v2`, with a SHA-256 hash of\n  each file. Both gates share the corpus and queries.\n  \"\"\"\n  def load(dir, gate \\\\ \"v1\") do\n    files = %{\"corpus\" => \"corpus.json\", \"queries\" => \"queries.json\", \"gate\" => @gates[gate]}\n    raw = Map.new(files, fn {name, file} -> {name, File.read!(Path.join(dir, file))} end)\n\n    fixtures = %{\n      corpus: Jason.decode!(raw[\"corpus\"])[\"documents\"],\n      queries: Jason.decode!(raw[\"queries\"])[\"queries\"],\n      gate: Jason.decode!(raw[\"gate\"]),\n      hashes: Map.new(raw, fn {name, bytes} -> {name, sha256(bytes)} end)\n    }\n\n    with :ok <- validate(fixtures), do: {:ok, fixtures}\n  end\n\n  @doc \"Checks fixture shape and judgments; returns every problem found.\"\n  def validate(%{corpus: corpus, queries: queries, gate: gate}) do\n    eligible = corpus |> eligible() |> MapSet.new(& &1[\"id\"])\n    ids = Enum.map(corpus, & &1[\"id\"])\n    tips = for %{\"kind\" => \"tip\", \"id\" => id} <- corpus, into: MapSet.new(), do: id\n\n    errors =\n      [\n        {length(queries) != 10, \"expected exactly ten queries, got #{length(queries)}\"},\n        {MapSet.size(eligible) not in 30..50,\n         \"expected 30-50 eligible documents, got #{MapSet.size(eligible)}\"},\n        {length(ids) != length(Enum.uniq(ids)), \"document ids are not unique\"},\n        {queries |> Enum.map(& &1[\"id\"]) |> Enum.uniq() |> length() != length(queries),\n         \"query ids are not unique\"},\n        {gate[\"dimensions\"] != 1024, \"gate dimensions must be 1024\"},\n        {gate[\"preparation\"][\"document_max_bytes\"] + @tokens_per_input_margin >\n           gate[\"model\"][\"context_tokens\"], \"document bound exceeds the model context\"}\n      ] ++\n        for(\n          id <- Map.get(gate[\"preparation\"], \"long_input_cohort\", []),\n          id not in eligible,\n          do: {true, \"long-input cohort #{id} is not an eligible document\"}\n        ) ++\n        Enum.flat_map(corpus, &document_errors(&1, tips)) ++\n        Enum.flat_map(queries, &query_errors(&1, eligible, gate))\n\n    case for({true, message} <- errors, do: message) do\n      [] -> :ok\n      messages -> {:error, messages}\n    end\n  end\n\n  defp document_errors(doc, tips) do\n    id = doc[\"id\"]\n\n    [\n      {doc[\"kind\"] not in [\"tip\", \"review\"], \"#{id}: unknown kind\"},\n      {doc[\"state\"] not in ~w(published hidden deleted private draft), \"#{id}: unknown state\"},\n      {doc[\"kind\"] == \"review\" and doc[\"parent_id\"] not in tips,\n       \"#{id}: review needs a tip parent\"},\n      {doc[\"kind\"] == \"tip\" and not is_binary(doc[\"title\"]), \"#{id}: tip needs a title\"},\n      {not String.valid?(doc[\"body\"] || <<0xFF>>) or String.trim(doc[\"body\"]) == \"\",\n       \"#{id}: body must be non-blank UTF-8\"}\n    ]\n  end\n\n  defp query_errors(query, eligible, gate) do\n    id = query[\"id\"]\n    relevant = query[\"relevant\"] || []\n\n    [\n      {query[\"category\"] not in @categories, \"#{id}: unknown category\"},\n      {relevant == [], \"#{id}: needs relevant documents\"},\n      {not is_binary(query[\"rationale\"]) or String.trim(query[\"rationale\"]) == \"\",\n       \"#{id}: needs a judgment rationale\"},\n      {match?({:error, _}, prepare_query(query[\"text\"] || \"\", gate)), \"#{id}: invalid query text\"}\n    ] ++\n      for doc_id <- relevant,\n          doc_id not in eligible,\n          do: {true, \"#{id}: relevant #{doc_id} is not an eligible document\"}\n  end\n\n  @doc \"\"\"\n  Returns documents that may reach the provider: published tips, and published reviews\n  whose parent tip is published. Hidden, deleted, private and draft text never leaves.\n  \"\"\"\n  def eligible(corpus) do\n    live_tips =\n      for %{\"kind\" => \"tip\", \"state\" => \"published\", \"id\" => id} <- corpus,\n          into: MapSet.new(),\n          do: id\n\n    Enum.filter(corpus, fn\n      %{\"kind\" => \"tip\", \"state\" => \"published\"} -> true\n      %{\"kind\" => \"review\", \"state\" => \"published\", \"parent_id\" => parent} -> parent in live_tips\n      _ineligible -> false\n    end)\n  end\n\n  ## Preparation\n\n  @doc \"Plain document text: a tip's title, a blank line and its body; a review's body.\"\n  def document_text(%{\"kind\" => \"tip\", \"title\" => title, \"body\" => body}),\n    do: title <> \"\\n\\n\" <> body\n\n  def document_text(%{\"kind\" => \"review\", \"body\" => body}), do: body\n\n  @doc \"\"\"\n  Prepares a document for embedding. A gate with a truncation separator (v1) bounds the\n  text to its byte cap; otherwise (v2) the full text is kept and `plan/1` rejects a\n  document over the cap before any request.\n  \"\"\"\n  def prepare_document(doc, gate) do\n    full = document_text(doc)\n\n    text =\n      case gate[\"preparation\"] do\n        %{\"document_max_bytes\" => max, \"truncation_separator\" => separator} ->\n          bound(full, max, separator)\n\n        %{\"document_max_bytes\" => _max} ->\n          full\n      end\n\n    %{id: doc[\"id\"], text: text, full_bytes: byte_size(full), truncated: text != full}\n  end\n\n  @doc \"\"\"\n  Eligible documents whose full text is compared against their prepared text: the gate's\n  frozen cohort in its order, or in v1 the documents truncated by preparation.\n  \"\"\"\n  def long_cohort(%{corpus: corpus, gate: gate}) do\n    documents = eligible(corpus)\n\n    case Map.fetch(gate[\"preparation\"], \"long_input_cohort\") do\n      {:ok, ids} ->\n        by_id = Map.new(documents, &{&1[\"id\"], &1})\n        Enum.map(ids, &Map.fetch!(by_id, &1))\n\n      :error ->\n        Enum.filter(documents, &prepare_document(&1, gate).truncated)\n    end\n  end\n\n  @doc \"Prefixes a reader query with the model card's retrieval instruction.\"\n  def prepare_query(text, gate) do\n    %{\"query_instruction\" => instruction, \"query_max_bytes\" => max} = gate[\"preparation\"]\n\n    cond do\n      not String.valid?(text) or String.trim(text) == \"\" -> {:error, :blank_query}\n      byte_size(text) > max -> {:error, :query_too_long}\n      true -> {:ok, instruction <> text}\n    end\n  end\n\n  @doc \"\"\"\n  Bounds valid UTF-8 `text` to `max` bytes. Longer text keeps equal head and tail byte\n  budgets, each cut back to a character boundary, joined by `separator`.\n  \"\"\"\n  def bound(text, max, _separator) when byte_size(text) <= max, do: text\n\n  def bound(text, max, separator) do\n    budget = max - byte_size(separator)\n    head = head_bytes(text, div(budget, 2))\n    tail = tail_bytes(text, budget - div(budget, 2))\n    head <> separator <> tail\n  end\n\n  defp head_bytes(text, n) do\n    n = back_to_boundary(text, n)\n    binary_part(text, 0, n)\n  end\n\n  defp back_to_boundary(text, n) when n > 0 and n < byte_size(text) do\n    if continuation?(:binary.at(text, n)), do: back_to_boundary(text, n - 1), else: n\n  end\n\n  defp back_to_boundary(_text, n), do: n\n\n  defp tail_bytes(text, n) do\n    start = forward_to_boundary(text, byte_size(text) - n)\n    binary_part(text, start, byte_size(text) - start)\n  end\n\n  defp forward_to_boundary(text, start) when start < byte_size(text) do\n    if continuation?(:binary.at(text, start)),\n      do: forward_to_boundary(text, start + 1),\n      else: start\n  end\n\n  defp forward_to_boundary(_text, start), do: start\n\n  defp continuation?(byte), do: Bitwise.band(byte, 0xC0) == 0x80\n\n  ## Scoring\n\n  @doc \"Ranks unit document vectors by cosine similarity, ties broken by id.\"\n  def rank(query, documents) do\n    documents\n    |> Enum.map(fn {id, vector} -> {id, dot(query, vector)} end)\n    |> Enum.sort_by(fn {id, score} -> {-score, id} end)\n  end\n\n  @doc \"Fraction of `relevant` ids within the first `k` ranked ids.\"\n  def recall(ranked_ids, relevant, k) do\n    top = ranked_ids |> Enum.take(k) |> MapSet.new()\n    Enum.count(relevant, &(&1 in top)) / length(relevant)\n  end\n\n  @doc \"Nearest-rank 95th percentile.\"\n  def p95(values) do\n    sorted = Enum.sort(values)\n    Enum.at(sorted, ceil(0.95 * length(sorted)) - 1)\n  end\n\n  defp dot(a, b), do: a |> Enum.zip_with(b, &(&1 * &2)) |> Enum.sum()\n\n  ## Provider\n\n  @doc \"\"\"\n  Embeds `inputs` in one request. Returns unit vectors of the gate's dimensions.\n\n  Every response must name the requested model and the pinned upstream, compared without\n  case (OpenRouter reports `Qwen/Qwen3-Embedding-8B` from `DeepInfra` for\n  `qwen/qwen3-embedding-8b` pinned to `deepinfra`). A 4096-value response is cut to its\n  first 1024 values and renormalized (Matryoshka truncation). Once `expected_length` is\n  set, any other length is an error. Errors are atoms or tuples of atoms and status codes;\n  bodies and headers never leave this function.\n  \"\"\"\n  def embed(inputs, provider) do\n    body =\n      %{model: provider.model, input: inputs}\n      |> put_if(provider.send_dimensions, :dimensions, provider.dimensions)\n      |> put_if(map_size(provider.routing) > 0, :provider, provider.routing)\n\n    with {:ok, response} <-\n           request(provider, method: :post, url: \"/embeddings\", json: body, auth: true),\n         {:ok, data} <- response_data(response, length(inputs)),\n         :ok <- identity(response, provider),\n         {:ok, vectors, length} <- vectors(data, provider) do\n      {:ok,\n       %{\n         vectors: vectors,\n         returned_length: length,\n         model: response[\"model\"],\n         provider: response[\"provider\"],\n         prompt_tokens: get_in(response, [\"usage\", \"prompt_tokens\"]),\n         cost_usd: get_in(response, [\"usage\", \"cost\"])\n       }}\n    end\n  end\n\n  defp identity(%{\"model\" => model, \"provider\" => upstream}, provider)\n       when is_binary(model) and is_binary(upstream) do\n    cond do\n      String.downcase(model) != String.downcase(provider.model) ->\n        {:error, :model_mismatch}\n\n      String.downcase(upstream) != String.downcase(provider.upstream) ->\n        {:error, :upstream_mismatch}\n\n      true ->\n        :ok\n    end\n  end\n\n  defp identity(_response, _provider), do: {:error, :missing_identity}\n\n  defp put_if(map, true, key, value), do: Map.put(map, key, value)\n  defp put_if(map, false, _key, _value), do: map\n\n  # One monotonic deadline covers pool checkout, connect, send, receive and JSON decode:\n  # Finch's own timeouts each cover one phase. The receive and connect limits match the\n  # deadline so Req's shorter defaults (15 s receive) never cut a 30 s document request;\n  # Finch's default pool wait can only end a request earlier. On expiry the request\n  # process is killed, so no late response is used; a request the provider already\n  # accepted cannot be recalled.\n  defp request(provider, opts) do\n    {auth?, opts} = Keyword.pop(opts, :auth, false)\n    deadline = provider.timeout_ms\n\n    opts =\n      [\n        base_url: provider.base_url,\n        retry: false,\n        receive_timeout: deadline,\n        connect_options: [timeout: deadline]\n      ]\n      |> Keyword.merge(if auth?, do: [auth: {:bearer, provider.api_key}], else: [])\n      |> Keyword.merge(opts)\n      |> Keyword.merge(provider.req_options)\n\n    task = Task.async(fn -> Req.request(opts) end)\n\n    case Task.yield(task, deadline) || Task.shutdown(task, :brutal_kill) do\n      {:ok, result} -> response(result)\n      nil -> {:error, :timeout}\n    end\n  end\n\n  defp response(result) do\n    case result do\n      {:ok, %Req.Response{status: 200, body: %{} = body}} -> {:ok, body}\n      {:ok, %Req.Response{status: 200}} -> {:error, :malformed_response}\n      {:ok, %Req.Response{status: status}} -> {:error, {:http_status, status}}\n      {:error, %Req.TransportError{reason: :timeout}} -> {:error, :timeout}\n      {:error, %Req.TransportError{}} -> {:error, :transport}\n      {:error, _exception} -> {:error, :request_failed}\n    end\n  end\n\n  defp response_data(%{\"data\" => data}, count) when is_list(data) do\n    indices = Enum.map(data, &(is_map(&1) && &1[\"index\"]))\n\n    if Enum.sort(indices) == Enum.to_list(0..(count - 1)//1),\n      do: {:ok, Enum.sort_by(data, & &1[\"index\"])},\n      else: {:error, :bad_indices}\n  end\n\n  defp response_data(_response, _count), do: {:error, :malformed_response}\n\n  defp vectors(data, provider) do\n    Enum.reduce_while(data, {:ok, [], nil}, fn item, {:ok, acc, _length} ->\n      case vector(item[\"embedding\"], provider) do\n        {:ok, vector} -> {:cont, {:ok, [vector | acc], length(item[\"embedding\"])}}\n        error -> {:halt, error}\n      end\n    end)\n    |> case do\n      {:ok, acc, length} -> {:ok, Enum.reverse(acc), length}\n      error -> error\n    end\n  end\n\n  defp vector(values, _provider) when not is_list(values), do: {:error, :malformed_response}\n\n  defp vector(values, %{expected_length: expected}) when expected not in [nil, length(values)],\n    do: {:error, {:vector_length, length(values)}}\n\n  defp vector(values, %{dimensions: dims}) when length(values) in [dims, 4096] do\n    values = Enum.take(values, dims)\n    norm = values |> Enum.map(&square/1) |> Enum.sum() |> :math.sqrt()\n\n    cond do\n      not Enum.all?(values, &is_number/1) -> {:error, :non_numeric_vector}\n      norm == 0 -> {:error, :zero_vector}\n      true -> {:ok, Enum.map(values, &(&1 / norm))}\n    end\n  end\n\n  defp vector(values, _provider), do: {:error, {:vector_length, length(values)}}\n\n  defp square(value) when is_number(value), do: value * value\n  defp square(_value), do: 0\n\n  ## Live run\n\n  @doc \"\"\"\n  Offline request and input-token bound for one live run. Rejects a prepared document\n  over the gate's byte cap or not valid UTF-8.\n  \"\"\"\n  def plan(%{corpus: corpus, queries: queries, gate: gate} = fixtures) do\n    docs = corpus |> eligible() |> Enum.map(&prepare_document(&1, gate))\n    long = long_cohort(fixtures)\n    passes = gate[\"gate\"][\"query_passes\"]\n    max = gate[\"preparation\"][\"document_max_bytes\"]\n    unfit = for doc <- docs, byte_size(doc.text) > max or not String.valid?(doc.text), do: doc.id\n    # The first document may be sent twice when a rejected dimensions parameter is retried.\n    retry = if retry_rejected_dimensions?(gate), do: 1, else: 0\n\n    query_bytes =\n      Enum.sum_by(queries, fn query ->\n        {:ok, text} = prepare_query(query[\"text\"], gate)\n        byte_size(text)\n      end)\n\n    inputs = length(docs) + length(long) + passes * length(queries) + retry\n\n    bytes =\n      Enum.sum_by(docs, &byte_size(&1.text)) + retry * byte_size(hd(docs).text) +\n        Enum.sum_by(long, &byte_size(document_text(&1))) + passes * query_bytes\n\n    plan = %{\n      documents: length(docs),\n      long_documents: length(long),\n      requests: @preflight_requests + inputs,\n      token_bound: bytes + inputs * @tokens_per_input_margin,\n      max_full_document_bytes: docs |> Enum.map(& &1.full_bytes) |> Enum.max()\n    }\n\n    budget = gate[\"budget\"]\n\n    cond do\n      unfit != [] ->\n        {:error, \"documents over #{max} bytes or not UTF-8: #{Enum.join(unfit, \", \")}\"}\n\n      plan.requests > budget[\"max_requests\"] ->\n        {:error, \"planned requests exceed the budget\"}\n\n      plan.token_bound > budget[\"max_input_tokens\"] ->\n        {:error, \"token bound exceeds the budget\"}\n\n      true ->\n        {:ok, plan}\n    end\n  end\n\n  # v1 retried a dimensions HTTP 400 once without the parameter; v2 stops on it.\n  defp retry_rejected_dimensions?(gate),\n    do: get_in(gate, [\"protocol\", \"retry_rejected_dimensions\"]) != false\n\n  @doc \"Runs the live probe and returns the report. Never raises on provider failures.\"\n  def run(fixtures, opts \\\\ []) do\n    %{gate: gate} = fixtures\n    baseline = rss_kib()\n\n    state = %{\n      fixtures: fixtures,\n      started_at: now(),\n      requests: [],\n      rss_peak: baseline,\n      docs: %{},\n      full: %{},\n      queries: %{},\n      query_ms: [],\n      dimensions_mode: nil,\n      preflight: %{}\n    }\n\n    steps = [\n      &check_plan/1,\n      &check_endpoint/1,\n      &check_key/1,\n      &embed_documents/1,\n      &embed_full_documents/1,\n      &embed_queries/1\n    ]\n\n    result =\n      case provider(gate, opts) do\n        {:ok, provider} -> reduce_ok(steps, Map.put(state, :provider, provider), & &1.(&2))\n        {:error, reason} -> {:error, reason, state}\n      end\n\n    report(result, baseline)\n  end\n\n  defp provider(gate, opts) do\n    key = Keyword.get_lazy(opts, :api_key, &fetch_api_key/0)\n\n    if is_binary(key) and String.trim(key) != \"\" do\n      provider = gate[\"provider\"]\n\n      {:ok,\n       %{\n         api_key: key,\n         base_url: provider[\"base_url\"],\n         model: gate[\"model\"][\"id\"],\n         routing: provider[\"routing\"],\n         upstream: hd(provider[\"routing\"][\"only\"]),\n         dimensions: gate[\"dimensions\"],\n         send_dimensions: true,\n         retry_rejected_dimensions: retry_rejected_dimensions?(gate),\n         expected_length: nil,\n         timeout_ms: gate[\"gate\"][\"document_deadline_ms\"],\n         req_options: Keyword.get(opts, :req_options, [])\n       }}\n    else\n      {:error, :missing_credentials}\n    end\n  end\n\n  defp fetch_api_key do\n    Tips.ProviderConfig.fetch!(\"OPENROUTER_API_KEY\")\n  rescue\n    RuntimeError -> nil\n  end\n\n  defp check_plan(state) do\n    case plan(state.fixtures) do\n      {:ok, plan} -> {:ok, put_in(state.preflight[:plan], plan)}\n      {:error, message} -> {:error, {:budget, message}, state}\n    end\n  end\n\n  # Current price and context for the pinned upstream; no bound, no run.\n  defp check_endpoint(state) do\n    %{gate: gate} = state.fixtures\n    [pinned] = gate[\"provider\"][\"routing\"][\"only\"]\n    url = \"/models/#{gate[\"model\"][\"id\"]}/endpoints\"\n\n    {result, state} =\n      timed(state, %{phase: \"endpoints\"}, fn ->\n        request(state.provider, method: :get, url: url)\n      end)\n\n    with {:ok, body} <- result,\n         {:ok, endpoint} <- pinned_endpoint(body, pinned),\n         {:ok, preflight} <- price_bound(endpoint, state.preflight.plan, gate) do\n      {:ok, %{state | preflight: Map.merge(state.preflight, preflight)}}\n    else\n      {:error, reason} -> {:error, reason, state}\n    end\n  end\n\n  defp pinned_endpoint(%{\"data\" => %{\"endpoints\" => endpoints}}, pinned)\n       when is_list(endpoints) do\n    case Enum.find(endpoints, &(&1[\"tag\"] == pinned)) do\n      nil -> {:error, :pinned_provider_unlisted}\n      endpoint -> {:ok, endpoint}\n    end\n  end\n\n  defp pinned_endpoint(_body, _pinned), do: {:error, :malformed_response}\n\n  defp price_bound(endpoint, plan, gate) do\n    with %{\"context_length\" => context, \"pricing\" => %{\"prompt\" => price}} <- endpoint,\n         true <- is_integer(context),\n         {price, \"\"} <- Float.parse(price) do\n      preflight = %{\n        endpoint: %{\n          provider: endpoint[\"provider_name\"],\n          tag: endpoint[\"tag\"],\n          status: endpoint[\"status\"],\n          context_tokens: context,\n          prompt_price_usd_per_token: price\n        },\n        estimated_max_cost_usd: plan.token_bound * price\n      }\n\n      instruction = byte_size(gate[\"preparation\"][\"query_instruction\"])\n      largest = max(plan.max_full_document_bytes, gate[\"preparation\"][\"document_max_bytes\"])\n\n      cond do\n        preflight.estimated_max_cost_usd > gate[\"budget\"][\"max_cost_usd\"] ->\n          {:error, {:budget, \"estimated cost bound exceeds the budget\"}}\n\n        largest + @tokens_per_input_margin > context ->\n          {:error, {:budget, \"largest allowed input may exceed the context\"}}\n\n        instruction + gate[\"preparation\"][\"query_max_bytes\"] > context ->\n          {:error, {:budget, \"query instruction and cap exceed the context\"}}\n\n        true ->\n          {:ok, preflight}\n      end\n    else\n      _missing -> {:error, :price_unavailable}\n    end\n  end\n\n  # Confirms the credential and records the key's limits without the label or usage.\n  defp check_key(state) do\n    {result, state} =\n      timed(state, %{phase: \"key\"}, fn ->\n        request(state.provider, method: :get, url: \"/key\", auth: true)\n      end)\n\n    case result do\n      {:ok, %{\"data\" => %{} = data}} ->\n        remaining = data[\"limit_remaining\"]\n\n        key = %{\n          is_free_tier: data[\"is_free_tier\"],\n          limit_usd: data[\"limit\"],\n          limit_covers_estimate:\n            not is_number(remaining) or remaining >= state.preflight.estimated_max_cost_usd,\n          rate_limit:\n            if(is_map(data[\"rate_limit\"]),\n              do: Map.take(data[\"rate_limit\"], ~w(requests interval))\n            )\n        }\n\n        if key.limit_covers_estimate,\n          do: {:ok, put_in(state.preflight[:key], key)},\n          else: {:error, :key_limit_too_low, state}\n\n      {:ok, _body} ->\n        {:error, :malformed_response, state}\n\n      {:error, reason} ->\n        {:error, reason, state}\n    end\n  end\n\n  defp embed_documents(state) do\n    %{corpus: corpus, gate: gate} = state.fixtures\n\n    corpus\n    |> eligible()\n    |> Enum.map(&prepare_document(&1, gate))\n    |> reduce_ok(state, fn doc, st ->\n      with {:ok, vector, st} <- embed_one(st, %{phase: \"document\", id: doc.id}, doc.text) do\n        {:ok, put_in(st.docs[doc.id], vector)}\n      end\n    end)\n  end\n\n  defp embed_full_documents(state) do\n    state.fixtures\n    |> long_cohort()\n    |> reduce_ok(state, fn doc, st ->\n      entry = %{phase: \"document_full\", id: doc[\"id\"]}\n\n      with {:ok, vector, st} <- embed_one(st, entry, document_text(doc)) do\n        {:ok, put_in(st.full[doc[\"id\"]], vector)}\n      end\n    end)\n  end\n\n  # Sequential measured passes; every attempt counts, with no warm-up exclusion.\n  defp embed_queries(state) do\n    %{queries: queries, gate: gate} = state.fixtures\n    provider = %{state.provider | timeout_ms: gate[\"gate\"][\"query_deadline_ms\"]}\n    state = %{state | provider: provider}\n\n    for pass <- 1..gate[\"gate\"][\"query_passes\"], query <- queries do\n      {pass, query}\n    end\n    |> reduce_ok(state, fn {pass, query}, st ->\n      {:ok, text} = prepare_query(query[\"text\"], gate)\n      entry = %{phase: \"query\", id: query[\"id\"], pass: pass}\n\n      with {:ok, vector, st} <- embed_one(st, entry, text) do\n        [%{elapsed_ms: ms} | _] = st.requests\n        st = %{st | query_ms: [ms | st.query_ms]}\n        {:ok, if(pass == 1, do: put_in(st.queries[query[\"id\"]], vector), else: st)}\n      end\n    end)\n  end\n\n  defp reduce_ok(items, state, fun) do\n    Enum.reduce_while(items, {:ok, state}, fn item, {:ok, st} ->\n      case fun.(item, st) do\n        {:ok, st} -> {:cont, {:ok, st}}\n        {:error, reason, st} -> {:halt, {:error, reason, st}}\n      end\n    end)\n  end\n\n  # The first embedding settles the dimension mode: 1024 values means the parameter was\n  # honored; 4096 means it was ignored. Under v1 a 400 is retried once without the\n  # parameter, and only a 4096-value success then establishes that it is unsupported.\n  defp embed_one(state, entry, text) do\n    entry = Map.put(entry, :input_bytes, byte_size(text))\n    {result, state} = timed(state, entry, fn -> embed([text], state.provider) end)\n\n    case {result, state.dimensions_mode} do\n      {{:error, {:http_status, 400}}, nil} when state.provider.retry_rejected_dimensions ->\n        provider = %{state.provider | send_dimensions: false, expected_length: 4096}\n\n        {retry, state} =\n          timed(%{state | provider: provider}, entry, fn -> embed([text], provider) end)\n\n        with {:ok, vector, state} <- settle(retry, state, \"unsupported\") do\n          {:ok, vector, confirm_rejection(state)}\n        end\n\n      {result, nil} ->\n        settle(result, state, nil)\n\n      {{:ok, %{vectors: [vector]}}, _mode} ->\n        {:ok, vector, state}\n\n      {{:error, reason}, _mode} ->\n        {:error, reason, state}\n    end\n  end\n\n  # The 400 counts as a dimensions rejection only after the retry without the parameter\n  # returned 4096 values; until then it keeps its HTTP label.\n  defp confirm_rejection(%{requests: [retry, rejected | rest]} = state) do\n    %{state | requests: [retry, %{rejected | outcome: \"dimensions_rejected\"} | rest]}\n  end\n\n  defp settle({:ok, %{vectors: [vector], returned_length: length}}, state, mode) do\n    mode = mode || if(length == 1024, do: \"requested\", else: \"ignored\")\n    provider = %{state.provider | expected_length: length}\n    {:ok, vector, %{state | dimensions_mode: mode, provider: provider}}\n  end\n\n  defp settle({:error, reason}, state, _mode), do: {:error, reason, state}\n\n  # Runs one request, records its allowlisted outcome and samples client RSS.\n  defp timed(state, entry, fun) do\n    entry = Map.put(entry, :started_at, now())\n    started = System.monotonic_time(:millisecond)\n    result = fun.()\n    elapsed = System.monotonic_time(:millisecond) - started\n\n    outcome =\n      case result do\n        {:ok, %{vectors: _} = ok} ->\n          %{\n            outcome: \"ok\",\n            returned_length: ok.returned_length,\n            prompt_tokens: ok.prompt_tokens,\n            cost_usd: ok.cost_usd,\n            model: ok.model,\n            provider: ok.provider\n          }\n\n        {:ok, _body} ->\n          %{outcome: \"ok\"}\n\n        {:error, reason} ->\n          %{outcome: error_label(reason)}\n      end\n\n    entry = entry |> Map.merge(outcome) |> Map.put(:elapsed_ms, elapsed)\n    rss = rss_kib()\n    {result, %{state | requests: [entry | state.requests], rss_peak: max(rss, state.rss_peak)}}\n  end\n\n  ## Report\n\n  defp report({:error, reason, state}, baseline) do\n    state\n    |> base_report(baseline)\n    |> Map.merge(%{\n      status: if(blocker(reason), do: \"blocked\", else: \"failed\"),\n      blocker: blocker(reason),\n      error: error_label(reason),\n      gates: [gate(\"provider_calls\", \"all requests succeed\", error_label(reason), false)]\n    })\n  end\n\n  defp report({:ok, state}, baseline) do\n    %{gate: gate, queries: queries} = state.fixtures\n    results = Enum.map(queries, &query_result(&1, state))\n    long = Enum.filter(results, & &1.long_input)\n    requests = Enum.reverse(state.requests)\n    query_ms = Enum.reverse(state.query_ms)\n\n    measured = %{\n      macro_recall: mean(Enum.map(results, & &1.recall)),\n      long_recall_bounded: mean(Enum.map(long, & &1.recall)),\n      long_recall_full: mean(Enum.map(long, & &1.recall_full)),\n      query_p95_ms: p95(state.query_ms),\n      query_max_ms: Enum.max(state.query_ms),\n      document_max_ms:\n        Enum.max(for %{phase: \"document\" <> _, elapsed_ms: ms} <- requests, do: ms),\n      incremental_rss_mib: (state.rss_peak - baseline) / 1024,\n      models: distinct(requests, :model),\n      upstreams: distinct(requests, :provider),\n      usage: usage(requests, state)\n    }\n\n    gates = gates(results, long, measured, gate)\n\n    state\n    |> base_report(baseline)\n    |> Map.merge(%{\n      status: if(Enum.all?(gates, & &1.passed), do: \"passed\", else: \"failed\"),\n      blocker: nil,\n      summary: %{\n        macro_recall_at_k: measured.macro_recall,\n        long_input_queries: Enum.map(long, & &1.id),\n        long_input_recall_bounded: measured.long_recall_bounded,\n        long_input_recall_full: measured.long_recall_full\n      },\n      queries: Enum.map(results, &Map.drop(&1, [:scores, :scores_full])),\n      scores: %{\n        bounded: Map.new(results, &{&1.id, &1.scores}),\n        full_long_documents: Map.new(results, &{&1.id, &1.scores_full})\n      },\n      latency: %{\n        query_ms: query_ms,\n        passes: passes(query_ms, length(queries)),\n        query_p95_ms: measured.query_p95_ms,\n        query_max_ms: measured.query_max_ms,\n        document_max_ms: measured.document_max_ms,\n        queries_per_second: length(state.query_ms) * 1000 / max(Enum.sum(state.query_ms), 1),\n        concurrency: 1,\n        http_retries: false\n      },\n      gates: gates\n    })\n  end\n\n  defp passes(query_ms, per_pass) do\n    query_ms\n    |> Enum.chunk_every(per_pass)\n    |> Enum.with_index(1)\n    |> Enum.map(fn {ms, pass} ->\n      %{pass: pass, query_ms: ms, p95_ms: p95(ms), max_ms: Enum.max(ms), mean_ms: mean(ms)}\n    end)\n  end\n\n  defp query_result(query, state) do\n    k = state.fixtures.gate[\"gate\"][\"k\"]\n    relevant = query[\"relevant\"]\n    vector = state.queries[query[\"id\"]]\n    ranked = rank(vector, state.docs)\n    ranked_full = rank(vector, Map.merge(state.docs, state.full))\n    top = ranked |> Enum.take(k) |> Enum.map(&elem(&1, 0))\n    hits = Enum.filter(top, &(&1 in relevant))\n    tip_of = Map.new(state.fixtures.corpus, &{&1[\"id\"], &1[\"parent_id\"] || &1[\"id\"]})\n\n    %{\n      id: query[\"id\"],\n      category: query[\"category\"],\n      relevant: relevant,\n      top_k: top,\n      hits: hits,\n      recall: recall(Enum.map(ranked, &elem(&1, 0)), relevant, k),\n      recall_full: recall(Enum.map(ranked_full, &elem(&1, 0)), relevant, k),\n      long_input: Enum.any?(relevant, &Map.has_key?(state.full, &1)),\n      top_k_tips: top |> Enum.map(&tip_of[&1]) |> Enum.uniq(),\n      relevant_tips_matched: hits |> Enum.map(&tip_of[&1]) |> Enum.uniq(),\n      scores: Map.new(ranked),\n      scores_full: Map.take(Map.new(ranked_full), Map.keys(state.full))\n    }\n  end\n\n  defp gates(results, long, measured, gate) do\n    %{\"k\" => k} = g = gate[\"gate\"]\n    budget = gate[\"budget\"]\n    usage = measured.usage\n    loss = measured.long_recall_full - measured.long_recall_bounded\n    every_hit = &Enum.all?(&1, fn result -> result.hits != [] end)\n    hit_count = &Enum.count(&1, fn result -> result.hits != [] end)\n\n    [\n      gate(\n        \"provider_calls\",\n        \"all requests succeed\",\n        usage.failed_requests,\n        usage.failed_requests == 0\n      ),\n      gate(\n        \"every_query_top_k_hit\",\n        \"each query has a relevant top-#{k} hit\",\n        hit_count.(results),\n        every_hit.(results)\n      ),\n      gate(\n        \"macro_recall_at_k\",\n        \">= #{g[\"min_macro_recall\"]}\",\n        measured.macro_recall,\n        measured.macro_recall >= g[\"min_macro_recall\"]\n      ),\n      gate(\n        \"long_input_top_k_hit\",\n        \"each long-input query keeps a top-#{k} hit\",\n        hit_count.(long),\n        every_hit.(long)\n      ),\n      gate(\n        \"long_input_recall_loss\",\n        \"<= #{g[\"long_input_max_recall_loss\"]}\",\n        loss,\n        loss <= g[\"long_input_max_recall_loss\"] + 1.0e-9\n      ),\n      gate(\n        \"query_p95_ms\",\n        \"<= #{g[\"query_p95_ms\"]}\",\n        measured.query_p95_ms,\n        measured.query_p95_ms <= g[\"query_p95_ms\"]\n      ),\n      gate(\n        \"query_deadline_ms\",\n        \"<= #{g[\"query_deadline_ms\"]}\",\n        measured.query_max_ms,\n        measured.query_max_ms <= g[\"query_deadline_ms\"]\n      ),\n      gate(\n        \"document_deadline_ms\",\n        \"<= #{g[\"document_deadline_ms\"]}\",\n        measured.document_max_ms,\n        measured.document_max_ms <= g[\"document_deadline_ms\"]\n      ),\n      gate(\n        \"incremental_rss_mib\",\n        \"<= #{g[\"max_incremental_rss_mib\"]}\",\n        measured.incremental_rss_mib,\n        measured.incremental_rss_mib <= g[\"max_incremental_rss_mib\"]\n      ),\n      gate(\n        \"candidate_identity\",\n        \"every response names the requested model and pinned upstream\",\n        %{models: measured.models, upstreams: measured.upstreams},\n        match?([_], measured.models) and match?([_], measured.upstreams)\n      ),\n      gate(\n        \"request_budget\",\n        \"<= #{budget[\"max_requests\"]} requests\",\n        usage.requests,\n        usage.requests <= budget[\"max_requests\"]\n      ),\n      gate(\n        \"token_budget\",\n        \"<= #{budget[\"max_input_tokens\"]} prompt tokens\",\n        usage.prompt_tokens,\n        usage.prompt_tokens <= budget[\"max_input_tokens\"]\n      ),\n      gate(\n        \"cost_budget\",\n        \"<= US$#{budget[\"max_cost_usd\"]}\",\n        usage.cost_usd,\n        usage.cost_usd <= budget[\"max_cost_usd\"]\n      )\n    ]\n  end\n\n  defp distinct(requests, key) do\n    requests |> Enum.map(& &1[key]) |> Enum.reject(&is_nil/1) |> Enum.uniq()\n  end\n\n  defp base_report(state, baseline) do\n    %{gate: gate, hashes: hashes} = state.fixtures\n    requests = Enum.reverse(state.requests)\n\n    long_inputs =\n      for doc <- long_cohort(state.fixtures) do\n        prepared = prepare_document(doc, gate)\n\n        %{\n          id: doc[\"id\"],\n          full_bytes: prepared.full_bytes,\n          bounded_bytes: byte_size(prepared.text),\n          dropped_bytes: prepared.full_bytes - byte_size(prepared.text),\n          reference: \"full text embedded separately\"\n        }\n      end\n\n    %{\n      probe: \"search embedding gate\",\n      started_at: state.started_at,\n      generated_at: now(),\n      code: code_identity(),\n      fixtures: %{gate_version: gate[\"version\"], hashes: hashes},\n      model: gate[\"model\"],\n      provider: Map.take(gate[\"provider\"], [\"name\", \"base_url\", \"routing\"]),\n      preparation: gate[\"preparation\"],\n      dimensions: %{\n        requested: gate[\"dimensions\"],\n        mode: state.dimensions_mode,\n        returned_lengths: distinct(requests, :returned_length)\n      },\n      preflight: state.preflight,\n      requests: requests,\n      usage: usage(requests, state),\n      memory: %{\n        baseline_rss_kib: baseline,\n        peak_rss_kib: state.rss_peak,\n        incremental_mib: (state.rss_peak - baseline) / 1024,\n        method: \"client OS RSS sampled after every request; hosted GPU memory is not observable\"\n      },\n      long_inputs: long_inputs\n    }\n  end\n\n  defp usage(requests, state) do\n    tokens = requests |> Enum.map(&(&1[:prompt_tokens] || 0)) |> Enum.sum()\n    reported = requests |> Enum.map(& &1[:cost_usd]) |> Enum.reject(&is_nil/1)\n    price = get_in(state.preflight, [:endpoint, :prompt_price_usd_per_token])\n\n    %{\n      requests: length(requests),\n      failed_requests: Enum.count(requests, &(&1.outcome not in [\"ok\", \"dimensions_rejected\"])),\n      prompt_tokens: tokens,\n      cost_usd: Enum.sum(reported),\n      cost_source: if(reported == [], do: \"none reported\", else: \"provider-reported usage.cost\"),\n      estimated_cost_usd: price && tokens * price\n    }\n  end\n\n  defp gate(name, threshold, value, passed),\n    do: %{name: name, threshold: threshold, value: value, passed: passed}\n\n  defp mean([]), do: 1.0\n  defp mean(values), do: Enum.sum(values) / length(values)\n\n  defp blocker(:missing_credentials), do: \"missing_credentials\"\n  defp blocker({:http_status, status}) when status in [401, 402, 403, 429], do: \"http_#{status}\"\n  defp blocker(:transport), do: \"transport\"\n  defp blocker(:pinned_provider_unlisted), do: \"pinned_provider_unlisted\"\n  defp blocker(:price_unavailable), do: \"price_unavailable\"\n  defp blocker(:key_limit_too_low), do: \"key_limit_too_low\"\n  defp blocker({:budget, _message}), do: \"budget\"\n  defp blocker(_reason), do: nil\n\n  defp error_label({:http_status, status}), do: \"http_#{status}\"\n  defp error_label({:vector_length, length}), do: \"vector_length_#{length}\"\n  defp error_label({:budget, message}), do: \"budget: #{message}\"\n  defp error_label(reason) when is_atom(reason), do: Atom.to_string(reason)\n\n  defp now, do: DateTime.utc_now() |> DateTime.truncate(:millisecond)\n\n  defp code_identity do\n    sha = git([\"rev-parse\", \"HEAD\"])\n    %{sha: sha, dirty: git([\"status\", \"--porcelain\"]) != \"\"}\n  end\n\n  defp git(args) do\n    case System.cmd(\"git\", args, stderr_to_stdout: true) do\n      {out, 0} -> String.trim(out)\n      _error -> \"unknown\"\n    end\n  end\n\n  defp rss_kib do\n    case System.cmd(\"ps\", [\"-o\", \"rss=\", \"-p\", System.pid()]) do\n      {out, 0} -> out |> String.trim() |> String.to_integer()\n      _error -> 0\n    end\n  end\n\n  defp sha256(bytes), do: :sha256 |> :crypto.hash(bytes) |> Base.encode16(case: :lower)\nend\n",
+          "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/search_probe.ex"
+        }
+      },
+      "method": "sent:textDocument/didOpen"
+    },
+    {
+      "time": 79526.552473875,
+      "data": {
+        "type": 3,
+        "message": "Server initialized, registering capabilities"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79526.5536665,
+      "data": {
+        "registrations": [
+          {
+            "registerOptions": {
+              "watchers": [
+                {
+                  "globPattern": "**/mix.lock"
+                },
+                {
+                  "globPattern": "**/*.{ex,exs}"
+                }
+              ]
+            },
+            "id": "-42",
+            "method": "workspace/didChangeWatchedFiles"
+          }
+        ]
+      },
+      "method": "client/registerCapability"
+    },
+    {
+      "time": 79526.555956708,
+      "data": {
+        "type": 3,
+        "message": "[tips-expert-neovim-validation] Starting project"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79526.562247291,
+      "data": {
+        "type": 3,
+        "message": "Opened file:///private/tmp/tips-expert-neovim-validation/lib/tips/search_probe.ex"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79526.563240791,
+      "data": {
+        "value": {
+          "kind": "begin",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79526.564616208,
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for tips-expert-neovim-validation was initialized. Ignoring."
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79526.568405458,
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for tips-expert-neovim-validation was initialized. Ignoring."
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79526.5759035,
+      "data": {
+        "value": {
+          "kind": "begin",
+          "title": "[tips-expert-neovim-validation] Preparing engine"
+        },
+        "token": 68
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79526.660098916,
+      "data": {
+        "type": 3,
+        "message": "[tips-expert-neovim-validation] Using path: /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/erts-17.0.6/bin:/opt/homebrew/Cellar/expert/0.1.10/libexec/expert/bin:/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-vendor/nvim-macos-arm64/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/VMware Fusion.app/Contents/Public:/opt/homebrew/Caskroom/codex/0.156.1/codex-path:/Users/chenghanlee/.codex/tmp/arg0/codex-arg0mtiZz0:/opt/homebrew/bin:/opt/homebrew/sbin:/Applications/Ghostty.app/Contents/MacOS:/Users/chenghanlee/.local/bin:/Users/chenghanlee/Documents/Programs/flutter/bin:/Users/chenghanlee/.docker/bin:/Users/chenghanlee/.docker/bin:/Users/chenghanlee/.local/bin"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79526.660429416,
+      "data": {
+        "type": 3,
+        "message": "[tips-expert-neovim-validation] Found elixir executable at /opt/homebrew/bin/elixir"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79526.66045925,
+      "data": {
+        "type": 3,
+        "message": "[tips-expert-neovim-validation] Found erl executable at /opt/homebrew/bin/erl"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79526.660483916,
+      "data": {
+        "type": 3,
+        "message": "[tips-expert-neovim-validation] Preparing engine"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79527.070784708,
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for tips-expert-neovim-validation was initialized. Ignoring."
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79527.576002958,
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for tips-expert-neovim-validation was initialized. Ignoring."
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79528.0825655,
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for tips-expert-neovim-validation was initialized. Ignoring."
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79528.092899166,
+      "data": {
+        "type": 3,
+        "message": "[tips-expert-neovim-validation] Engine available at: /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79528.114132666,
+      "data": {
+        "type": 3,
+        "message": "[tips-expert-neovim-validation] ebin paths:\n[\"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/patch/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_briefly/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_bunt/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_credo/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_deps_nix/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_elixir_sense/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_engine/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_file_system/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_forge/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_gen_lsp/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_hpax/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_jason/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_logger_backends/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_mint/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_options/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_parsec/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_path_glob/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_quokka/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_schematic/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_sourceror/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_spitfire/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_telemetry/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_typed_struct/ebin\"]"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79528.135142416,
+      "data": {
+        "value": {
+          "kind": "end",
+          "message": "Engine is ready",
+          "title": "[tips-expert-neovim-validation] Preparing engine"
+        },
+        "token": 68
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.135529541,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting Erlang node...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.180298875,
+      "data": {
+        "type": 2,
+        "message": "Received unexpected message {:EXIT, #PID<0.201.0>, :normal}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79528.4475885,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Bootstrapping engine...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.585380291,
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for tips-expert-neovim-validation was initialized. Ignoring."
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79528.603529375,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting elixir...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.603714333,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting runtime_tools...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.607959,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_engine...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.949878125,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_typed_struct...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.950047708,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_file_system...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.950175625,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_nimble_options...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.950309166,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_bunt...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.950514708,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_jason...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.950607875,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_logger_backends...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.950734916,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_hpax...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.950893958,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_mint...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.95105925,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_elixir_sense...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.951204333,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_sourceror...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.951345875,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_spitfire...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.951465125,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_telemetry...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.951585166,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_briefly...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.951664291,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_schematic...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.95177525,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_deps_nix...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.951886333,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_credo...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.95197575,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_quokka...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.952458041,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_gen_lsp...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.952548958,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_forge...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.95269225,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Starting xp_path_glob...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79528.952851541,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Loading engine modules...",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79529.0905725,
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for tips-expert-neovim-validation was initialized. Ignoring."
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79529.4857765,
+      "data": {
+        "value": {
+          "kind": "end",
+          "message": "Engine node started",
+          "title": "[tips-expert-neovim-validation] Starting engine node"
+        },
+        "token": 36
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79529.488121958,
+      "data": {
+        "type": 3,
+        "message": "Started project node for tips-expert-neovim-validation"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79529.4882615,
+      "data": {
+        "type": 3,
+        "message": "[tips-expert-neovim-validation] Engine initialized for project tips-expert-neovim-validation"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79529.660666958,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79530.288936208,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79530.492007541,
+      "data": {
+        "value": {
+          "kind": "begin",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1186
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79530.927429875,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79530.937538458,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "mix local.hex",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1186
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79530.942890208,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "mix local.rebar",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1186
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79530.945992791,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "mix deps.get",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1186
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79531.5660875,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79532.179433708,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79532.804807875,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79533.419401833,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79534.040464125,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79534.658276333,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79534.769806458,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "mix loadconfig",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1186
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79534.771068291,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Loading plugins",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1186
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79534.772749666,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Compiling tips-expert-neovim-validation",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1186
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79536.066991833,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79536.348005333,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79536.375330041,
+      "data": {
+        "type": 3,
+        "message": "No definition found for {:call, Tips.ProviderConfig, :mode, 0} with Indexer."
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79536.382987208,
+      "data": {
+        "value": {
+          "kind": "end",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1186
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79536.383537833,
+      "data": {
+        "value": {
+          "kind": "begin",
+          "title": "Finding Completion Candidates"
+        },
+        "token": 3
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79536.384785291,
+      "data": {
+        "type": 3,
+        "message": "Compiled tips-expert-neovim-validation in 5.9 seconds"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79536.385228,
+      "data": {
+        "value": {
+          "kind": "begin",
+          "title": "Loading search index"
+        },
+        "token": 1218
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79536.3961175,
+      "data": {
+        "value": {
+          "kind": "end",
+          "title": "Finding Completion Candidates"
+        },
+        "token": 3
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79536.543339625,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79536.543670958,
+      "data": {
+        "type": 3,
+        "message": "Search index is loading for tips-expert-neovim-validation..."
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79536.544489583,
+      "data": {
+        "type": 3,
+        "message": "Search index is loading for tips-expert-neovim-validation..."
+      },
+      "method": "window/showMessage"
+    },
+    {
+      "time": 79537.092401125,
+      "data": {
+        "type": 3,
+        "message": "Search index is loading for tips-expert-neovim-validation..."
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79537.092572916,
+      "data": {
+        "type": 3,
+        "message": "Search index is loading for tips-expert-neovim-validation..."
+      },
+      "method": "window/showMessage"
+    },
+    {
+      "time": 79537.092775791,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79537.169246958,
+      "data": {
+        "value": {
+          "kind": "end",
+          "title": "Loading search index"
+        },
+        "token": 1218
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79537.619939375,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79537.620104583,
+      "data": {
+        "type": 3,
+        "message": "Search index is loading for tips-expert-neovim-validation..."
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79537.620140958,
+      "data": {
+        "type": 3,
+        "message": "Search index is loading for tips-expert-neovim-validation..."
+      },
+      "method": "window/showMessage"
+    },
+    {
+      "time": 79538.14377125,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79538.143969458,
+      "data": {
+        "type": 3,
+        "message": "Search index is loading for tips-expert-neovim-validation..."
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79538.143991166,
+      "data": {
+        "type": 3,
+        "message": "Search index is loading for tips-expert-neovim-validation..."
+      },
+      "method": "window/showMessage"
+    },
+    {
+      "time": 79538.674021125,
+      "data": {
+        "type": 3,
+        "message": "Search index is loading for tips-expert-neovim-validation..."
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79538.674149875,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79538.674181666,
+      "data": {
+        "type": 3,
+        "message": "Search index is loading for tips-expert-neovim-validation..."
+      },
+      "method": "window/showMessage"
+    },
+    {
+      "time": 79539.001507333,
+      "data": {
+        "value": {
+          "kind": "begin",
+          "percentage": 0,
+          "title": "Indexing source code"
+        },
+        "token": 35
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79539.001812125,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Indexing",
+          "title": "Indexing source code",
+          "percentage": 100
+        },
+        "token": 35
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79539.014630708,
+      "data": {
+        "value": {
+          "kind": "end",
+          "message": "Completed in 13ms",
+          "title": "Indexing source code"
+        },
+        "token": 35
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79539.209683,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79540.085719208,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79540.172885,
+      "data": {
+        "changes": [
+          {
+            "type": 2,
+            "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex"
+          }
+        ]
+      },
+      "method": "sent:workspace/didChangeWatchedFiles"
+    },
+    {
+      "time": 79540.177117458,
+      "data": {
+        "textDocument": {
+          "version": 0,
+          "languageId": "elixir",
+          "text": "\n",
+          "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex"
+        }
+      },
+      "method": "sent:textDocument/didOpen"
+    },
+    {
+      "time": 79540.18407075,
+      "data": {
+        "textDocument": {
+          "version": 2,
+          "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex"
+        },
+        "contentChanges": [
+          {
+            "text": "defmodule Tips.ProviderConfig do\n  @moduledoc \"\"\"\n  Provider settings for development and test.\n\n  `config/runtime.exs` loads the ten fixed names from the checkout's `.env` and the\n  exported environment, with exported values winning. Callers request a value when\n  they need it, so a missing setting only fails the feature that uses it. Errors name\n  the variable and never include a value.\n  \"\"\"\n\n  @names ~w(\n    OPENROUTER_API_KEY\n    CLOUDFLARE_ACCOUNT_ID\n    R2_BUCKET\n    R2_ENDPOINT\n    R2_ACCESS_KEY_ID\n    R2_SECRET_ACCESS_KEY\n    R2_PUBLIC_URL\n    CLOUDFLARE_STREAM_API_TOKEN\n    CLOUDFLARE_STREAM_CUSTOMER_CODE\n    CLOUDFLARE_STREAM_SIGNING_KEY\n  )\n\n  # A value is unquoted from a shell-safe character set, single-quoted, or double-quoted\n  # without `$`, backticks or backslashes, so the shell and this parser read the same value.\n  @assignment ~r/^\\s*(?:export\\s+)?([A-Za-z_][A-Za-z0-9_]*)(.*)$/\n  @value ~r/^=(?:'([^']*)'|\"([^\"$`\\\\]*)\"|([A-Za-z0-9_.\\/:@+=,%-]*))(?:\\s+#.*)?\\s*$/\n\n  @doc \"\"\"\n  Returns the non-blank value of a provider variable.\n\n  Raises naming the variable when it is missing or blank.\n  \"\"\"\n  def fetch!(name) when name in @names do\n    value =\n      :tips\n      |> Application.get_env(__MODULE__, [])\n      |> Keyword.get(:values, %{})\n      |> Map.get(name, \"\")\n\n    if String.trim(value) == \"\" do\n      raise \"#{name} is missing or blank. Set it in .env, then re-source .env or \" <>\n              \"unset an overriding export; an exported value, even an empty one, wins.\"\n    end\n\n    value\n  end\n\n  def fetch!(_name), do: raise(ArgumentError, \"unknown provider configuration name\")\n\n  @doc \"\"\"\n  EXPERT_TIPS_DOC: Returns `:real` or `:stub`.\n\n  Test runs use `:stub` unless `TIPS_REAL_PROVIDERS=1`; development uses `:real`.\n  \"\"\"\n  def mode, do: :tips |> Application.get_env(__MODULE__, []) |> Keyword.get(:mode, :real)\n\n  @doc \"\"\"\n  Reads provider values from the `.env` file at `path` and the exported `env` map.\n\n  Exported values win. A missing file is normal. Other names in the file are ignored;\n  a malformed provider line raises with its line number and name, never its value.\n  \"\"\"\n  def load(path, env) do\n    path |> read_dotenv() |> Map.merge(Map.take(env, @names))\n  end\n\n  defp read_dotenv(path) do\n    case File.read(path) do\n      {:ok, contents} -> parse(path, String.trim_leading(contents, \"\\uFEFF\"))\n      {:error, :enoent} -> %{}\n      {:error, reason} -> raise \"#{path}: cannot read (#{:file.format_error(reason)})\"\n    end\n  end\n\n  defp parse(path, contents) do\n    contents\n    |> String.split(\"\\n\")\n    |> Enum.with_index(1)\n    |> Enum.reduce(%{}, fn {line, number}, values ->\n      case Regex.run(@assignment, line, capture: :all_but_first) do\n        [name, rest] when name in @names ->\n          Map.put(values, name, value!(rest, path, number, name))\n\n        _other ->\n          values\n      end\n    end)\n  end\n\n  defp value!(rest, path, number, name) do\n    case Regex.run(@value, rest, capture: :all_but_first) do\n      # Only one alternative matches; the others capture \"\".\n      [_ | _] = parts ->\n        Enum.join(parts)\n\n      nil ->\n        raise \"\"\"\n        #{path}:#{number}: invalid value for #{name}. \\\n        Use NAME=value, NAME='value' or NAME=\"value\" without $, ` or \\\\ in double quotes.\\\n        \"\"\"\n    end\n  end\nend",
+            "rangeLength": 0,
+            "range": {
+              "end": {
+                "line": 0,
+                "character": 0
+              },
+              "start": {
+                "line": 0,
+                "character": 0
+              }
+            }
+          }
+        ]
+      },
+      "method": "sent:textDocument/didChange"
+    },
+    {
+      "time": 79540.184121125,
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex"
+        }
+      },
+      "method": "sent:textDocument/didSave"
+    },
+    {
+      "time": 79540.18413875,
+      "data": {
+        "type": 3,
+        "message": "Opened file:///private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79540.617341458,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79541.148655791,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79541.185102083,
+      "data": {
+        "value": {
+          "kind": "begin",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 67
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79541.1853875,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Compiling tips-expert-neovim-validation",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 67
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79541.339068958,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "compiling: lib/.../provider_config.ex",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 67
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79541.441054708,
+      "data": {
+        "value": {
+          "kind": "end",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 67
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79541.441340541,
+      "data": {
+        "type": 3,
+        "message": "Compiled tips-expert-neovim-validation in 256 ms"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79541.441635333,
+      "data": {
+        "value": {
+          "kind": "begin",
+          "title": "Finding Completion Candidates"
+        },
+        "token": 99
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79541.451842041,
+      "data": {
+        "value": {
+          "kind": "end",
+          "title": "Finding Completion Candidates"
+        },
+        "token": 99
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79541.474090291,
+      "data": {
+        "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex",
+        "diagnostics": []
+      },
+      "method": "textDocument/publishDiagnostics"
+    },
+    {
+      "time": 79541.679364541,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79541.792580916,
+      "data": {
+        "changes": [
+          {
+            "type": 2,
+            "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex"
+          }
+        ]
+      },
+      "method": "sent:workspace/didChangeWatchedFiles"
+    },
+    {
+      "time": 79541.793594875,
+      "data": {
+        "textDocument": {
+          "version": 3,
+          "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex"
+        },
+        "contentChanges": [
+          {
+            "text": "\n  @moduledoc \"\"\"\n  Provider settings for development and test.\n\n  `config/runtime.exs` loads the ten fixed names from the checkout's `.env` and the\n  exported environment, with exported values winning. Callers request a value when\n  they need it, so a missing setting only fails the feature that uses it. Errors name\n  the variable and never include a value.\n  \"\"\"\n\n  @names ~w(\n    OPENROUTER_API_KEY\n    CLOUDFLARE_ACCOUNT_ID\n    R2_BUCKET\n    R2_ENDPOINT\n    R2_ACCESS_KEY_ID\n    R2_SECRET_ACCESS_KEY\n    R2_PUBLIC_URL\n    CLOUDFLARE_STREAM_API_TOKEN\n    CLOUDFLARE_STREAM_CUSTOMER_CODE\n    CLOUDFLARE_STREAM_SIGNING_KEY\n  )\n\n  # A value is unquoted from a shell-safe character set, single-quoted, or double-quoted\n  # without `$`, backticks or backslashes, so the shell and this parser read the same value.\n  @assignment ~r/^\\s*(?:export\\s+)?([A-Za-z_][A-Za-z0-9_]*)(.*)$/\n  @value ~r/^=(?:'([^']*)'|\"([^\"$`\\\\]*)\"|([A-Za-z0-9_.\\/:@+=,%-]*))(?:\\s+#.*)?\\s*$/\n\n  @doc \"\"\"\n  Returns the non-blank value of a provider variable.\n\n  Raises naming the variable when it is missing or blank.\n  \"\"\"\n  def fetch!(name) when name in @names do\n    value =\n      :tips\n      |> Application.get_env(__MODULE__, [])\n      |> Keyword.get(:values, %{})\n      |> Map.get(name, \"\")\n\n    if String.trim(value) == \"\" do\n      raise \"#{name} is missing or blank. Set it in .env, then re-source .env or \" <>\n              \"unset an overriding export; an exported value, even an empty one, wins.\"\n    end\n\n    value\n  end\n\n  def fetch!(_name), do: raise(ArgumentError, \"unknown provider configuration name\")\n\n  @doc \"\"\"\n  Returns `:real` or `:stub`.\n\n  Test runs use `:stub` unless `TIPS_REAL_PROVIDERS=1`; development uses `:real`.\n  \"\"\"\n  def mode, do: expert_probe_missing() |> then(fn _ -> :tips end) |> Application.get_env(__MODULE__, []) |> Keyword.get(:mode, :real)\n\n  @doc \"\"\"\n  Reads provider values from the `.env` file at `path` and the exported `env` map.\n\n  Exported values win. A missing file is normal. Other names in the file are ignored;\n  a malformed provider line raises with its line number and name, never its value.\n  \"\"\"\n  def load(path, env) do\n    path |> read_dotenv() |> Map.merge(Map.take(env, @names))\n  end\n\n  defp read_dotenv(path) do\n    case File.read(path) do\n      {:ok, contents} -> parse(path, String.trim_leading(contents, \"\\uFEFF\"))\n      {:error, :enoent} -> %{}\n      {:error, reason} -> raise \"#{path}: cannot read (#{:file.format_error(reason)})\"\n    end\n  end\n\n  defp parse(path, contents) do\n    contents\n    |> String.split(\"\\n\")\n    |> Enum.with_index(1)\n    |> Enum.reduce(%{}, fn {line, number}, values ->\n      case Regex.run(@assignment, line, capture: :all_but_first) do\n        [name, rest] when name in @names ->\n          Map.put(values, name, value!(rest, path, number, name))\n\n        _other ->\n          values\n      end\n    end)\n  end\n\n  defp value!(rest, path, number, name) do\n    case Regex.run(@value, rest, capture: :all_but_first) do\n      # Only one alternative matches; the others capture \"\".\n      [_ | _] = parts ->\n        Enum.join(parts)\n\n      nil ->\n        raise \"\"\"\n        #{path}:#{number}: invalid value for #{name}. \\\n        Use NAME=value, NAME='value' or NAME=\"value\" without $, ` or \\\\ in double quotes.\\\n        \"\"\"\n    end\n  end\n",
+            "rangeLength": 3267,
+            "range": {
+              "end": {
+                "line": 103,
+                "character": 0
+              },
+              "start": {
+                "line": 0,
+                "character": 32
+              }
+            }
+          }
+        ]
+      },
+      "method": "sent:textDocument/didChange"
+    },
+    {
+      "time": 79541.79362775,
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex"
+        }
+      },
+      "method": "sent:textDocument/didSave"
+    },
+    {
+      "time": 79542.79629275,
+      "data": {
+        "value": {
+          "kind": "begin",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1282
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79542.796579625,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Compiling tips-expert-neovim-validation",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1282
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79543.000722916,
+      "data": {
+        "value": {
+          "kind": "end",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1282
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79543.00105925,
+      "data": {
+        "type": 3,
+        "message": "Compiled tips-expert-neovim-validation in 205 ms"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79543.0013755,
+      "data": {
+        "value": {
+          "kind": "begin",
+          "title": "Finding Completion Candidates"
+        },
+        "token": 131
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79543.002584833,
+      "data": {
+        "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex",
+        "diagnostics": [
+          {
+            "severity": 1,
+            "source": "Elixir",
+            "data": null,
+            "message": "undefined function expert_probe_missing/0",
+            "range": {
+              "end": {
+                "line": 56,
+                "character": 0
+              },
+              "start": {
+                "line": 55,
+                "character": 16
+              }
+            }
+          }
+        ]
+      },
+      "method": "textDocument/publishDiagnostics"
+    },
+    {
+      "time": 79543.011003833,
+      "data": {
+        "value": {
+          "kind": "end",
+          "title": "Finding Completion Candidates"
+        },
+        "token": 131
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79543.015185958,
+      "data": {
+        "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex",
+        "diagnostics": [
+          {
+            "severity": 1,
+            "source": "Elixir",
+            "data": null,
+            "message": "undefined function expert_probe_missing/0",
+            "range": {
+              "end": {
+                "line": 56,
+                "character": 0
+              },
+              "start": {
+                "line": 55,
+                "character": 16
+              }
+            }
+          },
+          {
+            "severity": 1,
+            "source": "Elixir",
+            "data": null,
+            "message": "undefined function expert_probe_missing/0",
+            "range": {
+              "end": {
+                "line": 55,
+                "character": 36
+              },
+              "start": {
+                "line": 55,
+                "character": 16
+              }
+            }
+          }
+        ]
+      },
+      "method": "textDocument/publishDiagnostics"
+    },
+    {
+      "time": 79543.303598833,
+      "data": {
+        "changes": [
+          {
+            "type": 2,
+            "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex"
+          }
+        ]
+      },
+      "method": "sent:workspace/didChangeWatchedFiles"
+    },
+    {
+      "time": 79543.30456325,
+      "data": {
+        "textDocument": {
+          "version": 4,
+          "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex"
+        },
+        "contentChanges": [
+          {
+            "text": "\n  @moduledoc \"\"\"\n  Provider settings for development and test.\n\n  `config/runtime.exs` loads the ten fixed names from the checkout's `.env` and the\n  exported environment, with exported values winning. Callers request a value when\n  they need it, so a missing setting only fails the feature that uses it. Errors name\n  the variable and never include a value.\n  \"\"\"\n\n  @names ~w(\n    OPENROUTER_API_KEY\n    CLOUDFLARE_ACCOUNT_ID\n    R2_BUCKET\n    R2_ENDPOINT\n    R2_ACCESS_KEY_ID\n    R2_SECRET_ACCESS_KEY\n    R2_PUBLIC_URL\n    CLOUDFLARE_STREAM_API_TOKEN\n    CLOUDFLARE_STREAM_CUSTOMER_CODE\n    CLOUDFLARE_STREAM_SIGNING_KEY\n  )\n\n  # A value is unquoted from a shell-safe character set, single-quoted, or double-quoted\n  # without `$`, backticks or backslashes, so the shell and this parser read the same value.\n  @assignment ~r/^\\s*(?:export\\s+)?([A-Za-z_][A-Za-z0-9_]*)(.*)$/\n  @value ~r/^=(?:'([^']*)'|\"([^\"$`\\\\]*)\"|([A-Za-z0-9_.\\/:@+=,%-]*))(?:\\s+#.*)?\\s*$/\n\n  @doc \"\"\"\n  Returns the non-blank value of a provider variable.\n\n  Raises naming the variable when it is missing or blank.\n  \"\"\"\n  def fetch!(name) when name in @names do\n    value =\n      :tips\n      |> Application.get_env(__MODULE__, [])\n      |> Keyword.get(:values, %{})\n      |> Map.get(name, \"\")\n\n    if String.trim(value) == \"\" do\n      raise \"#{name} is missing or blank. Set it in .env, then re-source .env or \" <>\n              \"unset an overriding export; an exported value, even an empty one, wins.\"\n    end\n\n    value\n  end\n\n  def fetch!(_name), do: raise(ArgumentError, \"unknown provider configuration name\")\n\n  @doc \"\"\"\n  Returns `:real` or `:stub`.\n\n  Test runs use `:stub` unless `TIPS_REAL_PROVIDERS=1`; development uses `:real`.\n  \"\"\"\n  def mode, do: :tips |> Application.get_env(__MODULE__, []) |> Keyword.get(:mode, :real)\n\n  @doc \"\"\"\n  Reads provider values from the `.env` file at `path` and the exported `env` map.\n\n  Exported values win. A missing file is normal. Other names in the file are ignored;\n  a malformed provider line raises with its line number and name, never its value.\n  \"\"\"\n  def load(path, env) do\n    path |> read_dotenv() |> Map.merge(Map.take(env, @names))\n  end\n\n  defp read_dotenv(path) do\n    case File.read(path) do\n      {:ok, contents} -> parse(path, String.trim_leading(contents, \"\\uFEFF\"))\n      {:error, :enoent} -> %{}\n      {:error, reason} -> raise \"#{path}: cannot read (#{:file.format_error(reason)})\"\n    end\n  end\n\n  defp parse(path, contents) do\n    contents\n    |> String.split(\"\\n\")\n    |> Enum.with_index(1)\n    |> Enum.reduce(%{}, fn {line, number}, values ->\n      case Regex.run(@assignment, line, capture: :all_but_first) do\n        [name, rest] when name in @names ->\n          Map.put(values, name, value!(rest, path, number, name))\n\n        _other ->\n          values\n      end\n    end)\n  end\n\n  defp value!(rest, path, number, name) do\n    case Regex.run(@value, rest, capture: :all_but_first) do\n      # Only one alternative matches; the others capture \"\".\n      [_ | _] = parts ->\n        Enum.join(parts)\n\n      nil ->\n        raise \"\"\"\n        #{path}:#{number}: invalid value for #{name}. \\\n        Use NAME=value, NAME='value' or NAME=\"value\" without $, ` or \\\\ in double quotes.\\\n        \"\"\"\n    end\n  end\n",
+            "rangeLength": 3294,
+            "range": {
+              "end": {
+                "line": 103,
+                "character": 0
+              },
+              "start": {
+                "line": 0,
+                "character": 32
+              }
+            }
+          }
+        ]
+      },
+      "method": "sent:textDocument/didChange"
+    },
+    {
+      "time": 79543.3045825,
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex"
+        }
+      },
+      "method": "sent:textDocument/didSave"
+    },
+    {
+      "time": 79544.308426833,
+      "data": {
+        "value": {
+          "kind": "begin",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1314
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79544.30879925,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Compiling tips-expert-neovim-validation",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1314
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79544.455944125,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "compiling: lib/.../provider_config.ex",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1314
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79544.552162291,
+      "data": {
+        "value": {
+          "kind": "end",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1314
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79544.552491166,
+      "data": {
+        "type": 3,
+        "message": "Compiled tips-expert-neovim-validation in 244 ms"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79544.5525615,
+      "data": {
+        "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex",
+        "diagnostics": []
+      },
+      "method": "textDocument/publishDiagnostics"
+    },
+    {
+      "time": 79544.552798666,
+      "data": {
+        "value": {
+          "kind": "begin",
+          "title": "Finding Completion Candidates"
+        },
+        "token": 163
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79544.562633541,
+      "data": {
+        "value": {
+          "kind": "end",
+          "title": "Finding Completion Candidates"
+        },
+        "token": 163
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79544.578356875,
+      "data": {
+        "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex",
+        "diagnostics": []
+      },
+      "method": "textDocument/publishDiagnostics"
+    },
+    {
+      "time": 79544.736525458,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79544.821868125,
+      "data": {
+        "changes": [
+          {
+            "type": 1,
+            "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/expert_probe_52de2fd417.ex"
+          }
+        ]
+      },
+      "method": "sent:workspace/didChangeWatchedFiles"
+    },
+    {
+      "time": 79544.826214666,
+      "data": {
+        "textDocument": {
+          "version": 0,
+          "languageId": "elixir",
+          "text": "\n",
+          "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/expert_probe_52de2fd417.ex"
+        }
+      },
+      "method": "sent:textDocument/didOpen"
+    },
+    {
+      "time": 79544.8342535,
+      "data": {
+        "textDocument": {
+          "version": 2,
+          "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/expert_probe_52de2fd417.ex"
+        },
+        "contentChanges": [
+          {
+            "text": "defmodule Tips.ExpertProbe52DE2FD417 do\n  def mode, do: Tips.ProviderConfig.mode()\nend",
+            "rangeLength": 0,
+            "range": {
+              "end": {
+                "line": 0,
+                "character": 0
+              },
+              "start": {
+                "line": 0,
+                "character": 0
+              }
+            }
+          }
+        ]
+      },
+      "method": "sent:textDocument/didChange"
+    },
+    {
+      "time": 79544.834275916,
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/expert_probe_52de2fd417.ex"
+        }
+      },
+      "method": "sent:textDocument/didSave"
+    },
+    {
+      "time": 79544.834291791,
+      "data": {
+        "type": 3,
+        "message": "Opened file:///private/tmp/tips-expert-neovim-validation/lib/tips/expert_probe_52de2fd417.ex"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79545.26155825,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79545.792649583,
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79545.82945425,
+      "data": {
+        "value": {
+          "kind": "begin",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1346
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79545.829824666,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "Compiling tips-expert-neovim-validation",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1346
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79545.954628458,
+      "data": {
+        "value": {
+          "kind": "report",
+          "message": "compiling: lib/.../expert_probe_52de2fd417.ex",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1346
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79546.038288708,
+      "data": {
+        "value": {
+          "kind": "end",
+          "title": "Building tips-expert-neovim-validation"
+        },
+        "token": 1346
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79546.038495416,
+      "data": {
+        "type": 3,
+        "message": "Compiled tips-expert-neovim-validation in 209 ms"
+      },
+      "method": "window/logMessage"
+    },
+    {
+      "time": 79546.038675708,
+      "data": {
+        "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex",
+        "diagnostics": []
+      },
+      "method": "textDocument/publishDiagnostics"
+    },
+    {
+      "time": 79546.039020291,
+      "data": {
+        "value": {
+          "kind": "begin",
+          "title": "Finding Completion Candidates"
+        },
+        "token": 1378
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79546.04791,
+      "data": {
+        "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/expert_probe_52de2fd417.ex",
+        "diagnostics": []
+      },
+      "method": "textDocument/publishDiagnostics"
+    },
+    {
+      "time": 79546.048183375,
+      "data": {
+        "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex",
+        "diagnostics": []
+      },
+      "method": "textDocument/publishDiagnostics"
+    },
+    {
+      "time": 79546.049802541,
+      "data": {
+        "value": {
+          "kind": "end",
+          "title": "Finding Completion Candidates"
+        },
+        "token": 1378
+      },
+      "method": "$/progress"
+    },
+    {
+      "time": 79567.980316041,
+      "data": {
+        "changes": [
+          {
+            "type": 3,
+            "uri": "file:///private/tmp/tips-expert-neovim-validation/lib/tips/expert_probe_52de2fd417.ex"
+          }
+        ]
+      },
+      "method": "sent:workspace/didChangeWatchedFiles"
+    }
+  ],
+  "sync_state": {
+    "reindexes": [],
+    "applied": {
+      "/private/tmp/tips-expert-neovim-validation/lib/tips/expert_probe_52de2fd417.ex": {
+        "kind": 3,
+        "time": 79567.980817916
+      },
+      "/private/tmp/tips-expert-neovim-validation/lib/tips/provider_config.ex": {
+        "kind": 2,
+        "time": 79543.304535666
+      }
+    },
+    "failures": [],
+    "conflicts": []
+  },
+  "eof": {
+    "exit_code": 0,
+    "owned": {
+      "73605": {
+        "parent": 73520,
+        "state": "Ss",
+        "command": "bash /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/lib/xp_expert-0.1.10/priv/port_wrapper.sh /opt/homebrew/bin/elixir -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/patch/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_briefly/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_bunt/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_credo/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_deps_nix/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_elixir_sense/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_engine/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_file_system/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_forge/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_gen_lsp/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_hpax/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_jason/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_logger_backends/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_mint/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_options/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_parsec/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_path_glob/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_quokka/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_schematic/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_sourceror/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_spitfire/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_telemetry/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_typed_struct/ebin --erl -start_epmd false -epmd_module Elixir.XPForge.EPMD --cookie [REDACTED_RUNTIME_COOKIE] --no-halt -e System.argv() |> hd() |> Base.decode64!() |> Code.eval_string() bm9kZSA9IDoiZXhwZXJ0LXByb2plY3QtdGlwc19leHBlcnRfbmVvdmltX3ZhbGlkYXRpb24tNTczMjNAMTI3LjAuMC4xIgpub2RlX3N0YXJ0ID0gTm9kZS5zdGFydChub2RlLCA6bG9uZ25hbWVzKQoKY2FzZSBub2RlX3N0YXJ0IGRvCiAgezpvaywgX30gLT4KICAgIDpvayA9IFhQRm9yZ2UuTm9kZVBvcnRNYXBwZXIucmVnaXN0ZXIoKQogICAgSU8ucHV0cygib2siKQoKICB7OmVycm9yLCByZWFzb259IC0+CiAgICBJTy5wdXRzKCJlcnJvciBzdGFydGluZyBub2RlOiAje2luc3BlY3QocmVhc29uKX0iKQogICAgSU8ucHV0cygiZXJyb3Igc3RhcnRpbmcgbm9kZToKICN7aW5zcGVjdChyZWFzb24pfSIpCmVuZA=="
+      },
+      "73606": {
+        "parent": 73605,
+        "state": "S",
+        "command": "/opt/homebrew/Cellar/erlang/29.1/lib/erlang/erts-17.1/bin/beam.smp -- -root /opt/homebrew/Cellar/erlang/29.1/lib/erlang -bindir /opt/homebrew/Cellar/erlang/29.1/lib/erlang/erts-17.1/bin -progname erl -- -home /Users/chenghanlee -- -noshell -elixir_root /opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib -pa /opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib/elixir/ebin -s elixir start_cli -start_epmd false -epmd_module Elixir.XPForge.EPMD -setcookie expert -- -- -extra -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/patch/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_briefly/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_bunt/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_credo/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_deps_nix/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_elixir_sense/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_engine/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_file_system/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_forge/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_gen_lsp/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_hpax/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_jason/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_logger_backends/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_mint/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_options/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_parsec/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_path_glob/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_quokka/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_schematic/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_sourceror/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_spitfire/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_telemetry/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_typed_struct/ebin --no-halt -e System.argv() |> hd() |> Base.decode64!() |> Code.eval_string() bm9kZSA9IDoiZXhwZXJ0LXByb2plY3QtdGlwc19leHBlcnRfbmVvdmltX3ZhbGlkYXRpb24tNTczMjNAMTI3LjAuMC4xIgpub2RlX3N0YXJ0ID0gTm9kZS5zdGFydChub2RlLCA6bG9uZ25hbWVzKQoKY2FzZSBub2RlX3N0YXJ0IGRvCiAgezpvaywgX30gLT4KICAgIDpvayA9IFhQRm9yZ2UuTm9kZVBvcnRNYXBwZXIucmVnaXN0ZXIoKQogICAgSU8ucHV0cygib2siKQoKICB7OmVycm9yLCByZWFzb259IC0+CiAgICBJTy5wdXRzKCJlcnJvciBzdGFydGluZyBub2RlOiAje2luc3BlY3QocmVhc29uKX0iKQogICAgSU8ucHV0cygiZXJyb3Igc3RhcnRpbmcgbm9kZToKICN7aW5zcGVjdChyZWFzb24pfSIpCmVuZA=="
+      },
+      "73607": {
+        "parent": 73605,
+        "state": "S",
+        "command": "bash /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/lib/xp_expert-0.1.10/priv/port_wrapper.sh /opt/homebrew/bin/elixir -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/patch/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_briefly/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_bunt/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_credo/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_deps_nix/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_elixir_sense/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_engine/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_file_system/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_forge/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_gen_lsp/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_hpax/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_jason/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_logger_backends/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_mint/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_options/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_parsec/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_path_glob/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_quokka/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_schematic/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_sourceror/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_spitfire/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_telemetry/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_typed_struct/ebin --erl -start_epmd false -epmd_module Elixir.XPForge.EPMD --cookie [REDACTED_RUNTIME_COOKIE] --no-halt -e System.argv() |> hd() |> Base.decode64!() |> Code.eval_string() bm9kZSA9IDoiZXhwZXJ0LXByb2plY3QtdGlwc19leHBlcnRfbmVvdmltX3ZhbGlkYXRpb24tNTczMjNAMTI3LjAuMC4xIgpub2RlX3N0YXJ0ID0gTm9kZS5zdGFydChub2RlLCA6bG9uZ25hbWVzKQoKY2FzZSBub2RlX3N0YXJ0IGRvCiAgezpvaywgX30gLT4KICAgIDpvayA9IFhQRm9yZ2UuTm9kZVBvcnRNYXBwZXIucmVnaXN0ZXIoKQogICAgSU8ucHV0cygib2siKQoKICB7OmVycm9yLCByZWFzb259IC0+CiAgICBJTy5wdXRzKCJlcnJvciBzdGFydGluZyBub2RlOiAje2luc3BlY3QocmVhc29uKX0iKQogICAgSU8ucHV0cygiZXJyb3Igc3RhcnRpbmcgbm9kZToKICN7aW5zcGVjdChyZWFzb24pfSIpCmVuZA=="
+      },
+      "73608": {
+        "parent": 73607,
+        "state": "S",
+        "command": "bash /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/lib/xp_expert-0.1.10/priv/port_wrapper.sh /opt/homebrew/bin/elixir -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/patch/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_briefly/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_bunt/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_credo/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_deps_nix/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_elixir_sense/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_engine/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_file_system/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_forge/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_gen_lsp/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_hpax/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_jason/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_logger_backends/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_mint/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_options/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_parsec/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_path_glob/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_quokka/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_schematic/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_sourceror/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_spitfire/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_telemetry/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_typed_struct/ebin --erl -start_epmd false -epmd_module Elixir.XPForge.EPMD --cookie [REDACTED_RUNTIME_COOKIE] --no-halt -e System.argv() |> hd() |> Base.decode64!() |> Code.eval_string() bm9kZSA9IDoiZXhwZXJ0LXByb2plY3QtdGlwc19leHBlcnRfbmVvdmltX3ZhbGlkYXRpb24tNTczMjNAMTI3LjAuMC4xIgpub2RlX3N0YXJ0ID0gTm9kZS5zdGFydChub2RlLCA6bG9uZ25hbWVzKQoKY2FzZSBub2RlX3N0YXJ0IGRvCiAgezpvaywgX30gLT4KICAgIDpvayA9IFhQRm9yZ2UuTm9kZVBvcnRNYXBwZXIucmVnaXN0ZXIoKQogICAgSU8ucHV0cygib2siKQoKICB7OmVycm9yLCByZWFzb259IC0+CiAgICBJTy5wdXRzKCJlcnJvciBzdGFydGluZyBub2RlOiAje2luc3BlY3QocmVhc29uKX0iKQogICAgSU8ucHV0cygiZXJyb3Igc3RhcnRpbmcgbm9kZToKICN7aW5zcGVjdChyZWFzb24pfSIpCmVuZA=="
+      },
+      "73645": {
+        "parent": 73606,
+        "state": "Ss",
+        "command": "erl_child_setup 8192"
+      },
+      "73646": {
+        "parent": 73645,
+        "state": "Ss",
+        "command": "/opt/homebrew/Cellar/erlang/29.1/lib/erlang/erts-17.1/bin/inet_gethost 4"
+      },
+      "73647": {
+        "parent": 73646,
+        "state": "S",
+        "command": "/opt/homebrew/Cellar/erlang/29.1/lib/erlang/erts-17.1/bin/inet_gethost 4"
+      },
+      "73520": {
+        "parent": 73467,
+        "state": "Ss",
+        "command": "erl_child_setup 8192"
+      },
+      "73465": {
+        "parent": 73453,
+        "state": "Ss",
+        "command": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-vendor/vv-mcp"
+      },
+      "73466": {
+        "parent": 73465,
+        "state": "S",
+        "command": "nvim --headless --listen /var/folders/26/15tlmtc55wggjp8xt79bh5n40000gn/T/vv-mcp-73465-0.sock /private/tmp/tips-expert-neovim-validation/lib/tips/search_probe.ex"
+      },
+      "73467": {
+        "parent": 73466,
+        "state": "Ss",
+        "command": "/opt/homebrew/Cellar/expert/0.1.10/libexec/expert/erts-17.0.6/bin/beam.smp -S 4:4 -- -root /opt/homebrew/Cellar/expert/0.1.10/libexec/expert -bindir /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/erts-17.0.6/bin -progname erl -- -home /Users/chenghanlee -- -noshell -s elixir start_cli -setcookie expert -config /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/releases/0.1.10/sys -boot /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/releases/0.1.10/start_clean -boot_var RELEASE_LIB /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/lib -start_epmd false -epmd_module Elixir.XPForge.EPMD -- -- -- -- -extra --eval System.no_halt(true); Application.ensure_all_started(:xp_expert) -- --stdio"
+      }
+    },
+    "remaining": {}
+  },
+  "source_restored": true
+}

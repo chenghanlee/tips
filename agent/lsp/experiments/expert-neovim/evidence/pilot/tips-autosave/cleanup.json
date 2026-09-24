@@ -1,0 +1,30 @@
+{
+  "owned": {
+    "43242": {
+      "parent": 39558,
+      "state": "Ss",
+      "command": "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python agent/lsp/experiments/expert-neovim/tips_probe.py --sync --output tmp/expert-neovim/tips-autosave"
+    },
+    "43309": {
+      "parent": 43256,
+      "state": "Ss",
+      "command": "erl_child_setup 8192"
+    },
+    "43254": {
+      "parent": 43242,
+      "state": "Ss",
+      "command": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-vendor/vv-mcp"
+    },
+    "43255": {
+      "parent": 43254,
+      "state": "S",
+      "command": "nvim --headless --listen /var/folders/26/15tlmtc55wggjp8xt79bh5n40000gn/T/vv-mcp-43254-0.sock /private/tmp/tips-expert-neovim-codex/lib/tips/search_probe.ex"
+    },
+    "43256": {
+      "parent": 43255,
+      "state": "Ss",
+      "command": "/opt/homebrew/Cellar/expert/0.1.10/libexec/expert/erts-17.0.6/bin/beam.smp -S 4:4 -- -root /opt/homebrew/Cellar/expert/0.1.10/libexec/expert -bindir /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/erts-17.0.6/bin -progname erl -- -home /Users/chenghanlee -- -noshell -s elixir start_cli -setcookie expert -config /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/releases/0.1.10/sys -boot /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/releases/0.1.10/start_clean -boot_var RELEASE_LIB /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/lib -start_epmd false -epmd_module Elixir.XPForge.EPMD -- -- -- -- -extra --eval System.no_halt(true); Application.ensure_all_started(:xp_expert) -- --stdio"
+    }
+  },
+  "remaining": {}
+}

@@ -43,7 +43,8 @@ Primary references, inspected alongside pinned local implementations:
 - [Elixir Supervisor lifecycle conventions](https://hexdocs.pm/elixir/Supervisor.html)
 
 The raw installation URL was read with curl after the web fetch returned a cache
-miss; its downloaded copy is in the evidence directory. Version/provenance details
+miss; its [downloaded copy](evidence/upstream/expert-installation.txt) is archived.
+Version/provenance details
 are in [versions.json](versions.json). Upstream main-branch docs can evolve; the
 experiment's runtime versions and copied configs are the reproducibility record.
 

@@ -1,0 +1,1274 @@
+{
+  "schema_version": 1,
+  "date": "2026-09-24",
+  "scope": "Selected text evidence for all 15 recorded runs. Original local files are unchanged.",
+  "selection": "Top-level JSON, JSONL, log and trace files; Neovim environment Lua configurations and log files. Runtime registries, sockets, binaries, caches and dependency trees excluded. Also includes the supplied upstream installation guide.",
+  "redaction": "Runtime credentials in --cookie arguments and structured cookie fields replaced with [REDACTED_RUNTIME_COOKIE]. Ordinary uses of the Expert name and all result predicates, timings and error messages are retained. Original files are unchanged.",
+  "files": [
+    {
+      "path": "evidence/pilot/autosave/alpha-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/autosave/alpha-environment/config/nvim/init.lua",
+      "source_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "archived_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "bytes": 1378,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/autosave/alpha-environment/config/nvim/lua/sync.lua",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/autosave/alpha-environment/config/nvim/lua/sync.lua",
+      "source_sha256": "538eb6cdcbfa5d4d7ecc9d3e16ceda284a836be06c0f16545b1c0e573a300be7",
+      "archived_sha256": "538eb6cdcbfa5d4d7ecc9d3e16ceda284a836be06c0f16545b1c0e573a300be7",
+      "bytes": 2718,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/autosave/alpha-environment/nvim.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/autosave/alpha-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/autosave/alpha-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/autosave/alpha-environment/state/nvim/lsp.log",
+      "source_sha256": "44b859ab7d677baf8c39f710159622fafd5db494348742b0912e1314efc5ec30",
+      "archived_sha256": "44b859ab7d677baf8c39f710159622fafd5db494348742b0912e1314efc5ec30",
+      "bytes": 175320,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/autosave/alpha-mix.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/autosave/alpha-mix.log",
+      "source_sha256": "acb2d2380ac890efc4dd8238331e8103e48194b5262b45938832d4fd0c61255a",
+      "archived_sha256": "acb2d2380ac890efc4dd8238331e8103e48194b5262b45938832d4fd0c61255a",
+      "bytes": 236,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/autosave/alpha.jsonl",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/autosave/alpha.jsonl",
+      "source_sha256": "46cce9beed0b768d9af00dd4fb8d0c776c2c33b87ee32008390bf815db265884",
+      "archived_sha256": "46cce9beed0b768d9af00dd4fb8d0c776c2c33b87ee32008390bf815db265884",
+      "bytes": 53997,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/autosave/alpha.stderr.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/autosave/alpha.stderr.log",
+      "source_sha256": "1cedb794eeeeb8b473cf0c73564a48b98d10c8e7a5d43ee8bde705f12efdc853",
+      "archived_sha256": "1cedb794eeeeb8b473cf0c73564a48b98d10c8e7a5d43ee8bde705f12efdc853",
+      "bytes": 130,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/autosave/beta-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/autosave/beta-environment/config/nvim/init.lua",
+      "source_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "archived_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "bytes": 1378,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/autosave/beta-environment/config/nvim/lua/sync.lua",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/autosave/beta-environment/config/nvim/lua/sync.lua",
+      "source_sha256": "538eb6cdcbfa5d4d7ecc9d3e16ceda284a836be06c0f16545b1c0e573a300be7",
+      "archived_sha256": "538eb6cdcbfa5d4d7ecc9d3e16ceda284a836be06c0f16545b1c0e573a300be7",
+      "bytes": 2718,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/autosave/beta-environment/nvim.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/autosave/beta-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/autosave/beta-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/autosave/beta-environment/state/nvim/lsp.log",
+      "source_sha256": "a5e277cbc08ecef9ea8b867c3fb60017cf8780049eb14105293b26814bdf9366",
+      "archived_sha256": "a5e277cbc08ecef9ea8b867c3fb60017cf8780049eb14105293b26814bdf9366",
+      "bytes": 69396,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/autosave/beta-mix.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/autosave/beta-mix.log",
+      "source_sha256": "77e04e6f35c71ffdf1753d3cb6aa48eadefd9914a8935b551e78f020427e9b62",
+      "archived_sha256": "77e04e6f35c71ffdf1753d3cb6aa48eadefd9914a8935b551e78f020427e9b62",
+      "bytes": 236,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/autosave/beta.jsonl",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/autosave/beta.jsonl",
+      "source_sha256": "62bb09e2715b6538d338047f06a7cb3fd5846869c5d75aaa39e82fe213f77683",
+      "archived_sha256": "62bb09e2715b6538d338047f06a7cb3fd5846869c5d75aaa39e82fe213f77683",
+      "bytes": 19432,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/autosave/beta.stderr.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/autosave/beta.stderr.log",
+      "source_sha256": "cc6c70364ef92d1a8a8b605a36fbb6e36356fe0d102e160469713e8e2a012a59",
+      "archived_sha256": "cc6c70364ef92d1a8a8b605a36fbb6e36356fe0d102e160469713e8e2a012a59",
+      "bytes": 93,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/autosave/results.json",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/autosave/results.json",
+      "source_sha256": "cea7a6e00ab8f4963d644193764e21f56d48f275cd9e00569f46c2e3cd9f5604",
+      "archived_sha256": "cea7a6e00ab8f4963d644193764e21f56d48f275cd9e00569f46c2e3cd9f5604",
+      "bytes": 114727,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/baseline/alpha-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/baseline/alpha-environment/config/nvim/init.lua",
+      "source_sha256": "882c419639cfa133ed252b48c369227a38b43ca2b20cd36a4f8c4f8c75a56866",
+      "archived_sha256": "882c419639cfa133ed252b48c369227a38b43ca2b20cd36a4f8c4f8c75a56866",
+      "bytes": 1310,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/baseline/alpha-environment/nvim.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/baseline/alpha-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/baseline/alpha-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/baseline/alpha-environment/state/nvim/lsp.log",
+      "source_sha256": "6972535c30b5013a27c0478eb45986febc3a2bcaafb71970ff26ad5dd199137c",
+      "archived_sha256": "6972535c30b5013a27c0478eb45986febc3a2bcaafb71970ff26ad5dd199137c",
+      "bytes": 264746,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/baseline/alpha-mix.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/baseline/alpha-mix.log",
+      "source_sha256": "31ffc4086de4e260fb199b13fc5bc210bf5d7ded74a2ab778dd3466039954cb9",
+      "archived_sha256": "31ffc4086de4e260fb199b13fc5bc210bf5d7ded74a2ab778dd3466039954cb9",
+      "bytes": 236,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/baseline/alpha.jsonl",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/baseline/alpha.jsonl",
+      "source_sha256": "b6f1e2600a6115057e56747925039a2e59a461e6648e9e323ed2e646ff783eec",
+      "archived_sha256": "b6f1e2600a6115057e56747925039a2e59a461e6648e9e323ed2e646ff783eec",
+      "bytes": 132265,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/baseline/alpha.stderr.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/baseline/alpha.stderr.log",
+      "source_sha256": "fd9a070c0d37796b1df597d2d7329ed51974e70a0b5e84a0fc5950a83f0e1ca8",
+      "archived_sha256": "fd9a070c0d37796b1df597d2d7329ed51974e70a0b5e84a0fc5950a83f0e1ca8",
+      "bytes": 267,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/baseline/beta-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/baseline/beta-environment/config/nvim/init.lua",
+      "source_sha256": "882c419639cfa133ed252b48c369227a38b43ca2b20cd36a4f8c4f8c75a56866",
+      "archived_sha256": "882c419639cfa133ed252b48c369227a38b43ca2b20cd36a4f8c4f8c75a56866",
+      "bytes": 1310,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/baseline/beta-environment/nvim.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/baseline/beta-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/baseline/beta-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/baseline/beta-environment/state/nvim/lsp.log",
+      "source_sha256": "612b32a63aec0a45697872cef03526abe18b53ac2b10670a35430c35da0e2821",
+      "archived_sha256": "612b32a63aec0a45697872cef03526abe18b53ac2b10670a35430c35da0e2821",
+      "bytes": 70942,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/baseline/beta-mix.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/baseline/beta-mix.log",
+      "source_sha256": "9486f733f7dffb4e9bc6014266c4ba58555974450bc1fbcd71e15963da193d35",
+      "archived_sha256": "9486f733f7dffb4e9bc6014266c4ba58555974450bc1fbcd71e15963da193d35",
+      "bytes": 236,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/baseline/beta.jsonl",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/baseline/beta.jsonl",
+      "source_sha256": "e8eb553a7ba0f3cfdb9ffd526146c15fc986a0d1071abe062063695ae53a1372",
+      "archived_sha256": "e8eb553a7ba0f3cfdb9ffd526146c15fc986a0d1071abe062063695ae53a1372",
+      "bytes": 19953,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/baseline/beta.stderr.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/baseline/beta.stderr.log",
+      "source_sha256": "cc6c70364ef92d1a8a8b605a36fbb6e36356fe0d102e160469713e8e2a012a59",
+      "archived_sha256": "cc6c70364ef92d1a8a8b605a36fbb6e36356fe0d102e160469713e8e2a012a59",
+      "bytes": 93,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/baseline/results.json",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/baseline/results.json",
+      "source_sha256": "108815ffdc96e0bb80b20855e7c4dc0830b2e138c7da5a94940ca1f08bf58631",
+      "archived_sha256": "1143c265a68e3fcfb11b1691fe437cabee1f5b83e50cebfa0d8968ff4a1051a8",
+      "bytes": 202473,
+      "runtime_cookie_redactions": 6
+    },
+    {
+      "path": "evidence/pilot/save-reindex/alpha-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/save-reindex/alpha-environment/config/nvim/init.lua",
+      "source_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "archived_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "bytes": 1378,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/save-reindex/alpha-environment/config/nvim/lua/sync.lua",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/save-reindex/alpha-environment/config/nvim/lua/sync.lua",
+      "source_sha256": "af41729e44ab562507738e7dcf278933ff079cba540c0a7eb428b74cd96527b7",
+      "archived_sha256": "af41729e44ab562507738e7dcf278933ff079cba540c0a7eb428b74cd96527b7",
+      "bytes": 3058,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/save-reindex/alpha-environment/nvim.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/save-reindex/alpha-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/save-reindex/alpha-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/save-reindex/alpha-environment/state/nvim/lsp.log",
+      "source_sha256": "8cf5dec465fe38299cbfe58eb6c19d6989cfa8758d4888a50aa0960551af82ad",
+      "archived_sha256": "8cf5dec465fe38299cbfe58eb6c19d6989cfa8758d4888a50aa0960551af82ad",
+      "bytes": 130166,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/save-reindex/alpha-mix.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/save-reindex/alpha-mix.log",
+      "source_sha256": "110142f58f03606d5f5b120cfcd7ae229c98bf83889de56d5a4f0061e6c40ca7",
+      "archived_sha256": "110142f58f03606d5f5b120cfcd7ae229c98bf83889de56d5a4f0061e6c40ca7",
+      "bytes": 236,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/save-reindex/alpha.jsonl",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/save-reindex/alpha.jsonl",
+      "source_sha256": "912b26831939ca0b6b6a41ed6c2213d3456db04946ab5d725f70544337610eb0",
+      "archived_sha256": "912b26831939ca0b6b6a41ed6c2213d3456db04946ab5d725f70544337610eb0",
+      "bytes": 30162,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/save-reindex/alpha.stderr.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/save-reindex/alpha.stderr.log",
+      "source_sha256": "9e928eae4041e4f76835ba9a1b5ad91cc4e22793de66347467354af963f67d6f",
+      "archived_sha256": "9e928eae4041e4f76835ba9a1b5ad91cc4e22793de66347467354af963f67d6f",
+      "bytes": 314,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/save-reindex/beta-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/save-reindex/beta-environment/config/nvim/init.lua",
+      "source_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "archived_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "bytes": 1378,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/save-reindex/beta-environment/config/nvim/lua/sync.lua",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/save-reindex/beta-environment/config/nvim/lua/sync.lua",
+      "source_sha256": "af41729e44ab562507738e7dcf278933ff079cba540c0a7eb428b74cd96527b7",
+      "archived_sha256": "af41729e44ab562507738e7dcf278933ff079cba540c0a7eb428b74cd96527b7",
+      "bytes": 3058,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/save-reindex/beta-environment/nvim.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/save-reindex/beta-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/save-reindex/beta-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/save-reindex/beta-environment/state/nvim/lsp.log",
+      "source_sha256": "62469b2b4586ede913c016d8973c6861a26e42fddfbf37e1ed0b7bf821b733fb",
+      "archived_sha256": "62469b2b4586ede913c016d8973c6861a26e42fddfbf37e1ed0b7bf821b733fb",
+      "bytes": 71074,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/save-reindex/beta-mix.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/save-reindex/beta-mix.log",
+      "source_sha256": "fe4349f8a2a410c37d65321235e26050cd1973b793fdc72aa41766cb354f7a01",
+      "archived_sha256": "fe4349f8a2a410c37d65321235e26050cd1973b793fdc72aa41766cb354f7a01",
+      "bytes": 236,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/save-reindex/beta.jsonl",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/save-reindex/beta.jsonl",
+      "source_sha256": "f1460bbb75f682e878362093098f4c21527c6535544e62738c7a7e130af029a8",
+      "archived_sha256": "f1460bbb75f682e878362093098f4c21527c6535544e62738c7a7e130af029a8",
+      "bytes": 20022,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/save-reindex/beta.stderr.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/save-reindex/beta.stderr.log",
+      "source_sha256": "cc6c70364ef92d1a8a8b605a36fbb6e36356fe0d102e160469713e8e2a012a59",
+      "archived_sha256": "cc6c70364ef92d1a8a8b605a36fbb6e36356fe0d102e160469713e8e2a012a59",
+      "bytes": 93,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/save-reindex/results.json",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/save-reindex/results.json",
+      "source_sha256": "29d3647b6c5569a6ec0865c1ff24dc32a135aab8e719149852246c3792bba669",
+      "archived_sha256": "c22acf3d7a728586e077f49abb77d44bcfdbafe1fe9d29aa25638218b18918fc",
+      "bytes": 132208,
+      "runtime_cookie_redactions": 6
+    },
+    {
+      "path": "evidence/pilot/tips-autosave/cleanup.json",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-autosave/cleanup.json",
+      "source_sha256": "e8c36e265779078f115b2d2c61e5b256fb8d00c7c302c56cdef7dc890e4cd3fa",
+      "archived_sha256": "e8c36e265779078f115b2d2c61e5b256fb8d00c7c302c56cdef7dc890e4cd3fa",
+      "bytes": 1637,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/tips-autosave/results.json",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-autosave/results.json",
+      "source_sha256": "a3621b9c32dd8524ef66ba431327143c4bbe127c585f4a2fab79c09b282ffb52",
+      "archived_sha256": "a3621b9c32dd8524ef66ba431327143c4bbe127c585f4a2fab79c09b282ffb52",
+      "bytes": 122433,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/tips-autosave/tips-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-autosave/tips-environment/config/nvim/init.lua",
+      "source_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "archived_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "bytes": 1378,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/tips-autosave/tips-environment/config/nvim/lua/sync.lua",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-autosave/tips-environment/config/nvim/lua/sync.lua",
+      "source_sha256": "538eb6cdcbfa5d4d7ecc9d3e16ceda284a836be06c0f16545b1c0e573a300be7",
+      "archived_sha256": "538eb6cdcbfa5d4d7ecc9d3e16ceda284a836be06c0f16545b1c0e573a300be7",
+      "bytes": 2718,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/tips-autosave/tips-environment/nvim.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-autosave/tips-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/tips-autosave/tips-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-autosave/tips-environment/state/nvim/lsp.log",
+      "source_sha256": "bb0c2b8c8573467a2413481b009c7b896bf5eb3535f1f17569fba5a40d847e89",
+      "archived_sha256": "bb0c2b8c8573467a2413481b009c7b896bf5eb3535f1f17569fba5a40d847e89",
+      "bytes": 629217,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/tips-autosave/tips.jsonl",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-autosave/tips.jsonl",
+      "source_sha256": "5fe4bce8076109d5c46869661d65ae89191bdc965c6e5acf6921fdcf3201fee3",
+      "archived_sha256": "5fe4bce8076109d5c46869661d65ae89191bdc965c6e5acf6921fdcf3201fee3",
+      "bytes": 182895,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/tips-autosave/tips.stderr.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-autosave/tips.stderr.log",
+      "source_sha256": "ed18e6798e1e35be10a0e9cd30e4df80c49960c508e5939243ad783e6198933d",
+      "archived_sha256": "ed18e6798e1e35be10a0e9cd30e4df80c49960c508e5939243ad783e6198933d",
+      "bytes": 1671,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/tips-save-reindex/results.json",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-save-reindex/results.json",
+      "source_sha256": "6978f2352198bfd751090ae1934c4dc1436520c06a35ef28c77ef3fd278ed8c5",
+      "archived_sha256": "3786c2f42bf4c4a2b6a1abb5b8b6373961784b0aab6b81cb2e7a36c049c34460",
+      "bytes": 765412,
+      "runtime_cookie_redactions": 3
+    },
+    {
+      "path": "evidence/pilot/tips-save-reindex/tips-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-save-reindex/tips-environment/config/nvim/init.lua",
+      "source_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "archived_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "bytes": 1378,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/tips-save-reindex/tips-environment/config/nvim/lua/sync.lua",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-save-reindex/tips-environment/config/nvim/lua/sync.lua",
+      "source_sha256": "af41729e44ab562507738e7dcf278933ff079cba540c0a7eb428b74cd96527b7",
+      "archived_sha256": "af41729e44ab562507738e7dcf278933ff079cba540c0a7eb428b74cd96527b7",
+      "bytes": 3058,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/tips-save-reindex/tips-environment/nvim.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-save-reindex/tips-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/tips-save-reindex/tips-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-save-reindex/tips-environment/state/nvim/lsp.log",
+      "source_sha256": "69dec9cc7cecff8ce0172a59569ba094636c32b223add823eeda4c1782c4b129",
+      "archived_sha256": "69dec9cc7cecff8ce0172a59569ba094636c32b223add823eeda4c1782c4b129",
+      "bytes": 743859,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/tips-save-reindex/tips.jsonl",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-save-reindex/tips.jsonl",
+      "source_sha256": "564670be2a6e069d7b9bab9a2a68b79d517b221bf052187200e360701b3c67a4",
+      "archived_sha256": "564670be2a6e069d7b9bab9a2a68b79d517b221bf052187200e360701b3c67a4",
+      "bytes": 57259,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/pilot/tips-save-reindex/tips.stderr.log",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-save-reindex/tips.stderr.log",
+      "source_sha256": "154081cc24e60fd4d8dd10f400e7820e940052552bcbe38164e472305aeed67d",
+      "archived_sha256": "154081cc24e60fd4d8dd10f400e7820e940052552bcbe38164e472305aeed67d",
+      "bytes": 785,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/application-checks/compile.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/application-checks/compile.log",
+      "source_sha256": "12bd0d268b7ac861cec2c6ab20331df8170474daf05014c4eac0726d918637aa",
+      "archived_sha256": "12bd0d268b7ac861cec2c6ab20331df8170474daf05014c4eac0726d918637aa",
+      "bytes": 44,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/application-checks/credo-corrected.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/application-checks/credo-corrected.log",
+      "source_sha256": "fcd3bd8526476911f829bb7dd4cf103e8335e7a8c00c569daac8bfce78daffcf",
+      "archived_sha256": "fcd3bd8526476911f829bb7dd4cf103e8335e7a8c00c569daac8bfce78daffcf",
+      "bytes": 352,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/application-checks/credo.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/application-checks/credo.log",
+      "source_sha256": "46bc497eedcf8dd153a234189ec3d94d32f46722137682ef805b4ecc8ab84ff2",
+      "archived_sha256": "46bc497eedcf8dd153a234189ec3d94d32f46722137682ef805b4ecc8ab84ff2",
+      "bytes": 66,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/application-checks/format.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/application-checks/format.log",
+      "source_sha256": "67e25a799f7e5ee0c1fe73b8933ce4aa77d689e9f575864a38de216b935df7bc",
+      "archived_sha256": "67e25a799f7e5ee0c1fe73b8933ce4aa77d689e9f575864a38de216b935df7bc",
+      "bytes": 7961,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/application-checks/results.json",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/application-checks/results.json",
+      "source_sha256": "367cfe2ca992e949c1fc796fd7e83378f24988b7d5fa9568f451e0fac41a47fa",
+      "archived_sha256": "367cfe2ca992e949c1fc796fd7e83378f24988b7d5fa9568f451e0fac41a47fa",
+      "bytes": 1084,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/application-checks/test.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/application-checks/test.log",
+      "source_sha256": "868ca2421ea0eef61ac4aa5f42ea87db5c63c763f4f2ad06b7857c99a17b9585",
+      "archived_sha256": "868ca2421ea0eef61ac4aa5f42ea87db5c63c763f4f2ad06b7857c99a17b9585",
+      "bytes": 9433,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-delete-reindex/alpha-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha-environment/config/nvim/init.lua",
+      "source_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "archived_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "bytes": 1378,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-delete-reindex/alpha-environment/config/nvim/lua/sync.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha-environment/config/nvim/lua/sync.lua",
+      "source_sha256": "a0884e52122cc98745871fc7101ef835a69af2fac5020fd5fbeb6d86acffb2de",
+      "archived_sha256": "a0884e52122cc98745871fc7101ef835a69af2fac5020fd5fbeb6d86acffb2de",
+      "bytes": 4077,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-delete-reindex/alpha-environment/nvim.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-delete-reindex/alpha-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha-environment/state/nvim/lsp.log",
+      "source_sha256": "35dc3e969fd9f198bc0cfe0547c40b70b50f6365950596d9b07b6488341636e9",
+      "archived_sha256": "35dc3e969fd9f198bc0cfe0547c40b70b50f6365950596d9b07b6488341636e9",
+      "bytes": 134914,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-delete-reindex/alpha-mix.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha-mix.log",
+      "source_sha256": "0954272f6212d6e92730bfbcbc5e2789eeca827f04273d589aaed98c65c74deb",
+      "archived_sha256": "0954272f6212d6e92730bfbcbc5e2789eeca827f04273d589aaed98c65c74deb",
+      "bytes": 236,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-delete-reindex/alpha.jsonl",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha.jsonl",
+      "source_sha256": "7c7cecb4eed66f5d68cc181aaa430f5130786f15648b6189a25c72365857ee5f",
+      "archived_sha256": "7c7cecb4eed66f5d68cc181aaa430f5130786f15648b6189a25c72365857ee5f",
+      "bytes": 37050,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-delete-reindex/alpha.stderr.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha.stderr.log",
+      "source_sha256": "e664e29a2fbc20383c59ccc328f85eac39841f7e411f141e94748025871cc92c",
+      "archived_sha256": "e664e29a2fbc20383c59ccc328f85eac39841f7e411f141e94748025871cc92c",
+      "bytes": 130,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-delete-reindex/beta-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/beta-environment/config/nvim/init.lua",
+      "source_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "archived_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "bytes": 1378,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-delete-reindex/beta-environment/config/nvim/lua/sync.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/beta-environment/config/nvim/lua/sync.lua",
+      "source_sha256": "a0884e52122cc98745871fc7101ef835a69af2fac5020fd5fbeb6d86acffb2de",
+      "archived_sha256": "a0884e52122cc98745871fc7101ef835a69af2fac5020fd5fbeb6d86acffb2de",
+      "bytes": 4077,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-delete-reindex/beta-environment/nvim.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/beta-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-delete-reindex/beta-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/beta-environment/state/nvim/lsp.log",
+      "source_sha256": "f7c91a99d050103e32e99898e49ccffdcefdf084eeb3116867256716e0cfb40e",
+      "archived_sha256": "f7c91a99d050103e32e99898e49ccffdcefdf084eeb3116867256716e0cfb40e",
+      "bytes": 73478,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-delete-reindex/beta-mix.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/beta-mix.log",
+      "source_sha256": "294836e6c95ec6c2c7b2fb097b3f84a6e2d8f11727734ea4d6a77e3031e0a67b",
+      "archived_sha256": "294836e6c95ec6c2c7b2fb097b3f84a6e2d8f11727734ea4d6a77e3031e0a67b",
+      "bytes": 236,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-delete-reindex/beta.jsonl",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/beta.jsonl",
+      "source_sha256": "81fac0a4a6adaea3852068b90061ffae30c3464e83f01128eafe7249a5e9b1ec",
+      "archived_sha256": "81fac0a4a6adaea3852068b90061ffae30c3464e83f01128eafe7249a5e9b1ec",
+      "bytes": 20787,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-delete-reindex/beta.stderr.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/beta.stderr.log",
+      "source_sha256": "cc6c70364ef92d1a8a8b605a36fbb6e36356fe0d102e160469713e8e2a012a59",
+      "archived_sha256": "cc6c70364ef92d1a8a8b605a36fbb6e36356fe0d102e160469713e8e2a012a59",
+      "bytes": 93,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-delete-reindex/results.json",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/results.json",
+      "source_sha256": "8f4a4a9379f7f18b2b2938f2918dc6e50b712d0c1501cfe4f2da3f3dfa778427",
+      "archived_sha256": "859da7cd86e78262fe0e0cacc37c3d10746749c685e4228239be8feaadaea129",
+      "bytes": 141269,
+      "runtime_cookie_redactions": 6
+    },
+    {
+      "path": "evidence/tips-validation/editor-events/alpha-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-events/alpha-environment/config/nvim/init.lua",
+      "source_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "archived_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "bytes": 1378,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-events/alpha-environment/config/nvim/lua/sync.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-events/alpha-environment/config/nvim/lua/sync.lua",
+      "source_sha256": "1039cf9405d1e112ab2f783064086e9658d0756638a4a64675849f77c76e4f45",
+      "archived_sha256": "1039cf9405d1e112ab2f783064086e9658d0756638a4a64675849f77c76e4f45",
+      "bytes": 3995,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-events/alpha-environment/nvim.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-events/alpha-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-events/alpha-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-events/alpha-environment/state/nvim/lsp.log",
+      "source_sha256": "37f0ae8ade3ee87df9773941e39caeb8b8c97d7aac54fe54527c8807296ab160",
+      "archived_sha256": "37f0ae8ade3ee87df9773941e39caeb8b8c97d7aac54fe54527c8807296ab160",
+      "bytes": 200082,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-events/alpha-mix.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-events/alpha-mix.log",
+      "source_sha256": "a70860b4c2fbacb3a8535277a4d209937595b97b16a8ee9bd1e455b27091ea5a",
+      "archived_sha256": "a70860b4c2fbacb3a8535277a4d209937595b97b16a8ee9bd1e455b27091ea5a",
+      "bytes": 236,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-events/alpha.jsonl",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-events/alpha.jsonl",
+      "source_sha256": "4c9af98e8ee9c67a95e27180949996c4cd57d429ee7956c6bcc2a32b1bcd2ce2",
+      "archived_sha256": "4c9af98e8ee9c67a95e27180949996c4cd57d429ee7956c6bcc2a32b1bcd2ce2",
+      "bytes": 62361,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-events/alpha.stderr.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-events/alpha.stderr.log",
+      "source_sha256": "cc6c70364ef92d1a8a8b605a36fbb6e36356fe0d102e160469713e8e2a012a59",
+      "archived_sha256": "cc6c70364ef92d1a8a8b605a36fbb6e36356fe0d102e160469713e8e2a012a59",
+      "bytes": 93,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-events/beta-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-events/beta-environment/config/nvim/init.lua",
+      "source_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "archived_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "bytes": 1378,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-events/beta-environment/config/nvim/lua/sync.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-events/beta-environment/config/nvim/lua/sync.lua",
+      "source_sha256": "1039cf9405d1e112ab2f783064086e9658d0756638a4a64675849f77c76e4f45",
+      "archived_sha256": "1039cf9405d1e112ab2f783064086e9658d0756638a4a64675849f77c76e4f45",
+      "bytes": 3995,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-events/beta-environment/nvim.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-events/beta-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-events/beta-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-events/beta-environment/state/nvim/lsp.log",
+      "source_sha256": "abf5c0519c853aec7da3f23d75050fd2fa10f7a01686dd551932f9c207e83713",
+      "archived_sha256": "abf5c0519c853aec7da3f23d75050fd2fa10f7a01686dd551932f9c207e83713",
+      "bytes": 71029,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-events/beta-mix.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-events/beta-mix.log",
+      "source_sha256": "109c7e2576fce53f458d516f5b7ceea0cab5ed17f211f132f0a059c58e1a7042",
+      "archived_sha256": "109c7e2576fce53f458d516f5b7ceea0cab5ed17f211f132f0a059c58e1a7042",
+      "bytes": 236,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-events/beta.jsonl",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-events/beta.jsonl",
+      "source_sha256": "9234c3c8192653fb8152aa3ec7b909736c6dce71bb77d5b43e1772b1711cd9f8",
+      "archived_sha256": "9234c3c8192653fb8152aa3ec7b909736c6dce71bb77d5b43e1772b1711cd9f8",
+      "bytes": 19821,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-events/beta.stderr.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-events/beta.stderr.log",
+      "source_sha256": "f5d408236c1233b23a6805cb5e2a23cca4c4a68f1e1a96e334753cb56a89f4f5",
+      "archived_sha256": "f5d408236c1233b23a6805cb5e2a23cca4c4a68f1e1a96e334753cb56a89f4f5",
+      "bytes": 140,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/editor-events/results.json",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/editor-events/results.json",
+      "source_sha256": "c58c2b25b6d890ab2c1945763a893646e3b76d38911e1a1e8b5116c31ebaf958",
+      "archived_sha256": "369c10012047b56b4e384bbaa08c2b8f57b140bf9cf1814c02de11a8105ad4cf",
+      "bytes": 166905,
+      "runtime_cookie_redactions": 6
+    },
+    {
+      "path": "evidence/tips-validation/save-reindex/results.json",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/save-reindex/results.json",
+      "source_sha256": "832e9528a30b5737842e0b42ea9c1c855ce9c748ce2f4e5da0d8b38100f84b17",
+      "archived_sha256": "8cfa47bedfd91768972be8c2efb55804b1bcfec7b31a0f54c7797e783dac2837",
+      "bytes": 788518,
+      "runtime_cookie_redactions": 3
+    },
+    {
+      "path": "evidence/tips-validation/save-reindex/tips-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/save-reindex/tips-environment/config/nvim/init.lua",
+      "source_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "archived_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "bytes": 1378,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/save-reindex/tips-environment/config/nvim/lua/sync.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/save-reindex/tips-environment/config/nvim/lua/sync.lua",
+      "source_sha256": "af41729e44ab562507738e7dcf278933ff079cba540c0a7eb428b74cd96527b7",
+      "archived_sha256": "af41729e44ab562507738e7dcf278933ff079cba540c0a7eb428b74cd96527b7",
+      "bytes": 3058,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/save-reindex/tips-environment/nvim.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/save-reindex/tips-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/save-reindex/tips-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/save-reindex/tips-environment/state/nvim/lsp.log",
+      "source_sha256": "c798cdca30021d3d030e784b853cad8792057712ce1ba351fa83f5285d316b1a",
+      "archived_sha256": "c798cdca30021d3d030e784b853cad8792057712ce1ba351fa83f5285d316b1a",
+      "bytes": 780859,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/save-reindex/tips.jsonl",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/save-reindex/tips.jsonl",
+      "source_sha256": "7abaeff916af84834ab1b7c2c41f3c97782a1707b4893d1482592d5f39980cac",
+      "archived_sha256": "7abaeff916af84834ab1b7c2c41f3c97782a1707b4893d1482592d5f39980cac",
+      "bytes": 75089,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/save-reindex/tips.stderr.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/save-reindex/tips.stderr.log",
+      "source_sha256": "bcfc31cd370d1e5ecd1c46c83438ae85ea530f5cc40de137a31302984bcde571",
+      "archived_sha256": "bcfc31cd370d1e5ecd1c46c83438ae85ea530f5cc40de137a31302984bcde571",
+      "bytes": 691,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-combined-unique/expert.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-combined-unique/expert.log",
+      "source_sha256": "a8072afe4b5deeda2b53a17a095785ecabfae2a2238f156f4edbc043c9f926ca",
+      "archived_sha256": "a8072afe4b5deeda2b53a17a095785ecabfae2a2238f156f4edbc043c9f926ca",
+      "bytes": 849730,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-combined-unique/project.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-combined-unique/project.log",
+      "source_sha256": "a01d43f5f3f706c9c1cc48289d5f4beb4672f98382157625cfc73cb35dba2668",
+      "archived_sha256": "a01d43f5f3f706c9c1cc48289d5f4beb4672f98382157625cfc73cb35dba2668",
+      "bytes": 70367,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-combined-unique/results.json",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-combined-unique/results.json",
+      "source_sha256": "396f58a6cbb93ef0369fef4ff31bf0fe26348a9eb91e33133eac2366a3a662a1",
+      "archived_sha256": "74d8d3f8c35aaee713b0d6ede26e91a111371a0f7dd6fead0a79f6bdc918f5b0",
+      "bytes": 186376,
+      "runtime_cookie_redactions": 3
+    },
+    {
+      "path": "evidence/tips-validation/tips-combined-unique/tips-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-combined-unique/tips-environment/config/nvim/init.lua",
+      "source_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "archived_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "bytes": 1378,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-combined-unique/tips-environment/config/nvim/lua/sync.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-combined-unique/tips-environment/config/nvim/lua/sync.lua",
+      "source_sha256": "a0884e52122cc98745871fc7101ef835a69af2fac5020fd5fbeb6d86acffb2de",
+      "archived_sha256": "a0884e52122cc98745871fc7101ef835a69af2fac5020fd5fbeb6d86acffb2de",
+      "bytes": 4077,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-combined-unique/tips-environment/nvim.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-combined-unique/tips-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-combined-unique/tips-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-combined-unique/tips-environment/state/nvim/lsp.log",
+      "source_sha256": "470cce376d5142ab5f3feb8cc104eabdfd74f8c7904cfe85bada4306e02cda4f",
+      "archived_sha256": "470cce376d5142ab5f3feb8cc104eabdfd74f8c7904cfe85bada4306e02cda4f",
+      "bytes": 173844,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-combined-unique/tips.jsonl",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-combined-unique/tips.jsonl",
+      "source_sha256": "8d4daeb388a576a40159fd809e09d9b32221d9f338e67356021c269afe068036",
+      "archived_sha256": "8d4daeb388a576a40159fd809e09d9b32221d9f338e67356021c269afe068036",
+      "bytes": 34348,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-combined-unique/tips.stderr.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-combined-unique/tips.stderr.log",
+      "source_sha256": "9ae122ffc8f58b16bf1b1824d76b2364f39030ae0daa08b66338424fc441b1f9",
+      "archived_sha256": "9ae122ffc8f58b16bf1b1824d76b2364f39030ae0daa08b66338424fc441b1f9",
+      "bytes": 525,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-disk-create-unique/expert.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-disk-create-unique/expert.log",
+      "source_sha256": "8ef371d1858fa35f1be915571adb5572fbd399e4ea1f6f935c615f67a0b676c7",
+      "archived_sha256": "8ef371d1858fa35f1be915571adb5572fbd399e4ea1f6f935c615f67a0b676c7",
+      "bytes": 788437,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-disk-create-unique/project.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-disk-create-unique/project.log",
+      "source_sha256": "420f8a2fef4d7f9c41335987ebf22dcd6dd04ff30cb2b22f57812d6e236952f8",
+      "archived_sha256": "420f8a2fef4d7f9c41335987ebf22dcd6dd04ff30cb2b22f57812d6e236952f8",
+      "bytes": 65666,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-disk-create-unique/results.json",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-disk-create-unique/results.json",
+      "source_sha256": "fafb1e7fdb56c4c0672c20f2319d4049e8f561185f0bac40d3de1311d0214c07",
+      "archived_sha256": "de702ce5283947eeb29d3d2a446ce71523b8daec582caae08c0715e24be6585b",
+      "bytes": 105441,
+      "runtime_cookie_redactions": 3
+    },
+    {
+      "path": "evidence/tips-validation/tips-disk-create-unique/tips-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-disk-create-unique/tips-environment/config/nvim/init.lua",
+      "source_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "archived_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "bytes": 1378,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-disk-create-unique/tips-environment/config/nvim/lua/sync.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-disk-create-unique/tips-environment/config/nvim/lua/sync.lua",
+      "source_sha256": "a0884e52122cc98745871fc7101ef835a69af2fac5020fd5fbeb6d86acffb2de",
+      "archived_sha256": "a0884e52122cc98745871fc7101ef835a69af2fac5020fd5fbeb6d86acffb2de",
+      "bytes": 4077,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-disk-create-unique/tips-environment/nvim.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-disk-create-unique/tips-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-disk-create-unique/tips-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-disk-create-unique/tips-environment/state/nvim/lsp.log",
+      "source_sha256": "5082b327baa58edae74e8d83b01f86a9e6ec299f424396d7933855155f0701f3",
+      "archived_sha256": "5082b327baa58edae74e8d83b01f86a9e6ec299f424396d7933855155f0701f3",
+      "bytes": 156307,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-disk-create-unique/tips.jsonl",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-disk-create-unique/tips.jsonl",
+      "source_sha256": "e38476c5e7fb4769054972f480d2760f0c53ed7f2a85713181e954a0535cf693",
+      "archived_sha256": "e38476c5e7fb4769054972f480d2760f0c53ed7f2a85713181e954a0535cf693",
+      "bytes": 32599,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-disk-create-unique/tips.stderr.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-disk-create-unique/tips.stderr.log",
+      "source_sha256": "3f8a1c90c153e6faa63f0988605680cd4b30728a07ac68b6db36b5bc01399a45",
+      "archived_sha256": "3f8a1c90c153e6faa63f0988605680cd4b30728a07ac68b6db36b5bc01399a45",
+      "bytes": 453,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-editor-delete-reindex/expert.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-editor-delete-reindex/expert.log",
+      "source_sha256": "de6fb298b11e09c5e269f061f1a876310f66dc4753ba8c66086586f49295137d",
+      "archived_sha256": "de6fb298b11e09c5e269f061f1a876310f66dc4753ba8c66086586f49295137d",
+      "bytes": 658365,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-editor-delete-reindex/project.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-editor-delete-reindex/project.log",
+      "source_sha256": "1ede09844c8ab2bc0e88812845fcba7078fdd28bf6942353c9eb9a70251f0c37",
+      "archived_sha256": "1ede09844c8ab2bc0e88812845fcba7078fdd28bf6942353c9eb9a70251f0c37",
+      "bytes": 55050,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-editor-delete-reindex/results.json",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-editor-delete-reindex/results.json",
+      "source_sha256": "155c456c6e2bb73c28e392eac3ac99536079636da0045fbb827bebd615710253",
+      "archived_sha256": "acfb97113bfc1cb0626a641668a51b96253d092dbdbefc85176c4607292e8e77",
+      "bytes": 186554,
+      "runtime_cookie_redactions": 3
+    },
+    {
+      "path": "evidence/tips-validation/tips-editor-delete-reindex/tips-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-editor-delete-reindex/tips-environment/config/nvim/init.lua",
+      "source_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "archived_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "bytes": 1378,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-editor-delete-reindex/tips-environment/config/nvim/lua/sync.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-editor-delete-reindex/tips-environment/config/nvim/lua/sync.lua",
+      "source_sha256": "a0884e52122cc98745871fc7101ef835a69af2fac5020fd5fbeb6d86acffb2de",
+      "archived_sha256": "a0884e52122cc98745871fc7101ef835a69af2fac5020fd5fbeb6d86acffb2de",
+      "bytes": 4077,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-editor-delete-reindex/tips-environment/nvim.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-editor-delete-reindex/tips-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-editor-delete-reindex/tips-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-editor-delete-reindex/tips-environment/state/nvim/lsp.log",
+      "source_sha256": "c07554cf05507d86161ae0b79d9c027370e7e32a860e5441358a0cf297ae0c88",
+      "archived_sha256": "c07554cf05507d86161ae0b79d9c027370e7e32a860e5441358a0cf297ae0c88",
+      "bytes": 174856,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-editor-delete-reindex/tips.jsonl",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-editor-delete-reindex/tips.jsonl",
+      "source_sha256": "8df59395ff1bf083970149a44b943a8cf41d08338de93a3b134d1e7717dadd8f",
+      "archived_sha256": "8df59395ff1bf083970149a44b943a8cf41d08338de93a3b134d1e7717dadd8f",
+      "bytes": 34750,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-editor-delete-reindex/tips.stderr.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-editor-delete-reindex/tips.stderr.log",
+      "source_sha256": "9ae122ffc8f58b16bf1b1824d76b2364f39030ae0daa08b66338424fc441b1f9",
+      "archived_sha256": "9ae122ffc8f58b16bf1b1824d76b2364f39030ae0daa08b66338424fc441b1f9",
+      "bytes": 525,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-native-editor-create-unique/expert.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create-unique/expert.log",
+      "source_sha256": "846600429e2f5bbef38d8d524e5630aa55c1e7111cc01a00e514e52c061f8ff1",
+      "archived_sha256": "846600429e2f5bbef38d8d524e5630aa55c1e7111cc01a00e514e52c061f8ff1",
+      "bytes": 744964,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-native-editor-create-unique/project.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create-unique/project.log",
+      "source_sha256": "1b45d98b748bcac7fc7547f6a3d369fc2ee73c035a6b8d91c53b16f2f779448e",
+      "archived_sha256": "1b45d98b748bcac7fc7547f6a3d369fc2ee73c035a6b8d91c53b16f2f779448e",
+      "bytes": 62005,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-native-editor-create-unique/results.json",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create-unique/results.json",
+      "source_sha256": "7402361acdbda1a03e60726be3737f7f09e0cf4518acabc4281220763825d9af",
+      "archived_sha256": "88be26ae76efef711224da6257aa7ff9253c616e664146f656eb0cdfea539da8",
+      "bytes": 104177,
+      "runtime_cookie_redactions": 3
+    },
+    {
+      "path": "evidence/tips-validation/tips-native-editor-create-unique/tips-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create-unique/tips-environment/config/nvim/init.lua",
+      "source_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "archived_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "bytes": 1378,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-native-editor-create-unique/tips-environment/config/nvim/lua/sync.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create-unique/tips-environment/config/nvim/lua/sync.lua",
+      "source_sha256": "a0884e52122cc98745871fc7101ef835a69af2fac5020fd5fbeb6d86acffb2de",
+      "archived_sha256": "a0884e52122cc98745871fc7101ef835a69af2fac5020fd5fbeb6d86acffb2de",
+      "bytes": 4077,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-native-editor-create-unique/tips-environment/nvim.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create-unique/tips-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-native-editor-create-unique/tips-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create-unique/tips-environment/state/nvim/lsp.log",
+      "source_sha256": "ebd4410da61a327e3b03850157dd14a7dbdc7032acaf2faa27d97e5122c6b405",
+      "archived_sha256": "ebd4410da61a327e3b03850157dd14a7dbdc7032acaf2faa27d97e5122c6b405",
+      "bytes": 153087,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-native-editor-create-unique/tips.jsonl",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create-unique/tips.jsonl",
+      "source_sha256": "7764ed84d47cbce8c0035bac768f5b90a631de22fa37bc7485ac45b738b3e7fe",
+      "archived_sha256": "7764ed84d47cbce8c0035bac768f5b90a631de22fa37bc7485ac45b738b3e7fe",
+      "bytes": 31451,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-native-editor-create-unique/tips.stderr.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create-unique/tips.stderr.log",
+      "source_sha256": "ea267be294946969e556491002a0068d730fac226a6d5a465b518b977d6021db",
+      "archived_sha256": "ea267be294946969e556491002a0068d730fac226a6d5a465b518b977d6021db",
+      "bytes": 657,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-native-editor-create/expert.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create/expert.log",
+      "source_sha256": "e443765e8f43a2eeec8ef1d1ffc76f631b2e93064f19f7281aa668a8df198edc",
+      "archived_sha256": "e443765e8f43a2eeec8ef1d1ffc76f631b2e93064f19f7281aa668a8df198edc",
+      "bytes": 701306,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-native-editor-create/project.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create/project.log",
+      "source_sha256": "9edc97bd162a3f1f439116921caa8771f2cc69c9f5875440662f7ffd44c601cc",
+      "archived_sha256": "9edc97bd162a3f1f439116921caa8771f2cc69c9f5875440662f7ffd44c601cc",
+      "bytes": 58445,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-native-editor-create/results.json",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create/results.json",
+      "source_sha256": "d5c0ac9143822c88de8554d13f15e556c0354f3c1504a50264dc0fcfcb4bc7ac",
+      "archived_sha256": "505c85ec1ecd559184ab25f02d20f38c29dc6370db33259f9598cc5222d6e50e",
+      "bytes": 103550,
+      "runtime_cookie_redactions": 3
+    },
+    {
+      "path": "evidence/tips-validation/tips-native-editor-create/tips-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create/tips-environment/config/nvim/init.lua",
+      "source_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "archived_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "bytes": 1378,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-native-editor-create/tips-environment/config/nvim/lua/sync.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create/tips-environment/config/nvim/lua/sync.lua",
+      "source_sha256": "a0884e52122cc98745871fc7101ef835a69af2fac5020fd5fbeb6d86acffb2de",
+      "archived_sha256": "a0884e52122cc98745871fc7101ef835a69af2fac5020fd5fbeb6d86acffb2de",
+      "bytes": 4077,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-native-editor-create/tips-environment/nvim.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create/tips-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-native-editor-create/tips-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create/tips-environment/state/nvim/lsp.log",
+      "source_sha256": "ceb49240877a40673234f9b06b9452228b0b965d3398bc4580f2df766c8c73d6",
+      "archived_sha256": "ceb49240877a40673234f9b06b9452228b0b965d3398bc4580f2df766c8c73d6",
+      "bytes": 152283,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-native-editor-create/tips.jsonl",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create/tips.jsonl",
+      "source_sha256": "ed00e303c68cc23b6e4742713e96745f8a6ec07b0c94026dcd5b621b93914f2b",
+      "archived_sha256": "ed00e303c68cc23b6e4742713e96745f8a6ec07b0c94026dcd5b621b93914f2b",
+      "bytes": 31050,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-native-editor-create/tips.stderr.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create/tips.stderr.log",
+      "source_sha256": "a13b4980ca9ab3c9d1508a10f06b1e15d3a54c303685ae0dfbff0e249b6bf45b",
+      "archived_sha256": "a13b4980ca9ab3c9d1508a10f06b1e15d3a54c303685ae0dfbff0e249b6bf45b",
+      "bytes": 657,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-supervisor-trace/engine-supervisor.trace",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-supervisor-trace/engine-supervisor.trace",
+      "source_sha256": "c6fe3f4864cf98916ad1756e9ce2633056e22cd680df58ee688d70120cdd00c0",
+      "archived_sha256": "c6fe3f4864cf98916ad1756e9ce2633056e22cd680df58ee688d70120cdd00c0",
+      "bytes": 127496,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-supervisor-trace/expert.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-supervisor-trace/expert.log",
+      "source_sha256": "1ef5a33db5930e1a222773076c42016877a2709981e143056c6961b751fa7d1a",
+      "archived_sha256": "1ef5a33db5930e1a222773076c42016877a2709981e143056c6961b751fa7d1a",
+      "bytes": 910335,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-supervisor-trace/project.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-supervisor-trace/project.log",
+      "source_sha256": "0b4b4382f503a4a3c5ea4bdd93953626931fa8d6f87a18ab10d1956670145c2d",
+      "archived_sha256": "0b4b4382f503a4a3c5ea4bdd93953626931fa8d6f87a18ab10d1956670145c2d",
+      "bytes": 75004,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-supervisor-trace/results.json",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-supervisor-trace/results.json",
+      "source_sha256": "901944e115f1b6b73f065107243503bfe0197dda3afd5b7dc03e8a43d9ad34e4",
+      "archived_sha256": "f16c43205b139c2791df4cd635efcbfaf778cd8b35dcb40695caa72111af1e21",
+      "bytes": 186046,
+      "runtime_cookie_redactions": 3
+    },
+    {
+      "path": "evidence/tips-validation/tips-supervisor-trace/tips-environment/config/nvim/init.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-supervisor-trace/tips-environment/config/nvim/init.lua",
+      "source_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "archived_sha256": "0765cceace34b444fde600cbbef58d5f00872e9e78a99e866e930bd90e1962a8",
+      "bytes": 1378,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-supervisor-trace/tips-environment/config/nvim/lua/sync.lua",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-supervisor-trace/tips-environment/config/nvim/lua/sync.lua",
+      "source_sha256": "a0884e52122cc98745871fc7101ef835a69af2fac5020fd5fbeb6d86acffb2de",
+      "archived_sha256": "a0884e52122cc98745871fc7101ef835a69af2fac5020fd5fbeb6d86acffb2de",
+      "bytes": 4077,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-supervisor-trace/tips-environment/nvim.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-supervisor-trace/tips-environment/nvim.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-supervisor-trace/tips-environment/state/nvim/lsp.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-supervisor-trace/tips-environment/state/nvim/lsp.log",
+      "source_sha256": "795a71afa8cde7b38213b01d56a2b4c206ac409c87772526260e4310568a16f2",
+      "archived_sha256": "795a71afa8cde7b38213b01d56a2b4c206ac409c87772526260e4310568a16f2",
+      "bytes": 173461,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-supervisor-trace/tips.jsonl",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-supervisor-trace/tips.jsonl",
+      "source_sha256": "66a16de8a0e54f6bfac7ddbbea5349af88562a05965c703d815d64dcdc80b3f7",
+      "archived_sha256": "66a16de8a0e54f6bfac7ddbbea5349af88562a05965c703d815d64dcdc80b3f7",
+      "bytes": 34333,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-supervisor-trace/tips.stderr.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-supervisor-trace/tips.stderr.log",
+      "source_sha256": "3f8a1c90c153e6faa63f0988605680cd4b30728a07ac68b6db36b5bc01399a45",
+      "archived_sha256": "3f8a1c90c153e6faa63f0988605680cd4b30728a07ac68b6db36b5bc01399a45",
+      "bytes": 453,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/tips-validation/tips-supervisor-trace/trace-setup.log",
+      "source_path": "/private/tmp/expert-neovim-validation-runs/tips-supervisor-trace/trace-setup.log",
+      "source_sha256": "a05b481e0f68536343737f0708a70a120ac1b8a68cfec150fff685dbf0c2c91d",
+      "archived_sha256": "a05b481e0f68536343737f0708a70a120ac1b8a68cfec150fff685dbf0c2c91d",
+      "bytes": 22,
+      "runtime_cookie_redactions": 0
+    },
+    {
+      "path": "evidence/upstream/expert-installation.txt",
+      "source_path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/installation.md",
+      "source_url": "https://raw.githubusercontent.com/expert-lsp/expert/refs/heads/main/pages/installation.md",
+      "source_sha256": "8bdae7ddd472180544c7beb22ea0d31c1e476afc5ae8ac4fa273ebca7f6e6f53",
+      "archived_sha256": "8bdae7ddd472180544c7beb22ea0d31c1e476afc5ae8ac4fa273ebca7f6e6f53",
+      "bytes": 13017,
+      "runtime_cookie_redactions": 0
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+vim.lsp.set_log_level() is deprecated. Run ":checkhealth vim.deprecated" for more informationLSP[expert] Reindexed alpha in 128 ms

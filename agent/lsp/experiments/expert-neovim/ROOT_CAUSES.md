@@ -10,15 +10,18 @@ The previous ElixirLS/Sol findings are regression requirements, not proof about 
 
 ## Evidence map
 
-Paths below are local, disposable evidence, not committed dependencies:
+Paths below refer to the retained evidence, relative to this report:
 
-- A = `/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim`
-- B = `/private/tmp/expert-neovim-validation-runs`
-- Source = A/`expert-0.1.10`, the official v0.1.10 source archive matching the
-  Homebrew formula SHA256. Installed runtime is namespaced `XPExpert`/`XPEngine`.
+- A = `evidence/pilot`
+- B = `evidence/tips-validation`
+- Source = the official [Expert v0.1.10 source](https://github.com/expert-lsp/expert/tree/v0.1.10),
+  whose archive matches the Homebrew formula SHA256 recorded in `versions.json`.
+  Third-party source is not vendored here. Installed runtime is namespaced
+  `XPExpert`/`XPEngine`.
 - Each run has `results.json`, MCP JSONL, Neovim LSP log, and copied runtime config.
   Some Tips runs also have archived `expert.log` and `project.log`.
 - `evidence.json` summarizes timings, qualifications and original paths.
+- [ARCHIVE.md](ARCHIVE.md) describes retained files, redactions and verification.
 
 These probes record observations; exit code zero means the probe finished, not that
 every semantic check passed. Inspect `matched`, validated flags and cleanup results.

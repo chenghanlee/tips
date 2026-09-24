@@ -1,0 +1,60 @@
+-- Experimental adapter: reuse Neovim's registered file watcher and LSP client.
+-- Keep installed Expert and published vv-mcp untouched. No filesystem writes.
+local M = { pending = {}, applied = {}, conflicts = {}, failures = {} }
+
+local function sync(client, uri, kind)
+  local path = vim.uri_to_fname(uri)
+  local relative = vim.fs.relpath(client.root_dir, path)
+  if not relative or relative:match('^%.%.') then return end
+  if relative:match('^(deps)/') or relative:match('^_build/')
+      or relative:match('^%.expert/') or relative:match('^tmp/') then return end
+  if not path:match('%.exs?$') then return end
+  local b = vim.fn.bufnr(path)
+  if b >= 0 and vim.api.nvim_buf_is_loaded(b) and vim.bo[b].modified then
+    M.conflicts[path] = 'Unsaved Neovim changes; disk synchronization refused'
+    return
+  end
+  M.conflicts[path] = nil
+  if kind == 3 and not vim.uv.fs_stat(path) then
+    if b >= 0 then vim.api.nvim_buf_delete(b, { force = false }) end
+    -- Expert 0.1.10 consumes :deleted internally but gets numeric LSP events.
+    -- Its advertised command is the supported recovery path; never mutate its index.
+    client:request('workspace/executeCommand', { command = 'Reindex', arguments = {} },
+      function(err, result)
+        if err then M.failures[path] = err else M.applied[path] = { kind = kind, result = result } end
+      end)
+    return
+  end
+  if not vim.uv.fs_stat(path) then return end
+  if b < 0 then b = vim.fn.bufadd(path) end
+  vim.fn.bufload(b)
+  if not vim.lsp.buf_is_attached(b, client.id) then vim.lsp.buf_attach_client(b, client.id) end
+  vim.api.nvim_buf_call(b, function() vim.cmd('silent checktime') end)
+  -- Native reload sends close/open. Save notifies that the external tool has
+  -- already persisted this content; BufWritePost uses Neovim's capability handling.
+  vim.api.nvim_exec_autocmds('BufWritePost', { buffer = b, modeline = false })
+  M.applied[path] = { kind = kind, time = vim.uv.hrtime() / 1e9 }
+end
+
+function M.setup()
+  vim.api.nvim_create_autocmd('LspNotify', {
+    callback = function(args)
+      if args.data.method ~= 'workspace/didChangeWatchedFiles' then return end
+      local client = vim.lsp.get_client_by_id(args.data.client_id)
+      if not client or client.name ~= 'expert' then return end
+      for _, change in ipairs(args.data.params.changes) do
+        M.pending[change.uri] = { client = client, kind = change.type }
+      end
+      vim.schedule(function()
+        local batch = M.pending
+        M.pending = {}
+        for uri, change in pairs(batch) do
+          local ok, err = pcall(sync, change.client, uri, change.kind)
+          if not ok then M.failures[uri] = tostring(err) end
+        end
+      end)
+    end,
+  })
+end
+
+return M

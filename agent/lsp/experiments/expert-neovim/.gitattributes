@@ -1,0 +1,2 @@
+# Preserve captured bytes, including emitted line endings and trailing whitespace.
+evidence/** -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab

@@ -1,0 +1,1 @@
+vim.lsp.set_log_level() is deprecated. Run ":checkhealth vim.deprecated" for more informationLSP[expert] Search index is loading for alpha...LSP[expert] Search index is loading for alpha..."lib/caller.ex" "lib/caller.ex" 4L, 90B written"lib/caller.ex" 4L, 90B written

@@ -1,0 +1,4228 @@
+{
+  "commits": {
+    "alpha": "4c06d71a4b14908369e610b72f7f10a058c69109",
+    "beta": "fac4978337391b8d5f55b0d8b7d3ec9d1f1af916"
+  },
+  "alpha_first_hover": {
+    "isError": false,
+    "data": {
+      "clients": [],
+      "items": []
+    }
+  },
+  "alpha_baseline": {
+    "matched": true,
+    "samples": [
+      {
+        "seconds": 0.002,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 0.508,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 1.013,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 1.517,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 2.022,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 2.526,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 3.033,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 3.568,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 4.079,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 5.753,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\nALPHA documentation for the worktree experiment.\n"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "alpha_startup_seconds": 6.275,
+  "alpha_state": {
+    "clients": [
+      {
+        "root": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha",
+        "initialized": true,
+        "name": "expert",
+        "cmd": [
+          "/opt/homebrew/bin/expert",
+          "--stdio"
+        ],
+        "server_capabilities": {
+          "completionProvider": {
+            "triggerCharacters": [
+              ".",
+              "@",
+              "&",
+              "%",
+              "^",
+              ":",
+              "!",
+              "-",
+              "~"
+            ]
+          },
+          "definitionProvider": true,
+          "documentFormattingProvider": true,
+          "experimental": null,
+          "workspaceSymbolProvider": true,
+          "workspace": {
+            "workspaceFolders": {
+              "changeNotifications": true,
+              "supported": true
+            }
+          },
+          "documentSymbolProvider": true,
+          "executeCommandProvider": {
+            "commands": [
+              "Reindex",
+              "connectionDetails"
+            ]
+          },
+          "textDocumentSync": {
+            "openClose": true,
+            "change": 2,
+            "save": true
+          },
+          "referencesProvider": true,
+          "hoverProvider": true,
+          "codeActionProvider": {
+            "resolveProvider": false,
+            "codeActionKinds": [
+              "quickfix",
+              "refactor",
+              "refactor.extract",
+              "refactor.inline",
+              "refactor.rewrite",
+              "source",
+              "source.fixAll",
+              "source.organizeImports"
+            ]
+          },
+          "codeLensProvider": {
+            "resolveProvider": false
+          }
+        }
+      }
+    ],
+    "buffers": [
+      {
+        "modified": false,
+        "path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex",
+        "text": [
+          "defmodule V2Caller do",
+          "  def call_1, do: V2Target.answer()",
+          "  def call_2, do: V2Target.answer()",
+          "end"
+        ]
+      }
+    ],
+    "autoread": true
+  },
+  "alpha_definition": {
+    "isError": false,
+    "data": {
+      "clients": [
+        "expert"
+      ],
+      "locations": {
+        "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex": [
+          "3:7-3:13"
+        ]
+      }
+    }
+  },
+  "alpha_references": {
+    "matched": true,
+    "samples": [
+      {
+        "seconds": 0.006,
+        "value": {
+          "isError": false,
+          "data": {
+            "locations": {}
+          }
+        }
+      },
+      {
+        "seconds": 0.519,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                "3:19-3:36",
+                "2:19-2:36"
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  "beta_first_hover": {
+    "isError": false,
+    "data": {
+      "clients": [],
+      "items": []
+    }
+  },
+  "beta_baseline": {
+    "matched": true,
+    "samples": [
+      {
+        "seconds": 0.007,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 0.516,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 1.022,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 1.525,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 2.029,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 2.532,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 3.035,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 3.539,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 4.072,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 4.583,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "seconds": 5.656,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\nBETA documentation for the worktree experiment.\n"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "beta_startup_seconds": 6.177,
+  "beta_state": {
+    "autoread": true,
+    "buffers": [
+      {
+        "path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/beta/lib/caller.ex",
+        "modified": false,
+        "text": [
+          "defmodule V2Caller do",
+          "  def call_1, do: V2Target.answer()",
+          "  def call_2, do: V2Target.answer()",
+          "  def call_3, do: V2Target.answer()",
+          "end"
+        ]
+      }
+    ],
+    "clients": [
+      {
+        "name": "expert",
+        "cmd": [
+          "/opt/homebrew/bin/expert",
+          "--stdio"
+        ],
+        "root": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/beta",
+        "initialized": true,
+        "server_capabilities": {
+          "workspaceSymbolProvider": true,
+          "workspace": {
+            "workspaceFolders": {
+              "supported": true,
+              "changeNotifications": true
+            }
+          },
+          "referencesProvider": true,
+          "textDocumentSync": {
+            "openClose": true,
+            "change": 2,
+            "save": true
+          },
+          "codeActionProvider": {
+            "codeActionKinds": [
+              "quickfix",
+              "refactor",
+              "refactor.extract",
+              "refactor.inline",
+              "refactor.rewrite",
+              "source",
+              "source.fixAll",
+              "source.organizeImports"
+            ],
+            "resolveProvider": false
+          },
+          "codeLensProvider": {
+            "resolveProvider": false
+          },
+          "completionProvider": {
+            "triggerCharacters": [
+              ".",
+              "@",
+              "&",
+              "%",
+              "^",
+              ":",
+              "!",
+              "-",
+              "~"
+            ]
+          },
+          "executeCommandProvider": {
+            "commands": [
+              "Reindex",
+              "connectionDetails"
+            ]
+          },
+          "definitionProvider": true,
+          "hoverProvider": true,
+          "documentFormattingProvider": true,
+          "experimental": null,
+          "documentSymbolProvider": true
+        }
+      }
+    ]
+  },
+  "beta_definition": {
+    "isError": false,
+    "data": {
+      "clients": [
+        "expert"
+      ],
+      "locations": {
+        "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/beta/lib/target.ex": [
+          "3:7-3:13"
+        ]
+      }
+    }
+  },
+  "beta_references": {
+    "matched": true,
+    "samples": [
+      {
+        "seconds": 0.006,
+        "value": {
+          "isError": false,
+          "data": {
+            "locations": {}
+          }
+        }
+      },
+      {
+        "seconds": 0.513,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/beta/lib/caller.ex": [
+                "4:19-4:36",
+                "3:19-3:36",
+                "2:19-2:36"
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  "before_unopened_edit": {
+    "clients": [
+      {
+        "root": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha",
+        "initialized": true,
+        "name": "expert",
+        "cmd": [
+          "/opt/homebrew/bin/expert",
+          "--stdio"
+        ],
+        "server_capabilities": {
+          "completionProvider": {
+            "triggerCharacters": [
+              ".",
+              "@",
+              "&",
+              "%",
+              "^",
+              ":",
+              "!",
+              "-",
+              "~"
+            ]
+          },
+          "definitionProvider": true,
+          "documentFormattingProvider": true,
+          "experimental": null,
+          "workspaceSymbolProvider": true,
+          "workspace": {
+            "workspaceFolders": {
+              "changeNotifications": true,
+              "supported": true
+            }
+          },
+          "documentSymbolProvider": true,
+          "executeCommandProvider": {
+            "commands": [
+              "Reindex",
+              "connectionDetails"
+            ]
+          },
+          "textDocumentSync": {
+            "openClose": true,
+            "change": 2,
+            "save": true
+          },
+          "referencesProvider": true,
+          "hoverProvider": true,
+          "codeActionProvider": {
+            "resolveProvider": false,
+            "codeActionKinds": [
+              "quickfix",
+              "refactor",
+              "refactor.extract",
+              "refactor.inline",
+              "refactor.rewrite",
+              "source",
+              "source.fixAll",
+              "source.organizeImports"
+            ]
+          },
+          "codeLensProvider": {
+            "resolveProvider": false
+          }
+        }
+      }
+    ],
+    "buffers": [
+      {
+        "modified": false,
+        "path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex",
+        "text": [
+          "defmodule V2Caller do",
+          "  def call_1, do: V2Target.answer()",
+          "  def call_2, do: V2Target.answer()",
+          "end"
+        ]
+      }
+    ],
+    "autoread": true
+  },
+  "unopened_equal_size_edit": {
+    "matched": true,
+    "samples": [
+      {
+        "seconds": 0.003,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\nALPHA documentation for the worktree experiment.\n"
+            ]
+          }
+        }
+      },
+      {
+        "seconds": 0.516,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\nALPHA documentation for the worktree experiment.\n"
+            ]
+          }
+        }
+      },
+      {
+        "seconds": 1.025,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\nALPHA documentation for the worktree experiment.\n"
+            ]
+          }
+        }
+      },
+      {
+        "seconds": 1.534,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\nGAMMA documentation for the worktree experiment.\n"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "other_worktree_hover": {
+    "isError": false,
+    "data": {
+      "clients": [
+        "expert"
+      ],
+      "items": [
+        "```elixir\nV2Target.answer()\n```\n\nBETA documentation for the worktree experiment.\n"
+      ]
+    }
+  },
+  "unopened_atomic_replacement": {
+    "matched": true,
+    "samples": [
+      {
+        "seconds": 0.003,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\nGAMMA documentation for the worktree experiment.\n"
+            ]
+          }
+        }
+      },
+      {
+        "seconds": 0.509,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\nGAMMA documentation for the worktree experiment.\n"
+            ]
+          }
+        }
+      },
+      {
+        "seconds": 1.017,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\nGAMMA documentation for the worktree experiment.\n"
+            ]
+          }
+        }
+      },
+      {
+        "seconds": 1.524,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "items": [
+              "```elixir\nV2Target.answer()\n```\n\nOMEGA documentation for the worktree experiment.\n"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "created_file_references": {
+    "matched": true,
+    "samples": [
+      {
+        "seconds": 0.003,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                "3:19-3:36",
+                "2:19-2:36"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 0.508,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                "3:19-3:36",
+                "2:19-2:36"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 1.013,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                "3:19-3:36",
+                "2:19-2:36"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 1.517,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                "3:19-3:36",
+                "2:19-2:36"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 2.025,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                "3:19-3:36",
+                "2:19-2:36"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 2.531,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                "3:19-3:36",
+                "2:19-2:36"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 3.039,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                "3:19-3:36",
+                "2:19-2:36"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 3.546,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                "3:19-3:36",
+                "2:19-2:36"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 4.052,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                "3:19-3:36",
+                "2:19-2:36"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 4.56,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                "3:19-3:36",
+                "2:19-2:36"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 5.068,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                "3:19-3:36",
+                "2:19-2:36"
+              ],
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/extra.ex": [
+                "2:17-2:34"
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  "deleted_file_references": {
+    "matched": true,
+    "samples": [
+      {
+        "seconds": 0.003,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                "3:19-3:36",
+                "2:19-2:36"
+              ],
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/extra.ex": [
+                "2:17-2:34"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 0.509,
+        "value": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "expert"
+            ],
+            "locations": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                "3:19-3:36",
+                "2:19-2:36"
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  "deletion_validated": true,
+  "external_error": {
+    "matched": true,
+    "samples": [
+      {
+        "seconds": 0.001,
+        "value": {
+          "isError": false,
+          "data": {
+            "diagnostics": {}
+          }
+        }
+      },
+      {
+        "seconds": 0.507,
+        "value": {
+          "isError": false,
+          "data": {
+            "diagnostics": {}
+          }
+        }
+      },
+      {
+        "seconds": 1.011,
+        "value": {
+          "isError": false,
+          "data": {
+            "diagnostics": {}
+          }
+        }
+      },
+      {
+        "seconds": 1.514,
+        "value": {
+          "isError": false,
+          "data": {
+            "diagnostics": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                {
+                  "range": "2:19-3:1",
+                  "severity": "error",
+                  "message": "undefined function missing/0",
+                  "source": "Elixir"
+                },
+                {
+                  "range": "2:19-2:26",
+                  "severity": "error",
+                  "message": "undefined function missing/0",
+                  "source": "Elixir"
+                }
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  "error_buffer_state": {
+    "clients": [
+      {
+        "root": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha",
+        "initialized": true,
+        "name": "expert",
+        "cmd": [
+          "/opt/homebrew/bin/expert",
+          "--stdio"
+        ],
+        "server_capabilities": {
+          "completionProvider": {
+            "triggerCharacters": [
+              ".",
+              "@",
+              "&",
+              "%",
+              "^",
+              ":",
+              "!",
+              "-",
+              "~"
+            ]
+          },
+          "definitionProvider": true,
+          "documentFormattingProvider": true,
+          "experimental": null,
+          "workspaceSymbolProvider": true,
+          "workspace": {
+            "workspaceFolders": {
+              "changeNotifications": true,
+              "supported": true
+            }
+          },
+          "documentSymbolProvider": true,
+          "executeCommandProvider": {
+            "commands": [
+              "Reindex",
+              "connectionDetails"
+            ]
+          },
+          "textDocumentSync": {
+            "openClose": true,
+            "change": 2,
+            "save": true
+          },
+          "referencesProvider": true,
+          "hoverProvider": true,
+          "codeActionProvider": {
+            "resolveProvider": false,
+            "codeActionKinds": [
+              "quickfix",
+              "refactor",
+              "refactor.extract",
+              "refactor.inline",
+              "refactor.rewrite",
+              "source",
+              "source.fixAll",
+              "source.organizeImports"
+            ]
+          },
+          "codeLensProvider": {
+            "resolveProvider": false
+          }
+        }
+      }
+    ],
+    "autoread": true,
+    "buffers": [
+      {
+        "modified": false,
+        "path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex",
+        "text": [
+          "defmodule V2Caller do",
+          "  def call_1, do: missing()",
+          "  def call_2, do: V2Target.answer()",
+          "end"
+        ]
+      },
+      {
+        "modified": false,
+        "path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex",
+        "text": [
+          "defmodule V2Target do",
+          "  @doc \"OMEGA documentation for the worktree experiment.\"",
+          "  def answer, do: :alpha",
+          "end"
+        ]
+      }
+    ]
+  },
+  "checktime_control": {
+    "matched": true,
+    "samples": [
+      {
+        "seconds": 0.001,
+        "value": {
+          "isError": false,
+          "data": {
+            "diagnostics": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                {
+                  "range": "2:19-3:1",
+                  "severity": "error",
+                  "message": "undefined function missing/0",
+                  "source": "Elixir"
+                },
+                {
+                  "range": "2:19-2:26",
+                  "severity": "error",
+                  "message": "undefined function missing/0",
+                  "source": "Elixir"
+                }
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  "external_repair": {
+    "matched": true,
+    "samples": [
+      {
+        "seconds": 0.001,
+        "value": {
+          "isError": false,
+          "data": {
+            "diagnostics": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                {
+                  "range": "2:19-3:1",
+                  "severity": "error",
+                  "message": "undefined function missing/0",
+                  "source": "Elixir"
+                },
+                {
+                  "range": "2:19-2:26",
+                  "severity": "error",
+                  "message": "undefined function missing/0",
+                  "source": "Elixir"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 0.507,
+        "value": {
+          "isError": false,
+          "data": {
+            "diagnostics": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                {
+                  "range": "2:19-3:1",
+                  "severity": "error",
+                  "message": "undefined function missing/0",
+                  "source": "Elixir"
+                },
+                {
+                  "range": "2:19-2:26",
+                  "severity": "error",
+                  "message": "undefined function missing/0",
+                  "source": "Elixir"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 1.012,
+        "value": {
+          "isError": false,
+          "data": {
+            "diagnostics": {
+              "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": [
+                {
+                  "range": "2:19-3:1",
+                  "severity": "error",
+                  "message": "undefined function missing/0",
+                  "source": "Elixir"
+                },
+                {
+                  "range": "2:19-2:26",
+                  "severity": "error",
+                  "message": "undefined function missing/0",
+                  "source": "Elixir"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seconds": 1.517,
+        "value": {
+          "isError": false,
+          "data": {
+            "diagnostics": {}
+          }
+        }
+      }
+    ]
+  },
+  "repair_checktime_control": {
+    "matched": true,
+    "samples": [
+      {
+        "seconds": 0.001,
+        "value": {
+          "isError": false,
+          "data": {
+            "diagnostics": {}
+          }
+        }
+      }
+    ]
+  },
+  "final_state": {
+    "clients": [
+      {
+        "root": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha",
+        "initialized": true,
+        "name": "expert",
+        "cmd": [
+          "/opt/homebrew/bin/expert",
+          "--stdio"
+        ],
+        "server_capabilities": {
+          "completionProvider": {
+            "triggerCharacters": [
+              ".",
+              "@",
+              "&",
+              "%",
+              "^",
+              ":",
+              "!",
+              "-",
+              "~"
+            ]
+          },
+          "definitionProvider": true,
+          "documentFormattingProvider": true,
+          "experimental": null,
+          "workspaceSymbolProvider": true,
+          "workspace": {
+            "workspaceFolders": {
+              "changeNotifications": true,
+              "supported": true
+            }
+          },
+          "documentSymbolProvider": true,
+          "executeCommandProvider": {
+            "commands": [
+              "Reindex",
+              "connectionDetails"
+            ]
+          },
+          "textDocumentSync": {
+            "openClose": true,
+            "change": 2,
+            "save": true
+          },
+          "referencesProvider": true,
+          "hoverProvider": true,
+          "codeActionProvider": {
+            "resolveProvider": false,
+            "codeActionKinds": [
+              "quickfix",
+              "refactor",
+              "refactor.extract",
+              "refactor.inline",
+              "refactor.rewrite",
+              "source",
+              "source.fixAll",
+              "source.organizeImports"
+            ]
+          },
+          "codeLensProvider": {
+            "resolveProvider": false
+          }
+        }
+      }
+    ],
+    "autoread": true,
+    "buffers": [
+      {
+        "modified": false,
+        "path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex",
+        "text": [
+          "defmodule V2Caller do",
+          "  def call_1, do: V2Target.answer()",
+          "  def call_2, do: V2Target.answer()",
+          "end"
+        ]
+      },
+      {
+        "modified": false,
+        "path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex",
+        "text": [
+          "defmodule V2Target do",
+          "  @doc \"OMEGA documentation for the worktree experiment.\"",
+          "  def answer, do: :alpha",
+          "end"
+        ]
+      }
+    ]
+  },
+  "sync_state": {
+    "applied": {
+      "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex": {
+        "kind": 1,
+        "time": 78533.035734875
+      },
+      "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/extra.ex": {
+        "kind": 3,
+        "time": 78539.635074375
+      },
+      "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex": {
+        "kind": 2,
+        "time": 78541.659303583
+      }
+    },
+    "conflicts": [],
+    "failures": [],
+    "reindexes": [
+      {
+        "time": 78539.642948833,
+        "result": "ok"
+      }
+    ]
+  },
+  "alpha_events": [
+    {
+      "time": 78517.972733291,
+      "method": "sent:textDocument/didOpen",
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex",
+          "version": 0,
+          "languageId": "elixir",
+          "text": "defmodule V2Caller do\n  def call_1, do: V2Target.answer()\n  def call_2, do: V2Target.answer()\nend\n"
+        }
+      }
+    },
+    {
+      "time": 78517.980128583,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Server initialized, registering capabilities"
+      }
+    },
+    {
+      "time": 78517.981796333,
+      "method": "client/registerCapability",
+      "data": {
+        "registrations": [
+          {
+            "id": "-42",
+            "registerOptions": {
+              "watchers": [
+                {
+                  "globPattern": "**/mix.lock"
+                },
+                {
+                  "globPattern": "**/*.{ex,exs}"
+                }
+              ]
+            },
+            "method": "workspace/didChangeWatchedFiles"
+          }
+        ]
+      }
+    },
+    {
+      "time": 78517.984044333,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "[alpha] Starting project"
+      }
+    },
+    {
+      "time": 78517.990427375,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Opened file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex"
+      }
+    },
+    {
+      "time": 78517.992030625,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "kind": "begin",
+          "title": "[alpha] Starting engine node"
+        }
+      }
+    },
+    {
+      "time": 78517.992784875,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for alpha was initialized. Ignoring."
+      }
+    },
+    {
+      "time": 78517.997101583,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for alpha was initialized. Ignoring."
+      }
+    },
+    {
+      "time": 78518.005949375,
+      "method": "$/progress",
+      "data": {
+        "token": 34,
+        "value": {
+          "kind": "begin",
+          "title": "[alpha] Preparing engine"
+        }
+      }
+    },
+    {
+      "time": 78518.112704625,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "[alpha] Using path: /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/erts-17.0.6/bin:/opt/homebrew/Cellar/expert/0.1.10/libexec/expert/bin:/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-vendor/nvim-macos-arm64/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/VMware Fusion.app/Contents/Public:/opt/homebrew/Caskroom/codex/0.156.1/codex-path:/Users/chenghanlee/.codex/tmp/arg0/codex-arg0mtiZz0:/opt/homebrew/bin:/opt/homebrew/sbin:/Applications/Ghostty.app/Contents/MacOS:/Users/chenghanlee/.local/bin:/Users/chenghanlee/Documents/Programs/flutter/bin:/Users/chenghanlee/.docker/bin:/Users/chenghanlee/.docker/bin:/Users/chenghanlee/.local/bin"
+      }
+    },
+    {
+      "time": 78518.113016291,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "[alpha] Found elixir executable at /opt/homebrew/bin/elixir"
+      }
+    },
+    {
+      "time": 78518.113044333,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "[alpha] Found erl executable at /opt/homebrew/bin/erl"
+      }
+    },
+    {
+      "time": 78518.113070416,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "[alpha] Preparing engine"
+      }
+    },
+    {
+      "time": 78518.502975583,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for alpha was initialized. Ignoring."
+      }
+    },
+    {
+      "time": 78519.008814125,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for alpha was initialized. Ignoring."
+      }
+    },
+    {
+      "time": 78519.512533166,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for alpha was initialized. Ignoring."
+      }
+    },
+    {
+      "time": 78519.954506791,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "[alpha] Engine available at: /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns"
+      }
+    },
+    {
+      "time": 78519.981691791,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "[alpha] ebin paths:\n[\"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/patch/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_briefly/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_bunt/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_credo/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_deps_nix/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_elixir_sense/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_engine/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_file_system/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_forge/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_gen_lsp/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_hpax/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_jason/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_logger_backends/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_mint/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_options/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_parsec/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_path_glob/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_quokka/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_schematic/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_sourceror/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_spitfire/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_telemetry/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_typed_struct/ebin\"]"
+      }
+    },
+    {
+      "time": 78520.00928075,
+      "method": "$/progress",
+      "data": {
+        "token": 34,
+        "value": {
+          "title": "[alpha] Preparing engine",
+          "kind": "end",
+          "message": "Engine is ready"
+        }
+      }
+    },
+    {
+      "time": 78520.009803916,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting Erlang node..."
+        }
+      }
+    },
+    {
+      "time": 78520.017719333,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for alpha was initialized. Ignoring."
+      }
+    },
+    {
+      "time": 78520.068282,
+      "method": "window/logMessage",
+      "data": {
+        "type": 2,
+        "message": "Received unexpected message {:EXIT, #PID<0.202.0>, :normal}"
+      }
+    },
+    {
+      "time": 78520.399151208,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Bootstrapping engine..."
+        }
+      }
+    },
+    {
+      "time": 78520.521653291,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for alpha was initialized. Ignoring."
+      }
+    },
+    {
+      "time": 78520.596190333,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting elixir..."
+        }
+      }
+    },
+    {
+      "time": 78520.596397666,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting runtime_tools..."
+        }
+      }
+    },
+    {
+      "time": 78520.601683916,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_engine..."
+        }
+      }
+    },
+    {
+      "time": 78520.768691583,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_typed_struct..."
+        }
+      }
+    },
+    {
+      "time": 78520.768842333,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_file_system..."
+        }
+      }
+    },
+    {
+      "time": 78520.769177666,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_nimble_options..."
+        }
+      }
+    },
+    {
+      "time": 78520.769357375,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_bunt..."
+        }
+      }
+    },
+    {
+      "time": 78520.769484625,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_jason..."
+        }
+      }
+    },
+    {
+      "time": 78520.769546708,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_logger_backends..."
+        }
+      }
+    },
+    {
+      "time": 78520.769613958,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_hpax..."
+        }
+      }
+    },
+    {
+      "time": 78520.769750958,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_mint..."
+        }
+      }
+    },
+    {
+      "time": 78520.769841666,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_elixir_sense..."
+        }
+      }
+    },
+    {
+      "time": 78520.769938083,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_sourceror..."
+        }
+      }
+    },
+    {
+      "time": 78520.7701,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_spitfire..."
+        }
+      }
+    },
+    {
+      "time": 78520.770204416,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_telemetry..."
+        }
+      }
+    },
+    {
+      "time": 78520.770351333,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_briefly..."
+        }
+      }
+    },
+    {
+      "time": 78520.770599333,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_schematic..."
+        }
+      }
+    },
+    {
+      "time": 78520.770654791,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_deps_nix..."
+        }
+      }
+    },
+    {
+      "time": 78520.770899166,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_credo..."
+        }
+      }
+    },
+    {
+      "time": 78520.77105875,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_quokka..."
+        }
+      }
+    },
+    {
+      "time": 78520.771618125,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_gen_lsp..."
+        }
+      }
+    },
+    {
+      "time": 78520.7717255,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_forge..."
+        }
+      }
+    },
+    {
+      "time": 78520.77189125,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_path_glob..."
+        }
+      }
+    },
+    {
+      "time": 78520.771978833,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "report",
+          "message": "Loading engine modules..."
+        }
+      }
+    },
+    {
+      "time": 78521.028484875,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for alpha was initialized. Ignoring."
+      }
+    },
+    {
+      "time": 78521.416515833,
+      "method": "$/progress",
+      "data": {
+        "token": 36,
+        "value": {
+          "title": "[alpha] Starting engine node",
+          "kind": "end",
+          "message": "Engine node started"
+        }
+      }
+    },
+    {
+      "time": 78521.42049375,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Started project node for alpha"
+      }
+    },
+    {
+      "time": 78521.4205765,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "[alpha] Engine initialized for project alpha"
+      }
+    },
+    {
+      "time": 78521.557323125,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78522.071372958,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78522.425239708,
+      "method": "$/progress",
+      "data": {
+        "token": 130,
+        "value": {
+          "kind": "begin",
+          "title": "Building alpha"
+        }
+      }
+    },
+    {
+      "time": 78522.427135916,
+      "method": "$/progress",
+      "data": {
+        "token": 130,
+        "value": {
+          "title": "Building alpha",
+          "kind": "report",
+          "message": "mix local.hex"
+        }
+      }
+    },
+    {
+      "time": 78522.431547875,
+      "method": "$/progress",
+      "data": {
+        "token": 130,
+        "value": {
+          "title": "Building alpha",
+          "kind": "report",
+          "message": "mix local.rebar"
+        }
+      }
+    },
+    {
+      "time": 78522.43468025,
+      "method": "$/progress",
+      "data": {
+        "token": 130,
+        "value": {
+          "title": "Building alpha",
+          "kind": "report",
+          "message": "mix deps.get"
+        }
+      }
+    },
+    {
+      "time": 78522.45658,
+      "method": "$/progress",
+      "data": {
+        "token": 130,
+        "value": {
+          "title": "Building alpha",
+          "kind": "report",
+          "message": "mix loadconfig"
+        }
+      }
+    },
+    {
+      "time": 78522.45688275,
+      "method": "$/progress",
+      "data": {
+        "token": 130,
+        "value": {
+          "title": "Building alpha",
+          "kind": "report",
+          "message": "Loading plugins"
+        }
+      }
+    },
+    {
+      "time": 78522.458598625,
+      "method": "$/progress",
+      "data": {
+        "token": 130,
+        "value": {
+          "title": "Building alpha",
+          "kind": "report",
+          "message": "Compiling alpha"
+        }
+      }
+    },
+    {
+      "time": 78522.495411375,
+      "method": "$/progress",
+      "data": {
+        "token": 130,
+        "value": {
+          "title": "Building alpha",
+          "kind": "report",
+          "message": "compiling: lib/.../target.ex"
+        }
+      }
+    },
+    {
+      "time": 78522.500942541,
+      "method": "$/progress",
+      "data": {
+        "token": 130,
+        "value": {
+          "title": "Building alpha",
+          "kind": "report",
+          "message": "compiling: lib/.../caller.ex"
+        }
+      }
+    },
+    {
+      "time": 78523.745704416,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78523.900626333,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78523.904879416,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "No definition found for {:call, V2Target, :answer, 0} with Indexer."
+      }
+    },
+    {
+      "time": 78523.917274916,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78523.923777666,
+      "method": "$/progress",
+      "data": {
+        "token": 130,
+        "value": {
+          "kind": "end",
+          "title": "Building alpha"
+        }
+      }
+    },
+    {
+      "time": 78523.924464166,
+      "method": "$/progress",
+      "data": {
+        "token": 3,
+        "value": {
+          "kind": "begin",
+          "title": "Finding Completion Candidates"
+        }
+      }
+    },
+    {
+      "time": 78523.925563833,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Compiled alpha in 1.5 seconds"
+      }
+    },
+    {
+      "time": 78523.933646208,
+      "method": "$/progress",
+      "data": {
+        "token": 3,
+        "value": {
+          "kind": "end",
+          "title": "Finding Completion Candidates"
+        }
+      }
+    },
+    {
+      "time": 78523.997739458,
+      "method": "$/progress",
+      "data": {
+        "token": 162,
+        "value": {
+          "title": "Indexing source code",
+          "kind": "begin",
+          "percentage": 0
+        }
+      }
+    },
+    {
+      "time": 78523.998134125,
+      "method": "$/progress",
+      "data": {
+        "token": 162,
+        "value": {
+          "title": "Indexing source code",
+          "percentage": 100,
+          "kind": "report",
+          "message": "Indexing"
+        }
+      }
+    },
+    {
+      "time": 78524.000244416,
+      "method": "$/progress",
+      "data": {
+        "token": 162,
+        "value": {
+          "title": "Indexing source code",
+          "kind": "end",
+          "message": "Completed in 2ms"
+        }
+      }
+    },
+    {
+      "time": 78524.4298355,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78531.391227458,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78531.499903958,
+      "method": "sent:workspace/didChangeWatchedFiles",
+      "data": {
+        "changes": [
+          {
+            "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex",
+            "type": 2
+          }
+        ]
+      }
+    },
+    {
+      "time": 78531.504408125,
+      "method": "sent:textDocument/didOpen",
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex",
+          "version": 0,
+          "languageId": "elixir",
+          "text": "\n"
+        }
+      }
+    },
+    {
+      "time": 78531.509840541,
+      "method": "sent:textDocument/didChange",
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex",
+          "version": 2
+        },
+        "contentChanges": [
+          {
+            "text": "defmodule V2Target do\n  @doc \"GAMMA documentation for the worktree experiment.\"\n  def answer, do: :alpha\nend",
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 0
+              }
+            },
+            "rangeLength": 0
+          }
+        ]
+      }
+    },
+    {
+      "time": 78531.509870916,
+      "method": "sent:textDocument/didSave",
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex"
+        }
+      }
+    },
+    {
+      "time": 78531.509888166,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Opened file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex"
+      }
+    },
+    {
+      "time": 78531.903555708,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78532.412457541,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78532.510764458,
+      "method": "$/progress",
+      "data": {
+        "token": 35,
+        "value": {
+          "kind": "begin",
+          "title": "Building alpha"
+        }
+      }
+    },
+    {
+      "time": 78532.511134541,
+      "method": "$/progress",
+      "data": {
+        "token": 35,
+        "value": {
+          "title": "Building alpha",
+          "kind": "report",
+          "message": "Compiling alpha"
+        }
+      }
+    },
+    {
+      "time": 78532.533473375,
+      "method": "$/progress",
+      "data": {
+        "token": 35,
+        "value": {
+          "title": "Building alpha",
+          "kind": "report",
+          "message": "compiling: lib/.../target.ex"
+        }
+      }
+    },
+    {
+      "time": 78532.586653333,
+      "method": "$/progress",
+      "data": {
+        "token": 35,
+        "value": {
+          "kind": "end",
+          "title": "Building alpha"
+        }
+      }
+    },
+    {
+      "time": 78532.586998541,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Compiled alpha in 76 ms"
+      }
+    },
+    {
+      "time": 78532.587343833,
+      "method": "$/progress",
+      "data": {
+        "token": 67,
+        "value": {
+          "kind": "begin",
+          "title": "Finding Completion Candidates"
+        }
+      }
+    },
+    {
+      "time": 78532.59592125,
+      "method": "$/progress",
+      "data": {
+        "token": 67,
+        "value": {
+          "kind": "end",
+          "title": "Finding Completion Candidates"
+        }
+      }
+    },
+    {
+      "time": 78532.602323541,
+      "method": "textDocument/publishDiagnostics",
+      "data": {
+        "diagnostics": [],
+        "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex"
+      }
+    },
+    {
+      "time": 78532.921491166,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78532.931351125,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78533.034965916,
+      "method": "sent:workspace/didChangeWatchedFiles",
+      "data": {
+        "changes": [
+          {
+            "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex",
+            "type": 1
+          }
+        ]
+      }
+    },
+    {
+      "time": 78533.035770958,
+      "method": "sent:textDocument/didChange",
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex",
+          "version": 3
+        },
+        "contentChanges": [
+          {
+            "text": "\n  @doc \"OMEGA documentation for the worktree experiment.\"\n  def answer, do: :alpha\n",
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 21
+              },
+              "end": {
+                "line": 3,
+                "character": 0
+              }
+            },
+            "rangeLength": 84
+          }
+        ]
+      }
+    },
+    {
+      "time": 78533.035811,
+      "method": "sent:textDocument/didSave",
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex"
+        }
+      }
+    },
+    {
+      "time": 78533.436857583,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78533.945283375,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78534.038625208,
+      "method": "$/progress",
+      "data": {
+        "token": 99,
+        "value": {
+          "kind": "begin",
+          "title": "Building alpha"
+        }
+      }
+    },
+    {
+      "time": 78534.038786458,
+      "method": "$/progress",
+      "data": {
+        "token": 99,
+        "value": {
+          "title": "Building alpha",
+          "kind": "report",
+          "message": "Compiling alpha"
+        }
+      }
+    },
+    {
+      "time": 78534.059602208,
+      "method": "$/progress",
+      "data": {
+        "token": 99,
+        "value": {
+          "title": "Building alpha",
+          "kind": "report",
+          "message": "compiling: lib/.../target.ex"
+        }
+      }
+    },
+    {
+      "time": 78534.122111458,
+      "method": "$/progress",
+      "data": {
+        "token": 99,
+        "value": {
+          "kind": "end",
+          "title": "Building alpha"
+        }
+      }
+    },
+    {
+      "time": 78534.122319375,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Compiled alpha in 84 ms"
+      }
+    },
+    {
+      "time": 78534.122728666,
+      "method": "textDocument/publishDiagnostics",
+      "data": {
+        "diagnostics": [],
+        "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex"
+      }
+    },
+    {
+      "time": 78534.123252083,
+      "method": "$/progress",
+      "data": {
+        "token": 131,
+        "value": {
+          "kind": "begin",
+          "title": "Finding Completion Candidates"
+        }
+      }
+    },
+    {
+      "time": 78534.13187475,
+      "method": "$/progress",
+      "data": {
+        "token": 131,
+        "value": {
+          "kind": "end",
+          "title": "Finding Completion Candidates"
+        }
+      }
+    },
+    {
+      "time": 78534.135932083,
+      "method": "textDocument/publishDiagnostics",
+      "data": {
+        "diagnostics": [],
+        "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex"
+      }
+    },
+    {
+      "time": 78534.450944375,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78534.455998541,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78534.564517416,
+      "method": "sent:workspace/didChangeWatchedFiles",
+      "data": {
+        "changes": [
+          {
+            "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/extra.ex",
+            "type": 1
+          }
+        ]
+      }
+    },
+    {
+      "time": 78534.569453666,
+      "method": "sent:textDocument/didOpen",
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/extra.ex",
+          "version": 0,
+          "languageId": "elixir",
+          "text": "\n"
+        }
+      }
+    },
+    {
+      "time": 78534.575500291,
+      "method": "sent:textDocument/didChange",
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/extra.ex",
+          "version": 2
+        },
+        "contentChanges": [
+          {
+            "text": "defmodule V2Extra do\n  def call, do: V2Target.answer()\nend",
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 0
+              }
+            },
+            "rangeLength": 0
+          }
+        ]
+      }
+    },
+    {
+      "time": 78534.575560166,
+      "method": "sent:textDocument/didSave",
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/extra.ex"
+        }
+      }
+    },
+    {
+      "time": 78534.57558025,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Opened file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/extra.ex"
+      }
+    },
+    {
+      "time": 78534.960607125,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78535.466118958,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78535.572900458,
+      "method": "$/progress",
+      "data": {
+        "token": 163,
+        "value": {
+          "kind": "begin",
+          "title": "Building alpha"
+        }
+      }
+    },
+    {
+      "time": 78535.573168625,
+      "method": "$/progress",
+      "data": {
+        "token": 163,
+        "value": {
+          "title": "Building alpha",
+          "kind": "report",
+          "message": "Compiling alpha"
+        }
+      }
+    },
+    {
+      "time": 78535.587113083,
+      "method": "$/progress",
+      "data": {
+        "token": 163,
+        "value": {
+          "title": "Building alpha",
+          "kind": "report",
+          "message": "compiling: lib/.../extra.ex"
+        }
+      }
+    },
+    {
+      "time": 78535.640992875,
+      "method": "$/progress",
+      "data": {
+        "token": 163,
+        "value": {
+          "kind": "end",
+          "title": "Building alpha"
+        }
+      }
+    },
+    {
+      "time": 78535.641410166,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Compiled alpha in 69 ms"
+      }
+    },
+    {
+      "time": 78535.641988625,
+      "method": "textDocument/publishDiagnostics",
+      "data": {
+        "diagnostics": [],
+        "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex"
+      }
+    },
+    {
+      "time": 78535.642340375,
+      "method": "$/progress",
+      "data": {
+        "token": 195,
+        "value": {
+          "kind": "begin",
+          "title": "Finding Completion Candidates"
+        }
+      }
+    },
+    {
+      "time": 78535.648983875,
+      "method": "textDocument/publishDiagnostics",
+      "data": {
+        "diagnostics": [],
+        "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/extra.ex"
+      }
+    },
+    {
+      "time": 78535.64940625,
+      "method": "textDocument/publishDiagnostics",
+      "data": {
+        "diagnostics": [],
+        "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex"
+      }
+    },
+    {
+      "time": 78535.650007458,
+      "method": "$/progress",
+      "data": {
+        "token": 195,
+        "value": {
+          "kind": "end",
+          "title": "Finding Completion Candidates"
+        }
+      }
+    },
+    {
+      "time": 78535.970487666,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78536.47746325,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78536.984251458,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78537.491978541,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78537.998641041,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78538.504896375,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78539.012997416,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78539.521179958,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78539.524926541,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78539.634775916,
+      "method": "sent:workspace/didChangeWatchedFiles",
+      "data": {
+        "changes": [
+          {
+            "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/extra.ex",
+            "type": 3
+          }
+        ]
+      }
+    },
+    {
+      "time": 78539.642848666,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Reindex alpha"
+      }
+    },
+    {
+      "time": 78539.642962375,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "project reindex requested"
+      }
+    },
+    {
+      "time": 78539.702582666,
+      "method": "$/progress",
+      "data": {
+        "token": 194,
+        "value": {
+          "title": "Indexing source code",
+          "kind": "begin",
+          "percentage": 0
+        }
+      }
+    },
+    {
+      "time": 78539.702884583,
+      "method": "$/progress",
+      "data": {
+        "token": 194,
+        "value": {
+          "title": "Indexing source code",
+          "percentage": 100,
+          "kind": "report",
+          "message": "Indexing"
+        }
+      }
+    },
+    {
+      "time": 78539.704725458,
+      "method": "$/progress",
+      "data": {
+        "token": 194,
+        "value": {
+          "title": "Indexing source code",
+          "kind": "end",
+          "message": "Completed in 2ms"
+        }
+      }
+    },
+    {
+      "time": 78539.765934875,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Reindexed alpha in 128 ms"
+      }
+    },
+    {
+      "time": 78539.767509625,
+      "method": "window/showMessage",
+      "data": {
+        "type": 3,
+        "message": "Reindexed alpha in 128 ms"
+      }
+    },
+    {
+      "time": 78540.031101375,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      }
+    },
+    {
+      "time": 78540.144464541,
+      "method": "sent:workspace/didChangeWatchedFiles",
+      "data": {
+        "changes": [
+          {
+            "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex",
+            "type": 2
+          }
+        ]
+      }
+    },
+    {
+      "time": 78540.145300375,
+      "method": "sent:textDocument/didChange",
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex",
+          "version": 4
+        },
+        "contentChanges": [
+          {
+            "text": "\n  def call_1, do: missing()\n  def call_2, do: V2Target.answer()\n",
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 21
+              },
+              "end": {
+                "line": 3,
+                "character": 0
+              }
+            },
+            "rangeLength": 73
+          }
+        ]
+      }
+    },
+    {
+      "time": 78540.145321833,
+      "method": "sent:textDocument/didSave",
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex"
+        }
+      }
+    },
+    {
+      "time": 78541.148670666,
+      "method": "$/progress",
+      "data": {
+        "token": 226,
+        "value": {
+          "kind": "begin",
+          "title": "Building alpha"
+        }
+      }
+    },
+    {
+      "time": 78541.148855666,
+      "method": "$/progress",
+      "data": {
+        "token": 226,
+        "value": {
+          "title": "Building alpha",
+          "kind": "report",
+          "message": "Compiling alpha"
+        }
+      }
+    },
+    {
+      "time": 78541.219090458,
+      "method": "$/progress",
+      "data": {
+        "token": 226,
+        "value": {
+          "kind": "end",
+          "title": "Building alpha"
+        }
+      }
+    },
+    {
+      "time": 78541.219646,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Compiled alpha in 71 ms"
+      }
+    },
+    {
+      "time": 78541.220188666,
+      "method": "$/progress",
+      "data": {
+        "token": 227,
+        "value": {
+          "kind": "begin",
+          "title": "Finding Completion Candidates"
+        }
+      }
+    },
+    {
+      "time": 78541.22124725,
+      "method": "textDocument/publishDiagnostics",
+      "data": {
+        "diagnostics": [
+          {
+            "severity": 1,
+            "source": "Elixir",
+            "message": "undefined function missing/0",
+            "range": {
+              "start": {
+                "line": 1,
+                "character": 18
+              },
+              "end": {
+                "line": 2,
+                "character": 0
+              }
+            },
+            "data": null
+          }
+        ],
+        "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex"
+      }
+    },
+    {
+      "time": 78541.222229083,
+      "method": "textDocument/publishDiagnostics",
+      "data": {
+        "diagnostics": [],
+        "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/extra.ex"
+      }
+    },
+    {
+      "time": 78541.222290416,
+      "method": "textDocument/publishDiagnostics",
+      "data": {
+        "diagnostics": [],
+        "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex"
+      }
+    },
+    {
+      "time": 78541.224890083,
+      "method": "textDocument/publishDiagnostics",
+      "data": {
+        "diagnostics": [
+          {
+            "severity": 1,
+            "source": "Elixir",
+            "message": "undefined function missing/0",
+            "range": {
+              "start": {
+                "line": 1,
+                "character": 18
+              },
+              "end": {
+                "line": 2,
+                "character": 0
+              }
+            },
+            "data": null
+          },
+          {
+            "severity": 1,
+            "source": "Elixir",
+            "message": "undefined function missing/0",
+            "range": {
+              "start": {
+                "line": 1,
+                "character": 18
+              },
+              "end": {
+                "line": 1,
+                "character": 25
+              }
+            },
+            "data": null
+          }
+        ],
+        "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex"
+      }
+    },
+    {
+      "time": 78541.225619,
+      "method": "textDocument/publishDiagnostics",
+      "data": {
+        "diagnostics": [],
+        "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/extra.ex"
+      }
+    },
+    {
+      "time": 78541.225701125,
+      "method": "textDocument/publishDiagnostics",
+      "data": {
+        "diagnostics": [],
+        "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex"
+      }
+    },
+    {
+      "time": 78541.227843166,
+      "method": "$/progress",
+      "data": {
+        "token": 227,
+        "value": {
+          "kind": "end",
+          "title": "Finding Completion Candidates"
+        }
+      }
+    },
+    {
+      "time": 78541.550874375,
+      "method": "sent:textDocument/didClose",
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex"
+        }
+      }
+    },
+    {
+      "time": 78541.550912791,
+      "method": "sent:textDocument/didOpen",
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex",
+          "version": 4,
+          "languageId": "elixir",
+          "text": "defmodule V2Caller do\n  def call_1, do: missing()\n  def call_2, do: V2Target.answer()\nend\n"
+        }
+      }
+    },
+    {
+      "time": 78541.552131375,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Opened file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex"
+      }
+    },
+    {
+      "time": 78541.658688458,
+      "method": "sent:workspace/didChangeWatchedFiles",
+      "data": {
+        "changes": [
+          {
+            "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex",
+            "type": 2
+          }
+        ]
+      }
+    },
+    {
+      "time": 78541.659330083,
+      "method": "sent:textDocument/didChange",
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex",
+          "version": 6
+        },
+        "contentChanges": [
+          {
+            "text": "\n  def call_1, do: V2Target.answer()\n  def call_2, do: V2Target.answer()\n",
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 21
+              },
+              "end": {
+                "line": 3,
+                "character": 0
+              }
+            },
+            "rangeLength": 65
+          }
+        ]
+      }
+    },
+    {
+      "time": 78541.6593525,
+      "method": "sent:textDocument/didSave",
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex"
+        }
+      }
+    },
+    {
+      "time": 78542.662713583,
+      "method": "$/progress",
+      "data": {
+        "token": 259,
+        "value": {
+          "kind": "begin",
+          "title": "Building alpha"
+        }
+      }
+    },
+    {
+      "time": 78542.6629735,
+      "method": "$/progress",
+      "data": {
+        "token": 259,
+        "value": {
+          "title": "Building alpha",
+          "kind": "report",
+          "message": "Compiling alpha"
+        }
+      }
+    },
+    {
+      "time": 78542.682762625,
+      "method": "$/progress",
+      "data": {
+        "token": 259,
+        "value": {
+          "title": "Building alpha",
+          "kind": "report",
+          "message": "compiling: lib/.../caller.ex"
+        }
+      }
+    },
+    {
+      "time": 78542.720930958,
+      "method": "$/progress",
+      "data": {
+        "token": 259,
+        "value": {
+          "kind": "end",
+          "title": "Building alpha"
+        }
+      }
+    },
+    {
+      "time": 78542.72128925,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Compiled alpha in 59 ms"
+      }
+    },
+    {
+      "time": 78542.721323333,
+      "method": "textDocument/publishDiagnostics",
+      "data": {
+        "diagnostics": [],
+        "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex"
+      }
+    },
+    {
+      "time": 78542.721597625,
+      "method": "textDocument/publishDiagnostics",
+      "data": {
+        "diagnostics": [],
+        "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/extra.ex"
+      }
+    },
+    {
+      "time": 78542.721671875,
+      "method": "textDocument/publishDiagnostics",
+      "data": {
+        "diagnostics": [],
+        "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex"
+      }
+    },
+    {
+      "time": 78542.721796958,
+      "method": "$/progress",
+      "data": {
+        "token": 258,
+        "value": {
+          "kind": "begin",
+          "title": "Finding Completion Candidates"
+        }
+      }
+    },
+    {
+      "time": 78542.728921916,
+      "method": "textDocument/publishDiagnostics",
+      "data": {
+        "diagnostics": [],
+        "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex"
+      }
+    },
+    {
+      "time": 78542.729268708,
+      "method": "textDocument/publishDiagnostics",
+      "data": {
+        "diagnostics": [],
+        "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/extra.ex"
+      }
+    },
+    {
+      "time": 78542.72931225,
+      "method": "textDocument/publishDiagnostics",
+      "data": {
+        "diagnostics": [],
+        "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/target.ex"
+      }
+    },
+    {
+      "time": 78542.729502791,
+      "method": "$/progress",
+      "data": {
+        "token": 258,
+        "value": {
+          "kind": "end",
+          "title": "Finding Completion Candidates"
+        }
+      }
+    },
+    {
+      "time": 78543.073788625,
+      "method": "sent:textDocument/didClose",
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex"
+        }
+      }
+    },
+    {
+      "time": 78543.073841875,
+      "method": "sent:textDocument/didOpen",
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex",
+          "version": 6,
+          "languageId": "elixir",
+          "text": "defmodule V2Caller do\n  def call_1, do: V2Target.answer()\n  def call_2, do: V2Target.answer()\nend\n"
+        }
+      }
+    },
+    {
+      "time": 78543.074781333,
+      "method": "window/logMessage",
+      "data": {
+        "type": 3,
+        "message": "Opened file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex"
+      }
+    }
+  ],
+  "beta_events": [
+    {
+      "data": {
+        "textDocument": {
+          "uri": "file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/beta/lib/caller.ex",
+          "text": "defmodule V2Caller do\n  def call_1, do: V2Target.answer()\n  def call_2, do: V2Target.answer()\n  def call_3, do: V2Target.answer()\nend\n",
+          "version": 0,
+          "languageId": "elixir"
+        }
+      },
+      "method": "sent:textDocument/didOpen",
+      "time": 78524.970598666
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Server initialized, registering capabilities"
+      },
+      "method": "window/logMessage",
+      "time": 78524.979717333
+    },
+    {
+      "data": {
+        "registrations": [
+          {
+            "id": "-42",
+            "method": "workspace/didChangeWatchedFiles",
+            "registerOptions": {
+              "watchers": [
+                {
+                  "globPattern": "**/mix.lock"
+                },
+                {
+                  "globPattern": "**/*.{ex,exs}"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "method": "client/registerCapability",
+      "time": 78524.9813085
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "[beta] Starting project"
+      },
+      "method": "window/logMessage",
+      "time": 78524.983719416
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Opened file:///private/tmp/expert-neovim-validation-runs/editor-delete-reindex/beta/lib/caller.ex"
+      },
+      "method": "window/logMessage",
+      "time": 78524.998243458
+    },
+    {
+      "data": {
+        "value": {
+          "kind": "begin",
+          "title": "[beta] Starting engine node"
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78524.998877416
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for beta was initialized. Ignoring."
+      },
+      "method": "window/logMessage",
+      "time": 78525.001130166
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for beta was initialized. Ignoring."
+      },
+      "method": "window/logMessage",
+      "time": 78525.012132291
+    },
+    {
+      "data": {
+        "value": {
+          "kind": "begin",
+          "title": "[beta] Preparing engine"
+        },
+        "token": 1154
+      },
+      "method": "$/progress",
+      "time": 78525.014378125
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "[beta] Using path: /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/erts-17.0.6/bin:/opt/homebrew/Cellar/expert/0.1.10/libexec/expert/bin:/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-vendor/nvim-macos-arm64/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/VMware Fusion.app/Contents/Public:/opt/homebrew/Caskroom/codex/0.156.1/codex-path:/Users/chenghanlee/.codex/tmp/arg0/codex-arg0mtiZz0:/opt/homebrew/bin:/opt/homebrew/sbin:/Applications/Ghostty.app/Contents/MacOS:/Users/chenghanlee/.local/bin:/Users/chenghanlee/Documents/Programs/flutter/bin:/Users/chenghanlee/.docker/bin:/Users/chenghanlee/.docker/bin:/Users/chenghanlee/.local/bin"
+      },
+      "method": "window/logMessage",
+      "time": 78525.118999125
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "[beta] Found elixir executable at /opt/homebrew/bin/elixir"
+      },
+      "method": "window/logMessage",
+      "time": 78525.11936675
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "[beta] Found erl executable at /opt/homebrew/bin/erl"
+      },
+      "method": "window/logMessage",
+      "time": 78525.119444416
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "[beta] Preparing engine"
+      },
+      "method": "window/logMessage",
+      "time": 78525.119495208
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for beta was initialized. Ignoring."
+      },
+      "method": "window/logMessage",
+      "time": 78525.52128725
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for beta was initialized. Ignoring."
+      },
+      "method": "window/logMessage",
+      "time": 78526.027107166
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for beta was initialized. Ignoring."
+      },
+      "method": "window/logMessage",
+      "time": 78526.529846583
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "[beta] Engine available at: /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns"
+      },
+      "method": "window/logMessage",
+      "time": 78527.0124585
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for beta was initialized. Ignoring."
+      },
+      "method": "window/logMessage",
+      "time": 78527.0337355
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "[beta] ebin paths:\n[\"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/patch/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_briefly/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_bunt/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_credo/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_deps_nix/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_elixir_sense/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_engine/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_file_system/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_forge/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_gen_lsp/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_hpax/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_jason/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_logger_backends/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_mint/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_options/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_parsec/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_path_glob/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_quokka/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_schematic/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_sourceror/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_spitfire/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_telemetry/ebin\",\n \"/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_typed_struct/ebin\"]"
+      },
+      "method": "window/logMessage",
+      "time": 78527.043889083
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Preparing engine",
+          "kind": "end",
+          "message": "Engine is ready"
+        },
+        "token": 1154
+      },
+      "method": "$/progress",
+      "time": 78527.069760541
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting Erlang node..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.070168458
+    },
+    {
+      "data": {
+        "type": 2,
+        "message": "Received unexpected message {:EXIT, #PID<0.203.0>, :normal}"
+      },
+      "method": "window/logMessage",
+      "time": 78527.128257
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Bootstrapping engine..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.434296875
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for beta was initialized. Ignoring."
+      },
+      "method": "window/logMessage",
+      "time": 78527.536652708
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting elixir..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.60196075
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting runtime_tools..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.60216625
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_engine..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.607866791
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_typed_struct..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.729831416
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_file_system..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.730217166
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_nimble_options..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.73030075
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_bunt..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.730324166
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_jason..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.730344958
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_logger_backends..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.730486208
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_hpax..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.730621625
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_mint..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.730742625
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_elixir_sense..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.730872708
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_sourceror..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.730990375
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_spitfire..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.731143458
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_telemetry..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.7312295
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_briefly..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.731347875
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_schematic..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.731469875
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_deps_nix..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.731584916
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_credo..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.731724041
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_quokka..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.731839541
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_gen_lsp..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.733041958
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_forge..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.7338145
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Starting xp_path_glob..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.734443208
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "report",
+          "message": "Loading engine modules..."
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78527.7350355
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for beta was initialized. Ignoring."
+      },
+      "method": "window/logMessage",
+      "time": 78528.039966083
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Received request textDocument/hover before engine for beta was initialized. Ignoring."
+      },
+      "method": "window/logMessage",
+      "time": 78528.543306666
+    },
+    {
+      "data": {
+        "value": {
+          "title": "[beta] Starting engine node",
+          "kind": "end",
+          "message": "Engine node started"
+        },
+        "token": 1122
+      },
+      "method": "$/progress",
+      "time": 78528.567544416
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Started project node for beta"
+      },
+      "method": "window/logMessage",
+      "time": 78528.570648458
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "[beta] Engine initialized for project beta"
+      },
+      "method": "window/logMessage",
+      "time": 78528.5708395
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      },
+      "method": "window/logMessage",
+      "time": 78529.070897666
+    },
+    {
+      "data": {
+        "value": {
+          "kind": "begin",
+          "title": "Building beta"
+        },
+        "token": 35
+      },
+      "method": "$/progress",
+      "time": 78529.574770583
+    },
+    {
+      "data": {
+        "value": {
+          "title": "Building beta",
+          "kind": "report",
+          "message": "mix local.hex"
+        },
+        "token": 35
+      },
+      "method": "$/progress",
+      "time": 78529.579194708
+    },
+    {
+      "data": {
+        "value": {
+          "title": "Building beta",
+          "kind": "report",
+          "message": "mix local.rebar"
+        },
+        "token": 35
+      },
+      "method": "$/progress",
+      "time": 78529.58356175
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      },
+      "method": "window/logMessage",
+      "time": 78529.584379833
+    },
+    {
+      "data": {
+        "value": {
+          "title": "Building beta",
+          "kind": "report",
+          "message": "mix deps.get"
+        },
+        "token": 35
+      },
+      "method": "$/progress",
+      "time": 78529.587477375
+    },
+    {
+      "data": {
+        "value": {
+          "title": "Building beta",
+          "kind": "report",
+          "message": "mix loadconfig"
+        },
+        "token": 35
+      },
+      "method": "$/progress",
+      "time": 78529.611780708
+    },
+    {
+      "data": {
+        "value": {
+          "title": "Building beta",
+          "kind": "report",
+          "message": "Loading plugins"
+        },
+        "token": 35
+      },
+      "method": "$/progress",
+      "time": 78529.612244958
+    },
+    {
+      "data": {
+        "value": {
+          "title": "Building beta",
+          "kind": "report",
+          "message": "Compiling beta"
+        },
+        "token": 35
+      },
+      "method": "$/progress",
+      "time": 78529.614328833
+    },
+    {
+      "data": {
+        "value": {
+          "title": "Building beta",
+          "kind": "report",
+          "message": "compiling: lib/.../target.ex"
+        },
+        "token": 35
+      },
+      "method": "$/progress",
+      "time": 78529.659273625
+    },
+    {
+      "data": {
+        "value": {
+          "title": "Building beta",
+          "kind": "report",
+          "message": "compiling: lib/.../caller.ex"
+        },
+        "token": 35
+      },
+      "method": "$/progress",
+      "time": 78529.664503916
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      },
+      "method": "window/logMessage",
+      "time": 78530.659384
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      },
+      "method": "window/logMessage",
+      "time": 78530.816912208
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "No definition found for {:call, V2Target, :answer, 0} with Indexer."
+      },
+      "method": "window/logMessage",
+      "time": 78530.821007625
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      },
+      "method": "window/logMessage",
+      "time": 78530.834771833
+    },
+    {
+      "data": {
+        "value": {
+          "kind": "end",
+          "title": "Building beta"
+        },
+        "token": 35
+      },
+      "method": "$/progress",
+      "time": 78530.837797791
+    },
+    {
+      "data": {
+        "value": {
+          "kind": "begin",
+          "title": "Finding Completion Candidates"
+        },
+        "token": 67
+      },
+      "method": "$/progress",
+      "time": 78530.838351125
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Compiled beta in 1.3 seconds"
+      },
+      "method": "window/logMessage",
+      "time": 78530.8393335
+    },
+    {
+      "data": {
+        "value": {
+          "kind": "end",
+          "title": "Finding Completion Candidates"
+        },
+        "token": 67
+      },
+      "method": "$/progress",
+      "time": 78530.847942916
+    },
+    {
+      "data": {
+        "value": {
+          "title": "Indexing source code",
+          "kind": "begin",
+          "percentage": 0
+        },
+        "token": 1218
+      },
+      "method": "$/progress",
+      "time": 78530.907804375
+    },
+    {
+      "data": {
+        "value": {
+          "title": "Indexing source code",
+          "percentage": 100,
+          "kind": "report",
+          "message": "Indexing"
+        },
+        "token": 1218
+      },
+      "method": "$/progress",
+      "time": 78530.908089458
+    },
+    {
+      "data": {
+        "value": {
+          "title": "Indexing source code",
+          "kind": "end",
+          "message": "Completed in 2ms"
+        },
+        "token": 1218
+      },
+      "method": "$/progress",
+      "time": 78530.910026166
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      },
+      "method": "window/logMessage",
+      "time": 78531.34117775
+    },
+    {
+      "data": {
+        "type": 3,
+        "message": "Resolved entity: {:call, V2Target, :answer, 0}"
+      },
+      "method": "window/logMessage",
+      "time": 78532.92676875
+    }
+  ],
+  "alpha_eof": {
+    "exit_code": 0,
+    "owned": {
+      "49734": {
+        "parent": 49695,
+        "state": "Ss",
+        "command": "erl_child_setup 8192"
+      },
+      "49735": {
+        "parent": 49734,
+        "state": "Ss",
+        "command": "/opt/homebrew/Cellar/erlang/29.1/lib/erlang/erts-17.1/bin/inet_gethost 4"
+      },
+      "49736": {
+        "parent": 49735,
+        "state": "S",
+        "command": "/opt/homebrew/Cellar/erlang/29.1/lib/erlang/erts-17.1/bin/inet_gethost 4"
+      },
+      "49609": {
+        "parent": 49554,
+        "state": "Ss",
+        "command": "erl_child_setup 8192"
+      },
+      "49552": {
+        "parent": 49345,
+        "state": "Ss",
+        "command": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-vendor/vv-mcp"
+      },
+      "49553": {
+        "parent": 49552,
+        "state": "S",
+        "command": "nvim --headless --listen /var/folders/26/15tlmtc55wggjp8xt79bh5n40000gn/T/vv-mcp-49552-0.sock /private/tmp/expert-neovim-validation-runs/editor-delete-reindex/alpha/lib/caller.ex"
+      },
+      "49554": {
+        "parent": 49553,
+        "state": "Ss",
+        "command": "/opt/homebrew/Cellar/expert/0.1.10/libexec/expert/erts-17.0.6/bin/beam.smp -S 4:4 -- -root /opt/homebrew/Cellar/expert/0.1.10/libexec/expert -bindir /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/erts-17.0.6/bin -progname erl -- -home /Users/chenghanlee -- -noshell -s elixir start_cli -setcookie expert -config /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/releases/0.1.10/sys -boot /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/releases/0.1.10/start_clean -boot_var RELEASE_LIB /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/lib -start_epmd false -epmd_module Elixir.XPForge.EPMD -- -- -- -- -extra --eval System.no_halt(true); Application.ensure_all_started(:xp_expert) -- --stdio"
+      },
+      "49694": {
+        "parent": 49609,
+        "state": "Ss",
+        "command": "bash /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/lib/xp_expert-0.1.10/priv/port_wrapper.sh /opt/homebrew/bin/elixir -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/patch/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_briefly/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_bunt/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_credo/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_deps_nix/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_elixir_sense/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_engine/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_file_system/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_forge/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_gen_lsp/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_hpax/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_jason/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_logger_backends/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_mint/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_options/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_parsec/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_path_glob/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_quokka/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_schematic/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_sourceror/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_spitfire/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_telemetry/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_typed_struct/ebin --erl -start_epmd false -epmd_module Elixir.XPForge.EPMD --cookie [REDACTED_RUNTIME_COOKIE] --no-halt -e System.argv() |> hd() |> Base.decode64!() |> Code.eval_string() bm9kZSA9IDoiZXhwZXJ0LXByb2plY3QtYWxwaGEtNTI0NTlAMTI3LjAuMC4xIgpub2RlX3N0YXJ0ID0gTm9kZS5zdGFydChub2RlLCA6bG9uZ25hbWVzKQoKY2FzZSBub2RlX3N0YXJ0IGRvCiAgezpvaywgX30gLT4KICAgIDpvayA9IFhQRm9yZ2UuTm9kZVBvcnRNYXBwZXIucmVnaXN0ZXIoKQogICAgSU8ucHV0cygib2siKQoKICB7OmVycm9yLCByZWFzb259IC0+CiAgICBJTy5wdXRzKCJlcnJvciBzdGFydGluZyBub2RlOiAje2luc3BlY3QocmVhc29uKX0iKQogICAgSU8ucHV0cygiZXJyb3Igc3RhcnRpbmcgbm9kZToKICN7aW5zcGVjdChyZWFzb24pfSIpCmVuZA=="
+      },
+      "49695": {
+        "parent": 49694,
+        "state": "S",
+        "command": "/opt/homebrew/Cellar/erlang/29.1/lib/erlang/erts-17.1/bin/beam.smp -- -root /opt/homebrew/Cellar/erlang/29.1/lib/erlang -bindir /opt/homebrew/Cellar/erlang/29.1/lib/erlang/erts-17.1/bin -progname erl -- -home /Users/chenghanlee -- -noshell -elixir_root /opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib -pa /opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib/elixir/ebin -s elixir start_cli -start_epmd false -epmd_module Elixir.XPForge.EPMD -setcookie expert -- -- -extra -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/patch/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_briefly/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_bunt/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_credo/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_deps_nix/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_elixir_sense/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_engine/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_file_system/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_forge/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_gen_lsp/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_hpax/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_jason/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_logger_backends/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_mint/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_options/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_parsec/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_path_glob/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_quokka/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_schematic/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_sourceror/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_spitfire/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_telemetry/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_typed_struct/ebin --no-halt -e System.argv() |> hd() |> Base.decode64!() |> Code.eval_string() bm9kZSA9IDoiZXhwZXJ0LXByb2plY3QtYWxwaGEtNTI0NTlAMTI3LjAuMC4xIgpub2RlX3N0YXJ0ID0gTm9kZS5zdGFydChub2RlLCA6bG9uZ25hbWVzKQoKY2FzZSBub2RlX3N0YXJ0IGRvCiAgezpvaywgX30gLT4KICAgIDpvayA9IFhQRm9yZ2UuTm9kZVBvcnRNYXBwZXIucmVnaXN0ZXIoKQogICAgSU8ucHV0cygib2siKQoKICB7OmVycm9yLCByZWFzb259IC0+CiAgICBJTy5wdXRzKCJlcnJvciBzdGFydGluZyBub2RlOiAje2luc3BlY3QocmVhc29uKX0iKQogICAgSU8ucHV0cygiZXJyb3Igc3RhcnRpbmcgbm9kZToKICN7aW5zcGVjdChyZWFzb24pfSIpCmVuZA=="
+      },
+      "49696": {
+        "parent": 49694,
+        "state": "S",
+        "command": "bash /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/lib/xp_expert-0.1.10/priv/port_wrapper.sh /opt/homebrew/bin/elixir -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/patch/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_briefly/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_bunt/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_credo/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_deps_nix/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_elixir_sense/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_engine/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_file_system/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_forge/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_gen_lsp/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_hpax/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_jason/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_logger_backends/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_mint/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_options/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_parsec/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_path_glob/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_quokka/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_schematic/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_sourceror/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_spitfire/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_telemetry/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_typed_struct/ebin --erl -start_epmd false -epmd_module Elixir.XPForge.EPMD --cookie [REDACTED_RUNTIME_COOKIE] --no-halt -e System.argv() |> hd() |> Base.decode64!() |> Code.eval_string() bm9kZSA9IDoiZXhwZXJ0LXByb2plY3QtYWxwaGEtNTI0NTlAMTI3LjAuMC4xIgpub2RlX3N0YXJ0ID0gTm9kZS5zdGFydChub2RlLCA6bG9uZ25hbWVzKQoKY2FzZSBub2RlX3N0YXJ0IGRvCiAgezpvaywgX30gLT4KICAgIDpvayA9IFhQRm9yZ2UuTm9kZVBvcnRNYXBwZXIucmVnaXN0ZXIoKQogICAgSU8ucHV0cygib2siKQoKICB7OmVycm9yLCByZWFzb259IC0+CiAgICBJTy5wdXRzKCJlcnJvciBzdGFydGluZyBub2RlOiAje2luc3BlY3QocmVhc29uKX0iKQogICAgSU8ucHV0cygiZXJyb3Igc3RhcnRpbmcgbm9kZToKICN7aW5zcGVjdChyZWFzb24pfSIpCmVuZA=="
+      },
+      "49697": {
+        "parent": 49696,
+        "state": "S",
+        "command": "bash /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/lib/xp_expert-0.1.10/priv/port_wrapper.sh /opt/homebrew/bin/elixir -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/patch/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_briefly/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_bunt/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_credo/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_deps_nix/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_elixir_sense/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_engine/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_file_system/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_forge/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_gen_lsp/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_hpax/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_jason/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_logger_backends/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_mint/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_options/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_parsec/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_path_glob/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_quokka/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_schematic/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_sourceror/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_spitfire/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_telemetry/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_typed_struct/ebin --erl -start_epmd false -epmd_module Elixir.XPForge.EPMD --cookie [REDACTED_RUNTIME_COOKIE] --no-halt -e System.argv() |> hd() |> Base.decode64!() |> Code.eval_string() bm9kZSA9IDoiZXhwZXJ0LXByb2plY3QtYWxwaGEtNTI0NTlAMTI3LjAuMC4xIgpub2RlX3N0YXJ0ID0gTm9kZS5zdGFydChub2RlLCA6bG9uZ25hbWVzKQoKY2FzZSBub2RlX3N0YXJ0IGRvCiAgezpvaywgX30gLT4KICAgIDpvayA9IFhQRm9yZ2UuTm9kZVBvcnRNYXBwZXIucmVnaXN0ZXIoKQogICAgSU8ucHV0cygib2siKQoKICB7OmVycm9yLCByZWFzb259IC0+CiAgICBJTy5wdXRzKCJlcnJvciBzdGFydGluZyBub2RlOiAje2luc3BlY3QocmVhc29uKX0iKQogICAgSU8ucHV0cygiZXJyb3Igc3RhcnRpbmcgbm9kZToKICN7aW5zcGVjdChyZWFzb24pfSIpCmVuZA=="
+      }
+    },
+    "remaining": {}
+  },
+  "beta_after_alpha_eof": {
+    "isError": false,
+    "data": {
+      "clients": [
+        "expert"
+      ],
+      "items": [
+        "```elixir\nV2Target.answer()\n```\n\nBETA documentation for the worktree experiment.\n"
+      ]
+    }
+  },
+  "beta_eof": {
+    "exit_code": 0,
+    "owned": {
+      "49809": {
+        "parent": 49756,
+        "state": "Ss",
+        "command": "erl_child_setup 8192"
+      },
+      "49754": {
+        "parent": 49345,
+        "state": "Ss",
+        "command": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/neovim-vendor/vv-mcp"
+      },
+      "49755": {
+        "parent": 49754,
+        "state": "S",
+        "command": "nvim --headless --listen /var/folders/26/15tlmtc55wggjp8xt79bh5n40000gn/T/vv-mcp-49754-0.sock /private/tmp/expert-neovim-validation-runs/editor-delete-reindex/beta/lib/caller.ex"
+      },
+      "49756": {
+        "parent": 49755,
+        "state": "Ss",
+        "command": "/opt/homebrew/Cellar/expert/0.1.10/libexec/expert/erts-17.0.6/bin/beam.smp -S 4:4 -- -root /opt/homebrew/Cellar/expert/0.1.10/libexec/expert -bindir /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/erts-17.0.6/bin -progname erl -- -home /Users/chenghanlee -- -noshell -s elixir start_cli -setcookie expert -config /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/releases/0.1.10/sys -boot /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/releases/0.1.10/start_clean -boot_var RELEASE_LIB /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/lib -start_epmd false -epmd_module Elixir.XPForge.EPMD -- -- -- -- -extra --eval System.no_halt(true); Application.ensure_all_started(:xp_expert) -- --stdio"
+      },
+      "49957": {
+        "parent": 49902,
+        "state": "Ss",
+        "command": "erl_child_setup 8192"
+      },
+      "49958": {
+        "parent": 49957,
+        "state": "Ss",
+        "command": "/opt/homebrew/Cellar/erlang/29.1/lib/erlang/erts-17.1/bin/inet_gethost 4"
+      },
+      "49959": {
+        "parent": 49958,
+        "state": "S",
+        "command": "/opt/homebrew/Cellar/erlang/29.1/lib/erlang/erts-17.1/bin/inet_gethost 4"
+      },
+      "49901": {
+        "parent": 49809,
+        "state": "Ss",
+        "command": "bash /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/lib/xp_expert-0.1.10/priv/port_wrapper.sh /opt/homebrew/bin/elixir -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/patch/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_briefly/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_bunt/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_credo/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_deps_nix/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_elixir_sense/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_engine/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_file_system/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_forge/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_gen_lsp/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_hpax/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_jason/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_logger_backends/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_mint/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_options/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_parsec/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_path_glob/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_quokka/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_schematic/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_sourceror/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_spitfire/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_telemetry/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_typed_struct/ebin --erl -start_epmd false -epmd_module Elixir.XPForge.EPMD --cookie [REDACTED_RUNTIME_COOKIE] --no-halt -e System.argv() |> hd() |> Base.decode64!() |> Code.eval_string() bm9kZSA9IDoiZXhwZXJ0LXByb2plY3QtYmV0YS00MDI2NEAxMjcuMC4wLjEiCm5vZGVfc3RhcnQgPSBOb2RlLnN0YXJ0KG5vZGUsIDpsb25nbmFtZXMpCgpjYXNlIG5vZGVfc3RhcnQgZG8KICB7Om9rLCBffSAtPgogICAgOm9rID0gWFBGb3JnZS5Ob2RlUG9ydE1hcHBlci5yZWdpc3RlcigpCiAgICBJTy5wdXRzKCJvayIpCgogIHs6ZXJyb3IsIHJlYXNvbn0gLT4KICAgIElPLnB1dHMoImVycm9yIHN0YXJ0aW5nIG5vZGU6ICN7aW5zcGVjdChyZWFzb24pfSIpCiAgICBJTy5wdXRzKCJlcnJvciBzdGFydGluZyBub2RlOgogI3tpbnNwZWN0KHJlYXNvbil9IikKZW5k"
+      },
+      "49902": {
+        "parent": 49901,
+        "state": "S",
+        "command": "/opt/homebrew/Cellar/erlang/29.1/lib/erlang/erts-17.1/bin/beam.smp -- -root /opt/homebrew/Cellar/erlang/29.1/lib/erlang -bindir /opt/homebrew/Cellar/erlang/29.1/lib/erlang/erts-17.1/bin -progname erl -- -home /Users/chenghanlee -- -noshell -elixir_root /opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib -pa /opt/homebrew/Cellar/elixir/1.20.4/lib/elixir/bin/../lib/elixir/ebin -s elixir start_cli -start_epmd false -epmd_module Elixir.XPForge.EPMD -setcookie expert -- -- -extra -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/patch/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_briefly/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_bunt/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_credo/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_deps_nix/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_elixir_sense/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_engine/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_file_system/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_forge/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_gen_lsp/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_hpax/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_jason/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_logger_backends/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_mint/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_options/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_parsec/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_path_glob/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_quokka/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_schematic/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_sourceror/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_spitfire/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_telemetry/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_typed_struct/ebin --no-halt -e System.argv() |> hd() |> Base.decode64!() |> Code.eval_string() bm9kZSA9IDoiZXhwZXJ0LXByb2plY3QtYmV0YS00MDI2NEAxMjcuMC4wLjEiCm5vZGVfc3RhcnQgPSBOb2RlLnN0YXJ0KG5vZGUsIDpsb25nbmFtZXMpCgpjYXNlIG5vZGVfc3RhcnQgZG8KICB7Om9rLCBffSAtPgogICAgOm9rID0gWFBGb3JnZS5Ob2RlUG9ydE1hcHBlci5yZWdpc3RlcigpCiAgICBJTy5wdXRzKCJvayIpCgogIHs6ZXJyb3IsIHJlYXNvbn0gLT4KICAgIElPLnB1dHMoImVycm9yIHN0YXJ0aW5nIG5vZGU6ICN7aW5zcGVjdChyZWFzb24pfSIpCiAgICBJTy5wdXRzKCJlcnJvciBzdGFydGluZyBub2RlOgogI3tpbnNwZWN0KHJlYXNvbil9IikKZW5k"
+      },
+      "49903": {
+        "parent": 49901,
+        "state": "S",
+        "command": "bash /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/lib/xp_expert-0.1.10/priv/port_wrapper.sh /opt/homebrew/bin/elixir -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/patch/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_briefly/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_bunt/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_credo/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_deps_nix/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_elixir_sense/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_engine/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_file_system/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_forge/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_gen_lsp/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_hpax/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_jason/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_logger_backends/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_mint/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_options/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_parsec/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_path_glob/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_quokka/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_schematic/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_sourceror/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_spitfire/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_telemetry/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_typed_struct/ebin --erl -start_epmd false -epmd_module Elixir.XPForge.EPMD --cookie [REDACTED_RUNTIME_COOKIE] --no-halt -e System.argv() |> hd() |> Base.decode64!() |> Code.eval_string() bm9kZSA9IDoiZXhwZXJ0LXByb2plY3QtYmV0YS00MDI2NEAxMjcuMC4wLjEiCm5vZGVfc3RhcnQgPSBOb2RlLnN0YXJ0KG5vZGUsIDpsb25nbmFtZXMpCgpjYXNlIG5vZGVfc3RhcnQgZG8KICB7Om9rLCBffSAtPgogICAgOm9rID0gWFBGb3JnZS5Ob2RlUG9ydE1hcHBlci5yZWdpc3RlcigpCiAgICBJTy5wdXRzKCJvayIpCgogIHs6ZXJyb3IsIHJlYXNvbn0gLT4KICAgIElPLnB1dHMoImVycm9yIHN0YXJ0aW5nIG5vZGU6ICN7aW5zcGVjdChyZWFzb24pfSIpCiAgICBJTy5wdXRzKCJlcnJvciBzdGFydGluZyBub2RlOgogI3tpbnNwZWN0KHJlYXNvbil9IikKZW5k"
+      },
+      "49904": {
+        "parent": 49903,
+        "state": "S",
+        "command": "bash /opt/homebrew/Cellar/expert/0.1.10/libexec/expert/lib/xp_expert-0.1.10/priv/port_wrapper.sh /opt/homebrew/bin/elixir -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/patch/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_briefly/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_bunt/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_credo/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_deps_nix/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_elixir_sense/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_engine/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_file_system/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_forge/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_gen_lsp/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_hpax/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_jason/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_logger_backends/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_mint/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_options/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_nimble_parsec/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_path_glob/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_quokka/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_schematic/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_sourceror/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_spitfire/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_telemetry/ebin -pa /Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/xp_typed_struct/ebin --erl -start_epmd false -epmd_module Elixir.XPForge.EPMD --cookie [REDACTED_RUNTIME_COOKIE] --no-halt -e System.argv() |> hd() |> Base.decode64!() |> Code.eval_string() bm9kZSA9IDoiZXhwZXJ0LXByb2plY3QtYmV0YS00MDI2NEAxMjcuMC4wLjEiCm5vZGVfc3RhcnQgPSBOb2RlLnN0YXJ0KG5vZGUsIDpsb25nbmFtZXMpCgpjYXNlIG5vZGVfc3RhcnQgZG8KICB7Om9rLCBffSAtPgogICAgOm9rID0gWFBGb3JnZS5Ob2RlUG9ydE1hcHBlci5yZWdpc3RlcigpCiAgICBJTy5wdXRzKCJvayIpCgogIHs6ZXJyb3IsIHJlYXNvbn0gLT4KICAgIElPLnB1dHMoImVycm9yIHN0YXJ0aW5nIG5vZGU6ICN7aW5zcGVjdChyZWFzb24pfSIpCiAgICBJTy5wdXRzKCJlcnJvciBzdGFydGluZyBub2RlOgogI3tpbnNwZWN0KHJlYXNvbil9IikKZW5k"
+      }
+    },
+    "remaining": {}
+  }
+}

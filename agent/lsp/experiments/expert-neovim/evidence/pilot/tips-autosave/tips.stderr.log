@@ -1,0 +1,23 @@
+vim.lsp.set_log_level() is deprecated. Run ":checkhealth vim.deprecated" for more informationLua callback:
+...r/nvim-macos-arm64/share/nvim/runtime/lua/vim/_watch.lua:75: EMFILE
+stack traceback:
+	[C]: in function 'assert'
+	...r/nvim-macos-arm64/share/nvim/runtime/lua/vim/_watch.lua:75: in function <...r/nvim-macos-arm64/share/nvim/runtime/lua/vim/_watch.lua:74>
+	[C]: in function 'wait'
+	...im-macos-arm64/share/nvim/runtime/lua/vim/lsp/client.lua:811: in function 'request_sync'
+	...eixiyo-vv-mcp.nvim-d7ce20b/lua/vv-mcp/lsp/navigation.lua:41: in function <...eixiyo-vv-mcp.nvim-d7ce20b/lua/vv-mcp/lsp/navigation.lua:24>
+	[C]: in function 'pcall'
+	...ndor/beixiyo-vv-mcp.nvim-d7ce20b/lua/vv-mcp/lsp/init.lua:44: in function <...ndor/beixiyo-vv-mcp.nvim-d7ce20b/lua/vv-mcp/lsp/init.lua:19>LSP[expert] [tips-expert-neovim-codex] Engine build failed for tips-expert-neovim-codex::17600602.
+Build script exited with status: 1
+
+Namespacing 4 files:
+New: 4
+Changed: 0
+Deleted: 4
+** (File.Error) could not remove file "/Users/chenghanlee/Library/Caches/expert/0.1.10/ex-1.20.4-erl-17.1/c0m2fn5-5MavvF6LppYufw/_build/dev_ns/lib/mix_install/consolidated/Elixir.Forge.Document.Container.beam": not owner
+(elixir 1.20.4) lib/file.ex:1579: File.rm!/1
+(elixir 1.20.4) lib/enum.ex:983: Enum."-each/2-lists^foreach/1-0-"/2
+(forge 0.1.10) lib/forge/namespace/file_sync.ex:97: Forge.Namespace.FileSync.delete_removed/1
+(forge 0.1.10) lib/mix/tasks/namespace.ex:88: Mix.Tasks.Namespace.incremental_transforms/3
+(mix 1.20.4) lib/mix/task.ex:502: anonymous fn/3 in Mix.Task.run_task/5
+/opt/homebrew/Cellar/expert/0.1.10/libexec/expert/lib/xp_expert-0.1.10/priv/build_engine.exs:59: (file)

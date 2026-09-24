@@ -1,5 +1,9 @@
 # Installed Expert + headless Neovim experiment
 
+**Archived 2026-09-24.** See [ARCHIVE.md](ARCHIVE.md) for the decision, retained
+evidence, checksum verification and historical retrieval. Do not merge this
+experimental branch into main.
+
 **Result: useful reusable foundations, but not ready for rollout.** Installed
 Expert 0.1.10 has a delete-event mismatch and a worker lifecycle defect exposed by
 rapid compilations. No server patch or active client configuration was installed.

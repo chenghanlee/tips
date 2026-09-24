@@ -65,7 +65,8 @@
       },
       "qualifications": [
         "Observed navigation/diagnostics results retained; observer serialization failed at the end, so no normal EOF lifecycle claim for this run."
-      ]
+      ],
+      "archived_path": "evidence/pilot/autosave/results.json"
     },
     {
       "path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/baseline/results.json",
@@ -136,7 +137,8 @@
       },
       "qualifications": [
         "Deletion was not validated: created caller had never appeared. No automatic synchronization."
-      ]
+      ],
+      "archived_path": "evidence/pilot/baseline/results.json"
     },
     {
       "path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/save-reindex/results.json",
@@ -210,7 +212,8 @@
       },
       "qualifications": [
         "Tiny-fixture success is not sufficient; compare clean Tips save-reindex."
-      ]
+      ],
+      "archived_path": "evidence/pilot/save-reindex/results.json"
     },
     {
       "path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-autosave/results.json",
@@ -223,7 +226,8 @@
       },
       "qualifications": [
         "Startup failed under restricted cache permissions; not slow compilation. Controlled run stopped, owned cleanup recorded separately."
-      ]
+      ],
+      "archived_path": "evidence/pilot/tips-autosave/results.json"
     },
     {
       "path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-save-reindex/results.json",
@@ -274,7 +278,8 @@
       },
       "qualifications": [
         "Source archives under indexed root confounded workload; cleaner follow-up is B/save-reindex."
-      ]
+      ],
+      "archived_path": "evidence/pilot/tips-save-reindex/results.json"
     },
     {
       "path": "/private/tmp/expert-neovim-validation-runs/application-checks/results.json",
@@ -335,7 +340,8 @@
           "log": "credo-corrected.log",
           "note": "Original invalid --files invocation retained above; corrected command completed successfully."
         }
-      }
+      },
+      "archived_path": "evidence/tips-validation/application-checks/results.json"
     },
     {
       "path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/results.json",
@@ -406,7 +412,8 @@
           "owned_count": 11,
           "remaining_count": 0
         }
-      }
+      },
+      "archived_path": "evidence/tips-validation/editor-delete-reindex/results.json"
     },
     {
       "path": "/private/tmp/expert-neovim-validation-runs/editor-events/results.json",
@@ -477,7 +484,8 @@
           "owned_count": 11,
           "remaining_count": 0
         }
-      }
+      },
+      "archived_path": "evidence/tips-validation/editor-events/results.json"
     },
     {
       "path": "/private/tmp/expert-neovim-validation-runs/save-reindex/results.json",
@@ -528,7 +536,8 @@
       },
       "qualifications": [
         "Clean Tips workload. Three overlapping Reindex requests failed; no valid deletion pass."
-      ]
+      ],
+      "archived_path": "evidence/tips-validation/save-reindex/results.json"
     },
     {
       "path": "/private/tmp/expert-neovim-validation-runs/tips-combined-unique/results.json",
@@ -579,7 +588,8 @@
       },
       "qualifications": [
         "Engine shut down during rapid compile sequence; traced run identifies ModuleStore normal exits exhausting restart budget."
-      ]
+      ],
+      "archived_path": "evidence/tips-validation/tips-combined-unique/results.json"
     },
     {
       "path": "/private/tmp/expert-neovim-validation-runs/tips-disk-create-unique/results.json",
@@ -600,7 +610,8 @@
           "remaining_count": 0
         },
         "source_restored": true
-      }
+      },
+      "archived_path": "evidence/tips-validation/tips-disk-create-unique/results.json"
     },
     {
       "path": "/private/tmp/expert-neovim-validation-runs/tips-editor-delete-reindex/results.json",
@@ -651,7 +662,8 @@
       },
       "qualifications": [
         "Engine shut down during rapid compile sequence; traced run identifies ModuleStore normal exits exhausting restart budget."
-      ]
+      ],
+      "archived_path": "evidence/tips-validation/tips-editor-delete-reindex/results.json"
     },
     {
       "path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create/results.json",
@@ -675,7 +687,8 @@
       },
       "qualifications": [
         "INCONCLUSIVE creation control: reused filename already present in stale index. Superseded by unique filename controls."
-      ]
+      ],
+      "archived_path": "evidence/tips-validation/tips-native-editor-create/results.json"
     },
     {
       "path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create-unique/results.json",
@@ -696,7 +709,8 @@
           "remaining_count": 0
         },
         "source_restored": true
-      }
+      },
+      "archived_path": "evidence/tips-validation/tips-native-editor-create-unique/results.json"
     },
     {
       "path": "/private/tmp/expert-neovim-validation-runs/tips-supervisor-trace/results.json",
@@ -748,7 +762,8 @@
       "qualifications": [
         "Engine shut down during rapid compile sequence; traced run identifies ModuleStore normal exits exhausting restart budget.",
         "One Neovim log response containing connectionDetails runtime cookie was redacted; future instrumentation suppresses logging for that request."
-      ]
+      ],
+      "archived_path": "evidence/tips-validation/tips-supervisor-trace/results.json"
     }
   ],
   "validation": {

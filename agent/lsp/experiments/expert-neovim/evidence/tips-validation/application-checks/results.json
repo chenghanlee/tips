@@ -1,0 +1,57 @@
+{
+  "format": {
+    "exit_code": 0,
+    "seconds": 34.554928291996475,
+    "command": [
+      "unbuffer",
+      "mix",
+      "format",
+      "--check-formatted"
+    ]
+  },
+  "compile": {
+    "exit_code": 0,
+    "seconds": 1.40672829200048,
+    "command": [
+      "unbuffer",
+      "mix",
+      "compile",
+      "--warnings-as-errors"
+    ]
+  },
+  "test": {
+    "exit_code": 0,
+    "seconds": 52.672896749994834,
+    "command": [
+      "unbuffer",
+      "mix",
+      "test",
+      "test/tips/provider_config_test.exs"
+    ]
+  },
+  "credo": {
+    "exit_code": 130,
+    "seconds": 0.6574902089923853,
+    "command": [
+      "unbuffer",
+      "mix",
+      "credo",
+      "--strict",
+      "--files",
+      "lib/tips/provider_config.ex"
+    ]
+  },
+  "credo_corrected": {
+    "exit_code": 0,
+    "command": [
+      "unbuffer",
+      "mix",
+      "credo",
+      "--strict",
+      "--files-included",
+      "lib/tips/provider_config.ex"
+    ],
+    "log": "credo-corrected.log",
+    "note": "Original invalid --files invocation retained above; corrected command completed successfully."
+  }
+}

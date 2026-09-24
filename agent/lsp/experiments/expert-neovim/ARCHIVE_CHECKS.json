@@ -1,0 +1,20 @@
+{
+  "date": "2026-09-24",
+  "captured_artifacts": 158,
+  "captured_bytes": 13932680,
+  "original_and_archived_sha256": "passed",
+  "redaction_only_transformations": "passed",
+  "json_and_jsonl_parsing": "passed",
+  "all_15_run_archive_links": "passed",
+  "documentation_check": "passed",
+  "secret_scan": {
+    "tool": "Gitleaks",
+    "version": "8.30.1",
+    "scope": "agent/lsp/experiments/expert-neovim",
+    "exit_code": 0,
+    "findings": 0
+  },
+  "application_tests": "Not rerun for archival-only changes; original check output preserved in evidence/tips-validation/application-checks.",
+  "local_main_before_archive": "81501387eb77b220c95693f58076f7f8255da1b0",
+  "remote_main_observed_before_archive": "5fe1cda1bb16bea97df77c078ca0789ae641f909"
+}

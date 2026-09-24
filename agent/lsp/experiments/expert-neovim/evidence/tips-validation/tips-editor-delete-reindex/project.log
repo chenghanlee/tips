@@ -1,0 +1,755 @@
+
+17:27:12.389 instance_id=1A0D2BD824C [info] Build path /private/tmp/tips-expert-neovim-validation/.expert/build/erl-29/elixir-1.20 was compiled on a previous erlang version. Deleting
+
+17:27:13.347 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:13.971 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:14.026 instance_id=1A0D2BD824C [info] Building tips-expert-neovim-validation
+
+17:27:14.602 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:15.220 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:15.844 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:16.467 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:17.085 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:17.299 instance_id=1A0D2BD824C [info] Loaded []
+
+17:27:17.712 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:18.334 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:18.973 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:19.589 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:20.206 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:21.421 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:22.046 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:22.663 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:23.282 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:23.906 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:24.544 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:25.194 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:25.831 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:26.470 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:27.101 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:27.721 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:28.355 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:28.981 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:29.615 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:30.246 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:30.876 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:31.509 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:32.143 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:32.778 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:33.409 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:34.026 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:34.659 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:35.290 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:35.923 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:36.552 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:37.187 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:37.816 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:38.466 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:39.103 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:39.721 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:40.401 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:41.069 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:41.698 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:42.338 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:42.962 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:43.581 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:44.197 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:44.853 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:45.524 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:46.138 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:46.763 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:47.390 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:48.027 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:48.709 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:49.386 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:50.028 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:50.673 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:51.374 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:52.003 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:52.635 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:53.260 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:53.884 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:54.510 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:55.145 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:55.800 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:56.461 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:57.106 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:57.748 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:57.809 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:57.809 instance_id=1A0D2BD824C [info] No definition found for {:call, Tips.ProviderConfig, :mode, 0} with Indexer.
+
+17:27:57.823 instance_id=1A0D2BD824C [info] Loading 651 modules
+
+17:27:58.217 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:58.228 instance_id=1A0D2BD824C [info] Compile completed with status ok Produced 0 diagnostics []
+
+17:27:58.229 instance_id=1A0D2BD824C [info] Plugins found 0 results in 0.011 ms
+
+17:27:58.232 instance_id=1A0D2BD824C [info] backend reports empty
+
+17:27:58.746 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:58.924 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:58.969 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:58.970 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:58.996 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.093 instance_id=1A0D2BD824C [error] Could not expand alias: {:|>, [newlines: 1, line: 19, column: 7], [{:|>, [newlines: 1, line: 18, column: 7], [{:|>, [newlines: 1, line: 17, column: 7], [{:|>, [newlines: 1, line: 16, column: 7], [{:attrs, [line: 15, column: 7], nil}, {{:., [line: 16, column: 13], [{:__aliases__, [last: [line: 16, column: 10], line: 16, column: 10], [:Map]}, :put_new]}, [closing: [line: 16, column: 43], line: 16, column: 14], [{:__block__, [line: 16, column: 22], [:user_id]}, {{:., [line: 16, column: 40], [{:reporter, [line: 16, column: 32], nil}, :id]}, [no_parens: true, line: 16, column: 41], []}]}]}, {{:., [line: 17, column: 13], [{:__aliases__, [last: [line: 17, column: 10], line: 17, column: 10], [:Map]}, :put_new]}, [closing: [line: 17, column: 42], line: 17, column: 14], [{:__block__, [line: 17, column: 22], [:reason]}, {:__block__, [line: 17, column: 31], [:fabricated]}]}]}, {{:., [line: 18, column: 13], [{:__aliases__, [last: [line: 18, column: 10], line: 18, column: 10], [:Map]}, :put_new]}, [closing: [line: 18, column: 60], line: 18, column: 14], [{:__block__, [line: 18, column: 22], [:created_at]}, {{:., [line: 18, column: 43], [{:__aliases__, [last: [line: 18, column: 35], line: 18, column: 35], [:DateTime]}, :utc_now]}, [closing: [line: 18, column: 59], line: 18, column: 44], [{:__block__, [line: 18, column: 52], [:second]}]}]}]}, {:put_default_target, [closing: [line: 19, column: 29], line: 19, column: 10], []}]} at /private/tmp/tips-expert-neovim-validation/test/support/fixtures/moderation_fixtures.ex 14:8
+
+17:27:59.094 instance_id=1A0D2BD824C [error] Could not expand alias: {:|>, [newlines: 1, line: 34, column: 7], [{:|>, [newlines: 1, line: 33, column: 7], [{:|>, [newlines: 1, line: 32, column: 7], [{:|>, [newlines: 1, line: 31, column: 7], [{:|>, [newlines: 1, line: 30, column: 7], [{:attrs, [line: 29, column: 7], nil}, {{:., [line: 30, column: 13], [{:__aliases__, [last: [line: 30, column: 10], line: 30, column: 10], [:Map]}, :put_new]}, [closing: [line: 30, column: 44], line: 30, column: 14], [{:__block__, [line: 30, column: 22], [:user_id]}, {{:., [line: 30, column: 41], [{:recipient, [line: 30, column: 32], nil}, :id]}, [no_parens: true, line: 30, column: 42], []}]}]}, {{:., [line: 31, column: 13], [{:__aliases__, [last: [line: 31, column: 10], line: 31, column: 10], [:Map]}, :put_new]}, [closing: [line: 31, column: 41], line: 31, column: 14], [{:__block__, [line: 31, column: 22], [:type]}, {:__block__, [line: 31, column: 29], [:tip_upvoted]}]}]}, {{:., [line: 32, column: 13], [{:__aliases__, [last: [line: 32, column: 10], line: 32, column: 10], [:Map]}, :put_new]}, [closing: [line: 32, column: 31], line: 32, column: 14], [{:__block__, [line: 32, column: 22], [:count]}, {:__block__, [token: "1", line: 32, column: 30], [1]}]}]}, {{:., [line: 33, column: 13], [{:__aliases__, [last: [line: 33, column: 10], line: 33, column: 10], [:Map]}, :put_new]}, [closing: [line: 33, column: 60], line: 33, column: 14], [{:__block__, [line: 33, column: 22], ...}, ...]}]}, ...]} at /private/tmp/tips-expert-neovim-validation/test/support/fixtures/moderation_fixtures.ex 28:8
+
+17:27:59.184 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.185 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.185 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.186 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.188 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.188 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.188 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.188 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.188 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.189 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.189 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.189 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.189 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.189 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.198 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.279 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:59.547 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.748 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.749 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.749 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.749 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.749 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.749 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.749 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.749 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.749 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.749 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.749 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.812 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:27:59.815 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.878 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.878 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.878 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.878 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.878 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.879 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.879 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.879 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.879 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.879 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.879 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.879 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.879 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.879 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.981 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.981 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.981 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.981 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.981 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.981 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.981 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.981 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.981 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.981 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:27:59.981 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.045 instance_id=1A0D2BD824C [warning] Could not expand module [{:unquote, [closing: [line: 27, column: 40], line: 27, column: 22], [{:__MODULE__, [line: 27, column: 30], nil}]}, :Utils]. Please report this (at /private/tmp/tips-expert-neovim-validation/deps/wallaby/lib/wallaby/feature.ex 27:41)
+
+17:28:00.045 instance_id=1A0D2BD824C [warning] Could not expand module [{:unquote, [closing: [line: 31, column: 34], line: 31, column: 16], [{:__MODULE__, [line: 31, column: 24], nil}]}, :Utils]. Please report this (at /private/tmp/tips-expert-neovim-validation/deps/wallaby/lib/wallaby/feature.ex 31:35)
+
+17:28:00.045 instance_id=1A0D2BD824C [warning] Could not expand module [{:unquote, [closing: [line: 34, column: 32], line: 34, column: 14], [{:__MODULE__, [line: 34, column: 22], nil}]}, :Utils]. Please report this (at /private/tmp/tips-expert-neovim-validation/deps/wallaby/lib/wallaby/feature.ex 34:33)
+
+17:28:00.045 instance_id=1A0D2BD824C [warning] Could not expand module [{:unquote, [closing: [line: 37, column: 33], line: 37, column: 15], [{:__MODULE__, [line: 37, column: 23], nil}]}, :Utils]. Please report this (at /private/tmp/tips-expert-neovim-validation/deps/wallaby/lib/wallaby/feature.ex 37:34)
+
+17:28:00.045 instance_id=1A0D2BD824C [warning] Could not expand module [{:unquote, [closing: [line: 40, column: 33], line: 40, column: 15], [{:__MODULE__, [line: 40, column: 23], nil}]}, :Utils]. Please report this (at /private/tmp/tips-expert-neovim-validation/deps/wallaby/lib/wallaby/feature.ex 40:34)
+
+17:28:00.045 instance_id=1A0D2BD824C [warning] Could not expand module [{:unquote, [closing: [line: 42, column: 32], line: 42, column: 14], [{:__MODULE__, [line: 42, column: 22], nil}]}, :Utils]. Please report this (at /private/tmp/tips-expert-neovim-validation/deps/wallaby/lib/wallaby/feature.ex 42:33)
+
+17:28:00.045 instance_id=1A0D2BD824C [warning] Could not expand module [{:unquote, [closing: [line: 118, column: 33], line: 118, column: 15], [{:__MODULE__, [line: 118, column: 23], nil}]}, :Utils]. Please report this (at /private/tmp/tips-expert-neovim-validation/deps/wallaby/lib/wallaby/feature.ex 118:34)
+
+17:28:00.279 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.279 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.279 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.279 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.280 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.280 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.280 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.280 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.280 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.281 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.281 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.343 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:00.365 instance_id=1A0D2BD824C [error] Could not expand alias: [{{:__block__, [format: :keyword, line: 289, column: 28], [:session_family_id]}, {{:., [line: 289, column: 56], [{:__aliases__, [last: [line: 289, column: 52], line: 289, column: 47], [:Ecto, :UUID]}, :generate]}, [closing: [line: 289, column: 66], line: 289, column: 57], []}}] at /private/tmp/tips-expert-neovim-validation/test/tips/accounts/identity_schema_test.exs 289:20
+
+17:28:00.368 instance_id=1A0D2BD824C [error] Could not expand alias: {{:., [line: 345, column: 10], [{:__aliases__, [last: [line: 345, column: 7], line: 345, column: 7], [:Map]}, :merge]}, [newlines: 1, closing: [line: 348, column: 7], line: 345, column: 11], [{:%{}, [closing: [line: 346, column: 90], line: 346, column: 9], [{{:__block__, [format: :keyword, line: 346, column: 11], [:handle]}, {:<<>>, [delimiter: "\"", line: 346, column: 19], ["user", {:"::", [line: 346, column: 24], [{{:., [line: 346, column: 24], [Kernel, :to_string]}, [from_interpolation: true, closing: [line: 346, column: 60], line: 346, column: 24], [{{:., [line: 346, column: 32], [{:__aliases__, [last: [line: 346, column: 26], line: 346, column: 26], [:System]}, :unique_integer]}, [closing: [line: 346, column: 59], line: 346, column: 33], [{:__block__, [closing: [line: 346, column: 58], line: 346, column: 48], [[{:__block__, [line: 346, column: 49], [:positive]}]]}]}]}, {:binary, [line: 346, column: 24], nil}]}]}}, {{:__block__, [format: :keyword, line: 346, column: 64], [:email]}, {:unique_user_email, [closing: [line: 346, column: 89], line: 346, column: 71], []}}]}, {:attrs, [line: 347, column: 9], nil}]} at /private/tmp/tips-expert-neovim-validation/test/tips/accounts/identity_schema_test.exs 344:8
+
+17:28:00.517 instance_id=1A0D2BD824C [error] Could not expand alias: {{:., [line: 12, column: 11], [{:__aliases__, [last: [line: 12, column: 7], line: 12, column: 7], [:Enum]}, :into]}, [closing: [line: 19, column: 8], line: 12, column: 12], [{:attrs, [line: 12, column: 17], nil}, {:%{}, [newlines: 1, closing: [line: 19, column: 7], line: 12, column: 24], [{{:__block__, [format: :keyword, line: 13, column: 9], [:user_id]}, {{:., [line: 13, column: 22], [{:user, [line: 13, column: 18], nil}, :id]}, [no_parens: true, line: 13, column: 23], []}}, {{:__block__, [format: :keyword, line: 14, column: 9], [:submission_key]}, {{:., [line: 14, column: 34], [{:__aliases__, [last: [line: 14, column: 30], line: 14, column: 25], [:Ecto, :UUID]}, :generate]}, [closing: [line: 14, column: 44], line: 14, column: 35], []}}, {{:__block__, [format: :keyword, line: 15, column: 9], [:title]}, {:__block__, [delimiter: "\"", line: 15, column: 16], ["A useful technique"]}}, {{:__block__, [format: :keyword, line: 16, column: 9], [:body]}, {:__block__, [delimiter: "\"", line: 16, column: 15], ["Explain the technique with a concrete example."]}}, {{:__block__, [format: :keyword, line: 17, column: 9], [:tag_id]}, {:__block__, [delimiter: "\"", line: 17, column: 17], ["other"]}}, {{:__block__, [format: :keyword, line: 18, column: 9], [:created_at]}, {{:., [line: 18, column: 29], [{:__aliases__, [last: [line: 18, column: 21], line: 18, column: 21], [:DateTime]}, :utc_now]}, [closing: [line: 18, column: 45], line: 18, column: 30], [{:__block__, [line: 18, column: 38], [:second]}]}}]}]} at /private/tmp/tips-expert-neovim-validation/test/support/fixtures/content_fixtures.ex 11:8
+
+17:28:00.518 instance_id=1A0D2BD824C [error] Could not expand alias: {{:., [line: 27, column: 11], [{:__aliases__, [last: [line: 27, column: 7], line: 27, column: 7], [:Enum]}, :into]}, [closing: [line: 33, column: 8], line: 27, column: 12], [{:attrs, [line: 27, column: 17], nil}, {:%{}, [newlines: 1, closing: [line: 33, column: 7], line: 27, column: 24], [{{:__block__, [format: :keyword, line: 28, column: 9], [:tip_id]}, {{:., [line: 28, column: 20], [{:tip, [line: 28, column: 17], nil}, :id]}, [no_parens: true, line: 28, column: 21], []}}, {{:__block__, [format: :keyword, line: 29, column: 9], [:user_id]}, {{:., [line: 29, column: 32], [{:user_fixture, [closing: [line: 29, column: 31], line: 29, column: 18], []}, :id]}, [no_parens: true, line: 29, column: 33], []}}, {{:__block__, [format: :keyword, line: 30, column: 9], [:submission_key]}, {{:., [line: 30, column: 34], [{:__aliases__, [last: [line: 30, column: 30], line: 30, column: 25], [:Ecto, :UUID]}, :generate]}, [closing: [line: 30, column: 44], line: 30, column: 35], []}}, {{:__block__, [format: :keyword, line: 31, column: 9], [:body]}, {:__block__, [delimiter: "\"", line: 31, column: 15], ["The technique helped in this synthetic test."]}}, {{:__block__, [format: :keyword, line: 32, column: 9], [:created_at]}, {{:., [line: 32, column: 29], [{:__aliases__, [last: [line: 32, column: 21], line: 32, column: 21], [:DateTime]}, :utc_now]}, [closing: [line: 32, column: 45], line: 32, column: 30], [{:__block__, [line: 32, column: 38], [:second]}]}}]}]} at /private/tmp/tips-expert-neovim-validation/test/support/fixtures/content_fixtures.ex 26:8
+
+17:28:00.574 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.574 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.574 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.612 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.669 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.670 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.671 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.671 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.671 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.671 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.671 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.671 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.671 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.672 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.672 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:00.699 instance_id=1A0D2BD824C [error] Could not expand alias: [{{:__block__, [format: :keyword, line: 398, column: 29], [:user_id]}, {{:., [line: 398, column: 46], [{:original, [line: 398, column: 38], nil}, :user_id]}, [no_parens: true, line: 398, column: 47], []}}] at /private/tmp/tips-expert-neovim-validation/test/tips/content/schema_test.exs 398:21
+
+17:28:00.871 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:01.401 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:05.264 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:05.689 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:05.801 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:06.010 instance_id=1A0D2BD824C [error] Could not expand alias: {:|>, [newlines: 1, line: 19, column: 7], [{:|>, [newlines: 1, line: 18, column: 7], [{:|>, [newlines: 1, line: 17, column: 7], [{:|>, [newlines: 1, line: 16, column: 7], [{:attrs, [line: 15, column: 7], nil}, {{:., [line: 16, column: 13], [{:__aliases__, [last: [line: 16, column: 10], line: 16, column: 10], [:Map]}, :put_new]}, [closing: [line: 16, column: 43], line: 16, column: 14], [{:__block__, [line: 16, column: 22], [:user_id]}, {{:., [line: 16, column: 40], [{:reporter, [line: 16, column: 32], nil}, :id]}, [no_parens: true, line: 16, column: 41], []}]}]}, {{:., [line: 17, column: 13], [{:__aliases__, [last: [line: 17, column: 10], line: 17, column: 10], [:Map]}, :put_new]}, [closing: [line: 17, column: 42], line: 17, column: 14], [{:__block__, [line: 17, column: 22], [:reason]}, {:__block__, [line: 17, column: 31], [:fabricated]}]}]}, {{:., [line: 18, column: 13], [{:__aliases__, [last: [line: 18, column: 10], line: 18, column: 10], [:Map]}, :put_new]}, [closing: [line: 18, column: 60], line: 18, column: 14], [{:__block__, [line: 18, column: 22], [:created_at]}, {{:., [line: 18, column: 43], [{:__aliases__, [last: [line: 18, column: 35], line: 18, column: 35], [:DateTime]}, :utc_now]}, [closing: [line: 18, column: 59], line: 18, column: 44], [{:__block__, [line: 18, column: 52], [:second]}]}]}]}, {:put_default_target, [closing: [line: 19, column: 29], line: 19, column: 10], []}]} at /private/tmp/tips-expert-neovim-validation/test/support/fixtures/moderation_fixtures.ex 14:8
+
+17:28:06.012 instance_id=1A0D2BD824C [error] Could not expand alias: {:|>, [newlines: 1, line: 34, column: 7], [{:|>, [newlines: 1, line: 33, column: 7], [{:|>, [newlines: 1, line: 32, column: 7], [{:|>, [newlines: 1, line: 31, column: 7], [{:|>, [newlines: 1, line: 30, column: 7], [{:attrs, [line: 29, column: 7], nil}, {{:., [line: 30, column: 13], [{:__aliases__, [last: [line: 30, column: 10], line: 30, column: 10], [:Map]}, :put_new]}, [closing: [line: 30, column: 44], line: 30, column: 14], [{:__block__, [line: 30, column: 22], [:user_id]}, {{:., [line: 30, column: 41], [{:recipient, [line: 30, column: 32], nil}, :id]}, [no_parens: true, line: 30, column: 42], []}]}]}, {{:., [line: 31, column: 13], [{:__aliases__, [last: [line: 31, column: 10], line: 31, column: 10], [:Map]}, :put_new]}, [closing: [line: 31, column: 41], line: 31, column: 14], [{:__block__, [line: 31, column: 22], [:type]}, {:__block__, [line: 31, column: 29], [:tip_upvoted]}]}]}, {{:., [line: 32, column: 13], [{:__aliases__, [last: [line: 32, column: 10], line: 32, column: 10], [:Map]}, :put_new]}, [closing: [line: 32, column: 31], line: 32, column: 14], [{:__block__, [line: 32, column: 22], [:count]}, {:__block__, [token: "1", line: 32, column: 30], [1]}]}]}, {{:., [line: 33, column: 13], [{:__aliases__, [last: [line: 33, column: 10], line: 33, column: 10], [:Map]}, :put_new]}, [closing: [line: 33, column: 60], line: 33, column: 14], [{:__block__, [line: 33, column: 22], ...}, ...]}]}, ...]} at /private/tmp/tips-expert-neovim-validation/test/support/fixtures/moderation_fixtures.ex 28:8
+
+17:28:06.022 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.022 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.022 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.023 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.023 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.023 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.023 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.023 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.023 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.023 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.024 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.029 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.029 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.029 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.029 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.029 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.029 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.030 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.030 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.030 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.030 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.030 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.031 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.031 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.031 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.100 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.100 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.100 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.226 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.226 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.337 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:06.353 instance_id=1A0D2BD824C [info] Building tips-expert-neovim-validation
+
+17:28:06.446 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:06.869 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:07.022 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.022 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.022 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.022 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.022 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.022 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.022 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.022 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.023 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.023 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.023 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.085 instance_id=1A0D2BD824C [error] Could not expand alias: [{{:__block__, [format: :keyword, line: 398, column: 29], [:user_id]}, {{:., [line: 398, column: 46], [{:original, [line: 398, column: 38], nil}, :user_id]}, [no_parens: true, line: 398, column: 47], []}}] at /private/tmp/tips-expert-neovim-validation/test/tips/content/schema_test.exs 398:21
+
+17:28:07.148 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.148 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.148 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.148 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.148 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.148 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.148 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.148 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.148 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.148 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.148 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.150 instance_id=1A0D2BD824C [error] Could not expand alias: {{:., [line: 12, column: 11], [{:__aliases__, [last: [line: 12, column: 7], line: 12, column: 7], [:Enum]}, :into]}, [closing: [line: 19, column: 8], line: 12, column: 12], [{:attrs, [line: 12, column: 17], nil}, {:%{}, [newlines: 1, closing: [line: 19, column: 7], line: 12, column: 24], [{{:__block__, [format: :keyword, line: 13, column: 9], [:user_id]}, {{:., [line: 13, column: 22], [{:user, [line: 13, column: 18], nil}, :id]}, [no_parens: true, line: 13, column: 23], []}}, {{:__block__, [format: :keyword, line: 14, column: 9], [:submission_key]}, {{:., [line: 14, column: 34], [{:__aliases__, [last: [line: 14, column: 30], line: 14, column: 25], [:Ecto, :UUID]}, :generate]}, [closing: [line: 14, column: 44], line: 14, column: 35], []}}, {{:__block__, [format: :keyword, line: 15, column: 9], [:title]}, {:__block__, [delimiter: "\"", line: 15, column: 16], ["A useful technique"]}}, {{:__block__, [format: :keyword, line: 16, column: 9], [:body]}, {:__block__, [delimiter: "\"", line: 16, column: 15], ["Explain the technique with a concrete example."]}}, {{:__block__, [format: :keyword, line: 17, column: 9], [:tag_id]}, {:__block__, [delimiter: "\"", line: 17, column: 17], ["other"]}}, {{:__block__, [format: :keyword, line: 18, column: 9], [:created_at]}, {{:., [line: 18, column: 29], [{:__aliases__, [last: [line: 18, column: 21], line: 18, column: 21], [:DateTime]}, :utc_now]}, [closing: [line: 18, column: 45], line: 18, column: 30], [{:__block__, [line: 18, column: 38], [:second]}]}}]}]} at /private/tmp/tips-expert-neovim-validation/test/support/fixtures/content_fixtures.ex 11:8
+
+17:28:07.151 instance_id=1A0D2BD824C [error] Could not expand alias: {{:., [line: 27, column: 11], [{:__aliases__, [last: [line: 27, column: 7], line: 27, column: 7], [:Enum]}, :into]}, [closing: [line: 33, column: 8], line: 27, column: 12], [{:attrs, [line: 27, column: 17], nil}, {:%{}, [newlines: 1, closing: [line: 33, column: 7], line: 27, column: 24], [{{:__block__, [format: :keyword, line: 28, column: 9], [:tip_id]}, {{:., [line: 28, column: 20], [{:tip, [line: 28, column: 17], nil}, :id]}, [no_parens: true, line: 28, column: 21], []}}, {{:__block__, [format: :keyword, line: 29, column: 9], [:user_id]}, {{:., [line: 29, column: 32], [{:user_fixture, [closing: [line: 29, column: 31], line: 29, column: 18], []}, :id]}, [no_parens: true, line: 29, column: 33], []}}, {{:__block__, [format: :keyword, line: 30, column: 9], [:submission_key]}, {{:., [line: 30, column: 34], [{:__aliases__, [last: [line: 30, column: 30], line: 30, column: 25], [:Ecto, :UUID]}, :generate]}, [closing: [line: 30, column: 44], line: 30, column: 35], []}}, {{:__block__, [format: :keyword, line: 31, column: 9], [:body]}, {:__block__, [delimiter: "\"", line: 31, column: 15], ["The technique helped in this synthetic test."]}}, {{:__block__, [format: :keyword, line: 32, column: 9], [:created_at]}, {{:., [line: 32, column: 29], [{:__aliases__, [last: [line: 32, column: 21], line: 32, column: 21], [:DateTime]}, :utc_now]}, [closing: [line: 32, column: 45], line: 32, column: 30], [{:__block__, [line: 32, column: 38], [:second]}]}}]}]} at /private/tmp/tips-expert-neovim-validation/test/support/fixtures/content_fixtures.ex 26:8
+
+17:28:07.257 instance_id=1A0D2BD824C [info] Loading 0 modules
+
+17:28:07.263 instance_id=1A0D2BD824C [info] Compile completed with status ok Produced 0 diagnostics []
+
+17:28:07.265 instance_id=1A0D2BD824C [info] Plugins found 0 results in 0.006 ms
+
+17:28:07.283 instance_id=1A0D2BD824C [warning] Could not expand module [{:unquote, [closing: [line: 27, column: 40], line: 27, column: 22], [{:__MODULE__, [line: 27, column: 30], nil}]}, :Utils]. Please report this (at /private/tmp/tips-expert-neovim-validation/deps/wallaby/lib/wallaby/feature.ex 27:41)
+
+17:28:07.283 instance_id=1A0D2BD824C [warning] Could not expand module [{:unquote, [closing: [line: 31, column: 34], line: 31, column: 16], [{:__MODULE__, [line: 31, column: 24], nil}]}, :Utils]. Please report this (at /private/tmp/tips-expert-neovim-validation/deps/wallaby/lib/wallaby/feature.ex 31:35)
+
+17:28:07.283 instance_id=1A0D2BD824C [warning] Could not expand module [{:unquote, [closing: [line: 34, column: 32], line: 34, column: 14], [{:__MODULE__, [line: 34, column: 22], nil}]}, :Utils]. Please report this (at /private/tmp/tips-expert-neovim-validation/deps/wallaby/lib/wallaby/feature.ex 34:33)
+
+17:28:07.283 instance_id=1A0D2BD824C [warning] Could not expand module [{:unquote, [closing: [line: 37, column: 33], line: 37, column: 15], [{:__MODULE__, [line: 37, column: 23], nil}]}, :Utils]. Please report this (at /private/tmp/tips-expert-neovim-validation/deps/wallaby/lib/wallaby/feature.ex 37:34)
+
+17:28:07.283 instance_id=1A0D2BD824C [warning] Could not expand module [{:unquote, [closing: [line: 40, column: 33], line: 40, column: 15], [{:__MODULE__, [line: 40, column: 23], nil}]}, :Utils]. Please report this (at /private/tmp/tips-expert-neovim-validation/deps/wallaby/lib/wallaby/feature.ex 40:34)
+
+17:28:07.283 instance_id=1A0D2BD824C [warning] Could not expand module [{:unquote, [closing: [line: 42, column: 32], line: 42, column: 14], [{:__MODULE__, [line: 42, column: 22], nil}]}, :Utils]. Please report this (at /private/tmp/tips-expert-neovim-validation/deps/wallaby/lib/wallaby/feature.ex 42:33)
+
+17:28:07.283 instance_id=1A0D2BD824C [warning] Could not expand module [{:unquote, [closing: [line: 118, column: 33], line: 118, column: 15], [{:__MODULE__, [line: 118, column: 23], nil}]}, :Utils]. Please report this (at /private/tmp/tips-expert-neovim-validation/deps/wallaby/lib/wallaby/feature.ex 118:34)
+
+17:28:07.373 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.399 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:07.478 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.557 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.557 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.557 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.557 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.558 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.558 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.558 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.558 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.558 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.558 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.558 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.558 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.558 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.558 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.731 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.743 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.811 instance_id=1A0D2BD824C [error] Could not expand alias: [{{:__block__, [format: :keyword, line: 289, column: 28], [:session_family_id]}, {{:., [line: 289, column: 56], [{:__aliases__, [last: [line: 289, column: 52], line: 289, column: 47], [:Ecto, :UUID]}, :generate]}, [closing: [line: 289, column: 66], line: 289, column: 57], []}}] at /private/tmp/tips-expert-neovim-validation/test/tips/accounts/identity_schema_test.exs 289:20
+
+17:28:07.813 instance_id=1A0D2BD824C [error] Could not expand alias: {{:., [line: 345, column: 10], [{:__aliases__, [last: [line: 345, column: 7], line: 345, column: 7], [:Map]}, :merge]}, [newlines: 1, closing: [line: 348, column: 7], line: 345, column: 11], [{:%{}, [closing: [line: 346, column: 90], line: 346, column: 9], [{{:__block__, [format: :keyword, line: 346, column: 11], [:handle]}, {:<<>>, [delimiter: "\"", line: 346, column: 19], ["user", {:"::", [line: 346, column: 24], [{{:., [line: 346, column: 24], [Kernel, :to_string]}, [from_interpolation: true, closing: [line: 346, column: 60], line: 346, column: 24], [{{:., [line: 346, column: 32], [{:__aliases__, [last: [line: 346, column: 26], line: 346, column: 26], [:System]}, :unique_integer]}, [closing: [line: 346, column: 59], line: 346, column: 33], [{:__block__, [closing: [line: 346, column: 58], line: 346, column: 48], [[{:__block__, [line: 346, column: 49], [:positive]}]]}]}]}, {:binary, [line: 346, column: 24], nil}]}]}}, {{:__block__, [format: :keyword, line: 346, column: 64], [:email]}, {:unique_user_email, [closing: [line: 346, column: 89], line: 346, column: 71], []}}]}, {:attrs, [line: 347, column: 9], nil}]} at /private/tmp/tips-expert-neovim-validation/test/tips/accounts/identity_schema_test.exs 344:8
+
+17:28:07.817 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.818 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.818 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.818 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.818 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.818 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.818 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.818 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.818 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.818 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:07.819 instance_id=1A0D2BD824C [warning] nothing to expand (expand_alias was passed nil)
+
+17:28:08.527 instance_id=1A0D2BD824C [info] Building tips-expert-neovim-validation
+
+17:28:08.729 instance_id=1A0D2BD824C [info] Loading 0 modules
+
+17:28:08.732 instance_id=1A0D2BD824C [info] Plugins found 0 results in 0.007 ms
+
+17:28:10.040 instance_id=1A0D2BD824C [info] Building tips-expert-neovim-validation
+
+17:28:10.448 instance_id=1A0D2BD824C [info] Loading 0 modules
+
+17:28:10.454 instance_id=1A0D2BD824C [info] Compile completed with status ok Produced 0 diagnostics []
+
+17:28:10.457 instance_id=1A0D2BD824C [info] Plugins found 0 results in 0.007 ms
+
+17:28:10.967 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:12.466 instance_id=1A0D2BD824C [info] Building tips-expert-neovim-validation
+
+17:28:13.314 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:13.457 instance_id=1A0D2BD824C [info] Loading 0 modules
+
+17:28:13.460 instance_id=1A0D2BD824C [info] Compile completed with status ok Produced 0 diagnostics []
+
+17:28:13.460 instance_id=1A0D2BD824C [info] Plugins found 0 results in 0.006 ms
+
+17:28:13.848 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:14.378 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:14.908 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:15.441 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:15.974 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:16.509 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:17.042 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:17.575 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:18.112 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:18.645 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:19.178 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:19.714 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:20.247 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:20.782 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:21.315 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:21.850 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:22.384 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:22.917 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:23.455 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:23.989 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:24.523 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:25.056 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:28:25.591 instance_id=1A0D2BD824C [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:26.780 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:27.423 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:27.622 instance_id=1A0D2C248A2 [info] Building tips-expert-neovim-validation
+
+17:32:28.044 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:28.669 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:29.291 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:29.910 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:30.530 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:31.152 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:31.275 instance_id=1A0D2C248A2 [info] Loaded []
+
+17:32:31.509 instance_id=1A0D2C248A2 [info] Loading 3165 modules
+
+17:32:32.707 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:32.997 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:32.998 instance_id=1A0D2C248A2 [info] No definition found for {:call, Tips.ProviderConfig, :mode, 0} with Indexer.
+
+17:32:33.043 instance_id=1A0D2C248A2 [info] Compile completed with status ok Produced 0 diagnostics []
+
+17:32:33.044 instance_id=1A0D2C248A2 [info] Plugins found 0 results in 0.005 ms
+
+17:32:33.224 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:33.757 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:33.958 instance_id=1A0D2C248A2 [notice] disk_log: repairing ~c"/private/tmp/tips-expert-neovim-validation/.expert/indexes/ets/29.1/1.20.4/4/updates.wal" ...
+
+
+17:32:34.279 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:34.718 instance_id=1A0D2C248A2 [info] backend reports stale
+
+17:32:34.861 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:35.389 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:35.927 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:36.457 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:36.842 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:37.398 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:37.937 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:37.940 instance_id=1A0D2C248A2 [info] Building tips-expert-neovim-validation
+
+17:32:38.286 instance_id=1A0D2C248A2 [info] Loading 0 modules
+
+17:32:38.288 instance_id=1A0D2C248A2 [info] Compile completed with status ok Produced 0 diagnostics []
+
+17:32:38.288 instance_id=1A0D2C248A2 [info] Plugins found 0 results in 0.006 ms
+
+17:32:38.322 instance_id=1A0D2C248A2 [info] Plugins found 0 results in 0.009 ms
+
+17:32:38.465 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:39.583 instance_id=1A0D2C248A2 [info] Building tips-expert-neovim-validation
+
+17:32:39.834 instance_id=1A0D2C248A2 [info] Loading 0 modules
+
+17:32:39.836 instance_id=1A0D2C248A2 [info] Plugins found 0 results in 0.008 ms
+
+17:32:39.856 instance_id=1A0D2C248A2 [info] Plugins found 0 results in 0.008 ms
+
+17:32:41.105 instance_id=1A0D2C248A2 [info] Building tips-expert-neovim-validation
+
+17:32:41.374 instance_id=1A0D2C248A2 [info] Loading 0 modules
+
+17:32:41.378 instance_id=1A0D2C248A2 [info] Compile completed with status ok Produced 0 diagnostics []
+
+17:32:41.378 instance_id=1A0D2C248A2 [info] Plugins found 0 results in 0.008 ms
+
+17:32:41.407 instance_id=1A0D2C248A2 [info] Plugins found 0 results in 0.005 ms
+
+17:32:41.537 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:42.072 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:42.613 instance_id=1A0D2C248A2 [info] Resolved entity: {:call, Tips.ProviderConfig, :mode, 0}
+
+17:32:42.624 instance_id=1A0D2C248A2 [info] Building tips-expert-neovim-validation
+
+17:32:42.857 instance_id=1A0D2C248A2 [info] Loading 0 modules
+
+17:32:42.860 instance_id=1A0D2C248A2 [info] Compile completed with status ok Produced 0 diagnostics []
+
+17:32:42.861 instance_id=1A0D2C248A2 [info] Plugins found 0 results in 0.006 ms
+
+17:32:42.870 instance_id=1A0D2C248A2 [info] Plugins found 0 results in 0.004 ms
+
+17:32:42.892 instance_id=1A0D2C248A2 [notice] Application xp_engine exited: shutdown

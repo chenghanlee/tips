@@ -1,0 +1,253 @@
+==> file_system
+Compiling 7 files (.ex)
+Generated file_system app
+==> mime
+Compiling 1 file (.ex)
+Generated mime app
+==> nimble_options
+Compiling 3 files (.ex)
+Generated nimble_options app
+==> bunt
+Compiling 2 files (.ex)
+Generated bunt app
+==> comeonin
+Compiling 3 files (.ex)
+Generated comeonin app
+==> plug_crypto
+Compiling 5 files (.ex)
+Generated plug_crypto app
+==> hpax
+Compiling 4 files (.ex)
+Generated hpax app
+==> mint
+Compiling 1 file (.erl)
+Compiling 20 files (.ex)
+Generated mint app
+==> elixir_make
+Compiling 8 files (.ex)
+Generated elixir_make app
+==> bcrypt_elixir
+mkdir -p "/private/tmp/tips-expert-neovim-validation/_build/dev/lib/bcrypt_elixir/priv"
+cc -g -O3 -Wall -Wno-format-truncation -I"/opt/homebrew/Cellar/erlang/29.1/lib/erlang/erts-17.1/include" -Ic_src -fPIC -shared -dynamiclib -undefined dynamic_lookup c_src/bcrypt_nif.c c_src/blowfish.c -o "/private/tmp/tips-expert-neovim-validation/_build/dev/lib/bcrypt_elixir/priv/bcrypt_nif.so"
+Compiling 3 files (.ex)
+Generated bcrypt_elixir app
+==> decimal
+Compiling 4 files (.ex)
+Generated decimal app
+==> jason
+Compiling 10 files (.ex)
+Generated jason app
+==> esbuild
+Compiling 4 files (.ex)
+Generated esbuild app
+==> tips
+===> Analyzing applications...
+===> Compiling idna
+===> Analyzing applications...
+===> Compiling telemetry
+==> telemetry_metrics
+Compiling 7 files (.ex)
+Generated telemetry_metrics app
+==> tips
+===> Analyzing applications...
+===> Compiling telemetry_poller
+==> thousand_island
+Compiling 18 files (.ex)
+Generated thousand_island app
+==> db_connection
+Compiling 18 files (.ex)
+Generated db_connection app
+==> ecto
+Compiling 56 files (.ex)
+Generated ecto app
+==> phoenix_html
+Compiling 6 files (.ex)
+Generated phoenix_html app
+==> phoenix_template
+Compiling 4 files (.ex)
+     [33mwarning:[0m the variable "prefix_size" is accessed inside size(...) of a bitstring but it was defined outside of the match. You must precede it with the pin operator
+     │
+ 505 │       <<prefix::binary-size(prefix_size), ^suffix::binary>> -> prefix
+     │ [33m                            ~[0m
+     │
+     └─ lib/phoenix/template.ex:505:29: Phoenix.Template.unsuffix/2
+
+Generated phoenix_template app
+==> expo
+Compiling 2 files (.erl)
+Compiling 22 files (.ex)
+Generated expo app
+==> gettext
+Compiling 18 files (.ex)
+     [33mwarning:[0m this clause in cond will never match:
+
+         not is_binary(locale)
+
+     since it has type:
+
+         dynamic(false)
+
+     where "locale" was given the types:
+
+         # type: binary()
+         # from: lib/gettext.ex:806:28
+         locale
+
+         # type: binary()
+         # from: lib/gettext.ex:806:41
+         is_binary(locale)
+
+     type warning found at:
+     │
+ 808 │       not is_binary(locale) ->
+     │ [33m                            ~[0m
+     │
+     └─ lib/gettext.ex:808:29: Gettext.put_locale!/2
+
+     [33mwarning:[0m the following clause is redundant:
+
+         defp ensure_empty_msgstr!(%Expo.Message.Plural{} = message)
+
+     it has type:
+
+         dynamic(%Expo.Message.Plural{})
+
+     previous clauses have already matched on the following types:
+
+         %Expo.Message.Singular{}
+         %Expo.Message.Plural{}
+
+     │
+ 391 │   defp ensure_empty_msgstr!(%Message.Plural{} = message) do
+     │ [33m       ~[0m
+     │
+     └─ lib/gettext/extractor.ex:391:8: Gettext.Extractor.ensure_empty_msgstr!/1
+
+     [33mwarning:[0m Kernel.ParallelCompiler.async/1 is deprecated. Use `pmap/2` instead
+     │
+ 426 │               Kernel.ParallelCompiler.async(fn ->
+     │ [33m                                      ~[0m
+     │
+     └─ lib/gettext/compiler.ex:426:39: Gettext.Compiler.compile_po_files/3
+
+Generated gettext app
+==> phoenix_pubsub
+Compiling 12 files (.ex)
+Generated phoenix_pubsub app
+==> dns_cluster
+Compiling 1 file (.ex)
+     [33mwarning:[0m comparison between distinct types found:
+
+         net_state.started != :no
+
+     given types:
+
+         dynamic(not :no) != :no
+
+     where "net_state" was given the types:
+
+         # type: dynamic()
+         # from: lib/dns_cluster.ex:207:8
+         net_state
+
+         # type: dynamic(not false and not nil)
+         # from: lib/dns_cluster.ex:207:8
+         net_state
+
+         # type: dynamic(%{..., started: term()})
+         # from: lib/dns_cluster.ex:210:25
+         net_state.started == :no
+
+         # type: dynamic(%{..., started: not :no})
+         # from: lib/dns_cluster.ex:220:25
+         net_state.started == :no
+
+     While Elixir can compare across all types, you are comparing across types which are always disjoint, and the result is either always true or always false
+
+     type warning found at:
+     │
+ 221 │           (!release? and net_state.started != :no and net_state[:name_domain] != :longnames) ->
+     │ [33m                                           ~[0m
+     │
+     └─ lib/dns_cluster.ex:221:44: DNSCluster.warn_on_invalid_dist/0
+
+Generated dns_cluster app
+==> credo
+Compiling 257 files (.ex)
+Generated credo app
+==> plug
+Compiling 1 file (.erl)
+Compiling 42 files (.ex)
+Generated plug app
+[33mwarning:[0m "xref: [exclude: ...]" in your mix.exs file is deprecated, instead use: "elixirc_options: [no_warn_undefined: ...]"
+  (mix 1.20.4) lib/mix/tasks/compile.elixir.ex:243: Mix.Tasks.Compile.Elixir.xref_exclude_opts/2
+  (mix 1.20.4) lib/mix/tasks/compile.elixir.ex:142: Mix.Tasks.Compile.Elixir.run/1
+  (mix 1.20.4) lib/mix/task.ex:502: anonymous fn/3 in Mix.Task.run_task/5
+  (mix 1.20.4) lib/mix/task.compiler.ex:299: Mix.Task.Compiler.run_compiler/2
+  (mix 1.20.4) lib/mix/task.compiler.ex:287: Mix.Task.Compiler.run/4
+  (mix 1.20.4) lib/mix/tasks/compile.all.ex:75: Mix.Tasks.Compile.All.do_run/2
+
+==> postgrex
+Compiling 70 files (.ex)
+Generated postgrex app
+[33mwarning:[0m "xref: [exclude: ...]" in your mix.exs file is deprecated, instead use: "elixirc_options: [no_warn_undefined: ...]"
+  (mix 1.20.4) lib/mix/tasks/compile.elixir.ex:243: Mix.Tasks.Compile.Elixir.xref_exclude_opts/2
+  (mix 1.20.4) lib/mix/tasks/compile.elixir.ex:142: Mix.Tasks.Compile.Elixir.run/1
+  (mix 1.20.4) lib/mix/task.ex:502: anonymous fn/3 in Mix.Task.run_task/5
+  (mix 1.20.4) lib/mix/task.compiler.ex:299: Mix.Task.Compiler.run_compiler/2
+  (mix 1.20.4) lib/mix/task.compiler.ex:287: Mix.Task.Compiler.run/4
+  (mix 1.20.4) lib/mix/tasks/compile.all.ex:75: Mix.Tasks.Compile.All.do_run/2
+
+==> phoenix_ecto
+Compiling 7 files (.ex)
+Generated phoenix_ecto app
+==> ecto_sql
+Compiling 25 files (.ex)
+Generated ecto_sql app
+==> oban
+Compiling 70 files (.ex)
+Generated oban app
+==> nimble_pool
+Compiling 2 files (.ex)
+Generated nimble_pool app
+==> finch
+Compiling 23 files (.ex)
+Generated finch app
+==> req
+Compiling 24 files (.ex)
+Generated req app
+==> tailwind
+Compiling 3 files (.ex)
+Generated tailwind app
+==> websock
+Compiling 1 file (.ex)
+Generated websock app
+==> bandit
+Compiling 54 files (.ex)
+Generated bandit app
+==> swoosh
+Compiling 62 files (.ex)
+Generated swoosh app
+==> websock_adapter
+Compiling 4 files (.ex)
+Generated websock_adapter app
+==> phoenix
+Compiling 75 files (.ex)
+Generated phoenix app
+==> phoenix_live_reload
+Compiling 5 files (.ex)
+Generated phoenix_live_reload app
+==> phoenix_live_view
+Compiling 55 files (.ex)
+Generated phoenix_live_view app
+[33mwarning:[0m "xref: [exclude: ...]" in your mix.exs file is deprecated, instead use: "elixirc_options: [no_warn_undefined: ...]"
+  (mix 1.20.4) lib/mix/tasks/compile.elixir.ex:243: Mix.Tasks.Compile.Elixir.xref_exclude_opts/2
+  (mix 1.20.4) lib/mix/tasks/compile.elixir.ex:142: Mix.Tasks.Compile.Elixir.run/1
+  (mix 1.20.4) lib/mix/task.ex:502: anonymous fn/3 in Mix.Task.run_task/5
+  (mix 1.20.4) lib/mix/task.compiler.ex:299: Mix.Task.Compiler.run_compiler/2
+  (mix 1.20.4) lib/mix/task.compiler.ex:287: Mix.Task.Compiler.run/4
+  (mix 1.20.4) lib/mix/tasks/compile.all.ex:75: Mix.Tasks.Compile.All.do_run/2
+
+==> phoenix_live_dashboard
+Compiling 36 files (.ex)
+Generated phoenix_live_dashboard app
