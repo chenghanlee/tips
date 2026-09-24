@@ -1,0 +1,762 @@
+{
+  "date": "2026-09-24",
+  "status": "not ready for rollout",
+  "branch": "experiment/expert-neovim-codex",
+  "base_commit": "81501387eb77b220c95693f58076f7f8255da1b0",
+  "installed_expert": "0.1.10",
+  "new_actual_model_runs": false,
+  "five_second_hook_implemented": false,
+  "installed_server_patched": false,
+  "method": "Real stdio MCP requests; RPC observations and explicitly labeled editor/OTP controls. Observations are not a statistical performance estimate.",
+  "runs": [
+    {
+      "path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/autosave/results.json",
+      "name": "autosave",
+      "observations": {
+        "alpha_baseline": {
+          "matched": true,
+          "last_sample_seconds": 4.647
+        },
+        "alpha_references": {
+          "matched": true,
+          "last_sample_seconds": 0.521
+        },
+        "beta_baseline": {
+          "matched": true,
+          "last_sample_seconds": 4.521
+        },
+        "beta_references": {
+          "matched": true,
+          "last_sample_seconds": 0.517
+        },
+        "unopened_equal_size_edit": {
+          "matched": true,
+          "last_sample_seconds": 1.544
+        },
+        "unopened_atomic_replacement": {
+          "matched": true,
+          "last_sample_seconds": 1.547
+        },
+        "created_file_references": {
+          "matched": false,
+          "last_sample_seconds": 20.485
+        },
+        "deleted_file_references": {
+          "matched": true,
+          "last_sample_seconds": 0.004
+        },
+        "deletion_validated": false,
+        "external_error": {
+          "matched": true,
+          "last_sample_seconds": 3.038
+        },
+        "checktime_control": {
+          "matched": true,
+          "last_sample_seconds": 0.001
+        },
+        "external_repair": {
+          "matched": true,
+          "last_sample_seconds": 1.513
+        },
+        "repair_checktime_control": {
+          "matched": true,
+          "last_sample_seconds": 0.001
+        }
+      },
+      "qualifications": [
+        "Observed navigation/diagnostics results retained; observer serialization failed at the end, so no normal EOF lifecycle claim for this run."
+      ]
+    },
+    {
+      "path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/baseline/results.json",
+      "name": "baseline",
+      "observations": {
+        "alpha_baseline": {
+          "matched": true,
+          "last_sample_seconds": 5.43
+        },
+        "alpha_references": {
+          "matched": true,
+          "last_sample_seconds": 0.513
+        },
+        "beta_baseline": {
+          "matched": true,
+          "last_sample_seconds": 4.766
+        },
+        "beta_references": {
+          "matched": true,
+          "last_sample_seconds": 0.515
+        },
+        "unopened_equal_size_edit": {
+          "matched": false,
+          "last_sample_seconds": 20.379
+        },
+        "unopened_atomic_replacement": {
+          "matched": false,
+          "last_sample_seconds": 20.385
+        },
+        "created_file_references": {
+          "matched": false,
+          "last_sample_seconds": 20.302
+        },
+        "deleted_file_references": {
+          "matched": true,
+          "last_sample_seconds": 0.003
+        },
+        "external_error": {
+          "matched": false,
+          "last_sample_seconds": 12.109
+        },
+        "checktime_control": {
+          "matched": false,
+          "last_sample_seconds": 8.078
+        },
+        "editor_save_control": {
+          "matched": true,
+          "last_sample_seconds": 1.515
+        },
+        "external_repair": {
+          "matched": false,
+          "last_sample_seconds": 12.124
+        },
+        "repair_checktime_control": {
+          "matched": false,
+          "last_sample_seconds": 8.074
+        },
+        "alpha_eof": {
+          "exit_code": 0,
+          "owned_count": 11,
+          "remaining_count": 0
+        },
+        "beta_eof": {
+          "exit_code": 0,
+          "owned_count": 11,
+          "remaining_count": 0
+        }
+      },
+      "qualifications": [
+        "Deletion was not validated: created caller had never appeared. No automatic synchronization."
+      ]
+    },
+    {
+      "path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/save-reindex/results.json",
+      "name": "save-reindex",
+      "observations": {
+        "alpha_baseline": {
+          "matched": true,
+          "last_sample_seconds": 4.882
+        },
+        "alpha_references": {
+          "matched": true,
+          "last_sample_seconds": 0.514
+        },
+        "beta_baseline": {
+          "matched": true,
+          "last_sample_seconds": 4.702
+        },
+        "beta_references": {
+          "matched": true,
+          "last_sample_seconds": 0.515
+        },
+        "unopened_equal_size_edit": {
+          "matched": true,
+          "last_sample_seconds": 1.518
+        },
+        "unopened_atomic_replacement": {
+          "matched": true,
+          "last_sample_seconds": 1.526
+        },
+        "created_file_references": {
+          "matched": true,
+          "last_sample_seconds": 0.511
+        },
+        "deleted_file_references": {
+          "matched": true,
+          "last_sample_seconds": 0.508
+        },
+        "deletion_validated": true,
+        "external_error": {
+          "matched": true,
+          "last_sample_seconds": 0.503
+        },
+        "checktime_control": {
+          "matched": true,
+          "last_sample_seconds": 0.001
+        },
+        "external_repair": {
+          "matched": true,
+          "last_sample_seconds": 1.519
+        },
+        "repair_checktime_control": {
+          "matched": true,
+          "last_sample_seconds": 0.001
+        },
+        "sync_state": {
+          "conflicts": 0,
+          "failures": 0,
+          "reindex_ok": 6,
+          "reindex_errors": 0
+        },
+        "alpha_eof": {
+          "exit_code": 0,
+          "owned_count": 11,
+          "remaining_count": 0
+        },
+        "beta_eof": {
+          "exit_code": 0,
+          "owned_count": 11,
+          "remaining_count": 0
+        }
+      },
+      "qualifications": [
+        "Tiny-fixture success is not sufficient; compare clean Tips save-reindex."
+      ]
+    },
+    {
+      "path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-autosave/results.json",
+      "name": "tips-autosave",
+      "observations": {
+        "baseline_hover": {
+          "matched": false,
+          "last_sample_seconds": 180.502
+        }
+      },
+      "qualifications": [
+        "Startup failed under restricted cache permissions; not slow compilation. Controlled run stopped, owned cleanup recorded separately."
+      ]
+    },
+    {
+      "path": "/private/tmp/tips-expert-neovim-codex/tmp/expert-neovim/tips-save-reindex/results.json",
+      "name": "tips-save-reindex",
+      "observations": {
+        "baseline_hover": {
+          "matched": true,
+          "last_sample_seconds": 47.898
+        },
+        "references": {
+          "matched": true,
+          "last_sample_seconds": 15.427
+        },
+        "unopened_doc_edit": {
+          "matched": true,
+          "last_sample_seconds": 1.625
+        },
+        "compiler_error": {
+          "matched": true,
+          "last_sample_seconds": 2.018
+        },
+        "repair": {
+          "matched": true,
+          "last_sample_seconds": 1.511
+        },
+        "repair_validated": true,
+        "created_reference": {
+          "matched": false,
+          "last_sample_seconds": 20.776
+        },
+        "deleted_reference": {
+          "matched": true,
+          "last_sample_seconds": 10.16
+        },
+        "deletion_validated": false,
+        "sync_state": {
+          "conflicts": 0,
+          "failures": 0,
+          "reindex_ok": 1,
+          "reindex_errors": 3
+        },
+        "eof": {
+          "exit_code": 0,
+          "owned_count": 11,
+          "remaining_count": 0
+        },
+        "source_restored": true
+      },
+      "qualifications": [
+        "Source archives under indexed root confounded workload; cleaner follow-up is B/save-reindex."
+      ]
+    },
+    {
+      "path": "/private/tmp/expert-neovim-validation-runs/application-checks/results.json",
+      "name": "application-checks",
+      "observations": {
+        "format": {
+          "exit_code": 0,
+          "seconds": 34.554928291996475,
+          "command": [
+            "unbuffer",
+            "mix",
+            "format",
+            "--check-formatted"
+          ]
+        },
+        "compile": {
+          "exit_code": 0,
+          "seconds": 1.40672829200048,
+          "command": [
+            "unbuffer",
+            "mix",
+            "compile",
+            "--warnings-as-errors"
+          ]
+        },
+        "test": {
+          "exit_code": 0,
+          "seconds": 52.672896749994834,
+          "command": [
+            "unbuffer",
+            "mix",
+            "test",
+            "test/tips/provider_config_test.exs"
+          ]
+        },
+        "credo": {
+          "exit_code": 130,
+          "seconds": 0.6574902089923853,
+          "command": [
+            "unbuffer",
+            "mix",
+            "credo",
+            "--strict",
+            "--files",
+            "lib/tips/provider_config.ex"
+          ]
+        },
+        "credo_corrected": {
+          "exit_code": 0,
+          "command": [
+            "unbuffer",
+            "mix",
+            "credo",
+            "--strict",
+            "--files-included",
+            "lib/tips/provider_config.ex"
+          ],
+          "log": "credo-corrected.log",
+          "note": "Original invalid --files invocation retained above; corrected command completed successfully."
+        }
+      }
+    },
+    {
+      "path": "/private/tmp/expert-neovim-validation-runs/editor-delete-reindex/results.json",
+      "name": "editor-delete-reindex",
+      "observations": {
+        "alpha_baseline": {
+          "matched": true,
+          "last_sample_seconds": 5.753
+        },
+        "alpha_references": {
+          "matched": true,
+          "last_sample_seconds": 0.519
+        },
+        "beta_baseline": {
+          "matched": true,
+          "last_sample_seconds": 5.656
+        },
+        "beta_references": {
+          "matched": true,
+          "last_sample_seconds": 0.513
+        },
+        "unopened_equal_size_edit": {
+          "matched": true,
+          "last_sample_seconds": 1.534
+        },
+        "unopened_atomic_replacement": {
+          "matched": true,
+          "last_sample_seconds": 1.524
+        },
+        "created_file_references": {
+          "matched": true,
+          "last_sample_seconds": 5.068
+        },
+        "deleted_file_references": {
+          "matched": true,
+          "last_sample_seconds": 0.509
+        },
+        "deletion_validated": true,
+        "external_error": {
+          "matched": true,
+          "last_sample_seconds": 1.514
+        },
+        "checktime_control": {
+          "matched": true,
+          "last_sample_seconds": 0.001
+        },
+        "external_repair": {
+          "matched": true,
+          "last_sample_seconds": 1.517
+        },
+        "repair_checktime_control": {
+          "matched": true,
+          "last_sample_seconds": 0.001
+        },
+        "sync_state": {
+          "conflicts": 0,
+          "failures": 0,
+          "reindex_ok": 1,
+          "reindex_errors": 0
+        },
+        "alpha_eof": {
+          "exit_code": 0,
+          "owned_count": 11,
+          "remaining_count": 0
+        },
+        "beta_eof": {
+          "exit_code": 0,
+          "owned_count": 11,
+          "remaining_count": 0
+        }
+      }
+    },
+    {
+      "path": "/private/tmp/expert-neovim-validation-runs/editor-events/results.json",
+      "name": "editor-events",
+      "observations": {
+        "alpha_baseline": {
+          "matched": true,
+          "last_sample_seconds": 4.858
+        },
+        "alpha_references": {
+          "matched": true,
+          "last_sample_seconds": 0.512
+        },
+        "beta_baseline": {
+          "matched": true,
+          "last_sample_seconds": 4.855
+        },
+        "beta_references": {
+          "matched": true,
+          "last_sample_seconds": 0.513
+        },
+        "unopened_equal_size_edit": {
+          "matched": true,
+          "last_sample_seconds": 1.527
+        },
+        "unopened_atomic_replacement": {
+          "matched": true,
+          "last_sample_seconds": 1.526
+        },
+        "created_file_references": {
+          "matched": true,
+          "last_sample_seconds": 5.071
+        },
+        "deleted_file_references": {
+          "matched": false,
+          "last_sample_seconds": 20.265
+        },
+        "deletion_validated": false,
+        "external_error": {
+          "matched": true,
+          "last_sample_seconds": 2.019
+        },
+        "checktime_control": {
+          "matched": true,
+          "last_sample_seconds": 0.003
+        },
+        "external_repair": {
+          "matched": true,
+          "last_sample_seconds": 1.517
+        },
+        "repair_checktime_control": {
+          "matched": true,
+          "last_sample_seconds": 0.001
+        },
+        "sync_state": {
+          "conflicts": 0,
+          "failures": 0,
+          "reindex_ok": 0,
+          "reindex_errors": 0
+        },
+        "alpha_eof": {
+          "exit_code": 0,
+          "owned_count": 11,
+          "remaining_count": 0
+        },
+        "beta_eof": {
+          "exit_code": 0,
+          "owned_count": 11,
+          "remaining_count": 0
+        }
+      }
+    },
+    {
+      "path": "/private/tmp/expert-neovim-validation-runs/save-reindex/results.json",
+      "name": "save-reindex",
+      "observations": {
+        "baseline_hover": {
+          "matched": true,
+          "last_sample_seconds": 47.505
+        },
+        "references": {
+          "matched": true,
+          "last_sample_seconds": 6.992
+        },
+        "unopened_doc_edit": {
+          "matched": true,
+          "last_sample_seconds": 2.17
+        },
+        "compiler_error": {
+          "matched": true,
+          "last_sample_seconds": 1.517
+        },
+        "repair": {
+          "matched": true,
+          "last_sample_seconds": 2.019
+        },
+        "repair_validated": true,
+        "created_reference": {
+          "matched": false,
+          "last_sample_seconds": 15.183
+        },
+        "deleted_reference": {
+          "matched": true,
+          "last_sample_seconds": 0.026
+        },
+        "deletion_validated": false,
+        "sync_state": {
+          "conflicts": 0,
+          "failures": 0,
+          "reindex_ok": 1,
+          "reindex_errors": 3
+        },
+        "eof": {
+          "exit_code": 0,
+          "owned_count": 11,
+          "remaining_count": 0
+        },
+        "source_restored": true
+      },
+      "qualifications": [
+        "Clean Tips workload. Three overlapping Reindex requests failed; no valid deletion pass."
+      ]
+    },
+    {
+      "path": "/private/tmp/expert-neovim-validation-runs/tips-combined-unique/results.json",
+      "name": "tips-combined-unique",
+      "observations": {
+        "baseline_hover": {
+          "matched": true,
+          "last_sample_seconds": 9.023
+        },
+        "references": {
+          "matched": true,
+          "last_sample_seconds": 3.604
+        },
+        "unopened_doc_edit": {
+          "matched": true,
+          "last_sample_seconds": 1.617
+        },
+        "compiler_error": {
+          "matched": true,
+          "last_sample_seconds": 1.519
+        },
+        "repair": {
+          "matched": true,
+          "last_sample_seconds": 1.515
+        },
+        "repair_validated": true,
+        "created_reference": {
+          "matched": false,
+          "last_sample_seconds": 22.357
+        },
+        "deleted_reference": {
+          "matched": false,
+          "last_sample_seconds": 20.817
+        },
+        "deletion_validated": false,
+        "sync_state": {
+          "conflicts": 0,
+          "failures": 0,
+          "reindex_ok": 0,
+          "reindex_errors": 0
+        },
+        "eof": {
+          "exit_code": 0,
+          "owned_count": 11,
+          "remaining_count": 0
+        },
+        "source_restored": true
+      },
+      "qualifications": [
+        "Engine shut down during rapid compile sequence; traced run identifies ModuleStore normal exits exhausting restart budget."
+      ]
+    },
+    {
+      "path": "/private/tmp/expert-neovim-validation-runs/tips-disk-create-unique/results.json",
+      "name": "tips-disk-create-unique",
+      "observations": {
+        "via_editor": false,
+        "baseline": {
+          "matched": true,
+          "last_sample_seconds": 13.146
+        },
+        "created_reference": {
+          "matched": true,
+          "last_sample_seconds": 5.365
+        },
+        "eof": {
+          "exit_code": 0,
+          "owned_count": 11,
+          "remaining_count": 0
+        },
+        "source_restored": true
+      }
+    },
+    {
+      "path": "/private/tmp/expert-neovim-validation-runs/tips-editor-delete-reindex/results.json",
+      "name": "tips-editor-delete-reindex",
+      "observations": {
+        "baseline_hover": {
+          "matched": true,
+          "last_sample_seconds": 9.76
+        },
+        "references": {
+          "matched": true,
+          "last_sample_seconds": 3.602
+        },
+        "unopened_doc_edit": {
+          "matched": true,
+          "last_sample_seconds": 1.65
+        },
+        "compiler_error": {
+          "matched": true,
+          "last_sample_seconds": 1.521
+        },
+        "repair": {
+          "matched": true,
+          "last_sample_seconds": 1.514
+        },
+        "repair_validated": true,
+        "created_reference": {
+          "matched": false,
+          "last_sample_seconds": 22.431
+        },
+        "deleted_reference": {
+          "matched": false,
+          "last_sample_seconds": 20.844
+        },
+        "deletion_validated": false,
+        "sync_state": {
+          "conflicts": 0,
+          "failures": 0,
+          "reindex_ok": 0,
+          "reindex_errors": 0
+        },
+        "eof": {
+          "exit_code": 0,
+          "owned_count": 11,
+          "remaining_count": 0
+        },
+        "source_restored": true
+      },
+      "qualifications": [
+        "Engine shut down during rapid compile sequence; traced run identifies ModuleStore normal exits exhausting restart budget."
+      ]
+    },
+    {
+      "path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create/results.json",
+      "name": "tips-native-editor-create",
+      "observations": {
+        "via_editor": true,
+        "baseline": {
+          "matched": true,
+          "last_sample_seconds": 13.246
+        },
+        "created_reference": {
+          "matched": true,
+          "last_sample_seconds": 4.848
+        },
+        "eof": {
+          "exit_code": 0,
+          "owned_count": 11,
+          "remaining_count": 0
+        },
+        "source_restored": true
+      },
+      "qualifications": [
+        "INCONCLUSIVE creation control: reused filename already present in stale index. Superseded by unique filename controls."
+      ]
+    },
+    {
+      "path": "/private/tmp/expert-neovim-validation-runs/tips-native-editor-create-unique/results.json",
+      "name": "tips-native-editor-create-unique",
+      "observations": {
+        "via_editor": true,
+        "baseline": {
+          "matched": true,
+          "last_sample_seconds": 12.436
+        },
+        "created_reference": {
+          "matched": true,
+          "last_sample_seconds": 4.801
+        },
+        "eof": {
+          "exit_code": 0,
+          "owned_count": 11,
+          "remaining_count": 0
+        },
+        "source_restored": true
+      }
+    },
+    {
+      "path": "/private/tmp/expert-neovim-validation-runs/tips-supervisor-trace/results.json",
+      "name": "tips-supervisor-trace",
+      "observations": {
+        "baseline_hover": {
+          "matched": true,
+          "last_sample_seconds": 9.713
+        },
+        "references": {
+          "matched": true,
+          "last_sample_seconds": 3.216
+        },
+        "unopened_doc_edit": {
+          "matched": true,
+          "last_sample_seconds": 1.62
+        },
+        "compiler_error": {
+          "matched": true,
+          "last_sample_seconds": 1.511
+        },
+        "repair": {
+          "matched": true,
+          "last_sample_seconds": 1.516
+        },
+        "repair_validated": true,
+        "created_reference": {
+          "matched": false,
+          "last_sample_seconds": 22.409
+        },
+        "deleted_reference": {
+          "matched": false,
+          "last_sample_seconds": 20.836
+        },
+        "deletion_validated": false,
+        "sync_state": {
+          "conflicts": 0,
+          "failures": 0,
+          "reindex_ok": 0,
+          "reindex_errors": 0
+        },
+        "eof": {
+          "exit_code": 0,
+          "owned_count": 11,
+          "remaining_count": 0
+        },
+        "source_restored": true
+      },
+      "qualifications": [
+        "Engine shut down during rapid compile sequence; traced run identifies ModuleStore normal exits exhausting restart budget.",
+        "One Neovim log response containing connectionDetails runtime cookie was redacted; future instrumentation suppresses logging for that request."
+      ]
+    }
+  ],
+  "validation": {
+    "python_syntax": "passed",
+    "lua_files_and_7_rpc_chunks": "passed on Neovim 0.12.5",
+    "repository_documentation": "passed",
+    "application_source_restored": "validation checkout git status clean",
+    "checks": "See application-checks run, including corrected Credo result",
+    "engine_diagnosis": "OTP supervisor trace: permanent ModuleStore exits normally after each project_compiled; rapid restarts exhaust 3/5-second allowance"
+  }
+}
