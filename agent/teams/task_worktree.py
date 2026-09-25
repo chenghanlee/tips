@@ -555,19 +555,27 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
         Optional: on any failure ElixirLS compiles them itself, as before.
         """
         print("ElixirLS dependencies: preparing, about a minute on a new worktree.", flush=True)
-        try:
-            report = run(
-                [
-                    sys.executable,
-                    self.neovim_bundle / "bundle.py",
-                    "prepare-deps",
-                    "--workspace",
-                    self.worktree,
-                ],
-                env=os.environ | self.target_env,
-            )
-        except RefusalError as error:
-            report = str(error)
+        argv = [
+            sys.executable,
+            self.neovim_bundle / "bundle.py",
+            "prepare-deps",
+            "--workspace",
+            self.worktree,
+        ]
+        result = execute(argv, env=os.environ | self.target_env)
+        if result.returncode:
+            output = result.stderr.strip() or result.stdout.strip()
+            report = f"{shlex.join(map(str, argv))} failed: {output}"
+        else:
+            report = result.stdout.strip()
+            try:
+                status = json.loads(report).get("status")
+            except (ValueError, AttributeError):
+                status = None
+            # Mix writes to stderr, the report to stdout. Show Mix's output only when the
+            # report does not say the dependencies are ready, so its error is not lost.
+            if status not in ("seeded", "ready"):
+                sys.stderr.write(result.stderr)
         print("ElixirLS dependencies: " + report, flush=True)
 
     def launch(self) -> None:

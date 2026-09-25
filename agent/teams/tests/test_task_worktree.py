@@ -29,6 +29,8 @@ class FixtureState(TypedDict):
     wrong_start_root: str
     shell_timeout: bool
     prepare_fails: bool
+    prepare_not_seeded: bool
+    prepare_stdout: str
 
 
 TEAMS = Path(__file__).resolve().parents[1]
@@ -253,6 +255,16 @@ if mode == "doctor":
 elif mode == "prepare-deps":
     if state.get("prepare_fails"):
         sys.exit("ElixirLS session: An existing session owns the worktree")
+    if state.get("prepare_not_seeded"):
+        # As bundle.py: Mix writes to stderr, the report goes to stdout, the exit is 0.
+        print("** (Mix) Fixture deps.get failure", file=sys.stderr)
+        print(json.dumps({"status": "not-seeded", "detail": "mix deps.get exited 1"}))
+        sys.exit(0)
+    if "prepare_stdout" in state:
+        print("** (Mix) Fixture unrecognized report", file=sys.stderr)
+        print(state["prepare_stdout"])
+        sys.exit(0)
+    print("==> fixture normal Mix output", file=sys.stderr)
     print(json.dumps({"status": "seeded"}))
 else:
     sys.argv[0] = os.environ["REAL_BUNDLE"]
@@ -507,6 +519,8 @@ class WorktreeIntegrationTest(unittest.TestCase):
         prepared = next(e for e in events if e[:2] == ["bundle", "prepare-deps"])
         assert prepared[2:] == ["test", "_t3l"]
         assert 'ElixirLS dependencies: {"status": "seeded"}' in p.stdout
+        # Seeded: Mix's normal output stays out of the launching agent's view.
+        assert "fixture normal Mix output" not in p.stdout + p.stderr
         # Preparation is optional: a refusal is reported and the client still starts.
         s = self.state()
         s["agents"], s["prepare_fails"] = [], True
@@ -514,6 +528,26 @@ class WorktreeIntegrationTest(unittest.TestCase):
         p = self.call(*opt_in)
         assert "An existing session owns the worktree" in p.stdout
         assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 2
+        # A not-seeded report exits 0; Mix's own error must still reach the operator, once.
+        s = self.state()
+        s["agents"], s["prepare_fails"], s["prepare_not_seeded"] = [], False, True
+        self.save(s)
+        p = self.call(*opt_in)
+        assert (p.stdout + p.stderr).count("** (Mix) Fixture deps.get failure") == 1
+        assert 'ElixirLS dependencies: {"status": "not-seeded"' in p.stdout
+        assert "Fixture deps.get failure" not in p.stdout
+        assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 3
+        # An unknown status or a malformed report keeps Mix's output and the optional launch.
+        for n, stdout in enumerate(
+            ('{"status": "unexpected"}', "not json", '{"status": ["x"]}', "null"), 4
+        ):
+            s = self.state()
+            s["agents"], s["prepare_not_seeded"], s["prepare_stdout"] = [], False, stdout
+            self.save(s)
+            p = self.call(*opt_in)
+            assert (p.stdout + p.stderr).count("** (Mix) Fixture unrecognized report") == 1
+            assert "ElixirLS dependencies: " + stdout in p.stdout
+            assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == n
 
     def test_neovim_opt_in_rejects_claude_before_creating_worktree(self) -> None:
         result = self.call("--lsp", "neovim", role="test", ok=False)
