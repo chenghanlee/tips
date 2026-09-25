@@ -607,6 +607,10 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
         )
         client: list[str] = []
         if self.kind == "codex":
+            if self.args.lsp == "neovim":
+                # Codex 0.157's shared daemon gives shell commands the environment of the
+                # launch that started it; in-process Codex uses this team's environment.
+                client += ["--no-daemon"]
             client += ["-a", self.policies["codex_approval"], "-C", str(self.worktree)]
             if self.model:
                 client += ["-m", self.model]

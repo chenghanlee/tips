@@ -51,10 +51,16 @@ reports that it has nothing to do.
 ## Configure and launch
 
 ```sh
-python3 /absolute/bundle/bundle.py codex --workspace /absolute/worktree -- -m gpt-6-sol
+python3 /absolute/bundle/bundle.py codex --workspace /absolute/worktree -- --no-daemon -m gpt-6-sol
 ```
 
-The team helper does the same with `--lsp neovim --neovim-bundle /absolute/bundle`.
+`bundle.py codex` passes everything after `--` to Codex. `--no-daemon` runs Codex in its own
+process, so its shell commands get this launch's environment. Codex 0.157.0's shared
+app-server daemon gave them the environment of the launch that started the daemon instead
+(measured, see Team use below). The flag leaves a running daemon alone.
+
+The team helper does the same with `--lsp neovim --neovim-bundle /absolute/bundle`, and also
+passes `--no-daemon`.
 The bundle path is required; there is no default. On a new worktree, allow about a
 minute for dependency preparation before the client starts.
 
@@ -63,12 +69,15 @@ disables Expert and the automatic `mix-compile` and `mix-credo` plugin hooks in 
 worktree only. User-level and other hooks are unchanged. The beta adds no hooks, so
 there is no hook trust step. Codex loads this file only in a Codex-trusted worktree;
 in an untrusted one there is no `lsp` server and the plugin settings do not apply. In a
-trusted worktree, bare `codex` also works once the file exists. `bundle.py configure`
+trusted worktree, `codex --no-daemon` also works once the file exists. `bundle.py configure`
 with the same arguments writes the file only, without preparation or Codex.
 
-Team use: Codex's shared app-server daemon keeps the environment of the launch that
-started it. Whether commands in a later worktree inherit it is untested. Until that is
-tested, before any command that can write a database (`mix test`, `mix precommit`,
+Team use: in a Codex 0.157.0 test, a second worktree's session on the shared app-server
+daemon ran shell commands with the daemon's `TIPS_DB_SUFFIX` and ports and without `MIX_ENV`;
+the same launch with `--no-daemon` had the right values. The flag covers only this guide's
+commands and the team helper's `--lsp neovim` launch; other Codex versions and generic manual
+Codex launches outside these paths are not covered. Keep this check for now: before any
+command that can write a database (`mix test`, `mix precommit`,
 `mix setup`, migrations or other Ecto tasks), check in the agent's shell that `PGPORT`,
 `TIPS_DB_SUFFIX`, `TIPS_TEST_PORT` and `MIX_ENV` equal the values the team helper set for
 this worktree (ports and suffix from [agent/teams/config.toml](../../../teams/config.toml)
@@ -161,9 +170,10 @@ On Tips a warm check took about 1.3 s, and a cold test build with dependencies 4
 
 ## Stop, recover and relaunch
 
-- After Codex closes, Codex stops the MCP server. With Codex's shared app-server daemon this
-  can come later: in the Codex 0.157.0 acceptance run it came 60 s after close. Before the
-  session releases the worktree lock, Neovim stops ElixirLS and the compiler's process
+- After Codex closes, Codex stops the MCP server. With `--no-daemon`, as in this guide, the
+  worktree was free at the first check after close (one Codex 0.157.0 run). Without the flag,
+  Codex's shared app-server daemon stopped it 60 s after close in the 0.157.0 acceptance run.
+  Before the session releases the worktree lock, Neovim stops ElixirLS and the compiler's process
   groups it has found: groups below it at that moment and groups it recorded earlier.
   This also covers Codex's forced stop of the MCP server and an ElixirLS crash. If
   Neovim itself dies, the launcher stops the groups Neovim last recorded. Known limits
@@ -209,7 +219,7 @@ On Tips a warm check took about 1.3 s, and a cold test build with dependencies 4
    `--lsp-approval-mode` if it is not `prompt`:
 
    ```sh
-   python3 /absolute/saved-bundle/bundle.py codex --workspace /absolute/worktree --force -- ...
+   python3 /absolute/saved-bundle/bundle.py codex --workspace /absolute/worktree --force -- --no-daemon ...
    ```
 
    Without `--force`, the command refuses, because the worktree's configuration
@@ -224,7 +234,7 @@ The rollback target is the frozen, hook-based r24 bundle, manifest SHA-256
 `b3e8891c33c0259a7b4f2210219e50e477c5e41aeb525e3834d91b8a3b7a640f` (path in
 [NO_HOOKS_PLAN.md](NO_HOOKS_PLAN.md)). It differs from this beta:
 
-- Launch it with r24's own `bundle.py codex`, as in step 2. That command adds r24's
+- Launch it with r24's own `bundle.py codex`, as in step 2 (with `--no-daemon`). It adds r24's
   two compiler-feedback hooks to the Codex session. This branch's team helper does
   not, so it would start r24 without its hooks.
 - Before any agent work, review and trust both hooks in `/hooks`, then run r24's

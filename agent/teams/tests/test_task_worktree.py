@@ -515,6 +515,8 @@ class WorktreeIntegrationTest(unittest.TestCase):
         argv = self.state()["launch_argv"]
         assert argv[argv.index("-C") + 1] == str(self.wt)
         assert not any("hooks" in item for item in argv)
+        # In-process Codex: shell commands get this launch's environment, not a shared daemon's.
+        assert "--no-daemon" in argv
         # Project Mix compiles in the client's environment.
         prepared = next(e for e in events if e[:2] == ["bundle", "prepare-deps"])
         assert prepared[2:] == ["test", "_t3l"]
@@ -611,6 +613,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
         s = self.state()
         assert "configured-sol" in s["launch_argv"]
         assert "42000" in s["launch_argv"]
+        assert "--no-daemon" not in s["launch_argv"]  # Default Expert launch unchanged.
         assert s["launch_env"]["TIPS_TEST_PORT"] == "5160"
         assert s["launch_env"]["PGPORT"] == "5434"
 

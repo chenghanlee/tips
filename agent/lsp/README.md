@@ -106,10 +106,12 @@ code-action writes are excluded from both the schema and request parser.
 Launch the opt-in beta from the selected immutable bundle:
 
 ```bash
-python3 /absolute/bundle/bundle.py codex --workspace /absolute/worktree -- -m gpt-6-sol
+python3 /absolute/bundle/bundle.py codex --workspace /absolute/worktree -- --no-daemon -m gpt-6-sol
 ```
 
-Alternatively, the team helper accepts `--lsp neovim --neovim-bundle /absolute/bundle`.
+`--no-daemon` gives the session's shell commands this launch's environment; Codex 0.157.0's
+shared daemon did not. Alternatively, the team helper accepts `--lsp neovim --neovim-bundle /absolute/bundle`
+and adds `--no-daemon` itself.
 Both paths prepare ElixirLS dependencies first (about a minute on a new worktree)
 and generate the worktree's `.codex/config.toml`. That file adds the MCP server and
 turns off the automatic `mix-compile` and `mix-credo` plugin hooks for this worktree
