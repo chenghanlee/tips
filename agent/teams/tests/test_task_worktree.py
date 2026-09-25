@@ -3,7 +3,6 @@
 
 import json
 import os
-import shlex
 import shutil
 import subprocess
 import sys
@@ -34,19 +33,6 @@ class FixtureState(TypedDict):
 
 TEAMS = Path(__file__).resolve().parents[1]
 LSP_WRAPPER = TEAMS.parents[1] / "agent/lsp/launch_worktree_lsp.sh"
-# Answers one request at a time and exits on EOF, like `codex app-server --stdio`.
-FAKE_CODEX_APP_SERVER = """#!/usr/bin/env python3
-import json, os, sys
-open(os.environ["FAKE_ARGV"], "w").write(json.dumps(sys.argv[1:]))
-for line in sys.stdin:
-    message = json.loads(line)
-    if message.get("id") == 1:
-        print(json.dumps({"id": 1, "result": {}}), flush=True)
-    elif message.get("id") == 2:
-        hooks = json.loads(os.environ["FAKE_HOOKS"])
-        data = [{"cwd": message["params"]["cwds"][0], "hooks": hooks}]
-        print(json.dumps({"id": 2, "result": {"data": data}}), flush=True)
-"""
 # Deliberately fixed test data: changing production defaults must not rewrite tests.
 CONFIG = """\
 # Agent launch settings. Changes apply to newly started sessions.
@@ -253,7 +239,7 @@ if a[:2] == ["agent", "start"]:
 reply({"error": "unhandled fake Herdr command: " + repr(a)}, 2)
 """
 )
-# Records each call in the fake Herdr event log; the real bundle answers config/codex-args.
+# Records each call in the fake Herdr event log; the real bundle answers config.
 FAKE_NEOVIM_BUNDLE = r"""#!/usr/bin/env python3
 import json, os, runpy, sys
 from pathlib import Path
@@ -481,56 +467,13 @@ class WorktreeIntegrationTest(unittest.TestCase):
         # Codex validates transport even for a disabled, non-inherited server.
         assert cfg["mcp_servers"]["elixir-lsp"]["command"] == "/usr/bin/false"
         assert not cfg["plugins"]["mix-compile@elixir-agent-tools"]["enabled"]
-        assert cfg["plugins"]["mix-credo@elixir-agent-tools"]["enabled"]
+        # Solution 2: no automatic compiler or Credo feedback; agents validate explicitly.
+        assert not cfg["plugins"]["mix-credo@elixir-agent-tools"]["enabled"]
+        assert "hooks" not in cfg
         assert "shell_environment_policy" not in cfg
         assert "approval_policy" not in cfg
         assert server["tools"]["lsp"]["approval_mode"] == "approve"
-        # Codex 0.156.1 ignores linked-worktree hook files. The launch arguments
-        # must carry the hooks, with one stable trust definition across roots.
-        assert not (self.wt / ".codex/hooks.json").exists()
-        arguments = json.loads(
-            execute(
-                [
-                    sys.executable,
-                    str(bundle / "bundle.py"),
-                    "codex-args",
-                    "--workspace",
-                    str(self.wt),
-                ],
-                check=True,
-            ).stdout
-        )
-        assert arguments[:2] == ["-C", str(self.wt)]
-        hooks = tomllib.loads("\n".join(arguments[3::2]))["hooks"]
-        assert set(hooks) == {"PostToolUse", "Stop"}
-        assert hooks["PostToolUse"][0]["matcher"] == "^(apply_patch|Bash)$"
-        command = hooks["PostToolUse"][0]["hooks"][0]["command"]
-        assert command == hooks["Stop"][0]["hooks"][0]["command"]
-        assert shlex.split(command)[1:] == [
-            str(bundle / "bundle.py"),
-            "hook",
-            "--workspace",
-            "$PWD",
-            "--state",
-            "$PWD/.elixir_ls/session",
-            "--budget-ms",
-            "5000",
-        ]
-        assert "bypass" not in command
-        assert "audit" not in command
-        other = json.loads(
-            execute(
-                [
-                    sys.executable,
-                    str(bundle / "bundle.py"),
-                    "codex-args",
-                    "--workspace",
-                    str(self.root),
-                ],
-                check=True,
-            ).stdout
-        )
-        assert other[2:] == arguments[2:]
+        assert sorted(path.name for path in (self.wt / ".codex").iterdir()) == ["config.toml"]
         before = snapshot(self.wt / ".codex")
         self.call("--lsp", "neovim", "--neovim-bundle", str(bundle))
         assert snapshot(self.wt / ".codex") == before
@@ -555,9 +498,11 @@ class WorktreeIntegrationTest(unittest.TestCase):
             ["bundle", "config"],
             ["bundle", "prepare-deps"],
             ["pane", "run"],
-            ["bundle", "codex-args"],
             ["agent", "start"],
         ]
+        argv = self.state()["launch_argv"]
+        assert argv[argv.index("-C") + 1] == str(self.wt)
+        assert not any("hooks" in item for item in argv)
         # Project Mix compiles in the client's environment.
         prepared = next(e for e in events if e[:2] == ["bundle", "prepare-deps"])
         assert prepared[2:] == ["test", "_t3l"]
@@ -587,69 +532,6 @@ class WorktreeIntegrationTest(unittest.TestCase):
         result = self.call("--lsp", "neovim", ok=False)
         assert "--lsp neovim requires --neovim-bundle" in result.stderr
         assert not self.wt.exists()
-
-    def test_neovim_hook_check_requires_both_launch_hooks_trusted(self) -> None:
-        bundle = self.root / "agent/lsp/vendor/beta bundle"
-        bundle.mkdir()
-        shutil.copy(
-            TEAMS.parents[1] / "agent/lsp/experiments/codex-elixirls-v2/bundle.py",
-            bundle / "bundle.py",
-        )
-        launch = [sys.executable, str(bundle / "bundle.py")]
-        arguments = json.loads(
-            execute([*launch, "codex-args", "--workspace", str(self.root)], check=True).stdout
-        )
-        hooks = tomllib.loads("\n".join(arguments[3::2]))["hooks"]
-        command = hooks["Stop"][0]["hooks"][0]["command"]
-        tools = self.root / "fake-codex"
-        tools.mkdir()
-        (tools / "codex").write_text(FAKE_CODEX_APP_SERVER)
-        (tools / "codex").chmod(0o755)
-
-        def check(stop_trust: str) -> subprocess.CompletedProcess[str]:
-            listed = [
-                {
-                    "eventName": "postToolUse",
-                    "command": command,
-                    "matcher": "^(apply_patch|Bash)$",
-                    "enabled": True,
-                    "trustStatus": "trusted",
-                },
-                {
-                    "eventName": "stop",
-                    "command": command,
-                    "matcher": None,
-                    "enabled": True,
-                    "trustStatus": stop_trust,
-                },
-                # Another trusted user hook neither satisfies nor breaks the check.
-                {
-                    "eventName": "stop",
-                    "command": "true",
-                    "matcher": None,
-                    "enabled": True,
-                    "trustStatus": "trusted",
-                },
-            ]
-            env = os.environ | {
-                "PATH": f"{tools}{os.pathsep}{os.environ['PATH']}",
-                "FAKE_HOOKS": json.dumps(listed),
-                "FAKE_ARGV": str(tools / "argv.json"),
-            }
-            return execute(
-                [*launch, "verify-hooks", "--workspace", str(self.root)], env=env, timeout=30
-            )
-
-        trusted = check("trusted")
-        assert trusted.returncode == 0, trusted.stderr
-        assert [hook["trust"] for hook in json.loads(trusted.stdout)] == ["trusted", "trusted"]
-        # Trust is read for exactly the session flags that the launch passes to Codex.
-        argv = json.loads((tools / "argv.json").read_text())
-        assert argv == ["app-server", "--stdio", *arguments[2:]]
-        # Codex does not run a hook whose trusted hash belongs to another bundle.
-        modified = check("modified")
-        assert modified.returncode == 1
-        assert "untrusted or modified hooks do not run" in modified.stderr
 
     def test_claude_only_and_actual_target_environment(self) -> None:
         self.call("--start", role="test", team="6")

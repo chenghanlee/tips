@@ -48,16 +48,7 @@ def main():
         return {'exit': proc.returncode, 'seconds': time.monotonic() - before,
                 'stderr': proc.stderr[-2000:]}
 
-    def hook(client, event='PostToolUse'):
-        before = time.monotonic()
-        proc = subprocess.run([sys.executable, str(bundle / 'bundle.py'), 'hook',
-            '--workspace', str(client.root), '--state', str(client.state_dir)],
-            input=json.dumps({'hook_event_name': event, 'tool_name': 'Bash'}),
-            text=True, capture_output=True, timeout=6)
-        assert proc.returncode == 0, proc.stderr
-        return {'seconds': time.monotonic() - before, 'output': json.loads(proc.stdout)}
-
-    def close(client, expected_exit=0, removed_state=True):
+    def close(client, expected_exit=0, removed_state=True, unregistered=True):
         client.remember()
         if client.proc.poll() is None:
             client.proc.stdin.close()
@@ -71,15 +62,20 @@ def main():
         else:
             assert 'Operation not permitted' not in stderr, stderr
         if removed_state:
-            assert not (client.state_dir / 'owner.json').exists()
+            if unregistered:
+                assert not any((client.state_dir / 'registry').glob('*.json'))
             assert not Path(client.instance['socket']).exists()
         observed.update(exit=client.proc.returncode, stderr=stderr, removed_state=removed_state)
         return observed
 
     try:
         first = start(alpha, 'first')
-        protected = [first.state_dir / name for name in ('environment.json', 'owner.json', 'config/nvim/init.lua')]
+        protected = [first.state_dir / name for name in ('environment.json', 'config/nvim/init.lua')]
         hashes = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in protected}
+        # With the same root and state, prepare() rewrites those bytes unchanged but clears the
+        # registry: only the live entry shows a refused launch that ran it without ownership.
+        live = first.state_dir / 'registry' / f"{first.instance['pid']}.json"
+        assert live.is_file(), live
         alias = output / 'alpha-alias'
         alias.symlink_to(alpha, target_is_directory=True)
         for name, root, state, mode in (
@@ -94,6 +90,7 @@ def main():
             assert result['exit'] != 0 and 'owns' in result['stderr'] and 3 <= result['seconds'] < 4.5, result
             assert hashes == {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in protected}
             assert first.rpc().exec_lua("return require('neovim_sync').ready()")
+            assert live.is_file(), (name, 'refused launch removed the live registry entry')
         second = start(beta, 'second')
         save('separate_root', {'alpha_pid': first.instance['pid'], 'beta_pid': second.instance['pid']})
         save('first_eof_cleanup', close(first))
@@ -134,12 +131,6 @@ def main():
                 assert poll(lambda: recovered.proc.poll(), lambda value: value is not None, 3)['matched']
                 save('server_exit_reply', {'transport_closed': True, 'error': str(error)})
             assert poll(lambda: recovered.proc.poll(), lambda value: value is not None, 5)['matched']
-            response = hook(recovered)
-            save('server_exit_hook', response)
-            assert 'reconnect' in json.dumps(response).lower(), response
-            assert hook(recovered, 'Stop')['output'] == {}
-            assert hook(recovered)['output'] == {}
-            save('dead_session_reported_once', True)
             save('server_exit_cleanup', close(recovered, 1))
             final = start(alpha, 'after-kill')
             save('server_exit_reconnect', {'pid': final.instance['pid'], 'ready': True})
@@ -179,7 +170,8 @@ def main():
             os.kill(last.proc.pid, signal.SIGTERM)
             time.sleep(0.15)
             os.kill(last.proc.pid, signal.SIGTERM)
-            save('repeated_termination_cleanup', close(last, 143))
+            # A stopped Neovim cannot unregister itself; the next start's prepare() removes the entry.
+            save('repeated_termination_cleanup', close(last, 143, unregistered=False))
             healthy = start(alpha, 'after-kill')
             save('last_eof_cleanup', close(healthy))
         else:

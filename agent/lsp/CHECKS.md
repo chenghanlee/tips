@@ -3,14 +3,14 @@
 The Neovim beta runtime still lives under `experiments/codex-elixirls-v2/`.
 These files are maintained code, despite that directory name:
 
-- `bundle.py`, `build_bundle.py`, `neovim_launcher.py`, `neovim_hook.py`, `neovim_prepare.py`
+- `bundle.py`, `build_bundle.py`, `neovim_launcher.py`, `neovim_prepare.py`
 - `neovim_init.lua`, `neovim_owner.lua`, `neovim_sync.lua`, `neovim_feedback.lua`
 - The pinned compiler, ElixirLS and vv-mcp patches copied by `build_bundle.py`
 
-The [Python profile](pyproject.toml) explicitly selects the five Python files
-and the dependency preparation tests.
-Ruff also checks `hook_contract_probe.py`, a gate probe; strict Pyright does not
-(probes are exempt from strict typing).
+The [Python profile](pyproject.toml) explicitly selects the four Python files
+and the dependency preparation tests, plus three gate probes,
+`hookfree_recovery_gate.py`, `seven_ops_acceptance.py` and `hooks_list_gate.py`, for Ruff
+only (not strict Pyright).
 Historical probes, research, generated bundles and dependency sources are excluded.
 When adding a maintained runtime Python file, add it to both check lists in that profile.
 
@@ -41,7 +41,7 @@ not suppress complexity checks, type checks, or arbitrary files.
 The harness uses Pyright for Python definition, references, hover and diagnostics.
 This session has no `codex-lsp-bridge` MCP tool, so the beta checks connect Neovim
 directly to the installed `pyright-langserver --stdio`. The live check opens the
-four maintained Python files, requests their pull diagnostics, and checks hover,
+maintained Python files, requests their pull diagnostics, and checks hover,
 definition and references at the `Build.check_rust()` call. A published empty
 diagnostic cache is not substituted for a completed diagnostic request.
 
@@ -58,7 +58,7 @@ written by the runtime or boundary tests. From `experiments/codex-elixirls-v2`, 
 luacheck --codes neovim_init.lua neovim_owner.lua neovim_sync.lua neovim_feedback.lua neovim_patch_boundaries.lua
 ```
 
-`neovim_patch_boundaries.lua` holds 23 boundary checks.
+`neovim_patch_boundaries.lua` holds 21 boundary checks.
 
 This is a local lint/static-analysis check; CI does not yet run it. A Lua language
 server remains unavailable, so no Lua LSP pass is claimed. The Lua core runs against
@@ -69,8 +69,42 @@ The older probes that start Neovim by hand from a `--vendor` directory, such as
 gates. They predate `bundle.py`, do not copy `neovim_owner.lua`, which
 `neovim_init.lua` requires, and leave `V2_ELIXIR_LS` unset, which selects Homebrew's
 unpatched `elixir-ls`. On r23, six of them failed at startup or on their first check.
-Of these older probes, only `neovim_reconcile_probe.py --bundle` starts through the
-bundle; it passed on r23 and stays active.
+`neovim_reconcile_probe.py` is also historical: it drives recovery through the
+deleted hook. `hookfree_recovery_gate.py --bundle` replaces it and triggers
+recovery through ordinary `lsp` requests only; `--mutant no-scan` and
+`--mutant drop-failed` must fail.
+
+`seven_ops_acceptance.py --bundle` is the seven-operation gate. It builds a fixture and
+judges answer content from ordinary `lsp` requests: first reads, valid empties and scope,
+UTF-16 columns, changed doc and spec, moved definitions, references, symbol renames, a
+compile error and its repair, an edit during a running build, and unanswered timeouts.
+`--compose` also runs the explicit check from `AGENTS.md` beside the live LS; it needs
+`mix` and GNU `timeout` on PATH. Exit 0 is pass, 1 is a failure or cleanup problem, and
+2 is inconclusive: a required condition, such as an LS build while the CLI runs, did not
+occur. Rerun an inconclusive result; it is not a pass. From the repository root:
+
+```sh
+B="$PWD/agent/lsp/vendor/elixirls-neovim-beta-rN"
+G=agent/lsp/experiments/codex-elixirls-v2/seven_ops_acceptance.py
+PYTHONDONTWRITEBYTECODE=1 python3 "$G" --bundle "$B" --output "$(mktemp -d)/seven" --compose
+PYTHONDONTWRITEBYTECODE=1 python3 "$G" --bundle "$B" --output "$(mktemp -d)/control" \
+  --control always-current
+```
+
+The first command must exit 0 with empty `failed` and `inconclusive`. The negative control
+must exit 1 with `"control_caught": true`: every failure is a wrong or empty `current`
+answer and cleanup is clean. Each output directory holds the full `results.json`.
+
+`hooks_list_gate.py <worktree> <bundle>` checks which hooks Codex loads for a configured,
+Codex-trusted worktree, through Codex's read-only `hooks/list`. It must exit 0 (PASS): the
+config names the bundle, no hook runs the bundle, no `mix-credo` or `mix-compile` plugin
+hook is enabled, and user hooks are still listed (it needs at least one user hook, for
+example in ~/.codex/hooks.json). Its positive control re-lists with
+`-c plugins.mix-credo@elixir-agent-tools.enabled=true` (unquoted: Codex keeps quotes in
+`-c` keys) and must show an enabled `mix-credo` hook; otherwise the result is
+INCONCLUSIVE (exit 1). The gate cannot detect an untrusted worktree, whose
+.codex/config.toml Codex does not load; a PASS there is vacuous. Run it after a launch in
+that worktree has loaded its config (/mcp lists lsp). Rerun it after a Codex upgrade.
 
 For changes to the maintained vv-mcp patches, apply them to a disposable copy of
 the pinned source, then run `cargo test --locked -p vv-mcp`,
@@ -158,10 +192,9 @@ drift could report clean when it is not.
 | vv-mcp `operations` table (`sync_from_disk`) | disk sync before reads | reads skip disk sync | none mapped |
 | `Mix.Project.with_deps_lock` (@doc false: hidden, private Mix API) | dependency reload patch | fails closed only if the function disappears (`build_error` → failed; the bundle build only warns). A changed lock can keep compiling and silently stop serializing with `deps.get` | on any Elixir/Mix bump: read the Mix source (same lock as `deps.get`), then the forced-overlap check (historical: `dependency-lifecycle` `tips_git_probe.py --gap-ms 3000`, not yet a repository gate) |
 | `Mix.Dep.Converger.converge/1` options, `Mix.Dep` load paths, `Code.delete_path` purge | dependency reload patch | stale dependency modules reported current | none maintained (historical: `drb_probe2.py` v2, `drb_probe3.py` v3c, `drb_probe4.py` v4, `dependency-lifecycle/dl_probe.py` dl) |
-| Bundled Neovim client disconnect texts `E247:` and `was closed by the peer` (`vim._cs_remote`) | `neovim_hook.py` | a lost session reads as generic unavailable; the one-time disconnected notice is not shown | beta-session `stop_probe.py` exited, lost_notice and reset checks (not yet a repository gate) |
 | 21 `add_call_to_line` call sites | ElixirSense call-env patch | parse crash at run time | `build_bundle.py` strict compile of `deps/elixir_sense` |
 | Parser stale-result rule | open-document version patch | wrong publication version | harness R-series |
-| Build publication before `build` telemetry | 150 ms quiet window | a hook may return before late diagnostics arrive (unmeasured) | none (historical: `build_order_probe.py`, measured schedule, not causal) |
+| Build publication before `build` telemetry | 150 ms quiet window | a diagnostics request may read `current` before late diagnostics arrive (unmeasured) | none (historical: `build_order_probe.py`, measured schedule, not causal) |
 
 Harness = `experiments/codex-elixirls-v2/first_touch_acceptance.py`. It builds its own
 fixture and needs only an installed bundle. `PYTHONDONTWRITEBYTECODE=1` keeps the
@@ -174,27 +207,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 agent/lsp/experiments/codex-elixirls-v2/first_
 
 It exits 0 only when its final `failed` list is empty, `eof_cleanup` is true and
 `survivors_after_cleanup` is empty. The full record is in `results.json` in the
-output directory. Cases C1, R1-R15, R14b, W1-W3, WS and V1 carry verdicts; H1-H6
-and Q are measurements only.
-
-The hook-contract gate runs the bundled hook (PostToolUse and Stop texts:
-publication-pending S1-S3, deadline D1-D4) against the harness fixture. Use the bundle's Python (3.14); `--output` must not exist:
-
-```sh
-PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/opt/python@3.14/bin/python3.14 \
-  agent/lsp/experiments/codex-elixirls-v2/hook_contract_probe.py \
-  --bundle "$PWD/agent/lsp/vendor/elixirls-neovim-beta-rN" --output "$(mktemp -d)/hook-contract"
-```
-
-It exits 0 only when all seven checks pass, each with hook exit 0, `eof_cleanup` is true
-and no process survives cleanup. A failed check prints a summary line and exits 1. Once
-the harness has started, `results.json` is written on the paths the probe covers,
-including an exception such as a hook timeout (exit 1 with a traceback). Not every path
-is covered: if the harness fails to start there is no `results.json` (see
-`acceptance.stderr.log`), and a malformed `hook-audit.jsonl` line would skip it (the raw
-audit file stays; not seen so far). S1 and S2 measured 4.84-4.87 s against the 5 s hook
-budget, under load, without a stress test. The older `hook_contract_probe.py` in the
-beta session's `runtime-review/probes/` exits 0 even when a check fails and is historical only.
+output directory. Cases C1, R1-R15, R14b, W1-W3, WS and V1 carry verdicts; Q is a
+measurement only.
 
 Historical evidence, not runnable repository gates: acceptance A1-A10
 (`first_read_acceptance.py`), trace contract T2 (`trace_contract_probe.py`),

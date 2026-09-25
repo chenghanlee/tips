@@ -110,21 +110,40 @@ python3 /absolute/bundle/bundle.py codex --workspace /absolute/worktree -- -m gp
 ```
 
 Alternatively, the team helper accepts `--lsp neovim --neovim-bundle /absolute/bundle`.
-Both paths prepare ElixirLS dependencies first (about a minute on a new worktree),
-generate project MCP configuration and attach feedback hooks as normal session
-configuration. Codex 0.156.1 loads linked-worktree hooks from the main repository,
-so writing a worktree `.codex/hooks.json` and running bare `codex` does not enable
-beta feedback.
+Both paths prepare ElixirLS dependencies first (about a minute on a new worktree)
+and generate the worktree's `.codex/config.toml`. That file adds the MCP server and
+turns off the automatic `mix-compile` and `mix-credo` plugin hooks for this worktree
+only; user and other hooks stay as they are. The beta adds no hooks, so there is no
+hook trust step. [INSTALL.md](experiments/codex-elixirls-v2/INSTALL.md) covers build,
+launch, rollback, recovery and known limits. It does not change the application's
+compiler or PATH.
+In team use, check the worktree's database settings before any command that can
+write a database, including `mix test` (INSTALL, Configure and launch).
 
-Review the session hooks through `/hooks` before work, then prove them with
-`bundle.py verify-hooks --workspace /absolute/worktree`. Repeat both after every
-upgrade or rollback. The hook definition is the same across worktrees for one
-bundle and one Python. Another bundle or Python changes the definition, and
-trusting it un-trusts the previous one.
-[INSTALL.md](experiments/codex-elixirls-v2/INSTALL.md) covers build, launch,
-hook review, rollback, recovery and known limits.
-The configuration disables the separate compiler-feedback plugin, preserves
-Credo, and does not change the application's compiler or PATH.
+Nothing reports compiler results automatically. Ask the `lsp` tool, and validate
+explicitly before calling work done:
+
+- **Compile.** After your last edit, run as its own command:
+
+  ```sh
+  MIX_ENV=test timeout --foreground -k 5 90 mix compile --force --warnings-as-errors
+  ```
+
+  Exit 0 passes only if nothing was written during or after the command and the tool
+  reports no interrupt, background move or timeout; otherwise it is unfinished, even
+  with exit 0. Exit 1 is a compile error or warning. Exit 124 or 137 is unfinished:
+  rerun, with a larger limit if needed.
+  GNU `timeout` bounds the compile. If your tool has its own command timeout, set it
+  to at least 120 s (Claude Code Bash). If the tool returns a `session_id` instead of an
+  exit code (Codex `exec_command`, `tty` off), the command is still running; that is not
+  a background move. Call `write_stdin` on that `session_id` with empty `chars` until a
+  result has an exit code, and edit nothing meanwhile.
+  Use this exact command; do not wrap it in `unbuffer` (see INSTALL.md).
+  Plain incremental `mix compile` can miss same-second or timestamp-preserving edits.
+  Do not add `--force` to `mix test` or `mix precommit`; aliases ignore it.
+- **Format, Credo, tests.** Run `mix format` before the compile; it can rewrite files.
+  After the compile, run `mix credo --strict` on edited files, then `mix test`. A
+  skipped check is unfinished, not passed.
 
 An exited ElixirLS session requires restarting the coding client in the same
 worktree. Intentionally stopping its LSP client also ends that session. Ownership

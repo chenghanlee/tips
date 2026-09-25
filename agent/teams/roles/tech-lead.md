@@ -41,7 +41,7 @@ gh pr merge "$PR" --merge --match-head-commit "$REVIEWED_SHA"
 ```
 
 1. Request TPM advancement of your checkout to `REVIEWED_SHA`. Confirm `git rev-parse HEAD` matches and `TIPS_CHECK_TIMEOUT_SECONDS` is set.
-2. Review the integrated head's entire diff against `origin/main` once. Run `mix compile --warnings-as-errors`, `mix format --check-formatted`, `mix credo --strict`, `mix test` exactly once there. Documentation-only PRs need no local tests; `agent/teams` Python follows shared Checks. Clean updates get no second local run or tester round.
+2. Review the integrated head's entire diff against `origin/main` once. Run `mix format --check-formatted`, the compile check from `AGENTS.md`, `mix credo --strict` and `mix test` exactly once there. Documentation-only PRs need no local tests; `agent/teams` Python follows shared Checks. Clean updates get no second local run or tester round.
 3. Append a `review` round to your comment. Above the headings, record reviewer and implementer, base and head SHAs, tester verdict per head, independently run checks, unresolved findings and follow-ups. Use these five exact `###` headings, each substantive (one line each for `probe`):
 
 | Heading | Review |

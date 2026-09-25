@@ -6,38 +6,20 @@ import hashlib
 import json
 import os
 import platform
-import selectors
-import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
-import time
 from pathlib import Path
-from typing import IO, TypedDict, cast
+from typing import TypedDict, cast
 
 ROOT = Path(__file__).resolve().parent
-HOOK_MATCHER = "^(apply_patch|Bash)$"
 
 
 class Manifest(TypedDict):
     python: str
     elixir_otp: str
     files: dict[str, str]
-
-
-class ListedHook(TypedDict, total=False):
-    """The `hooks/list` fields that decide whether Codex runs a hook."""
-
-    eventName: str
-    command: str
-    matcher: str | None
-    enabled: bool
-    trustStatus: str
-
-
-class ListedCwd(TypedDict):
-    hooks: list[ListedHook]
 
 
 class Arguments(argparse.Namespace):
@@ -55,7 +37,7 @@ def configuration(workspace: Path, approval: str = "prompt") -> dict[str, str]:
     config = f"""[plugins."mix-compile@elixir-agent-tools"]
 enabled = false
 [plugins."mix-credo@elixir-agent-tools"]
-enabled = true
+enabled = false
 
 [mcp_servers.elixir-lsp]
 command = "/usr/bin/false"
@@ -73,108 +55,6 @@ tool_timeout_sec = 120
 approval_mode = {json.dumps(approval)}
 """
     return {".codex/config.toml": config}
-
-
-def hook_command() -> str:
-    # Codex runs hooks in its session cwd. Keep the definition identical across
-    # worktrees so reviewing another worktree does not replace its trusted hash.
-    return (
-        shlex.join([sys.executable, str(ROOT / "bundle.py"), "hook"])
-        + ' --workspace "$PWD" --state "$PWD/.elixir_ls/session" --budget-ms 5000'
-    )
-
-
-def codex_arguments(workspace: Path) -> list[str]:
-    """Linked worktrees inherit main-repo hooks; attach beta hooks to this session."""
-    handler = (
-        '{type = "command", command = '
-        + json.dumps(hook_command())
-        + ', timeout = 6, statusMessage = "Reading ElixirLS compiler feedback"}'
-    )
-    return [
-        "-C",
-        str(workspace.resolve()),
-        "-c",
-        "hooks.PostToolUse = [{matcher = "
-        + json.dumps(HOOK_MATCHER)
-        + ", hooks = ["
-        + handler
-        + "]}]",
-        "-c",
-        "hooks.Stop = [{hooks = [" + handler + "]}]",
-    ]
-
-
-def list_hooks(workspace: Path) -> list[ListedHook]:
-    """Ask Codex which hooks this launch loads and whether it trusts them."""
-    executable = shutil.which("codex")
-    if not executable:
-        raise RuntimeError("Codex is not on PATH")
-    # Resolved client, the launch's own session flags and the read-only hooks/list method.
-    with (
-        subprocess.Popen(  # noqa: S603
-            [executable, "app-server", "--stdio", *codex_arguments(workspace)[2:]],
-            cwd=workspace,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-        ) as server
-    ):
-        requests, replies = cast(IO[str], server.stdin), cast(IO[str], server.stdout)
-        selector = selectors.DefaultSelector()
-        selector.register(replies, selectors.EVENT_READ)
-        deadline = time.monotonic() + 30
-
-        def request(number: int, method: str, params: object) -> dict[str, object]:
-            requests.write(json.dumps({"id": number, "method": method, "params": params}) + "\n")
-            requests.flush()
-            # Codex exits at end of input, so wait for each answer before closing.
-            while selector.select(max(0.0, deadline - time.monotonic())):
-                line = replies.readline()
-                if not line:
-                    break
-                reply = cast(dict[str, object], json.loads(line))
-                if reply.get("id") == number and "result" in reply:
-                    return cast(dict[str, object], reply["result"])
-                if reply.get("id") == number:
-                    raise RuntimeError(f"Codex rejected {method}: {reply.get('error')}")
-            raise RuntimeError(f"Codex did not answer {method} within 30 seconds")
-
-        request(1, "initialize", {"clientInfo": {"name": "elixirls-hook-check", "version": "1"}})
-        requests.write('{"method": "initialized"}\n')
-        listed = cast(list[ListedCwd], request(2, "hooks/list", {"cwds": [str(workspace)]})["data"])
-    return [hook for entry in listed for hook in entry["hooks"]]
-
-
-def verify_hooks(workspace: Path) -> list[dict[str, object]]:
-    """Admission check: Codex runs this bundle's two hooks only when both are trusted."""
-    command = hook_command()
-    ours = [
-        hook
-        for hook in list_hooks(workspace.resolve(strict=True))
-        if hook.get("command") == command
-    ]
-    found: list[dict[str, object]] = [
-        {
-            "event": hook.get("eventName"),
-            "matcher": hook.get("matcher"),
-            "enabled": hook.get("enabled"),
-            "trust": hook.get("trustStatus"),
-        }
-        for hook in sorted(ours, key=lambda hook: str(hook.get("eventName")))
-    ]
-    expected: list[dict[str, object]] = [
-        {"event": "postToolUse", "matcher": HOOK_MATCHER, "enabled": True, "trust": "trusted"},
-        {"event": "stop", "matcher": None, "enabled": True, "trust": "trusted"},
-    ]
-    if found != expected:
-        raise RuntimeError(
-            "Beta hooks are not ready: "
-            + json.dumps(found)
-            + ". Review both in Codex /hooks; untrusted or modified hooks do not run."
-        )
-    return found
 
 
 def configure(workspace: Path, approval: str, force: bool) -> None:
@@ -200,11 +80,7 @@ def configure(workspace: Path, approval: str, force: bool) -> None:
             temporary.replace(path)
         finally:
             temporary.unlink(missing_ok=True)
-    print(
-        "Configured Neovim beta in "
-        + str(workspace)
-        + ". Start with bundle.py codex; review its session hooks with /hooks."
-    )
+    print("Configured Neovim beta in " + str(workspace) + ". Start with bundle.py codex.")
 
 
 def verify() -> Manifest:
@@ -245,7 +121,6 @@ def prepare(workspace: Path, state: Path) -> Path:
     # A killed Neovim cannot unregister itself; none of these old entries is live.
     for path in (state / "registry").glob("*.json"):
         path.unlink()
-    (state / "feedback-unavailable").unlink(missing_ok=True)
     env = {
         f"XDG_{kind.upper()}_HOME": str(state / kind)
         for kind in ("config", "data", "state", "cache")
@@ -268,9 +143,6 @@ def prepare(workspace: Path, state: Path) -> Path:
             "V2_WORKSPACE": str(workspace),
             "V2_SESSION_STATE": str(state),
             "VV_MCP_MANAGED_IDLE_TIMEOUT_MS": "300000",
-            "V2_SYNC_READS": "1",
-            "V2_FEEDBACK": "1",
-            "V2_AUTOMATIC": "1",
             "ERL_FLAGS": "+S 4:4",
         }
     )
@@ -313,16 +185,12 @@ def start_codex(workspace: Path, extra: list[str]) -> None:
     # exec discards Python's buffers: a piped stdout would lose the setup output.
     sys.stdout.flush()
     # Resolved client executable and argument array; no shell or trust bypass.
-    os.execv(executable, [executable, *codex_arguments(workspace), *extra])  # noqa: S606
+    os.execv(executable, [executable, "-C", str(workspace), *extra])  # noqa: S606
 
 
 def client_setup(workspace: Path, args: Arguments, extra: list[str]) -> None:
     if args.mode == "config":
         print(json.dumps(configuration(workspace, args.lsp_approval_mode)))
-    elif args.mode == "codex-args":
-        print(json.dumps(codex_arguments(workspace)))
-    elif args.mode == "verify-hooks":
-        print(json.dumps(verify_hooks(workspace), indent=2))
     else:
         manifest = verify()
         sys.path.insert(0, str(ROOT / "adapter"))
@@ -347,13 +215,10 @@ def main() -> None:
             "doctor",
             "config",
             "configure",
-            "codex-args",
             "codex",
-            "verify-hooks",
             "prepare-deps",
             "prepare",
             "serve",
-            "hook",
             "server",
         ],
     )
@@ -364,7 +229,7 @@ def main() -> None:
     )
     parser.add_argument("--force", action="store_true")
     args, extra = parser.parse_known_args(namespace=Arguments())
-    if args.mode in {"config", "configure", "codex-args", "codex", "verify-hooks", "prepare-deps"}:
+    if args.mode in {"config", "configure", "codex", "prepare-deps"}:
         if not args.workspace:
             parser.error("--workspace is required")
         client_setup(args.workspace, args, extra)
@@ -382,7 +247,7 @@ def main() -> None:
 
             with ownership(args.workspace, args.state):
                 print(prepare(args.workspace, args.state))
-        elif args.mode == "serve":
+        else:
             verify()
             sys.path.insert(0, str(ROOT / "adapter"))
             from neovim_launcher import launch, ownership
@@ -390,22 +255,6 @@ def main() -> None:
             with ownership(args.workspace, args.state) as lock_fds:
                 path = prepare(args.workspace, args.state)
                 launch(ROOT / "vendor", args.workspace.resolve(), path, lock_fds)
-        else:
-            # Current Python and bundled hook; caller options remain separate arguments.
-            os.execv(  # noqa: S606
-                sys.executable,
-                [
-                    sys.executable,
-                    str(ROOT / "adapter/neovim_hook.py"),
-                    "--vendor",
-                    str(ROOT / "vendor"),
-                    "--workspace",
-                    str(args.workspace.resolve()),
-                    "--registry",
-                    str(args.state.resolve() / "registry"),
-                    *extra,
-                ],
-            )
 
 
 if __name__ == "__main__":

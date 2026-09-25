@@ -1,9 +1,8 @@
--- Shared prototype core. Uses Neovim watchers/checktime/diagnostic storage.
+-- Synchronization and freshness state for direct LSP requests.
+-- Uses Neovim watchers/checktime/diagnostic storage.
 -- Build logs are version-specific hints, never a compiler correctness guarantee.
-local M = { generation = 0, completed = -1, building = false, queued = false,
-  activity = 0, last_output = '', reported_diagnostics = false, reported_pending = false,
-  conflicts = {}, files = {}, pending = {}, sync_errors = {}, result = nil,
-  last_post_generation = 0, stop_pending = false, documents = {}, builds = 0 }
+local M = { generation = 0, completed = -1, building = false, queued = false, activity = 0,
+  conflicts = {}, files = {}, pending = {}, sync_errors = {}, result = nil, documents = {}, builds = 0 }
 local function now() return vim.uv.hrtime() / 1e9 end
 
 -- Open documents ElixirLS parses (0.31.1 parser.ex should_parse?; Neovim's language ID is the
@@ -203,7 +202,7 @@ local function server_state()
   return #clients > 0 and 'stopped' or 'starting'
 end
 
--- One observation shared by MCP and hooks. "current" is an editor build hint,
+-- The observation each MCP request reports. "current" is an editor build hint,
 -- never a replacement for ordinary compilation/tests or a server revision ID.
 -- `uri` limits publication readiness to the one document an answer covers. `semantic` answers
 -- (hover, definition, references, document_symbols) read no published diagnostics.
@@ -221,7 +220,7 @@ function M.status(uri, semantic)
     status, message = 'conflict', 'Neovim has unsaved changes; automatic reload was refused.'
   elseif M.scan_error or next(M.sync_errors) then
     status, message = 'sync_error', 'External-edit synchronization is pending after a scan/reload/save failure; '
-      .. 'it will retry on the next hook or LSP read. Cached results may be stale.'
+      .. 'it will retry on the next LSP request. Cached results may be stale.'
   elseif not is_built then
     status, message = 'pending', 'Compilation pending; diagnostics are not yet current. '
       .. 'Retry in about 1 second. This is not a clean result.'
@@ -244,136 +243,6 @@ function M.status(uri, semantic)
   return { status = status, message = message, generation = M.generation, completed = M.completed,
     building = M.building, queued = M.queued, retryable = status ~= 'exited' and status ~= 'conflict',
     waiting = waiting }
-end
-
-function M.collect(budget_ms, event, expires_at)
-  local started = now()
-  local function remaining()
-    local left = budget_ms - (now() - started) * 1000
-    if expires_at then
-      -- Unix time is shared across local processes; monotonic elapsed time
-      -- independently caps the wait if the wall clock moves backwards.
-      local seconds, micros = vim.uv.gettimeofday()
-      left = math.min(left, (expires_at - seconds - micros / 1e6) * 1000)
-    end
-    return math.max(0, math.floor(left))
-  end
-  local stopping = event == 'Stop'
-  if stopping and not M.stop_pending then
-    return { message = '', status = 'quiet', generation = M.generation }
-  end
-  if expires_at and remaining() == 0 then
-    return { message = '', status = 'expired', generation = M.generation }
-  end
-  M.scan()
-  local edited = M.generation ~= M.last_post_generation
-  if event and not stopping and not edited then budget_ms = 0 end
-  if budget_ms > 0 then
-    local retry_at = now() + 0.2
-    vim.wait(remaining(), function()
-      if (M.scan_error or next(M.pending)) and now() >= retry_at then
-        M.scan()
-        retry_at = now() + 0.2
-      end
-      return M.exited ~= nil or server_state() == 'stopped' or M.ready() or next(M.conflicts) ~= nil
-    end, 20)
-  end
-  -- Native watcher callbacks run while vim.wait yields. A second full snapshot
-  -- after exhausting the wait would extend the hook's deadline.
-  local diagnostics = {}
-  for _, d in ipairs(vim.diagnostic.get()) do
-    local path = vim.api.nvim_buf_get_name(d.bufnr)
-    if path:sub(1, #M.root + 1) == M.root .. '/' and d.severity <= vim.diagnostic.severity.WARN then
-      diagnostics[#diagnostics + 1] = { path = path:sub(#M.root + 2), diagnostic = d }
-    end
-  end
-  table.sort(diagnostics, function(a, b)
-    local x, y = a.diagnostic, b.diagnostic
-    if x.severity ~= y.severity then return x.severity < y.severity end
-    if a.path ~= b.path then return a.path < b.path end
-    if x.lnum ~= y.lnum then return x.lnum < y.lnum end
-    if x.col ~= y.col then return x.col < y.col end
-    return x.message < y.message
-  end)
-  local lines, omitted_errors = {}, 0
-  for i, item in ipairs(diagnostics) do
-    local d = item.diagnostic
-    -- Cut at 600 bytes, never inside a UTF-8 character: a partial character breaks the hook's JSON.
-    local text = d.message:gsub('\n', ' ')
-    if #text > 600 then text = text:sub(1, 600 + vim.str_utf_start(text, 601)) end
-    lines[i] = string.format('%s:%d:%d: %s: %s', item.path,
-      d.lnum + 1, d.col + 1, d.severity == 1 and 'error' or 'warning', text)
-    if i > 8 and d.severity == 1 then omitted_errors = omitted_errors + 1 end
-  end
-  local rendered = table.concat(vim.list_slice(lines, 1, 8), '\n')
-  if #lines > 8 then
-    rendered = rendered .. string.format('\n%d more diagnostics (%d errors).', #lines - 8, omitted_errors)
-  end
-  local observed = M.status()
-  local message, status = observed.message, observed.status
-  if event and status == 'pending' then
-    -- Stop consumes the pending state: only a later tool checks again.
-    local cause = observed.waiting and ('Diagnostics for ' .. observed.waiting .. ' have not arrived from ElixirLS')
-      or 'Compilation is still pending'
-    message = stopping and cause .. ', so validation is unfinished. This is not a clean result.'
-      or cause .. '. Feedback will be checked after the next eligible tool or at Stop. '
-        .. 'This is not a clean result.'
-  end
-  if status == 'current' or status == 'failed' then
-    if #lines > 0 then
-      -- A crashed build's only diagnostic is mix.exs:1; say where the real error is.
-      status, message = 'diagnostics', rendered .. (M.result == 'build_error' and '\n' .. message or '')
-    elseif status == 'failed' then
-      status, message = 'failed', 'Compilation failed; no diagnostic details were published.'
-    elseif M.reported_diagnostics then
-      status, message = 'cleared', 'Previously reported compiler diagnostics cleared after compilation.'
-    elseif M.reported_pending then
-      status, message = 'completed', 'Compilation completed; no compiler diagnostics are currently reported.'
-    else
-      status, message = 'quiet', ''
-    end
-  elseif #lines > 0 then
-    message = message .. '\nCached diagnostics (may be stale):\n'
-      .. rendered
-  end
-  -- Late duplicate publications can reset the quiet window without a new edit.
-  -- An unchanged tool must not replace already-reported feedback with pending.
-  if event and not stopping and not edited and status == 'pending' then
-    return { message = '', status = status, generation = M.generation, completed = M.completed,
-      building = M.building, diagnostic_count = #lines }
-  end
-  -- Startup/MCP reads observe without consuming public delivery history.
-  if not event then
-    observed.message, observed.status, observed.diagnostic_count = message, status, #lines
-    return observed
-  end
-  -- Do not consume delivery state after a delayed/expired RPC.
-  if expires_at then
-    local seconds, micros = vim.uv.gettimeofday()
-    if seconds + micros / 1e6 >= expires_at + 0.1 then
-      return { message = '', status = 'expired', generation = M.generation }
-    end
-  end
-  -- Consume Stop only after successful collection, never before a fallible scan.
-  if stopping then M.stop_pending = false end
-  -- Do not lose a previous error merely because a parser briefly clears its cache.
-  if status == 'diagnostics' then M.reported_diagnostics = true end
-  if status == 'cleared' then M.reported_diagnostics = false end
-  if status == 'pending' or status == 'sync_error' then M.reported_pending = true end
-  if M.ready() then M.reported_pending = false end
-  if event and not stopping then
-    if edited or status == 'sync_error' then
-      M.stop_pending = status == 'pending' or status == 'sync_error'
-    elseif status ~= 'pending' and status ~= 'sync_error' then
-      M.stop_pending = false
-    end
-    M.last_post_generation = M.generation
-  end
-  local key = tostring(M.generation) .. ':' .. status .. ':' .. message
-  local output = message ~= '' and (stopping or key ~= M.last_output) and ('ElixirLS: ' .. message) or ''
-  M.last_output = key
-  return { message = output, status = status, generation = M.generation, completed = M.completed,
-    building = M.building, diagnostic_count = #lines }
 end
 
 function M.setup()

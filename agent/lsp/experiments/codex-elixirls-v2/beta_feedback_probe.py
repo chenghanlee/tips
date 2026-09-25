@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Exercise reviewed feedback composition through the installed MCP and hook."""
+"""Exercise reviewed feedback composition through the installed MCP (ordinary lsp requests, no hook)."""
 import argparse
 import json
 from pathlib import Path
-import subprocess
 import sys
+import time
 
 from bundle_probe import BundleMCP
 from neovim_probe import poll
@@ -33,12 +33,16 @@ def main():
     def lua(code, *args):
         return client.rpc().exec_lua(code, *args)
 
-    def hook():
-        response = subprocess.run([sys.executable, str(bundle / 'bundle.py'), 'hook',
-            '--workspace', str(root), '--state', str(client.state_dir)],
-            input=json.dumps({'hook_event_name': 'PostToolUse', 'tool_name': 'apply_patch'}),
-            text=True, capture_output=True, check=True, timeout=6)
-        return json.loads(response.stdout)
+    def settle(seconds=20):
+        """Ordinary diagnostics request, repeated (labelled bounded retry) until current or failed."""
+        deadline = time.monotonic() + seconds
+        while True:
+            reply = client.call('lsp', operation='diagnostics', uri=str(target))
+            data = reply['data']
+            feedback = data.get('feedback') or (data.get('error') or {}).get('feedback') or {}
+            if feedback.get('status') in ('current', 'failed') or time.monotonic() > deadline:
+                return reply
+            time.sleep(0.25)
 
     try:
         client = BundleMCP(bundle, root, output, 'feedback')
@@ -67,10 +71,6 @@ def main():
           _G.review_ns=vim.api.nvim_create_namespace('feedback_probe')
           vim.diagnostic.set(_G.review_ns,b,ds)
         """, str(target))
-        reply = hook()
-        save('error_before_warnings', reply)
-        text = json.dumps(reply)
-        assert 'THE_COMPILE_ERROR' in text and '2 more diagnostics (0 errors)' in text, text
         lua("vim.api.nvim_buf_set_lines(vim.fn.bufnr(...),0,0,false,{'# unsaved edit'})", str(target))
         target.write_bytes(original + b'\n# external edit\n')
         reply = client.call('lsp', operation='diagnostics', uri=str(target))
@@ -82,13 +82,14 @@ def main():
         assert lua("return vim.bo[vim.fn.bufnr(...)].modified", str(target))
         # Discard only this probe's intentionally unsaved buffer, then test BOM reload.
         lua("vim.diagnostic.reset(_G.review_ns); vim.api.nvim_buf_call(vim.fn.bufnr(...),function() vim.cmd('edit!') end)", str(target))
-        hook()
+        settle()
         target.write_bytes(b'\xef\xbb\xbf' + original + b'\n# first BOM\n')
         lua("vim.api.nvim_buf_call(vim.fn.bufnr(...),function() vim.cmd('edit!') end)", str(target))
-        hook()
+        settle()
         target.write_bytes(b'\xef\xbb\xbf' + original + b'\n# second BOM\n')
-        reply = hook()
-        save('bom_hook', reply)
+        reply = settle()
+        save('bom_diagnostics', reply)
+        assert reply['data']['feedback']['status'] == 'failed', reply
         assert 'unexpected token' in json.dumps(reply), reply
         state = lua("return require('neovim_sync').status()")
         save('bom_state', state)
@@ -99,13 +100,15 @@ def main():
         assert reply['data']['feedback']['status'] == 'failed', reply
         assert 'error' not in reply['data'], reply
         target.write_bytes(original)
-        save('bom_repair_hook', hook())
+        reply = settle()
+        save('bom_repair', reply)
+        assert reply['data']['feedback']['status'] == 'current', reply
         assert lua("return require('neovim_sync').status().status") == 'current'
         client.remember()
         client.proc.stdin.close()
         client.proc.wait(timeout=6)
         assert client.proc.returncode == 0 and not Path(client.log.name).read_text()
-        assert not (client.state_dir / 'owner.json').exists()
+        assert not any((client.state_dir / 'registry').glob('*.json'))
         assert not Path(client.instance['socket']).exists()
         assert poll(lambda: alive(client.owned), lambda p: not p, 3)['matched']
         save('passed', True)

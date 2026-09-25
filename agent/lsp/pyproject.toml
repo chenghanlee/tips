@@ -6,11 +6,12 @@ include = [
   "experiments/codex-elixirls-v2/bundle.py",
   "experiments/codex-elixirls-v2/build_bundle.py",
   "experiments/codex-elixirls-v2/neovim_launcher.py",
-  "experiments/codex-elixirls-v2/neovim_hook.py",
   "experiments/codex-elixirls-v2/neovim_prepare.py",
   "experiments/codex-elixirls-v2/tests/*.py",
-  # Gate probe: Ruff only, not strict Pyright (see CHECKS.md).
-  "experiments/codex-elixirls-v2/hook_contract_probe.py",
+  # Gate probes: Ruff only, not strict Pyright (see CHECKS.md).
+  "experiments/codex-elixirls-v2/hookfree_recovery_gate.py",
+  "experiments/codex-elixirls-v2/seven_ops_acceptance.py",
+  "experiments/codex-elixirls-v2/hooks_list_gate.py",
 ]
 
 [tool.ruff.lint.extend-per-file-ignores]
@@ -21,7 +22,6 @@ include = [
   "experiments/codex-elixirls-v2/bundle.py",
   "experiments/codex-elixirls-v2/build_bundle.py",
   "experiments/codex-elixirls-v2/neovim_launcher.py",
-  "experiments/codex-elixirls-v2/neovim_hook.py",
   "experiments/codex-elixirls-v2/neovim_prepare.py",
   "experiments/codex-elixirls-v2/tests",
 ]

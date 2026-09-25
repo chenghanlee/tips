@@ -9,6 +9,7 @@ lock, and a relaunch must not see a late write.
 import argparse
 import json
 import os
+import queue
 import signal
 import subprocess
 import sys
@@ -58,11 +59,26 @@ def main():
                                '--state', str(output / 'lock-probe-state')], capture_output=True, text=True, timeout=20)
         return proc.returncode == 0
 
-    def hook(client, event='PostToolUse'):
-        return subprocess.run([sys.executable, str(bundle / 'bundle.py'), 'hook', '--workspace', str(client.root),
-                               '--state', str(client.state_dir)], input=json.dumps(
-                                   {'hook_event_name': event, 'tool_name': 'Bash'}),
-                              text=True, capture_output=True, timeout=8).stdout
+    def ask(client):
+        # An ordinary request scans the edited files, as an agent's next `lsp` call would.
+        try:
+            response = client.request('tools/call', {'name': 'lsp', 'arguments': {
+                'operation': 'diagnostics', 'uri': str(root / 'lib/slow.ex'), 'timeoutMs': 1000}}, timeout=3)
+            return '\n'.join(c.get('text', '') for c in response.get('content', []))
+        except OSError as error:  # broken pipe: the launcher is gone
+            return 'transport closed: ' + str(error)
+        except queue.Empty:
+            gone = poll(lambda: client.proc.poll(), lambda v: v is not None, 3)['matched']
+            return 'transport closed: no reply, launcher exited' if gone else 'no reply'
+        except RuntimeError as error:
+            return 'mcp error: ' + str(error)
+
+    def exited(text):
+        try:
+            error = json.loads(text)['error']
+        except (ValueError, KeyError, TypeError):
+            return False
+        return error.get('code') == 'elixirls_exited' and error.get('retryable') is False
 
     try:
         first = BundleMCP(bundle, root, output, 'first')
@@ -80,7 +96,7 @@ def main():
             f'"trap \'\' TERM; sleep {args.sleep // 2}; echo {marker} > {late}"]])\n'
             '  def ok, do: :ok\n'
             'end\n')
-        hook(first)
+        ask(first)
         save('ports_seen', poll(lambda: len(spawned()) >= 2 or None, bool, 30)['matched'])
         time.sleep(0.6)  # More than two samples of the editor's group record.
         first.remember()
@@ -91,10 +107,10 @@ def main():
         os.kill(beam, signal.SIGKILL)
         orphaned = poll(lambda: all(row['ppid'] == 1 for row in spawned().values()) or None, bool, 3)
         save('ports_orphaned_by_crash', orphaned['matched'])
-        # A dead server must say so and ask for a restart, never promise a retry.
-        after_crash = hook(first)
-        save('hook_after_crash', {'s': round(time.monotonic() - crashed, 3), 'output': after_crash})
-        guidance = 'Retry in about' not in after_crash and 'reconnect' in after_crash.lower()
+        # A dead server must say so, never promise a retry (or the launcher has already exited).
+        after_crash = ask(first)
+        save('request_after_crash', {'s': round(time.monotonic() - crashed, 3), 'output': after_crash[:600]})
+        guidance = after_crash.startswith('transport closed') or exited(after_crash)
         # Sample until the lock is accepted; record which port programs are alive then.
         samples, accepted = [], None
         while time.monotonic() - crashed < 12 and accepted is None:

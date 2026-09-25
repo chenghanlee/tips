@@ -70,7 +70,7 @@ def main():
         assert poll(lambda: alive(client.owned), lambda p: not p, 3)['matched']
         assert client.proc.returncode == 0, client.proc.returncode
         assert not Path(client.log.name).read_text(), Path(client.log.name).read_text()
-        assert not (client.state_dir / 'owner.json').exists()
+        assert not any((client.state_dir / 'registry').glob('*.json'))
         assert not Path(client.instance['socket']).exists()
         return time.monotonic() - then
 

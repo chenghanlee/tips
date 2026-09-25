@@ -20,9 +20,8 @@ vim.opt.rtp:prepend(vim.env.V2_VV_UTILS)
 vim.opt.rtp:prepend(vim.env.V2_VV_PLUGIN)
 
 _G.v2_events = {}
-local feedback = vim.env.V2_FEEDBACK == '1' and require('neovim_feedback') or nil
-local automatic = (vim.env.V2_AUTOMATIC == '1' or feedback) and require('neovim_sync') or nil
-if automatic then automatic.setup() end
+local sync = require('neovim_sync')
+sync.setup()
 -- Opt-in trace (TIPS_LSP_TRACE=1): received events here, sent ones in the cmd wrapper below.
 local function trace_event(method, data)
   if trace then
@@ -31,7 +30,7 @@ local function trace_event(method, data)
 end
 local function record(method, data)
   trace_event(method, data)
-  if automatic then automatic.observe(method, data) end
+  sync.observe(method, data)
 end
 
 local elixir_ls = vim.env.V2_ELIXIR_LS or '/opt/homebrew/bin/elixir-ls'
@@ -51,7 +50,7 @@ vim.lsp.config('elixirls', {
         revisions[document.uri] = (revisions[document.uri] or 0) + 1
         document.version = revisions[document.uri]
       end
-      if automatic and document then automatic.sent(method, document, buffer_version) end
+      if document then sync.sent(method, document, buffer_version) end
       trace_event('sent:' .. method, params)
       return notify(method, params)
     end
@@ -62,7 +61,7 @@ vim.lsp.config('elixirls', {
   filetypes = { 'elixir', 'eelixir', 'heex', 'surface' },
   root_dir = root,
   on_exit = function(code, signal)
-    if automatic then automatic.exited = { code = code, signal = signal } end
+    sync.exited = { code = code, signal = signal }
     -- Briefly expose the terminal state, then let the launcher's existing child
     -- monitor close MCP and reap the owned process group. No restart supervisor.
     -- During exit, neovim_owner.lua stopped it on purpose; do not quit twice.
@@ -93,15 +92,13 @@ require('vv-mcp').setup({
   server = { path = vim.env.V2_VV_BINARY, auto_install = false },
 })
 
--- Experimental use of the adapter's existing disk-sync helper. This operation
--- table is internal, not a documented configuration option or upstream fix.
-if vim.env.V2_SYNC_READS == '1' then
-  local operations = require('vv-mcp.lsp.operations')
-  -- Diagnostics read the cache even when an unsaved buffer prevents disk reload.
-  -- The feedback wrapper supplies conflict/freshness status for that cache.
-  for _, name in ipairs({ 'hover', 'definition', 'references' }) do
-    operations.get(name).sync_from_disk = true
-  end
+-- The adapter's existing disk-sync helper. This operation table is internal,
+-- not a documented configuration option or upstream fix.
+local operations = require('vv-mcp.lsp.operations')
+-- Diagnostics read the cache even when an unsaved buffer prevents disk reload.
+-- The request wrapper supplies conflict/freshness status for that cache.
+for _, name in ipairs({ 'hover', 'definition', 'references' }) do
+  operations.get(name).sync_from_disk = true
 end
 
-if feedback then feedback.install() end
+require('neovim_feedback').install()

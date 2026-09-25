@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Supported rollback: switch one Tips worktree between immutable bundles.
 
-Each step runs the user-facing `configure`, launches exactly the generated MCP
-entry and runs exactly the generated hook command. Sequence: new, saved, new.
+Each step runs the user-facing `configure` and launches exactly the generated MCP
+entry. Sequence: new, saved, new.
 Timings are recorded, not asserted; navigation and strict cleanup are asserted.
 """
 import argparse
@@ -93,7 +93,7 @@ def main():
         gone = poll(lambda: alive(client.owned), lambda p: not p, 3)
         return {'seconds': time.monotonic() - then, 'exit': client.proc.returncode,
                 'no_survivors': gone['matched'], 'stderr': Path(client.log.name).read_text(),
-                'owner_removed': not (client.state_dir / 'owner.json').exists(),
+                'registry_empty': not any((client.state_dir / 'registry').glob('*.json')),
                 'socket_removed': not Path(client.instance['socket']).exists()}
 
     try:
@@ -109,10 +109,6 @@ def main():
                 step['configure_force'] = {'exit': forced.returncode, 'stderr': forced.stderr.strip()}
             server = tomllib.loads((root / '.codex/config.toml').read_text())['mcp_servers']['elixir_neovim']
             step['server'] = [server['command'], *server['args']]
-            arguments = json.loads(bundle_command(bundle, 'codex-args', '--workspace', str(root)).stdout)
-            hooks = tomllib.loads('\n'.join(arguments[3::2]))['hooks']
-            command = hooks['PostToolUse'][0]['hooks'][0]['command']
-            step['hook_command'] = command
             then = time.monotonic()
             client = ConfiguredMCP(root, output, name, server)
             clients.append(client)
@@ -127,22 +123,15 @@ def main():
                                         character=column, timeoutMs=5000)
                     navigation[operation] = bool(reply['data'].get('items') or reply['data'].get('locations'))
             step['navigation'] = navigation
-            hooked = subprocess.run(['/bin/sh', '-c', command], cwd=root, capture_output=True,
-                text=True, timeout=10, input=json.dumps({'hook_event_name': 'PostToolUse',
-                                                         'tool_name': 'apply_patch'}))
-            step['hook'] = {'exit': hooked.returncode, 'stdout': hooked.stdout.strip(),
-                            'stderr': hooked.stderr.strip()}
             step['cleanup'] = close(client)
             cleanup = step['cleanup']
             step['passed'] = all([
                 step['doctor_exit'] == 0,
                 server['args'][0] == str(bundle / 'bundle.py'),
-                str(bundle / 'bundle.py') in command,
                 step['ready']['value'] is True,
                 navigation == {'hover': True, 'definition': True, 'references': True},
-                hooked.returncode == 0 and hooked.stdout.strip() == '{}',
                 cleanup['exit'] == 0, cleanup['no_survivors'], cleanup['stderr'] == '',
-                cleanup['owner_removed'], cleanup['socket_removed'],
+                cleanup['registry_empty'], cleanup['socket_removed'],
             ])
             save(name, step)
         save('load_end', load())

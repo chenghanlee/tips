@@ -65,7 +65,7 @@ def main():
         save('exit', client.proc.returncode)
         save('eof_cleanup', poll(lambda: alive(client.owned), lambda p: not p, 6))
         save('stderr', Path(client.log.name).read_text())
-        save('owner_removed', not (client.state_dir / 'owner.json').exists())
+        save('registry_empty', not any((client.state_dir / 'registry').glob('*.json')))
         before = used()
         env = {k: v for k, v in os.environ.items() if k != 'V2_PYTHON'}
         missing = subprocess.run([str(bundle / 'elixir-ls')], env=env, stdin=subprocess.DEVNULL,
@@ -81,7 +81,7 @@ def main():
             results['exit'] == 0,
             results['eof_cleanup']['matched'],
             results['stderr'] == '',
-            results['owner_removed'],
+            results['registry_empty'],
             results['entry_without_verified_python']['exit'] != 0,
             'V2_PYTHON' in results['entry_without_verified_python']['stderr'],
             results['entry_without_verified_python']['path_python3_used'] == [],

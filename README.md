@@ -29,11 +29,16 @@ After setup, run these checks from your development checkout:
 
 ```sh
 mix format --check-formatted
-mix compile --warnings-as-errors
+MIX_ENV=test mix compile --force --warnings-as-errors
 mix credo --strict
 mix test
 python3 scripts/check_docs.py
 ```
+
+Run the compile as its own step. `--force` recompiles the whole project, so an edit made
+in the same second as the previous build is not missed; plain incremental `mix compile`
+can miss it. Agents run it with a time limit; see the Compile check in
+[AGENTS.md](AGENTS.md).
 
 `mix test` excludes browser tests. Follow the
 [browser test instructions](docs/development/local-development.md#browser-tests-and-ci)

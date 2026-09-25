@@ -230,20 +230,6 @@ class Harness:
             f"{r['status']}/{r['diagnostics'] or r['items'] or r['error_code'] or '-'}/{r['call_ms']}ms"
             + (f"!{','.join(r['problems'])}" if r['problems'] else '') for r in rows), flush=True)
 
-    def hook(self, label, event='PostToolUse'):
-        """One hook exactly as Codex runs it; measured, not judged."""
-        before = self.lua(STATE)
-        started = time.monotonic()
-        run = subprocess.run([sys.executable, str(self.bundle / 'bundle.py'), 'hook', '--workspace', str(self.root),
-                              '--state', str(self.client.state_dir), '--budget-ms', '5000'],
-                             input=json.dumps({'hook_event_name': event, 'tool_name': 'apply_patch',
-                                               'stop_hook_active': False}),
-                             capture_output=True, text=True, timeout=30)
-        row = {'case': label, 'result': 'MEASURED', 'seconds': round(time.monotonic() - started, 2),
-               'status_before': before, 'output': run.stdout.strip()[:600], 'exit': run.returncode}
-        self.cases.append(row)
-        print(f"MEASURED {label}  {row['seconds']} s  {row['output'][:260]}", flush=True)
-
     def polled(self, operation, file, seconds, gap=0.05):
         samples, end = [], time.monotonic() + seconds
         while time.monotonic() < end:
@@ -277,7 +263,6 @@ def main():
         h.call('hover', 'lib/alpha.ex', line=3, character=33)
         race += h.polled('diagnostics', 'test/worse_test.exs', 0.6)
         h.case('R1 forced-parse null-version publication (hover on another new file)', race, True)
-        h.hook('H1 PostToolUse hook, every open document published')
         late = h.polled('diagnostics', 'test/late_test.exs', 1.0)
         time.sleep(DELAY_MS / 1000 + 0.5)
         late.append(h.call('diagnostics', 'test/late_test.exs'))
@@ -286,7 +271,6 @@ def main():
         ws = h.call('workspace_diagnostics', 'test/lost_test.exs')
         ws['file'] = 'test/lost_test.exs'
         h.case('WS workspace diagnostics while lost_test.exs awaits', [ws], True)
-        h.hook('H2 PostToolUse hook while lost_test.exs never gets a publication')
         h.case('W1 warm error file while lost_test.exs awaits (URIs independent)',
                [h.call('diagnostics', 'test/bad_test.exs')], True, expect_useful=True, ready_by_end=True)
         h.case('W2 lib build warning, first touch', [h.call('diagnostics', 'lib/warn.ex')], True, expect_useful=True)
@@ -389,18 +373,6 @@ def main():
         (h.root / 'lib/warn.ex').write_text('defmodule Fr.Warn do\n  def unused(x, do: 1\nend\n')
         h.case('R13 open lib file edited to a syntax error (parser/build precedence), polled 3 s',
                h.polled('diagnostics', 'lib/warn.ex', 3.0, gap=0.2), True)
-
-        # Downstream: hooks after an edit while one open document never gets its publication
-        # (a lost publication or a crashed parse), then after that document is closed.
-        alpha = h.root / 'lib/alpha.ex'
-        (h.root / 'lib/warn.ex').write_text('defmodule Fr.Warn do\n  def unused(x), do: 1\nend\n')
-        alpha.write_text(alpha.read_text() + '# edited\n')
-        h.hook('H3 PostToolUse hook after an edit while lost_test.exs never gets a publication')
-        h.hook('H4 Stop hook after H3', event='Stop')
-        h.lua("vim.cmd('bwipeout! ' .. vim.fn.bufnr(...)) return true", str(h.root / 'test/lost_test.exs'))
-        alpha.write_text(alpha.read_text() + '# edited again\n')
-        h.hook('H5 PostToolUse hook after an edit, lost_test.exs closed')
-        h.hook('H6 Stop hook after H5', event='Stop')
 
         h.client.remember()
         h.client.proc.stdin.close()

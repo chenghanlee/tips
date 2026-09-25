@@ -1,7 +1,7 @@
 -- One-shot Python LSP verification; no edits or watch registration.
 local root = assert(vim.env.CORE_CHECK_ROOT)
 local core = root .. '/experiments/codex-elixirls-v2'
-local files = { 'bundle.py', 'build_bundle.py', 'neovim_launcher.py', 'neovim_hook.py' }
+local files = { 'bundle.py', 'build_bundle.py', 'neovim_launcher.py', 'neovim_prepare.py' }
 local buffers = {}
 for _, name in ipairs(files) do
   local b = vim.fn.bufadd(core .. '/' .. name)

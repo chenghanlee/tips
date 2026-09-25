@@ -110,7 +110,7 @@ for generation 3 and delivered nothing. Its text matched generation 2.
 changes those identities. The five-second wait itself worked in these cases.
 
 Code anchors: [launcher](neovim_launcher.py), lines 49–52;
-[collector](neovim_sync.lua), lines 129–150; [hook](neovim_hook.py), lines 46–64.
+[collector](neovim_sync.lua), lines 129–150; hook (`neovim_hook.py`, removed in Solution 2; see a388e4d), lines 46–64.
 
 ## 3. Cold-start edits left feedback permanently uncertain
 
@@ -231,7 +231,7 @@ means “the one final attempt was used,” not “the compiler became current.�
 avoids a continuation loop but is another reason the final uncertainty must remain
 visible to the agent.
 
-Code anchors: [hook](neovim_hook.py), lines 29–55; [collector](neovim_sync.lua),
+Code anchors: hook (`neovim_hook.py`, removed in Solution 2; see a388e4d), lines 29–55; [collector](neovim_sync.lua),
 lines 83–106; [readiness wrapper](neovim_feedback.lua), lines 30–36; vendor
 `vv-mcp/lsp/diagnostics.lua`, lines 37–44 and 79–83.
 

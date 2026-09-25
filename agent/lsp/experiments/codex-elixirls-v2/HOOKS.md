@@ -1,5 +1,7 @@
 # Automatic feedback after normal file edits
 
+Historical. Solution 2 ([NO_HOOKS_PLAN.md](NO_HOOKS_PLAN.md)) removed these hooks.
+
 Date: 2026-09-24. Branch: `experiment/elixirls-codex-v2`.
 
 Latest: [save/readiness/delivery/deadline fixes](FOUR_FIXES.md) and
@@ -140,7 +142,7 @@ MCP queries -> published vv-mcp -> same Neovim -> same ElixirLS
   checks relevant saved source content, reloads only unmodified loaded buffers,
   and collects compiler errors/warnings. It detects creation, deletion and atomic
   replacement. Unsaved editor changes are preserved and reported as a conflict.
-- [neovim_hook.py](neovim_hook.py) runs the bundled `nvim --server --remote-expr`
+- `neovim_hook.py` (removed in Solution 2; see a388e4d) runs the bundled `nvim --server --remote-expr`
   client under a subprocess timeout, observes the five-second feedback budget, and
   emits informational PostToolUse JSON or a pending-edit Stop continuation. The
   timeout kills a stalled client near the deadline; it is not a hard total cutoff

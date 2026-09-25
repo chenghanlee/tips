@@ -1,6 +1,10 @@
 # Codex + ElixirLS experiment v2
 
-Updated: 2026-09-25. Branch: `experiment/elixirls-codex-v2`.
+Updated: 2026-09-26. Branch: `experiment/elixirls-no-hooks` ([Solution 2](NO_HOOKS_PLAN.md)).
+
+Solution 2 removes the automatic compiler-feedback hooks. Agents ask the `lsp` tool
+and validate explicitly; [INSTALL.md](INSTALL.md) is the current guide. Sections
+below that mention hooks describe earlier stages.
 
 The stack remains provisional. [Operational fixes and comparison](OPERATIONAL_FIXES.md)
 supersede the earlier internal-rollout readiness claim. The new bundle fixes

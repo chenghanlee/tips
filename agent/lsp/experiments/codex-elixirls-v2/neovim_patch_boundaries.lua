@@ -95,52 +95,31 @@ check('partial_success_is_not_resent', function()
   assert(counts[vim.uri_from_fname(second)] == 2)
   return counts
 end)
-check('hook_retries_within_budget', function()
-  local m, path, client = fixture('hook_retry')
-  local attempts = 0
-  client.notify = function()
-    attempts = attempts + 1
-    if attempts == 1 then return false end
-    m.completed, m.result, m.activity = m.generation, 'mix_compile_ok', 0
-    return true
-  end
-  vim.fn.writefile({ '# changed disk content' }, path)
-  local start = vim.uv.hrtime()
-  local reply = m.collect(700, 'PostToolUse')
-  local ms = (vim.uv.hrtime() - start) / 1e6
-  assert(attempts == 2 and m.ready(), 'hook did not retry its failed save')
-  assert(ms < 700)
-  return { milliseconds = ms, status = reply.status }
-end)
 check('overlap_does_not_disable_later_wait', function()
   local m, path = fixture('overlap')
   m.building = true
   vim.fn.writefile({ '# edit during build' }, path)
   m.scan()
   m.building, m.completed, m.result, m.activity = false, m.generation, 'mix_compile_ok', 0
-  assert(m.ready(), 'ordinary overlap permanently disabled feedback')
+  assert(m.ready(), 'ordinary overlap permanently disabled readiness')
   vim.fn.writefile({ '# next edit needs a build' }, path)
-  vim.defer_fn(function()
-    m.completed, m.result, m.activity = m.generation, 'mix_compile_ok', 0
-  end, 250)
-  local start = vim.uv.hrtime()
-  m.collect(700, 'PostToolUse')
-  local ms = (vim.uv.hrtime() - start) / 1e6
-  assert(ms >= 200 and ms < 700 and m.ready(), 'later edit skipped its wait')
-  return { milliseconds = ms }
+  m.scan()
+  assert(m.status().status == 'pending', 'later edit read as current')
+  m.completed, m.result, m.activity = m.generation, 'mix_compile_ok', 0
+  assert(m.ready(), 'later build did not restore readiness')
+  return true
 end)
 check('persistent_failure_is_bounded_and_recoverable', function()
   local m, path, client = fixture('persistent')
   client.notify = function() return false end
   vim.fn.writefile({ '# changed disk content' }, path)
-  local start = vim.uv.hrtime()
-  local reply = m.collect(450, 'PostToolUse')
-  local ms = (vim.uv.hrtime() - start) / 1e6
-  assert(reply.status == 'sync_error' and ms < 550 and m.stop_pending)
+  m.scan()
+  local status = m.status()
+  assert(status.status == 'sync_error' and status.retryable, status.status)
   client.notify = function() return true end
   m.scan()
-  assert(m.generation == 1 and not next(m.pending))
-  return { milliseconds = ms, status = reply.status }
+  assert(m.generation == 1 and not next(m.pending) and not next(m.sync_errors))
+  return status.status
 end)
 check('conflict_preserves_buffer_and_diagnostic_access', function()
   local m, path = fixture('conflict')
@@ -240,9 +219,6 @@ check('exited_server_requires_reconnect_without_polling', function()
   local reply = require('vv-mcp.lsp').request({ operation = 'hover' })
   assert(reply.error.code == 'elixirls_exited' and reply.error.retryable == false)
   assert(reply.error.retryAfterMs == nil and reply.error.message:find('reconnect'))
-  local start = vim.uv.hrtime()
-  local feedback = m.collect(5000, 'PostToolUse')
-  assert(feedback.status == 'exited' and (vim.uv.hrtime() - start) / 1e6 < 300)
   return true
 end)
 check('early_symbol_error_preserves_startup_feedback', function()
@@ -272,23 +248,6 @@ check('bom_reload_preserves_wire_text', function()
   assert(not next(m.sync_errors), vim.inspect(m.sync_errors))
   assert(text == '# after\n', 'BOM must stay in disk representation, not LSP text')
   return true
-end)
-check('errors_precede_truncated_warnings', function()
-  local m, _, _ = fixture('diagnostic_priority')
-  local b = vim.api.nvim_get_current_buf()
-  vim.api.nvim_buf_set_lines(b, 0, -1, false, { '# first', '# second' })
-  vim.api.nvim_set_option_value('modified', false, { buf = b })
-  local ns = vim.api.nvim_create_namespace('beta_priority')
-  local diagnostics = {}
-  for i = 1, 9 do diagnostics[#diagnostics + 1] = { lnum = 0, col = 0, severity = 2, message = 'warning ' .. i } end
-  diagnostics[#diagnostics + 1] = { lnum = 1, col = 0, severity = 1, message = 'THE_COMPILE_ERROR' }
-  vim.diagnostic.set(ns, b, diagnostics)
-  m.completed, m.result, m.activity = m.generation, 'mix_compile_ok', 0
-  local reply = m.collect(0)
-  vim.diagnostic.reset(ns)
-  assert(reply.message:find('THE_COMPILE_ERROR', 1, true), reply.message)
-  assert(reply.message:find('2 more diagnostics (0 errors)', 1, true), reply.message)
-  return reply.message
 end)
 check('setup_replaces_and_coalesces_notify_scans', function()
   local first = fixture('first_setup')

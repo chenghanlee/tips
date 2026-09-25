@@ -1,4 +1,4 @@
--- MCP and hooks use the same observation; neither consumes the other's output.
+-- Wraps each MCP LSP request: synchronize files first, then qualify the answer's freshness.
 local M = {}
 local sync = require('neovim_sync')
 

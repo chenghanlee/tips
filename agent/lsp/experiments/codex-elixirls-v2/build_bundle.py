@@ -29,7 +29,6 @@ ADAPTER_FILES = (
     "neovim_sync.lua",
     "neovim_feedback.lua",
     "neovim_launcher.py",
-    "neovim_hook.py",
     "neovim_prepare.py",
 )
 PROVENANCE_FILES = (

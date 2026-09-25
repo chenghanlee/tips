@@ -2,7 +2,7 @@
 """Own one headless Neovim and the published vv-mcp stdio server per session.
 
 MCP bytes pass directly to vv-mcp; this launcher implements no protocol tools.
-Eager startup lets post-edit hooks work without a model first calling an LSP tool.
+Eager startup lets ElixirLS build before the first LSP request.
 """
 
 import argparse
@@ -39,17 +39,6 @@ class Arguments(argparse.Namespace):
     vendor: Path
     workspace: Path
     environment: Path
-
-
-def write_record(path: Path, value: object) -> None:
-    """Publish whole records so a killed writer cannot leave partial JSON."""
-    with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, delete=False) as stream:
-        temporary = Path(stream.name)
-        stream.write(json.dumps(value) + "\n")
-    try:
-        temporary.replace(path)
-    finally:
-        temporary.unlink(missing_ok=True)
 
 
 @contextmanager
@@ -101,7 +90,6 @@ def ownership(root: Path, state: Path) -> Generator[tuple[int, ...], None, None]
         # lifetime even if Neovim/launcher die. Its start also uses LOCK_NB.
         with locks(server_lock_paths(root, state), deadline):
             pass
-        (state / "owner.json").unlink(missing_ok=True)
         yield lock_fds
 
 
@@ -234,11 +222,9 @@ def launch(vendor: Path, root: Path, environment: Path, lock_fds: tuple[int, ...
     os.unlink(socket)
     nvim: subprocess.Popen[bytes] | None = None
     bridge: subprocess.Popen[bytes] | None = None
-    owner_path = Path(env["VV_MCP_REGISTRY"]).parent / "owner.json"
-    remembered = owner_path.parent / "compiler-groups"
+    remembered = Path(env["VV_MCP_REGISTRY"]).parent / "compiler-groups"
     # Group IDs from an earlier session may belong to other processes now.
     remembered.unlink(missing_ok=True)
-    published_owner = False
 
     def terminate(*_: object) -> None:
         raise SystemExit(143)
@@ -267,21 +253,6 @@ def launch(vendor: Path, root: Path, environment: Path, lock_fds: tuple[int, ...
                     pass_fds=lock_fds,
                 )
             entry = registration(nvim, Path(env["VV_MCP_REGISTRY"]), socket)
-            write_record(owner_path, entry)
-            # Registration starts a new one-time failure-delivery window. An
-            # earlier startup hook may have reported the missing registration.
-            (owner_path.parent / "feedback-unavailable").unlink(missing_ok=True)
-            published_owner = True
-            environment.with_suffix(".startup.json").write_text(
-                json.dumps(
-                    {
-                        "status": "registered",
-                        "instanceId": entry["instanceId"],
-                        "message": "Compiler readiness is reported by hooks and MCP tools.",
-                    }
-                )
-                + "\n"
-            )
             # The bound server never falls back to a managed replacement.
             # Fixed bundled executable and our verified instance, without a shell.
             bridge = subprocess.Popen(  # noqa: S603
@@ -307,8 +278,6 @@ def launch(vendor: Path, root: Path, environment: Path, lock_fds: tuple[int, ...
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         cleanup(nvim, bridge, remembered)
         remembered.unlink(missing_ok=True)
-        if published_owner:
-            owner_path.unlink(missing_ok=True)
         Path(socket).unlink(missing_ok=True)
 
 

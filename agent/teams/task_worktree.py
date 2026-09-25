@@ -600,19 +600,6 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
         client: list[str] = []
         if self.kind == "codex":
             client += ["-a", self.policies["codex_approval"], "-C", str(self.worktree)]
-            if self.args.lsp == "neovim":
-                client = ["-a", self.policies["codex_approval"]]
-                client += json.loads(
-                    run(
-                        [
-                            sys.executable,
-                            self.neovim_bundle / "bundle.py",
-                            "codex-args",
-                            "--workspace",
-                            self.worktree,
-                        ]
-                    )
-                )
             if self.model:
                 client += ["-m", self.model]
             client += ["-c", "model_reasoning_effort=" + json.dumps(self.effort)]
