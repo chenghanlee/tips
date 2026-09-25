@@ -1,0 +1,18 @@
+--- a/apps/language_server/lib/language_server/server.ex
++++ b/apps/language_server/lib/language_server/server.ex
+@@ -2323,6 +2323,15 @@
+             {build_document_version, build_and_dialyzer_diagnostics}
+         end
+ 
++      # An open document names its version only once the parser has parsed that version.
++      # Otherwise a client cannot tell these diagnostics from ones for the text it sent.
++      version =
++        case source_files do
++          %{^uri => %SourceFile{version: ^parser_diagnostics_document_version}} -> version
++          %{^uri => _} -> nil
++          _ -> version
++        end
++
+       Diagnostics.publish_file_diagnostics(
+         uri,
+         uri_diagnostics,

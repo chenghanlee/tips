@@ -95,6 +95,42 @@ in each worktree. Elixir and Erlang must be on the client's `PATH`.
 
 ## Check changes
 
+For the maintained Neovim beta code, use [the scoped lint, static and LSP checks](CHECKS.md).
+The beta remains opt-in; it does not change the default Expert configuration above.
+
+The beta exposes seven read-only `lsp` operations: `hover`, `definition`,
+`references`, `document_symbols`, `workspace_symbols`, `diagnostics`, and
+`workspace_diagnostics`. Use ordinary writing tools for edits. MCP rename and
+code-action writes are excluded from both the schema and request parser.
+
+Launch the opt-in beta from the selected immutable bundle:
+
+```bash
+python3 /absolute/bundle/bundle.py codex --workspace /absolute/worktree -- -m gpt-6-sol
+```
+
+Alternatively, the team helper accepts `--lsp neovim --neovim-bundle /absolute/bundle`.
+Both paths prepare ElixirLS dependencies first (about a minute on a new worktree),
+generate project MCP configuration and attach feedback hooks as normal session
+configuration. Codex 0.156.1 loads linked-worktree hooks from the main repository,
+so writing a worktree `.codex/hooks.json` and running bare `codex` does not enable
+beta feedback.
+
+Review the session hooks through `/hooks` before work, then prove them with
+`bundle.py verify-hooks --workspace /absolute/worktree`. Repeat both after every
+upgrade or rollback. The hook definition is the same across worktrees for one
+bundle and one Python. Another bundle or Python changes the definition, and
+trusting it un-trusts the previous one.
+[INSTALL.md](experiments/codex-elixirls-v2/INSTALL.md) covers build, launch,
+hook review, rollback, recovery and known limits.
+The configuration disables the separate compiler-feedback plugin, preserves
+Credo, and does not change the application's compiler or PATH.
+
+An exited ElixirLS session requires restarting the coding client in the same
+worktree. Intentionally stopping its LSP client also ends that session. Ownership
+locks prevent another beta launcher from using a live worktree or session state;
+they do not coordinate unrelated editors that ignore those locks.
+
 ```bash
 python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
 ```

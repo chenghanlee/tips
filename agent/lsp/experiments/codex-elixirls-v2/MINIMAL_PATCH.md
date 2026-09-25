@@ -22,14 +22,23 @@ the five-second synchronous hook, and incremental compilation remain the contrac
   its result `superseded`. Empty pending results explicitly do not prove absence.
   Actual unavailable clients, failed synchronization and unsaved-buffer conflicts
   still prevent semantic reads; diagnostics remain available with qualification.
+  A timed-out or failed LSP request is `unanswered`, not an empty answer; a partial
+  answer names the failed client. A build that ends during a request makes its
+  answer `pending` (counted from the existing build telemetry, not from the scanned
+  files).
 - **No permanent uncertainty state:** overlap does not disable later waits or
   navigation. Completed build observations permit normal service again. The
   observation is not proof of which bytes Mix compiled.
 - **Small vv-mcp patch:** its compact success formatters otherwise discard
   `feedback`. [The patch](vv-mcp-feedback.patch) preserves it alongside existing
-  JSON results and prefixes its message to Markdown results. This changes only
-  one Rust source file, including its regression test. It does not replace MCP
-  transport, LSP handling, result compaction or worktree routing.
+  JSON results and prefixes its message to Markdown results. In Rust it changes
+  one source file, including its regression test. It also keeps the server's LSP
+  error response in the existing per-client `error` field, formatted by Neovim's
+  `vim.lsp.rpc.format_rpc_error` (one Lua statement in each of `navigation.lua` and
+  `symbols.lua`; vv-mcp otherwise read only `response.result`, so an error response
+  became a clean empty answer), and rejects a `workspace_diagnostics` uri that is not
+  an existing absolute path (`context.lua`) instead of answering "0 diagnostics". It
+  does not replace MCP transport, LSP handling, result compaction or worktree routing.
 
 These changes separate three facts previously conflated: seeing an edit is not
 synchronizing it; build status is not result availability; scanner filtering is
@@ -39,6 +48,8 @@ not native watcher filtering. Reuse the existing mechanisms at each boundary.
 
 Raw output is under `tmp/elixirls-v2/minimal-patch/`. The retained result index
 and source hashes are in [minimal-patch-evidence.json](minimal-patch-evidence.json).
+The four rows from "Timed-out request" to "Hook diagnostic over 600 bytes" come from
+`tmp/elixirls-v2/beta-team/observed-limitations/freshness-labels/` (CAND7C.md, HOOKCUT.md).
 
 | Boundary | Result |
 | --- | --- |
@@ -54,10 +65,14 @@ and source hashes are in [minimal-patch-evidence.json](minimal-patch-evidence.js
 | Source, config and external-template watcher controls | Notifications still delivered |
 | Queried file error and repair | Approximately 0.320 s and 0.298 s |
 | Eight/fifteen-second builds | Pending feedback at 4.79–4.80 s |
-| Stalled RPC and concurrent/expired hooks | Under 5 s; expired Stop preserves later delivery |
+| Stalled RPC and concurrent/expired hooks | Under 5 s in this 2026-09-24 run (the later supported-client hook: about 5 s, 5.003 s measured); expired Stop preserves later delivery |
 | Worktree isolation, atomic replacement, failed tool hook | Existing integration regressions pass |
 | EOF, killed launcher and normal exit | Observed owned descendants exit |
-| vv-mcp checks | 58 tests and Clippy with warnings denied pass |
+| Timed-out request, LSP error response, partial answer | `unanswered` or named failed client; answers kept |
+| Build of an ignored dependency during a request | `pending`, one retry |
+| Unparsable file's `[]` document symbols | Qualified; repair clears it |
+| Hook diagnostic over 600 bytes with a multibyte character at the cut | Whole characters; hook JSON is strict UTF-8 |
+| vv-mcp checks | 58 tests (2026-09-24; 59 on the 2026-09-25 staged patches) and Clippy with warnings denied pass |
 | Patch and scripts | Patch reapplies exactly; Python syntax checks pass |
 
 The six initial synchronization/policy boundary tests failed before the changes.

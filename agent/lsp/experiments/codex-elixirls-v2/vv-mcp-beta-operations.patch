@@ -1,0 +1,231 @@
+--- a/crates/vv-mcp/src/server.rs
++++ b/crates/vv-mcp/src/server.rs
+@@ -149,41 +149,27 @@
+     }
+ 
+     #[tool(
+-        description = r#"Execute an LSP operation through the Neovim instance matching `uri`.
++        description = r#"Read Elixir code intelligence from this coding client's assigned worktree.
+ 
+-PATHS AND POSITIONS
+-- Pass a native absolute path. Unix: /home/user/file.ts. Windows: C:/work/file.ts.
+-- Plain paths are recommended; do not manually construct file:// URIs.
+-- Input and output positions are 1-based. Output range `45:17-45:32` can be reused as line=45, character=17.
+-- Do not guess symbol positions. For a known file, call document_symbols first. For a project search, call workspace_symbols with query.
+-
+-CHOOSE BY INTENT
+-No position required:
+-- document_symbols: outline symbols in one file; optional query and symbolKinds filters.
+-- workspace_symbols: search project symbols; requires query.
+-- diagnostics: diagnostics for one file; optional severities, sources, and codes filters.
+-- workspace_diagnostics: diagnostics under a workspace path; optional severities, sources, and codes filters.
+-- document_links: navigable targets in one document.
+-- inlay_hints: inferred types and parameter-name hints; optionally accepts startLine and endLine.
+-- prepare_call_hierarchy: create call graph nodes at a symbol position and return callId values.
+-- incoming_calls, outgoing_calls: query one graph layer by callId; returned nodes include new callId values for further traversal; set includeExternal=false for workspace-only nodes.
+-
+-Symbol position required:
+-- hover: signature and documentation.
+-- definition, declaration, type_definition, implementation: navigation locations.
+-- references: project references grouped by file; includeDeclaration defaults to true. Set includeExternal=false to keep workspace files, or pathPattern to match a normalized path substring.
+-- document_highlight: semantic occurrences in the current document.
+-- code_actions: fixes and refactors available at a position.
+-
+-Call-site position required:
+-- signature_help: pass a position inside the intended call argument.
++BETA OPERATIONS (read-only)
++- hover: documentation and signature at a symbol.
++- definition: source locations at a symbol.
++- references: usages in files the ElixirLS build compiles (usually lib/ and test/support/) and in the queried file; includeDeclaration defaults to true. Do not assume coverage of tests, config or scripts; also text-search them before API changes.
++- document_symbols: symbols in a file; optional query and symbolKinds.
++- workspace_symbols: which file defines a public module, function, macro, type or callback compiled by the ElixirLS build (usually lib/ and test/support/; not defp, tests, scripts or deps); requires query. Its range is a line, often the @doc line, not the name. The index updates in the background after each build, so results can lag the build the status reports; if a just-changed symbol is missing or old, retry.
++- diagnostics: cached compiler diagnostics for one file.
++- workspace_diagnostics: cached compiler diagnostics for files at or under the path in uri; pass the project root for all files.
+ 
+-SAFE WRITE FLOWS
+-- Rename: prepare_rename -> rename_preview(newName) -> rename_apply(renameId).
+-- Specific fix: code_actions -> code_action_preview(actionId) -> code_action_apply(actionId).
+-- Fix a document: fix_document_preview -> code_action_apply(actionId). It prefers each LSP's source.fixAll and falls back to diagnostic quick fixes.
+-
+-When no matching Neovim is running, the server starts one managed headless instance for the target project and reuses it until its idle timeout. Preview operations never modify files. Apply operations save to disk and reject stale, expired, reused, or overlapping edits. Command-only code actions are not executed. List results are compact and limited by max-results."#
++Pass an absolute path in uri. Positions are 1-based line and character (UTF-16 code units;
++on ASCII lines this is the plain column). Point at a character of the intended name; take positions
++from document_symbols range starts, or lines from numbered output (rg -n), not by counting. Answers are for whatever is at
++that position. An empty answer does not prove absence: verify the position and the operation's
++scope.
++Every result includes feedback about startup, compilation, synchronization and freshness.
++Pending or empty diagnostics do not establish a clean build. Continue normal compilation
++and tests. Use normal writing tools for edits; this beta has no MCP write operations.
++If the owned session exits, restart the coding client in this worktree to reconnect.
++Results are compact and limited by max-results."#
+     )]
+     async fn lsp(&self, Parameters(params): Parameters<LspParams>) -> String {
+         match self.run_lsp(&params).await {
+@@ -509,10 +495,12 @@
+     /// Optional start line for `read_buffer`, 1-based inclusive
+     #[serde(skip_serializing_if = "Option::is_none")]
+     #[arg(long)]
++    #[schemars(skip)]
+     start_line: Option<u32>,
+     /// Optional end line for `read_buffer`, 1-based inclusive
+     #[serde(skip_serializing_if = "Option::is_none")]
+     #[arg(long)]
++    #[schemars(skip)]
+     end_line: Option<u32>,
+     /// Maximum lines returned for `read_buffer`, defaults to 200
+     #[serde(skip_serializing_if = "Option::is_none")]
+@@ -641,17 +629,17 @@
+ #[derive(Debug, Deserialize, Serialize, schemars::JsonSchema, clap::Args)]
+ #[serde(rename_all = "camelCase")]
+ pub struct LspParams {
+-    /// LSP operation to execute; some apply operations write to disk and must follow the safe write flow
++    /// Read-only beta operation; file edits use the coding client writing tools
+     #[arg(long, value_enum)]
+     operation: LspOperation,
+     /// Native Unix or Windows absolute path; plain paths recommended, also accepts file URIs
+     #[arg(long)]
+     uri: String,
+-    /// 1-based line number; required for position operations, prefer reusing range start from symbol queries
++    /// 1-based line number; required for position operations; take it from a document_symbols range start or rg -n
+     #[serde(skip_serializing_if = "Option::is_none")]
+     #[arg(long)]
+     line: Option<u32>,
+-    /// 1-based column number; `signature_help` must pass a position inside the target call argument
++    /// 1-based column number at the target symbol
+     #[serde(skip_serializing_if = "Option::is_none")]
+     #[arg(long)]
+     character: Option<u32>,
+@@ -671,18 +659,22 @@
+     /// New symbol name; required only for `rename_preview`
+     #[serde(skip_serializing_if = "Option::is_none")]
+     #[arg(long)]
++    #[schemars(skip)]
+     new_name: Option<String>,
+     /// Transaction ID from `rename_preview`; required only for `rename_apply`
+     #[serde(skip_serializing_if = "Option::is_none")]
+     #[arg(long)]
++    #[schemars(skip)]
+     rename_id: Option<String>,
+     /// Code Action ID; candidate actions must be previewed first, full-document fix IDs skip preview
+     #[serde(skip_serializing_if = "Option::is_none")]
+     #[arg(long)]
++    #[schemars(skip)]
+     action_id: Option<String>,
+     /// Optional kind filter for `code_actions`, e.g. `quickfix` or `refactor.extract`
+     #[serde(skip_serializing_if = "Option::is_none")]
+     #[arg(long)]
++    #[schemars(skip)]
+     action_kind: Option<String>,
+     /// Optional timeout in milliseconds on Neovim side for slower language servers
+     /// On CLI, injected as a global option by `set_routing`
+@@ -700,6 +692,7 @@
+     /// Call hierarchy node ID; returned by prepare or previous level query
+     #[serde(skip_serializing_if = "Option::is_none")]
+     #[arg(long)]
++    #[schemars(skip)]
+     call_id: Option<String>,
+     /// Include symbol declarations in `references`; defaults to true
+     #[serde(skip_serializing_if = "Option::is_none")]
+@@ -859,29 +852,65 @@
+ #[value(rename_all = "snake_case")]
+ pub enum LspOperation {
+     Definition,
++    #[serde(skip_deserializing)]
++    #[schemars(skip)]
+     Declaration,
++    #[serde(skip_deserializing)]
++    #[schemars(skip)]
+     TypeDefinition,
++    #[serde(skip_deserializing)]
++    #[schemars(skip)]
+     Implementation,
+     References,
++    #[serde(skip_deserializing)]
++    #[schemars(skip)]
+     DocumentHighlight,
+     Hover,
++    #[serde(skip_deserializing)]
++    #[schemars(skip)]
+     SignatureHelp,
++    #[serde(skip_deserializing)]
++    #[schemars(skip)]
+     DocumentLinks,
++    #[serde(skip_deserializing)]
++    #[schemars(skip)]
+     InlayHints,
++    #[serde(skip_deserializing)]
++    #[schemars(skip)]
+     PrepareCallHierarchy,
++    #[serde(skip_deserializing)]
++    #[schemars(skip)]
+     IncomingCalls,
++    #[serde(skip_deserializing)]
++    #[schemars(skip)]
+     OutgoingCalls,
+     DocumentSymbols,
+     WorkspaceSymbols,
+     Diagnostics,
+     WorkspaceDiagnostics,
++    #[serde(skip_deserializing)]
++    #[schemars(skip)]
+     CodeActions,
++    #[serde(skip_deserializing)]
++    #[schemars(skip)]
+     CodeActionPreview,
++    #[serde(skip_deserializing)]
++    #[schemars(skip)]
+     FixDocument,
++    #[serde(skip_deserializing)]
++    #[schemars(skip)]
+     FixDocumentPreview,
++    #[serde(skip_deserializing)]
++    #[schemars(skip)]
+     CodeActionApply,
++    #[serde(skip_deserializing)]
++    #[schemars(skip)]
+     PrepareRename,
++    #[serde(skip_deserializing)]
++    #[schemars(skip)]
+     RenamePreview,
++    #[serde(skip_deserializing)]
++    #[schemars(skip)]
+     RenameApply,
+ }
+ 
+@@ -923,7 +952,7 @@
+         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+             .with_server_info(Implementation::new("vv-mcp", env!("CARGO_PKG_VERSION")))
+             .with_instructions(
+-                "Pass native absolute paths and 1-based positions. Omit instanceId for automatic routing by uri; use list_instances only to inspect or disambiguate projects. When a symbol position is uncertain, locate it with document_symbols for a known file or workspace_symbols for a project query, then reuse the returned range start. For writes, always follow the preview-to-apply flow described by the lsp or workspace tool.",
++                "Pass native absolute paths and 1-based positions. Omit instanceId for automatic routing by uri; use list_instances only to inspect or disambiguate projects. When a symbol position is uncertain, find its file with workspace_symbols if needed, then take the position from document_symbols in that file. This Elixir beta exposes seven read-only lsp operations. Use the coding client writing tools for edits.",
+             )
+     }
+ }
+@@ -933,6 +962,27 @@
+     use super::*;
+ 
+     #[test]
++    fn beta_schema_and_decoder_allow_exactly_seven_read_operations() {
++        use clap::ValueEnum;
++        let allowed = [
++            "definition",
++            "references",
++            "hover",
++            "document_symbols",
++            "workspace_symbols",
++            "diagnostics",
++            "workspace_diagnostics",
++        ];
++        let schema = serde_json::to_value(schemars::schema_for!(LspOperation)).unwrap();
++        assert_eq!(schema["enum"], serde_json::json!(allowed));
++        for operation in LspOperation::value_variants() {
++            let name = operation.as_str();
++            let decoded = serde_json::from_value::<LspOperation>(serde_json::json!(name));
++            assert_eq!(decoded.is_ok(), allowed.contains(&name), "{name}");
++        }
++    }
++
++    #[test]
+     fn rpc_timeout_exceeds_inner_lsp_timeout() {
+         assert_eq!(rpc_timeout(None), Duration::from_millis(4000));
+         assert_eq!(rpc_timeout(Some(7500)), Duration::from_millis(8500));

@@ -68,7 +68,7 @@ def main():
             save('warm_' + operation, response)
             assert response['data']['feedback']['status'] == 'current', response
             assert 'V2Target' in json.dumps(response), response
-        save('server_command', client.rpc().exec_lua('return vim.lsp.get_clients()[1].config.cmd'))
+        save('server_command', client.rpc().exec_lua('return vim.env.V2_ELIXIR_LS'))
         client.remember()
         client.proc.stdin.close()
         client.proc.wait(timeout=8)

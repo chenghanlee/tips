@@ -15,6 +15,8 @@ from probe import alive
 
 
 def main():
+    # These checks read the opt-in LSP trace; the launched Neovim inherits it.
+    os.environ['TIPS_LSP_TRACE'] = '1'
     parser = argparse.ArgumentParser()
     parser.add_argument('--vendor', type=Path, required=True)
     parser.add_argument('--cohort', type=Path, required=True)
@@ -40,6 +42,8 @@ def main():
             rpc = pynvim.attach('socket', path=entry['socket'])
             assert poll(lambda: rpc.exec_lua("return require('neovim_sync').ready()"), bool, 120)['matched']
             before = rpc.exec_lua('return #_G.v2_events')
+            # Positive control: the no-fixture and no-build checks below mean nothing on an empty trace.
+            assert before > 0, 'LSP trace is empty; TIPS_LSP_TRACE is not on'
             start = time.monotonic()
             command = ['unbuffer', 'mix', 'test', *task['tests']]
             with (run / 'mix-test.log').open('w') as log:

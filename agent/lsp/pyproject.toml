@@ -1,0 +1,31 @@
+# Maintain the runtime and build entry points; historical probes are excluded.
+# Python rules match agent-team-harness's Python profile and agent/teams.
+[tool.ruff]
+extend = "../teams/pyproject.toml"
+include = [
+  "experiments/codex-elixirls-v2/bundle.py",
+  "experiments/codex-elixirls-v2/build_bundle.py",
+  "experiments/codex-elixirls-v2/neovim_launcher.py",
+  "experiments/codex-elixirls-v2/neovim_hook.py",
+  "experiments/codex-elixirls-v2/neovim_prepare.py",
+  "experiments/codex-elixirls-v2/tests/*.py",
+  # Gate probe: Ruff only, not strict Pyright (see CHECKS.md).
+  "experiments/codex-elixirls-v2/hook_contract_probe.py",
+]
+
+[tool.ruff.lint.extend-per-file-ignores]
+"experiments/codex-elixirls-v2/tests/*.py" = ["S101"]
+
+[tool.pyright]
+include = [
+  "experiments/codex-elixirls-v2/bundle.py",
+  "experiments/codex-elixirls-v2/build_bundle.py",
+  "experiments/codex-elixirls-v2/neovim_launcher.py",
+  "experiments/codex-elixirls-v2/neovim_hook.py",
+  "experiments/codex-elixirls-v2/neovim_prepare.py",
+  "experiments/codex-elixirls-v2/tests",
+]
+# The preparation tests import the module from its directory.
+extraPaths = ["experiments/codex-elixirls-v2"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"

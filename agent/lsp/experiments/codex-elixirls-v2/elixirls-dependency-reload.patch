@@ -1,0 +1,192 @@
+--- a/apps/language_server/lib/language_server/build.ex
++++ b/apps/language_server/lib/language_server/build.ex
+@@ -20,20 +20,22 @@
+             :timer.tc(fn ->
+               Logger.info("Starting build with MIX_ENV: #{Mix.env()} MIX_TARGET: #{Mix.target()}")
+ 
+-              # read cache before cleaning up mix state in reload_project
+-              cached_deps = read_cached_deps()
+               mixfile = Path.absname(MixfileHelpers.mix_exs(), root_path)
+ 
+               case reload_project(mixfile, root_path) do
+                 {:ok, mixfile_diagnostics} ->
+-                  handle_reloaded_project(
+-                    parent,
+-                    mixfile,
+-                    root_path,
+-                    mixfile_diagnostics,
+-                    opts,
+-                    cached_deps
+-                  )
++                  # deps.get and deps.update change mix.lock and deps while holding this
++                  # lock. Hold it too, so purge_changed_deps/1 and deps.loadpaths see the
++                  # same dependencies.
++                  Mix.Project.with_deps_lock(fn ->
++                    handle_reloaded_project(
++                      parent,
++                      mixfile,
++                      root_path,
++                      mixfile_diagnostics,
++                      opts
++                    )
++                  end)
+ 
+                 {:error, mixfile_diagnostics} ->
+                   Server.build_finished(parent, {:error, mixfile_diagnostics})
+@@ -103,22 +105,19 @@
+   ## Build Process
+ 
+   # After reloading the project, update deps and (optionally) compile.
+-  defp handle_reloaded_project(parent, mixfile, root_path, mixfile_diagnostics, opts, cached_deps) do
++  defp handle_reloaded_project(parent, mixfile, root_path, mixfile_diagnostics, opts) do
+     {deps_result, deps_raw_diagnostics} =
+       Code.with_diagnostics([log: true], fn ->
+         try do
+-          current_deps = Mix.Dep.Converger.converge([])
++          # The deps that deps.loadpaths puts on the code path: this env and target only.
++          current_deps = Mix.Dep.Converger.converge(env: Mix.env(), target: Mix.target())
+ 
+-          purge_changed_deps(current_deps, cached_deps)
+-
+-          # Note: we intentionally don't gate this on `current_deps != cached_deps`.
+-          # `current_deps` comes from `Mix.Dep.Converger.converge([])` (full universe,
+-          # `app_properties` kept in opts) while `cached_deps` comes from the env-filtered
+-          # `{:cached_deps, project}` cache (written via `Mix.Dep.cached/0`, which pops
+-          # `app_properties`), so the two are never structurally equal in steady state.
+-          # `fetch_deps/1` already filters down to deps with actionable statuses.
++          purge_changed_deps(current_deps)
++
++          # `fetch_deps/1` filters down to deps with actionable statuses. Like deps.get, it
++          # covers every env and target.
+           if Keyword.get(opts, :fetch_deps?) do
+-            fetch_deps(current_deps)
++            fetch_deps(Mix.Dep.Converger.converge([]))
+           end
+ 
+           state = %{
+@@ -611,7 +610,8 @@
+         {:nomatchvsn, _} -> true
+         :lockoutdated -> true
+         {:lockmismatch, _} -> true
+-        _ -> false
++        # deps.compile deletes and rebuilds these without purging their loaded modules.
++        _ -> Mix.Dep.compilable?(dep)
+       end
+ 
+     if purge? do
+@@ -620,33 +620,61 @@
+   end
+ 
+   defp purge_dep(%Mix.Dep{app: app} = dep) do
+-    if app in :persistent_term.get(:language_server_required_apps) do
+-      raise "Unloading required #{app}"
+-    end
++    purge_paths(Mix.Dep.load_paths(dep))
++    purge_project_app(app)
++  end
+ 
+-    for path <- Mix.Dep.load_paths(dep) do
+-      Code.delete_path(path)
++  # A dependency may share its app name with the language server's own app. purge_paths/1
++  # purges only modules loaded from the project build path; keep the server's app loaded.
++  defp purge_project_app(app) do
++    if app not in :persistent_term.get(:language_server_required_apps) do
++      purge_app(app)
+     end
+-
+-    purge_app(app)
+   end
+ 
+-  defp purge_changed_deps(_current_deps, nil), do: :ok
+-
+-  defp purge_changed_deps(current_deps, cached_deps) do
+-    current_deps_by_app = get_deps_by_app(current_deps)
+-    cached_deps_by_app = get_deps_by_app(cached_deps)
+-    removed_apps = Map.keys(cached_deps_by_app) -- Map.keys(current_deps_by_app)
++  defp purge_paths(paths) do
++    # Only this function removes dependency paths (prune_code_paths: false), and it
++    # purges their modules below, so nothing is loaded from a path already outside
++    # the code path. Code.delete_path/1 returns false for those.
++    paths = for path <- paths, Code.delete_path(path), do: path
+ 
+-    removed_deps =
+-      cached_deps_by_app
+-      |> Map.take(removed_apps)
+-      |> Enum.flat_map(&elem(&1, 1))
+-      |> Enum.uniq()
++    # reset_apps_config/0 already unloaded the app, so purge_app/1 cannot list its
++    # modules. Purge the modules loaded from the dependency's build path instead.
++    if paths != [] do
++      for {module, file} <- :code.all_loaded(),
++          is_list(file),
++          Path.dirname(List.to_string(file)) in paths do
++        purge_module(module)
++      end
++    end
++  end
+ 
++  # The VM's code path is the inventory of what dependencies left loaded: project
++  # dependency paths enter it only through Mix loadpaths and leave it only through
++  # purge_paths/1. Mix's cached deps cannot serve: reload_project/2 clears them before it
++  # loads mix.exs and config, so a failed reload lost them while the modules stayed loaded.
++  defp purge_changed_deps(current_deps) do
++    lib = Path.expand(Path.join(Mix.Project.build_path(), "lib"))
++    project_paths = for app <- project_apps(), do: Path.join([lib, to_string(app), "ebin"])
++
++    dep_paths =
++      current_deps
++      |> get_deps_by_app()
++      |> Map.values()
++      |> List.flatten()
++      |> Enum.flat_map(&Mix.Dep.load_paths/1)
++
++    current_paths = MapSet.new(project_paths ++ dep_paths, &Path.expand/1)
++
+     # purge removed dependencies
+-    for dep <- removed_deps do
+-      purge_dep(dep)
++    for path <- :code.get_path(),
++        path = List.to_string(path),
++        expanded = Path.expand(path),
++        Path.basename(expanded) == "ebin",
++        Path.dirname(Path.dirname(expanded)) == lib,
++        expanded not in current_paths do
++      purge_paths([path])
++      purge_project_app(String.to_atom(Path.basename(Path.dirname(expanded))))
+     end
+ 
+     # purge current dependencies in invalid state
+@@ -655,6 +683,14 @@
+     end
+   end
+ 
++  defp project_apps() do
++    if Mix.Project.umbrella?() do
++      Map.keys(Mix.Project.apps_paths())
++    else
++      [Mix.Project.config()[:app]]
++    end
++  end
++
+   defp unload_mix_project_apps(reload? \\ false) do
+     # Unloading drops each app's *non-persistent* application env. Config applied via
+     # `loadconfig`/`app.config` is set with `persistent: true`, so it survives the
+@@ -763,18 +799,4 @@
+ 
+     Code.compiler_options(options)
+   end
+-
+-  defp read_cached_deps() do
+-    # we cannot use Mix.Dep.cached() here as it tries to load deps
+-    project = Mix.Project.get()
+-    # in test do not try to load cache from elixir_ls
+-    if project != nil and project != ElixirLS.LanguageServer.MixProject do
+-      env_target = {Mix.env(), Mix.target()}
+-
+-      case Mix.State.read_cache({:cached_deps, project}) do
+-        {^env_target, deps} -> deps
+-        _ -> nil
+-      end
+-    end
+-  end
+ end

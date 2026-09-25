@@ -13,6 +13,8 @@ from probe import prepare
 
 
 def main():
+    # These checks read the opt-in LSP trace; the launched Neovim inherits it.
+    os.environ['TIPS_LSP_TRACE'] = '1'
     p = argparse.ArgumentParser()
     p.add_argument('--vendor', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)

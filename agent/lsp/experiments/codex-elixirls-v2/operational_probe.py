@@ -83,7 +83,9 @@ def main():
             detail = {'initialize_seconds': elapsed, 'reply': reply}
             (directory / 'observed.json').write_text(json.dumps(detail, indent=2))
             assert elapsed < 5, detail
-            assert reply['data']['feedback']['status'] in {'pending', 'unavailable'}, reply
+            assert reply['data']['feedback']['status'] in {'starting', 'pending', 'unavailable'}, reply
+            if reply['data']['feedback']['status'] == 'starting':
+                assert reply['data']['feedback']['retryable'] is True, reply
             assert poll(lambda: (root / 'compile-started').exists(), bool, 10)['matched']
             detail['compiler_entered_slow_module_before_shutdown'] = True
             (directory / 'observed.json').write_text(json.dumps(detail, indent=2))

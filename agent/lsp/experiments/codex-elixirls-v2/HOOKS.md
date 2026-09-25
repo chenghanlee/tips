@@ -35,8 +35,9 @@ in a fraction of a second. Five seconds is a starting policy, not a promise that
 every project can compile within that time.
 
 The Python deadline includes connection and RPC time; the compiler wait uses the
-remaining budget with room for the final snapshot and response. Process startup
-and OS scheduling add small overhead to measured tool latency. The host's
+remaining budget with room for the final snapshot and response. Python start-up
+and output are outside it, so there is no hard total cutoff; process startup and
+OS scheduling add small overhead to measured tool latency. The host's
 six-second timeout is a cleanup guard, not an extra second of compilation wait.
 Calls with no new relevant source changes read current state without another
 compilation wait. A multi-file tool invocation has one shared budget.
@@ -139,10 +140,12 @@ MCP queries -> published vv-mcp -> same Neovim -> same ElixirLS
   checks relevant saved source content, reloads only unmodified loaded buffers,
   and collects compiler errors/warnings. It detects creation, deletion and atomic
   replacement. Unsaved editor changes are preserved and reported as a conflict.
-- [neovim_hook.py](neovim_hook.py) connects through `pynvim`, observes the five-second
-  feedback budget, and emits informational PostToolUse JSON or a pending-edit
-  Stop continuation. The same deadline bounds a stalled Neovim connection.
-  Identical ordinary feedback is deduplicated.
+- [neovim_hook.py](neovim_hook.py) runs the bundled `nvim --server --remote-expr`
+  client under a subprocess timeout, observes the five-second feedback budget, and
+  emits informational PostToolUse JSON or a pending-edit Stop continuation. The
+  timeout kills a stalled client near the deadline; it is not a hard total cutoff
+  (Python start-up and output are outside it). Identical ordinary feedback is
+  deduplicated.
 - [neovim_init.lua](neovim_init.lua) keeps the standard ElixirLS configuration and
   the earlier adapter read-refresh and startup-message adaptations. Published
   Neovim, vv-mcp and ElixirLS binaries remain unchanged.

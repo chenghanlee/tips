@@ -39,6 +39,10 @@
     "hex-source.tar.gz": {
       "url": "https://api.github.com/repos/hexpm/hex/tarball/v2.5.1",
       "sha256": "6e79233a2a7441a7d43b18b8d3f3e393393ea0fc18d96f6489f4bc46c1d7f81d"
+    },
+    "rebar3-3.25.1-otp-28": {
+      "url": "https://builds.hex.pm/installs/1.18.4/rebar3-3.25.1-otp-28",
+      "sha256": "8dead71212b8008ec830c085607c23ec2997ab1c36a3c91901ac42c9814ee08c"
     }
   }
 }

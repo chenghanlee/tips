@@ -7,6 +7,7 @@ does not expose arbitrary buffer editing. This is not a Codex editing rollout.
 
 import argparse
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -49,6 +50,8 @@ return {
 
 
 def main():
+    # These checks read the opt-in LSP trace; the launched Neovim inherits it.
+    os.environ['TIPS_LSP_TRACE'] = '1'
     parser = argparse.ArgumentParser()
     parser.add_argument('--vendor', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)

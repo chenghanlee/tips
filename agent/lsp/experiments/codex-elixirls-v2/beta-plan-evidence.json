@@ -1,0 +1,449 @@
+{
+  "kind": "beta planning and revalidation, not runtime fixes or beta admission",
+  "base_commit": "fd4e2da8b013996ffb8527f30784f423fb9fc61a",
+  "bundle_manifest_sha256": "80f20594670350ae2f1a3355a7c3b196adf82891ad1de9935e2aa76811e13f16",
+  "doctor": {
+    "passed": true,
+    "seconds": 0.398,
+    "tracked_files": 1312
+  },
+  "operational_host": {
+    "cold_start": {
+      "passed": true,
+      "detail": {
+        "initialize_seconds": 0.3762448750057956,
+        "reply": {
+          "isError": false,
+          "data": {
+            "clients": [
+              "elixirls"
+            ],
+            "feedback": {
+              "building": false,
+              "completed": -1,
+              "generation": 0,
+              "message": "Compilation pending; diagnostics are not yet current. Retry in about 1 second. This is not a clean result. Returned results may be incomplete or stale; an empty result does not establish absence.",
+              "queued": true,
+              "status": "pending"
+            },
+            "symbols": {
+              "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/beta-review/baseline-operational-host/cold/alpha/lib/target.ex": [
+                {
+                  "detail": "defmodule",
+                  "kind": "Module",
+                  "name": "V2Target",
+                  "range": "1:11-1:19"
+                },
+                {
+                  "container": "V2Target",
+                  "detail": "def",
+                  "kind": "Function",
+                  "name": "answer/0",
+                  "range": "5:7-5:13"
+                }
+              ]
+            }
+          }
+        },
+        "compiler_entered_slow_module_before_shutdown": true
+      }
+    },
+    "neovim_death": {
+      "passed": true,
+      "detail": {
+        "exited": {
+          "matched": true,
+          "samples": [
+            {
+              "seconds": 0.0,
+              "value": null
+            },
+            {
+              "seconds": 0.257,
+              "value": 1
+            }
+          ]
+        },
+        "reply": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"error\":{\"code\":\"request_failed\",\"message\":\"Neovim instance not found: alpha-287ca731:34547\"}}"
+            }
+          ],
+          "isError": false
+        },
+        "hook": {
+          "seconds": 0.14424766700540204,
+          "output": {
+            "hookSpecificOutput": {
+              "hookEventName": "PostToolUse",
+              "additionalContext": "ElixirLS feedback unavailable: [Errno 2] No such file or directory: '/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/beta-review/baseline-operational-host/death/death-session/owner.json'. This does not mean the source is error-free."
+            }
+          }
+        },
+        "registry": []
+      }
+    },
+    "stalled_shutdown": {
+      "passed": true,
+      "detail": {
+        "exited": true,
+        "seconds": 2.112510916995234,
+        "survivors": {}
+      }
+    },
+    "bound_instance": {
+      "passed": true,
+      "detail": {
+        "reply": {
+          "isError": false,
+          "data": {
+            "error": {
+              "code": "request_failed",
+              "message": "Neovim instance not found: deliberately-absent-instance"
+            }
+          }
+        },
+        "registry_files": [],
+        "owned": {
+          "35170": {
+            "parent": 33853,
+            "state": "Ss",
+            "command": "/private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v2/vendor/vv-mcp --instance-id deliberately-absent-instance"
+          }
+        }
+      }
+    },
+    "scan_failure_recovery": {
+      "passed": true,
+      "detail": {
+        "at_failure": {
+          "error": "nil",
+          "state": {
+            "completed": 1,
+            "status": "sync_error",
+            "message": "External-edit synchronization is pending after a scan/reload/save failure; it will retry on the next hook or LSP read. Cached results may be stale.",
+            "queued": false,
+            "generation": 1,
+            "building": false
+          },
+          "ok": true
+        },
+        "retry_hook": {
+          "seconds": 0.1753340409923112,
+          "output": {
+            "hookSpecificOutput": {
+              "hookEventName": "PostToolUse",
+              "additionalContext": "ElixirLS: lib/target.ex:1:1: error: ** (CompileError) lib/target.ex: cannot compile module V2Target (errors have been logged)  \nlib/target.ex:3:20: error: undefined function missing_scan_probe/0 (expected V2Target to define such a function or for it to be imported, but none are available)"
+            }
+          }
+        },
+        "after_retry": {
+          "completed": 1,
+          "status": "failed",
+          "message": "Compilation failed; read diagnostics and fix the errors.",
+          "queued": false,
+          "generation": 1,
+          "building": false
+        }
+      }
+    },
+    "hook_identity": {
+      "passed": true,
+      "detail": {
+        "seconds": 0.1327587499981746,
+        "output": {
+          "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "ElixirLS feedback unavailable: Neovim instance differs from the session owner; restart the session. This does not mean the source is error-free."
+          }
+        }
+      }
+    },
+    "stalled_sigterm": {
+      "passed": true,
+      "detail": {
+        "exited": true,
+        "seconds": 2.0751458750019083,
+        "survivors": {}
+      }
+    }
+  },
+  "operational_sandbox": {
+    "cold_start": {
+      "passed": false,
+      "error": "PermissionError(1, 'Operation not permitted')"
+    },
+    "neovim_death": {
+      "passed": false,
+      "error": "PermissionError(1, 'Operation not permitted')"
+    },
+    "stalled_shutdown": {
+      "passed": false,
+      "error": "PermissionError(1, 'Operation not permitted')"
+    },
+    "bound_instance": {
+      "passed": false,
+      "error": "PermissionError(1, 'Operation not permitted')"
+    },
+    "scan_failure_recovery": {
+      "passed": false,
+      "error": "PermissionError(1, 'Operation not permitted')"
+    },
+    "hook_identity": {
+      "passed": false,
+      "error": "PermissionError(1, 'Operation not permitted')"
+    },
+    "stalled_sigterm": {
+      "passed": false,
+      "error": "PermissionError(1, 'Operation not permitted')"
+    }
+  },
+  "ownership_baseline": {
+    "first": {
+      "pid": 37215,
+      "instance": {
+        "cwd": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/beta-review/ownership-baseline/alpha",
+        "kind": "interactive",
+        "instanceId": "alpha-151fe63b:37215",
+        "projectId": "alpha-151fe63b",
+        "socket": "/var/folders/26/15tlmtc55wggjp8xt79bh5n40000gn/T/elixir-nvim-zw_xdvw3.sock",
+        "roots": [
+          "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/beta-review/ownership-baseline/alpha"
+        ],
+        "lspClients": [],
+        "updatedAt": 1790277689,
+        "pid": 37215
+      },
+      "ready": true
+    },
+    "second": {
+      "pid": 37283,
+      "instance": {
+        "updatedAt": 1790277691,
+        "kind": "interactive",
+        "instanceId": "alpha-151fe63b:37283",
+        "projectId": "alpha-151fe63b",
+        "socket": "/var/folders/26/15tlmtc55wggjp8xt79bh5n40000gn/T/elixir-nvim-1ae05uvk.sock",
+        "roots": [
+          "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/beta-review/ownership-baseline/alpha"
+        ],
+        "lspClients": [],
+        "cwd": "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/beta-review/ownership-baseline/alpha",
+        "pid": 37283
+      },
+      "ready": true
+    },
+    "both_live": true,
+    "build_directories": [
+      "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/beta-review/ownership-baseline/alpha/.elixir_ls/build",
+      "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/beta-review/ownership-baseline/alpha/.elixir_ls/build"
+    ],
+    "survivors": [
+      {},
+      {}
+    ]
+  },
+  "runtime_baseline": {
+    "unchanged_hooks": [
+      {
+        "seconds": 0.1733,
+        "exit": 0,
+        "output": {}
+      },
+      {
+        "seconds": 0.1371,
+        "exit": 0,
+        "output": {}
+      },
+      {
+        "seconds": 0.1408,
+        "exit": 0,
+        "output": {}
+      },
+      {
+        "seconds": 0.137,
+        "exit": 0,
+        "output": {}
+      },
+      {
+        "seconds": 0.1341,
+        "exit": 0,
+        "output": {}
+      },
+      {
+        "seconds": 0.1279,
+        "exit": 0,
+        "output": {}
+      },
+      {
+        "seconds": 0.1306,
+        "exit": 0,
+        "output": {}
+      },
+      {
+        "seconds": 0.1323,
+        "exit": 0,
+        "output": {}
+      },
+      {
+        "seconds": 0.1227,
+        "exit": 0,
+        "output": {}
+      },
+      {
+        "seconds": 0.1312,
+        "exit": 0,
+        "output": {}
+      },
+      {
+        "seconds": 0.1367,
+        "exit": 0,
+        "output": {}
+      },
+      {
+        "seconds": 0.1315,
+        "exit": 0,
+        "output": {}
+      }
+    ],
+    "scans_ms": [
+      6.115291,
+      5.321875,
+      5.508458,
+      6.102208,
+      5.656084,
+      5.483666,
+      5.455417,
+      6.1285,
+      6.428458,
+      6.044666,
+      6.124208,
+      5.523875,
+      5.962459,
+      5.800875,
+      6.043458,
+      5.615583,
+      5.700083,
+      5.360833,
+      5.523417,
+      5.589
+    ],
+    "trace": {
+      "events": 32,
+      "bytes": 7270,
+      "log_level": 1
+    },
+    "server_death_hook": {
+      "seconds": 0.185,
+      "exit": 0,
+      "output": {
+        "hookSpecificOutput": {
+          "hookEventName": "PostToolUse",
+          "additionalContext": "ElixirLS: Compiler feedback unavailable: ElixirLS is still starting or has stopped. This is not a clean result."
+        }
+      }
+    },
+    "server_death_navigation": {
+      "isError": false,
+      "data": {
+        "error": {
+          "code": "elixirls_unavailable",
+          "feedback": {
+            "building": false,
+            "completed": 0,
+            "generation": 0,
+            "message": "Compiler feedback unavailable: ElixirLS is still starting or has stopped. This is not a clean result.",
+            "queued": false,
+            "status": "unavailable"
+          },
+          "message": "Compiler feedback unavailable: ElixirLS is still starting or has stopped. This is not a clean result.",
+          "retryAfterMs": 1000,
+          "retryable": true
+        }
+      }
+    },
+    "editor_alive_after_server_death": true,
+    "survivors": {}
+  },
+  "fable_startup": {
+    "cold": {
+      "initialize_s": 0.44,
+      "ready_s": 74.0,
+      "builds": 2,
+      "compile_took": [
+        "Compile took 71775 milliseconds",
+        "Compile took 370 milliseconds"
+      ],
+      "status": "current",
+      "result": 0,
+      "shutdown_s": 1.08,
+      "leftovers": [],
+      "elixir_ls_size": "42M"
+    },
+    "warm": {
+      "initialize_s": 0.43,
+      "ready_s": 3.5,
+      "builds": 1,
+      "compile_took": [
+        "Compile took 1637 milliseconds"
+      ],
+      "status": "current",
+      "result": 0,
+      "shutdown_s": 1.05,
+      "leftovers": [],
+      "elixir_ls_size": "42M"
+    },
+    "seed_copy_s": 0.78,
+    "seeded": {
+      "initialize_s": 0.419,
+      "ready_s": 3.4,
+      "builds": 1,
+      "compile_took": [
+        "Compile took 1686 milliseconds"
+      ],
+      "status": "current",
+      "result": 0,
+      "shutdown_s": 1.13,
+      "leftovers": [],
+      "elixir_ls_size": "40M"
+    },
+    "warm_after_seed": {
+      "initialize_s": 0.502,
+      "ready_s": 3.5,
+      "builds": 1,
+      "compile_took": [
+        "Compile took 1744 milliseconds"
+      ],
+      "status": "current",
+      "result": 0,
+      "shutdown_s": 1.14,
+      "leftovers": [],
+      "elixir_ls_size": "40M"
+    }
+  },
+  "interpretation": [
+    "Two accepted sessions prove missing ownership enforcement, not demonstrated corruption.",
+    "Dead-server unavailable response works, but retryable=true has no restart path.",
+    "Fable startup measures ready(), not first useful hover/definition/references.",
+    "Fable shutdown timings include sleep(1), and its leftovers filter is not complete owned-tree tracking.",
+    "Cache seeding is an exploratory timing, not a freshness validation.",
+    "Sandbox denial does not count as passing a lifecycle test.",
+    "No new three-agent workload cohort or runtime repair was performed in this planning pass."
+  ],
+  "probe_sources": {
+    "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/beta-review/ownership_probe.py": {
+      "sha256": "052ea9ef811e83488848790a312e68b7ace76b1ec6a8e935cc2202fa9a1d6299",
+      "source": "import json, os, sys, time\nfrom pathlib import Path\nR=Path('/private/tmp/tips-elixirls-codex-v2')\nE=R/'agent/lsp/experiments/codex-elixirls-v2'\nB=R/'agent/lsp/vendor/elixirls-neovim-v2'\nsys.path[:0]=[str(E),str(B/'vendor/python')]\nfrom bundle_probe import BundleMCP\nfrom probe import prepare,alive\nfrom neovim_probe import poll\nout=Path(__file__).parent/'ownership-baseline'\nout.mkdir()\na,b,*_=prepare(out)\nclients=[]\nresult={}\ntry:\n    for label in ('first','second'):\n        c=BundleMCP(B,a,out,label); clients.append(c)\n        rpc=c.rpc()\n        result[label]={'pid':rpc.exec_lua('return vim.fn.getpid()'), 'instance':c.instance,\n            'ready':poll(lambda:rpc.exec_lua(\"return require('neovim_sync').ready()\"), bool, 20)['matched']}\n    result['both_live']=all(c.proc.poll() is None for c in clients)\n    result['build_directories']=[str(c.root/'.elixir_ls/build') for c in clients]\nfinally:\n    for c in clients:\n        c.remember(); c.cleanup()\n    result['survivors']=[alive(c.owned) for c in clients]\n    (out/'results.json').write_text(json.dumps(result,indent=2)+'\\n')\n    print(json.dumps(result,indent=2))\n"
+    },
+    "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/beta-review/runtime_baseline_probe.py": {
+      "sha256": "d8da8a53a156f5f7318e3e6afcba966598f9d5deea1a969fe26c3b9ba797934a",
+      "source": "import json, os, statistics, sys, time, subprocess, signal\nfrom pathlib import Path\nR=Path('/private/tmp/tips-elixirls-codex-v2'); E=R/'agent/lsp/experiments/codex-elixirls-v2'; B=R/'agent/lsp/vendor/elixirls-neovim-v2'\nsys.path[:0]=[str(E),str(B/'vendor/python')]\nfrom bundle_probe import BundleMCP\nfrom neovim_probe import poll\nfrom probe import prepare,alive\nout=Path(__file__).parent/'runtime-baseline'; out.mkdir()\na,_,*_=prepare(out)\nclient=None; result={}\ntry:\n    client=BundleMCP(B,a,out,'profile'); rpc=client.rpc()\n    assert poll(lambda:rpc.exec_lua(\"return require('neovim_sync').ready()\"),bool,20)['matched']\n    def hook():\n        start=time.monotonic()\n        p=subprocess.run([sys.executable,str(B/'bundle.py'),'hook','--workspace',str(a),'--state',str(client.state_dir)],input=json.dumps({'hook_event_name':'PostToolUse','tool_name':'Bash'}),text=True,capture_output=True,timeout=7)\n        return {'seconds':round(time.monotonic()-start,4),'exit':p.returncode,'output':json.loads(p.stdout)}\n    result['unchanged_hooks']=[hook() for _ in range(12)]\n    result['scans_ms']=rpc.exec_lua(\"local m=require('neovim_sync'); local t={}; for i=1,20 do local s=vim.uv.hrtime(); m.scan(); table.insert(t,(vim.uv.hrtime()-s)/1e6) end; return t\")\n    result['trace']=rpc.exec_lua(\"return { events=#_G.v2_events, bytes=#vim.json.encode(_G.v2_events), log_level=vim.lsp.log.get_level() }\")\n    # Kill only the ElixirLS child, keeping the editor/bridge alive.\n    client.remember()\n    beams=[pid for pid, row in client.owned.items() if 'beam.smp' in row['command'] and 'ElixirLS.LanguageServer.main()' in row['command']]\n    assert len(beams)==1, beams\n    os.kill(beams[0],signal.SIGKILL)\n    assert poll(lambda:rpc.exec_lua(\"return require('neovim_sync').status().status\"),lambda s:s=='unavailable',5)['matched']\n    result['server_death_hook']=hook()\n    result['server_death_navigation']=client.nav('hover')\n    result['editor_alive_after_server_death']=client.proc.poll() is None\nfinally:\n    if client:\n        client.remember(); client.cleanup(); result['survivors']=alive(client.owned)\n    (out/'results.json').write_text(json.dumps(result,indent=2)+'\\n')\n    print(json.dumps(result,indent=2))\n"
+    },
+    "/private/tmp/tips-elixirls-codex-v2/tmp/elixirls-v2/beta-review/probes/startup/startup_probe.py": {
+      "sha256": "8c5a925fb19514a234fb0b9219883177d93bd559c3b0a46a69f5d059f4c4de9b",
+      "source": "#!/usr/bin/env python3\n\"\"\"Session start cost with the installed v2 bundle on an isolated Tips copy.\ncold: no .elixir_ls. seeded: .elixir_ls/build/test copied from the worktree's own _build/test. warm: existing .elixir_ls.\nRead-only use of the bundle; the copy lives under the Fable release-review probes folder.\"\"\"\nimport json, os, queue, shutil, signal, subprocess, sys, threading, time\nfrom pathlib import Path\nHERE = Path(__file__).resolve().parent\nBUNDLE = Path('/private/tmp/tips-elixirls-codex-v2/agent/lsp/vendor/elixirls-neovim-v2')\nROOT = Path('/private/tmp/tips-fable-release-review-9xb93ihp/probes/mixtime/tips')\nsys.path.insert(0, str(BUNDLE / 'vendor/python'))\nimport pynvim\nout = {}\ndef save(k, v):\n    out[k] = v; (HERE / 'results.json').write_text(json.dumps(out, indent=1) + '\\n'); print(k, json.dumps(v)[:300], flush=True)\ndef leftovers():\n    rows = subprocess.run(['ps', '-eo', 'pid,command'], capture_output=True, text=True).stdout.splitlines()[1:]\n    return [r[:120] for r in rows if 'tips-fable-release-review' in r and 'startup_probe' not in r and 'ps -eo' not in r]\ndef session(name):\n    state = HERE / f'{name}-state'\n    if state.exists(): shutil.rmtree(state)\n    q = queue.Queue(); t0 = time.time()\n    proc = subprocess.Popen([sys.executable, str(BUNDLE / 'bundle.py'), 'serve', '--workspace', str(ROOT), '--state', str(state)],\n        cwd=ROOT, env=os.environ | {'ERL_FLAGS': '+S 4:4'}, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=(HERE / f'{name}.stderr.log').open('w'), text=True, bufsize=1, start_new_session=True)\n    def read():\n        for line in proc.stdout:\n            try: q.put(json.loads(line))\n            except json.JSONDecodeError: pass\n    threading.Thread(target=read, daemon=True).start()\n    proc.stdin.write(json.dumps({'jsonrpc': '2.0', 'id': 1, 'method': 'initialize', 'params': {'protocolVersion': '2024-11-05', 'capabilities': {}, 'clientInfo': {'name': 'fable-startup', 'version': '1'}}}) + '\\n'); proc.stdin.flush()\n    q.get(timeout=60); init = round(time.time() - t0, 3)\n    proc.stdin.write(json.dumps({'jsonrpc': '2.0', 'method': 'notifications/initialized'}) + '\\n'); proc.stdin.flush()\n    reg = [json.loads(p.read_text()) for p in (state / 'registry').glob('*.json')]\n    nv = pynvim.attach('socket', path=reg[0]['socket'])\n    while not nv.exec_lua(\"return require('neovim_sync').ready()\"):\n        if time.time() - t0 > 300: break\n        time.sleep(0.5)\n    ready = round(time.time() - t0, 1)\n    builds = nv.exec_lua('local n = 0; for _, e in ipairs(_G.v2_events) do if e.method == \"window/logMessage\" and (e.data.message or \"\"):find(\"Starting build\", 1, true) then n = n + 1 end end; return n')\n    took = nv.exec_lua('local r = {}; for _, e in ipairs(_G.v2_events) do if e.method == \"window/logMessage\" and (e.data.message or \"\"):find(\"Compile took\", 1, true) then r[#r+1] = e.data.message end end; return r')\n    result = nv.exec_lua(\"return require('neovim_sync').status()\")\n    nv.close()\n    proc.stdin.close(); t1 = time.time()\n    try: proc.wait(timeout=20)\n    except subprocess.TimeoutExpired: os.killpg(proc.pid, signal.SIGKILL)\n    time.sleep(1)\n    save(name, {'initialize_s': init, 'ready_s': ready, 'builds': builds, 'compile_took': took, 'status': result['status'], 'result': result.get('completed'),\n                'shutdown_s': round(time.time() - t1, 2), 'leftovers': leftovers(), 'elixir_ls_size': subprocess.run(['du', '-sh', str(ROOT / '.elixir_ls')], capture_output=True, text=True).stdout.split()[0]})\nshutil.rmtree(ROOT / '.elixir_ls', ignore_errors=True)\nsession('cold')\nsession('warm')\nshutil.rmtree(ROOT / '.elixir_ls', ignore_errors=True)\n(ROOT / '.elixir_ls/build').mkdir(parents=True)\nt = time.time(); shutil.copytree(ROOT / '_build/test', ROOT / '.elixir_ls/build/test', symlinks=True); save('seed_copy_s', round(time.time() - t, 2))\nsession('seeded')\nsession('warm_after_seed')\n"
+    }
+  }
+}

@@ -1,0 +1,376 @@
+--- a/apps/language_server/lib/language_server/server.ex	2026-09-25 21:05:57
++++ b/apps/language_server/lib/language_server/server.ex	2026-09-25 21:05:57
+@@ -794,7 +794,6 @@
+ 
+       state
+     else
+-      WorkspaceSymbols.notify_uris_modified([uri])
+       state = update_in(state.source_files[uri], &%{&1 | dirty?: false})
+       trigger_build(state, [SourceFile.Path.from_uri(uri)])
+     end
+@@ -874,10 +873,6 @@
+ 
+     state = %{state | source_files: source_files}
+ 
+-    changes
+-    |> Enum.map(& &1.uri)
+-    |> WorkspaceSymbols.notify_uris_modified()
+-
+     if build_changes != [] do
+       trigger_build(state, Enum.map(build_changes, &SourceFile.Path.from_uri(&1.uri)))
+     else
+--- a/apps/language_server/lib/language_server/providers/workspace_symbols.ex	2026-09-25 21:05:57
++++ b/apps/language_server/lib/language_server/providers/workspace_symbols.ex	2026-09-25 21:33:14
+@@ -21,7 +21,7 @@
+   @typep symbol_t :: module | {module, atom, non_neg_integer}
+   @typep state_t :: %{
+            required(key_t) => [symbol_information_t],
+-           modified_uris: [String.t()]
++           rerun: boolean
+          }
+ 
+   @symbol_codes for kind <- [
+@@ -60,14 +60,6 @@
+     end
+   end
+ 
+-  @spec notify_uris_modified([String.t()], GenServer.server()) :: :ok | nil
+-  def notify_uris_modified(uris, server \\ __MODULE__) do
+-    unless :persistent_term.get(:language_server_test_mode, false) and
+-             not :persistent_term.get(:language_server_override_test_mode, false) do
+-      GenServer.cast(server, {:uris_modified, uris})
+-    end
+-  end
+-
+   ## Server Callbacks
+ 
+   @impl GenServer
+@@ -75,15 +67,11 @@
+     {:ok,
+      %{
+        modules: [],
+-       modules_indexed: false,
+        types: [],
+-       types_indexed: false,
+        callbacks: [],
+-       callbacks_indexed: false,
+        functions: [],
+-       functions_indexed: false,
+        indexing: false,
+-       modified_uris: [],
++       rerun: false,
+        project_dir: nil,
+        tag_support: false
+      }}
+@@ -140,95 +128,26 @@
+     {:noreply, %{state | project_dir: project_dir, tag_support: tag_support}}
+   end
+ 
+-  # not yet indexed
+-  def handle_cast(
+-        :build_complete,
+-        state = %{
+-          indexing: false,
+-          modules_indexed: false,
+-          project_dir: project_dir,
+-          tag_support: tag_support
+-        }
+-      ) do
+-    Logger.info("[ElixirLS WorkspaceSymbols] Indexing...")
+-
+-    module_paths =
+-      get_app_modules()
+-      |> process_chunked(fn chunk ->
+-        for module <- chunk,
+-            path = find_module_path(module),
+-            do: {module, path}
+-      end)
+-
+-    Logger.info("[ElixirLS WorkspaceSymbols] Module discovery complete")
+-
+-    index(module_paths, project_dir, tag_support)
+-
+-    {:noreply, %{state | indexing: true}}
+-  end
+-
+-  @impl GenServer
+-  # indexed but some uris were modified
+-  def handle_cast(
+-        :build_complete,
+-        %{
+-          indexing: false,
+-          modified_uris: modified_uris = [_ | _],
+-          project_dir: project_dir,
+-          tag_support: tag_support
+-        } = state
+-      ) do
+-    Logger.info("[ElixirLS WorkspaceSymbols] Updating index...")
+-
+-    module_paths =
+-      get_app_modules()
+-      |> process_chunked(fn chunk ->
+-        for module <- chunk,
+-            path = find_module_path(module),
+-            SourceFile.Path.to_uri(path, project_dir) in modified_uris,
+-            do: {module, path}
+-      end)
+-
+-    Logger.info("[ElixirLS WorkspaceSymbols] #{length(module_paths)} modules need reindexing")
+-
+-    index(module_paths, project_dir, tag_support)
+-
+-    modules =
+-      state.modules
+-      |> Enum.reject(&(&1.location.uri in modified_uris))
+-
+-    {:noreply,
+-     %{
+-       state
+-       | modules: modules,
+-         modules_indexed: false,
+-         indexing: true,
+-         modified_uris: []
+-     }}
++  # Every build re-reads the whole project index from its beams. A build that
++  # completes during an index run is kept as one rerun, never dropped.
++  def handle_cast(:build_complete, state = %{indexing: true}) do
++    {:noreply, %{state | rerun: true}}
+   end
+ 
+-  # indexed and no uris modified or already indexing
+   def handle_cast(:build_complete, state) do
+-    {:noreply, state}
++    {:noreply, index_project(state)}
+   end
+ 
+   @impl GenServer
+-  def handle_cast({:uris_modified, uris}, state) do
+-    state = %{state | modified_uris: Enum.uniq(uris ++ state.modified_uris)}
+-
+-    {:noreply, state}
++  def handle_info({:indexing_complete, key, results}, state) do
++    state = %{state | key => results, indexing: false}
++    {:noreply, if(state.rerun, do: index_project(state), else: state)}
+   end
+ 
+-  @impl GenServer
+-  def handle_info({:indexing_complete, key, results}, state) do
+-    state =
+-      state
+-      |> Map.put(key, results ++ state[key])
+-      |> Map.put(:"#{key}_indexed", true)
+-
+-    indexed = state.modules_indexed
+-
+-    {:noreply, %{state | indexing: not indexed}}
++  defp index_project(state = %{project_dir: project_dir, tag_support: tag_support}) do
++    Logger.info("[ElixirLS WorkspaceSymbols] Indexing...")
++    index(project_dir, tag_support)
++    %{state | indexing: true, rerun: false}
+   end
+ 
+   ## Helpers
+@@ -250,28 +169,37 @@
+           []
+       end
+ 
+-    for app <- apps do
+-      case :application.get_key(app, :modules) do
+-        {:ok, modules} ->
+-          modules
+-
+-        :undefined ->
+-          []
+-      end
++    # List the compiled beams, as Mix does when it writes the .app. The loaded .app
++    # module list can lag: Mix skips the rewrite when two builds share an mtime second.
++    for app <- apps,
++        dir = :code.lib_dir(app),
++        is_list(dir),
++        {:ok, files} <- [File.ls(Path.join(dir, "ebin"))],
++        file <- files,
++        Path.extname(file) == ".beam" do
++      file |> Path.rootname() |> String.to_atom()
+     end
+-    |> List.flatten()
+     |> Enum.filter(&Code.ensure_loaded?/1)
+   end
+ 
+   defp find_module_path(module) do
+     with true <- Code.ensure_loaded?(module),
+-         path when not is_nil(path) <- module.module_info(:compile)[:source],
++         path when not is_nil(path) <- module_info(module, :compile)[:source],
+          path_binary = List.to_string(path),
+          true <- File.exists?(path_binary, [:raw]) do
+       path_binary
+     else
+       _ -> nil
+     end
++  end
++
++  # A build can delete a module while the index reads it. That build's
++  # build_complete schedules a rerun that replaces this result, so treat the
++  # module as empty here instead of crashing the index.
++  defp module_info(module, key) do
++    module.module_info(key)
++  rescue
++    UndefinedFunctionError -> []
+   end
+ 
+   @module_kind_codes [
+@@ -352,11 +280,13 @@
+ 
+   @builtin_functions [{:module_info, 0}, {:module_info, 1}, {:behaviour_info, 1}, {:__info__, 1}]
+ 
+-  defp index(module_paths, project_dir, tag_support) do
+-    chunked_module_paths = chunk_by_schedulers(module_paths)
+-
++  defp index(project_dir, tag_support) do
+     index_async(:modules, fn ->
+-      chunked_module_paths
++      get_app_modules()
++      |> process_chunked(fn chunk ->
++        for module <- chunk, path = find_module_path(module), do: {module, path}
++      end)
++      |> chunk_by_schedulers()
+       |> do_process_chunked(fn chunk ->
+         for {module, path} <- chunk do
+           {module_annotation, module_metadata, docs} =
+@@ -405,7 +335,7 @@
+ 
+           # functions/macros
+           function_results =
+-            for {function, arity_original} <- module.module_info(:exports),
++            for {function, arity_original} <- module_info(module, :exports),
+                 {function, arity_original} not in @builtin_functions,
+                 {function, arity} = SourceFile.strip_macro_prefix({function, arity_original}) do
+               kind =
+--- a/apps/language_server/test/providers/workspace_symbols_test.exs	2026-09-25 21:05:57
++++ b/apps/language_server/test/providers/workspace_symbols_test.exs	2026-09-25 21:09:36
+@@ -1,6 +1,6 @@
+ defmodule ElixirLS.LanguageServer.Providers.WorkspaceSymbolsTest do
+   alias ElixirLS.LanguageServer.Providers.WorkspaceSymbols
+-  alias ElixirLS.LanguageServer.{Server, Protocol, Tracer, MixProjectCache}
++  alias ElixirLS.LanguageServer.{Server, Protocol, SourceFile, Tracer, MixProjectCache}
+   use ElixirLS.Utils.MixTest.Case, async: false
+   import ElixirLS.LanguageServer.Test.ServerTestHelpers
+   use Protocol
+@@ -198,6 +198,118 @@
+                &(&1.name ==
+                    "ElixirLS.LanguageServer.Fixtures.WorkspaceSymbols.some_macrocallback/1")
+              )
++    end)
++  end
++
++  test "drops a deleted module after the next build", %{server: server} do
++    in_fixture(Path.join(__DIR__, ".."), "workspace_symbols", fn ->
++      write_module("lib/deleted.ex", "Deleted", "deleted_fun")
++      initialize(server)
++      wait_for_build()
++      wait_for_symbols(&("ElixirLS.LanguageServer.Fixtures.Deleted.deleted_fun/0" in &1))
++
++      File.rm!("lib/deleted.ex")
++      notify_changed(server, "lib/deleted.ex", 3)
++      wait_for_build()
++
++      wait_for_symbols(fn names ->
++        "ElixirLS.LanguageServer.Fixtures.WorkspaceSymbols" in names and
++          not Enum.any?(
++            names,
++            &String.starts_with?(&1, "ElixirLS.LanguageServer.Fixtures.Deleted")
++          )
++      end)
++    end)
++  end
++
++  test "keeps a build that completes while the index runs", %{server: server} do
++    in_fixture(Path.join(__DIR__, ".."), "workspace_symbols", fn ->
++      # Loading this module blocks while the test holds it, so an index run that
++      # loads it waits there.
++      File.write!("lib/hold.ex", """
++      defmodule ElixirLS.LanguageServer.Fixtures.Hold do
++        @on_load :hold
++        def hold do
++          case :persistent_term.get(:workspace_symbols_test_hold, nil) do
++            nil ->
++              :ok
++
++            test ->
++              send(test, {:held, self()})
++
++              receive do
++                :release -> :ok
++              end
++          end
++        end
++      end
++      """)
++
++      initialize(server)
++      wait_for_build()
++      wait_for_symbols(&("ElixirLS.LanguageServer.Fixtures.Hold.hold/0" in &1))
++
++      :persistent_term.put(:workspace_symbols_test_hold, self())
++      unload(ElixirLS.LanguageServer.Fixtures.Hold)
++      write_module("lib/first.ex", "First", "first_fun")
++      notify_changed(server, "lib/first.ex", 1)
++      wait_for_build()
++      assert_receive {:held, hold}, 20_000
++
++      write_module("lib/added.ex", "Added", "added_fun")
++      notify_changed(server, "lib/added.ex", 1)
++      wait_for_build()
++      :persistent_term.erase(:workspace_symbols_test_hold)
++      send(hold, :release)
++
++      wait_for_symbols(fn names ->
++        "ElixirLS.LanguageServer.Fixtures.First.first_fun/0" in names and
++          "ElixirLS.LanguageServer.Fixtures.Added.added_fun/0" in names
++      end)
+     end)
+   end
++
++  defp wait_for_build do
++    assert_receive %{
++                     "method" => "window/logMessage",
++                     "params" => %{"message" => "Compile took" <> _}
++                   },
++                   20_000
++  end
++
++  defp wait_for_symbols(fun, timeout \\ 10_000) do
++    {:ok, list} = WorkspaceSymbols.symbols("ElixirLS.LanguageServer.Fixtures.")
++    names = Enum.map(list, & &1.name)
++
++    cond do
++      fun.(names) ->
++        names
++
++      timeout <= 0 ->
++        flunk("unexpected symbols: #{inspect(names)}")
++
++      true ->
++        Process.sleep(100)
++        wait_for_symbols(fun, timeout - 100)
++    end
++  end
++
++  defp write_module(path, name, function) do
++    File.write!(path, """
++    defmodule ElixirLS.LanguageServer.Fixtures.#{name} do
++      def #{function}, do: :ok
++    end
++    """)
++  end
++
++  defp notify_changed(server, path, type) do
++    uri = SourceFile.Path.to_uri(Path.absname(path))
++    Server.receive_packet(server, did_change_watched_files([%{"uri" => uri, "type" => type}]))
++  end
++
++  defp unload(module) do
++    :code.purge(module)
++    :code.delete(module)
++    :code.purge(module)
++  end
+ end

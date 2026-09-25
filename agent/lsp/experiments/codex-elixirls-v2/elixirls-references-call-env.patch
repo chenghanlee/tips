@@ -1,0 +1,350 @@
+diff -ruN a/apps/language_server/lib/language_server/providers/references/locator.ex b/apps/language_server/lib/language_server/providers/references/locator.ex
+--- a/apps/language_server/lib/language_server/providers/references/locator.ex	2026-09-25 16:06:08
++++ b/apps/language_server/lib/language_server/providers/references/locator.ex	2026-09-25 16:06:08
+@@ -12,6 +12,7 @@
+   alias ElixirSense.Core.Binding
+   require ElixirSense.Core.Introspection, as: Introspection
+   alias ElixirSense.Core.Metadata
++  alias ElixirSense.Core.MetadataBuilder
+   alias ElixirSense.Core.Normalized.Code, as: NormalizedCode
+   alias ElixirSense.Core.State
+   alias ElixirSense.Core.State.AttributeInfo
+@@ -48,7 +49,8 @@
+           env,
+           attributes,
+           metadata,
+-          trace
++          trace,
++          Keyword.get(options, :ast)
+         )
+         |> Enum.uniq()
+     end
+@@ -85,7 +87,8 @@
+           calls: calls,
+           types: metadata_types
+         } = metadata,
+-        trace
++        trace,
++        ast \\ nil
+       ) do
+     binding_env = Binding.from_env(env, metadata, context.begin)
+ 
+@@ -108,15 +111,18 @@
+           {line, column} = context.end
+           call_arity = Metadata.get_call_arity(metadata, module, function, line, column) || :any
+ 
++          # an alias_expansion_as call repeats its alias_expansion call with the unexpanded alias
++          candidate? = fn call ->
++            (function == nil or call.func == function) and call.kind != :alias_expansion_as
++          end
++
+           metadata_call_references =
+             calls
+             |> Map.values()
+             |> List.flatten()
+-            |> Enum.filter(fn call -> function == nil or call.func == function end)
+-            |> Enum.map(fn call ->
+-              {call_line, call_column} = call.position
+-              env = Metadata.get_cursor_env(metadata, {call_line, call_column || 1})
+-
++            |> Enum.filter(candidate?)
++            |> with_envs(metadata, ast, candidate?)
++            |> Enum.map(fn {call, env} ->
+               binding_env = Binding.from_env(env, metadata, call.position)
+ 
+               mod_or_nil =
+@@ -131,10 +137,11 @@
+                     call.mod
+                 end
+ 
++              # call receivers are already expanded, so aliases are not applied again
+               found =
+                 {mod_or_nil, function}
+                 |> wrap_atom
+-                |> expand(binding_env, env.module, env.aliases)
++                |> expand(binding_env, env.module, [])
+                 |> Introspection.actual_mod_fun(
+                   env,
+                   mods_funs,
+@@ -272,6 +279,8 @@
+     trace
+     |> Map.values()
+     |> List.flatten()
++    # an alias_expansion_as call repeats its alias_expansion call with the unexpanded alias
++    |> Enum.reject(&match?(%{kind: :alias_expansion_as}, &1))
+     |> Enum.filter(caller_filter(mfa, mods_funs))
+     |> Enum.uniq()
+   end
+@@ -459,6 +468,36 @@
+ 
+   defp get_matching_arities(other, _mods_funs) do
+     other
++  end
++
++  # Pairs each candidate call with the env it was recorded in, from one metadata build of the
++  # request's AST (the same AST as the metadata, so the same calls). Without an AST each call
++  # gets the cursor env at its position, as before.
++  defp with_envs([], _metadata, _ast, _candidate?), do: []
++
++  defp with_envs(calls, %Metadata{source: source} = metadata, ast, candidate?) do
++    ast =
++      ast ||
++        case Code.string_to_quoted(source,
++               columns: true,
++               token_metadata: true,
++               emit_warnings: false
++             ) do
++          {:ok, ast} -> ast
++          _ -> nil
++        end
++
++    if ast do
++      MetadataBuilder.build(ast, nil, true).calls
++      |> Map.values()
++      |> List.flatten()
++      |> Enum.filter(candidate?)
++      |> Enum.map(&{&1, &1.env})
++    else
++      Enum.map(calls, fn %{position: {line, column}} = call ->
++        {call, Metadata.get_cursor_env(metadata, {line, column || 1})}
++      end)
++    end
+   end
+ 
+   defp wrap_atom({nil, other}), do: {nil, other}
+diff -ruN a/apps/language_server/lib/language_server/providers/references.ex b/apps/language_server/lib/language_server/providers/references.ex
+--- a/apps/language_server/lib/language_server/providers/references.ex	2026-09-25 16:06:08
++++ b/apps/language_server/lib/language_server/providers/references.ex	2026-09-25 16:06:08
+@@ -26,7 +26,10 @@
+       trace = ElixirLS.LanguageServer.Tracer.get_trace()
+ 
+       base_refs =
+-        Locator.references(source_file.text, line, character, trace, metadata: metadata)
++        Locator.references(source_file.text, line, character, trace,
++          metadata: metadata,
++          ast: parser_context.ast
++        )
+         |> Enum.map(fn elixir_sense_reference ->
+           elixir_sense_reference
+           |> build_reference(uri, source_file.text, project_dir)
+diff -ruN a/apps/language_server/test/providers/references/locator_test.exs b/apps/language_server/test/providers/references/locator_test.exs
+--- a/apps/language_server/test/providers/references/locator_test.exs	2026-09-25 16:06:08
++++ b/apps/language_server/test/providers/references/locator_test.exs	2026-09-25 16:06:08
+@@ -2361,4 +2361,134 @@
+     |> Enum.at(line - 1)
+     |> String.slice((column - 1)..-1//1)
+   end
++
++  describe "resolves each call in its own lexical env" do
++    test "variable rebound later on the same line", %{trace: trace} do
++      buffer = """
++      defmodule LexEnvRefs.One do
++        def x, do: :one
++      end
++
++      defmodule LexEnvRefs.Two do
++        def x, do: :two
++      end
++
++      defmodule LexEnvRefs.Caller do
++        def f, do: (mod = LexEnvRefs.One; mod.x(); mod = LexEnvRefs.Two; mod.x())
++        def g, do: (mod = LexEnvRefs.One; mod = mod.x(); mod)
++      end
++      """
++
++      assert Locator.references(buffer, 2, 7, trace) == [
++               %{
++                 range: %{start: %{line: 10, column: 41}, end: %{line: 10, column: 42}},
++                 uri: nil
++               },
++               %{range: %{start: %{line: 11, column: 47}, end: %{line: 11, column: 48}}, uri: nil}
++             ]
++
++      assert Locator.references(buffer, 6, 7, trace) == [
++               %{range: %{start: %{line: 10, column: 72}, end: %{line: 10, column: 73}}, uri: nil}
++             ]
++    end
++
++    test "variable bound by one clause of a one-line fn", %{trace: trace} do
++      buffer = """
++      defmodule LexEnvRefs.One do
++        def x, do: :one
++      end
++
++      defmodule LexEnvRefs.Caller do
++        def f(mods), do: Enum.map(mods, fn LexEnvRefs.One = mod -> mod.x(); mod -> mod end)
++      end
++      """
++
++      assert Locator.references(buffer, 2, 7, trace) == [
++               %{range: %{start: %{line: 6, column: 66}, end: %{line: 6, column: 67}}, uri: nil}
++             ]
++    end
++
++    test "attribute redefined later on the same line", %{trace: trace} do
++      buffer = """
++      defmodule LexEnvRefs.One do
++        def x, do: :one
++      end
++
++      defmodule LexEnvRefs.Two do
++        def x, do: :two
++      end
++
++      defmodule LexEnvRefs.Caller do
++        @mod LexEnvRefs.One
++        def f, do: @mod.x(); @mod LexEnvRefs.Two; def g, do: @mod.x()
++      end
++      """
++
++      assert Locator.references(buffer, 2, 7, trace) == [
++               %{range: %{start: %{line: 11, column: 19}, end: %{line: 11, column: 20}}, uri: nil}
++             ]
++
++      assert Locator.references(buffer, 6, 7, trace) == [
++               %{range: %{start: %{line: 11, column: 61}, end: %{line: 11, column: 62}}, uri: nil}
++             ]
++    end
++
++    test "local call when the module changes later on the same line", %{trace: trace} do
++      buffer = """
++      defmodule LexEnvRefs.A do def x, do: :a; def f, do: x() end; defmodule LexEnvRefs.B do def x, do: :b end
++      """
++
++      assert Locator.references(buffer, 1, 31, trace) == [
++               %{range: %{start: %{line: 1, column: 53}, end: %{line: 1, column: 54}}, uri: nil}
++             ]
++
++      assert Locator.references(buffer, 1, 92, trace) == []
++    end
++
++    test "expanded call receivers are not alias-expanded again", %{trace: trace} do
++      buffer = """
++      defmodule LexEnvRefs.Target do
++        def run, do: :target
++      end
++
++      defmodule LexEnvRefs.Ctx.LexEnvRefs do
++        def run, do: :ctx
++      end
++
++      defmodule LexEnvRefs.Caller do
++        alias LexEnvRefs.Target, as: Tg
++        alias LexEnvRefs.Ctx.LexEnvRefs
++
++        def f, do: Tg.run()
++        def g, do: LexEnvRefs.run()
++      end
++      """
++
++      assert Locator.references(buffer, 2, 7, trace) == [
++               %{range: %{start: %{line: 13, column: 17}, end: %{line: 13, column: 20}}, uri: nil}
++             ]
++
++      assert Locator.references(buffer, 6, 7, trace) == [
++               %{range: %{start: %{line: 14, column: 25}, end: %{line: 14, column: 28}}, uri: nil}
++             ]
++    end
++
++    test "remote type in a spec is not a function reference", %{trace: trace} do
++      buffer = """
++      defmodule LexEnvRefs.Types do
++        @type t :: atom
++        def t, do: :t
++      end
++
++      defmodule LexEnvRefs.Spec do
++        @spec f() :: LexEnvRefs.Types.t()
++        def f, do: LexEnvRefs.Types.t()
++      end
++      """
++
++      assert Locator.references(buffer, 3, 7, trace) == [
++               %{range: %{start: %{line: 8, column: 31}, end: %{line: 8, column: 32}}, uri: nil}
++             ]
++    end
++  end
+ end
+diff -ruN a/apps/language_server/test/providers/references_test.exs b/apps/language_server/test/providers/references_test.exs
+--- a/apps/language_server/test/providers/references_test.exs	2026-09-25 16:10:07
++++ b/apps/language_server/test/providers/references_test.exs	2026-09-25 16:10:07
+@@ -37,6 +37,8 @@
+     Code.compile_file(FixtureHelpers.get_path("macro_a.ex"))
+     Code.compile_file(FixtureHelpers.get_path("references_erlang.ex"))
+     Code.compile_file(FixtureHelpers.get_path("references_alias.ex"))
++    Code.compile_file(FixtureHelpers.get_path("references_alias_as.ex"))
++    Code.compile_file(FixtureHelpers.get_path("references_real_registry.ex"))
+     {:ok, context}
+   end
+ 
+@@ -270,5 +272,50 @@
+     references_lines = Enum.map(list, & &1.range.start.line)
+ 
+     assert references_lines == [1, 2, 3, 3, 4, 4, 7, 11, 15, 19, 20]
++  end
++
++  test "a short alias named like a real module is not a reference to that module" do
++    file_path = FixtureHelpers.get_path("references_real_registry.ex")
++    parser_context = ParserContextBuilder.from_path(file_path)
++    uri = SourceFile.Path.to_uri(file_path)
++
++    {line, char} = {1, 17}
++
++    ElixirLS.Test.TextLoc.annotate_assert(file_path, line, char, """
++      def start, do: Registry.start_link(keys: :unique, name: __MODULE__)
++                     ^
++    """)
++
++    {line, char} =
++      SourceFile.lsp_position_to_elixir(parser_context.source_file.text, {line, char})
++
++    list = References.references(parser_context, uri, line, char, false, File.cwd!())
++
++    assert Enum.any?(list, &String.ends_with?(&1.uri, "references_real_registry.ex"))
++    refute Enum.any?(list, &String.ends_with?(&1.uri, "references_alias_as.ex"))
++  end
++
++  test "finds references to an aliased module through its short alias" do
++    file_path = FixtureHelpers.get_path("references_alias_as.ex")
++    parser_context = ParserContextBuilder.from_path(file_path)
++    uri = SourceFile.Path.to_uri(file_path)
++
++    {line, char} = {7, 21}
++
++    ElixirLS.Test.TextLoc.annotate_assert(file_path, line, char, """
++      def find(key), do: Registry.lookup(key)
++                         ^
++    """)
++
++    {line, char} =
++      SourceFile.lsp_position_to_elixir(parser_context.source_file.text, {line, char})
++
++    list = References.references(parser_context, uri, line, char, true, File.cwd!())
++
++    assert [{0, 0}, {5, 2}, {7, 21}, {7, 30}] ==
++             list
++             |> Enum.filter(&String.ends_with?(&1.uri, "references_alias_as.ex"))
++             |> Enum.map(&{&1.range.start.line, &1.range.start.character})
++             |> Enum.sort()
+   end
+ end
+diff -ruN a/apps/language_server/test/support/fixtures/references_alias_as.ex b/apps/language_server/test/support/fixtures/references_alias_as.ex
+--- a/apps/language_server/test/support/fixtures/references_alias_as.ex	1970-01-01 08:00:00
++++ b/apps/language_server/test/support/fixtures/references_alias_as.ex	2026-09-25 16:10:07
+@@ -0,0 +1,9 @@
++defmodule ElixirLS.Test.ReferencesAliasAs.Registry do
++  def lookup(key), do: key
++end
++
++defmodule ElixirLS.Test.ReferencesAliasAs do
++  alias ElixirLS.Test.ReferencesAliasAs.Registry
++
++  def find(key), do: Registry.lookup(key)
++end
+diff -ruN a/apps/language_server/test/support/fixtures/references_real_registry.ex b/apps/language_server/test/support/fixtures/references_real_registry.ex
+--- a/apps/language_server/test/support/fixtures/references_real_registry.ex	1970-01-01 08:00:00
++++ b/apps/language_server/test/support/fixtures/references_real_registry.ex	2026-09-25 16:10:07
+@@ -0,0 +1,3 @@
++defmodule ElixirLS.Test.ReferencesRealRegistry do
++  def start, do: Registry.start_link(keys: :unique, name: __MODULE__)
++end

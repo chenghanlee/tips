@@ -20,6 +20,8 @@ On issue assignment:
 agent/teams/task_worktree.py "$ISSUE-review-team-$N-lead" --team "$N" --role lead [--ui] --pane "$LEAD_PANE" --review-ref "$SHA" --start
 ```
 
+With the Neovim ElixirLS beta (`--lsp neovim --neovim-bundle /absolute/bundle`, Codex roles only), `--start` first prepares ElixirLS dependencies: about a minute on a new worktree. Run that command with a Bash timeout of 600000 ms. This is a launch timeout. It is separate from the five-second compiler-feedback budget.
+
 For `ui` issues, include `--ui` on every lead call, including reruns. Otherwise the helper selects the other lead configuration, rejects running clients as conflicting, or silently launches the wrong lead on first `--start`.
 
 Choose pane IDs from start output or `herdr pane list`; never guess. When `herdr agent get` shows `idle`, brief tech lead with issue URL, base SHA and exact completion command. Never wait for compilation.

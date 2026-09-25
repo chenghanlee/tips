@@ -212,7 +212,7 @@ check('symbol_results_are_qualified_during_startup', function()
   vim.lsp.get_clients = function() return {} end
   for _, operation in ipairs({ 'document_symbols', 'workspace_symbols' }) do
     local reply = require('vv-mcp.lsp').request({ operation = operation })
-    assert(not reply.error and reply.feedback.status == 'unavailable')
+    assert(not reply.error and reply.feedback.status == 'starting')
     assert(reply.feedback.message:find('empty result', 1, true))
   end
   vim.lsp.get_clients = function() return { {is_stopped=function() return false end} } end
@@ -227,8 +227,22 @@ check('startup_unavailability_allows_retry', function()
   dofile(source .. '/neovim_feedback.lua').install()
   vim.lsp.get_clients = function() return {} end
   local reply = require('vv-mcp.lsp').request({ operation = 'hover' })
-  assert(reply.error.code == 'elixirls_unavailable' and reply.error.retryable)
+  assert(reply.error.code == 'elixirls_starting' and reply.error.retryable)
   assert(reply.error.retryAfterMs == 1000)
+  return true
+end)
+check('exited_server_requires_reconnect_without_polling', function()
+  local m = fixture('exited')
+  package.loaded.neovim_sync = m
+  package.loaded['vv-mcp.lsp'] = { request = function() error('Do not query a dead server') end }
+  dofile(source .. '/neovim_feedback.lua').install()
+  m.exited = { code = 0, signal = 9 }
+  local reply = require('vv-mcp.lsp').request({ operation = 'hover' })
+  assert(reply.error.code == 'elixirls_exited' and reply.error.retryable == false)
+  assert(reply.error.retryAfterMs == nil and reply.error.message:find('reconnect'))
+  local start = vim.uv.hrtime()
+  local feedback = m.collect(5000, 'PostToolUse')
+  assert(feedback.status == 'exited' and (vim.uv.hrtime() - start) / 1e6 < 300)
   return true
 end)
 check('early_symbol_error_preserves_startup_feedback', function()
@@ -243,5 +257,214 @@ check('early_symbol_error_preserves_startup_feedback', function()
   assert(reply.feedback.status == 'pending')
   return true
 end)
+check('bom_reload_preserves_wire_text', function()
+  local m, path, client = fixture('bom')
+  vim.fn.writefile({ '\239\187\191# before' }, path)
+  vim.cmd('edit!')
+  m.scan()
+  local text
+  client.notify = function(_, method, params)
+    if method == 'textDocument/didSave' then text = params.text end
+    return true
+  end
+  vim.fn.writefile({ '\239\187\191# after' }, path)
+  m.scan()
+  assert(not next(m.sync_errors), vim.inspect(m.sync_errors))
+  assert(text == '# after\n', 'BOM must stay in disk representation, not LSP text')
+  return true
+end)
+check('errors_precede_truncated_warnings', function()
+  local m, _, _ = fixture('diagnostic_priority')
+  local b = vim.api.nvim_get_current_buf()
+  vim.api.nvim_buf_set_lines(b, 0, -1, false, { '# first', '# second' })
+  vim.api.nvim_set_option_value('modified', false, { buf = b })
+  local ns = vim.api.nvim_create_namespace('beta_priority')
+  local diagnostics = {}
+  for i = 1, 9 do diagnostics[#diagnostics + 1] = { lnum = 0, col = 0, severity = 2, message = 'warning ' .. i } end
+  diagnostics[#diagnostics + 1] = { lnum = 1, col = 0, severity = 1, message = 'THE_COMPILE_ERROR' }
+  vim.diagnostic.set(ns, b, diagnostics)
+  m.completed, m.result, m.activity = m.generation, 'mix_compile_ok', 0
+  local reply = m.collect(0)
+  vim.diagnostic.reset(ns)
+  assert(reply.message:find('THE_COMPILE_ERROR', 1, true), reply.message)
+  assert(reply.message:find('2 more diagnostics (0 errors)', 1, true), reply.message)
+  return reply.message
+end)
+check('setup_replaces_and_coalesces_notify_scans', function()
+  local first = fixture('first_setup')
+  local old, current = 0, 0
+  first.scan = function() old = old + 1 end
+  local second = fixture('second_setup')
+  second.scan = function() current = current + 1 end
+  for _ = 1, 10 do
+    vim.api.nvim_exec_autocmds('LspNotify', { data = { method = 'workspace/didChangeWatchedFiles' } })
+  end
+  vim.wait(50, function() return false end)
+  assert(old == 0 and current == 1, string.format('old=%d current=%d', old, current))
+  return true
+end)
+check('semantic_current_makes_no_diagnostics_claim', function()
+  local m = fixture('semantic_current')
+  m.scan()  -- first scan records the fixture files
+  package.loaded.neovim_sync = m
+  package.loaded['vv-mcp.lsp'] = { request = function()
+    return { results = { { client = 'elixirls', result = { contents = 'docs' } } } }
+  end }
+  dofile(source .. '/neovim_feedback.lua').install()
+  m.completed, m.result, m.activity = m.generation, 'mix_compile_ok', 0
+  local request = require('vv-mcp.lsp').request
+  for _, operation in ipairs({ 'hover', 'definition', 'references', 'document_symbols' }) do
+    local reply = request({ operation = operation })
+    assert(reply.feedback.status == 'current', operation .. ' ' .. reply.feedback.status)
+    assert(not reply.feedback.message:find('diagnostics', 1, true), operation)
+  end
+  local diagnostics = request({ operation = 'diagnostics' })
+  assert(diagnostics.feedback.message:find('compiler diagnostics are available', 1, true))
+  return true
+end)
+check('unanswered_is_not_an_empty_current_answer', function()
+  local m = fixture('unanswered')
+  m.scan()  -- first scan records the fixture files
+  package.loaded.neovim_sync = m
+  package.loaded['vv-mcp.lsp'] = { request = function()
+    return { results = { { client = 'elixirls', error = 'timeout' } } }
+  end }
+  dofile(source .. '/neovim_feedback.lua').install()
+  m.completed, m.result, m.activity = m.generation, 'mix_compile_ok', 0
+  for _, operation in ipairs({ 'hover', 'document_symbols', 'workspace_symbols' }) do
+    local reply = require('vv-mcp.lsp').request({ operation = operation })
+    assert(reply.feedback.status == 'unanswered' and reply.feedback.retryable, operation)
+    assert(reply.feedback.message:find('(elixirls: timeout)', 1, true)
+      and reply.feedback.message:find('not an empty result', 1, true), operation)
+  end
+  return true
+end)
+check('terminal_status_is_not_hidden', function()
+  local m = fixture('terminal')
+  m.scan()  -- first scan records the fixture files
+  package.loaded.neovim_sync = m
+  local during
+  package.loaded['vv-mcp.lsp'] = { request = function()
+    during()
+    return { results = { { client = 'elixirls', error = 'timeout' } } }
+  end }
+  dofile(source .. '/neovim_feedback.lua').install()
+  local request, seen = require('vv-mcp.lsp').request, {}
+  for _, operation in ipairs({ 'hover', 'document_symbols' }) do
+    for _, change in ipairs({ false, true }) do
+      m.exited, m.completed, m.result, m.activity = nil, m.generation, 'mix_compile_ok', 0
+      -- A server exit during the request reaches Neovim's request_sync as a timeout.
+      during = function()
+        m.exited = { code = 1, signal = 0 }
+        if change then m.generation = m.generation + 1 end
+      end
+      local reply = request({ operation = operation })
+      assert(reply.feedback.status == 'exited' and reply.feedback.retryable == false,
+        operation .. ' ' .. reply.feedback.status)
+      seen[#seen + 1] = reply.feedback.status
+    end
+  end
+  m.exited = nil
+  during = function() m.conflicts[m.root .. '/lib/target.ex'] = true end
+  local conflict = request({ operation = 'document_symbols' })
+  assert(conflict.feedback.status == 'conflict' and conflict.feedback.retryable == false)
+  return seen
+end)
+check('build_during_request_is_not_current', function()
+  local m = fixture('build_during')
+  m.scan()  -- first scan records the fixture files
+  package.loaded.neovim_sync = m
+  local build = false
+  package.loaded['vv-mcp.lsp'] = { request = function()
+    if build then
+      -- A watcher-only build (ignored deps/ path): starts and ends, generation unchanged.
+      m.observe('window/logMessage', { message = 'Starting build with MIX_ENV: test' })
+      m.observe('telemetry/event', { name = 'build', properties = {
+        ['elixir_ls.build_result'] = 'mix_compile_ok',
+      } })
+    end
+    return { results = { { client = 'elixirls', result = { contents = 'docs' } } } }
+  end }
+  dofile(source .. '/neovim_feedback.lua').install()
+  m.completed, m.result, m.activity = m.generation, 'mix_compile_ok', 0
+  local request = require('vv-mcp.lsp').request
+  local idle = request({ operation = 'hover' })
+  assert(idle.feedback.status == 'current', idle.feedback.status)
+  build = true
+  local during = request({ operation = 'hover' })
+  assert(during.feedback.generation == idle.feedback.generation, 'generation changed')
+  assert(during.feedback.status == 'pending', during.feedback.status)
+  assert(during.feedback.message:find('Retry the query', 1, true))
+  build = false
+  local after = request({ operation = 'hover' })
+  assert(after.feedback.status == 'current', after.feedback.status)
+  return { idle = idle.feedback.status, during = during.feedback.status, after = after.feedback.status }
+end)
+check('document_symbols_qualified_by_current_errors', function()
+  local m, path = fixture('symbol_errors')
+  m.scan()  -- first scan records the fixture files
+  package.loaded.neovim_sync = m
+  package.loaded['vv-mcp.lsp.normalize'] = { input_path = function(input) return input end }
+  package.loaded['vv-mcp.lsp'] = { request = function()
+    return { results = { { client = 'elixirls', result = {} } } }
+  end }
+  dofile(source .. '/neovim_feedback.lua').install()
+  m.completed, m.result, m.activity = m.generation, 'mix_compile_ok', 0
+  local bufnr = vim.fn.bufnr(path)
+  local uri = vim.uri_from_bufnr(bufnr)
+  m.documents[uri] = { sent = 1, buffer_version = vim.lsp.util.buf_versions[bufnr], bufnr = bufnr }
+  local request = require('vv-mcp.lsp').request
+  local function publish(version, severity)
+    m.observe('textDocument/publishDiagnostics', { uri = uri, version = version,
+      diagnostics = severity and { { severity = severity, message = 'x' } } or {} })
+    m.activity = 0
+  end
+  local function symbols() return request({ operation = 'document_symbols', uri = path }).feedback end
+  publish(1, 1)
+  local broken = symbols()
+  assert(broken.status == 'current' and broken.message:find('has errors', 1, true), broken.message)
+  m.documents[uri].sent = 2  -- repair sent; its publication has not arrived
+  local waiting = symbols()
+  assert(waiting.status == 'pending' and not waiting.message:find('has errors', 1, true))
+  publish(1, 1)  -- a late publication for the old version is not reused
+  assert(symbols().status == 'pending')
+  publish(2, nil)
+  local repaired = symbols()
+  assert(repaired.status == 'current' and not repaired.message:find('has errors', 1, true))
+  publish(2, 2)  -- a warning is not an error
+  assert(not symbols().message:find('has errors', 1, true))
+  publish(2, 1)
+  local hover = request({ operation = 'hover', uri = path }).feedback
+  assert(hover.status == 'current' and not hover.message:find('has errors', 1, true))
+  return { broken = broken.status, waiting = waiting.status, repaired = repaired.status }
+end)
+check('client_errors_are_not_empty_answers', function()
+  local m, path = fixture('client_errors')
+  m.scan()  -- first scan records the fixture files
+  package.loaded.neovim_sync = m
+  package.loaded['vv-mcp.lsp.normalize'] = { input_path = function(input) return input end }
+  local reply
+  package.loaded['vv-mcp.lsp'] = { request = function() return vim.deepcopy(reply) end }
+  dofile(source .. '/neovim_feedback.lua').install()
+  m.completed, m.result, m.activity = m.generation, 'mix_compile_ok', 0
+  local request = require('vv-mcp.lsp').request
+  local function ask(answers)
+    reply = { results = answers }
+    return request({ operation = 'references', uri = path, line = 1, character = 1 }).feedback
+  end
+  local empty = ask({ { client = 'elixirls' } })
+  assert(empty.status == 'current' and not empty.message:find('No answer', 1, true), empty.message)
+  -- vv-mcp formats a server error response with Neovim's own formatter.
+  local invalid = vim.lsp.rpc.format_rpc_error({ code = -32602, message = 'file:///x' })
+  local refused = ask({ { client = 'elixirls', error = invalid } })
+  assert(refused.status == 'unanswered' and refused.message:find(invalid, 1, true), refused.message)
+  local down = vim.lsp.rpc.format_rpc_error({ code = -32603, message = 'down' })
+  local partial = ask({ { client = 'elixirls', result = { { uri = path } } }, { client = 'other', error = down } })
+  assert(partial.status == 'current'
+    and partial.message:find('No answer from other: ' .. down .. '; results may be incomplete', 1, true),
+    partial.status .. ': ' .. partial.message)
+  return { empty = empty.status, refused = refused.status, partial = partial.status }
+end)
+
 vim.fn.writefile({ vim.json.encode(results) }, output .. '/results.json')
 vim.cmd(failures == 0 and 'qa!' or 'cquit 1')

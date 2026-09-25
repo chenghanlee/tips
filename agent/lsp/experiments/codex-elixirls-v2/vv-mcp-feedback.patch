@@ -63,3 +63,43 @@
      }
  
      #[test]
+--- a/lua/vv-mcp/lsp/context.lua
++++ b/lua/vv-mcp/lsp/context.lua
+@@ -112,6 +112,13 @@
+   end
+ 
+   if operation.scope == 'workspace' then
++    if vim.fn.isabsolutepath(path) ~= 1 or not vim.uv.fs_stat(path) then
++      return nil, {
++        code = 'invalid_path',
++        message = 'uri must be an existing absolute path; pass the project root for the whole workspace',
++        path = Normalize.wire_path(path),
++      }
++    end
+     clients = vim.lsp.get_clients()
+   else
+     bufnr = loaded_buffer(path)
+--- a/lua/vv-mcp/lsp/navigation.lua
++++ b/lua/vv-mcp/lsp/navigation.lua
+@@ -56,7 +56,8 @@
+       results[#results + 1] = {
+         client = client.name,
+         result = result,
+-        error = error and tostring(error) or nil,
++        error = error and tostring(error)
++          or response and response.err and vim.lsp.rpc.format_rpc_error(response.err) or nil,
+       }
+     end
+   end
+--- a/lua/vv-mcp/lsp/symbols.lua
++++ b/lua/vv-mcp/lsp/symbols.lua
+@@ -59,7 +59,8 @@
+       results[#results + 1] = {
+         client = client.name,
+         result = result,
+-        error = error and tostring(error) or nil,
++        error = error and tostring(error)
++          or response and response.err and vim.lsp.rpc.format_rpc_error(response.err) or nil,
+       }
+     end
+   end

@@ -58,6 +58,8 @@ class Arguments(argparse.Namespace):
     start: bool
     force: bool
     ui: bool
+    lsp: str
+    neovim_bundle: Path | None
 
 
 def parse_arguments() -> Arguments:
@@ -75,6 +77,10 @@ def parse_arguments() -> Arguments:
         "--kind", choices=["codex", "claude"], help="Must match the configured role kind"
     )
     parser.add_argument("--review-ref")
+    parser.add_argument("--lsp", choices=["expert", "neovim"], default="expert")
+    parser.add_argument(
+        "--neovim-bundle", type=Path, help="Installed Neovim beta bundle; requires --lsp neovim"
+    )
     parser.add_argument(
         "--ui",
         action="store_true",
@@ -182,6 +188,10 @@ class WorktreeTask:
     def check_settings(self) -> None:
         if self.kind not in ("codex", "claude") or (self.args.kind and self.args.kind != self.kind):
             raise RefusalError("--kind must match the configured role.kind.")
+        if self.args.lsp == "neovim" and self.kind != "codex":
+            raise RefusalError("The opt-in Neovim beta currently supports Codex only.")
+        if self.args.neovim_bundle and self.args.lsp != "neovim":
+            raise RefusalError("--neovim-bundle requires --lsp neovim.")
         if not 1 <= self.args.team <= self.team["max_teams"]:
             raise RefusalError(f"Team must be between 1 and {self.team['max_teams']}.")
         if self.timeouts["mcp_tool_seconds"] != 120:
@@ -227,6 +237,20 @@ class WorktreeTask:
                     )
 
     def check_tools(self) -> None:
+        if self.args.lsp == "neovim":
+            # Each release is a separate immutable directory; never guess one.
+            if self.args.neovim_bundle is None:
+                raise RefusalError("--lsp neovim requires --neovim-bundle /installed/bundle.")
+            self.neovim_bundle = self.args.neovim_bundle.resolve()
+            if not (self.neovim_bundle / "bundle.py").is_file():
+                raise RefusalError(
+                    f"Missing Neovim bundle: {self.neovim_bundle}; build it before opting in."
+                )
+            if not (self.root / ".agents/skills").is_dir():
+                raise RefusalError("Shared skills directory is missing.")
+            if self.args.start:
+                run([sys.executable, self.neovim_bundle / "bundle.py", "doctor"], timeout=30)
+            return
         self.wrapper = self.root / "agent/lsp/launch_worktree_lsp.sh"
         if not self.wrapper.is_file() or not (self.root / ".agents/skills").is_dir():
             raise RefusalError("Canonical LSP wrapper or shared skills directory is missing.")
@@ -279,6 +303,22 @@ class WorktreeTask:
             self.old_head = git("-C", self.worktree, "rev-parse", "HEAD")
 
     def prepare_config(self) -> None:
+        if self.args.lsp == "neovim":
+            files = json.loads(
+                run(
+                    [
+                        sys.executable,
+                        self.neovim_bundle / "bundle.py",
+                        "config",
+                        "--workspace",
+                        self.worktree,
+                        "--lsp-approval-mode",
+                        self.policies["codex_lsp_approval_mode"],
+                    ]
+                )
+            )
+            self.desired = {self.worktree / name: content for name, content in files.items()}
+            return
         if self.kind == "codex":
             config = f"""[plugins."mix-compile@elixir-agent-tools"]
 enabled = true
@@ -509,7 +549,30 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
             self.skills.unlink(missing_ok=True)
             self.skills.symlink_to(shared_skills)
 
+    def prepare_dependencies(self) -> None:
+        """Compile dependencies once with project Mix and seed ElixirLS's private build.
+
+        Optional: on any failure ElixirLS compiles them itself, as before.
+        """
+        print("ElixirLS dependencies: preparing, about a minute on a new worktree.", flush=True)
+        try:
+            report = run(
+                [
+                    sys.executable,
+                    self.neovim_bundle / "bundle.py",
+                    "prepare-deps",
+                    "--workspace",
+                    self.worktree,
+                ],
+                env=os.environ | self.target_env,
+            )
+        except RefusalError as error:
+            report = str(error)
+        print("ElixirLS dependencies: " + report, flush=True)
+
     def launch(self) -> None:
+        if self.args.lsp == "neovim":
+            self.prepare_dependencies()
         # Herdr runs separately: exports must execute in the target pane.
         marker = "TIPS_TASK_READY_" + uuid.uuid4().hex
         setup = (
@@ -537,6 +600,19 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
         client: list[str] = []
         if self.kind == "codex":
             client += ["-a", self.policies["codex_approval"], "-C", str(self.worktree)]
+            if self.args.lsp == "neovim":
+                client = ["-a", self.policies["codex_approval"]]
+                client += json.loads(
+                    run(
+                        [
+                            sys.executable,
+                            self.neovim_bundle / "bundle.py",
+                            "codex-args",
+                            "--workspace",
+                            self.worktree,
+                        ]
+                    )
+                )
             if self.model:
                 client += ["-m", self.model]
             client += ["-c", "model_reasoning_effort=" + json.dumps(self.effort)]
