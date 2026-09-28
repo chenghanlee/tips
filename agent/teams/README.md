@@ -84,7 +84,11 @@ For context recovery, keep issue and branch open. Record base and head SHAs, PR 
 
 **Environment.** The helper applies the role’s configured model, effort, permissions, database suffix and test port in the live target process. It exports `PGPORT`, `TIPS_DB_SUFFIX`, `TIPS_TEST_PORT`, `MIX_ENV`, `TIPS_CHECK_TIMEOUT_SECONDS`, `TIPS_PROVIDER_ENV_FILE`, and links main checkout's `.agents/skills` into each worktree. Preserve these values in tests, including Wallaby.
 
-Read provider settings by path from main checkout's `.env`; only the user adds new credentials there. Never write secrets into worktrees. Inspect launch values with `env | grep -E '^(PGPORT|MIX_ENV|TIPS_)'`; macOS `printenv` prints only its first named variable. Startup confirms client launch, not index readiness: Expert indexes in the background. Never add a compile gate or probe LSP; see [LSP guide](../lsp/README.md). Agents propose defaults and use synthetic fixtures; never fabricate firsthand production content. Real-provider tests require user-authorized invocations quoted on the issue by lead TPM, with scoped secrets; never run automatically on PR code.
+It also sets `TIPS_ELIXIR_TOOLS` to the shared Dexter installation and leaves `PATH`
+unchanged. Codex's project config declares `TIPS_ELIXIR_TOOLS`, not the launching
+shell's `PATH`. Both clients invoke `"$TIPS_ELIXIR_TOOLS/bin/dexter"`.
+
+Read provider settings by path from main checkout's `.env`; only the user adds new credentials there. Never write secrets into worktrees. Inspect launch values with `env | grep -E '^(PGPORT|MIX_ENV|TIPS_)'`; macOS `printenv` prints only its first named variable. Before database-writing checks, confirm the team/role partition matches config. Startup confirms client launch, not index readiness: Dexter indexes in the background; see [Dexter guide](../lsp/README.md). Agents propose defaults and use synthetic fixtures; never fabricate firsthand production content. Real-provider tests require user-authorized invocations quoted on the issue by lead TPM, with scoped secrets; never run automatically on PR code.
 
 **Checks.** Trust CI only for commands actually run. For `agent/teams` Python changes, CI is the evidence: open the exact-head `checks` run, verify these four steps passed and link the run in your round.
 
@@ -120,7 +124,7 @@ For code changes, first complete the [lead TPM's ad-hoc Codex review](roles/lead
 ## Client constraints
 
 - Codex sandboxes cannot write main checkout's `.git`, so team TPM runs all Git administration there; Claude tech leads follow the same flow. The helper and `team.py stop` reject callers lacking that write access.
-- Codex writes only within its worktree, so chavruta lives in reviewer's `tmp/`. Codex `never` approval rejects tools needing approval, so generated config sets per-tool approval only for the four LSP tools, preserving the user's sandbox configuration.
+- Codex writes only within its worktree, so chavruta lives in reviewer's `tmp/`. Codex `never` approval rejects tools needing approval. Dexter uses ordinary shell permissions; report unavailable commands rather than bypassing the client's policy.
 - Codex reviewers outside teams cannot post to GitHub.
 - Claude auto mode may deny tech-lead `gh pr merge`, developers killing their own LSP children, copying/writing `.env`, or pilots posting issue comments. Treat each as Permission denial.
 - `/new`, `/clear` and `cd` cannot reroot a running client's LSP. Clients cannot stop themselves with `team.py stop`. Optional `--kind` must match configured role kind.

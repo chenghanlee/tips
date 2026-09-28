@@ -13,14 +13,10 @@ db_suffix_prefix = "_team"
 launch_seconds = 120
 shutdown_seconds = 15
 shell_seconds = 15
-mcp_startup_seconds = 60
-mcp_tool_seconds = 120
 checks_minutes = 30
 
 [launch]
 codex_approval = "never"
-# Applies only to definition, references, hover and diagnostics on our LSP server.
-codex_lsp_approval_mode = "approve"
 claude_permission_mode = "auto"
 
 [roles.dev]

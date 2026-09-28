@@ -47,8 +47,8 @@ criteria and review evidence in the relevant GitHub issue and PR.
 - [Agent teams](agent/teams/README.md): the shared operating agreement, with one card per
   role under `agent/teams/roles/`; [setup](agent/teams/SETUP.md) covers prerequisites and
   configuration.
-- [Elixir language server](agent/lsp/README.md): build the shared tools and run a
-  separate server for each coding client's worktree.
+- [Dexter navigation](agent/lsp/README.md): one pinned upstream command-line tool
+  for Claude and Codex Elixir navigation.
 
 Agent tooling is separate from the application. You do not need it to run Tips.
 
@@ -73,13 +73,13 @@ Agent tooling is separate from the application. You do not need it to run Tips.
 | `docs/development/` | Setup, testing and toolchain guides |
 | `docs/design/` | Current product and technical requirements |
 | `agent/teams/` | Agent coordination, configuration, instructions and tests |
-| `agent/lsp/` | Agent language-server launcher, builds and patches |
+| `agent/lsp/` | Pinned upstream Dexter installation and usage |
 
 Installed LSP binaries live in ignored `agent/lsp/vendor/`, shared from the main checkout.
 
 Keep root files in their standard locations for Mix, Git and Docker.
 Put disposable experiment output in ignored `tmp/` or outside the repository.
-Expert stores its generated logs, indexes and builds in `_build/expert/`.
+Dexter stores its generated index in `.dexter/`.
 
 Leave generated and client-managed folders, such as `_build/`, `deps/`, `.codex/`
 and `.claude/`, in their expected locations.

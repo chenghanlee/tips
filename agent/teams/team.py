@@ -216,7 +216,7 @@ def herdr(*args: str) -> HerdrResult:
 
 
 def processes() -> ProcessRows:
-    # Parent links, not process groups: Expert engines can create their own groups.
+    # Parent links, not process groups: children can create their own groups.
     rows: ProcessRows = {}
     for line in run("ps", "-axo", "pid=,ppid=,stat=,lstart=").splitlines():
         pid, parent, state, started = line.split(None, 3)
@@ -251,6 +251,20 @@ def pane_occupant(pane: str) -> tuple[Path, bool]:
     return occupant(pane, herdr("pane", "process-info", "--pane", pane)["process_info"])
 
 
+def release_dexter(root: Path, tools: Path, timeout: float) -> bool:
+    """Ask the workspace owner to stop; an attached client makes Dexter refuse."""
+    if not (root / ".dexter").exists():
+        return True
+    # Without its exact marker, Dexter can resolve --root to an ancestor's index.
+    if not (root / ".dexter/dexter.db").is_file():
+        return False
+    try:
+        result = execute([tools / "bin/dexter", "stop", "--root", root], timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return False
+    return result.returncode == 0
+
+
 def stop(pane: str, root: str | Path) -> None:
     root = Path(root)
     if not root.is_absolute():
@@ -270,7 +284,7 @@ def stop(pane: str, root: str | Path) -> None:
         raise RuntimeError(f"{pane}: cannot stop the calling agent; ask its TPM to stop it")
     identity = {pid: rows[pid][1] for pid in owned if pid in rows}
     signal_client(pane, current, clients, owned)
-    wait_for_exit(pane, shell, identity)
+    wait_for_exit(pane, shell, identity, clients, root)
     release_name(pane, current)
     print(f"{pane}: client and owned descendants exited")
 
@@ -290,10 +304,17 @@ def signal_client(pane: str, current: Entity, clients: set[int], owned: set[int]
         raise RuntimeError(f"{pane}: agent/process state disagrees; preserved")
 
 
-def wait_for_exit(pane: str, shell: int, identity: dict[int, str]) -> None:
+def wait_for_exit(
+    pane: str, shell: int, identity: dict[int, str], clients: set[int], root: Path
+) -> None:
     deadline = time.monotonic() + cfg["timeouts"]["shutdown_seconds"]
+    tools = Path(os.environ.get("TIPS_ELIXIR_TOOLS", str(main / "agent/lsp/vendor")))
+    # A coordinator does not own other users of the main checkout's shared index.
+    released = root == main.resolve()
     while True:
         rows = processes()
+        if not released and not clients.intersection(rows):
+            released = release_dexter(root, tools, max(0.1, deadline - time.monotonic()))
         # Include children born during graceful shutdown, while their parent is still known.
         for parent in (shell, *identity):
             if parent == shell or rows.get(parent, (None, None))[1] == identity[parent]:
@@ -302,10 +323,13 @@ def wait_for_exit(pane: str, shell: int, identity: dict[int, str]) -> None:
         alive = [
             pid for pid, started in identity.items() if rows.get(pid, (None, None))[1] == started
         ]
-        if not alive:
+        if not alive and released:
             return
         if time.monotonic() >= deadline:
-            raise RuntimeError(f"{pane}: surviving owned processes {alive}; resources preserved")
+            raise RuntimeError(
+                f"{pane}: surviving owned processes {alive} or Dexter release unconfirmed; "
+                "resources preserved"
+            )
         time.sleep(0.1)
 
 
@@ -353,7 +377,7 @@ def validate_config_fields(path: Path, value: Config) -> None:
         require_type(settings.get(key), str, f"{path}: team.{key}")
     object_fields(fields.get("timeouts"), f"{path}: timeouts")
     policies = object_fields(fields.get("launch"), f"{path}: launch")
-    for key in ("codex_approval", "codex_lsp_approval_mode", "claude_permission_mode"):
+    for key in ("codex_approval", "claude_permission_mode"):
         require_type(policies.get(key), str, f"{path}: launch.{key}")
     roles = object_fields(fields.get("roles"), f"{path}: roles")
     for name in ("dev", "test", "lead", "tpm", "lead_tpm"):
@@ -379,8 +403,6 @@ def validate_settings(path: Path, value: Config) -> None:
         "shutdown_seconds",
         "shell_seconds",
         "checks_minutes",
-        "mcp_startup_seconds",
-        "mcp_tool_seconds",
     ):
         if type(value["timeouts"][key]) is not int or value["timeouts"][key] <= 0:
             raise RuntimeError(f"{path}: timeouts.{key} must be a positive integer")
@@ -391,8 +413,6 @@ def validate_settings(path: Path, value: Config) -> None:
         if role is not None and role["kind"] not in ("codex", "claude"):
             raise RuntimeError(f"{path}: invalid role {name}")
     validate_lead_ui(path, value)
-    if value["launch"]["codex_lsp_approval_mode"] not in ("auto", "prompt", "writes", "approve"):
-        raise RuntimeError(f"{path}: invalid Codex LSP approval mode")
 
 
 def validate_lead_ui(path: Path, value: Config) -> None:
@@ -503,7 +523,14 @@ def coordinator(pane: Entity, name: str, role: str) -> None:
             "--effort",
             spec["effort"],
             "--settings",
-            json.dumps({"enabledPlugins": {"elixir-lsp@elixir-agent-tools": False}}),
+            json.dumps(
+                {
+                    "enabledPlugins": {
+                        "elixir-lsp@elixir-agent-tools": False,
+                        "dexter-lsp@dexter": False,
+                    }
+                }
+            ),
             "--strict-mcp-config",
             "--mcp-config",
             '{"mcpServers":{}}',

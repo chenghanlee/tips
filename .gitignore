@@ -7,6 +7,8 @@
 !.env.example
 .agent-runs/
 /agent/lsp/vendor/
+/.dexter/
+/.dexter.db*
 /agent/elixir-agent-tools/
 .worktrees/
 __pycache__/

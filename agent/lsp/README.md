@@ -1,111 +1,183 @@
-# Elixir language server
+# Dexter for Tips
 
-Codex and Claude use Expert through an MCP bridge. Each coding client runs its own
-bridge and Expert in its assigned worktree. Clients share installed binaries and
-the engine preparation cache. TPMs run without an LSP.
+**Experimental integration.** Claude and Codex both use Dexter's stock command-line
+interface for named Elixir navigation. The limits below apply.
 
-## Files
+Tips uses unmodified [Dexter](https://github.com/remoteoss/dexter) to find Elixir
+definitions and references. Both clients run its `lookup` and `references`
+commands in a normal shell. Tips sessions disable Dexter's native LSP plugin.
+Hover, diagnostics and cursor-position requests are not provided.
+This integration adds no MCP bridge, wrapper, Neovim adapter, compilation hook or local server patch.
 
-| File | Purpose |
-|---|---|
-| `launch_worktree_lsp.sh` | Start the bridge and Expert in the supplied worktree. |
-| `build_install_expert.sh` | Build, test and install patched Expert. |
-| `build_install_mcp_bridge.sh` | Build, test and install the patched MCP bridge. |
-| `patches/expert-reference-results.patch` | Distinguish reference results, index readiness and failures. |
-| `patches/expert-generated-data.patch` | Keep per-checkout logs, indexes and builds under `_build/expert/`. |
-| `patches/expert-worktree-isolation.patch` | Isolate project indexes and serialize shared engine preparation. |
-| `patches/mcp-bridge-tools-and-lifecycle.patch` | Fix navigation, document synchronization, deadlines and process cleanup. |
+Why not the native plugin: in our test, it kept its own copy of each queried file.
+Claude's Edit tool updated that copy; a shell edit (`sed`, `mix format`, generators)
+left it stale, while the CLI returned the new location from the updated index.
 
-Existing installed binaries can run without the patch files. A new teammate needs
-the patches to reproduce those working binaries. Deleting them would leave our
-fixes only inside the current installation, unless recovered from Git history.
-Keep the patches in `patches/`; the build scripts apply them before compiling.
+## Install
 
-`vendor/` holds the installed binaries and versioned Expert releases. It is ignored
-by Git and shared from the main checkout. Per-worktree generated data belongs in
-`_build/expert/`.
+Install Git and Go 1.26.1 or newer. From the main checkout:
 
-## Build and validate
-
-Install the tools listed in the [local development guide](../../docs/development/local-development.md).
-Builds also require Git, Bash, `patch`, Python 3.12, Go and `unbuffer` (Expect).
-Build from a worktree and set the shared installation directory explicitly:
-
-```bash
-export TIPS_ELIXIR_TOOLS=/absolute/path/to/main/agent/lsp/vendor
-agent/lsp/build_install_expert.sh
-agent/lsp/build_install_mcp_bridge.sh
+```sh
+agent/lsp/install_dexter.sh
 ```
 
-The scripts fetch pinned sources, apply patches and run affected tests before
-installation. Expert installs a versioned release; the bridge replaces its binary
-atomically. An existing Expert release is not overwritten. Installing tools does
-not restart clients. Restart a client to load new binaries.
+The installer builds the exact upstream commit in [dexter.rev](dexter.rev),
+without modifying its source. This is an unreleased upstream revision containing
+the shared workspace daemon; the binary's version string alone does not identify it. To use a shared
+installation elsewhere, set `TIPS_ELIXIR_TOOLS` before installing and launching.
 
-## Start and use
+`vendor/` is Git-ignored. Rebuild after changing the pin and restart clients before
+using the new binary. Do not mix server versions or upgrade a running workspace's
+daemon in place. The helper uses this pinned path, not an arbitrary system Dexter.
 
-Use the [team workflow](../teams/README.md) to provision and launch clients.
-The helper generates the selected client's config from [config.toml](../teams/config.toml).
-It calls the main checkout's wrapper with the assigned absolute worktree path.
-Older review commits do not need their own copy of the wrapper.
+## Use with agent teams
 
-Configure the MCP client to invoke the wrapper with its worktree path:
+From the assigned worktree root, both clients run:
 
-```bash
-/absolute/path/to/main/agent/lsp/launch_worktree_lsp.sh /absolute/path/to/worktree
+```sh
+"$TIPS_ELIXIR_TOOLS/bin/dexter" --root "$PWD" lookup --strict --wait 30s Module function
+"$TIPS_ELIXIR_TOOLS/bin/dexter" --root "$PWD" references --wait 30s Module function
 ```
 
-It finds binaries in the main checkout's `agent/lsp/vendor/bin`, unless
-`TIPS_ELIXIR_TOOLS` specifies another tools directory. Install Mix dependencies
-in each worktree. Elixir and Erlang must be on the client's `PATH`.
+The [team helper](../teams/README.md) sets `TIPS_ELIXIR_TOOLS` to the installation
+path; it does not change `PATH`. Codex receives it and the team's other values
+through its supported `shell_environment_policy.set` config. This keeps the
+shell's database partition explicit even with a shared Codex daemon.
 
-- Brief agents after client launch. Expert builds and indexes in the background.
-- Do not add a compile-ready gate or start another LSP as a probe.
-- A running reviewer's checkout advances in place and its LSP keeps the same
-  root. A client is stopped, with all owned descendants verified to exit, only
-  when a reviewer session is replaced or a worktree is deleted; the team scripts
-  do both (see the Team TPM and Lead TPM cards in the
-  [agent teams guide](../teams/README.md)). Conversation reset does not reroot
-  the LSP.
-- After wrapper path changes, regenerate client configs before their next launch.
-  Update standalone client configs when the new path exists in main.
+Claude's launch passes the generated `.claude/settings.local.json` with `--settings`.
+It disables Dexter's native plugin, the old Expert plugin and automatic Mix plugins
+for that session. A linked worktree may read local settings from the main checkout,
+so the helper names the file explicitly. Coordinator sessions disable the native
+plugin too; they do not initialize or own an index.
+Normal formatting, compilation, Credo and tests remain explicit project checks.
 
-## Tool behavior
+## Use directly
 
-- Source files must belong to the Expert session's workspace. An outside file
-  returns a workspace-mismatch error with both paths. Use a session rooted at
-  that file's project; retrying the current session will not load it.
-  Definition results may still point to external dependency source files.
-- `definition`, `references` and `hover` take `filePath`, `line` and `column`.
-  Positions are 1-based; columns use UTF-16 code units.
-- References belong to the project selected by the source file. Query a call site
-  in the application to find its uses of a dependency.
-- References retry only `index_not_ready`. Other failures and timeouts are errors,
-  not successful empty results.
-- Keep the client tool timeout aligned with the bridge's compiled deadline.
-  The helper rejects a conflicting setting. Queued calls can wait before that
-  handler deadline starts.
-- Diagnostics without document versions cannot confirm an exact edit match.
-  A timeout can leave stale diagnostics. Inspect the reported result.
-- Expert logs, indexes and builds are in the assigned worktree's `_build/expert/`
-  directory. Installed binaries remain in the main checkout's `agent/lsp/vendor/`.
-  Removing `_build/` also removes this generated data; Expert recreates it.
-- After installing this version, restart old LSP sessions before removing their
-  obsolete `.expert/` directories. Do not move or delete data used by a live server.
+In your terminal, prepare the worktree and start Claude with Dexter's native plugin
+disabled for this new session only. For Codex, run `codex` instead of the last line.
+
+```sh
+cd /absolute/path/to/tips-worktree
+
+# Once per new worktree, before querying (omit if already initialized).
+/absolute/path/to/main/agent/lsp/vendor/bin/dexter init "$PWD"
+
+claude --settings '{"enabledPlugins":{"dexter-lsp@dexter":false}}'
+```
+
+Inside the agent's shell, both clients query with the pinned binary's absolute path:
+
+```sh
+/absolute/path/to/main/agent/lsp/vendor/bin/dexter --root "$PWD" lookup --strict --wait 30s Tips.ProviderConfig
+/absolute/path/to/main/agent/lsp/vendor/bin/dexter --root "$PWD" references --wait 30s Tips.ProviderConfig
+```
+
+The `--settings` flag changes only that session and leaves the global plugin
+installed. It does not override a managed policy that requires the plugin. It keeps
+your other plugins, including automatic Mix plugins. The CLI still starts Dexter's
+daemon and BEAM helper; in our Homebrew 0.7.2 test, that helper made the
+`mix-compile` hook skip compilation. Run project checks explicitly.
+A coordinator that needs ad hoc navigation uses these direct instructions.
+
+Team sessions get `TIPS_ELIXIR_TOOLS` from the helper. A direct launch may not
+inherit exports from its terminal under a shared Codex daemon, so use the absolute
+path. Do not assume bare `dexter` selects this installation.
+
+Optional: to avoid passing the flag each launch, run
+`claude plugin disable dexter-lsp@dexter --scope local`. Local scope applies to this
+project on your machine; in a linked worktree, Claude may store it at the main
+checkout, which affects all its worktrees. Undo it with
+`claude plugin enable dexter-lsp@dexter --scope local`. The per-session flag is the default.
+
+The team helper performs the initial `init` automatically. It matters for nested
+worktrees: this Dexter revision can otherwise prefer an ancestor's existing index
+over a nearer Git/Mix root, even with `--root`. Do not delete `.dexter/` while a
+client is running. Reinitialize before querying again if you removed it.
+
+For a function, append its name after the module. `lookup --strict` prevents fuzzy name
+matching. CLI arguments name a module and optionally a function; they do not select
+an arity or resolve an expression at a call site. Resolve aliases and imports from
+source, then inspect the returned source before edits.
+Lookup follows `defdelegate` to its target by default. Add `--no-follow-delegates`
+when you want the delegating function's own declaration.
+`references Module` finds uses of the module itself, not all calls to its functions;
+name the function to find its callers.
+
+## What the results mean
+
+Dexter owns parsing, indexing, watching and readiness. `--wait 30s` bounds initial
+index waiting; it does not certify that an answer includes a particular edit.
+Both empty and non-empty results can be incomplete. If initial indexing takes
+longer than the wait, the pinned CLI can return a non-empty subset without a warning.
+Successful exit and silence do not prove indexing finished. Wait for the command
+to exit before reading its result. If a result disagrees with source, report the
+limit and inspect the source; do not repeat the query until it agrees.
+
+The pinned revision indexes Git-ignored source copies under `tmp/`, including
+files created by Tips' own tests, producing duplicate locations. A copy can
+appear first. There is no stock exclusion setting in this revision. Check the
+path before editing; keep future copied projects outside the working repository.
+
+Homebrew `dexter-lsp` 0.7.2 is not a supported substitute: it has no `stop`,
+`--root` or `--wait`.
+
+Startup found ordinary offline edits, but queries immediately after a live write
+returned stale or missing results in our multi-worktree test. `--wait` waits for
+startup indexing, not for each edit; a later shell command is not a freshness
+guarantee either.
+
+For a known changed file that still returns an old answer, run
+`reindex path/to/file.ex` with the same pinned binary and workspace root used for
+navigation, then inspect the returned source. This recovered the tested offline
+edit that preserved size and modification time. Use the file form: bare or
+directory `reindex` uses modification times and can skip such edits. Reindex
+completion is not proof that parsing and index writes succeeded. It is recovery
+for an observed problem, not a required step after every edit. `init --force`
+deletes and rebuilds the whole index and requires the workspace to be released;
+it is not needed for this tested recovery.
+
+Dexter parses source and may approximate generated code using compiled artifacts.
+`--strict` prevents fuzzy name matching but can still return a module declaration
+for a BEAM-derived function, without marking it as approximate. Our reference tests
+missed a delegated caller and protocol/behaviour implementation callers reached
+through dynamic dispatch. A real Tips query also missed the local capture
+`&fetch_api_key/0`; exit 1 with "No references found" does not prove there are no callers.
+Navigation is useful evidence, not a replacement for
+compilation or tests, and a successful compile
+does not certify reference completeness. There is no required per-file diagnostic
+ritual or synthetic global `current` label.
+
+## Stop and change workspaces
+
+Dexter shares one daemon/index per workspace. Index files live in `.dexter/`; a CLI
+query can leave an intentionally idle daemon. Closing a frontend need not stop it.
+Before deleting or repurposing a workspace, use the supported command:
+
+```sh
+/absolute/path/to/main/agent/lsp/vendor/bin/dexter --root /absolute/path/to/tips-worktree stop
+```
+
+This refuses while clients remain attached. Close those clients and retry; do not
+force another agent off the workspace. The team helper uses this same non-forced
+command during teardown and before reconfiguring an unowned worktree. A refusal
+preserves the worktree. It does not certify unrelated shell jobs have finished.
+Stopping a coordinator in the main checkout leaves that shared index alone;
+the coordinator does not own other users' main-checkout sessions.
+
+If `.dexter/` exists without `dexter.db`, the helper refuses reuse or cleanup:
+Dexter's root discovery could otherwise select an ancestor's index. Close the
+affected clients and have the operator verify that no Dexter process owns that
+worktree before removing the incomplete `.dexter/` directory and rerunning setup.
+Do not use `dexter stop --root` to repair this missing-marker case.
 
 ## Check changes
 
-```bash
+```sh
 python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
+pyright -p agent/teams/pyproject.toml
+python3 scripts/check_docs.py
 ```
 
-Before adopting launcher or tool changes, pilot both real clients in disposable
-worktrees. Check client cwd, actual LSP workspace, exact reference results,
-reviewer revision advance and complete descendant exit. Config inspection alone
-does not prove the running root. Do not infer full team capacity from a small pilot.
-
-In the same pilot, each client must create a file and use its normal shell to
-stage, commit and push to a disposable remote. Verify clean worktrees, matching
-local/remote SHAs and receipt of the explicit Herdr handoff. Preserve permission
-errors and report them to the TPM; do not use an API workaround. Follow the
-[handoff instructions](../teams/README.md#shared-rules). No hooks or `--wait`.
+On an upstream bump, test real CLI navigation from both clients, external edits,
+same-named isolated workspaces, and the non-forced stop contract. Keep the server
+unmodified; report upstream defects instead of growing a compatibility layer.

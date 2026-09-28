@@ -186,7 +186,7 @@ label matches `RELEASE_REVISION`, as used by CI.
 ### Agent tooling
 
 Use the [agent team guide](../../agent/teams/README.md) for coordination and
-[Elixir LSP guide](../../agent/lsp/README.md) for client setup, builds and acceptance.
+[Dexter guide](../../agent/lsp/README.md) for client setup, builds and acceptance.
 
 ### Extension-enabled database
 

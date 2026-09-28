@@ -246,6 +246,76 @@ while True: time.sleep(.05)
         assert p.poll() is None
         assert "surviv" in r.stderr.lower()
 
+    def dexter(self, refusal: bool = False) -> None:
+        (self.root / ".dexter").mkdir()
+        (self.root / ".dexter/dexter.db").touch()
+        tools = self.root / "tools/bin"
+        tools.mkdir(parents=True)
+        program = tools / "dexter"
+        record = self.root / "dexter-call"
+        program.write_text(
+            "#!/usr/bin/env python3\nimport json, pathlib, sys\n"
+            f"pathlib.Path({str(record)!r}).write_text(json.dumps(sys.argv[1:]))\n"
+            f"sys.exit({1 if refusal else 0})\n"
+        )
+        program.chmod(0o755)
+        self.env["TIPS_ELIXIR_TOOLS"] = str(tools.parent)
+
+    def test_stop_releases_dexter_using_its_non_forced_command(self) -> None:
+        self.dexter()
+        self.client()
+        r = self.stop()
+        assert r.returncode == 0, r.stderr
+        assert json.loads((self.root / "dexter-call").read_text()) == [
+            "stop",
+            "--root",
+            str(self.root),
+        ]
+
+    def test_dexter_refusal_preserves_resources_and_name(self) -> None:
+        self.dexter(refusal=True)
+        self.client()
+        r = self.stop()
+        assert r.returncode != 0
+        assert "preserved" in r.stderr
+        calls = [json.loads(line) for line in (self.root / "calls").read_text().splitlines()]
+        assert ["agent", "rename", "wT:p1", "--clear"] not in calls
+
+    def test_main_coordinator_exit_leaves_the_shared_index_alone(self) -> None:
+        self.dexter(refusal=True)
+        alias = self.root / "main-alias"
+        alias.symlink_to(self.root, target_is_directory=True)
+        client = self.client()
+        result = execute(
+            [
+                "python3",
+                "-c",
+                "import sys; from pathlib import Path; sys.path.insert(0,sys.argv[1]); "
+                "import team; team.configure(); team.main=Path(sys.argv[2]); "
+                'team.stop("wT:p1",team.main)',
+                str(SCRIPT.parent),
+                str(alias),
+            ],
+            env=self.env,
+            timeout=8,
+        )
+        assert result.returncode == 0, result.stderr
+        assert client.wait(timeout=2) == 0
+        assert not (self.root / "dexter-call").exists()
+
+    def test_dexter_stop_timeout_preserves_resources_with_release_error(self) -> None:
+        self.dexter()
+        (self.root / "tools/bin/dexter").write_text(
+            "#!/usr/bin/env python3\nimport time\ntime.sleep(5)\n"
+        )
+        self.client()
+        result = self.stop()
+        assert result.returncode != 0
+        assert "resources preserved" in result.stderr
+        assert "TimeoutExpired" not in result.stderr
+        calls = [json.loads(line) for line in (self.root / "calls").read_text().splitlines()]
+        assert ["agent", "rename", "wT:p1", "--clear"] not in calls
+
 
 class GitAdminGuardTest(unittest.TestCase):
     def test_writable_probe_preserves_existing_git_files(self) -> None:
@@ -415,6 +485,13 @@ class TeamLifecycleTest(unittest.TestCase):
         setups = [c[3] for c in self.calls() if c[:2] == ["pane", "run"]]
         assert "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=35" in setups[0]
         assert "--strict-mcp-config" in starts[0]
+        settings = json.loads(starts[0][starts[0].index("--settings") + 1])
+        assert settings == {
+            "enabledPlugins": {
+                "elixir-lsp@elixir-agent-tools": False,
+                "dexter-lsp@dexter": False,
+            }
+        }
 
     def test_narrow_pane_setup_acknowledges_output_but_never_its_echo(self) -> None:
         r = self.run_team("start", "1")

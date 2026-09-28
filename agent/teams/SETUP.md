@@ -6,7 +6,7 @@ Humans: perform setup from the repository root. Agents use the [operating agreem
 
 Install Python 3.12 and [configured client CLIs](config.toml). Authenticate clients and GitHub CLI (`gh`) for this repository. Merges require GNU `timeout` on `PATH`: macOS `brew install coreutils`; Linux distribution `coreutils` package.
 
-From the main checkout, install pinned [Elixir Agent Tools](https://github.com/georgeguimaraes/elixir-agent-tools) for required skills/Mix plugins:
+From the main checkout, install pinned [Elixir Agent Tools](https://github.com/georgeguimaraes/elixir-agent-tools) for engineering skills:
 
 ```bash
 git clone https://github.com/georgeguimaraes/elixir-agent-tools.git agent/elixir-agent-tools
@@ -19,24 +19,26 @@ done
 
 Inspect existing destinations before replacing these Git-ignored dependencies. Keep the source checkout: launchers link main checkout's `.agents/skills` into worktrees without downloading skills.
 
-From the main checkout, install plugins for clients you use:
+For Claude Code, install the engineering skills plugin from that checkout:
 
 ```bash
-# Codex
-codex plugin marketplace add "$PWD/agent/elixir-agent-tools"
-codex plugin add mix-compile@elixir-agent-tools
-codex plugin add mix-credo@elixir-agent-tools
-
-# Claude Code (user scope makes the installations available across worktrees)
+# Claude Code (user scope makes the installation available across worktrees)
 claude plugin marketplace add "$PWD/agent/elixir-agent-tools"
 claude plugin install --scope user elixir-dev@elixir-agent-tools
-claude plugin install --scope user mix-compile@elixir-agent-tools
-claude plugin install --scope user mix-credo@elixir-agent-tools
 ```
 
-Codex discovers linked `.agents/skills`; never also install Codex `elixir-dev`. Claude loads the same five skills through `elixir-dev`. Generated configs enable both Mix check plugins. Follow plugin trust prompts. Tips uses a patched LSP bridge; generated Claude config disables upstream `elixir-lsp`.
+Codex discovers linked `.agents/skills`; never also install Codex `elixir-dev`. Claude loads the same five skills through `elixir-dev`. Generated configs disable automatic Mix plugins, the old Expert integration and Dexter's native LSP plugin. Agents run project checks explicitly.
 
-Build shared Expert/MCP bridge binaries with the [LSP guide](../lsp/README.md#build-and-validate), then start new client sessions. Keep installed binaries independent of task worktrees.
+Install stock Dexter with the [Dexter guide](../lsp/README.md#install), then start new client sessions. Both clients use the pinned binary's CLI; no Dexter plugin is needed. If `dexter-lsp@dexter` is installed globally, team launches disable it per session and leave the global installation intact. Keep the installation independent of task worktrees.
+
+Merge the Dexter integration, including root `AGENTS.md` and `CLAUDE.md`, into
+`origin/main` before provisioning normal tasks. New developer branches start from
+the helper's freshly fetched `origin/main` and inherit these instructions from that
+commit; installing the binary alone does not update them. Existing task branches
+must merge the updated `origin/main`, and review refs must include the instructions,
+before starting a Dexter session. With teams stopped, update the canonical checkout
+and install its pinned Dexter before launching new teams. The helper does not copy
+instructions over a task branch's files.
 
 ## Starting the lead TPM
 
@@ -50,16 +52,16 @@ Do not run it while another live agent owns `lead-tpm`. The lead TPM starts and 
 
 ## Configuration
 
-Edit [config.toml](config.toml): team limits; client/model/effort per role; port/database allocation; permissions; coordinator compaction; time budgets. Scripts read the canonical main checkout's file. Use `TIPS_TEAM_CONFIG=/absolute/path` for staged configuration in a disposable pilot. Settings apply next launch. When changing the corresponding client timeout, rebuild/retest the bridge: its request deadline is compiled in.
+Edit [config.toml](config.toml): team limits; client/model/effort per role; port/database allocation; permissions; coordinator compaction; time budgets. Scripts read the canonical main checkout's file. Use `TIPS_TEAM_CONFIG=/absolute/path` for staged configuration in a disposable pilot. Settings apply next launch.
 
-Codex config applies `launch.codex_lsp_approval_mode` only to four enabled LSP tools via [per-tool MCP settings](https://developers.openai.com/codex/mcp), preserving overall approval/sandbox policies. Codex approval policy neither changes nor guarantees its sandbox. Claude permission mode uses the same config. Coordinator launches use configured compaction; coding launches do not inherit it.
+Client approval and sandbox policies remain separate from Dexter. Claude permission mode uses the team config. Coordinator launches use configured compaction; coding launches do not inherit it. Codex shell environment settings receive the existing team values; no daemon launch workaround is required.
 
 | Allocation | Components |
 |---|---|
 | Database suffix | `team.db_suffix_prefix`, team number, `roles.<role>.db_suffix` |
 | Test port | `team.port_base` + team number × `team.port_stride` + role `port_offset` |
 
-Both clients invoke main checkout's LSP wrapper with the assigned absolute worktree root; reviewed revisions need not contain the wrapper. Configuration/tooling changes require disposable pilots verifying both client and LSP roots in each actual client. Before scaling, measure simultaneous cold-start capacity; configured team limits do not verify it.
+Both clients use main checkout's Dexter installation in the assigned worktree. Configuration/tooling changes require disposable pilots verifying client and Dexter roots. Before scaling, measure simultaneous cold-start capacity; configured team limits do not verify it.
 
 Set database connection limits in [compose.yaml](../../compose.yaml), overridden by `TIPS_DB_MAX_CONNECTIONS`. Recreate the database service to apply changes, only with no teams running. Agent launch settings never restart PostgreSQL or existing clients.
 

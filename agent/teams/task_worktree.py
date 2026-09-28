@@ -23,6 +23,7 @@ from team import (
     load_config,
     occupant,
     parse_herdr,
+    release_dexter,
     require_git_admin,
     stop_agent,
 )
@@ -117,7 +118,7 @@ class WorktreeTask:
     worktree: Path
     branch: str
     existing_branch: bool
-    wrapper: Path
+    tools: Path
     review_sha: str | None
     old_head: str | None
     desired: dict[Path, str]
@@ -184,11 +185,6 @@ class WorktreeTask:
             raise RefusalError("--kind must match the configured role.kind.")
         if not 1 <= self.args.team <= self.team["max_teams"]:
             raise RefusalError(f"Team must be between 1 and {self.team['max_teams']}.")
-        if self.timeouts["mcp_tool_seconds"] != 120:
-            raise RefusalError(
-                "The patched bridge has a compiled 120-second deadline. "
-                "Rebuild and revalidate it before changing mcp_tool_seconds."
-            )
 
     def resolve_worktree(self) -> None:
         self.issue = self.args.task.split("-", 1)[0]
@@ -227,19 +223,14 @@ class WorktreeTask:
                     )
 
     def check_tools(self) -> None:
-        self.wrapper = self.root / "agent/lsp/launch_worktree_lsp.sh"
-        if not self.wrapper.is_file() or not (self.root / ".agents/skills").is_dir():
-            raise RefusalError("Canonical LSP wrapper or shared skills directory is missing.")
-        if self.args.start:
-            tools = (
-                Path(os.environ.get("TIPS_ELIXIR_TOOLS", str(self.root / "agent/lsp/vendor")))
-                / "bin"
-            )
-            for binary in ("mcp-language-server", "expert"):
-                if not os.access(tools / binary, os.X_OK):
-                    raise RefusalError(
-                        f"Missing executable: {tools / binary}; run tool preflight first."
-                    )
+        self.tools = Path(
+            os.environ.get("TIPS_ELIXIR_TOOLS", str(self.root / "agent/lsp/vendor"))
+        ).resolve()
+        if not (self.root / ".agents/skills").is_dir():
+            raise RefusalError("Shared skills directory is missing.")
+        self.target_env["TIPS_ELIXIR_TOOLS"] = str(self.tools)
+        if self.args.start and not os.access(self.tools / "bin/dexter", os.X_OK):
+            raise RefusalError("Dexter is missing; run agent/lsp/install_dexter.sh.")
 
     def fetch(self) -> None:
         # Review heads are often pushed after main's last fetch; fetch before resolving them.
@@ -280,48 +271,27 @@ class WorktreeTask:
 
     def prepare_config(self) -> None:
         if self.kind == "codex":
-            config = f"""[plugins."mix-compile@elixir-agent-tools"]
-enabled = true
+            config = """[plugins."mix-compile@elixir-agent-tools"]
+enabled = false
 [plugins."mix-credo@elixir-agent-tools"]
-enabled = true
+enabled = false
 
-[mcp_servers.elixir-lsp]
-command = "/bin/sh"
-args = {json.dumps([str(self.wrapper), str(self.worktree)], ensure_ascii=False)}
-cwd = {json.dumps(str(self.worktree), ensure_ascii=False)}
-startup_timeout_sec = {self.timeouts["mcp_startup_seconds"]}
-tool_timeout_sec = {self.timeouts["mcp_tool_seconds"]}
-enabled_tools = ["definition", "references", "hover", "diagnostics"]
+[shell_environment_policy.set]
 """
-            for tool in ("definition", "references", "hover", "diagnostics"):
-                config += (
-                    f"\n[mcp_servers.elixir-lsp.tools.{tool}]\n"
-                    f"approval_mode = {json.dumps(self.policies['codex_lsp_approval_mode'])}\n"
-                )
+            config += "".join(
+                f"{key} = {json.dumps(value)}\n" for key, value in self.target_env.items()
+            )
             self.desired = {self.worktree / ".codex/config.toml": config}
         else:
             self.desired = {
                 self.worktree / ".claude/settings.local.json": json.dumps(
                     {
                         "enabledPlugins": {
-                            "mix-compile@elixir-agent-tools": True,
-                            "mix-credo@elixir-agent-tools": True,
+                            "mix-compile@elixir-agent-tools": False,
+                            "mix-credo@elixir-agent-tools": False,
                             "elixir-lsp@elixir-agent-tools": False,
-                        }
-                    },
-                    indent=2,
-                )
-                + "\n",
-                self.worktree / ".claude/elixir-mcp.json": json.dumps(
-                    {
-                        "mcpServers": {
-                            "elixir-lsp": {
-                                "type": "stdio",
-                                "command": "/bin/sh",
-                                "args": [str(self.wrapper), str(self.worktree)],
-                                "timeout": self.timeouts["mcp_tool_seconds"] * 1000,
-                            }
-                        }
+                            "dexter-lsp@dexter": False,
+                        },
                     },
                     indent=2,
                 )
@@ -462,6 +432,13 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
             raise RefusalError("Target pane is not at its shell; nothing will be launched there.")
 
     def checkout(self) -> None:
+        if self.owner is None and not release_dexter(
+            self.worktree, self.tools, self.timeouts["shutdown_seconds"]
+        ):
+            raise RefusalError(
+                "Dexter release unconfirmed; worktree preserved. "
+                "Check its index and attached clients (agent/lsp/README.md)."
+            )
         if not self.worktree.exists():
             if self.review_sha:
                 git("worktree", "add", "--detach", self.worktree, self.review_sha)
@@ -510,6 +487,14 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
             self.skills.symlink_to(shared_skills)
 
     def launch(self) -> None:
+        # Init names this exact root; automatic discovery can prefer a parent's index.
+        if not (self.worktree / ".dexter/dexter.db").is_file():
+            print(
+                run(
+                    [self.tools / "bin/dexter", "init", self.worktree],
+                    timeout=self.timeouts["launch_seconds"],
+                )
+            )
         # Herdr runs separately: exports must execute in the target pane.
         marker = "TIPS_TASK_READY_" + uuid.uuid4().hex
         setup = (
@@ -546,8 +531,9 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
                 self.policies["claude_permission_mode"],
                 "--effort",
                 self.effort,
-                "--mcp-config",
-                str(self.worktree / ".claude/elixir-mcp.json"),
+                # Linked worktrees may read local settings from the main checkout; pass by path.
+                "--settings",
+                str(self.worktree / ".claude/settings.local.json"),
             ]
             if self.model:
                 client += ["--model", self.model]
@@ -584,7 +570,7 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
             f"{self.kind}"
             ", "
             f"{self.worktree}"
-            ". Project compilation may still be running."
+            ". Dexter is available; project checks remain explicit."
         )
 
     def occupant(self, pane: str) -> tuple[Path, bool]:

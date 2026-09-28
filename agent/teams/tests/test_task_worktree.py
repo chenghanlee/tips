@@ -20,6 +20,7 @@ class FixtureState(TypedDict):
     events: list[list[str]]
     cwd: str
     output: str
+    env: dict[str, str]
     launch_env: dict[str, str | None]
     launch_argv: list[str]
     stop_fails: bool
@@ -31,7 +32,7 @@ class FixtureState(TypedDict):
 
 
 TEAMS = Path(__file__).resolve().parents[1]
-LSP_WRAPPER = TEAMS.parents[1] / "agent/lsp/launch_worktree_lsp.sh"
+DEXTER_REV = TEAMS.parents[1] / "agent/lsp/dexter.rev"
 # Deliberately fixed test data: changing production defaults must not rewrite tests.
 CONFIG = """\
 # Agent launch settings. Changes apply to newly started sessions.
@@ -48,13 +49,10 @@ db_suffix_prefix = "_t"
 launch_seconds = 120
 shutdown_seconds = 15
 shell_seconds = 15
-mcp_startup_seconds = 60
-mcp_tool_seconds = 120
 checks_minutes = 30
 
 [launch]
 codex_approval = "never"
-codex_lsp_approval_mode = "approve"
 claude_permission_mode = "bypassPermissions"
 
 [roles.dev]
@@ -218,6 +216,7 @@ if a[:2] == ["agent", "start"]:
             "TIPS_CHECK_TIMEOUT_SECONDS",
             "TIPS_TEAM_CONFIG",
             "TIPS_PROVIDER_ENV_FILE",
+            "TIPS_ELIXIR_TOOLS",
         ]
     }
     state["launch_argv"] = a
@@ -280,11 +279,11 @@ class WorktreeIntegrationTest(unittest.TestCase):
         for d in ("agent/lsp", "agent/teams", ".agents/skills", "agent/lsp/vendor/bin", "fakebin"):
             (self.root / d).mkdir(parents=True)
         (self.root / ".gitignore").write_text(
-            ".codex/\n.claude/\n.agents/\nagent/lsp/vendor/\n.worktrees/\nfakebin/\nsta"
+            ".codex/\n.claude/\n.agents/\n.dexter/\nagent/lsp/vendor/\n.worktrees/\nfakebin/\nsta"
             "te.json\nstop.py\n"
         )
         shutil.copy(TEAMS / "task_worktree.py", self.root / "agent/teams/task_worktree.py")
-        shutil.copy(LSP_WRAPPER, self.root / "agent/lsp/launch_worktree_lsp.sh")
+        shutil.copy(DEXTER_REV, self.root / "agent/lsp/dexter.rev")
         (self.root / "agent/teams/team.py").write_text(
             (TEAMS / "team.py").read_text()
             + (
@@ -295,7 +294,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
         )
         (self.root / "agent/teams/config.toml").write_text(CONFIG)
         (self.root / "tracked.txt").write_text("base\n")
-        for name in ("expert", "mcp-language-server"):
+        for name in ("dexter",):
             p = self.root / "agent/lsp/vendor/bin" / name
             p.write_text("#!/bin/sh\nexit 0\n")
             p.chmod(0o755)
@@ -410,27 +409,140 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert not (self.root / ".worktrees").exists()
         assert snapshot(git_dir) == before
 
-    def test_codex_only_canonical_wrapper_and_idempotent_config(self) -> None:
+    def test_codex_only_and_idempotent_config(self) -> None:
         self.call()
         path = self.wt / ".codex/config.toml"
-        cfg = tomllib.loads(path.read_text())["mcp_servers"]["elixir-lsp"]
-        assert cfg["args"] == [str(self.root / "agent/lsp/launch_worktree_lsp.sh"), str(self.wt)]
-        assert cfg["cwd"] == str(self.wt)
-        assert cfg["tool_timeout_sec"] == 120
         assert not (self.wt / ".claude").exists()
         before = path.stat().st_mtime_ns
         self.call()
         assert before == path.stat().st_mtime_ns
         assert self.git("-C", str(self.wt), "status", "--porcelain") == ""
 
+    def test_dexter_codex_uses_stock_cli_and_declared_shell_environment(self) -> None:
+        self.call()
+        cfg = tomllib.loads((self.wt / ".codex/config.toml").read_text())
+        assert "mcp_servers" not in cfg
+        policy = cfg["shell_environment_policy"]["set"]
+        assert policy["MIX_ENV"] == "test"
+        assert policy["TIPS_DB_SUFFIX"] == "_t3l"
+        assert "PATH" not in policy
+        assert policy["TIPS_ELIXIR_TOOLS"] == str(self.root / "agent/lsp/vendor")
+
+    def test_codex_reuse_does_not_depend_on_the_launchers_path(self) -> None:
+        self.call()
+        path = self.wt / ".codex/config.toml"
+        before = path.read_bytes(), path.stat().st_mtime_ns
+        self.env["PATH"] = str(self.root / "another-bin") + os.pathsep + self.env["PATH"]
+        self.call("--start")
+        assert (path.read_bytes(), path.stat().st_mtime_ns) == before
+        assert self.state()["launch_env"]["TIPS_ELIXIR_TOOLS"] == str(
+            self.root / "agent/lsp/vendor"
+        )
+        assert self.state()["env"]["PATH"] == self.env["PATH"]
+
+    def test_dexter_claude_uses_stock_cli_with_native_plugin_disabled(self) -> None:
+        # The session reads the generated file by path; linked-worktree discovery can miss it.
+        self.call("--start", role="test", team="6")
+        settings = self.wt / ".claude/settings.local.json"
+        assert json.loads(settings.read_text()) == {
+            "enabledPlugins": {
+                "mix-compile@elixir-agent-tools": False,
+                "mix-credo@elixir-agent-tools": False,
+                "elixir-lsp@elixir-agent-tools": False,
+                "dexter-lsp@dexter": False,
+            }
+        }
+        assert [p.name for p in settings.parent.iterdir()] == ["settings.local.json"]
+        s = self.state()
+        argv = s["launch_argv"]
+        assert argv[argv.index("--") + 1 :] == [
+            "--permission-mode",
+            "bypassPermissions",
+            "--effort",
+            "xhigh",
+            "--settings",
+            str(settings),
+            "--model",
+            "fixture-test",
+        ]
+        assert s["launch_env"]["TIPS_ELIXIR_TOOLS"] == str(self.root / "agent/lsp/vendor")
+        # Agents call the explicit binary; the pane keeps the caller's PATH unchanged.
+        setup = next(e[3] for e in s["events"] if e[:2] == ["pane", "run"])
+        assert "PATH=" not in setup
+        assert s["env"]["PATH"] == self.env["PATH"]
+
+    def test_dexter_initializes_exact_worktree_before_launch(self) -> None:
+        dexter = self.root / "agent/lsp/vendor/bin/dexter"
+        dexter.write_text(
+            '#!/bin/sh\n[ "$1" = init ] || exit 0\n'
+            'mkdir -p "$2/.dexter"\ntouch "$2/.dexter/dexter.db"\n'
+        )
+        self.call("--start")
+        assert (self.wt / ".dexter/dexter.db").is_file()
+        assert not (self.root / ".dexter").exists()
+
+    def test_dexter_init_failure_prevents_client_launch(self) -> None:
+        dexter = self.root / "agent/lsp/vendor/bin/dexter"
+        dexter.write_text('#!/bin/sh\necho "index unavailable" >&2\nexit 1\n')
+        result = self.call("--start", ok=False)
+        assert "index unavailable" in result.stderr
+        assert "launch_argv" not in self.state()
+
+    def test_reuse_releases_index_and_does_not_reinitialize_it(self) -> None:
+        self.call()
+        database = self.wt / ".dexter/dexter.db"
+        database.parent.mkdir()
+        database.write_text("existing index")
+        dexter = self.root / "agent/lsp/vendor/bin/dexter"
+        dexter.write_text(
+            '#!/bin/sh\n[ "$1" = stop ] || exit 19\nprintf "%s\\n" "$@" > "$3/.dexter/stop-args"\n'
+        )
+        self.call("--start")
+        assert database.read_text() == "existing index"
+        assert (database.parent / "stop-args").read_text().splitlines() == [
+            "stop",
+            "--root",
+            str(self.wt),
+        ]
+        assert self.state()["launch_argv"]
+
+    def test_attached_index_prevents_checkout_and_launch_on_reuse(self) -> None:
+        self.call()
+        (self.wt / ".dexter").mkdir()
+        (self.wt / ".dexter/dexter.db").touch()
+        self.commit("new review head")
+        newer = self.git("rev-parse", "HEAD")
+        dexter = self.root / "agent/lsp/vendor/bin/dexter"
+        dexter.write_text("#!/bin/sh\nexit 1\n")
+        result = self.call("--start", ref=newer, ok=False)
+        assert "release" in result.stderr
+        assert "preserved" in result.stderr
+        assert self.git("-C", str(self.wt), "rev-parse", "HEAD") == self.base
+        assert "launch_argv" not in self.state()
+
+    def test_incomplete_index_never_targets_ancestor_or_changes_checkout(self) -> None:
+        self.call()
+        (self.root / ".dexter").mkdir()
+        (self.root / ".dexter/dexter.db").touch()
+        (self.wt / ".dexter").mkdir()
+        self.commit("new review head")
+        newer = self.git("rev-parse", "HEAD")
+        dexter = self.root / "agent/lsp/vendor/bin/dexter"
+        dexter.write_text(
+            "#!/usr/bin/env python3\nfrom pathlib import Path\n"
+            f"Path({str(self.root / '.dexter/called')!r}).touch()\n"
+        )
+        result = self.call("--start", ref=newer, ok=False)
+        assert "release" in result.stderr
+        assert "preserved" in result.stderr
+        assert not (self.root / ".dexter/called").exists()
+        assert self.git("-C", str(self.wt), "rev-parse", "HEAD") == self.base
+        assert "launch_argv" not in self.state()
+
     def test_claude_only_and_actual_target_environment(self) -> None:
         self.call("--start", role="test", team="6")
         assert not (self.wt / ".codex").exists()
-        mcp = json.loads((self.wt / ".claude/elixir-mcp.json").read_text())["mcpServers"][
-            "elixir-lsp"
-        ]
-        assert mcp["args"] == [str(self.root / "agent/lsp/launch_worktree_lsp.sh"), str(self.wt)]
-        assert mcp["timeout"] == 120000
+        assert not (self.wt / ".claude/elixir-mcp.json").exists()
         assert not json.loads((self.wt / ".claude/settings.local.json").read_text())[
             "enabledPlugins"
         ]["elixir-lsp@elixir-agent-tools"]
@@ -445,10 +557,11 @@ class WorktreeIntegrationTest(unittest.TestCase):
             "TIPS_CHECK_TIMEOUT_SECONDS": "1800",
             "TIPS_TEAM_CONFIG": str(self.root / "agent/teams/config.toml"),
             "TIPS_PROVIDER_ENV_FILE": str(self.root / ".env"),
+            "TIPS_ELIXIR_TOOLS": str(self.root / "agent/lsp/vendor"),
         }
         assert s["cwd"] == str(self.wt)
         assert "fixture-test" in s["launch_argv"]
-        assert "--mcp-config" in s["launch_argv"]
+        assert "--plugin-dir" not in s["launch_argv"]
 
     def test_codex_models_and_config_parameters(self) -> None:
         self.call("--start")
@@ -634,7 +747,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
     def test_missing_tool_and_invalid_team_refused(self) -> None:
         self.call("--start", team="7", ok=False)
         assert not self.wt.exists()
-        (self.root / "agent/lsp/vendor/bin/expert").unlink()
+        (self.root / "agent/lsp/vendor/bin/dexter").unlink()
         self.call("--start", ok=False)
         assert not self.wt.exists()
 
@@ -656,26 +769,17 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert not any(e[0] == "stop_agent" for e in self.state()["events"])
         assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 1
 
-    def test_canonical_wrapper_not_needed_in_reviewed_commit(self) -> None:
-        self.git("rm", "agent/lsp/launch_worktree_lsp.sh")
-        self.commit("old revision without wrapper")
+    def test_dexter_install_not_needed_in_reviewed_commit(self) -> None:
+        self.git("rm", "agent/lsp/dexter.rev")
+        self.commit("old revision without Dexter")
         old = self.git("rev-parse", "HEAD")
-        (self.root / "agent/lsp").mkdir(exist_ok=True)
-        shutil.copy(LSP_WRAPPER, self.root / "agent/lsp/launch_worktree_lsp.sh")
-        self.call("--start", ref=old)
-        cfg = tomllib.loads((self.wt / ".codex/config.toml").read_text())["mcp_servers"][
-            "elixir-lsp"
-        ]
-        assert Path(cfg["args"][0]).is_file()
-        assert not (self.wt / "agent/lsp/launch_worktree_lsp.sh").exists()
+        shutil.copy(DEXTER_REV, self.root / "agent/lsp/dexter.rev")
+        self.call("--start", ref=old, role="test")
+        assert "launch_argv" in self.state()
+        assert not (self.wt / "agent/lsp/dexter.rev").exists()
 
-    def test_kind_mismatch_and_unsupported_bridge_timeout_refused(self) -> None:
+    def test_kind_mismatch_refused(self) -> None:
         self.call("--kind", "claude", ok=False)
-        assert not self.wt.exists()
-        path = self.root / "agent/teams/config.toml"
-        path.write_text(CONFIG.replace("mcp_tool_seconds = 120", "mcp_tool_seconds = 180"))
-        p = self.call(ok=False)
-        assert "compiled 120-second" in p.stderr
         assert not self.wt.exists()
 
     def test_role_inferred_from_agent_name_and_policy_from_config(self) -> None:
@@ -844,34 +948,11 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call("--agent", "team-3-dev", ok=False)
         assert not self.wt.exists()
 
-    def test_wrapper_explicit_root_is_used_from_main(self) -> None:
-        self.call()
-        bridge = self.root / "agent/lsp/vendor/bin/mcp-language-server"
-        bridge.write_text(
-            r"""#!/usr/bin/env python3
-import json, os, sys
-
-print(json.dumps({"cwd": os.getcwd(), "argv": sys.argv[1:]}))
-"""
-        )
-        p = execute(
-            ["/bin/sh", str(self.root / "agent/lsp/launch_worktree_lsp.sh"), str(self.wt)],
-            cwd=self.root,
-            env=self.env,
-            check=True,
-        )
-        assert json.loads(p.stdout)["cwd"] == str(self.wt)
-
-    def test_codex_lsp_approval_is_scoped_to_four_tools(self) -> None:
+    def test_codex_permissions_unchanged_without_bridge(self) -> None:
         self.call("--start")
         cfg = tomllib.loads((self.wt / ".codex/config.toml").read_text())
-        server = cfg["mcp_servers"]["elixir-lsp"]
-        assert server["tools"] == {
-            name: {"approval_mode": "approve"}
-            for name in ("definition", "references", "hover", "diagnostics")
-        }
+        assert "mcp_servers" not in cfg
         assert "approval_policy" not in cfg
-        assert "default_tools_approval_mode" not in server
         assert "never" in self.state()["launch_argv"]
 
 
