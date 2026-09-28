@@ -24,6 +24,9 @@ docs/implementation/communication/
 # The directory Mix downloads your dependencies sources to.
 /deps/
 
+# ElixirLS stores a private build and launcher ownership lock in each worktree.
+/.elixir_ls/
+
 # Where 3rd-party dependencies like ExDoc output generated docs.
 /doc/
 

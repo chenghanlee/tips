@@ -1,0 +1,282 @@
+--- a/internal/lsp/client.go
++++ b/internal/lsp/client.go
+@@ -19,13 +19,15 @@
+ )
+ 
+ type Client struct {
+-	expert  *expertStartup
+-	Cmd     *exec.Cmd
+-	stdin   io.WriteCloser
+-	stdinMu contextMutex
+-	closed  chan struct{}
+-	stdout  *bufio.Reader
+-	stderr  io.ReadCloser
++	elixirLSRoot   string
++	elixirLSMixEnv string
++	expert         *expertStartup
++	Cmd            *exec.Cmd
++	stdin          io.WriteCloser
++	stdinMu        contextMutex
++	closed         chan struct{}
++	stdout         *bufio.Reader
++	stderr         io.ReadCloser
+ 
+ 	// Request ID counter
+ 	nextID atomic.Int32
+@@ -144,6 +146,9 @@
+ 	// Register handlers
+ 	c.RegisterServerRequestHandler("workspace/applyEdit", HandleApplyEdit)
+ 	c.RegisterServerRequestHandler("workspace/configuration", HandleWorkspaceConfiguration)
++	if c.IsElixirLS() {
++		c.RegisterServerRequestHandler("workspace/configuration", c.elixirLSConfiguration)
++	}
+ 	c.RegisterServerRequestHandler("client/registerCapability", HandleRegisterCapability)
+ 	c.RegisterNotificationHandler("window/showMessage", HandleServerMessage)
+ 	c.RegisterNotificationHandler("textDocument/publishDiagnostics",
+@@ -313,6 +318,9 @@
+ // MCP tool handlers share this path; locking only the map allows duplicate opens
+ // and versions to reach the server out of order.
+ func (c *Client) OpenFile(ctx context.Context, filepath string) error {
++	if err := c.checkElixirLSWorkspace(filepath); err != nil {
++		return err
++	}
+ 	if err := c.checkExpertWorkspace(filepath); err != nil {
+ 		return err
+ 	}
+@@ -356,7 +364,7 @@
+ // immediately before sending, while holding the document lock.
+ func (c *Client) NotifyChangeVersion(ctx context.Context, filepath string) (int32, uint64, error) {
+ 	// Diagnostics needs a new publication even when the contents are unchanged.
+-	return c.notifyChangeVersion(ctx, filepath, true)
++	return c.notifyChangeVersion(ctx, filepath, !c.IsElixirLS())
+ }
+ 
+ func (c *Client) notifyChangeVersion(ctx context.Context, filepath string, force bool) (int32, uint64, error) {
+@@ -391,6 +399,13 @@
+ 	seqBefore, _ := c.DiagnosticsSeq(protocol.DocumentUri(uri))
+ 	if err := c.Notify(ctx, "textDocument/didChange", params); err != nil {
+ 		return 0, 0, err
++	}
++	if c.IsElixirLS() {
++		if err := c.Notify(ctx, "textDocument/didSave", protocol.DidSaveTextDocumentParams{
++			TextDocument: protocol.TextDocumentIdentifier{URI: protocol.DocumentUri(uri)},
++		}); err != nil {
++			return 0, 0, err
++		}
+ 	}
+ 	fileInfo.Version = version
+ 	fileInfo.ContentHash = hash
+--- /dev/null
++++ b/internal/lsp/elixirls.go
+@@ -0,0 +1,70 @@
++package lsp
++
++import (
++	"encoding/json"
++	"fmt"
++	"path/filepath"
++)
++
++// ConfigureElixirLS selects the saved-file lifecycle before initialization.
++// Keep settings in the LSP client: editor configuration files are not read by MCP.
++func (c *Client) ConfigureElixirLS(workspace, mixEnv string) {
++	if mixEnv == "" {
++		mixEnv = "test"
++	}
++	c.elixirLSRoot = workspace
++	c.elixirLSMixEnv = mixEnv
++}
++
++func (c *Client) IsElixirLS() bool { return c.elixirLSRoot != "" }
++
++func (c *Client) elixirLSConfiguration(raw json.RawMessage) (any, error) {
++	var params struct {
++		Items []struct {
++			Section string `json:"section"`
++		} `json:"items"`
++	}
++	if err := json.Unmarshal(raw, &params); err != nil {
++		return nil, err
++	}
++	result := make([]any, len(params.Items))
++	settings := map[string]any{
++		"autoBuild": true, "fetchDeps": false, "dialyzerEnabled": false,
++		"suggestSpecs": false, "enableTestLenses": false, "mcpEnabled": false,
++		"mixEnv": c.elixirLSMixEnv,
++	}
++	for i, item := range params.Items {
++		switch item.Section {
++		case "elixirLS":
++			result[i] = settings
++		case "":
++			result[i] = map[string]any{"elixirLS": settings}
++		default:
++			result[i] = nil
++		}
++	}
++	return result, nil
++}
++
++func (c *Client) checkElixirLSWorkspace(path string) error {
++	if !c.IsElixirLS() {
++		return nil
++	}
++	root, err := filepath.EvalSymlinks(c.elixirLSRoot)
++	if err != nil {
++		return err
++	}
++	file, err := filepath.Abs(path)
++	if err != nil {
++		return err
++	}
++	file, err = filepath.EvalSymlinks(file)
++	if err != nil {
++		return err
++	}
++	relative, err := filepath.Rel(root, file)
++	if err != nil || !filepath.IsLocal(relative) {
++		return fmt.Errorf("file %q is outside this ElixirLS session's workspace %q", path, root)
++	}
++	return nil
++}
+--- /dev/null
++++ b/internal/lsp/elixirls_test.go
+@@ -0,0 +1,71 @@
++package lsp
++
++import (
++	"context"
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++func TestElixirLSSettingsAndSavedDocuments(t *testing.T) {
++	root := t.TempDir()
++	path := filepath.Join(root, "sample.ex")
++	if err := os.WriteFile(path, []byte("defmodule Sample do\nend\n"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	c, pipe := testClient()
++	c.ConfigureElixirLS(root, "test")
++	result, err := c.elixirLSConfiguration(json.RawMessage(`{"items":[{"section":"elixirLS"},{"section":"unknown"}]}`))
++	if err != nil {
++		t.Fatal(err)
++	}
++	encoded, _ := json.Marshal(result)
++	var settings []map[string]any
++	if err := json.Unmarshal(encoded, &settings); err != nil {
++		t.Fatal(err)
++	}
++	if len(settings) != 2 || settings[0]["fetchDeps"] != false || settings[0]["dialyzerEnabled"] != false || settings[0]["mixEnv"] != "test" || len(settings[1]) != 0 {
++		t.Fatalf("wrong settings: %s", encoded)
++	}
++	if err := c.OpenFile(context.Background(), path); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, []byte("defmodule Sample do\n def value, do: :new\nend\n"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	if err := c.SyncFile(context.Background(), path); err != nil {
++		t.Fatal(err)
++	}
++	if err := c.SyncFile(context.Background(), path); err != nil {
++		t.Fatal(err)
++	}
++	got := syncMessages(t, pipe)
++	methods := []string{}
++	for _, message := range got {
++		methods = append(methods, message.Method)
++	}
++	encoded, _ = json.Marshal(methods)
++	if string(encoded) != `["textDocument/didOpen","textDocument/didChange","textDocument/didSave"]` {
++		t.Fatalf("missing save or duplicate rebuild: %s", encoded)
++	}
++}
++
++func TestElixirLSRejectsOtherWorktreeAndEscapingSymlink(t *testing.T) {
++	root := t.TempDir()
++	outside := filepath.Join(t.TempDir(), "other.ex")
++	if err := os.WriteFile(outside, []byte("defmodule Other do\nend\n"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	alias := filepath.Join(root, "alias.ex")
++	if err := os.Symlink(outside, alias); err != nil {
++		t.Fatal(err)
++	}
++	c, _ := testClient()
++	c.ConfigureElixirLS(root, "test")
++	for _, path := range []string{outside, alias} {
++		if err := c.OpenFile(context.Background(), path); err == nil {
++			t.Fatalf("accepted outside input: %s", path)
++		}
++	}
++}
+--- a/internal/lsp/expert.go
++++ b/internal/lsp/expert.go
+@@ -209,7 +209,7 @@
+ // ShouldOpenFile limits automatic document opens, not filesystem notifications.
+ // Expert still needs asset/config change events but cannot analyze those as Elixir.
+ func (c *Client) ShouldOpenFile(path string) bool {
+-	if c.expert == nil {
++	if c.expert == nil && !c.IsElixirLS() {
+ 		return true
+ 	}
+ 	switch filepath.Ext(path) {
+--- a/internal/tools/diagnostics.go
++++ b/internal/tools/diagnostics.go
+@@ -56,6 +56,10 @@
+ 	if err != nil {
+ 		return "", fmt.Errorf("could not send file content to the language server: %w", err)
+ 	}
++	if client.IsElixirLS() {
++		// Reads must not force another change/save and clear compiler diagnostics.
++		seqBefore = 0
++	}
+ 	snapshot, published := client.WaitForDiagnostics(ctx, uri, seqBefore, version, diagnosticsPublishTimeout)
+ 	if err := ctx.Err(); err != nil {
+ 		return "", err
+@@ -63,6 +67,14 @@
+ 	diagnostics := snapshot.Diagnostics
+ 	var fileInfo string
+ 	switch {
++	case client.IsElixirLS():
++		// ElixirLS publishes parser diagnostics for didChange before the save build.
++		// A matching document version therefore does NOT prove compilation completed.
++		fileInfo = fmt.Sprintf("Latest ElixirLS publication for %s (compiler completion unverified).\n", filePath)
++		fileInfo += "Results may be stale; an empty list is not a successful compile. Run mix compile --warnings-as-errors and tests to validate saved code.\n"
++		if snapshot.Sequence == 0 {
++			return fmt.Sprintf("No ElixirLS publication received for %s (compiler completion unverified). Run mix compile --warnings-as-errors and tests.\n", filePath), nil
++		}
+ 	case !published:
+ 		fileInfo = fmt.Sprintf("Fresh diagnostics unavailable for %s: no matching publication within %s.\n", filePath, diagnosticsPublishTimeout)
+ 		if snapshot.Sequence == 0 {
+--- a/main.go
++++ b/main.go
+@@ -24,6 +24,7 @@
+ var processStartedAt = time.Now()
+ 
+ type config struct {
++	elixirLS     bool
+ 	workspaceDir string
+ 	lspCommand   string
+ 	lspArgs      []string
+@@ -42,6 +43,7 @@
+ 	cfg := &config{}
+ 	flag.StringVar(&cfg.workspaceDir, "workspace", "", "Path to workspace directory")
+ 	flag.StringVar(&cfg.lspCommand, "lsp", "", "LSP command to run (args should be passed after --)")
++	flag.BoolVar(&cfg.elixirLS, "elixirls", false, "Use ElixirLS settings and saved-document synchronization")
+ 	flag.Parse()
+ 
+ 	// Get remaining args after -- as LSP arguments
+@@ -91,6 +93,9 @@
+ 	client, err := lsp.NewClient(s.config.lspCommand, s.config.lspArgs...)
+ 	if err != nil {
+ 		return fmt.Errorf("failed to create LSP client: %v", err)
++	}
++	if s.config.elixirLS {
++		client.ConfigureElixirLS(s.config.workspaceDir, os.Getenv("MIX_ENV"))
+ 	}
+ 	s.lspClient = client
+ 	s.workspaceWatcher = watcher.NewWorkspaceWatcher(client)

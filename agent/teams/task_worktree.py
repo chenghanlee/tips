@@ -6,6 +6,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -58,6 +59,7 @@ class Arguments(argparse.Namespace):
     start: bool
     force: bool
     ui: bool
+    lsp: str
 
 
 def parse_arguments() -> Arguments:
@@ -75,6 +77,7 @@ def parse_arguments() -> Arguments:
         "--kind", choices=["codex", "claude"], help="Must match the configured role kind"
     )
     parser.add_argument("--review-ref")
+    parser.add_argument("--lsp", choices=["expert", "elixirls"], default="expert")
     parser.add_argument(
         "--ui",
         action="store_true",
@@ -142,6 +145,8 @@ class WorktreeTask:
         )
         self.role = cast(CodingRole, self.config["roles"][self.role_key()])
         self.kind = self.role["kind"]
+        if self.args.lsp == "elixirls" and self.kind != "codex":
+            raise RefusalError("ElixirLS experiment requires Codex.")
         self.check_settings()
         self.model, self.effort = (self.role["model"], self.role["effort"])
         self.port = (
@@ -227,7 +232,12 @@ class WorktreeTask:
                     )
 
     def check_tools(self) -> None:
-        self.wrapper = self.root / "agent/lsp/launch_worktree_lsp.sh"
+        filename = (
+            "launch_worktree_elixirls.py"
+            if self.args.lsp == "elixirls"
+            else "launch_worktree_lsp.sh"
+        )
+        self.wrapper = self.root / "agent/lsp" / filename
         if not self.wrapper.is_file() or not (self.root / ".agents/skills").is_dir():
             raise RefusalError("Canonical LSP wrapper or shared skills directory is missing.")
         if self.args.start:
@@ -235,11 +245,20 @@ class WorktreeTask:
                 Path(os.environ.get("TIPS_ELIXIR_TOOLS", str(self.root / "agent/lsp/vendor")))
                 / "bin"
             )
-            for binary in ("mcp-language-server", "expert"):
+            binaries = (
+                ("mcp-language-server",)
+                if self.args.lsp == "elixirls"
+                else ("mcp-language-server", "expert")
+            )
+            for binary in binaries:
                 if not os.access(tools / binary, os.X_OK):
                     raise RefusalError(
                         f"Missing executable: {tools / binary}; run tool preflight first."
                     )
+            if self.args.lsp == "elixirls" and shutil.which(
+                os.environ.get("TIPS_ELIXIRLS_COMMAND", "elixir-ls")
+            ) is None:
+                raise RefusalError("elixir-ls is missing from PATH.")
 
     def fetch(self) -> None:
         # Review heads are often pushed after main's last fetch; fetch before resolving them.
@@ -286,13 +305,25 @@ enabled = true
 enabled = true
 
 [mcp_servers.elixir-lsp]
-command = "/bin/sh"
+command = {json.dumps("python3" if self.args.lsp == "elixirls" else "/bin/sh")}
 args = {json.dumps([str(self.wrapper), str(self.worktree)], ensure_ascii=False)}
 cwd = {json.dumps(str(self.worktree), ensure_ascii=False)}
 startup_timeout_sec = {self.timeouts["mcp_startup_seconds"]}
 tool_timeout_sec = {self.timeouts["mcp_tool_seconds"]}
 enabled_tools = ["definition", "references", "hover", "diagnostics"]
 """
+            if self.args.lsp == "elixirls":
+                server_env = {
+                    **self.target_env,
+                    "TIPS_ELIXIR_TOOLS": os.environ.get(
+                        "TIPS_ELIXIR_TOOLS", str(self.root / "agent/lsp/vendor")
+                    ),
+                }
+                if "TIPS_ELIXIRLS_COMMAND" in os.environ:
+                    server_env["TIPS_ELIXIRLS_COMMAND"] = os.environ["TIPS_ELIXIRLS_COMMAND"]
+                config += "\n[mcp_servers.elixir-lsp.env]\n" + "".join(
+                    f"{key} = {json.dumps(value)}\n" for key, value in server_env.items()
+                )
             for tool in ("definition", "references", "hover", "diagnostics"):
                 config += (
                     f"\n[mcp_servers.elixir-lsp.tools.{tool}]\n"
@@ -518,6 +549,8 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
             + " && export "
             + " ".join((shlex.quote(k + "=" + v) for k, v in self.target_env.items()))
         )
+        if self.args.lsp == "elixirls":
+            setup += " && unset MIX_BUILD_PATH MIX_BUILD_ROOT MIX_DEPS_PATH"
         if "compaction_percent" not in self.role:
             setup += " && unset CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"
         # As in team.coordinator: the echoed format never contains the whole marker.
@@ -537,6 +570,8 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
         client: list[str] = []
         if self.kind == "codex":
             client += ["-a", self.policies["codex_approval"], "-C", str(self.worktree)]
+            if self.args.lsp == "elixirls":
+                client += ["--no-daemon"]
             if self.model:
                 client += ["-m", self.model]
             client += ["-c", "model_reasoning_effort=" + json.dumps(self.effort)]

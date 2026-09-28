@@ -16,6 +16,7 @@ from team import execute
 
 
 class FixtureState(TypedDict):
+    env: dict[str, str]
     agents: list[dict[str, str]]
     events: list[list[str]]
     cwd: str
@@ -422,6 +423,32 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call()
         assert before == path.stat().st_mtime_ns
         assert self.git("-C", str(self.wt), "status", "--porcelain") == ""
+
+    def test_elixirls_opt_in_uses_explicit_root_without_changing_default(self) -> None:
+        wrapper = self.root / "agent/lsp/launch_worktree_elixirls.py"
+        shutil.copy(LSP_WRAPPER.with_name("launch_worktree_elixirls.py"), wrapper)
+        server = self.root / "fakebin/elixir-ls"
+        server.write_text("#!/bin/sh\nexit 0\n")
+        server.chmod(0o755)
+        self.env.update(MIX_BUILD_PATH="/shared/build", MIX_DEPS_PATH="/shared/deps")
+        self.call("--lsp", "elixirls", "--start")
+        cfg = tomllib.loads((self.wt / ".codex/config.toml").read_text())["mcp_servers"][
+            "elixir-lsp"
+        ]
+        assert cfg["command"] == "python3"
+        assert cfg["args"] == [str(wrapper), str(self.wt)]
+        assert cfg["cwd"] == str(self.wt)
+        assert cfg["env"]["MIX_ENV"] == "test"
+        assert cfg["env"]["TIPS_DB_SUFFIX"] == "_t3l"
+        assert cfg["env"]["TIPS_TEST_PORT"] == "4132"
+        assert "--no-daemon" in self.state()["launch_argv"]
+        assert "MIX_BUILD_PATH" not in self.state()["env"]
+        assert "MIX_DEPS_PATH" not in self.state()["env"]
+
+    def test_elixirls_opt_in_rejects_claude_before_provisioning(self) -> None:
+        result = self.call("--lsp", "elixirls", role="test", ok=False)
+        assert "ElixirLS experiment requires Codex" in result.stderr
+        assert not self.wt.exists()
 
     def test_claude_only_and_actual_target_environment(self) -> None:
         self.call("--start", role="test", team="6")

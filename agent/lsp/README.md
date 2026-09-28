@@ -4,6 +4,9 @@ Codex and Claude use Expert through an MCP bridge. Each coding client runs its o
 bridge and Expert in its assigned worktree. Clients share installed binaries and
 the engine preparation cache. TPMs run without an LSP.
 
+An opt-in [Codex + ElixirLS experiment](ELIXIRLS_EXPERIMENT.md) tests the same
+worktree ownership model. Expert remains the default.
+
 ## Files
 
 | File | Purpose |
