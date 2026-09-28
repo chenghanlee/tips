@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 
 
-LAUNCHER = Path(__file__).resolve().parents[1] / "launch_worktree_elixirls.py"
+LAUNCHER = Path(__file__).resolve().parents[1] / "launch_worktree_dexter.py"
 
 
 class LauncherTest(unittest.TestCase):
@@ -35,7 +35,7 @@ class LauncherTest(unittest.TestCase):
         self.env = {
             **os.environ,
             "TIPS_ELIXIR_TOOLS": str(tools.parent),
-            "TIPS_ELIXIRLS_COMMAND": sys.executable,
+            "TIPS_DEXTER_COMMAND": sys.executable,
             "MIX_BUILD_PATH": "/shared/build/dev",
             "MIX_BUILD_ROOT": "/shared/build",
             "MIX_DEPS_PATH": "/shared/deps",
@@ -57,8 +57,10 @@ class LauncherTest(unittest.TestCase):
         self.assertEqual(reply["cwd"], str(self.root))
         self.assertEqual(
             reply["args"],
-            ["--workspace", str(self.root), "--lsp", sys.executable, "--elixirls"],
+            ["--workspace", str(self.root), "--lsp", sys.executable,
+             "--dexter", "--", "lsp", str(self.root)],
         )
+        self.assertTrue((self.root / ".dexter/dexter.db").is_file())
         self.assertEqual(reply["env"], {
             "MIX_BUILD_PATH": None, "MIX_BUILD_ROOT": None, "MIX_DEPS_PATH": None,
             "MIX_ENV": "test", "TIPS_DB_SUFFIX": "_owned_fixture", "TIPS_TEST_PORT": "4931",
@@ -71,8 +73,18 @@ class LauncherTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("root of a Git checkout", result.stderr)
 
+    def test_rejects_symlinked_index_database(self):
+        state = self.root / ".dexter"
+        state.mkdir()
+        shared = self.root / "shared.db"
+        shared.touch()
+        (state / "dexter.db").symlink_to(shared)
+        result = self.run_launcher()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("symlinked Dexter state", result.stderr)
+
     def test_rejects_shared_project_directories(self):
-        for name in ("deps", "_build", ".elixir_ls"):
+        for name in ("deps", "_build", ".dexter"):
             with self.subTest(name=name):
                 link = self.root / name
                 link.symlink_to(self.root / "tools", target_is_directory=True)

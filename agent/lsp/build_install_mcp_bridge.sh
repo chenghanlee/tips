@@ -21,8 +21,8 @@ chmod -R u+w "$build_dir"
 cd "$build_dir"
 patch -p1 --dry-run < "$script_dir/patches/mcp-bridge-tools-and-lifecycle.patch"
 patch -p1 < "$script_dir/patches/mcp-bridge-tools-and-lifecycle.patch"
-patch -p1 --dry-run < "$script_dir/patches/mcp-bridge-elixirls.patch"
-patch -p1 < "$script_dir/patches/mcp-bridge-elixirls.patch"
+patch -p1 --dry-run < "$script_dir/patches/mcp-bridge-dexter.patch"
+patch -p1 < "$script_dir/patches/mcp-bridge-dexter.patch"
 # Test the changed packages. Upstream integration tests require missing fixture
 # workspaces/external servers; watcher timing tests can flake under build load (F7).
 go vet ./...

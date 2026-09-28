@@ -424,14 +424,14 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert before == path.stat().st_mtime_ns
         assert self.git("-C", str(self.wt), "status", "--porcelain") == ""
 
-    def test_elixirls_opt_in_uses_explicit_root_without_changing_default(self) -> None:
-        wrapper = self.root / "agent/lsp/launch_worktree_elixirls.py"
-        shutil.copy(LSP_WRAPPER.with_name("launch_worktree_elixirls.py"), wrapper)
-        server = self.root / "fakebin/elixir-ls"
+    def test_dexter_opt_in_uses_explicit_root_without_changing_default(self) -> None:
+        wrapper = self.root / "agent/lsp/launch_worktree_dexter.py"
+        shutil.copy(LSP_WRAPPER.with_name("launch_worktree_dexter.py"), wrapper)
+        server = self.root / "fakebin/dexter"
         server.write_text("#!/bin/sh\nexit 0\n")
         server.chmod(0o755)
         self.env.update(MIX_BUILD_PATH="/shared/build", MIX_DEPS_PATH="/shared/deps")
-        self.call("--lsp", "elixirls", "--start")
+        self.call("--lsp", "dexter", "--start")
         cfg = tomllib.loads((self.wt / ".codex/config.toml").read_text())["mcp_servers"][
             "elixir-lsp"
         ]
@@ -445,9 +445,9 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert "MIX_BUILD_PATH" not in self.state()["env"]
         assert "MIX_DEPS_PATH" not in self.state()["env"]
 
-    def test_elixirls_opt_in_rejects_claude_before_provisioning(self) -> None:
-        result = self.call("--lsp", "elixirls", role="test", ok=False)
-        assert "ElixirLS experiment requires Codex" in result.stderr
+    def test_dexter_opt_in_rejects_claude_before_provisioning(self) -> None:
+        result = self.call("--lsp", "dexter", role="test", ok=False)
+        assert "Dexter experiment requires Codex" in result.stderr
         assert not self.wt.exists()
 
     def test_claude_only_and_actual_target_environment(self) -> None:

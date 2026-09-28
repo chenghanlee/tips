@@ -1,0 +1,265 @@
+--- a/internal/lsp/client.go
++++ b/internal/lsp/client.go
+@@ -19,13 +19,14 @@
+ )
+ 
+ type Client struct {
+-	expert  *expertStartup
+-	Cmd     *exec.Cmd
+-	stdin   io.WriteCloser
+-	stdinMu contextMutex
+-	closed  chan struct{}
+-	stdout  *bufio.Reader
+-	stderr  io.ReadCloser
++	dexterRoot string
++	expert     *expertStartup
++	Cmd        *exec.Cmd
++	stdin      io.WriteCloser
++	stdinMu    contextMutex
++	closed     chan struct{}
++	stdout     *bufio.Reader
++	stderr     io.ReadCloser
+ 
+ 	// Request ID counter
+ 	nextID atomic.Int32
+@@ -313,6 +314,9 @@
+ // MCP tool handlers share this path; locking only the map allows duplicate opens
+ // and versions to reach the server out of order.
+ func (c *Client) OpenFile(ctx context.Context, filepath string) error {
++	if err := c.checkDexterWorkspace(filepath); err != nil {
++		return err
++	}
+ 	if err := c.checkExpertWorkspace(filepath); err != nil {
+ 		return err
+ 	}
+@@ -356,7 +360,7 @@
+ // immediately before sending, while holding the document lock.
+ func (c *Client) NotifyChangeVersion(ctx context.Context, filepath string) (int32, uint64, error) {
+ 	// Diagnostics needs a new publication even when the contents are unchanged.
+-	return c.notifyChangeVersion(ctx, filepath, true)
++	return c.notifyChangeVersion(ctx, filepath, !c.IsDexter())
+ }
+ 
+ func (c *Client) notifyChangeVersion(ctx context.Context, filepath string, force bool) (int32, uint64, error) {
+@@ -391,6 +395,13 @@
+ 	seqBefore, _ := c.DiagnosticsSeq(protocol.DocumentUri(uri))
+ 	if err := c.Notify(ctx, "textDocument/didChange", params); err != nil {
+ 		return 0, 0, err
++	}
++	if c.IsDexter() {
++		if err := c.Notify(ctx, "textDocument/didSave", protocol.DidSaveTextDocumentParams{
++			TextDocument: protocol.TextDocumentIdentifier{URI: protocol.DocumentUri(uri)},
++		}); err != nil {
++			return 0, 0, err
++		}
+ 	}
+ 	fileInfo.Version = version
+ 	fileInfo.ContentHash = hash
+--- /dev/null
++++ b/internal/lsp/dexter.go
+@@ -0,0 +1,36 @@
++package lsp
++
++import (
++	"fmt"
++	"path/filepath"
++)
++
++// ConfigureDexter enables worktree checks and saved-document synchronization.
++func (c *Client) ConfigureDexter(workspace string) {
++	c.dexterRoot = workspace
++}
++
++func (c *Client) IsDexter() bool { return c.dexterRoot != "" }
++
++func (c *Client) checkDexterWorkspace(path string) error {
++	if !c.IsDexter() {
++		return nil
++	}
++	root, err := filepath.EvalSymlinks(c.dexterRoot)
++	if err != nil {
++		return err
++	}
++	file, err := filepath.Abs(path)
++	if err != nil {
++		return err
++	}
++	file, err = filepath.EvalSymlinks(file)
++	if err != nil {
++		return err
++	}
++	relative, err := filepath.Rel(root, file)
++	if err != nil || !filepath.IsLocal(relative) {
++		return fmt.Errorf("file %q is outside this Dexter session's workspace %q", path, root)
++	}
++	return nil
++}
+--- /dev/null
++++ b/internal/lsp/dexter_test.go
+@@ -0,0 +1,59 @@
++package lsp
++
++import (
++	"context"
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++func TestDexterSavedDocuments(t *testing.T) {
++	root := t.TempDir()
++	path := filepath.Join(root, "sample.ex")
++	if err := os.WriteFile(path, []byte("defmodule Sample do\nend\n"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	c, pipe := testClient()
++	c.ConfigureDexter(root)
++	if err := c.OpenFile(context.Background(), path); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, []byte("defmodule Sample do\n def value, do: :new\nend\n"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	if err := c.SyncFile(context.Background(), path); err != nil {
++		t.Fatal(err)
++	}
++	if err := c.SyncFile(context.Background(), path); err != nil {
++		t.Fatal(err)
++	}
++	got := syncMessages(t, pipe)
++	methods := []string{}
++	for _, message := range got {
++		methods = append(methods, message.Method)
++	}
++	encoded, _ := json.Marshal(methods)
++	if string(encoded) != `["textDocument/didOpen","textDocument/didChange","textDocument/didSave"]` {
++		t.Fatalf("missing save or duplicate rebuild: %s", encoded)
++	}
++}
++
++func TestDexterRejectsOtherWorktreeAndEscapingSymlink(t *testing.T) {
++	root := t.TempDir()
++	outside := filepath.Join(t.TempDir(), "other.ex")
++	if err := os.WriteFile(outside, []byte("defmodule Other do\nend\n"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	alias := filepath.Join(root, "alias.ex")
++	if err := os.Symlink(outside, alias); err != nil {
++		t.Fatal(err)
++	}
++	c, _ := testClient()
++	c.ConfigureDexter(root)
++	for _, path := range []string{outside, alias} {
++		if err := c.OpenFile(context.Background(), path); err == nil {
++			t.Fatalf("accepted outside input: %s", path)
++		}
++	}
++}
+--- a/internal/lsp/expert.go
++++ b/internal/lsp/expert.go
+@@ -209,7 +209,7 @@
+ // ShouldOpenFile limits automatic document opens, not filesystem notifications.
+ // Expert still needs asset/config change events but cannot analyze those as Elixir.
+ func (c *Client) ShouldOpenFile(path string) bool {
+-	if c.expert == nil {
++	if c.expert == nil && !c.IsDexter() {
+ 		return true
+ 	}
+ 	switch filepath.Ext(path) {
+--- a/internal/tools/diagnostics.go
++++ b/internal/tools/diagnostics.go
+@@ -37,6 +37,13 @@
+ 	err = client.OpenFile(ctx, filePath)
+ 	if err != nil {
+ 		return "", fmt.Errorf("could not open file: %v", err)
++	}
++
++	if client.IsDexter() {
++		if err := client.SyncFile(ctx, filePath); err != nil {
++			return "", err
++		}
++		return "Compiler diagnostics unavailable: Dexter does not compile the project or publish compiler diagnostics on save. Its formatting-error diagnostics are not a compilation check. Run mix compile --warnings-as-errors and the relevant tests.", nil
+ 	}
+ 
+ 	if err := client.WaitForProject(ctx, filePath); err != nil {
+--- /dev/null
++++ b/internal/watcher/dexter_test.go
+@@ -0,0 +1,32 @@
++package watcher
++
++import (
++	"context"
++	"testing"
++
++	"github.com/isaacphi/mcp-language-server/internal/protocol"
++)
++
++type dexterRecordingClient struct {
++	recordingClient
++	synced []string
++}
++
++func (c *dexterRecordingClient) IsDexter() bool         { return true }
++func (c *dexterRecordingClient) IsFileOpen(string) bool { return true }
++func (c *dexterRecordingClient) NotifyChange(_ context.Context, path string) error {
++	c.synced = append(c.synced, path)
++	return nil
++}
++
++func TestDexterAtomicReplacementRefreshesOpenDocument(t *testing.T) {
++	client := &dexterRecordingClient{}
++	watcher := NewWorkspaceWatcher(client)
++	watcher.handleFileEvent(context.Background(), "file:///fixture.ex", protocol.FileChangeType(protocol.Created))
++	if len(client.synced) != 1 || client.synced[0] != "/fixture.ex" {
++		t.Fatalf("atomic replacement did not refresh the document: %v", client.synced)
++	}
++	if len(client.events) != 1 || client.events[0].Type != protocol.FileChangeType(protocol.Created) {
++		t.Fatalf("replacement did not trigger index update: %v", client.events)
++	}
++}
+--- a/internal/watcher/watcher.go
++++ b/internal/watcher/watcher.go
+@@ -533,6 +533,14 @@
+ func (w *WorkspaceWatcher) handleFileEvent(ctx context.Context, uri string, changeType protocol.FileChangeType) {
+ 	// If the file is open and it's a change event, use didChange notification
+ 	filePath := uri[7:] // Remove "file://" prefix
++	// Atomic saves replace the inode and arrive as Created. Dexter updates its
++	// index for that event but retains an open document's old text unless we sync.
++	if mode, ok := w.client.(interface{ IsDexter() bool }); ok && mode.IsDexter() &&
++		changeType == protocol.FileChangeType(protocol.Created) && w.client.IsFileOpen(filePath) {
++		if err := w.client.NotifyChange(ctx, filePath); err != nil {
++			watcherLogger.Error("Error synchronizing replaced file: %v", err)
++		}
++	}
+ 	if changeType == protocol.FileChangeType(protocol.Changed) && w.client.IsFileOpen(filePath) {
+ 		err := w.client.NotifyChange(ctx, filePath)
+ 		if err != nil {
+--- a/main.go
++++ b/main.go
+@@ -24,6 +24,7 @@
+ var processStartedAt = time.Now()
+ 
+ type config struct {
++	dexter       bool
+ 	workspaceDir string
+ 	lspCommand   string
+ 	lspArgs      []string
+@@ -42,6 +43,7 @@
+ 	cfg := &config{}
+ 	flag.StringVar(&cfg.workspaceDir, "workspace", "", "Path to workspace directory")
+ 	flag.StringVar(&cfg.lspCommand, "lsp", "", "LSP command to run (args should be passed after --)")
++	flag.BoolVar(&cfg.dexter, "dexter", false, "Use Dexter workspace checks and saved-document synchronization")
+ 	flag.Parse()
+ 
+ 	// Get remaining args after -- as LSP arguments
+@@ -91,6 +93,9 @@
+ 	client, err := lsp.NewClient(s.config.lspCommand, s.config.lspArgs...)
+ 	if err != nil {
+ 		return fmt.Errorf("failed to create LSP client: %v", err)
++	}
++	if s.config.dexter {
++		client.ConfigureDexter(s.config.workspaceDir)
+ 	}
+ 	s.lspClient = client
+ 	s.workspaceWatcher = watcher.NewWorkspaceWatcher(client)
