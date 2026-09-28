@@ -705,6 +705,15 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call("--start")
         assert f.read_text() == '{"mine":true}\n'
 
+    def test_claude_launch_refuses_conflicting_local_settings_without_overwriting(self) -> None:
+        self.call(role="test")
+        f = self.wt / ".claude/settings.local.json"
+        f.write_text('{"mine":true}\n')
+        result = self.call("--start", role="test", ok=False)
+        assert "Refusing to overwrite" in result.stderr
+        assert f.read_text() == '{"mine":true}\n'
+        assert not any(e[:2] == ["agent", "start"] for e in self.state()["events"])
+
     def test_wrong_owner_and_busy_pane_refused_before_mutation(self) -> None:
         s = self.state()
         s["agents"] = [
@@ -811,6 +820,26 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call("--start", role="dev", task="29-dev", ref=False)
         assert (wt / "tracked.txt").read_text() == "unfinished work\n"
         assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 1
+
+    def test_new_developer_inherits_committed_instructions_from_fetched_main(self) -> None:
+        instructions = {
+            "AGENTS.md": "Use stock Dexter CLI for Elixir navigation.\n",
+            "CLAUDE.md": "@AGENTS.md\n",
+        }
+        for name, content in instructions.items():
+            (self.root / name).write_text(content)
+        self.git("add", *instructions)
+        self.commit("shared Dexter instructions")
+        release = self.git("rev-parse", "HEAD")
+        assert self.git("rev-parse", "origin/main") == self.base
+        (self.root / "AGENTS.md").write_text("Uncommitted launcher-only instructions.\n")
+
+        self.call(role="dev", task="29-dev", ref=False)
+
+        worktree = self.root / ".worktrees/29-dev"
+        assert self.git("-C", str(worktree), "rev-parse", "HEAD") == release
+        for name, content in instructions.items():
+            assert (worktree / name).read_text() == content
 
     def test_last_edit_during_shutdown_prevents_advance(self) -> None:
         task, wt = "28-review-team-3-test", self.root / ".worktrees/28-review-team-3-test"

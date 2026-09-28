@@ -9,26 +9,31 @@ defmodule TipsWeb.UserLive.Settings do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <div class="text-center">
-        <.header>
-          Account Settings
-          <:subtitle>Manage your account email address and password settings</:subtitle>
-        </.header>
+      <div class="space-y-1 text-center">
+        <h1 class="text-2xl font-semibold">Account Settings</h1>
+        <p class="text-sm text-muted-foreground">
+          Manage your account email address and password settings
+        </p>
       </div>
 
-      <.form for={@email_form} id="email_form" phx-submit="update_email" phx-change="validate_email">
-        <.input
+      <.form
+        for={@email_form}
+        id="email_form"
+        phx-submit="update_email"
+        phx-change="validate_email"
+        class="space-y-4"
+      >
+        <UI.field
           field={@email_form[:email]}
           type="email"
           label="Email"
           autocomplete="username"
           spellcheck="false"
-          required
         />
-        <.button variant="primary" phx-disable-with="Changing...">Change Email</.button>
+        <UI.button size="lg" phx-disable-with="Changing...">Change Email</UI.button>
       </.form>
 
-      <div class="divider" />
+      <hr />
 
       <.form
         for={@password_form}
@@ -38,6 +43,7 @@ defmodule TipsWeb.UserLive.Settings do
         phx-change="validate_password"
         phx-submit="update_password"
         phx-trigger-action={@trigger_submit}
+        class="space-y-4"
       >
         <input
           name={@password_form[:email].name}
@@ -46,24 +52,23 @@ defmodule TipsWeb.UserLive.Settings do
           spellcheck="false"
           value={@current_email}
         />
-        <.input
+        <UI.field
           field={@password_form[:password]}
           type="password"
           label="New password"
           autocomplete="new-password"
           spellcheck="false"
-          required
         />
-        <.input
+        <UI.field
           field={@password_form[:password_confirmation]}
           type="password"
           label="Confirm new password"
           autocomplete="new-password"
           spellcheck="false"
         />
-        <.button variant="primary" phx-disable-with="Saving...">
+        <UI.button size="lg" phx-disable-with="Saving...">
           Save Password
-        </.button>
+        </UI.button>
       </.form>
     </Layouts.app>
     """
@@ -90,6 +95,7 @@ defmodule TipsWeb.UserLive.Settings do
 
     socket =
       socket
+      |> assign(:page_title, "Account settings")
       |> assign(:current_email, user.email)
       |> assign(:email_form, to_form(email_changeset))
       |> assign(:password_form, to_form(password_changeset))

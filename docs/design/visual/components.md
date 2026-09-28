@@ -26,6 +26,8 @@ Page-specific components belong to the listed feature task.
 
 ## Shared: built by #42
 
+Implemented in `lib/tips_web/components/ui.ex` (`TipsWeb.UI`).
+
 | Name | Purpose | Attrs and slots | Wraps | Shown in |
 |---|---|---|---|---|
 | `site_header` | Top bar: Tips home link and account link | `current_scope`; `editor` (boolean: render exits as ordinary `<a href>` so the leave warning covers them) | `<header>`, `<a>` | all three files, top |

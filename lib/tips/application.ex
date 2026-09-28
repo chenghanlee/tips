@@ -8,11 +8,13 @@ defmodule Tips.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      TwMerge.Cache,
       TipsWeb.Telemetry,
       Tips.Repo,
       {Oban, Application.fetch_env!(:tips, Oban)},
       {DNSCluster, query: Application.get_env(:tips, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Tips.PubSub},
+      {Tips.AdmissionLimiter, Application.fetch_env!(:tips, Tips.AdmissionLimiter)},
       # Start a worker by calling: Tips.Worker.start_link(arg)
       # {Tips.Worker, arg},
       # Start to serve requests, typically the last entry

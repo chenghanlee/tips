@@ -90,6 +90,12 @@ shell's `PATH`. Both clients invoke `"$TIPS_ELIXIR_TOOLS/bin/dexter"`.
 
 Read provider settings by path from main checkout's `.env`; only the user adds new credentials there. Never write secrets into worktrees. Inspect launch values with `env | grep -E '^(PGPORT|MIX_ENV|TIPS_)'`; macOS `printenv` prints only its first named variable. Before database-writing checks, confirm the team/role partition matches config. Startup confirms client launch, not index readiness: Dexter indexes in the background; see [Dexter guide](../lsp/README.md). Agents propose defaults and use synthetic fixtures; never fabricate firsthand production content. Real-provider tests require user-authorized invocations quoted on the issue by lead TPM, with scoped secrets; never run automatically on PR code.
 
+**Code navigation.** Developers, testers and tech leads follow the stock Dexter CLI
+instructions in [AGENTS.md](../../AGENTS.md). Before changing an API, inspect its
+callers; resolve aliases and imports from source and check returned paths before
+editing. Dexter provides named lookup and references, not hover or diagnostics.
+Formatting, compilation, Credo and tests remain explicit project checks.
+
 **Checks.** Trust CI only for commands actually run. For `agent/teams` Python changes, CI is the evidence: open the exact-head `checks` run, verify these four steps passed and link the run in your round.
 
 ```sh
