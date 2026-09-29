@@ -54,10 +54,10 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def command(argv, root, timeout):
+def command(argv, root, timeout, env=None):
     try:
         p = subprocess.run(argv, cwd=root, capture_output=True, timeout=timeout,
-                           env={**os.environ, 'DEXTER_DAEMON_IDLE_TIMEOUT': '0'})
+                           env={**(os.environ if env is None else env), 'DEXTER_DAEMON_IDLE_TIMEOUT': '0'})
     except subprocess.TimeoutExpired as e:
         raise Failure('timeout', {'command': argv, 'seconds': timeout}) from e
     result = {'exit_code': p.returncode, 'stdout': p.stdout.decode(errors='replace'),
@@ -65,6 +65,24 @@ def command(argv, root, timeout):
     if p.returncode:
         raise Failure('process', result)
     return result
+
+
+def stdlib_config(value, root, timeout, check_toolchain=False):
+    if not value:
+        raise Failure('stdlib', 'Run dx start with DEXTER_ELIXIR_LIB_ROOT pointing to the lib directory of matching Elixir sources')
+    try:
+        path = Path(value).expanduser().resolve(strict=True)
+        with (path / 'elixir/lib/enum.ex').open('rb') as source:
+            if not source.read(1):
+                raise ValueError('enum.ex is empty')
+        version = (path.parent / 'VERSION').read_text().strip()
+    except (OSError, ValueError) as e:
+        raise Failure('stdlib', f'Expected Elixir sources at {value}/elixir/lib/enum.ex and ../VERSION: {e}') from e
+    if check_toolchain:
+        installed = command(['elixir', '--short-version'], root, timeout)['stdout'].strip()
+        if version != installed:
+            raise Failure('stdlib', f'Elixir source version {version} does not match the worktree toolchain {installed}')
+    return {'root': str(path), 'version': version}
 
 
 def bound_path(root, name):
@@ -117,13 +135,13 @@ def operation_lock(state, timeout):
 
 
 class Session:
-    def __init__(self, binary, root, timeout):
+    def __init__(self, binary, root, timeout, env=None):
         self.timeout, self.events, self.serial = timeout, [], 0
         self.messages = queue.Queue()
         self.log = tempfile.TemporaryFile()
         self.proc = subprocess.Popen([str(binary), '-C', str(root), 'lsp'], cwd=root,
                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.log,
-                                     env={**os.environ, 'DEXTER_DAEMON_IDLE_TIMEOUT': '0'})
+                                     env={**(os.environ if env is None else env), 'DEXTER_DAEMON_IDLE_TIMEOUT': '0'})
         self.reader = threading.Thread(target=self.read_frames, daemon=True)
         self.reader.start()
 
@@ -506,12 +524,29 @@ def main(argv=None):
         if state.parent.is_symlink() or state.is_symlink() or database.is_symlink():
             raise Failure('scope', 'Dexter database and client state must belong to this worktree, not symlinks')
         with operation_lock(state, args.timeout):
+            config_path = state / 'stdlib.json'
+            child_env = dict(os.environ)
+            if args.operation != 'stop':
+                if args.operation != 'start' and not database.is_file():
+                    raise Failure('not_initialized', 'Run dx start first: this exact root needs its own database')
+                saved = json.loads(config_path.read_text()) if config_path.exists() else {}
+                value = (os.environ.get('DEXTER_ELIXIR_LIB_ROOT') or saved.get('root')) if args.operation == 'start' else saved.get('root')
+                report['stdlib'] = {'status': 'unconfigured'}
+                config = stdlib_config(value, root, args.timeout, check_toolchain=args.operation == 'start')
+                if args.operation != 'start' and config != saved:
+                    raise Failure('stdlib', 'Saved Elixir sources changed; run dx start again')
+                child_env['DEXTER_ELIXIR_LIB_ROOT'] = config['root']
+                if args.operation == 'start' and config != saved and database.is_file():
+                    # An existing daemon keeps its old environment. Never force a
+                    # teammate off: stock stop refuses while a client is attached.
+                    report['restart'] = command([str(binary), '-C', str(root), 'stop'], root, args.timeout)
+                report['stdlib'] = {'status': 'configured', **config}
             if args.operation == 'start' and not database.exists():
-                report['init'] = command([str(binary), 'init', str(root)], root, args.timeout)
+                report['init'] = command([str(binary), 'init', str(root)], root, args.timeout, env=child_env)
             if not database.is_file():
                 raise Failure('not_initialized', 'Run dx start first: a database at this exact root prevents Dexter from selecting an ancestor')
             def reindex(target=None):
-                return command([str(binary), '-C', str(root), 'reindex', *([str(target)] if target else [])], root, args.timeout)
+                return command([str(binary), '-C', str(root), 'reindex', *([str(target)] if target else [])], root, args.timeout, env=child_env)
             if args.operation in ('start', 'stop', 'reindex'):
                 if args.operation == 'stop':
                     report['result'] = command([str(binary), '-C', str(root), 'stop'], root, args.timeout)
@@ -519,6 +554,8 @@ def main(argv=None):
                     target = bound_path(root, params['file']) if 'file' in params else None
                     report['result'] = reindex(target)
                     report['reconcile'] = 'batch processed; success of each indexed file is unverified'
+                    if args.operation == 'start':
+                        config_path.write_text(json.dumps(config) + '\n')
             else:
                 mutation = args.operation in ('rename', 'write') or params.get('apply') is True
                 if params.get('apply') and args.operation not in ('rename', 'write', 'completion', 'code-actions', 'format'):
@@ -548,7 +585,7 @@ def main(argv=None):
                         report['result'] = {'applied': apply_workspace_edit(root, edit, before)}
                     else:
                         report['reconcile'] = reindex()
-                        session = Session(binary, root, args.timeout)
+                        session = Session(binary, root, args.timeout, env=child_env)
                         try:
                             capabilities = session.initialize(root)
                             report['result'] = capabilities if args.operation == 'capabilities' else workflow(session, root, args.operation, params, report, before)

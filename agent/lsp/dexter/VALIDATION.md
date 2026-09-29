@@ -21,9 +21,34 @@ claim that stock Dexter satisfies strict freshness and mutation correctness.
 Run from this worktree:
 
 ```sh
+DEXTER_ELIXIR_LIB_ROOT=/absolute/path/to/matching-elixir-source/lib \
 DEXTER_BINARY="$PWD/agent/lsp/dexter/vendor/dexter" \
   python3 -m unittest discover -s agent/lsp/dexter/tests -v
 ```
+
+### Standard-library configuration follow-up
+
+The client now validates matching sources on `start`, saves the path/version per
+worktree, and uses that environment for all later Dexter processes. Configuration
+changes retire an old daemon with stock non-forced `stop`; unchanged `start` does
+not restart it. Four added real-server tests cover missing/source-less paths,
+version mismatch, migration of a legacy daemon and automatic daemon replacement,
+and refusal to disconnect an attached teammate. All **23 tests passed** (17.8 s).
+The regression tests failed against the original implementation before the fix.
+
+On this machine, authentic Elixir 1.20.4 sources were exported from the clean
+official-repository checkout at `759443e724f55bf58e71c0603644e99058918d52` into the
+main checkout's ignored `agent/lsp/vendor/elixir-1.20.4/` directory. No runtime or
+upstream source was changed. The prototype's old daemon was stopped normally and
+restarted with the saved source path. The main checkout's language stack was not
+started or changed.
+
+Actual Tips `Enum.each` lookups at `lib/tips_web/user_auth.ex:180` then returned
+documentation and definitions in authentic `enum.ex`. Separate client processes
+had no `DEXTER_ELIXIR_LIB_ROOT` override: they used the saved worktree configuration.
+Wall times were **132.6 ms hover** and **131.4 ms definition**. These are two smoke
+observations, not a benchmark distribution or a claim about index freshness.
+Evidence: main checkout `tmp/dexter-architecture-review/stdlib-fixed-live.json`.
 
 The local build manifest supplies the checksum for the locally built binary.
 For a different external build, audit its revision and pass its checksum when

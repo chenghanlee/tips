@@ -43,10 +43,36 @@ bash agent/lsp/dexter/build.sh /absolute/path/to/dexter-source
 With the local build, the shortest smoke check is:
 
 ```sh
+export DEXTER_ELIXIR_LIB_ROOT=/absolute/path/to/matching-elixir-source/lib
 python3 agent/lsp/dexter/dx.py --root "$PWD" start </dev/null
 printf '%s\n' '{"query":"Tips.Content"}' |
   python3 agent/lsp/dexter/dx.py --root "$PWD" workspace-symbols
 ```
+
+### Standard-library sources
+
+`start` requires authentic Elixir sources matching `elixir --short-version` in
+the worktree's toolchain. Set the stock `DEXTER_ELIXIR_LIB_ROOT` variable to the
+source checkout's **lib** directory, containing `elixir/lib/enum.ex`; `VERSION`
+must be one directory above it. A source-less Homebrew library directory is not
+sufficient. Obtain the matching release from the official
+[Elixir repository](https://github.com/elixir-lang/elixir). A single unchanged,
+shared source directory outside the active worktrees is sufficient; no separate
+copy per agent is needed. This does not install or change the Elixir runtime.
+
+The client checks sources and version before indexing, then saves the path/version
+in `.dexter/dx/stdlib.json`. Subsequent commands need no environment override:
+they reuse that worktree configuration for both CLI and LSP processes, including
+when Dexter automatically starts a replacement daemon. Their `stdlib` field
+reports configuration, not proof that every library symbol is indexed.
+
+For an existing database without saved configuration, or when the configured
+path/version changes, `start` first uses stock `dexter stop` to retire the old
+daemon. It never uses `--force`; an attached teammate makes configuration fail
+without disconnecting them. Retry after the team is idle. Repeating `start`
+with unchanged configuration does not restart the daemon. Run `start` again
+after changing toolchains. Do not independently start this worktree's daemon
+with a different environment. `stop` remains usable if sources are unavailable.
 
 The build writes an ignored `vendor/build.json` with the binary checksum.
 The client defaults to this local vendor build and verifies its manifest checksum.
@@ -187,6 +213,7 @@ returned. No workaround is presented as an upstream fix.
 ## Tests
 
 ```sh
+DEXTER_ELIXIR_LIB_ROOT=/absolute/path/to/matching-elixir-source/lib \
 DEXTER_BINARY=/absolute/path/to/the/audited/dexter \
   python3 -m unittest discover -s agent/lsp/dexter/tests -v
 ```
