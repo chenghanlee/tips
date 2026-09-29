@@ -303,3 +303,52 @@ full Elixir Git checkout as the standard-library source. Both the original
 the main checkout's vendored `lib` and `VERSION` layout, despite identical `lib`
 contents. The cause remains unisolated. Use the validated vendored sources for
 the pilot; do not infer that arbitrary source-checkout layouts have been tested.
+
+## Outgoing call sites (2026-09-30)
+
+`outgoing-calls` replaces stock `callHierarchy/outgoingCalls`, which returned null or a
+short list for ordinary functions (four nulls and three two-row lists across seven
+preserved trial receipts; every miss was a dropped call, none a wrong target). The
+new path parses the saved source once with the public parser, prepares each call name
+with the configured Dexter binary's `prepareCallHierarchy` in the same session and groups identical items into
+the LSP outgoing list. Implementation: `dexter_client/outgoing.py`, `sites.exs` and
+the existing workflow dispatch. No resolver, cache, index, service or new upstream
+patch; generated targets use the packaged argument-count binary.
+
+Hand-derived expectations were written before any run, from source, on two isolated
+fixtures: eight common cases (`E1`-`E8`: qualified and aliased calls, pipe and capture
+helpers, a bodiless default head, two same-arity clauses queried from either head, a
+no-call control, a private helper calling generated functions, an ExUnit private helper
+with `send`/`self`/an anonymous call) and a real `use Ecto.Repo` fixture with ecto
+3.14.2 / ecto_sql 3.14.0 copied from the main lock (piped `insert!/1`, `one/1`,
+`delete!/1`, adapter-injected `query!/1` and `/2`, an ExUnit helper, a no-call control).
+The isolated prototype found 18 of 20 expected rows on the first fixture (the two
+misses are Erlang-module calls, documented unsupported) and 9 of 9 on the real Ecto
+fixture, with zero wrong targets, zero false positives and empty controls; the
+`query!/2` label defect it exposed is fixed by the packaged arity binary.
+
+Integrated run (2026-09-30, binary `d4ac1fd5`, helper `sites.exs` `250707cf`, fixtures
+`fa9fb4a` and `2b7059f`, daemons started and stopped per fixture, one cold and one warm
+`dx outgoing-calls` per query, exact expected sets compared; runner and receipts kept
+outside the checkout):
+
+| fixture | queries | expected rows | found | missed | wrong targets | false positives |
+|---|---|---|---|---|---|---|
+| common `E1`-`E8` (+ second heads `E4b`, `E5b`) | 10 | 20 | 18 | 2 (`:inet.is_ip_address/1`, `:ets.info/2`, Erlang, documented unsupported, reported as `unresolved_count: 1`) | 0 | 0 |
+| real `use Ecto.Repo` `R1`-`R5` | 5 | 9 | 9 | 0 | 0 | 0 |
+
+Every request returned `ok: true`, exit 0, and identical cold and warm results. Both
+heads of a two-clause function (`E4`/`E4b`, `E5`/`E5b`) returned the same list with both
+clauses in `clauses`. Both no-call controls returned an empty list. `Kernel.self/0` in `E8`
+is a correct extra call not in the hand set. The real Ecto fixture labelled
+`Shop.Repo.query!/2` and `Shop.Repo.query!/1` by the called arity, so the prototype's
+label defect is gone in the integrated command. Wall time per request was 436-488 ms
+(`elapsed_ms` 377-428), measured as request totals only; no attribution between
+parser and prepares was measured in this run. Final checks reported by the root
+integrator on the worktree: 12 ExUnit helper tests, 37 adapter tests, `ruff check`
+and `ruff format --check` on 24 files, Pyright strict with 0 errors, scoped Credo pass.
+Runner and receipts:
+`/private/tmp/claude-501/-Users-chenghanlee-Software-Projects-tiny-big-agents-tips/6aff7bc9-f4ed-48da-b9cb-b1dfb48c812c/scratchpad/outgoing-acceptance/`
+(`run_integrated.py`, `evidence/integrated.json`). No accuracy percentage is claimed for the population of Elixir
+sources; the supported and unsupported forms are listed in
+[the contract](README.md#outgoing-calls).

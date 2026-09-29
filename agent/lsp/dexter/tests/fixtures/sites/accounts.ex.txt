@@ -1,0 +1,62 @@
+defmodule Shop.Accounts do
+  alias Shop.{Repo, Token}
+
+  def deliver(user) do
+    token = Token.build(user, "login")
+    Repo.insert!(token)
+    Shop.Mailer.send_login(user, token)
+  end
+
+  def update(user, attrs) do
+    user
+    |> Token.changeset(attrs)
+    |> save_and_clear()
+  end
+
+  def normalize_all(emails) do
+    Enum.map(emails, &normalize/1)
+  end
+
+  def admit(email, ip, server \\ __MODULE__)
+
+  def admit(email, ip, server) when is_binary(email) do
+    normalized = Token.normalize(email)
+
+    if :inet.is_ip_address(ip) do
+      GenServer.call(server, {:admit, normalized})
+    else
+      {:error, :invalid}
+    end
+  end
+
+  def handle(:count, state) do
+    {:reply, :ets.info(state.table, :size), state}
+  end
+
+  def handle({:admit, keys}, state) do
+    entries = Enum.map(keys, &entry(state, &1))
+
+    case Enum.find(entries, fn {_key, count} -> count > 3 end) do
+      nil -> {:reply, :ok, state}
+      _hit -> {:reply, limited(state), state}
+    end
+  end
+
+  def version, do: 1
+
+  defp save_and_clear(changeset) do
+    row = Repo.insert!(changeset)
+    Repo.delete!(row)
+    row
+  end
+
+  defp normalize(email), do: Token.normalize(email)
+  defp entry(state, key), do: {key, Map.get(state, key, 0)}
+  defp limited(_state), do: {:error, :limited}
+
+  def deliver(user, opts) do
+    Token.verify({user, opts})
+  end
+
+  def admit(email), do: Token.verify(email)
+end

@@ -48,6 +48,7 @@ jobs:
           python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
           python3 -m unittest discover -s agent/lsp/dexter/tests -v
           elixir agent/lsp/dexter/tests/owners_test.exs
+          elixir agent/lsp/dexter/tests/sites_test.exs
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |

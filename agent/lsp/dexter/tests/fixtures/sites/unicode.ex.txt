@@ -1,0 +1,13 @@
+defmodule Shop.Unicode do
+  def greet(name) do
+    "héllo 😀 " <> Shop.Token.build(name, "ç")
+  end
+
+  def family do
+    x = "👩‍👩‍👧"; foo(x)
+  end
+
+  def cafe do
+    café = 1; bar(café)
+  end
+end

@@ -6,6 +6,7 @@ from typing import Any, cast
 
 from .edits import Snapshot, apply_workspace_edit, bound_path, digest, offset
 from .incoming import incoming_calls
+from .outgoing import outgoing_calls
 from .protocol import DxError, JsonObject, Session
 
 METHODS = {
@@ -79,15 +80,10 @@ def query_document(
         session.request("textDocument/formatting", request)
         report["diagnostic_kind"] = "syntax"
         return session.diagnostics(path.as_uri())
-    if op in ("incoming-calls", "outgoing-calls"):
+    if op == "incoming-calls":
         items = session.request("textDocument/prepareCallHierarchy", request)
         report["prepared_items"] = items
-        if op == "incoming-calls":
-            return incoming_calls(session, root, selected(items or [], params), report)
-        report["followup_sent"] = bool(items)
-        if not items:
-            return None
-        request = {"item": selected(items, params)}
+        return incoming_calls(session, root, selected(items or [], params), report)
     result = session.request(METHODS[op], request)
     if op == "format":
         diagnostics = session.diagnostics(path.as_uri())
@@ -170,7 +166,11 @@ def workflow(
     if params.get("expected_sha256", digest(data)) != digest(data):
         raise DxError("changed_base", "Input position refers to a different file revision")
     request = document_request(session, path, data, op, params)
-    result = query_document(session, root, path, op, params, request, report)
+    result: Any = (
+        outgoing_calls(session, root, path, data, params, report)
+        if op == "outgoing-calls"
+        else query_document(session, root, path, op, params, request, report)
+    )
     if op == "completion" and ("select" in params or params.get("apply")):
         resolve_completion(session, root, path, result, params, report, before)
     if params.get("apply") and op in ("format", "code-actions", "rename"):

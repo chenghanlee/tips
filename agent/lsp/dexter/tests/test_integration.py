@@ -240,14 +240,27 @@ class StockDexter(unittest.TestCase):
         )
         incoming = self.dx(self.b, "incoming-calls", file="lib/sample.ex", line=3, column=8)
         assert incoming["result"]
-        # Pinned Dexter returns null for this unqualified local-call fixture.
+        # The unqualified local call that stock outgoingCalls dropped is a prepared site.
         local = self.dx(self.b, "outgoing-calls", file="lib/sample.ex", line=4, column=8)
-        assert local["result"] is None
+        assert local["caller"] == {"module": "Sample", "name": "call", "arity": 0}
+        assert local["unresolved_count"] == 0
+        assert [(call["to"]["name"], call["fromRanges"]) for call in local["result"]] == [
+            (
+                "Sample.greet/1",
+                [{"start": {"line": 3, "character": 16}, "end": {"line": 3, "character": 21}}],
+            )
+        ]
         (self.b / "lib/caller.ex").write_text(
             'defmodule Caller do\n  def run do\n    Sample.greet("world")\n  end\nend\n'
         )
         outgoing = self.dx(self.b, "outgoing-calls", file="lib/caller.ex", line=2, column=8)
-        assert "Sample.greet" in json.dumps(outgoing["result"])
+        assert outgoing["unresolved_count"] == 0
+        assert [(call["to"]["name"], call["fromRanges"]) for call in outgoing["result"]] == [
+            (
+                "Sample.greet/1",
+                [{"start": {"line": 2, "character": 11}, "end": {"line": 2, "character": 16}}],
+            )
+        ]
 
     def test_competing_saved_writes_reject_stale_base(self) -> None:
         path = self.a / "lib/race.ex"

@@ -164,7 +164,7 @@ line-level.
 | `completion` | position; optional `select` index or exact label resolves the item in the same session |
 | `call-hierarchy` | position; returns prepared items |
 | `incoming-calls` | position, optional `select`; prepare + `references` + one source-owner parse in one session; see [incoming calls](#incoming-calls) |
-| `outgoing-calls` | position, optional `select`; prepare + follow-up in one session |
+| `outgoing-calls` | position on a function head or body line; one source parse + one `prepareCallHierarchy` per call site in one session; see [outgoing calls](#outgoing-calls) |
 | `code-actions` | position, optional zero-based `range` and raw `diagnostics` |
 | `format` | optional LSP formatting `options` |
 | `rename` | position, `new_name`, **`apply: true` required** |
@@ -251,6 +251,91 @@ Abridged receipt (usual `operation`, `root`, `source`, `prepared_items`, `reconc
 
 With an empty `unavailable` list the same receipt has `ok: true`, no `error`, and exit 0.
 
+### Outgoing calls
+
+Stock Dexter's `callHierarchy/outgoingCalls` reads the first same-name definition
+only, up to the next definition line, and keeps just the qualified calls whose target
+has an indexed source definition. Same-module helpers, generated functions such as
+`Repo.insert!`, standard-library calls and every later clause are dropped, and the
+short list arrives as a normal answer. The client does not send that request.
+`outgoing-calls` parses the saved source once with the public `Code.string_to_quoted`
+parser (one `elixir` subprocess, no compilation, no evaluation) to list the call
+names inside every clause of the function at the requested line, then asks the
+configured Dexter binary's `prepareCallHierarchy` (the packaged binary includes the
+argument-count patch) at each call name in the same session. Identical prepared
+items are grouped into the usual LSP outgoing list, one entry per target with a
+`fromRanges` per call site. Dexter supplies the resolution of aliases, imports, `use`
+chains and generated functions; the parser never resolves names.
+
+The position may be the head or any body line. The caller is the function whose
+lexical module, name and arity own that line; all of its clauses contribute, and a
+bodiless default head contributes no sites. A same-name function of another arity is
+a different caller. The report carries `caller` (`module`, `name`, `arity`),
+`clauses` (1-based `line`/`end_line` per clause) and `unresolved_count`, the number
+of parser-listed call sites where prepare returned no item. Those sites are not in
+`result`. The count is not the total of missing calls: constructs the parser skips
+(listed below) are never enumerated and never counted. A nil prepare is not an error: the
+command keeps `ok: true` and exit 0 with the count, by the accepted common-path
+contract, so read `unresolved_count` before trusting a short list.
+
+Target names and anchors are the prepared items as Dexter returns them: a generated `Repo.insert!/1`
+anchors at the consumer module line, not at a function body, and its `/arity` is the
+called arity with the packaged argument-count binary. `fromRanges` are the parser's
+call-name positions, converted to LSP ranges. Follow-up requests from a returned item
+stay name-keyed, as everywhere in Dexter's call hierarchy.
+
+Supported on the common path: qualified calls through plain aliases, fully qualified
+calls, pipes, captures (`&helper/1`, `&helper(&1, x)`), bare `def`/`defp` helpers of
+the same module, generated functions from a compiled `use` chain, and Elixir
+standard-library calls. Generated targets need the provider's BEAM in `_build`;
+without a compiled project they prepare to nothing and count as unresolved.
+
+Not supported, counted in `unresolved_count` or skipped by the parser as documented:
+Erlang-module calls (`:ets.info/2`: prepare returns no item), dynamic calls
+(`fun.()`, `var.fun()`, `apply/3` targets), calls inside `quote`, sigils and HEEx
+templates, calls in guards and default-argument expressions, macro-generated calls
+that are not written in the body, and bare zero-argument calls written without
+parentheses (`foo` alone; `foo x` is listed). Operators and special forms are never
+listed. The helper receives the saved source snapshot as JSON, which pins the bytes
+the parser reads; each prepare reads Dexter's own disk and index state. A file change
+observed during the request is reported as the usual `changed_base` failure; that
+check does not prove the index agrees with the snapshot. When the helper cannot answer
+(the file fails to parse, the line is in no function, one line holds heads of two
+functions, or `elixir` is missing) the command fails with `error.kind:
+"outgoing_parser"` and no `result`. This is a common-path answer, not complete
+call-graph coverage; no accuracy figure is claimed.
+
+```sh
+printf '%s
+' '{"file":"lib/shop/items.ex","line":4,"column":7}' |
+  python3 agent/lsp/dexter/dx.py --root "$PWD" outgoing-calls
+```
+
+Abridged receipt (usual `operation`, `root`, `source`, `reconcile`, `freshness`,
+`warnings` and `daemon_log` fields omitted; ranges zero-based as in `--json`):
+
+```json
+{"caller": {"module": "Shop.Items", "name": "create", "arity": 1},
+ "clauses": [{"line": 4, "end_line": 8}],
+ "unresolved_count": 0,
+ "result": [
+   {"to": {"name": "Shop.Item.changeset/2", "kind": 12, "detail": "def",
+           "uri": "file:///abs/lib/shop/item.ex", "range": {"start": {"line": 8, "character": 0}, "end": {"line": 8, "character": 0}},
+           "data": {"module": "Shop.Item", "function": "changeset"}},
+    "fromRanges": [{"start": {"line": 5, "character": 12}, "end": {"line": 5, "character": 21}}]},
+   {"to": {"name": "Shop.Repo.insert!/1", "kind": 12, "detail": "def",
+           "uri": "file:///abs/lib/shop/repo.ex", "range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 0}},
+           "data": {"module": "Shop.Repo", "function": "insert!"}},
+    "fromRanges": [{"start": {"line": 6, "character": 12}, "end": {"line": 6, "character": 19}}]}],
+ "ok": true,
+ "elapsed_ms": 387}
+```
+
+Measured on the two isolated fixtures with the integrated command, one cold and one
+warm request per query: `elapsed_ms` 377-428 and client wall time 436-488 ms, cold and
+warm alike, measured as request totals only. See
+[VALIDATION.md](VALIDATION.md#outgoing-call-sites-2026-09-30).
+
 ### Edits and follow-ups
 
 - Formatting and code actions return proposals unless `apply: true` is provided.
@@ -328,8 +413,9 @@ native watcher plus an explicit full reconciliation before each lookup. That
 adds latency. It is not yet proven for all dependency/path-dependency changes.
 One fresh session discards per-session caches, not the shared daemon's stale data.
 
-Known upstream limitations include silent partial rename writes and missing outgoing
-results in the tested unqualified local-call fixture. Results are preserved as
+Known upstream limitations include silent partial rename writes. Stock outgoing
+calls are no longer requested; `outgoing-calls` lists source call sites and prepares
+each one, with the unsupported forms in [outgoing calls](#outgoing-calls). Results are preserved as
 returned. The argument-count patch does not establish safe multi-arity rename,
 complete call hierarchy, or strict index freshness. See the
 [patch validation record](patches/README.md) before relying on a particular construct.
