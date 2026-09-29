@@ -642,12 +642,14 @@ def main(argv=None):
                         if any('error' in r for r in report['post_reconcile']):
                             raise Failure('post_reconcile', 'Mutation may be partial; see changed_files and snapshot')
         report['ok'] = True
-    except (Failure, OSError, ValueError, KeyError, TypeError, KeyboardInterrupt) as e:
+        output = report if args.json else compact_report(report)
+    except (Failure, OSError, ValueError, KeyError, TypeError, AttributeError, KeyboardInterrupt) as e:
         report['ok'] = False
         report['error'] = {'kind': e.kind if isinstance(e, Failure) else type(e).__name__,
                            'detail': e.detail if isinstance(e, Failure) else str(e)}
-    report['elapsed_ms'] = round((time.monotonic() - began) * 1000, 1)
-    print(json.dumps(report if args.json else compact_report(report), ensure_ascii=False, separators=(',', ':')))
+        output = report
+    output['elapsed_ms'] = round((time.monotonic() - began) * 1000, 1)
+    print(json.dumps(output, ensure_ascii=False, separators=(',', ':')))
     return 0 if report['ok'] else 1
 
 

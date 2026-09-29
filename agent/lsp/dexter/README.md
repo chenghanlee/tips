@@ -128,7 +128,7 @@ It keeps every match, warning/error notification, and diagnostics publication.
 Use `--json` for the full report with original LSP fields and zero-based ranges;
 other structured results in the compact view also retain their LSP ranges.
 Failures always retain the full report.
-`daemon_log` retains the proxy-reported log path in both views. Inspect that log
+For LSP workflows, `daemon_log` retains the proxy-reported log path in both views. Inspect that log
 when results look incomplete: upstream read/parse/index errors may appear there
 despite a successful lookup. The adapter does not parse the log or certify freshness.
 Dexter sometimes returns column 1 and a zero-width range for a symbol farther

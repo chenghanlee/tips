@@ -1,6 +1,9 @@
 """Adversarial subprocess tests: errors must never become empty answers."""
 import importlib.util
+import json
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -10,6 +13,8 @@ spec.loader.exec_module(dx)
 
 SERVER = r'''#!/usr/bin/env python3
 import sys,json
+if sys.argv[-1]=='reindex':print('Fixture reindex');sys.exit(0)
+sys.stderr.write('starting (root: %s, daemon log: /tmp/fixture.log)\n'%sys.argv[2]);sys.stderr.flush()
 
 def send(o):
  b=json.dumps({'jsonrpc':'2.0',**o},ensure_ascii=False).encode()
@@ -26,6 +31,8 @@ while True:
  if method=='exit':break
  if method=='die':sys.exit(7)
  if method=='hang':continue
+ if method=='initialize':send({'id':m['id'],'result':{'capabilities':{}}});continue
+ if method=='textDocument/definition':send({'id':m['id'],'result':[{'uri':'file:///bad.ex','range':{}}]});continue
  if method=='error':send({'id':m['id'],'error':{'code':-32603,'message':'upstream failed','data':{'path':'é.ex'}}});continue
  if method=='watch':send({'id':'register','method':'client/registerCapability','params':{'registrations':[]}});continue
  if m.get('id')=='register':
@@ -68,6 +75,29 @@ class Protocol(unittest.TestCase):
     def test_watcher_registration_is_honestly_rejected(self):
         response = self.session.request('watch')
         self.assertEqual(response['error']['code'], -32601)
+
+    def test_malformed_location_returns_json_error_instead_of_traceback(self):
+        subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
+        (self.root / 'mix.exs').write_text('# protocol fixture\n')
+        sources = self.root / 'sources/lib'
+        (sources / 'elixir/lib').mkdir(parents=True)
+        (sources / 'elixir/lib/enum.ex').write_text('# unused protocol fixture\n')
+        (sources.parent / 'VERSION').write_text('0.0.0')
+        state = self.root / '.dexter/dx'
+        state.mkdir(parents=True)
+        (state.parent / 'dexter.db').touch()
+        (state / 'stdlib.json').write_text(json.dumps({'root': str(sources.resolve()), 'version': '0.0.0'}))
+        binary = self.root / 'server'
+        result = subprocess.run([sys.executable, dx.__file__, '--root', str(self.root),
+                                 '--binary', str(binary), '--sha256', dx.digest(binary.read_bytes()),
+                                 'definition'], input='{"file":"mix.exs"}', text=True,
+                                capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertFalse(report['ok'])
+        self.assertEqual(report['error']['kind'], 'KeyError')
+        self.assertEqual(report['result'][0]['range'], {})
+        self.assertNotIn('Traceback', result.stderr)
 
 
 if __name__ == '__main__':
