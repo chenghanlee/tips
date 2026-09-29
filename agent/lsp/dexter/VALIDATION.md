@@ -7,6 +7,34 @@ claim that stock Dexter satisfies strict freshness and mutation correctness.
 
 ## Team launcher integration
 
+Challenge-review follow-up: **85 team tests and 24 adapter tests passed**. The
+team run enabled real Dexter fixtures and the installed Codex check. A later
+correction to that Codex check also passed individually: it parses the generated
+plugin values explicitly and checks that a legacy MCP definition in the fixture
+main checkout is absent from the worktree's server list. It does **not** prove
+project settings auto-load or real-model instruction uptake; a CLI trust override
+was insufficient to establish project-file loading.
+
+The launcher now preserves unrelated coding-Claude MCP servers, omits the invalid
+transport-less Codex MCP table, and defaults source discovery to the main checkout's
+versioned Elixir sources. Team retirement relocates snapshots before deleting
+resources and refuses if that move fails. Ordinary `write` snapshots retain only
+the target pre-image. Test daemons use a short explicit idle timeout and register
+cleanup before startup; team daemons still default to a persistent watcher.
+
+The default report omits repeated metadata and renders simple navigation lists
+with relative paths and 1-based ranges. No matches are truncated, diagnostics and
+warning/error notifications remain, and `--json` preserves the full protocol report.
+On the prototype tree without deps, a paired smoke measured hover output at
+1,821 → 909 bytes, definition at 1,892 → 832, references at 3,441 → 972; all six
+calls succeeded in 128–135 ms. This is not a distribution or a full Tips-with-deps
+benchmark. Evidence: main `tmp/dexter-architecture-review/review-fixes-output.json`.
+
+Ruff, formatting, strict Pyright, documentation links and whitespace checks pass.
+Real client sandbox/trust behavior and a mixed-harness assignment remain pilot
+checks. Reviewers measured a local-socket denial with Codex network access disabled;
+the setup guide records the prerequisite without changing user sandbox settings.
+
 The prototype branch now provisions Dexter during worktree setup, exports a
 worktree-bound command for both harnesses, supports explicit same-team `--share`,
 and stops one daemon per retiring worktree. Native language plugins and the old

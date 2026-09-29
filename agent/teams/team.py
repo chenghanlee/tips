@@ -641,6 +641,8 @@ def stop_team(target: str) -> None:
             )
             if result.returncode:
                 raise RuntimeError(result.stderr or result.stdout)
+    for root in sorted(roots):
+        preserve_recovery(root)
     if roots or panes:
         drop_databases(target)
     for root in sorted(roots):
@@ -684,10 +686,6 @@ def owned_worktrees(panes: dict[str, Entity]) -> set[Path]:
 
 def check_worktrees(roots: set[Path]) -> None:
     for root in sorted(roots):
-        if any((root / ".dexter/dx/snapshots").glob("*.json")):
-            raise RuntimeError(
-                f"Recovery snapshots remain in {root}; review and remove them before retirement"
-            )
         if git("status", "--porcelain", "--untracked-files=all", root=root):
             raise RuntimeError(f"Dirty worktree {root}; remaining resources preserved")
         # Merged HEAD also proves all local commits reached origin/main.
@@ -697,6 +695,16 @@ def check_worktrees(roots: set[Path]) -> None:
             raise RuntimeError(
                 f"Unmerged worktree {root}; remaining resources preserved"
             ) from error
+
+
+def preserve_recovery(root: Path) -> None:
+    snapshots = root / ".dexter/dx/snapshots"
+    if snapshots.exists():
+        recovery = main / "tmp/dexter-recovery"
+        recovery.mkdir(parents=True, exist_ok=True)
+        destination = Path(tempfile.mkdtemp(prefix=root.name + "-", dir=recovery)) / "snapshots"
+        snapshots.rename(destination)
+        print(f"Recovery snapshots preserved: {destination}")
 
 
 def drop_databases(target: str) -> None:

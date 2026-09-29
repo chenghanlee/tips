@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 DX = Path(__file__).resolve().parents[1] / 'dx.py'
 BINARY = os.environ.get('DEXTER_BINARY')
@@ -17,7 +18,11 @@ BINARY = os.environ.get('DEXTER_BINARY')
 class StockDexter(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        idle = patch.dict(os.environ, {'DEXTER_DAEMON_IDLE_TIMEOUT': '5s'})
+        idle.start()
+        cls.addClassCleanup(idle.stop)
         cls.temp = tempfile.TemporaryDirectory(prefix='dx-integration-')
+        cls.addClassCleanup(cls.temp.cleanup)
         cls.repo = (Path(cls.temp.name) / 'repo').resolve()
         cls.repo.mkdir()
         cls.git(cls.repo, 'init', '-q')
@@ -31,20 +36,15 @@ class StockDexter(unittest.TestCase):
         cls.git(cls.repo, 'worktree', 'add', '-q', '-b', 'a', str(cls.a))
         cls.git(cls.repo, 'worktree', 'add', '-q', '-b', 'b', str(cls.b))
         for root in (cls.a, cls.b):
-            subprocess.run([sys.executable, str(DX), '--binary', BINARY, '--root', str(root), 'start'], input='{}', text=True, capture_output=True, check=True, timeout=90)
+            cls.addClassCleanup(subprocess.run, [BINARY, '-C', str(root), 'stop'], capture_output=True)
+            subprocess.run([sys.executable, str(DX), '--json', '--binary', BINARY, '--root', str(root), 'start'], input='{}', text=True, capture_output=True, check=True, timeout=90)
 
     @staticmethod
     def git(root, *args):
         return subprocess.run(['git', '-C', str(root), *args], check=True, capture_output=True)
 
-    @classmethod
-    def tearDownClass(cls):
-        for root in (cls.a, cls.b):
-            subprocess.run([BINARY, '-C', str(root), 'stop'], capture_output=True)
-        cls.temp.cleanup()
-
     def dx(self, root, op, **params):
-        p = subprocess.run([sys.executable, str(DX), '--binary', BINARY, '--root', str(root), op], input=json.dumps(params), text=True, capture_output=True, timeout=90)
+        p = subprocess.run([sys.executable, str(DX), '--json', '--binary', BINARY, '--root', str(root), op], input=json.dumps(params), text=True, capture_output=True, timeout=90)
         self.assertTrue(p.stdout, p.stderr)
         data = json.loads(p.stdout)
         self.assertEqual(p.returncode, 0, data)
@@ -87,7 +87,7 @@ class StockDexter(unittest.TestCase):
         self.assertIn('def updated', path.read_text())
         self.assertIn('updated()', path.read_text())
         self.assertTrue(result['snapshot'])
-        p = subprocess.run([sys.executable, str(DX), '--binary', BINARY, '--root', str(self.b), 'write'], input=json.dumps({'file':'lib/mutate.ex', 'text':'bad', 'expected_sha256':'wrong'}), capture_output=True, text=True)
+        p = subprocess.run([sys.executable, str(DX), '--json', '--binary', BINARY, '--root', str(self.b), 'write'], input=json.dumps({'file':'lib/mutate.ex', 'text':'bad', 'expected_sha256':'wrong'}), capture_output=True, text=True)
         self.assertNotEqual(p.returncode, 0)
         self.assertIn('base', p.stdout.lower())
         self.assertIn('def updated', path.read_text())
@@ -150,7 +150,7 @@ class StockDexter(unittest.TestCase):
         processes = []
         for value in (1, 2):
             payload = {'file': 'lib/race.ex', 'text': original.replace('do: 0', f'do: {value}'), 'expected_sha256': hashlib.sha256(original.encode()).hexdigest()}
-            p = subprocess.Popen([sys.executable, str(DX), '--binary', BINARY, '--root', str(self.a), 'write'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            p = subprocess.Popen([sys.executable, str(DX), '--json', '--binary', BINARY, '--root', str(self.a), 'write'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             p.stdin.write(json.dumps(payload))
             p.stdin.close()
             processes.append(p)
@@ -162,6 +162,8 @@ class StockDexter(unittest.TestCase):
             p.stdout.close()
             p.stderr.close()
         self.assertEqual(sum(r['ok'] for r in results), 1)
+        saved = json.loads(Path(next(r['snapshot'] for r in results if r['ok'])).read_text())
+        self.assertEqual(set(saved['files']), {'lib/race.ex'})
         self.assertEqual([r['error']['kind'] for r in results if not r['ok']], ['changed_base'])
         self.assertIn(path.read_text(), [original.replace('do: 0', f'do: {v}') for v in (1, 2)])
 
@@ -194,9 +196,9 @@ class StockDexter(unittest.TestCase):
         child = self.repo / 'nested'
         self.git(self.repo, 'worktree', 'add', '-q', '-b', 'nested', str(child))
         try:
-            p = subprocess.run([sys.executable, str(DX), '--binary', BINARY, '--root', str(child), 'hover'], input=json.dumps({'file':'lib/sample.ex', 'line':3, 'column':8}), capture_output=True, text=True)
+            p = subprocess.run([sys.executable, str(DX), '--json', '--binary', BINARY, '--root', str(child), 'hover'], input=json.dumps({'file':'lib/sample.ex', 'line':3, 'column':8}), capture_output=True, text=True)
             self.assertEqual(json.loads(p.stdout)['error']['kind'], 'not_initialized')
-            parent = subprocess.run([sys.executable, str(DX), '--binary', BINARY, '--root', str(self.repo), 'workspace-symbols'], input='{}', capture_output=True, text=True)
+            parent = subprocess.run([sys.executable, str(DX), '--json', '--binary', BINARY, '--root', str(self.repo), 'workspace-symbols'], input='{}', capture_output=True, text=True)
             self.assertEqual(json.loads(parent.stdout)['error']['kind'], 'isolation')
             self.dx(child, 'start')
             self.assertTrue((child / '.dexter/dexter.db').is_file())
@@ -229,7 +231,7 @@ class StockDexter(unittest.TestCase):
         nested.mkdir(parents=True)
         self.git(nested, 'init', '-q')
         try:
-            p = subprocess.run([sys.executable, str(DX), '--binary', BINARY, '--root', str(self.a), 'workspace-symbols'], input='{}', capture_output=True, text=True)
+            p = subprocess.run([sys.executable, str(DX), '--json', '--binary', BINARY, '--root', str(self.a), 'workspace-symbols'], input='{}', capture_output=True, text=True)
             self.assertEqual(json.loads(p.stdout)['error']['kind'], 'isolation')
         finally:
             import shutil

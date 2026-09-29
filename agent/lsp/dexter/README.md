@@ -93,7 +93,9 @@ printf '%s\n' '{"file":"lib/example.ex","line":12,"column":8}' |
 
 Provisioning can run `start` in the background while other worktree setup
 continues; keep its exit status/output and wait before claiming setup succeeded.
-`DEXTER_DAEMON_IDLE_TIMEOUT=0` is set by the client. Only worktree retirement
+The client defaults `DEXTER_DAEMON_IDLE_TIMEOUT` to `0` to keep the team watcher
+running. Tests and scratch runs can explicitly set a short duration such as `5s`;
+an idle restart is not equivalent to a continuously running watcher. Only worktree retirement
 should call `stop`; never call it when one agent exits. Stock stop refuses active
 LSP clients. It cannot know about a teammate who is thinking between commands.
 
@@ -119,6 +121,13 @@ Positions `line`/`column` are **1-based UTF-16**. LSP ranges in input/output rem
 
 All commands take one JSON object on stdin, and return one JSON object. Omitted
 stdin means `{}`. Nonzero exit means failure; inspect `error.kind` and `detail`.
+The default omits repeated protocol metadata and renders simple navigation
+locations as `path:start-line:start-column-end-line:end-column`, with 1-based
+UTF-16 positions and worktree-relative paths. External URIs stay absolute.
+It keeps every match, warning/error notification, and diagnostics publication.
+Use `--json` for the full report with original LSP fields and zero-based ranges;
+other structured results in the compact view also retain their LSP ranges.
+Failures always retain the full report.
 
 | Commands | Input beyond `file` |
 | --- | --- |
@@ -156,11 +165,15 @@ construct. See [VALIDATION.md](VALIDATION.md) for evidence and remaining gaps.
   may write files inside Dexter before responding. Variable/alias rename can
   return edits for the client to apply. Rename sessions never send `didOpen`,
   avoiding Dexter's proposed-open-buffer index pollution.
-- Mutations save source contents (including ignored source that Dexter may index) and initial Git status in a private snapshot,
-  preserve pre-existing dirty edits, report changed files, then reconcile those
+- Mutations save source contents (including ignored source that Dexter may index) and initial Git status in a private snapshot.
+  `write` preserves only its target's pre-edit contents; rename and apply workflows
+  retain the full source snapshot because their changes can span files.
+  Workflows preserve pre-existing dirty edits, report changed files, then reconcile those
   paths. Snapshots are for manual recovery; no automatic revert is attempted. They are
   not automatically pruned because they may contain the only copy of dirty work.
-  Remove reviewed snapshots manually when recovery is no longer needed.
+  Remove reviewed snapshots manually when recovery is no longer needed. Team
+  retirement moves them to the main checkout's `tmp/dexter-recovery/` and prints
+  the unique destination; it does not delete them.
 - Returned edits are validated before any client writes; create/rename/delete
   resource operations are processed in order. This is **not** a multi-file
   transaction. A crash or server-side partial failure can still leave edits.

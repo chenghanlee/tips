@@ -39,8 +39,9 @@ def run(
     timeout: float | None = None,
     env: dict[str, str] | None = None,
     input_text: str | None = None,
+    cwd: Path | None = None,
 ) -> str:
-    result = execute(argv, timeout=timeout, env=env, input_text=input_text)
+    result = execute(argv, timeout=timeout, env=env, input_text=input_text, cwd=cwd)
     if result.returncode:
         raise RefusalError(
             f"{shlex.join(map(str, argv))} failed: {result.stderr.strip() or result.stdout.strip()}"
@@ -309,11 +310,8 @@ class WorktreeTask:
 enabled = true
 [plugins."mix-credo@elixir-agent-tools"]
 enabled = true
-[mcp_servers.elixir-lsp]
-enabled = false
 """
-            for plugin in NATIVE_LSP_PLUGINS:
-                config += f"\n[plugins.{json.dumps(plugin)}]\nenabled = false\n"
+            config += '\n[plugins."elixir-lsp@elixir-agent-tools"]\nenabled = false\n'
             self.desired[self.worktree / ".codex/config.toml"] = config
         else:
             self.desired[self.worktree / ".claude/settings.local.json"] = (
@@ -329,8 +327,6 @@ enabled = false
                 )
                 + "\n"
             )
-            # Keep the previous filename to replace its legacy bridge definition.
-            self.desired[self.worktree / ".claude/elixir-mcp.json"] = '{"mcpServers":{}}\n'
 
     def language_brief(self) -> str:
         return (
@@ -341,8 +337,11 @@ enabled = false
             "Use write with expected_sha256 for cooperating source edits. Native Edit, "
             "apply_patch and shell writes bypass the shared lock. Rename is an immediate "
             "mutation; do not overlap it with native teammate writes. Freshness is unverified; "
-            "empty results are not proof of absence. Use normal Mix compile/tests for compiler "
-            "diagnostics. Do not stop the shared daemon when this agent exits. "
+            "empty results are not proof of absence. After every dx mutation, run Mix "
+            "compile and Credo on edited Elixir files, plus relevant tests: Bash-based "
+            "dx edits do not trigger native edit hooks. Do not stop the shared daemon "
+            "when this agent exits. Do not run git clean -x: it deletes TIPS_DX, the "
+            "index and recovery snapshots while the daemon may still run. "
             "Read the team operating agreement and your role card, then await assignment."
         )
 
@@ -352,6 +351,21 @@ enabled = false
             # A joining agent uses the existing worktree configuration; it must
             # not replace the shared daemon's environment between teammate calls.
             env.pop("DEXTER_ELIXIR_LIB_ROOT", None)
+        elif (
+            not env.get("DEXTER_ELIXIR_LIB_ROOT")
+            and not (self.worktree / ".dexter/dx/stdlib.json").exists()
+        ):
+            version = run(
+                ["elixir", "--short-version"],
+                cwd=self.worktree,
+                env=env,
+                timeout=self.timeouts["dexter_startup_seconds"],
+            )
+            if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?", version):
+                raise RefusalError(f"Unexpected Elixir version: {version!r}")
+            env["DEXTER_ELIXIR_LIB_ROOT"] = str(
+                self.root / "agent/lsp/vendor" / f"elixir-{version}" / "lib"
+            )
         output = run(
             ["/bin/sh", self.wrapper, "start"],
             timeout=self.timeouts["dexter_startup_seconds"],
@@ -593,18 +607,13 @@ enabled = false
             if self.model:
                 client += ["-m", self.model]
             client += ["-c", "model_reasoning_effort=" + json.dumps(self.effort)]
-            client += ["-c", "mcp_servers.elixir-lsp.enabled=false", self.language_brief()]
+            client.append(self.language_brief())
         else:
             client += [
                 "--permission-mode",
                 self.policies["claude_permission_mode"],
                 "--effort",
                 self.effort,
-                "--strict-mcp-config",
-                "--mcp-config",
-                str(self.worktree / ".claude/elixir-mcp.json"),
-                "--settings",
-                str(self.worktree / ".claude/settings.local.json"),
                 "--append-system-prompt",
                 self.language_brief(),
             ]

@@ -57,7 +57,7 @@ def digest(data):
 def command(argv, root, timeout, env=None):
     try:
         p = subprocess.run(argv, cwd=root, capture_output=True, timeout=timeout,
-                           env={**(os.environ if env is None else env), 'DEXTER_DAEMON_IDLE_TIMEOUT': '0'})
+                           env={'DEXTER_DAEMON_IDLE_TIMEOUT': '0', **(os.environ if env is None else env)})
     except subprocess.TimeoutExpired as e:
         raise Failure('timeout', {'command': argv, 'seconds': timeout}) from e
     result = {'exit_code': p.returncode, 'stdout': p.stdout.decode(errors='replace'),
@@ -141,7 +141,7 @@ class Session:
         self.log = tempfile.TemporaryFile()
         self.proc = subprocess.Popen([str(binary), '-C', str(root), 'lsp'], cwd=root,
                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.log,
-                                     env={**(os.environ if env is None else env), 'DEXTER_DAEMON_IDLE_TIMEOUT': '0'})
+                                     env={'DEXTER_DAEMON_IDLE_TIMEOUT': '0', **(os.environ if env is None else env)})
         self.reader = threading.Thread(target=self.read_frames, daemon=True)
         self.reader.start()
 
@@ -485,12 +485,41 @@ def workflow(session, root, op, params, report, before):
     return result
 
 
+def compact_report(report):
+    if not report.get('ok') or report['operation'] in ('start', 'stop', 'reindex', 'capabilities'):
+        return report
+    hidden = {'upstream_revision', 'binary_sha256', 'warnings', 'frontend_stderr', 'reconcile', 'notifications'}
+    result = {key: value for key, value in report.items() if key not in hidden}
+    events = [event for event in report.get('notifications', [])
+              if event.get('method') == 'textDocument/publishDiagnostics' or
+              (event.get('method') in ('window/logMessage', 'window/showMessage') and
+               event.get('params', {}).get('type') in (1, 2))]
+    if events:
+        result['notifications'] = events
+    if report['operation'] in ('definition', 'references', 'type-definition', 'declaration', 'implementation'):
+        locations = report.get('result')
+        if isinstance(locations, list):
+            rendered = []
+            for location in locations:
+                if isinstance(location, dict) and set(location) == {'uri', 'range'}:
+                    uri = location['uri']
+                    prefix = Path(report['root']).as_uri() + '/'
+                    path = unquote(uri[len(prefix):]) if uri.startswith(prefix) else uri
+                    start, end = location['range']['start'], location['range']['end']
+                    rendered.append(f"{path}:{start['line']+1}:{start['character']+1}-{end['line']+1}:{end['character']+1}")
+                else:
+                    rendered.append(location)
+            result['result'] = rendered
+    return result
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', required=True, type=Path, help='Exact Git worktree/Mix root')
     parser.add_argument('--binary', type=Path, default=Path(__file__).resolve().parent / 'vendor/dexter', help='Pinned stock Dexter executable; defaults to local vendor build')
     parser.add_argument('--sha256', default=None, help='Checksum of your audited stock build; defaults to local build manifest')
     parser.add_argument('--timeout', type=float, default=60)
+    parser.add_argument('--json', action='store_true', help='Full protocol report; default is compact JSON with readable navigation locations')
     parser.add_argument('operation', choices=[*METHODS, 'capabilities', 'diagnostics', 'start', 'stop', 'reindex', 'write'])
     args = parser.parse_args(argv)
     report = {'operation': args.operation, 'freshness': 'unverified', 'upstream_revision': REVISION,
@@ -562,7 +591,11 @@ def main(argv=None):
                     raise Failure('input', 'apply is not valid for this operation')
                 before = source_snapshot(root) if mutation else {}
                 if mutation:
-                    report['snapshot'] = save_snapshot(state, root, before)
+                    recovery = before
+                    if args.operation == 'write':
+                        target = bound_path(root, params['file'])
+                        recovery = {path: data for path, data in before.items() if path == target}
+                    report['snapshot'] = save_snapshot(state, root, recovery)
                     report['mutation_completion'] = 'unverified; inspect changed files; no automatic rollback'
                 try:
                     if args.operation == 'write':
@@ -611,7 +644,7 @@ def main(argv=None):
         report['error'] = {'kind': e.kind if isinstance(e, Failure) else type(e).__name__,
                            'detail': e.detail if isinstance(e, Failure) else str(e)}
     report['elapsed_ms'] = round((time.monotonic() - began) * 1000, 1)
-    print(json.dumps(report, ensure_ascii=False))
+    print(json.dumps(report if args.json else compact_report(report), ensure_ascii=False, separators=(',', ':')))
     return 0 if report['ok'] else 1
 
 

@@ -17,22 +17,21 @@ STDLIB = os.environ.get('DEXTER_ELIXIR_LIB_ROOT')
 class StandardLibrary(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='dx-stdlib-')
+        self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
+        self.addCleanup(subprocess.run, [BINARY, '-C', str(self.root), 'stop'], capture_output=True)
         subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
         (self.root / 'mix.exs').write_text('defmodule Fixture.MixProject do\n  use Mix.Project\n  def project, do: [app: :fixture, version: "0.1.0"]\nend\n')
         (self.root / 'sample.ex').write_text('defmodule Sample do\n  def run, do: Enum.map([1], & &1)\nend\n')
         self.env = dict(os.environ)
+        self.env['DEXTER_DAEMON_IDLE_TIMEOUT'] = '5s'
         self.env.pop('DEXTER_ELIXIR_LIB_ROOT', None)
-
-    def tearDown(self):
-        subprocess.run([BINARY, '-C', str(self.root), 'stop'], capture_output=True)
-        self.temp.cleanup()
 
     def invoke(self, op, params=None, stdlib=None):
         env = dict(self.env)
         if stdlib is not None:
             env['DEXTER_ELIXIR_LIB_ROOT'] = str(stdlib)
-        p = subprocess.run([sys.executable, str(DX), '--binary', BINARY,
+        p = subprocess.run([sys.executable, str(DX), '--json', '--binary', BINARY,
                             '--root', str(self.root), op], input=json.dumps(params or {}),
                            env=env, capture_output=True, text=True, timeout=90)
         self.assertTrue(p.stdout, p.stderr)

@@ -29,6 +29,7 @@ class FixtureState(TypedDict):
     wrong_start_root: str
     shell_timeout: bool
     dexter_fails: bool
+    dexter_stdlib: str | None
 
 
 TEAMS = Path(__file__).resolve().parents[1]
@@ -250,6 +251,7 @@ root = args.root
 state_path = Path(os.environ['FAKE_HERDR_STATE'])
 state = json.loads(state_path.read_text())
 state['events'].append(['dexter', root, args.operation])
+state['dexter_stdlib'] = os.environ.get('DEXTER_ELIXIR_LIB_ROOT')
 state_path.write_text(json.dumps(state))
 print(json.dumps({'ok': not state.get('dexter_fails'), 'root': root}))
 sys.exit(1 if state.get('dexter_fails') else 0)
@@ -284,6 +286,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
             os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1", HERDR_ENV="1"
         )
         self.env.pop("TIPS_TEAM_CONFIG", None)
+        self.env.setdefault("DEXTER_ELIXIR_LIB_ROOT", str(self.root / "fixture-stdlib"))
         for k in (
             "TIPS_DB_SUFFIX",
             "TIPS_TEST_PORT",
@@ -435,8 +438,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
     def test_codex_only_canonical_wrapper_and_idempotent_config(self) -> None:
         self.call()
         path = self.wt / ".codex/config.toml"
-        cfg = tomllib.loads(path.read_text())["mcp_servers"]["elixir-lsp"]
-        assert cfg == {"enabled": False}
+        assert "mcp_servers" not in tomllib.loads(path.read_text())
         assert str(self.wt) in (self.wt / ".dexter/dx/command.sh").read_text()
         assert not (self.wt / ".claude").exists()
         before = path.stat().st_mtime_ns
@@ -447,7 +449,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
     def test_claude_only_and_actual_target_environment(self) -> None:
         self.call("--start", role="test", team="6")
         assert not (self.wt / ".codex").exists()
-        assert json.loads((self.wt / ".claude/elixir-mcp.json").read_text()) == {"mcpServers": {}}
+        assert not (self.wt / ".claude/elixir-mcp.json").exists()
         plugins = json.loads((self.wt / ".claude/settings.local.json").read_text())[
             "enabledPlugins"
         ]
@@ -468,7 +470,8 @@ class WorktreeIntegrationTest(unittest.TestCase):
         }
         assert s["cwd"] == str(self.wt)
         assert "fixture-test" in s["launch_argv"]
-        assert "--mcp-config" in s["launch_argv"]
+        for flag in ("--mcp-config", "--strict-mcp-config", "--settings"):
+            assert flag not in s["launch_argv"]
 
     def test_codex_models_and_config_parameters(self) -> None:
         self.call("--start")
@@ -883,7 +886,11 @@ class WorktreeIntegrationTest(unittest.TestCase):
     def test_codex_disables_old_lsp_without_changing_approval_policy(self) -> None:
         self.call("--start")
         cfg = tomllib.loads((self.wt / ".codex/config.toml").read_text())
-        assert cfg["mcp_servers"]["elixir-lsp"] == {"enabled": False}
+        assert "mcp_servers" not in cfg
+        assert cfg["plugins"]["elixir-lsp@elixir-agent-tools"] == {"enabled": False}
+        assert "elixir-ls@skills-dir" not in cfg["plugins"]
+        assert "dexter-lsp@dexter" not in cfg["plugins"]
+        assert "mcp_servers.elixir-lsp.enabled=false" not in self.state()["launch_argv"]
         assert "approval_policy" not in cfg
         assert "never" in self.state()["launch_argv"]
         assert str(self.wt / ".dexter/dx/command.sh") in self.state()["launch_argv"][-1]
@@ -896,11 +903,61 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert starts[-1][1:] == [str(self.wt), "start"]
         self.call("--start")
         assert self.state()["launch_env"]["TIPS_DX"] == str(wrapper)
-        assert "elixir-lsp.enabled=false" in " ".join(self.state()["launch_argv"])
+        assert str(wrapper) in self.state()["launch_argv"][-1]
+
+    def test_stdlib_default_uses_target_toolchain_and_preserves_saved_config(self) -> None:
+        self.env.pop("DEXTER_ELIXIR_LIB_ROOT", None)
+        elixir = self.root / "fakebin/elixir"
+        elixir.write_text(
+            '#!/bin/sh\ntest "$PWD" = "$EXPECTED_WORKTREE" || exit 1\nprintf "1.2.3\\n"\n'
+        )
+        elixir.chmod(0o755)
+        self.env["EXPECTED_WORKTREE"] = str(self.wt)
+        self.call()
+        assert self.state()["dexter_stdlib"] == str(self.root / "agent/lsp/vendor/elixir-1.2.3/lib")
+        (self.wt / ".dexter/dx/stdlib.json").write_text('{"root":"saved-by-dx"}')
+        elixir.unlink()
+        self.call()
+        assert self.state()["dexter_stdlib"] is None
+        self.env["DEXTER_ELIXIR_LIB_ROOT"] = str(self.root / "explicit-sources")
+        self.call()
+        assert self.state()["dexter_stdlib"] == self.env["DEXTER_ELIXIR_LIB_ROOT"]
+
+    @unittest.skipUnless(
+        os.environ.get("TIPS_TEST_REAL_CODEX"), "opt-in installed Codex config check"
+    )
+    def test_installed_codex_accepts_generated_configuration(self) -> None:
+        legacy = self.root / ".codex/config.toml"
+        legacy.parent.mkdir()
+        legacy.write_text('[mcp_servers.elixir-lsp]\ncommand = "/usr/bin/false"\n')
+        self.call("--start")
+        launch = self.state()["launch_argv"]
+        args = launch[launch.index("--") + 1 : -1]
+        config = tomllib.loads((self.wt / ".codex/config.toml").read_text())
+        assert set(config) == {"plugins"}
+        # A CLI trust override does not prove project-file loading. Parse the
+        # generated values explicitly, without changing the user's trust store.
+        for name, plugin in config["plugins"].items():
+            args += ["-c", f"plugins.{json.dumps(name)}.enabled={json.dumps(plugin['enabled'])}"]
+        result = execute(
+            [
+                "codex",
+                *args,
+                "mcp",
+                "list",
+                "--json",
+            ],
+            cwd=self.wt,
+            env=self.env,
+            timeout=30,
+        )
+        assert result.returncode == 0, result.stderr
+        assert "elixir-lsp" not in {server["name"] for server in json.loads(result.stdout)}
 
     @unittest.skipUnless(os.environ.get("TIPS_TEST_REAL_DEXTER"), "opt-in stock Dexter integration")
     def test_two_mixed_teams_use_isolated_real_daemons(self) -> None:
         self.env["TIPS_DEXTER_HOME"] = os.environ["TIPS_TEST_REAL_DEXTER"]
+        self.env["DEXTER_DAEMON_IDLE_TIMEOUT"] = "5s"
         source = (
             'defmodule Sample do\n  @doc "Original documentation"\n'
             "  def greet(name), do: name\nend\n"
