@@ -624,6 +624,9 @@ def main(argv=None):
                             report['result'] = capabilities if args.operation == 'capabilities' else workflow(session, root, args.operation, params, report, before)
                         finally:
                             report['frontend_stderr'] = session.close()
+                            startup = re.search(re.escape(f'starting (root: {root}, daemon log: ') + r'([^\r\n]+)\)', report['frontend_stderr'])
+                            if startup:
+                                report['daemon_log'] = startup[1]
                             report['notifications'] = session.events
                 finally:
                     if mutation:

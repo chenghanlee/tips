@@ -128,6 +128,12 @@ It keeps every match, warning/error notification, and diagnostics publication.
 Use `--json` for the full report with original LSP fields and zero-based ranges;
 other structured results in the compact view also retain their LSP ranges.
 Failures always retain the full report.
+`daemon_log` retains the proxy-reported log path in both views. Inspect that log
+when results look incomplete: upstream read/parse/index errors may appear there
+despite a successful lookup. The adapter does not parse the log or certify freshness.
+Dexter sometimes returns column 1 and a zero-width range for a symbol farther
+along the line. Use the reported line to inspect the source; do not treat the
+column as a precise token boundary.
 
 | Commands | Input beyond `file` |
 | --- | --- |
@@ -174,6 +180,9 @@ construct. See [VALIDATION.md](VALIDATION.md) for evidence and remaining gaps.
   Remove reviewed snapshots manually when recovery is no longer needed. Team
   retirement moves them to the main checkout's `tmp/dexter-recovery/` and prints
   the unique destination; it does not delete them.
+  This folder is an exception to the usual disposable `tmp/` convention. Retention
+  is local and best-effort, not a backup: move needed recovery data before manually
+  cleaning `tmp/`, running `git clean -x`, or deleting the main checkout.
 - Returned edits are validated before any client writes; create/rename/delete
   resource operations are processed in order. This is **not** a multi-file
   transaction. A crash or server-side partial failure can still leave edits.

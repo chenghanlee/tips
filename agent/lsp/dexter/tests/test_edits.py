@@ -18,12 +18,14 @@ class Edits(unittest.TestCase):
         error = {'method': 'window/showMessage', 'params': {'type': 1, 'message': 'error'}}
         report = {'operation': 'references', 'ok': True, 'root': '/project',
                   'freshness': 'unverified', 'result': [location] * 224,
+                  'daemon_log': '/tmp/dexter-test/project.log',
                   'binary_sha256': 'static', 'notifications': [diagnostics, warning, error,
                       {'method': 'client/registerCapability'}]}
         compact = dx.compact_report(report)
         self.assertEqual(compact['result'], ['lib/a b.ex:2:3-4:5'] * 224)
         self.assertEqual(compact['notifications'], [diagnostics, warning, error])
         self.assertEqual(compact['freshness'], 'unverified')
+        self.assertEqual(compact['daemon_log'], report['daemon_log'])
         self.assertNotIn('binary_sha256', compact)
         self.assertEqual(report['result'][0], location)
         report['ok'] = False

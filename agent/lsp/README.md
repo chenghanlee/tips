@@ -55,7 +55,9 @@ merge-only while it contains nested team worktrees.
 before dropping databases/removing clean, merged worktrees. Recovery snapshots
 move to a unique directory under the main checkout's `tmp/dexter-recovery/`;
 retirement prints that path and never prunes it. A failed move preserves the
-worktree and databases. A known external
+worktree and databases. That recovery directory is not disposable by default;
+retention is local and best-effort, so move needed copies before cleaning `tmp/`.
+A known external
 Herdr teammate or a Dexter stop refusal preserves the worktree. Individual agent
 exit never requests daemon shutdown. Unregistered/external clients remain outside
 the team ownership contract: do not retire a tree they still use.

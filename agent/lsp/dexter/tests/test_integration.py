@@ -49,6 +49,9 @@ class StockDexter(unittest.TestCase):
         data = json.loads(p.stdout)
         self.assertEqual(p.returncode, 0, data)
         self.assertEqual(data['freshness'], 'unverified')
+        if 'frontend_stderr' in data:
+            self.assertTrue(Path(data['daemon_log']).is_file())
+            self.assertIn(data['daemon_log'], data['frontend_stderr'])
         return data
 
     def test_saved_atomic_edit_and_worktree_isolation(self):

@@ -79,6 +79,8 @@ Installed LSP binaries live in ignored `agent/lsp/vendor/`, shared from the main
 
 Keep root files in their standard locations for Mix, Git and Docker.
 Put disposable experiment output in ignored `tmp/` or outside the repository.
+Exception: `tmp/dexter-recovery/` can hold the only copy of pre-edit work. Review
+or move those snapshots before cleaning `tmp/`; they are not disposable by default.
 Dexter stores its per-worktree index and adapter state in `.dexter/`.
 
 Leave generated and client-managed folders, such as `_build/`, `deps/`, `.codex/`
