@@ -5,6 +5,81 @@
 This is a working **prototype of the transport and workflows**, not a release
 claim that stock Dexter satisfies strict freshness and mutation correctness.
 
+## Incoming call ownership (2026-09-30)
+
+Expanded live verification on eight additional examples passed its declared contracts:
+25 supported reference lines had the correct owners; one line with calls in two
+different functions was explicitly `multiple_owners` (expected partial result).
+Stock incoming calls on the same 25 supported lines produced 5 correct owners,
+13 wrong owners and 7 omissions. Every expected reference line was present in the
+index. Coverage added setup/context combinations, cross-module attribution, inline
+and multiline keyword syntax, nested/absolute modules, nested control flow, same-line
+deduplication/ambiguity, pipelines and duplicate test labels with multi-clause helpers.
+The executable fixture passed 18 ExUnit tests with warnings as errors. Source/client
+hashes were unchanged and the fixture daemon stopped. Full source-derived expectations,
+raw receipts and limitations: `/private/tmp/dx-incoming-expanded-5008ri/RESULTS.md`.
+This was a verification-only run; the implementation was not changed. The two
+ambiguous same-line owners remain unsupported, and lexical clause arity does not
+prove runtime/default-argument arity resolution.
+
+The prototype, integrated live run and eight-example source/receipts are also
+archived in the main checkout's ignored `tmp/dx-fix-checkpoints/2026-09-30/`, with
+SHA-256 checksums in `artifacts.json`. Runtime databases, build caches and nested
+Git directories are excluded. The regression tests and fixtures below are versioned.
+
+`incoming-calls` now uses stock references and Elixir's public parser for lexical
+ownership. It runs inside the existing DX session and worktree lock. There is one
+batched parser subprocess, no outer adapter CLI, new service, cache, index or upstream
+patch. Implementation: `dexter_client/incoming.py`, `owners.exs`, and the existing
+workflow dispatch. The JSON result is source-call sites plus explicit unsupported
+lines, not fabricated LSP call-hierarchy items. See [the contract](README.md#incoming-calls).
+
+The independently owned live fixture contained seven indexed references. Stock Dexter
+returned one correct owner, misattributed two sites to a closed helper, and omitted
+four. The integrated command returned all six supported sites with the exact source
+owners, including aliased and imported calls. The seventh, a capture, appeared in
+`unavailable` with `not_direct_call`; exit 1 retained the result. Results were identical
+in one cold and three warm requests. Removing the capture file for a separate request
+produced six correct sites, no unavailable entries, and exit 0. The file was restored
+byte-for-byte and the fixture daemon stopped.
+
+Same-fixture wall times: stock **114–119 ms**, integrated seven-site answers
+**474–492 ms**, separate clean six-site answer **534 ms**. Integrated `elapsed_ms`
+was 413–432 ms and 467 ms respectively. These are a small feasibility sample, not a
+capacity benchmark. Keeping a single stateless parser process per request trades VM
+startup cost for fewer moving parts.
+
+Acceptance covers ExUnit blocks before/after helpers, ordinary and keyword-do clauses,
+inline ends, nested control forms, nested/absolute module names, defaults, aliases and
+imports, repeated references on a line, captures/quotes/typespecs, malformed sources,
+dynamic identity, unreadable/out-of-root sources and observed caller-source changes.
+The deliberate source fixtures are stored as `.txt` data so Dexter does not index them.
+CI sets up the existing Elixir toolchain before the Python workflow tests and runs the
+standalone ExUnit acceptance script in the same job.
+
+Nine ExUnit acceptance tests and six Python workflow tests passed. Two existing
+real-server hierarchy/capability regressions passed; nine existing protocol/edit tests
+also passed. The other 14 stock-server tests were not run for this change. Helper
+compilation with warnings as errors, formatting, strict Credo, Ruff, strict Pyright,
+documentation links and whitespace checks passed. This checkout has no Mix dependencies,
+so its direct Credo hook failed; scoped Credo used byte-identical scratch copies and
+the main checkout's existing compiled dependencies, with no installation. No application
+code changed and no application-wide Mix suite was run.
+
+The index still determines target identity and which reference lines exist. The helper
+does not independently resolve aliases/imports, execute macros or prove index freshness.
+Its ranges are source navigation lines, and test/setup names identify syntax, not
+expanded runtime functions. Captures and other unsupported cases cause explicit partial
+failure; block graph follow-ups remain unsupported. The original 13-site trial corpus
+was not replayed in this integration run. No full semantic parity claim follows.
+
+Local raw evidence: `/private/tmp/tips-dx-integrated-live/evidence/`, runs
+`live-20260930-024942-stock-baseline`, `live-20260930-025145-integrated`, and
+`live-20260930-025159-clean-phase`. An earlier mid-edit run is labelled invalid and is
+not evidence of the completed implementation. After these live runs, output cleanup
+removed the obsolete `followup_sent` field for incoming calls and added the unsupported
+line count to the error detail; ownership behavior was unchanged.
+
 ## Team launcher integration
 
 Challenge-review follow-up: **85 team tests and 24 adapter tests passed**. The

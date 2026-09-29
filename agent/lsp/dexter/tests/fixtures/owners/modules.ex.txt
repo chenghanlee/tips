@@ -1,0 +1,11 @@
+defmodule MyApp.Outer do
+  defmodule Inner do
+    def run(x), do: MyApp.Admission.admit(x)
+  end
+
+  defmodule Elixir.MyApp.Absolute do
+    def run(x), do: MyApp.Admission.admit(x)
+  end
+
+  def after_nested(x), do: MyApp.Admission.admit(x)
+end

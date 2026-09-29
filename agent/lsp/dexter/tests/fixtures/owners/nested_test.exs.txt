@@ -1,0 +1,37 @@
+defmodule MyApp.GateHelper do
+  def build(x), do: MyApp.Admission.admit(x)
+end
+
+defmodule MyApp.NestedTest do
+  use ExUnit.Case
+
+  setup_all do
+    MyApp.Admission.admit(0)
+    :ok
+  end
+
+  describe "outer" do
+    setup _context do
+      MyApp.Admission.admit(1)
+      :ok
+    end
+
+    test "control flow" do
+      if true do
+        case MyApp.Admission.admit(2) do
+          _ -> for x <- [3], do: MyApp.Admission.admit(x)
+        end
+      end
+    end
+
+    test "with and fn" do
+      with {:ok, y} <- {:ok, 4} do
+        Enum.map([y], fn z -> MyApp.Admission.admit(z) end)
+      end
+    end
+  end
+
+  test "after describe" do
+    MyApp.Admission.admit(5)
+  end
+end
