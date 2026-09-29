@@ -1,6 +1,6 @@
 diff --git a/internal/lsp/arity_integration_test.go b/internal/lsp/arity_integration_test.go
 new file mode 100644
-index 0000000000000000000000000000000000000000..6155a0ff7fae5651e9542beef7fc5f5ab0e5e598
+index 0000000..6155a0f
 --- /dev/null
 +++ b/internal/lsp/arity_integration_test.go
 @@ -0,0 +1,1157 @@
@@ -1163,7 +1163,7 @@ index 0000000000000000000000000000000000000000..6155a0ff7fae5651e9542beef7fc5f5a
 +}
 diff --git a/internal/lsp/arity_navigation.go b/internal/lsp/arity_navigation.go
 new file mode 100644
-index 0000000000000000000000000000000000000000..827e58da1c09624a7bb0b43c26df153adda8b2ec
+index 0000000..827e58d
 --- /dev/null
 +++ b/internal/lsp/arity_navigation.go
 @@ -0,0 +1,375 @@
@@ -1542,8 +1542,106 @@ index 0000000000000000000000000000000000000000..827e58da1c09624a7bb0b43c26df153a
 +	}
 +	return s.resolveModuleWithNesting(qualifier, aliases, path, line)
 +}
+diff --git a/internal/lsp/call_hierarchy_generated_arity_test.go b/internal/lsp/call_hierarchy_generated_arity_test.go
+new file mode 100644
+index 0000000..9f38aa4
+--- /dev/null
++++ b/internal/lsp/call_hierarchy_generated_arity_test.go
+@@ -0,0 +1,92 @@
++package lsp
++
++import (
++	"context"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"go.lsp.dev/protocol"
++	"go.lsp.dev/uri"
++)
++
++// A generated function with default arguments compiles to one export per arity,
++// as Ecto.Repo's query!(sql, params \\ [], opts \\ []) does. Preparing the call
++// hierarchy at a call must name the arity the call reaches, not the first export.
++func TestPrepareCallHierarchyGeneratedFunctionUsesCallArity(t *testing.T) {
++	server, cleanup := setupTestServer(t)
++	t.Cleanup(cleanup)
++
++	indexAndCompile(t, server, "MyApp.Store", "lib/my_app/store.ex",
++		"defmodule MyApp.Store do\n  use SharedLib.Store\nend\n",
++		beamExport{"lookup", 1}, beamExport{"lookup", 2}, beamExport{"lookup", 3})
++	bumpDirMtime(t, filepath.Join(server.projectRoot, "_build", "dev", "lib", "my_app", "ebin"))
++
++	const callerSource = `defmodule MyApp.Caller do
++  alias MyApp.Store
++
++  def one(sql), do: Store.lookup(sql)
++  def two(sql), do: Store.lookup(sql, [])
++  def three(sql), do: Store.lookup(sql, [], [])
++  def piped(sql), do: sql |> Store.lookup([])
++  def captured, do: &Store.lookup/2
++  def unexported(sql), do: Store.lookup(sql, [], [], :extra)
++end
++`
++	indexFile(t, server.store, server.projectRoot, "lib/my_app/caller.ex", callerSource)
++	callerURI := string(uri.File(filepath.Join(server.projectRoot, "lib/my_app/caller.ex")))
++	server.docs.Set(callerURI, callerSource)
++
++	prepare := func(t *testing.T, line int) []protocol.CallHierarchyItem {
++		t.Helper()
++		text := strings.Split(callerSource, "\n")[line]
++		character := strings.Index(text, "lookup")
++		if character < 0 {
++			t.Fatalf("no lookup call on line %d: %q", line, text)
++		}
++		items, err := server.PrepareCallHierarchy(context.Background(), &protocol.CallHierarchyPrepareParams{
++			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
++				TextDocument: protocol.TextDocumentIdentifier{URI: protocol.DocumentURI(callerURI)},
++				Position:     protocol.Position{Line: uint32(line), Character: uint32(character)},
++			},
++		})
++		if err != nil {
++			t.Fatal(err)
++		}
++		return items
++	}
++
++	for _, tc := range []struct {
++		name string
++		line int
++		want string
++	}{
++		{"one argument", 3, "MyApp.Store.lookup/1"},
++		{"optional argument supplied", 4, "MyApp.Store.lookup/2"},
++		{"every argument supplied", 5, "MyApp.Store.lookup/3"},
++		{"pipe supplies the first argument", 6, "MyApp.Store.lookup/2"},
++		{"capture names the arity", 7, "MyApp.Store.lookup/2"},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			items := prepare(t, tc.line)
++			if len(items) != 1 || items[0].Name != tc.want {
++				t.Fatalf("items = %#v, want one item named %s", items, tc.want)
++			}
++			if module, function := extractCallHierarchyData(items[0].Data); module != "MyApp.Store" || function != "lookup" {
++				t.Fatalf("data = %s.%s, want MyApp.Store.lookup", module, function)
++			}
++			// The anchor stays on the consumer module: a generated function has no source line.
++			if !strings.HasSuffix(string(items[0].URI), "/lib/my_app/store.ex") || items[0].Range.Start.Line != 0 {
++				t.Fatalf("anchor = %s line %d, want the MyApp.Store module line", items[0].URI, items[0].Range.Start.Line)
++			}
++		})
++	}
++
++	// No export takes four arguments. Another arity's item would be a convincing
++	// wrong answer, so there is no item at all.
++	t.Run("unexported arity", func(t *testing.T) {
++		if items := prepare(t, 8); len(items) != 0 {
++			t.Fatalf("items = %#v, want none: MyApp.Store exports no lookup/4", items)
++		}
++	})
++}
 diff --git a/internal/lsp/elixir.go b/internal/lsp/elixir.go
-index 6e3f525ff27ecd16f3feba7e0d8b16de0ca3d1eb..aa16c2ca09011a88893ed405d60ea7a4cfadbfc0 100644
+index 6e3f525..aa16c2c 100644
 --- a/internal/lsp/elixir.go
 +++ b/internal/lsp/elixir.go
 @@ -7,6 +7,7 @@ import (
@@ -1632,7 +1730,7 @@ index 6e3f525ff27ecd16f3feba7e0d8b16de0ca3d1eb..aa16c2ca09011a88893ed405d60ea7a4
  // @typep, @opaque, @spec, @callback or @macrocallback declaration.
  func (tf *TokenizedFile) InTypespec(targetLine int) bool {
 diff --git a/internal/lsp/hover_test.go b/internal/lsp/hover_test.go
-index 3495319f376a58238cb77ac96baa0f1a4d207b43..3ec5b8c763c5452cc0e556b0bd91ac1d7a2a26ac 100644
+index 3495319..3ec5b8c 100644
 --- a/internal/lsp/hover_test.go
 +++ b/internal/lsp/hover_test.go
 @@ -1275,13 +1275,18 @@ end
@@ -1658,7 +1756,7 @@ index 3495319f376a58238cb77ac96baa0f1a4d207b43..3ec5b8c763c5452cc0e556b0bd91ac1d
  
  	// line 8 is `@spec build(schema()) :: schema()` — col 14 is on the type
 diff --git a/internal/lsp/name_navigation.go b/internal/lsp/name_navigation.go
-index 4e380f0bc5864dda6e0cc4814de55f1358c3661f..cd7fe5f1f040e235a75387dd5e7c1165ee69a84d 100644
+index 4e380f0..cd7fe5f 100644
 --- a/internal/lsp/name_navigation.go
 +++ b/internal/lsp/name_navigation.go
 @@ -1,6 +1,9 @@
@@ -1771,7 +1869,7 @@ index 4e380f0bc5864dda6e0cc4814de55f1358c3661f..cd7fe5f1f040e235a75387dd5e7c1165
  		return
  	}
 diff --git a/internal/lsp/server.go b/internal/lsp/server.go
-index afc32414d4808a5b61c8a8e91115b0b9684a75ed..1063b17f2101846eca5720a6e3f79e1ff5509db4 100644
+index afc3241..ad699f8 100644
 --- a/internal/lsp/server.go
 +++ b/internal/lsp/server.go
 @@ -1154,8 +1154,15 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
@@ -2256,8 +2354,23 @@ index afc32414d4808a5b61c8a8e91115b0b9684a75ed..1063b17f2101846eca5720a6e3f79e1f
  		})
  	}
  
+@@ -7110,6 +7107,14 @@ func (s *Server) PrepareCallHierarchy(ctx context.Context, params *protocol.Call
+ 
+ 	r := defResults[0]
+ 	if len(generatedFunctions) > 0 {
++		// A generated callable is labelled with the arity the syntax at the
++		// cursor calls; a known arity with no such export is not this function.
++		// An unknown arity keeps every export. Source definitions keep the
++		// first row as before.
++		generatedFunctions = generatedWithArity(generatedFunctions, s.functionNameAt(docURI, tf, lineNum, col, functionName).arity)
++		if len(generatedFunctions) == 0 {
++			return nil, nil
++		}
+ 		r.Arity = generatedFunctions[0].Arity
+ 		r.Kind = generatedFunctions[0].Kind
+ 	}
 diff --git a/internal/lsp/server_test.go b/internal/lsp/server_test.go
-index 50f1959c1dc1f07a496866ea38afd1881646e97e..2ff1058491f75b40da6b92327a071812b811fa62 100644
+index 50f1959..2ff1058 100644
 --- a/internal/lsp/server_test.go
 +++ b/internal/lsp/server_test.go
 @@ -3008,6 +3008,7 @@ end
@@ -2316,7 +2429,7 @@ index 50f1959c1dc1f07a496866ea38afd1881646e97e..2ff1058491f75b40da6b92327a071812
  
  // A consumer may override a function injected by __using__. References to that
 diff --git a/internal/store/store.go b/internal/store/store.go
-index 1e6f5fd1cbce848696cf644eb01b7e993f879a0b..a09a88d68b064606c00891638c387e5bc3cc5791 100644
+index 1e6f5fd..a09a88d 100644
 --- a/internal/store/store.go
 +++ b/internal/store/store.go
 @@ -1086,13 +1086,27 @@ func (s *Store) LookupModulesInFile(filePath string) ([]string, error) {
@@ -2486,7 +2599,7 @@ index 1e6f5fd1cbce848696cf644eb01b7e993f879a0b..a09a88d68b064606c00891638c387e5b
  }
 diff --git a/internal/treesitter/arity.go b/internal/treesitter/arity.go
 new file mode 100644
-index 0000000000000000000000000000000000000000..5c4231915fab2757ce3bc42040cecd1d1e7e0267
+index 0000000..5c42319
 --- /dev/null
 +++ b/internal/treesitter/arity.go
 @@ -0,0 +1,487 @@
@@ -2979,7 +3092,7 @@ index 0000000000000000000000000000000000000000..5c4231915fab2757ce3bc42040cecd1d
 +}
 diff --git a/internal/treesitter/arity_test.go b/internal/treesitter/arity_test.go
 new file mode 100644
-index 0000000000000000000000000000000000000000..1b3d495a926b6342ea74b0042da9c63f4f4ef7c3
+index 0000000..1b3d495
 --- /dev/null
 +++ b/internal/treesitter/arity_test.go
 @@ -0,0 +1,237 @@
@@ -3221,7 +3334,7 @@ index 0000000000000000000000000000000000000000..1b3d495a926b6342ea74b0042da9c63f
 +	}
 +}
 diff --git a/internal/treesitter/variables.go b/internal/treesitter/variables.go
-index c00de05ffd78b4f876cf115ea2d1a899a69f7b09..0a31c9f34774fc0ba526df0b039c78d9e53cab52 100644
+index c00de05..0a31c9f 100644
 --- a/internal/treesitter/variables.go
 +++ b/internal/treesitter/variables.go
 @@ -194,7 +194,10 @@ func resolveVariableScope(root *tree_sitter.Node, src []byte, line, col uint) *r

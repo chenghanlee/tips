@@ -13,7 +13,8 @@ both functions. Choosing a module by name before checking arguments can also
 select a local function instead of the imported function the call actually uses.
 
 The correction carries the argument count through the existing definition,
-hover and reference paths. It uses the existing Elixir grammar to identify
+hover and reference paths, and selects the called arity when preparing a
+generated callable for call hierarchy. It uses the existing Elixir grammar to identify
 calls, pipes, keyword arguments, blocks, captures and declaration defaults.
 Reference candidates are checked against the module and argument count of the
 same source occurrence. No second resolver, index, service or schema migration
@@ -23,7 +24,7 @@ Verified call references use the function token's range, converted to the
 negotiated LSP position encoding. Declaration locations may still be line-level.
 The stock CLI's name-based searches retain their existing meaning.
 
-## Validation — 2026-09-30
+## Initial validation — 2026-09-30
 
 The reproduced argument-count failures pass with the patch. This is a bounded
 correction, not production adoption or proof that all Elixir constructs resolve
@@ -104,15 +105,43 @@ query returned the same 221 locations across 165 files but took a median
 check (`88a94072`) took 782 ms. These are request timings, not cold-index or complete `dx`
 workflow timings. No cache or second index was added.
 
+## Generated Repo arity follow-up — 2026-09-30
+
+`Repo.query!(sql, [])` still appeared as `query!/1` in call-hierarchy preparation
+with the original arity patch. This handler used the first compiled export.
+It now filters generated exports using the existing cursor-arity helper before
+constructing the item. The production change is eight added Go lines, including
+four comment lines. There is no new parser, dependency, schema or process.
+
+The six handler regressions cover `/1`, `/2`, `/3`, a pipe, a capture, and a known
+unsupported arity. The original implementation failed five; all six pass now.
+A known arity with no matching export returns no item. Unknown arity retains
+the existing name-based behavior. Consumer module anchors remain unchanged.
+
+The unchanged real-Ecto fixture (Ecto 3.14.2, ecto_sql 3.14.0) returns the same
+nine expected calls with zero label mismatches: `query!(sql, [])` now reports
+`/2`, while `query!(sql)` stays `/1`. No database was started or queried.
+The rebuilt package matches the binary used for this check byte for byte.
+The full Go suite, `go vet`, upstream lint configuration, formatting and module
+tidy diff pass; the packaged adapter suite passes all 25 tests without skips.
+Sandboxed attempts failed cache/process access; the normal-permission runs pass.
+Evidence is in `tmp/dexter-arity-patch/repo-arity-followup/` in the main checkout.
+
+This is a generated-item preparation fix. Source-defined preparation still uses
+the first definition row. Incoming/outgoing follow-ups still use module and
+function name without arity; correct labels do not make those graphs arity-aware.
+The outgoing prototype also groups by module and function, so sites of different
+arities can still share one label. Those are separate limitations.
+
 ## Exact artifacts
 
 - Base: `cd099f31b7701803292584887bb614628f721b0a`.
-- Patch SHA-256: `68b11d9d36b126e5fbc9bff0b6c1f14500b5b55d61dce0df2e06ee8d95a1ff8c`.
-- Tested macOS arm64 binary SHA-256: `1fed2fbf71b7a6984d80725e5fb4832d1e361d71f6b430832834070f40b644b0`.
+- Patch SHA-256: `cf465ffd10665d12838621fa7998d189e65abeeb22521b3813bfddddb10624ef`.
+- Tested macOS arm64 binary SHA-256: `d4ac1fd543e5f3efd31876faa4e19e379c5e24836906c1b7333fd7f009ff0251`.
 - Build: Go 1.26.3, `go build -trimpath -buildvcs=false ./cmd/`.
 
-The patch touches 11 Go files: 2,519 added and 136 removed lines, including
-1,428 added test lines. It is one backend patch; it adds no integration process
+The combined patch touches 12 Go files: 2,619 added and 136 removed lines,
+including 1,520 added test lines. It is one backend patch; it adds no integration process
 or library dependency. Keep its regression tests when re-pinning.
 
 Detailed local evidence is in the main checkout's ignored

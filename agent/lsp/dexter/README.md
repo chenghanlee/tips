@@ -26,7 +26,9 @@ server, editor, gateway, first-party file watcher or second index.
 
 `dx.py` and its `dexter_client/` package are first-party integration code that we maintain.
 The local backend correction is kept separately in `patches/function-arity.patch`;
-the adapter does not implement function resolution. Codex, Claude and third-party
+the adapter does not implement function resolution. The patch also corrects
+generated call-hierarchy labels such as `Repo.query!(sql, [])` to `/2`; graph
+follow-ups remain name-based. Codex, Claude and third-party
 libraries are unchanged. MCP would change transport; it would not
 remove responsibility for LSP sessions, notifications, follow-ups and edits.
 
