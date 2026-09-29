@@ -1,0 +1,9 @@
+defmodule MyApp.Broken do
+  def check(x) do
+    MyApp.Admission.admit(x)
+  end
+
+  def other(x) do
+    MyApp.Admission.admit(x
+  end
+end

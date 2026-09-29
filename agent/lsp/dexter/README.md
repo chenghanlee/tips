@@ -163,7 +163,8 @@ line-level.
 | `workspace-symbols` | `query`; no file |
 | `completion` | position; optional `select` index or exact label resolves the item in the same session |
 | `call-hierarchy` | position; returns prepared items |
-| `incoming-calls`, `outgoing-calls` | position, optional `select`; prepare + follow-up in one session |
+| `incoming-calls` | position, optional `select`; prepare + `references` + one source-owner parse in one session; see [incoming calls](#incoming-calls) |
+| `outgoing-calls` | position, optional `select`; prepare + follow-up in one session |
 | `code-actions` | position, optional zero-based `range` and raw `diagnostics` |
 | `format` | optional LSP formatting `options` |
 | `rename` | position, `new_name`, **`apply: true` required** |
@@ -174,6 +175,81 @@ line-level.
 The wrapper has named workflows for every capability family advertised by this
 pin. **Request coverage is not proof of semantic parity** across every Elixir
 construct. See [VALIDATION.md](VALIDATION.md) for evidence and remaining gaps.
+
+### Incoming calls
+
+Stock Dexter's `callHierarchy/incomingCalls` assigns each reference to the nearest
+preceding `def` in the file, so a call inside an ExUnit `test`, `setup` or `describe`
+block is dropped, or attributed to an unrelated helper closed above it. The client
+does not send that request. `incoming-calls` prepares the item, asks stock
+`references` (declaration excluded) in the same session, then parses every caller
+file once with the public `Code.string_to_quoted` parser (one `elixir` subprocess,
+no compilation, no evaluation) to name the lexical unit containing each reference
+line. It stays under the same operation lock as every other lookup.
+
+`result` is `{"sites": [...], "unavailable": [...]}`, and
+`result_kind` says what it is: `source_call_owners_at_indexed_reference_lines`.
+Each site has `path`, 1-based `line`, `status: "resolved"`, `kind: "call"` and an
+`owner` with `kind` (`def`, `defp`, `defmacro`, `defmacrop`, `test`, `setup`,
+`setup_all`), `module`, `name` (`null` for `setup`), `line`, `end_line`, and for
+function and macro owners `arity` plus `arity_ambiguous` (default arguments).
+`test`/`setup` owners are recognised by their literal syntactic form on the page,
+not by expanding ExUnit macros. `positions` is
+`1-based source lines; not exact LSP ranges`: use the line to open the source.
+`block_followups` is `unsupported`: `test`/`setup` owners are source block labels,
+not functions Dexter knows, so no further call-hierarchy request can be made from them.
+
+Every reference line the index returned is accounted for exactly once. Lines the
+parser cannot own honestly go to `unavailable` with `path`, `line`, a `reason` and a short `detail`:
+`parse_error`, `no_call_candidate`, `not_direct_call` (captures, `quote`, typespecs),
+`ambiguous_callee`, `multiple_owners`, `no_owner` (module body),
+`dynamic_identity` (`def unquote(...)`, `defmodule unquote(...)`) or
+`source_unavailable` (caller file outside the root boundary or unreadable). When that list is
+non-empty the command keeps the full `result` but reports `ok: false` with
+`error.kind: "incoming_unavailable"` and exits 1, so a partial answer is never read
+as a complete one. `upstream_reference_count` is the raw number of `Location` objects the index
+returned; two on one line count twice there but are answered once. A reference the
+index missed cannot appear anywhere in this result.
+
+Identity is inherited from the index, not re-resolved: the parser matches the
+prepared function name on the reported line and does not resolve aliases, imports or
+arity itself. `caller_sources` lists `{path, sha256}` for every file the parser read;
+those are read hashes, not an acknowledgement of the indexed revision, and
+`freshness` stays `unverified`. A caller file whose bytes differ between the parser's read and the recheck after
+parsing rejects the whole result. Measured on a seven-site fixture (2026-09-30, one cold and three warm requests):
+`elapsed_ms` 413-432 with one unavailable site, 467 with six clean sites, against
+56-60 for the stock lookup on the same fixture. Almost all of the difference is the
+parser subprocess. Paths inside `result` and `caller_sources` are absolute.
+
+```sh
+printf '%s\n' '{"file":"lib/demo/target.ex","line":5,"column":7}' |
+  python3 agent/lsp/dexter/dx.py --root "$PWD" incoming-calls
+```
+
+Abridged receipt (usual `operation`, `root`, `source`, `prepared_items`, `reconcile`,
+`freshness`, `warnings` and `daemon_log` fields omitted):
+
+```json
+{"result_kind": "source_call_owners_at_indexed_reference_lines",
+ "positions": "1-based source lines; not exact LSP ranges",
+ "block_followups": "unsupported",
+ "upstream_reference_count": 2,
+ "caller_sources": [{"path": "/abs/test/demo/helper_test.exs", "sha256": "c345…"}],
+ "result": {
+   "sites": [
+     {"path": "/abs/test/demo/helper_test.exs", "line": 9, "status": "resolved", "kind": "call",
+      "owner": {"kind": "setup", "module": "Demo.HelperTest", "name": null, "line": 8, "end_line": 11}},
+     {"path": "/abs/test/demo/helper_test.exs", "line": 23, "status": "resolved", "kind": "call",
+      "owner": {"kind": "defp", "module": "Demo.HelperTest", "name": "bottom_helper", "arity": 0,
+                "arity_ambiguous": false, "line": 22, "end_line": 24}}],
+   "unavailable": [
+     {"path": "/abs/test/demo/capture_test.exs", "line": 5, "reason": "not_direct_call", "detail": "capture"}]},
+ "ok": false,
+ "error": {"kind": "incoming_unavailable", "detail": "1 reference line(s) have no supported source owner"},
+ "elapsed_ms": 423.1}
+```
+
+With an empty `unavailable` list the same receipt has `ok: true`, no `error`, and exit 0.
 
 ### Edits and follow-ups
 

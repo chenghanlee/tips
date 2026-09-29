@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from .edits import Snapshot, apply_workspace_edit, bound_path, digest, offset
+from .incoming import incoming_calls
 from .protocol import DxError, JsonObject, Session
 
 METHODS = {
@@ -67,6 +68,7 @@ def document_request(
 
 def query_document(
     session: Session,
+    root: Path,
     path: Path,
     op: str,
     params: JsonObject,
@@ -79,7 +81,10 @@ def query_document(
         return session.diagnostics(path.as_uri())
     if op in ("incoming-calls", "outgoing-calls"):
         items = session.request("textDocument/prepareCallHierarchy", request)
-        report["prepared_items"], report["followup_sent"] = items, bool(items)
+        report["prepared_items"] = items
+        if op == "incoming-calls":
+            return incoming_calls(session, root, selected(items or [], params), report)
+        report["followup_sent"] = bool(items)
         if not items:
             return None
         request = {"item": selected(items, params)}
@@ -165,11 +170,17 @@ def workflow(
     if params.get("expected_sha256", digest(data)) != digest(data):
         raise DxError("changed_base", "Input position refers to a different file revision")
     request = document_request(session, path, data, op, params)
-    result = query_document(session, path, op, params, request, report)
+    result = query_document(session, root, path, op, params, request, report)
     if op == "completion" and ("select" in params or params.get("apply")):
         resolve_completion(session, root, path, result, params, report, before)
     if params.get("apply") and op in ("format", "code-actions", "rename"):
         apply_result(root, path, op, result, params, report, before)
     if not params.get("apply") and path.read_bytes() != data:
         raise DxError("changed_base", "Source changed during the lookup; result rejected")
+    if op == "incoming-calls" and result["unavailable"]:
+        report["result"] = result
+        raise DxError(
+            "incoming_unavailable",
+            f"{len(result['unavailable'])} reference line(s) have no supported source owner",
+        )
     return result
