@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import cast
 
 from team import (
+    NATIVE_LSP_PLUGINS,
     CodingRole,
     Config,
     Entity,
@@ -33,9 +34,13 @@ class RefusalError(Exception):
 
 
 def run(
-    argv: Sequence[str | Path], *, timeout: float | None = None, env: dict[str, str] | None = None
+    argv: Sequence[str | Path],
+    *,
+    timeout: float | None = None,
+    env: dict[str, str] | None = None,
+    input_text: str | None = None,
 ) -> str:
-    result = execute(argv, timeout=timeout, env=env)
+    result = execute(argv, timeout=timeout, env=env, input_text=input_text)
     if result.returncode:
         raise RefusalError(
             f"{shlex.join(map(str, argv))} failed: {result.stderr.strip() or result.stdout.strip()}"
@@ -58,6 +63,7 @@ class Arguments(argparse.Namespace):
     start: bool
     force: bool
     ui: bool
+    share: bool
 
 
 def parse_arguments() -> Arguments:
@@ -76,6 +82,11 @@ def parse_arguments() -> Arguments:
     )
     parser.add_argument("--review-ref")
     parser.add_argument(
+        "--share",
+        action="store_true",
+        help="Join a same-team task worktree; no review-ref or checkout advancement",
+    )
+    parser.add_argument(
         "--ui",
         action="store_true",
         help="Launch the lead with roles.lead_ui (issues labelled ui); lead role only",
@@ -90,6 +101,10 @@ def parse_arguments() -> Arguments:
 
 
 def validate_arguments(args: Arguments) -> tuple[str, str]:
+    if args.share and args.review_ref:
+        raise RefusalError(
+            "--share cannot advance a review checkout; join its task branch instead."
+        )
     if not re.fullmatch(r"[0-9]+-[a-z0-9]+(?:-[a-z0-9]+)*", args.task):
         raise RefusalError("Task must be <issue>-<slug>.")
     if not re.fullmatch(r"w[A-Za-z0-9]+:p[A-Za-z0-9]+", args.pane):
@@ -123,9 +138,11 @@ class WorktreeTask:
     desired: dict[Path, str]
     changed: list[Path]
     owner: Entity | None
+    teammates: list[Entity]
 
     def __init__(self, args: Arguments) -> None:
         self.args = args
+        self.teammates = []
         self.role_name, self.agent_name = validate_arguments(self.args)
         self.root = Path(git("rev-parse", "--path-format=absolute", "--git-common-dir")).parent
         if Path.cwd() != self.root:
@@ -184,11 +201,6 @@ class WorktreeTask:
             raise RefusalError("--kind must match the configured role.kind.")
         if not 1 <= self.args.team <= self.team["max_teams"]:
             raise RefusalError(f"Team must be between 1 and {self.team['max_teams']}.")
-        if self.timeouts["mcp_tool_seconds"] != 120:
-            raise RefusalError(
-                "The patched bridge has a compiled 120-second deadline. "
-                "Rebuild and revalidate it before changing mcp_tool_seconds."
-            )
 
     def resolve_worktree(self) -> None:
         self.issue = self.args.task.split("-", 1)[0]
@@ -227,19 +239,17 @@ class WorktreeTask:
                     )
 
     def check_tools(self) -> None:
-        self.wrapper = self.root / "agent/lsp/launch_worktree_lsp.sh"
-        if not self.wrapper.is_file() or not (self.root / ".agents/skills").is_dir():
-            raise RefusalError("Canonical LSP wrapper or shared skills directory is missing.")
-        if self.args.start:
-            tools = (
-                Path(os.environ.get("TIPS_ELIXIR_TOOLS", str(self.root / "agent/lsp/vendor")))
-                / "bin"
-            )
-            for binary in ("mcp-language-server", "expert"):
-                if not os.access(tools / binary, os.X_OK):
-                    raise RefusalError(
-                        f"Missing executable: {tools / binary}; run tool preflight first."
-                    )
+        home = Path(
+            os.environ.get("TIPS_DEXTER_HOME", str(self.root / "agent/lsp/dexter"))
+        ).resolve()
+        self.adapter = home / "dx.py"
+        self.binary = home / "vendor/dexter"
+        self.wrapper = self.worktree / ".dexter/dx/command.sh"
+        if not self.adapter.is_file() or not (self.root / ".agents/skills").is_dir():
+            raise RefusalError("Shared Dexter adapter or skills directory is missing.")
+        if not os.access(self.binary, os.X_OK):
+            raise RefusalError(f"Missing executable: {self.binary}; build stock Dexter first.")
+        self.target_env["TIPS_DX"] = str(self.wrapper)
 
     def fetch(self) -> None:
         # Review heads are often pushed after main's last fetch; fetch before resolving them.
@@ -279,54 +289,76 @@ class WorktreeTask:
             self.old_head = git("-C", self.worktree, "rev-parse", "HEAD")
 
     def prepare_config(self) -> None:
+        command = shlex.join([sys.executable, str(self.adapter)])
+        binding = shlex.join(
+            [
+                "--root",
+                str(self.worktree),
+                "--binary",
+                str(self.binary),
+                "--timeout",
+                str(self.timeouts["dexter_tool_seconds"]),
+            ]
+        )
+        self.desired = {
+            self.wrapper: "#!/bin/sh\nexec " + command + ' "$@" ' + binding + "\n",
+            self.worktree / ".dexter/.gitignore": "*\n",
+        }
         if self.kind == "codex":
-            config = f"""[plugins."mix-compile@elixir-agent-tools"]
+            config = """[plugins."mix-compile@elixir-agent-tools"]
 enabled = true
 [plugins."mix-credo@elixir-agent-tools"]
 enabled = true
-
 [mcp_servers.elixir-lsp]
-command = "/bin/sh"
-args = {json.dumps([str(self.wrapper), str(self.worktree)], ensure_ascii=False)}
-cwd = {json.dumps(str(self.worktree), ensure_ascii=False)}
-startup_timeout_sec = {self.timeouts["mcp_startup_seconds"]}
-tool_timeout_sec = {self.timeouts["mcp_tool_seconds"]}
-enabled_tools = ["definition", "references", "hover", "diagnostics"]
+enabled = false
 """
-            for tool in ("definition", "references", "hover", "diagnostics"):
-                config += (
-                    f"\n[mcp_servers.elixir-lsp.tools.{tool}]\n"
-                    f"approval_mode = {json.dumps(self.policies['codex_lsp_approval_mode'])}\n"
-                )
-            self.desired = {self.worktree / ".codex/config.toml": config}
+            for plugin in NATIVE_LSP_PLUGINS:
+                config += f"\n[plugins.{json.dumps(plugin)}]\nenabled = false\n"
+            self.desired[self.worktree / ".codex/config.toml"] = config
         else:
-            self.desired = {
-                self.worktree / ".claude/settings.local.json": json.dumps(
+            self.desired[self.worktree / ".claude/settings.local.json"] = (
+                json.dumps(
                     {
                         "enabledPlugins": {
                             "mix-compile@elixir-agent-tools": True,
                             "mix-credo@elixir-agent-tools": True,
-                            "elixir-lsp@elixir-agent-tools": False,
-                        }
+                            **NATIVE_LSP_PLUGINS,
+                        },
                     },
                     indent=2,
                 )
-                + "\n",
-                self.worktree / ".claude/elixir-mcp.json": json.dumps(
-                    {
-                        "mcpServers": {
-                            "elixir-lsp": {
-                                "type": "stdio",
-                                "command": "/bin/sh",
-                                "args": [str(self.wrapper), str(self.worktree)],
-                                "timeout": self.timeouts["mcp_tool_seconds"] * 1000,
-                            }
-                        }
-                    },
-                    indent=2,
-                )
-                + "\n",
-            }
+                + "\n"
+            )
+            # Keep the previous filename to replace its legacy bridge definition.
+            self.desired[self.worktree / ".claude/elixir-mcp.json"] = '{"mcpServers":{}}\n'
+
+    def language_brief(self) -> str:
+        return (
+            f"Language tools for this session: use {self.wrapper} via your shell tool "
+            f"with JSON on stdin. This command is bound to {self.worktree}; "
+            f"read {self.adapter.parent / 'README.md'} for all operations. "
+            "Use Dexter LSP through this command, not native LSP or the old MCP bridge. "
+            "Use write with expected_sha256 for cooperating source edits. Native Edit, "
+            "apply_patch and shell writes bypass the shared lock. Rename is an immediate "
+            "mutation; do not overlap it with native teammate writes. Freshness is unverified; "
+            "empty results are not proof of absence. Use normal Mix compile/tests for compiler "
+            "diagnostics. Do not stop the shared daemon when this agent exits. "
+            "Read the team operating agreement and your role card, then await assignment."
+        )
+
+    def start_language_server(self) -> None:
+        env = {**os.environ, **self.target_env}
+        if self.teammates:
+            # A joining agent uses the existing worktree configuration; it must
+            # not replace the shared daemon's environment between teammate calls.
+            env.pop("DEXTER_ELIXIR_LIB_ROOT", None)
+        output = run(
+            ["/bin/sh", self.wrapper, "start"],
+            timeout=self.timeouts["dexter_startup_seconds"],
+            env=env,
+            input_text="",
+        )
+        print(f"Dexter provisioning: {output}")
 
     def check_target_tree(self) -> None:
         self.target_tree = git(
@@ -336,7 +368,8 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
             or (self.branch if self.existing_branch else "origin/main"),
         )
         selected = [path.relative_to(self.worktree).as_posix() for path in self.desired] + [
-            ".agents/skills"
+            ".agents/skills",
+            ".dexter",
         ]
         for relative in selected:
             if git("ls-tree", self.target_tree, "--", relative):
@@ -344,6 +377,8 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
                     f"Requested revision tracks generated path {relative}; preserving checkout."
                 )
             parent = str(Path(relative).parent)
+            if parent == ".":
+                continue
             entry = git("ls-tree", self.target_tree, "--", parent)
             if entry and (not entry.startswith("040000 tree ")):
                 raise RefusalError(
@@ -354,8 +389,11 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
         # Preflight selected files before stopping a client or changing HEAD.
         self.changed = []
         for path, content in self.desired.items():
-            if path.is_symlink() or path.parent.is_symlink():
-                raise RefusalError(f"Refusing symlinked client configuration: {path}")
+            for parent in (path, *path.parents):
+                if parent == self.worktree:
+                    break
+                if parent.is_symlink():
+                    raise RefusalError(f"Refusing symlinked client configuration: {path}")
             if path.exists() and path.read_text() != content and (not self.args.force):
                 raise RefusalError(
                     f"Refusing to overwrite {path}; inspect it before using --force."
@@ -387,6 +425,15 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
             if not relevant:
                 continue
             if (
+                agent_root == str(self.worktree)
+                and pane != self.args.pane
+                and self.args.share
+                and re.fullmatch(f"team-{self.args.team}-(dev|lead|test)", agent.get("name") or "")
+                and agent.get("name") != self.agent_name
+            ):
+                self.teammates.append(agent)
+                continue
+            if (
                 agent.get("pane_id") != self.args.pane
                 or agent_root != str(self.worktree)
                 or agent.get("agent") != self.kind
@@ -412,6 +459,10 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
                 )
 
     def reuse_or_stop_owner(self) -> bool:
+        if self.teammates and any(path.exists() for path in self.changed):
+            raise RefusalError(
+                "Shared client configuration changed; stop teammates before reconfiguring."
+            )
         if self.owner is None:
             return False
         if not self.old_head:
@@ -453,6 +504,7 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
         if not self.review_sha:
             raise RefusalError("A running reviewer advances only to an explicit --review-ref.")
         git("-C", self.worktree, "checkout", "--detach", "--no-overwrite-ignore", self.review_sha)
+        self.start_language_server()
         print(f"Advanced {self.agent_name} in place: {self.worktree} at {self.review_sha}")
         return True
 
@@ -503,6 +555,7 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
                 temp.unlink(missing_ok=True)
 
     def link_skills(self) -> None:
+        self.wrapper.chmod(0o755)
         self.skills.parent.mkdir(parents=True, exist_ok=True)
         shared_skills = self.root / ".agents/skills"
         if not self.skills.is_symlink() or os.readlink(self.skills) != str(shared_skills):
@@ -540,14 +593,20 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
             if self.model:
                 client += ["-m", self.model]
             client += ["-c", "model_reasoning_effort=" + json.dumps(self.effort)]
+            client += ["-c", "mcp_servers.elixir-lsp.enabled=false", self.language_brief()]
         else:
             client += [
                 "--permission-mode",
                 self.policies["claude_permission_mode"],
                 "--effort",
                 self.effort,
+                "--strict-mcp-config",
                 "--mcp-config",
                 str(self.worktree / ".claude/elixir-mcp.json"),
+                "--settings",
+                str(self.worktree / ".claude/settings.local.json"),
+                "--append-system-prompt",
+                self.language_brief(),
             ]
             if self.model:
                 client += ["--model", self.model]
@@ -584,7 +643,7 @@ enabled_tools = ["definition", "references", "hover", "diagnostics"]
             f"{self.kind}"
             ", "
             f"{self.worktree}"
-            ". Project compilation may still be running."
+            ". Dexter is started; index freshness is unverified."
         )
 
     def occupant(self, pane: str) -> tuple[Path, bool]:
@@ -613,6 +672,7 @@ def main() -> None:
     task.checkout()
     task.write_config()
     task.link_skills()
+    task.start_language_server()
     print(f"Worktree: {task.worktree}")
     if task.args.start:
         task.launch()

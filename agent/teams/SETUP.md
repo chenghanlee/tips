@@ -34,9 +34,9 @@ claude plugin install --scope user mix-compile@elixir-agent-tools
 claude plugin install --scope user mix-credo@elixir-agent-tools
 ```
 
-Codex discovers linked `.agents/skills`; never also install Codex `elixir-dev`. Claude loads the same five skills through `elixir-dev`. Generated configs enable both Mix check plugins. Follow plugin trust prompts. Tips uses a patched LSP bridge; generated Claude config disables upstream `elixir-lsp`.
+Codex discovers linked `.agents/skills`; never also install Codex `elixir-dev`. Claude loads the same five skills through `elixir-dev`. Generated configs enable both Mix check plugins. Follow plugin trust prompts. Generated client configuration disables native ElixirLS/Dexter plugins and the old Expert bridge for these sessions.
 
-Build shared Expert/MCP bridge binaries with the [LSP guide](../lsp/README.md#build-and-validate), then start new client sessions. Keep installed binaries independent of task worktrees.
+Build the pinned unmodified Dexter source with the [LSP guide](../lsp/README.md#build-and-validate), and set `DEXTER_ELIXIR_LIB_ROOT` to matching Elixir sources before provisioning. Keep the shared tools/sources independent of task worktrees.
 
 ## Starting the lead TPM
 
@@ -50,16 +50,19 @@ Do not run it while another live agent owns `lead-tpm`. The lead TPM starts and 
 
 ## Configuration
 
-Edit [config.toml](config.toml): team limits; client/model/effort per role; port/database allocation; permissions; coordinator compaction; time budgets. Scripts read the canonical main checkout's file. Use `TIPS_TEAM_CONFIG=/absolute/path` for staged configuration in a disposable pilot. Settings apply next launch. When changing the corresponding client timeout, rebuild/retest the bridge: its request deadline is compiled in.
+Edit [config.toml](config.toml): team limits; client/model/effort per role; port/database allocation; permissions; coordinator compaction; time budgets. Scripts read the canonical main checkout's file. Use `TIPS_TEAM_CONFIG=/absolute/path` for staged configuration in a disposable pilot. Settings apply next launch. `timeouts.dexter_startup_seconds` bounds provisioning and `dexter_tool_seconds` bounds each adapter operation; neither requires rebuilding Dexter.
 
-Codex config applies `launch.codex_lsp_approval_mode` only to four enabled LSP tools via [per-tool MCP settings](https://developers.openai.com/codex/mcp), preserving overall approval/sandbox policies. Codex approval policy neither changes nor guarantees its sandbox. Claude permission mode uses the same config. Coordinator launches use configured compaction; coding launches do not inherit it.
+Both harnesses use the generated `$TIPS_DX` shell command. Existing shell approval
+and sandbox policies remain in force; no MCP-specific permission exception is
+added. Claude uses the configured permission mode. Coordinators run without LSP;
+coding launches do not inherit coordinator compaction settings.
 
 | Allocation | Components |
 |---|---|
 | Database suffix | `team.db_suffix_prefix`, team number, `roles.<role>.db_suffix` |
 | Test port | `team.port_base` + team number × `team.port_stride` + role `port_offset` |
 
-Both clients invoke main checkout's LSP wrapper with the assigned absolute worktree root; reviewed revisions need not contain the wrapper. Configuration/tooling changes require disposable pilots verifying both client and LSP roots in each actual client. Before scaling, measure simultaneous cold-start capacity; configured team limits do not verify it.
+Both clients invoke a generated worktree-bound command pointing to the shared Dexter adapter; reviewed revisions need not contain the adapter. The helper eagerly starts Dexter even when invoked without `--start`. For staged pilots, `TIPS_DEXTER_HOME` selects the shared adapter/build directory. Configuration/tooling changes require disposable pilots verifying both client and LSP roots in each actual client. Before scaling, measure simultaneous cold-start capacity; configured team limits do not verify it.
 
 Set database connection limits in [compose.yaml](../../compose.yaml), overridden by `TIPS_DB_MAX_CONNECTIONS`. Recreate the database service to apply changes, only with no teams running. Agent launch settings never restart PostgreSQL or existing clients.
 
@@ -70,3 +73,19 @@ Follow [shared Checks](README.md#shared-rules): four commands, CI evidence, test
 ## Milestones
 
 Read the [Project 15 readme](https://github.com/users/chenghanlee/projects/15) with `gh project view 15 --owner chenghanlee`. Milestones, gate issues and dev-adapter policy live there, never mirrored here. Gates name environment, revision, evidence and unresolved blockers.
+
+## Sharing a task worktree
+
+Keep separate reviewer worktrees by default. To deliberately join the developer's
+worktree, use the same task slug with `--share`, a different coding role/pane,
+and no `--review-ref`. For example, with your assigned task/team/pane values:
+
+```sh
+agent/teams/task_worktree.py "$TASK" --team "$N" --role lead --pane "$PANE" --share --start
+```
+
+Both sessions receive the same bound `$TIPS_DX`; neither owns the shared daemon.
+Existing configurations cannot change while a teammate is running. Coordinate
+native source writes, and pause them during an in-place rename. The adapter's
+lock covers cooperating writes only. Independent review still requires a reviewer
+who did not implement the change; sharing a checkout does not waive that rule.

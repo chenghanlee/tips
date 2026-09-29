@@ -181,8 +181,9 @@ mutation automatically. No crash recovery guarantee is made.
 For this pilot, use `dx` as the language-tool path in both harnesses; do not
 enable a separate native Dexter plugin as an alternate lookup path. Its
 long-lived open-document state has a different saved-file synchronization contract.
-The prototype does not change either harness's global settings or production
-launchers. Team adoption remains an explicit acceptance gate.
+The team launcher generates session-local settings and eagerly starts this adapter.
+It does not change either harness's global settings. Full team adoption remains
+an explicit acceptance gate; see [team integration](../README.md#team-integration).
 
 ## Honest limits
 

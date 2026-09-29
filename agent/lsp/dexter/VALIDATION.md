@@ -5,6 +5,40 @@
 This is a working **prototype of the transport and workflows**, not a release
 claim that stock Dexter satisfies strict freshness and mutation correctness.
 
+## Team launcher integration
+
+The prototype branch now provisions Dexter during worktree setup, exports a
+worktree-bound command for both harnesses, supports explicit same-team `--share`,
+and stops one daemon per retiring worktree. Native language plugins and the old
+Expert bridge are disabled in generated sessions. The old patch/build scripts
+were removed from this branch; user-wide installations and live teams were not
+changed. Main remains merge-only, with agents operating in leaf worktrees.
+
+Validation: **82 team tests passed**, including an opt-in test using real stock
+Dexter daemons with fake Herdr/model clients representing two mixed teams. Four
+simulated agents share two worktrees; an atomic edit changes the first tree's
+hover while the second retains the original. The generated command stays bound
+even when invoked from main with a competing `--root` argument. An additional
+retirement snapshot-preservation test passed after that full run. Ruff lint and
+format checks, strict Pyright, documentation links, and `git diff --check` pass.
+Ruff was an existing cached executable; nothing was installed. The first run's
+five process tests hit sandbox denial of `/bin/ps`; the successful full rerun had
+permission to inspect and signal only its synthetic child processes.
+
+The launcher tests simulate Codex/Claude processes: they do not establish real
+client approval behavior, sandbox socket access, or full mixed-team task success.
+The prior live shell smoke and the remaining upstream correctness limitations
+below remain the extent of actual-client evidence. Challenge review and real
+client acceptance remain required before adopting this for production teams.
+
+Run the opt-in launcher integration with the already-built adapter directory:
+
+```sh
+TIPS_TEST_REAL_DEXTER="$PWD/agent/lsp/dexter" \
+DEXTER_ELIXIR_LIB_ROOT=/absolute/path/to/matching-elixir-source/lib \
+  python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
+```
+
 ## Build and automated checks
 
 - Built unmodified upstream `cd099f31b7701803292584887bb614628f721b0a` using

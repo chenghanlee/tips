@@ -537,6 +537,53 @@ class TeamLifecycleTest(unittest.TestCase):
         assert json.loads(self.state.read_text())["workspaces"]
         assert not (self.root / "docker-calls").exists()
 
+    def test_shared_worktree_daemon_stops_once_before_retirement(self) -> None:
+        assert self.run_team("start", "1").returncode == 0
+        work = self.repo / ".worktrees/task"
+        execute(["git", "-C", self.repo, "worktree", "add", "-q", "--detach", work], check=True)
+        (self.repo / ".git/info/exclude").write_text(".dexter/\n")
+        wrapper = work / ".dexter/dx/command.sh"
+        wrapper.parent.mkdir(parents=True)
+        wrapper.write_text(
+            '#!/bin/sh\necho "$1" >> "$DEXTER_STOP_LOG"\nexit "${DEXTER_STOP_FAIL:-0}"\n'
+        )
+        state = json.loads(self.state.read_text())
+        state["panes"][0].pop("agent")
+        for pane in state["panes"][1:3]:
+            pane["cwd"] = str(work)
+        self.state.write_text(json.dumps(state))
+        log = self.root / "dexter-stop"
+        self.env["DEXTER_STOP_LOG"] = str(log)
+        self.env["DEXTER_STOP_FAIL"] = "1"
+        failed = self.run_team("stop", "1")
+        assert failed.returncode != 0
+        assert work.exists()
+        assert not (self.root / "docker-calls").exists()
+        assert log.read_text() == "stop\n"
+        self.env["DEXTER_STOP_FAIL"] = "0"
+        result = self.run_team("stop", "1")
+        assert result.returncode == 0, result.stderr
+        assert log.read_text() == "stop\nstop\n"
+        assert not work.exists()
+
+    def test_recovery_snapshots_block_retirement_even_with_clean_git(self) -> None:
+        assert self.run_team("start", "1").returncode == 0
+        work = self.repo / ".worktrees/task"
+        execute(["git", "-C", self.repo, "worktree", "add", "-q", "--detach", work], check=True)
+        (self.repo / ".git/info/exclude").write_text(".dexter/\n")
+        snapshot = work / ".dexter/dx/snapshots/recovery.json"
+        snapshot.parent.mkdir(parents=True)
+        snapshot.write_text('{"files":{"ignored.ex":"saved contents"}}')
+        state = json.loads(self.state.read_text())
+        state["panes"][0].pop("agent")
+        state["panes"][1]["cwd"] = str(work)
+        self.state.write_text(json.dumps(state))
+        result = self.run_team("stop", "1")
+        assert result.returncode != 0
+        assert "Recovery snapshots remain" in result.stderr
+        assert snapshot.is_file()
+        assert not (self.root / "docker-calls").exists()
+
     def test_clean_unmerged_worktree_refuses_before_any_stop(self) -> None:
         assert self.run_team("start", "1").returncode == 0
         work = self.repo / ".worktrees/task"
