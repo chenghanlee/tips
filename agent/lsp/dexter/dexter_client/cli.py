@@ -84,7 +84,11 @@ def compact_report(report: JsonObject) -> JsonObject:
 
 
 def parse_arguments(argv: Sequence[str] | None) -> Arguments:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=(
+            "Experimental saved-file client for pinned, unmodified Dexter. Python stdlib only."
+        )
+    )
     parser.add_argument("--root", required=True, type=Path, help="Exact Git worktree/Mix root")
     parser.add_argument(
         "--binary",

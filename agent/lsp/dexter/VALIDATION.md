@@ -212,3 +212,15 @@ The maximum Ruff McCabe complexity in the adapter is 9 (limit 10); the old
 `apply_workspace_edit`, `workflow` and `main` measured 17, 26 and 33. Splitting
 responsibilities does not add a process, dependency, upstream patch or stronger
 freshness/concurrency guarantee.
+
+All three independent reviewers accepted the refactor. One intentional tightening
+is that diagnostics and empty call-hierarchy results now also reject a source
+file changed during the lookup (`changed_base`); previously those paths returned
+before the final source check. This is not a shared-index freshness guarantee.
+
+The third reviewer reproduced a 60-second syntax-diagnostics timeout using a
+full Elixir Git checkout as the standard-library source. Both the original
+`742d8f1` and the refactor failed in that environment; the same test passed with
+the main checkout's vendored `lib` and `VERSION` layout, despite identical `lib`
+contents. The cause remains unisolated. Use the validated vendored sources for
+the pilot; do not infer that arbitrary source-checkout layouts have been tested.
