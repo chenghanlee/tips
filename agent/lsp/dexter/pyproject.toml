@@ -1,0 +1,7 @@
+# The harness owns the lint and formatting rules.
+[tool.ruff]
+extend = "../../teams/pyproject.toml"
+
+# Same test-only assertion exception, anchored to this test directory.
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]

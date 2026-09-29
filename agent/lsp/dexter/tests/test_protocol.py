@@ -1,20 +1,21 @@
 """Adversarial subprocess tests: errors must never become empty answers."""
-import importlib.util
+
+import hashlib
 import json
-from pathlib import Path
-import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
-spec = importlib.util.spec_from_file_location('dx', Path(__file__).resolve().parents[1] / 'dx.py')
-dx = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(dx)
+from agent.lsp.dexter.dexter_client import protocol as dx
+from agent.lsp.dexter.tests.support import dx_error
+from agent.teams.team import execute
 
-SERVER = r'''#!/usr/bin/env python3
+SERVER = r"""#!/usr/bin/env python3
 import sys,json
 if sys.argv[-1]=='reindex':print('Fixture reindex');sys.exit(0)
-sys.stderr.write('starting (root: %s, daemon log: /tmp/fixture.log)\n'%sys.argv[2]);sys.stderr.flush()
+sys.stderr.write('starting (root: %s, daemon log: /fixture.log)\n'%sys.argv[2])
+sys.stderr.flush()
 
 def send(o):
  b=json.dumps({'jsonrpc':'2.0',**o},ensure_ascii=False).encode()
@@ -32,73 +33,91 @@ while True:
  if method=='die':sys.exit(7)
  if method=='hang':continue
  if method=='initialize':send({'id':m['id'],'result':{'capabilities':{}}});continue
- if method=='textDocument/definition':send({'id':m['id'],'result':[{'uri':'file:///bad.ex','range':{}}]});continue
- if method=='error':send({'id':m['id'],'error':{'code':-32603,'message':'upstream failed','data':{'path':'é.ex'}}});continue
- if method=='watch':send({'id':'register','method':'client/registerCapability','params':{'registrations':[]}});continue
+ if method=='textDocument/definition':
+  send({'id':m['id'],'result':[{'uri':'file:///bad.ex','range':{}}]});continue
+ if method=='error':
+  error={'code':-32603,'message':'upstream failed','data':{'path':'é.ex'}}
+  send({'id':m['id'],'error':error});continue
+ if method=='watch':
+  send({'id':'register','method':'client/registerCapability','params':{'registrations':[]}});continue
  if m.get('id')=='register':
   send({'id':1,'result':m});continue
  if 'id' in m:send({'id':m['id'],'result':[]})
-'''
+"""
 
 
 class Protocol(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
-        binary = self.root / 'server'
+        binary = self.root / "server"
         binary.write_text(SERVER)
         binary.chmod(0o755)
         self.session = dx.Session(binary, self.root, 3)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.session.close()
-        self.assertIsNotNone(self.session.proc.poll())
+        assert self.session.proc.poll() is not None
         self.temp.cleanup()
 
-    def test_error_retains_code_and_data(self):
-        with self.assertRaises(dx.Failure) as error:
-            self.session.request('error')
-        self.assertEqual(error.exception.kind, 'lsp')
-        self.assertEqual(error.exception.detail['data'], {'path':'é.ex'})
-        self.assertEqual(self.session.request('empty'), [])
+    def test_error_retains_code_and_data(self) -> None:
+        error = dx_error(lambda: self.session.request("error"))
+        assert error.kind == "lsp"
+        assert error.detail == {
+            "code": -32603,
+            "message": "upstream failed",
+            "data": {"path": "é.ex"},
+        }
+        assert self.session.request("empty") == []
 
-    def test_timeout_is_error(self):
-        with self.assertRaises(dx.Failure) as error:
-            self.session.request('hang', timeout=0.4)
-        self.assertEqual(error.exception.kind, 'timeout')
+    def test_timeout_is_error(self) -> None:
+        error = dx_error(lambda: self.session.request("hang", timeout=0.4))
+        assert error.kind == "timeout"
 
-    def test_crash_is_error(self):
-        with self.assertRaises(dx.Failure) as error:
-            self.session.request('die')
-        self.assertEqual(error.exception.kind, 'transport')
+    def test_crash_is_error(self) -> None:
+        error = dx_error(lambda: self.session.request("die"))
+        assert error.kind == "transport"
 
-    def test_watcher_registration_is_honestly_rejected(self):
-        response = self.session.request('watch')
-        self.assertEqual(response['error']['code'], -32601)
+    def test_watcher_registration_is_honestly_rejected(self) -> None:
+        response = self.session.request("watch")
+        assert response["error"]["code"] == -32601
 
-    def test_malformed_location_returns_json_error_instead_of_traceback(self):
-        subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
-        (self.root / 'mix.exs').write_text('# protocol fixture\n')
-        sources = self.root / 'sources/lib'
-        (sources / 'elixir/lib').mkdir(parents=True)
-        (sources / 'elixir/lib/enum.ex').write_text('# unused protocol fixture\n')
-        (sources.parent / 'VERSION').write_text('0.0.0')
-        state = self.root / '.dexter/dx'
+    def test_malformed_location_returns_json_error_instead_of_traceback(self) -> None:
+        execute(["git", "init", "-q", str(self.root)], check=True)
+        (self.root / "mix.exs").write_text("# protocol fixture\n")
+        sources = self.root / "sources/lib"
+        (sources / "elixir/lib").mkdir(parents=True)
+        (sources / "elixir/lib/enum.ex").write_text("# unused protocol fixture\n")
+        (sources.parent / "VERSION").write_text("0.0.0")
+        state = self.root / ".dexter/dx"
         state.mkdir(parents=True)
-        (state.parent / 'dexter.db').touch()
-        (state / 'stdlib.json').write_text(json.dumps({'root': str(sources.resolve()), 'version': '0.0.0'}))
-        binary = self.root / 'server'
-        result = subprocess.run([sys.executable, dx.__file__, '--root', str(self.root),
-                                 '--binary', str(binary), '--sha256', dx.digest(binary.read_bytes()),
-                                 'definition'], input='{"file":"mix.exs"}', text=True,
-                                capture_output=True, timeout=10)
-        self.assertEqual(result.returncode, 1)
+        (state.parent / "dexter.db").touch()
+        (state / "stdlib.json").write_text(
+            json.dumps({"root": str(sources.resolve()), "version": "0.0.0"})
+        )
+        binary = self.root / "server"
+        result = execute(
+            [
+                sys.executable,
+                str(Path(__file__).resolve().parents[1] / "dx.py"),
+                "--root",
+                str(self.root),
+                "--binary",
+                str(binary),
+                "--sha256",
+                hashlib.sha256(binary.read_bytes()).hexdigest(),
+                "definition",
+            ],
+            input_text='{"file":"mix.exs"}',
+            timeout=10,
+        )
+        assert result.returncode == 1
         report = json.loads(result.stdout)
-        self.assertFalse(report['ok'])
-        self.assertEqual(report['error']['kind'], 'KeyError')
-        self.assertEqual(report['result'][0]['range'], {})
-        self.assertNotIn('Traceback', result.stderr)
+        assert not report["ok"]
+        assert report["error"]["kind"] == "KeyError"
+        assert report["result"][0]["range"] == {}
+        assert "Traceback" not in result.stderr
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

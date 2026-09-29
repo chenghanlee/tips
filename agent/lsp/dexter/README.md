@@ -23,13 +23,13 @@ server, editor, gateway, first-party file watcher or second index.
   configuration, not a full-feature client available to both harnesses.
 - Stock `lspprobe` is useful as a reference but supports only four request types.
 
-`dx.py` is first-party integration code that we maintain. It does not modify
+`dx.py` and its `dexter_client/` package are first-party integration code that we maintain. It does not modify
 Dexter, Codex, Claude, or a library. MCP would change transport; it would not
 remove responsibility for LSP sessions, notifications, follow-ups and edits.
 
 ## Build and run
 
-Requires Python 3.10+, Git, Go for building, and the project's Elixir toolchain
+Requires Python 3.12+, Git, Go for building, and the project's Elixir toolchain
 for formatting. macOS/Linux only (`flock`). The installed Homebrew 0.7.2 is too
 old for the daemon architecture even though the audited source has that version
 constant. Pin **cd099f31b7701803292584887bb614628f721b0a**.
@@ -233,7 +233,38 @@ Known stock limitations include silent partial rename writes and missing outgoin
 results in the tested unqualified local-call fixture. Results are preserved as
 returned. No workaround is presented as an upstream fix.
 
+## Client structure
+
+`dx.py` is the executable entry point. The modules under `dexter_client/` have
+separate responsibilities:
+
+- `cli.py`: arguments, binary/root checks, output and exit status.
+- `workspace.py`: daemon lifecycle, worktree isolation, locks and recovery snapshots.
+- `protocol.py`: subprocess ownership, LSP framing, requests and notifications.
+- `workflows.py`: each language operation's request and follow-up sequence.
+- `edits.py`: edit-target boundaries, UTF-16 coordinates and applying returned edits.
+
+These are modules in the same process, not additional services. Dependencies flow
+from the CLI through the worktree/workflows to protocol and file operations;
+those lower layers do not import the CLI. Local state has concrete types. Raw
+LSP objects preserve extension fields rather than defining a second LSP schema.
+Keep the package beside `dx.py` when using the adapter from another checkout.
+
 ## Tests
+
+The adapter inherits the team harness's Ruff rules (including complexity at most
+10) and is included in its strict Pyright project. From the repository root:
+
+```sh
+ruff check agent/teams agent/lsp/dexter
+ruff format --check agent/teams agent/lsp/dexter
+pyright --project agent/teams/pyproject.toml
+python3 -m unittest discover -s agent/lsp/dexter/tests -v
+```
+
+Tests reuse the harness's subprocess helper, so run them from the repository root
+with `agent/teams` present. CI runs these static checks and the protocol/edit tests. Real Dexter tests need
+the pinned local binary and sources and otherwise report skips:
 
 ```sh
 DEXTER_ELIXIR_LIB_ROOT=/absolute/path/to/matching-elixir-source/lib \

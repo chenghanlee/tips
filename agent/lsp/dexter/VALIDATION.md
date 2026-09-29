@@ -190,3 +190,25 @@ these errors are not converted into empty language results.
 Main Tips must be merge-only for this pilot while `.worktrees/` and fixture
 clones live beneath it. Agents use a leaf worktree. Moving the team's worktree
 layout is a separate decision; this prototype does not change production launchers.
+
+
+## Typed modular refactor
+
+The adapter and its tests now use the team harness's Ruff profile and strict
+Pyright project; CI includes them in lint, formatting and type checking. Local
+validation used Ruff 0.16.8 from the existing offline cache and installed Pyright
+1.1.413, matching CI's versions; remote CI has not been run for this change.
+No lint selection or complexity limit was relaxed. The test-only `S101`
+exception matches the harness. Open-ended LSP payloads retain explicit dynamic
+values; local process, snapshot, configuration and argument state are typed.
+
+All 25 adapter tests passed with the pinned real Dexter binary and authentic
+Elixir sources. The 85-test team suite included real Dexter and installed Codex
+checks: 80 passed in the sandbox; five shutdown tests were blocked by sandbox
+permission to run `/bin/ps`. All seven shutdown tests then passed with process
+access. No live teams or model sessions were launched by these tests.
+
+The maximum Ruff McCabe complexity in the adapter is 9 (limit 10); the old
+`apply_workspace_edit`, `workflow` and `main` measured 17, 26 and 33. Splitting
+responsibilities does not add a process, dependency, upstream patch or stronger
+freshness/concurrency guarantee.

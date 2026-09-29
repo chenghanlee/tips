@@ -89,15 +89,16 @@ Read provider settings by path from main checkout's `.env`; only the user adds n
 **Checks.** Trust CI only for commands actually run. For `agent/teams` Python changes, CI is the evidence: open the exact-head `checks` run, verify these four steps passed and link the run in your round.
 
 ```sh
-ruff check agent/teams
-ruff format --check agent/teams
+ruff check agent/teams agent/lsp/dexter
+ruff format --check agent/teams agent/lsp/dexter
 pyright --project agent/teams/pyproject.toml
 python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
+python3 -m unittest discover -s agent/lsp/dexter/tests -v
 ```
 
 Developers run these before pushing, in their worktree, if Ruff and Pyright are already on `PATH`; otherwise use CI. Agents never install them. Scripts use only standard-library dependencies. Tests use disposable Git repositories, fake Herdr and owned child processes, never live teams. Tests need permission to run `ps` and signal their own children.
 
-Only `team.py:execute` and `StopAgentTest.client` have reviewed `# noqa: S603` exceptions: variable argument lists, no shell, resolved executable, fixed or test-owned arguments. Suppress nothing else. When these calls change, tech leads review trusted executable selection and arguments; passing lint cannot prove subprocess safety. Settings: [pyproject.toml](pyproject.toml). If checks are pending, report them as pending without waiting; the tech lead's timed pre-merge wait checks completion. Users decide secret rotation; never rewrite history.
+The reviewed `# noqa: S603` boundaries are `team.py:execute`, `StopAgentTest.client`, and Dexter [protocol.py](../lsp/dexter/dexter_client/protocol.py)'s `command`/`spawn_process`: variable argument lists, no shell, resolved executable, fixed or test-owned arguments. Dexter validates its binary checksum before dispatch; its Git/Elixir calls use fixed verbs. These are per-call exceptions, not a disabled security rule. Suppress nothing else. When these calls change, tech leads review trusted executable selection and arguments; passing lint cannot prove subprocess safety. Settings: [pyproject.toml](pyproject.toml). If checks are pending, report them as pending without waiting; the tech lead's timed pre-merge wait checks completion. Users decide secret rotation; never rewrite history.
 
 **Secrets.** Never put credentials in logs, issues, PRs, handoffs or chat. Ordinary PR CI needs no production secrets.
 

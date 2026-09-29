@@ -32,14 +32,16 @@ jobs:
       - run: python scripts/check_docs.py
       - name: Install Python check tools
         run: python -m pip install ruff==0.16.8 pyright==1.1.413
-      - name: Lint local agent lifecycle
-        run: ruff check agent/teams
-      - name: Check local agent lifecycle formatting
-        run: ruff format --check agent/teams
-      - name: Type-check local agent lifecycle
+      - name: Lint agent harness and Dexter client
+        run: ruff check agent/teams agent/lsp/dexter
+      - name: Check agent harness and Dexter client formatting
+        run: ruff format --check agent/teams agent/lsp/dexter
+      - name: Type-check agent harness and Dexter client
         run: pyright --project agent/teams/pyproject.toml
-      - name: Check local agent lifecycle
-        run: python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
+      - name: Check agent harness and Dexter client
+        run: |
+          python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
+          python3 -m unittest discover -s agent/lsp/dexter/tests -v
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
         with:
           elixir-version: '1.20.4'
