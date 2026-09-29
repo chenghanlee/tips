@@ -1,5 +1,9 @@
 # Prototype validation
 
+The original record below describes the stock-backend prototype. The local
+argument-count correction has a separate [patch validation record](patches/README.md)
+with its final binary, tests, measured cost and remaining limits.
+
 2026-09-29. Branch `experiment/dexter-agent-prototype`.
 
 This is a working **prototype of the transport and workflows**, not a release

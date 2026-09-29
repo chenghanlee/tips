@@ -1,9 +1,10 @@
 # Dexter agent prototype
 
-Experimental. **No upstream code is patched. This is not yet a fully correct production integration.**
+Experimental. **This branch carries one local Dexter patch for argument-count
+lookups. This is not yet a fully correct production integration.**
 
 Both Codex and Claude run `dx.py` through their existing shell tool. It speaks the
-standard LSP protocol to stock `dexter lsp`. That frontend connects to Dexter's
+standard LSP protocol to `dexter lsp`. That frontend connects to Dexter's
 one shared daemon per canonical Git worktree. Each command gets a fresh LSP
 session; ending the command does not stop teammates' daemon.
 
@@ -23,8 +24,10 @@ server, editor, gateway, first-party file watcher or second index.
   configuration, not a full-feature client available to both harnesses.
 - Stock `lspprobe` is useful as a reference but supports only four request types.
 
-`dx.py` and its `dexter_client/` package are first-party integration code that we maintain. It does not modify
-Dexter, Codex, Claude, or a library. MCP would change transport; it would not
+`dx.py` and its `dexter_client/` package are first-party integration code that we maintain.
+The local backend correction is kept separately in `patches/function-arity.patch`;
+the adapter does not implement function resolution. Codex, Claude and third-party
+libraries are unchanged. MCP would change transport; it would not
 remove responsibility for LSP sessions, notifications, follow-ups and edits.
 
 ## Build and run
@@ -34,7 +37,10 @@ for formatting. macOS/Linux only (`flock`). The installed Homebrew 0.7.2 is too
 old for the daemon architecture even though the audited source has that version
 constant. Pin **cd099f31b7701803292584887bb614628f721b0a**.
 
-Build an unmodified checkout of that exact revision:
+Supply an unmodified checkout of that exact revision. The build script exports
+it to a temporary directory, checks and applies the local patch there, then
+builds the binary. It leaves your source checkout unchanged and removes the
+temporary copy on exit:
 
 ```sh
 bash agent/lsp/dexter/build.sh /absolute/path/to/dexter-source
@@ -74,7 +80,8 @@ with unchanged configuration does not restart the daemon. Run `start` again
 after changing toolchains. Do not independently start this worktree's daemon
 with a different environment. `stop` remains usable if sources are unavailable.
 
-The build writes an ignored `vendor/build.json` with the binary checksum.
+The build writes an ignored `vendor/build.json` with the upstream revision,
+local patch checksum and binary checksum.
 The client defaults to this local vendor build and verifies its manifest checksum.
 For an explicit binary from another location, use its absolute path and checksum:
 
@@ -90,6 +97,15 @@ python3 "$DX" --binary "$DX_BINARY" --sha256 "$DX_SHA256" --root "$TREE" start <
 printf '%s\n' '{"file":"lib/example.ex","line":12,"column":8}' |
   python3 "$DX" --binary "$DX_BINARY" --sha256 "$DX_SHA256" --root "$TREE" hover
 ```
+
+Switch builds only while the team is idle. **Before running `build.sh` over an
+active binary**, use each worktree's existing bound command to `stop` its daemon.
+After building, re-provision the bound commands with the new checksum and `start`
+the worktrees. Old bound commands pin the old checksum and will refuse the new
+binary. Do not mix stock and patched
+clients on one running daemon: they share the upstream protocol version, and a
+new frontend is not proof that the existing daemon has the patch. The isolated
+patch tests use fresh roots and do not replace any existing team's binary.
 
 Provisioning can run `start` in the background while other worktree setup
 continues; keep its exit status/output and wait before claiming setup succeeded.
@@ -133,7 +149,9 @@ when results look incomplete: upstream read/parse/index errors may appear there
 despite a successful lookup. The adapter does not parse the log or certify freshness.
 Dexter sometimes returns column 1 and a zero-width range for a symbol farther
 along the line. Use the reported line to inspect the source; do not treat the
-column as a precise token boundary.
+column as a precise token boundary. The argument-count patch returns precise
+function-token ranges for verified call references; other locations can remain
+line-level.
 
 | Commands | Input beyond `file` |
 | --- | --- |
@@ -170,7 +188,10 @@ construct. See [VALIDATION.md](VALIDATION.md) for evidence and remaining gaps.
 - Rename is an **immediate mutation**, never a preview. Module/function rename
   may write files inside Dexter before responding. Variable/alias rename can
   return edits for the client to apply. Rename sessions never send `didOpen`,
-  avoiding Dexter's proposed-open-buffer index pollution.
+  avoiding Dexter's proposed-open-buffer index pollution. The argument-count
+  patch corrects shared name classification, so captures, pipe targets and mid-token
+  cursors can now reach function rename. That rename still operates across all
+  argument counts of the name; it does not safely rename just one overload.
 - Mutations save source contents (including ignored source that Dexter may index) and initial Git status in a private snapshot.
   `write` preserves only its target's pre-edit contents; rename and apply workflows
   retain the full source snapshot because their changes can span files.
@@ -229,9 +250,11 @@ native watcher plus an explicit full reconciliation before each lookup. That
 adds latency. It is not yet proven for all dependency/path-dependency changes.
 One fresh session discards per-session caches, not the shared daemon's stale data.
 
-Known stock limitations include silent partial rename writes and missing outgoing
+Known upstream limitations include silent partial rename writes and missing outgoing
 results in the tested unqualified local-call fixture. Results are preserved as
-returned. No workaround is presented as an upstream fix.
+returned. The argument-count patch does not establish safe multi-arity rename,
+complete call hierarchy, or strict index freshness. See the
+[patch validation record](patches/README.md) before relying on a particular construct.
 
 ## Client structure
 
@@ -272,7 +295,9 @@ DEXTER_BINARY=/absolute/path/to/the/audited/dexter \
   python3 -m unittest discover -s agent/lsp/dexter/tests -v
 ```
 
-The default checksum is the original audited macOS build. A separately built
-binary needs its audited checksum passed to the client; update the test invocation
-as described in validation if using another build. Tests create disposable actual
+For this patched build, set `DEXTER_BINARY` to the local `vendor/dexter`
+produced by `build.sh`; the tests then use its build manifest. Normal client use
+can also supply an audited external binary with an explicit `--sha256` argument.
+Without a matching manifest or explicit checksum, the client retains the original
+stock-build checksum as its fallback. Tests create disposable actual
 Git worktrees and stop their own daemons. They never use the Tips database.

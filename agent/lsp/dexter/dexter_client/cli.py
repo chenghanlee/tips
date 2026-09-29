@@ -86,7 +86,7 @@ def compact_report(report: JsonObject) -> JsonObject:
 def parse_arguments(argv: Sequence[str] | None) -> Arguments:
     parser = argparse.ArgumentParser(
         description=(
-            "Experimental saved-file client for pinned, unmodified Dexter. Python stdlib only."
+            "Experimental saved-file client for an audited Dexter build. Python stdlib only."
         )
     )
     parser.add_argument("--root", required=True, type=Path, help="Exact Git worktree/Mix root")
@@ -94,12 +94,12 @@ def parse_arguments(argv: Sequence[str] | None) -> Arguments:
         "--binary",
         type=Path,
         default=Path(__file__).resolve().parents[1] / "vendor/dexter",
-        help="Pinned stock Dexter executable; defaults to local vendor build",
+        help="Audited Dexter executable; defaults to local vendor build",
     )
     parser.add_argument(
         "--sha256",
         default=None,
-        help="Checksum of your audited stock build; defaults to local build manifest",
+        help="Checksum of your audited build; defaults to local build manifest",
     )
     parser.add_argument("--timeout", type=float, default=60)
     parser.add_argument(
@@ -133,7 +133,7 @@ def verify_root(args: Arguments, report: JsonObject) -> tuple[Path, Path]:
         else:
             checksum = DEFAULT_SHA256
     if digest(binary.read_bytes()) != checksum:
-        raise DxError("binary", "Checksum mismatch; audit the stock build and specify its checksum")
+        raise DxError("binary", "Checksum mismatch; audit the build and specify its checksum")
     report["root"], report["binary_sha256"] = str(root), checksum
     if args.operation != "stop":
         for _ in walk_sources(root):

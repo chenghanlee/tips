@@ -1,4 +1,4 @@
-"""Real stock Dexter tests. Set DEXTER_BINARY to the audited build."""
+"""Real Dexter tests. Set DEXTER_BINARY to the audited build."""
 
 import hashlib
 import json
@@ -18,7 +18,7 @@ DX = Path(__file__).resolve().parents[1] / "dx.py"
 BINARY = os.environ.get("DEXTER_BINARY", "")
 
 
-@unittest.skipUnless(BINARY, "set DEXTER_BINARY to run stock-server integration tests")
+@unittest.skipUnless(BINARY, "set DEXTER_BINARY to run real-server integration tests")
 class StockDexter(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:

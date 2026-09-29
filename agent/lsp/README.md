@@ -1,16 +1,17 @@
 # Agent language tools
 
-The team launcher uses one **unmodified Dexter daemon per worktree**, shared by
+The team launcher uses one **Dexter daemon per worktree**, shared by
 Codex and Claude through our Python `dx` adapter. Each workflow gets a fresh LSP
-session. There is no MCP bridge, editor process, custom watcher, or upstream patch.
+session. There is no MCP bridge, editor process, or custom watcher. This branch
+has one explicit local backend patch for function argument-count lookups.
 This remains a prototype: strict saved-index freshness and concurrent native-write
 rename safety are not established. See [validation](dexter/VALIDATION.md).
 
 ## Build and validate
 
-Follow [Dexter setup](dexter/README.md#build-and-run): build the pinned stock source
-with `dexter/build.sh`, provide matching Elixir sources using
-`DEXTER_ELIXIR_LIB_ROOT`, and run the stock-server tests. Keep the adapter, binary,
+Follow [Dexter setup](dexter/README.md#build-and-run): build the pinned source and
+reviewed local patch with `dexter/build.sh`, provide matching Elixir sources using
+`DEXTER_ELIXIR_LIB_ROOT`, and run the real-server tests. Keep the adapter, binary,
 and stdlib sources outside retiring task worktrees. The installed Homebrew release
 currently lacks the required daemon commands; the pinned source build is separate.
 

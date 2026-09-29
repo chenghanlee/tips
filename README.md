@@ -73,7 +73,7 @@ Agent tooling is separate from the application. You do not need it to run Tips.
 | `docs/development/` | Setup, testing and toolchain guides |
 | `docs/design/` | Current product and technical requirements |
 | `agent/teams/` | Agent coordination, configuration, instructions and tests |
-| `agent/lsp/` | Agent language-server adapter and stock build |
+| `agent/lsp/` | Agent language-server adapter, pinned build and local patch |
 
 Installed LSP binaries live in ignored `agent/lsp/vendor/`, shared from the main checkout.
 
