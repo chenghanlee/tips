@@ -96,8 +96,10 @@ non-zero with the reason on stderr. Files are relative to the worktree. The stoc
   the same worktree until the buffer is saved. One writer per worktree.
 - Call hierarchy answers are standard LSP items and carry no reasons. The old
   adapter's `unavailable` list, `unresolved_count`, exactly-once accounting and
-  `freshness` field are gone: a call the resolver cannot own is omitted, never
-  mis-owned, and nothing in the answer says so. Omitted on purpose:
+  `freshness` field are gone: a call the resolver cannot own is omitted without
+  a completeness indicator. When completeness matters, cross-check
+  `findReferences` against the `fromRanges` of `incomingCalls`; a reference
+  with no matching range is a call the hierarchy left out. Omitted on purpose:
   - incoming: calls in typespecs, quote bodies and defs inside `quote`, files
     that do not parse cleanly, top-level and module-body calls, test labels
     built by interpolation, modules named by a variable, heads named by
