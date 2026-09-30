@@ -173,9 +173,9 @@ scanning importing files on a large repository is unmeasured.
 ## Exact artifacts
 
 - Base: `cd099f31b7701803292584887bb614628f721b0a`.
-- Patched source: Dexter branch `fix/reference-imports-local-types` at `b266703`;
-  `git diff cd099f31..b266703` is the packaged patch.
-- Patch SHA-256: `185e67dfaf9d56e24c0922f7237edce095e2764f5249794a1743689dc0d7add9`.
+- Patched source: Dexter branch `fix/reference-imports-local-types` at `6e38b3c`;
+  `git diff cd099f31..6e38b3c` is the packaged patch.
+- Patch SHA-256: `6fa219e14159b2a454060104143c54a686ce604bcae233506aaa6de4dcdf762a`.
 - macOS arm64 binary SHA-256: `7f01cbf2807e7b1ff1eb668fc3550aa9008198210e32d71c1b94383a2cc60fca`,
   built with `build.sh` from the stock archive plus this patch; `vendor/build.json`
   records both checksums.
@@ -234,3 +234,50 @@ can otherwise attach to an old daemon and still return the old answers.
 When changing the upstream pin, review whether upstream fixed these cases, run
 the retained regression and inversion checks, and remove this patch if it is no
 longer needed. A patch that applies cleanly is not sufficient evidence.
+
+## Required Go static analysis
+
+Every Go change, including test code and this carried patch, must run the
+`tiny_big_agents` custom golangci-lint profile. Upstream `make lint` alone
+is insufficient. [tba-golangci.yml](tba-golangci.yml) retains its analyzers
+(including Staticcheck and NilAway) and thresholds. The only adaptations are
+Dexter's NilAway module prefix, module-relative paths, and removal of TBA-only
+path exemptions that would otherwise exclude Dexter from complexity/clone checks.
+
+Use custom golangci-lint **v2.12.2**, built with Go **1.26.3**, and the NilAway
+module plugin `go.uber.org/nilaway/cmd/gclplugin` at
+`v0.0.0-20260515015210-fd187751154f`, matching TBA's `.custom-gcl.yml`. Reuse
+TBA's `.agent-runs/.cache/golangci-lint/custom-gcl` when available; a stock
+golangci-lint binary cannot run this plugin.
+
+From the patched Dexter source root, set `CUSTOM_GCL` to that executable and
+`TBA_LINT_CONFIG` to the absolute path of this directory's `tba-golangci.yml`:
+
+```sh
+"$CUSTOM_GCL" run --config "$TBA_LINT_CONFIG" \
+  --max-issues-per-linter 0 --max-same-issues 0 --uniq-by-line=false \
+  --output.json.path /tmp/dexter-lint.json ./...
+```
+
+Run the same profile on the unchanged base when attributing findings. Compare
+by analyzer, function/source and diagnostic, accounting for shifted lines.
+Fix issues introduced by our code; report inherited findings and any increases
+in existing function complexity explicitly. Do not suppress rules or rewrite
+unrelated upstream code to get a green total. Record tool/profile changes when
+updating these pins.
+
+Latest check (2026-09-30, source `6e38b3c`): **1,460 findings**, including
+24 NilAway reports, versus **1,461** on parent `8f03fa4` under this same
+profile. After normalizing shifted diagnostic lines, the only difference is
+the fixed `filepath.Join` argument in our generated-arity test. The six
+regressions pass, and rebuilding produces the unchanged binary checksum.
+The earlier generated-arity change puts `PrepareCallHierarchy` cognitive
+complexity at **22**, above the limit of 20; it remains a reported cost, not
+a clean gate. No finding occurs in the new references/type test or
+`arity_navigation.go`. No unrelated upstream implementation was changed.
+
+The first run reported five additional gosec taint findings in unchanged
+functions; they did not recur in the final run. Their cause is not established;
+the initial report is retained, not counted as five repaired defects. Detailed
+reports and the normalized comparison are in the main checkout's
+`tmp/dexter-reference-triage/patch-followup/root-checks/tba-*.{json,log}`.

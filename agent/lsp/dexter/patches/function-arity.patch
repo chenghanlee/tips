@@ -1555,7 +1555,7 @@ index 0000000..9b50d8b
 +}
 diff --git a/internal/lsp/call_hierarchy_generated_arity_test.go b/internal/lsp/call_hierarchy_generated_arity_test.go
 new file mode 100644
-index 0000000..9f38aa4
+index 0000000..c48a7c6
 --- /dev/null
 +++ b/internal/lsp/call_hierarchy_generated_arity_test.go
 @@ -0,0 +1,92 @@
@@ -1595,7 +1595,7 @@ index 0000000..9f38aa4
 +end
 +`
 +	indexFile(t, server.store, server.projectRoot, "lib/my_app/caller.ex", callerSource)
-+	callerURI := string(uri.File(filepath.Join(server.projectRoot, "lib/my_app/caller.ex")))
++	callerURI := string(uri.File(filepath.Join(server.projectRoot, "lib", "my_app", "caller.ex")))
 +	server.docs.Set(callerURI, callerSource)
 +
 +	prepare := func(t *testing.T, line int) []protocol.CallHierarchyItem {

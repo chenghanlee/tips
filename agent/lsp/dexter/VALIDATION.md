@@ -417,3 +417,19 @@ main checkout `tmp/dexter-reference-triage/patch-followup/` (`RESULT.md`,
 Not established: reference completeness over Elixir sources, `use`-injected
 consumers without an import row, interpolation, type-parameter scoping, rename
 safety, index freshness. No accuracy percentage is claimed.
+
+## Required TBA Go profile follow-up (2026-09-30)
+
+The full custom TBA golangci-lint profile, including Staticcheck and NilAway,
+was run on source `6e38b3c` and pre-extension parent `8f03fa4`. It reports
+1,460 versus 1,461 findings; after accounting for shifted diagnostic lines,
+the only difference is a corrected path-join argument in our generated-arity
+test. All six affected regressions pass. No production code changed in this
+follow-up; the rebuilt binary checksum remains `7f01cbf2…`.
+
+This is not a strict-lint pass: inherited findings remain, including the
+earlier generated-arity handler's cognitive complexity of 22 (limit 20).
+The initial run's five additional taint findings in unchanged functions did
+not recur; both reports are retained. See the
+[required Go check](patches/README.md#required-go-static-analysis) for the
+versioned profile, tool pins, comparison policy and evidence paths.

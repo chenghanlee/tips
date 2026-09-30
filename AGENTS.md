@@ -28,6 +28,8 @@ Scope searches to relevant paths and file types; broaden as needed.
 - **Dexter LSP**: In provisioned coding sessions, use the bound `$TIPS_DX` shell command with JSON input for definitions, references, hover, symbols, completion, call hierarchy, and other language operations. Read [the workflow guide](agent/lsp/dexter/README.md#available-workflows). Positions are 1-based UTF-16. Prefer LSP for symbol resolution. Freshness is unverified; do not interpret an empty answer as proven absence. Use normal Mix compile/tests for compiler diagnostics. Native editing tools bypass the worktree lock; coordinate shared-tree mutations. Report an unavailable command rather than starting an alternate language server.
 - **mix-credo**: Run `mix credo --strict` on any edited `.ex`/`.exs` files and fix issues you introduced. Skip only if the Credo task is unavailable; report dependency and project failures.
 
+- **Go static analysis**: For every Go change, including carried upstream patches, run the same custom golangci-lint profile as `tiny_big_agents`, including Staticcheck and NilAway. Use the [pinned Dexter profile and instructions](agent/lsp/dexter/patches/README.md#required-go-static-analysis) for Dexter. Keep checks and thresholds enabled; compare with the unchanged baseline, fix findings introduced by our code, and report inherited findings separately. Do not refactor unrelated upstream code to clear its lint debt.
+
 Report unavailable tools and failed checks; use appropriate fallbacks. Failed searches do not establish that no matches exist. LSP and Credo checks do not replace formatting, compilation, or tests.
 
 ## Software Design
