@@ -1,5 +1,5 @@
 diff --git a/cmd/main.go b/cmd/main.go
-index ce8da11..013c7fb 100644
+index ce8da11..38d1932 100644
 --- a/cmd/main.go
 +++ b/cmd/main.go
 @@ -14,6 +14,7 @@ import (
@@ -10,26 +10,28 @@ index ce8da11..013c7fb 100644
  	"github.com/remoteoss/dexter/internal/stdlib"
  	"github.com/remoteoss/dexter/internal/store"
  	"github.com/remoteoss/dexter/internal/version"
-@@ -147,6 +148,18 @@ func main() {
+@@ -139,14 +140,17 @@ func main() {
+ 	stopCmd.Flags().BoolVar(&forceStop, "force", false, "Stop even while editor or CLI clients are attached")
+ 
+ 	lspCmd := &cobra.Command{
+-		Use:   "lsp [path]",
++		Use:   "lsp",
+ 		Short: "Start the LSP server (stdio)",
+-		Args:  cobra.MaximumNArgs(1),
++		Args:  cobra.NoArgs,
+ 		RunE: func(cmd *cobra.Command, args []string) error {
+-			projectRoot, err := resolvePath(args, 0)
++			projectRoot, err := os.Getwd()
  			if err != nil {
  				return err
  			}
-+			if rootDir != "" {
-+				boundRoot, err := os.Getwd()
-+				if err != nil {
-+					return err
-+				}
-+				if projectRoot != boundRoot {
-+					return fmt.Errorf("LSP path %s does not match --root %s", projectRoot, boundRoot)
-+				}
-+			}
 +			if err := lsp.ValidateWorkspaceRoot(projectRoot); err != nil {
 +				return err
 +			}
  			cmdLSP(projectRoot)
  			return nil
  		},
-@@ -180,10 +193,11 @@ func main() {
+@@ -180,10 +184,11 @@ func main() {
  		Short: "Print the version",
  		Run: func(cmd *cobra.Command, args []string) {
  			fmt.Println(version.Version)
@@ -42,20 +44,47 @@ index ce8da11..013c7fb 100644
  
  	if err := rootCmd.Execute(); err != nil {
  		os.Exit(1)
-@@ -668,7 +682,6 @@ func cmdStopIncompatible(ctx context.Context, root string, e *daemon.Incompatibl
+@@ -315,25 +320,6 @@ func requireProjectRoot(dir string, allowNonProject bool) {
+ 	fatal(fmt.Errorf("refusing to use %s as a workspace: no mix.exs, .git, or Dexter database found, so it does not look like an Elixir project\nhint: run from a project, pass --root <path>, or pass -y/--yes to index it anyway", dir))
+ }
+ 
+-// warnProjectRoot is the LSP's version of the same check. An editor, unlike a
+-// shell command, is authoritative about what the user opened, and refusing to
+-// start would leave them with no language server and only a log line to
+-// explain it — so this warns loudly and serves the directory anyway. The warning
+-// is written to stderr, which every LSP client keeps in its server log.
+-func warnProjectRoot(dir string) {
+-	if home, err := os.UserHomeDir(); err == nil && sameDir(dir, home) {
+-		if hasDexterMarker(dir) {
+-			return
+-		}
+-		log.Printf("Warning: %s is your home directory, not a project; indexing it because the editor asked. Set --root <path> in the editor's dexter command if that is wrong.", dir)
+-		return
+-	}
+-	if looksLikeProjectRoot(dir) {
+-		return
+-	}
+-	log.Printf("Warning: %s does not look like an Elixir project (no mix.exs, .git, or Dexter database); indexing it because the editor asked. Set --root <path> if that is the wrong directory.", dir)
+-}
+-
+ // sameDir reports whether two paths name the same directory. Stat is the
+ // authority so a symlinked spelling (or a case-insensitive filesystem) cannot
+ // sneak a home directory past the check.
+@@ -668,8 +654,6 @@ func cmdStopIncompatible(ctx context.Context, root string, e *daemon.Incompatibl
  // frontend. The daemon starts on demand: it belongs to the workspace, not to
  // this editor, the CLI, or any other frontend that happens to reach it first.
  func cmdLSP(projectRoot string) {
 -	projectRoot = findProjectRoot(projectRoot)
- 	warnProjectRoot(projectRoot)
+-	warnProjectRoot(projectRoot)
  	log.SetOutput(os.Stderr)
  	log.Printf("Dexter LSP proxy v%s starting (root: %s, daemon log: %s)", version.Version, projectRoot, daemonLogPath(projectRoot))
+ 	if err := daemon.ProxyLSP(context.Background(), projectRoot, os.Stdin, os.Stdout); err != nil {
 diff --git a/cmd/query.go b/cmd/query.go
 new file mode 100644
-index 0000000..d3b23f0
+index 0000000..9043aa5
 --- /dev/null
 +++ b/cmd/query.go
-@@ -0,0 +1,176 @@
+@@ -0,0 +1,173 @@
 +package main
 +
 +import (
@@ -100,9 +129,6 @@ index 0000000..d3b23f0
 +	}
 +	if err := lsp.ValidateWorkspaceRoot(root); err != nil {
 +		return err
-+	}
-+	if !looksLikeProjectRoot(root) {
-+		return fmt.Errorf("workspace %s does not look like a project", root)
 +	}
 +	if wait < time.Millisecond || wait > time.Duration(1<<63-1)-30*time.Second {
 +		return fmt.Errorf("--wait must be at least 1ms and fit in milliseconds")
@@ -865,10 +891,10 @@ index 3b67eac..e33d696 100644
  	}
 diff --git a/internal/lsp/arity_integration_test.go b/internal/lsp/arity_integration_test.go
 new file mode 100644
-index 0000000..25d4639
+index 0000000..1f9bbfc
 --- /dev/null
 +++ b/internal/lsp/arity_integration_test.go
-@@ -0,0 +1,1074 @@
+@@ -0,0 +1,1057 @@
 +package lsp
 +
 +import (
@@ -1448,24 +1474,7 @@ index 0000000..25d4639
 +	if col < 0 {
 +		t.Fatalf("anchor %q not on %v", a.anchor, a.site)
 +	}
-+	// The cursor must sit on an identifier that is not a keyword such as def.
-+	pos := col + a.offset
-+	start, end := pos, pos
-+	for start > 0 && isArityIdent(text[start-1]) {
-+		start--
-+	}
-+	for end < len(text) && isArityIdent(text[end]) {
-+		end++
-+	}
-+	switch word := text[start:end]; word {
-+	case "", "def", "defp", "do", "end", "fn":
-+		t.Fatalf("cursor %v lands on %q", a, word)
-+	}
-+	return "file://" + filepath.Join(root, a.site.file), line, uint32(pos)
-+}
-+
-+func isArityIdent(c byte) bool {
-+	return c == '_' || c == '?' || c == '!' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
++	return "file://" + filepath.Join(root, a.site.file), line, uint32(col + a.offset)
 +}
 +
 +func aritySiteKeys(t *testing.T, sites ...aritySite) []string {
@@ -1945,10 +1954,10 @@ index 0000000..25d4639
 +}
 diff --git a/internal/lsp/arity_navigation.go b/internal/lsp/arity_navigation.go
 new file mode 100644
-index 0000000..9b50d8b
+index 0000000..fa85591
 --- /dev/null
 +++ b/internal/lsp/arity_navigation.go
-@@ -0,0 +1,386 @@
+@@ -0,0 +1,378 @@
 +// Package lsp implements Dexter's language server.
 +package lsp
 +
@@ -2115,14 +2124,13 @@ index 0000000..9b50d8b
 +	// modules are the providers an occurrence may resolve to: the looked-up
 +	// module and the modules whose __using__ injects it (or the facade).
 +	modules map[string]bool
-+	// files maps each candidate file to its candidate 1-based lines. A nil
-+	// set means the whole file: it defines the function or imports its
-+	// module, and the index misses some of its bare calls.
-+	files map[string]map[int]bool
++	// files are the candidate files, each scanned whole: the index misses
++	// some calls even in files it lists.
++	files map[string]bool
 +}
 +
 +func newOccurrenceGroup(function string, arity treesitter.Arity, modules ...string) occurrenceGroup {
-+	g := occurrenceGroup{function: function, arity: arity, modules: map[string]bool{}, files: map[string]map[int]bool{}}
++	g := occurrenceGroup{function: function, arity: arity, modules: map[string]bool{}, files: map[string]bool{}}
 +	for _, m := range modules {
 +		g.modules[m] = true
 +	}
@@ -2131,29 +2139,21 @@ index 0000000..9b50d8b
 +
 +func (g occurrenceGroup) addCandidates(refs []store.ReferenceResult) {
 +	for _, r := range refs {
-+		lines, seen := g.files[r.FilePath]
-+		if seen && lines == nil {
-+			continue
-+		}
-+		if lines == nil {
-+			lines = map[int]bool{}
-+			g.files[r.FilePath] = lines
-+		}
-+		lines[r.Line] = true
++		g.files[r.FilePath] = true
 +	}
 +}
 +
-+// addDefinitionFiles marks the files that define module.function for a
-+// whole-file scan, as findBareCallRefs does for the name search, and the
-+// files that import module: the index has no row for an imported
-+// &function/arity or a call after a one-line def head.
++// addDefinitionFiles adds the files that define module.function, as
++// findBareCallRefs does for the name search, and the files that import
++// module: the index has no row for an imported &function/arity or a call
++// after a one-line def head.
 +func (g occurrenceGroup) addDefinitionFiles(s *Server, module, function string) {
 +	defs, err := s.store.LookupFunction(module, function)
 +	if err != nil {
 +		return
 +	}
 +	for _, d := range defs {
-+		g.files[d.FilePath] = nil
++		g.files[d.FilePath] = true
 +	}
 +	refs, err := s.store.LookupReferences(module, "")
 +	if err != nil {
@@ -2161,16 +2161,16 @@ index 0000000..9b50d8b
 +	}
 +	for _, r := range refs {
 +		if r.Kind == "import" {
-+			g.files[r.FilePath] = nil
++			g.files[r.FilePath] = true
 +		}
 +	}
 +}
 +
 +// referenceOccurrences answers a references request for one function
-+// identity. The indexed references and the definition files only say where
-+// the name may occur. Each occurrence there is kept when its written argument
-+// count matches and it resolves, with the scope rules go-to-definition uses,
-+// to one of the group's modules.
++// identity. The indexed references, the definition files and the importing
++// files only name the files to scan. Each occurrence there is kept when its
++// written argument count matches and it resolves, with the scope rules
++// go-to-definition uses, to one of the group's modules.
 +func (s *Server) referenceOccurrences(module, function string, opts NameReferenceOptions, candidates []store.ReferenceResult, injectors []string) ([]NameLocation, error) {
 +	main := newOccurrenceGroup(function, opts.Arity, append([]string{module}, injectors...)...)
 +	main.addCandidates(candidates)
@@ -2213,8 +2213,9 @@ index 0000000..9b50d8b
 +	var groups []occurrenceGroup
 +	heads := map[delegateHead]bool{}
 +	for _, delegate := range delegates {
-+		head := delegateHead{delegate.Module, delegate.Function, s.delegateHeadArity(delegate.FilePath, delegate.Line, delegate.Function, delegate.Arity)}
-+		if heads[head] || !arity.Matches(head.arity.Max) {
++		headArity, ok := s.delegateHeadArity(delegate.FilePath, delegate.Line, delegate.Function)
++		head := delegateHead{delegate.Module, delegate.Function, headArity}
++		if !ok || heads[head] || !arity.Matches(head.arity.Max) {
 +			continue
 +		}
 +		heads[head] = true
@@ -2240,15 +2241,14 @@ index 0000000..9b50d8b
 +	sort.Strings(files)
 +	var out []NameLocation
 +	for _, file := range files {
-+		out = append(out, s.matchOccurrences(file, g.files[file], g)...)
++		out = append(out, s.matchOccurrences(file, g)...)
 +	}
 +	return out
 +}
 +
 +// matchOccurrences returns the occurrences of g.function in one file that
-+// have g's arity and resolve to one of g's modules. lines restricts the
-+// search to candidate lines; nil searches the whole file.
-+func (s *Server) matchOccurrences(file string, lines map[int]bool, g occurrenceGroup) []NameLocation {
++// have g's arity and resolve to one of g's modules.
++func (s *Server) matchOccurrences(file string, g occurrenceGroup) []NameLocation {
 +	text, _, ok := s.readFileText(file)
 +	if !ok {
 +		return nil
@@ -2261,9 +2261,6 @@ index 0000000..9b50d8b
 +			continue
 +		}
 +		line := int(occ.Line)
-+		if lines != nil && !lines[line+1] {
-+			continue
-+		}
 +		if tf == nil {
 +			tf = NewTokenizedFile(text)
 +		}
@@ -2293,20 +2290,21 @@ index 0000000..9b50d8b
 +	arity            treesitter.Arity
 +}
 +
-+// delegateHeadArity returns the arities of the defdelegate head on line
-+// (1-based) of file that accepts arity. The index keeps one row per arity a
-+// head with defaults accepts, and two heads can share a line, so the head is
-+// read from source. Without readable source it is arity alone.
-+func (s *Server) delegateHeadArity(file string, line int, function string, arity int) treesitter.Arity {
-+	if text, _, ok := s.readFileText(file); ok {
-+		for _, occ := range treesitter.FunctionOccurrencesInSource([]byte(text), function) {
-+			if occ.Kind == treesitter.OccurrenceHead && occ.Keyword == "defdelegate" &&
-+				int(occ.NameLine)+1 == line && occ.Arity.Matches(arity) {
-+				return occ.Arity
-+			}
++// delegateHeadArity returns the arities of the defdelegate head of function
++// on line (1-based) of file. The index keeps one row per arity a head with
++// defaults accepts, so the head is read from source. ok is false without
++// readable source or such a head.
++func (s *Server) delegateHeadArity(file string, line int, function string) (treesitter.Arity, bool) {
++	text, _, ok := s.readFileText(file)
++	if !ok {
++		return treesitter.Arity{}, false
++	}
++	for _, occ := range treesitter.FunctionOccurrencesInSource([]byte(text), function) {
++		if occ.Kind == treesitter.OccurrenceHead && occ.Keyword == "defdelegate" && int(occ.NameLine)+1 == line {
++			return occ.Arity, true
 +		}
 +	}
-+	return treesitter.ExactArity(arity)
++	return treesitter.Arity{}, false
 +}
 +
 +// followDelegatesArity is store.LookupFollowDelegate for a call of the given
@@ -2317,7 +2315,10 @@ index 0000000..9b50d8b
 +	}
 +	return s.store.LookupFollowDelegateArity(module, function, arity.Min, arity.Max, func(r store.LookupResult, hopFunction string) int {
 +		// After an as: rename the hop's function is not the looked-up one.
-+		return s.delegateHeadArity(r.FilePath, r.Line, hopFunction, r.Arity).Max
++		if head, ok := s.delegateHeadArity(r.FilePath, r.Line, hopFunction); ok {
++			return head.Max
++		}
++		return r.Arity
 +	})
 +}
 +
@@ -2883,7 +2884,7 @@ index 0000000..d3ea1b6
 +}
 diff --git a/internal/lsp/call_hierarchy_test.go b/internal/lsp/call_hierarchy_test.go
 new file mode 100644
-index 0000000..46d0ab5
+index 0000000..4c84fc9
 --- /dev/null
 +++ b/internal/lsp/call_hierarchy_test.go
 @@ -0,0 +1,619 @@
@@ -3381,9 +3382,9 @@ index 0000000..46d0ab5
 +`)
 +
 +	// early/1 no longer calls admit. later/1 does, on a line the index never
-+	// saw in a file that neither defines nor imports the target: a documented
-+	// miss, not a wrong owner.
++	// saw; the index still lists the file, which is scanned whole.
 +	assertRows(t, incomingRows(t, server, incoming(t, server, admit)), []string{
++		`lib/stale.ex | def MyApp.Stale.later/1 [2:2-2:44] sel [2:6-2:11] <- 2:36-2:41`,
 +		`lib/stale_import.ex | def MyApp.StaleImport.a/1 [4:2-4:47] sel [4:6-4:7] <- 4:16-4:21`,
 +	})
 +	assertRows(t, outgoingRows(outgoing(t, server, caller)), []string{
@@ -5700,10 +5701,10 @@ index 0000000..e8fc658
 +end
 diff --git a/internal/lsp/workspace_root.go b/internal/lsp/workspace_root.go
 new file mode 100644
-index 0000000..04f3b7c
+index 0000000..b2aad30
 --- /dev/null
 +++ b/internal/lsp/workspace_root.go
-@@ -0,0 +1,172 @@
+@@ -0,0 +1,177 @@
 +package lsp
 +
 +import (
@@ -5731,6 +5732,11 @@ index 0000000..04f3b7c
 +	}
 +	if !info.IsDir() {
 +		return fmt.Errorf("workspace root %s is not a directory", root)
++	}
++	if _, err := os.Stat(filepath.Join(root, ".git")); err != nil {
++		if mix, err := os.Stat(filepath.Join(root, "mix.exs")); err != nil || !mix.Mode().IsRegular() {
++			return fmt.Errorf("workspace %s has no .git or mix.exs source project", root)
++		}
 +	}
 +	// Check the nearest checkout before database markers, which can belong to
 +	// an enclosing repository when a foreign checkout is nested inside it.
@@ -5877,40 +5883,10 @@ index 0000000..04f3b7c
 +	return false
 +}
 diff --git a/internal/store/store.go b/internal/store/store.go
-index ac6c873..4c61bb2 100644
+index ac6c873..c437398 100644
 --- a/internal/store/store.go
 +++ b/internal/store/store.go
-@@ -1454,6 +1454,7 @@ type DelegateEntry struct {
- 	DelegateAs string // the target function name (empty if same as Function)
- 	FilePath   string
- 	Line       int
-+	Arity      int // the facade arity; a head with defaults has one entry per arity
- }
- 
- // LookupDelegatesTo returns all defdelegate definitions that forward the given
-@@ -1461,10 +1462,10 @@ type DelegateEntry struct {
- // equals target) and the as: case (delegate_as equals target function name).
- func (s *Store) LookupDelegatesTo(targetModule, targetFunction string) ([]DelegateEntry, error) {
- 	rows, err := s.db.Query(
--		`SELECT d.module, d.function, d.delegate_as, f.path, d.line FROM definitions d JOIN files f ON f.id = d.file_id
-+		`SELECT d.module, d.function, d.delegate_as, f.path, d.line, d.arity FROM definitions d JOIN files f ON f.id = d.file_id
- 		 WHERE d.kind = 'defdelegate' AND d.delegate_to = ? AND d.delegate_as = '' AND d.function = ?
- 		 UNION ALL
--		 SELECT d.module, d.function, d.delegate_as, f.path, d.line FROM definitions d JOIN files f ON f.id = d.file_id
-+		 SELECT d.module, d.function, d.delegate_as, f.path, d.line, d.arity FROM definitions d JOIN files f ON f.id = d.file_id
- 		 WHERE d.kind = 'defdelegate' AND d.delegate_to = ? AND d.delegate_as = ?`,
- 		targetModule, targetFunction, targetModule, targetFunction,
- 	)
-@@ -1476,7 +1477,7 @@ func (s *Store) LookupDelegatesTo(targetModule, targetFunction string) ([]Delega
- 	var results []DelegateEntry
- 	for rows.Next() {
- 		var r DelegateEntry
--		if err := rows.Scan(&r.Module, &r.Function, &r.DelegateAs, &r.FilePath, &r.Line); err != nil {
-+		if err := rows.Scan(&r.Module, &r.Function, &r.DelegateAs, &r.FilePath, &r.Line, &r.Arity); err != nil {
- 			return nil, err
- 		}
- 		results = append(results, r)
-@@ -1719,10 +1720,21 @@ func (s *Store) NextFunctionLine(filePath string, startLine int) int {
+@@ -1719,10 +1719,21 @@ func (s *Store) NextFunctionLine(filePath string, startLine int) int {
  }
  
  func (s *Store) LookupFollowDelegate(module, function string) ([]LookupResult, error) {
@@ -5934,7 +5910,7 @@ index ac6c873..4c61bb2 100644
  	if depth > 5 {
  		return nil, nil
  	}
-@@ -1731,30 +1743,51 @@ func (s *Store) lookupFollowDelegate(module, function string, depth int) ([]Look
+@@ -1731,30 +1742,51 @@ func (s *Store) lookupFollowDelegate(module, function string, depth int) ([]Look
  	if err != nil {
  		return nil, err
  	}
@@ -6005,10 +5981,10 @@ index ac6c873..4c61bb2 100644
  }
 diff --git a/internal/treesitter/arity.go b/internal/treesitter/arity.go
 new file mode 100644
-index 0000000..d68596c
+index 0000000..71b11fb
 --- /dev/null
 +++ b/internal/treesitter/arity.go
-@@ -0,0 +1,479 @@
+@@ -0,0 +1,412 @@
 +// Package treesitter answers syntax questions about Elixir source with the
 +// tree-sitter Elixir grammar.
 +package treesitter
@@ -6040,12 +6016,12 @@ index 0000000..d68596c
 +type OccurrenceKind uint8
 +
 +const (
-+	// OccurrencePlain is a name that is not a function reference: a bound
-+	// variable, a binding in a pattern, a module attribute or the left of a
-+	// dot. Its arity is unknown.
++	// OccurrencePlain is a name that is not a function reference: a variable,
++	// a module attribute, the left of a dot, or any bare name without call
++	// syntax (Elixir rejects a parenless local call as an undefined variable).
++	// Its arity is unknown.
 +	OccurrencePlain OccurrenceKind = iota
-+	// OccurrenceCall is a call, a pipe target, a capture, or a bare name that
-+	// no variable binds, which Elixir reads as a call with no arguments.
++	// OccurrenceCall is a call, a pipe target or a capture.
 +	OccurrenceCall
 +	// OccurrenceHead is the name in a def/defp/defmacro/defguard/defdelegate head.
 +	OccurrenceHead
@@ -6097,7 +6073,7 @@ index 0000000..d68596c
 +	if node == nil || node.Kind() != "identifier" {
 +		return FunctionOccurrence{}, false
 +	}
-+	return classifyWithScope(root, node, src), true
++	return classifyFunctionName(node, src), true
 +}
 +
 +// FunctionOccurrencesInSource parses src and returns every occurrence of name.
@@ -6118,7 +6094,7 @@ index 0000000..d68596c
 +	walk = func(n *tree_sitter.Node) {
 +		if n.Kind() == "identifier" {
 +			if n.Utf8Text(src) == name {
-+				out = append(out, classifyWithScope(root, n, src))
++				out = append(out, classifyFunctionName(n, src))
 +			}
 +			return
 +		}
@@ -6130,73 +6106,6 @@ index 0000000..d68596c
 +		walk(root)
 +	}
 +	return out
-+}
-+
-+// classifyWithScope is classifyFunctionName plus the one case syntax alone
-+// cannot settle: a bare name is a variable when one is bound and name/0
-+// otherwise.
-+func classifyWithScope(root, ident *tree_sitter.Node, src []byte) FunctionOccurrence {
-+	occ := classifyFunctionName(ident, src)
-+	if occ.Kind == OccurrencePlain && zeroArityCall(root, ident, src) {
-+		occ.Kind, occ.Arity = OccurrenceCall, ExactArity(0)
-+	}
-+	return occ
-+}
-+
-+// zeroArityCall reports whether a bare identifier with no call syntax calls a
-+// function with no arguments. The binding check is the variable resolver's,
-+// so a name counts as a call only where go-to-definition would not treat it
-+// as a variable.
-+func zeroArityCall(root, ident *tree_sitter.Node, src []byte) bool {
-+	parent := ident.Parent()
-+	if parent == nil || parent.Kind() == "dot" || parent.Kind() == "call" {
-+		return false
-+	}
-+	if parent.Kind() == "unary_operator" {
-+		// `@name` is a module attribute and `^name` a pinned variable.
-+		if op := operatorText(parent, src); op == "@" || op == "^" {
-+			return false
-+		}
-+	}
-+	if inPattern(ident, src) {
-+		return false
-+	}
-+	pos := ident.StartPosition()
-+	return resolveVariableScope(root, src, pos.Row, pos.Column) == nil
-+}
-+
-+// inPattern reports whether node sits where Elixir binds variables: the left
-+// of `=` or `<-`, a clause's arguments, or a definition head. A binding that
-+// is never used is still a variable, though the variable resolver, which
-+// looks for a second occurrence, cannot tell.
-+func inPattern(node *tree_sitter.Node, src []byte) bool {
-+	child := node
-+	for parent := node.Parent(); parent != nil; child, parent = parent, parent.Parent() {
-+		switch parent.Kind() {
-+		case "binary_operator":
-+			left := sameNode(parent.ChildByFieldName("left"), child)
-+			switch operatorText(parent, src) {
-+			case "=", "<-":
-+				if left {
-+					return true
-+				}
-+			case "when", `\\`:
-+				if !left {
-+					// A guard or a default value is an expression.
-+					return false
-+				}
-+			}
-+		case "stab_clause":
-+			return sameNode(parent.ChildByFieldName("left"), child)
-+		case "arguments":
-+			if keyword, _ := definitionHeadCall(child, src); keyword != "" {
-+				return true
-+			}
-+		case "do_block":
-+			return false
-+		}
-+	}
-+	return false
 +}
 +
 +// classifyFunctionName derives kind and arity for an identifier from the
@@ -6490,10 +6399,10 @@ index 0000000..d68596c
 +}
 diff --git a/internal/treesitter/arity_test.go b/internal/treesitter/arity_test.go
 new file mode 100644
-index 0000000..dfa11b2
+index 0000000..11840a6
 --- /dev/null
 +++ b/internal/treesitter/arity_test.go
-@@ -0,0 +1,237 @@
+@@ -0,0 +1,176 @@
 +package treesitter
 +
 +import (
@@ -6524,6 +6433,8 @@ index 0000000..dfa11b2
 +    &MyApp.Store.put/2
 +    &put(&1, :v)
 +    Store.put(key, :v, [])
++    Store.fetch
++    ping
 +    put key, :v, [:x]
 +    put(key, fn a, b -> {a, b} end)
 +    put(key, mode: :fast, retries: 2)
@@ -6559,6 +6470,8 @@ index 0000000..dfa11b2
 +		{"capture of a call", "&put(&1, :v)", "put", OccurrenceCall, ExactArity(2), ""},
 +		{"qualified call", "Store.put(key, :v, [])", "put", OccurrenceCall, ExactArity(3), "Store"},
 +		{"call without parentheses", "put key, :v, [:x]", "put", OccurrenceCall, ExactArity(3), ""},
++		{"qualified name without parentheses calls name/0", "Store.fetch", "fetch", OccurrenceCall, ExactArity(0), "Store"},
++		{"bare name without parentheses is not a call", "ping", "ping", OccurrencePlain, Arity{}, ""},
 +		{"anonymous function is one argument", "put(key, fn a, b -> {a, b} end)", "put", OccurrenceCall, ExactArity(2), ""},
 +		{"trailing keyword list is one argument", "put(key, mode: :fast, retries: 2)", "put", OccurrenceCall, ExactArity(2), ""},
 +		{"do-block is another argument after keywords", "wrap(key, k: 1) do", "wrap", OccurrenceCall, ExactArity(3), ""},
@@ -6647,71 +6560,6 @@ index 0000000..dfa11b2
 +	}
 +}
 +
-+// A bare name is a variable where one is bound and a call with no arguments
-+// everywhere else (Elixir reads `ping` as ping/0).
-+func TestFunctionOccurrenceAt_BareName(t *testing.T) {
-+	src := `defmodule MyApp.Pinger do
-+  @doc "Pings."
-+  def ping, do: :pong
-+  def ping(x), do: x
-+
-+  def bare do
-+    ping
-+  end
-+
-+  def param(ping) do
-+    ping
-+  end
-+
-+  def assigned do
-+    ping = 1
-+    ping
-+  end
-+
-+  def unused(other) do
-+    {:ok, ping} = other
-+    @ping
-+  end
-+end
-+`
-+	cases := []struct {
-+		name  string
-+		line  string
-+		kind  OccurrenceKind
-+		arity Arity
-+		nth   int // which match of line, 0-based
-+	}{
-+		{"unbound bare name calls name/0", "ping", OccurrenceCall, ExactArity(0), 0},
-+		{"parameter binding", "def param(ping) do", OccurrencePlain, Arity{}, 0},
-+		{"bound parameter use", "ping", OccurrencePlain, Arity{}, 1},
-+		{"assignment binding", "ping = 1", OccurrencePlain, Arity{}, 0},
-+		{"assigned variable use", "ping", OccurrencePlain, Arity{}, 2},
-+		{"unused pattern binding", "{:ok, ping} = other", OccurrencePlain, Arity{}, 0},
-+		{"module attribute", "@ping", OccurrencePlain, Arity{}, 0},
-+	}
-+	lines := strings.Split(src, "\n")
-+	root, cleanup := parseElixir([]byte(src))
-+	defer cleanup()
-+	for _, tc := range cases {
-+		t.Run(tc.name, func(t *testing.T) {
-+			row, col := nameAt(t, lines, tc.line, "ping", tc.nth)
-+			checkOccurrenceAt(t, root, []byte(src), row, col, FunctionOccurrence{Kind: tc.kind, Arity: tc.arity})
-+		})
-+	}
-+
-+	// `@doc "..."` sets an attribute; it is not a call of doc/1.
-+	if occ, _ := FunctionOccurrenceAt(root, []byte(src), 1, 3); occ.Kind != OccurrencePlain {
-+		t.Errorf("@doc: got kind %d, want plain", occ.Kind)
-+	}
-+	// Go-to-definition asks the variable resolver first: a lone bare call is
-+	// not a variable wherever the cursor sits in the name.
-+	for _, col := range []uint{4, 5, 7} {
-+		if occs := FindVariableOccurrencesWithTree(root, []byte(src), 6, col); len(occs) != 0 {
-+			t.Errorf("col %d: bare call read as a variable: %+v", col, occs)
-+		}
-+	}
-+}
-+
 +// Each defdelegate head keeps its own arity range, also with two heads on one
 +// line; a head with defaults accepts a range.
 +func TestFunctionOccurrences_DelegateHeads(t *testing.T) {
@@ -6733,7 +6581,7 @@ index 0000000..dfa11b2
 +}
 diff --git a/internal/treesitter/owners.go b/internal/treesitter/owners.go
 new file mode 100644
-index 0000000..65dda5f
+index 0000000..6f30595
 --- /dev/null
 +++ b/internal/treesitter/owners.go
 @@ -0,0 +1,297 @@
@@ -6813,7 +6661,7 @@ index 0000000..65dda5f
 +	if ident == nil || ident.Kind() != "identifier" || ident.StartPosition() != (tree_sitter.Point{Row: line, Column: col}) {
 +		return FunctionOccurrence{}, Owner{}, false
 +	}
-+	occ := classifyWithScope(s.root, ident, s.src)
++	occ := classifyFunctionName(ident, s.src)
 +	if occ.Kind != OccurrenceCall || occ.Name != name {
 +		return FunctionOccurrence{}, Owner{}, false
 +	}
@@ -6872,7 +6720,7 @@ index 0000000..65dda5f
 +				return
 +			}
 +		case "identifier":
-+			if occ := classifyWithScope(s.root, n, s.src); occ.Kind == OccurrenceCall {
++			if occ := classifyFunctionName(n, s.src); occ.Kind == OccurrenceCall {
 +				calls = append(calls, occ)
 +			}
 +			return
@@ -7035,22 +6883,10 @@ index 0000000..65dda5f
 +	return nil
 +}
 diff --git a/internal/treesitter/variables.go b/internal/treesitter/variables.go
-index c00de05..0a31c9f 100644
+index c00de05..7ab576c 100644
 --- a/internal/treesitter/variables.go
 +++ b/internal/treesitter/variables.go
-@@ -194,7 +194,10 @@ func resolveVariableScope(root *tree_sitter.Node, src []byte, line, col uint) *r
- 	// This ensures bare function calls fall through to function reference lookup.
- 	// Exception: if the cursor is on an assignment target (LHS of =), it is
- 	// unambiguously a variable binding regardless of other occurrences.
--	if !isAssignmentTarget(cursorNode, src) && !variableDefinedInScope(scope, src, varName, line, col) {
-+	// The cursor may sit anywhere in the name; its own occurrence starts at
-+	// the node, not at the cursor.
-+	start := cursorNode.StartPosition()
-+	if !isAssignmentTarget(cursorNode, src) && !variableDefinedInScope(scope, src, varName, start.Row, start.Column) {
- 		return nil
- 	}
- 
-@@ -256,6 +259,11 @@ func isFunctionNameInCall(node *tree_sitter.Node, src []byte) bool {
+@@ -256,6 +256,11 @@ func isFunctionNameInCall(node *tree_sitter.Node, src []byte) bool {
  		return false
  	}
  
@@ -7245,12 +7081,84 @@ index 0000000..c59dde2
 +		t.Fatalf("%s: definition at %d:%d = %v, want %s line 1", label, line, col, got, wantURI)
 +	}
 +}
+diff --git a/lsp_integration_test.go b/lsp_integration_test.go
+index 56fad77..74150d1 100644
+--- a/lsp_integration_test.go
++++ b/lsp_integration_test.go
+@@ -6,7 +6,6 @@ import (
+ 	"path/filepath"
+ 	"reflect"
+ 	"strings"
+-	"sync"
+ 	"testing"
+ 	"time"
+ 
+@@ -74,49 +73,20 @@ func TestLSP_RootFlagServesWorkspaceFromAnotherDirectory(t *testing.T) {
+ 	}
+ }
+ 
+-// TestLSP_WarnsOnNonProjectRoot covers the editor side of the not-a-project
+-// guard: an editor is authoritative about what the user opened, so the LSP
+-// warns and serves rather than refusing, and the warning reaches the server log
+-// an editor collects.
+-func TestLSP_WarnsOnNonProjectRoot(t *testing.T) {
++// Native and query entry points require an active source project, not just
++// a database left behind by an earlier index.
++func TestLSP_RejectsNonProjectRoot(t *testing.T) {
+ 	binary := buildDexter(t)
+ 	root := t.TempDir()
+-	var stderr safeBuffer
+-	client, err := lsptest.Start(binary, root, &stderr)
+-	if err != nil {
+-		t.Fatalf("lsp refused a directory that is not a project: %v", err)
++	t.Cleanup(func() { stopQueryDaemon(t, root) })
++	assertCommandRefused(t, binary, []string{"--root", root, "lsp"}, "no .git or mix.exs")
++	if err := os.Mkdir(filepath.Join(root, ".dexter"), 0o700); err != nil {
++		t.Fatal(err)
+ 	}
+-	defer client.Close()
+-
+-	// The warning is written by the child before the handshake completes, but
+-	// the parent's stderr copy goroutine may not have landed it yet when Start
+-	// returns, so wait for it rather than sampling once.
+-	deadline := time.Now().Add(5 * time.Second)
+-	for !strings.Contains(stderr.String(), "does not look like an Elixir project") {
+-		if time.Now().After(deadline) {
+-			t.Fatalf("serving a non-project root logged no warning:\n%s", stderr.String())
+-		}
+-		time.Sleep(10 * time.Millisecond)
++	if err := os.WriteFile(filepath.Join(root, ".dexter", "dexter.db"), nil, 0o600); err != nil {
++		t.Fatal(err)
+ 	}
+-}
+-
+-// safeBuffer is a bytes.Buffer the test may read while os/exec's stderr copy
+-// goroutine writes it; bytes.Buffer itself is not safe for that.
+-type safeBuffer struct {
+-	mu  sync.Mutex
+-	buf bytes.Buffer
+-}
+-
+-func (b *safeBuffer) Write(p []byte) (int, error) {
+-	b.mu.Lock()
+-	defer b.mu.Unlock()
+-	return b.buf.Write(p)
+-}
+-
+-func (b *safeBuffer) String() string {
+-	b.mu.Lock()
+-	defer b.mu.Unlock()
+-	return b.buf.String()
++	assertCommandRefused(t, binary, []string{"--root", root, "lsp"}, "no .git or mix.exs")
+ }
+ 
+ // daemonLogs returns what the workspace daemon logged for root. The daemon exits
 diff --git a/query_integration_test.go b/query_integration_test.go
 new file mode 100644
-index 0000000..5156810
+index 0000000..3d3509c
 --- /dev/null
 +++ b/query_integration_test.go
-@@ -0,0 +1,387 @@
+@@ -0,0 +1,401 @@
 +package main
 +
 +import (
@@ -7342,19 +7250,29 @@ index 0000000..5156810
 +	t.Cleanup(func() { stopQueryDaemon(t, root) })
 +	other := t.TempDir()
 +	writeQueryFixture(t, other)
++	databaseOnly := t.TempDir()
++	if err := os.Mkdir(filepath.Join(databaseOnly, ".dexter"), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(databaseOnly, ".dexter", "dexter.db"), nil, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { stopQueryDaemon(t, databaseOnly) })
 +	for _, test := range []struct {
 +		name string
 +		root string
 +		args []string
++		want string
 +	}{
-+		{"subdirectory-root", filepath.Join(root, "lib"), []string{"definition", "worker.ex", "6", "47"}},
-+		{"outside-file", root, []string{"definition", filepath.Join(other, "lib", "worker.ex"), "6", "47"}},
-+		{"zero-position", root, []string{"definition", "lib/worker.ex", "0", "1"}},
-+		{"write-operation", root, []string{"rename", "lib/worker.ex", "6", "47"}},
-+		{"non-project", t.TempDir(), []string{"workspace-symbols", "SharedLib"}},
++		{"subdirectory-root", filepath.Join(root, "lib"), []string{"definition", "worker.ex", "6", "47"}, ""},
++		{"outside-file", root, []string{"definition", filepath.Join(other, "lib", "worker.ex"), "6", "47"}, ""},
++		{"zero-position", root, []string{"definition", "lib/worker.ex", "0", "1"}, ""},
++		{"write-operation", root, []string{"rename", "lib/worker.ex", "6", "47"}, ""},
++		{"non-project", t.TempDir(), []string{"workspace-symbols", "SharedLib"}, ""},
++		{"database-only", databaseOnly, []string{"workspace-symbols", "SharedLib"}, "no .git or mix.exs"},
 +	} {
 +		t.Run(test.name, func(t *testing.T) {
-+			assertCommandRefused(t, binary, append([]string{"--root", test.root, "query"}, test.args...), "")
++			assertCommandRefused(t, binary, append([]string{"--root", test.root, "query"}, test.args...), test.want)
 +		})
 +	}
 +}
@@ -7431,6 +7349,9 @@ index 0000000..5156810
 +	root := t.TempDir()
 +	writeQueryFixture(t, root)
 +	queryGit(t, root, "init", "-q")
++	if err := os.Remove(filepath.Join(root, "mix.exs")); err != nil {
++		t.Fatal(err)
++	}
 +	app := filepath.Join(root, "app")
 +	writeQueryFixture(t, app)
 +	alias := filepath.Join(t.TempDir(), "app-alias")
@@ -7443,14 +7364,15 @@ index 0000000..5156810
 +	for _, test := range []struct {
 +		name string
 +		args []string
++		want string
 +	}{
-+		{"subdirectory", []string{"--root", filepath.Join(root, "lib"), "lsp", filepath.Join(root, "lib")}},
-+		{"conflicting-path", []string{"--root", root, "lsp", other}},
-+		{"symlink-subdirectory-native", []string{"--root", alias, "lsp", alias}},
-+		{"symlink-subdirectory-query", []string{"--root", alias, "query", "workspace-symbols", "SharedLib"}},
++		{"subdirectory", []string{"--root", app, "lsp"}, "exact checkout"},
++		{"positional-path", []string{"--root", root, "lsp", root}, ""},
++		{"symlink-subdirectory-native", []string{"--root", alias, "lsp"}, "exact checkout"},
++		{"symlink-subdirectory-query", []string{"--root", alias, "query", "workspace-symbols", "SharedLib"}, "exact checkout"},
 +	} {
 +		t.Run(test.name, func(t *testing.T) {
-+			assertCommandRefused(t, binary, test.args, "")
++			assertCommandRefused(t, binary, test.args, test.want)
 +		})
 +	}
 +	client, err := lsptest.Start(binary, root, nil)
@@ -7501,7 +7423,7 @@ index 0000000..5156810
 +				t.Fatal(err)
 +			}
 +			defer func() { _ = os.RemoveAll(nested) }()
-+			for _, args := range [][]string{{"--root", root, "query", "workspace-symbols"}, {"--root", root, "lsp", root}, {"--root", alias, "query", "workspace-symbols"}, {"--root", alias, "lsp", alias}} {
++			for _, args := range [][]string{{"--root", root, "query", "workspace-symbols"}, {"--root", root, "lsp"}, {"--root", alias, "query", "workspace-symbols"}, {"--root", alias, "lsp"}} {
 +				assertCommandRefused(t, binary, args, "nested checkout")
 +			}
 +		})
