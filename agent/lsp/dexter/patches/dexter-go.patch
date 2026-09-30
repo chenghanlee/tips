@@ -2382,10 +2382,10 @@ index 0000000..8c45367
 +}
 diff --git a/internal/lsp/call_hierarchy.go b/internal/lsp/call_hierarchy.go
 new file mode 100644
-index 0000000..188f434
+index 0000000..a7e5744
 --- /dev/null
 +++ b/internal/lsp/call_hierarchy.go
-@@ -0,0 +1,431 @@
+@@ -0,0 +1,492 @@
 +package lsp
 +
 +import (
@@ -2524,7 +2524,13 @@ index 0000000..188f434
 +	if !ok {
 +		return nil, nil
 +	}
-+	return []protocol.CallHierarchyItem{s.definitionItem(fullModule, functionName, r)}, nil
++	files := itemFiles{}
++	defer files.close()
++	item, ok := s.definitionItem(files, fullModule, functionName, r)
++	if !ok {
++		return nil, nil
++	}
++	return []protocol.CallHierarchyItem{item}, nil
 +}
 +
 +// definitionForArity picks the row an item names: the first definition with
@@ -2556,24 +2562,62 @@ index 0000000..188f434
 +	return arity
 +}
 +
-+// definitionItem is the item for one definition row of module.function.
-+func (s *Server) definitionItem(module, function string, r store.LookupResult) protocol.CallHierarchyItem {
-+	nameCol := 0
-+	defLine, _ := s.getFileLine(r.FilePath, r.Line)
-+	if col := findTokenColumn(defLine, function); col >= 0 {
-+		nameCol = col
++// definitionItem is the item for one definition row of module.function: it
++// spans the declaration the row points at and selects its name. A generated
++// function has no declaration of its own; its row is the module that
++// generates it, so the item spans that module's declaration and selects the
++// module's name, and keeps the function's identity. ok is false when the
++// source declares neither there any more.
++func (s *Server) definitionItem(files itemFiles, module, function string, r store.LookupResult) (protocol.CallHierarchyItem, bool) {
++	file := files.get(s, r.FilePath)
++	if file == nil {
++		return protocol.CallHierarchyItem{}, false
 +	}
++	decl, ok := file.source.Declaration(uint(r.Line-1), function)
++	if !ok {
++		return protocol.CallHierarchyItem{}, false
++	}
++	lines := file.lines
 +	return protocol.CallHierarchyItem{
-+		Name:   fmt.Sprintf("%s.%s/%d", module, function, r.Arity),
-+		Kind:   protocol.SymbolKindFunction,
-+		Detail: r.Kind,
-+		URI:    uri.File(r.FilePath),
-+		Range:  lineRange(r.Line - 1),
-+		SelectionRange: protocol.Range{
-+			Start: s.outPosLine(defLine, r.Line-1, nameCol),
-+			End:   s.outPosLine(defLine, r.Line-1, nameCol+len(function)),
-+		},
-+		Data: newCallHierarchyData(module, function, r.Arity),
++		Name:           fmt.Sprintf("%s.%s/%d", module, function, r.Arity),
++		Kind:           protocol.SymbolKindFunction,
++		Detail:         r.Kind,
++		URI:            uri.File(r.FilePath),
++		Range:          s.pointRange(lines, decl.Start, decl.End),
++		SelectionRange: s.pointRange(lines, decl.NameStart, decl.NameEnd),
++		Data:           newCallHierarchyData(module, function, r.Arity),
++	}, true
++}
++
++// itemFiles are the files one request builds items in, each read and parsed
++// once.
++type itemFiles map[string]*itemFile
++
++type itemFile struct {
++	source *treesitter.Source
++	lines  []string
++}
++
++// get returns the parsed file at path, or nil when it cannot be read.
++func (files itemFiles) get(s *Server, path string) *itemFile {
++	if file, seen := files[path]; seen {
++		return file
++	}
++	var file *itemFile
++	if text, _, ok := s.readFileText(path); ok {
++		if source, ok := treesitter.ParseSyntax([]byte(text)); ok {
++			file = &itemFile{source: source, lines: strings.Split(text, "\n")}
++		}
++	}
++	files[path] = file
++	return file
++}
++
++func (files itemFiles) close() {
++	for _, file := range files {
++		if file != nil {
++			file.source.Close()
++		}
 +	}
 +}
 +
@@ -2695,25 +2739,41 @@ index 0000000..188f434
 +	if !found {
 +		return nil, nil
 +	}
++	// Calls are grouped by the function they reach. Its item is built once,
++	// from the first of its definition rows whose declaration is in source.
++	files := itemFiles{}
++	defer files.close()
 +	calls := []protocol.CallHierarchyOutgoingCall{}
 +	byTarget := map[string]int{}
 +	for n := range sites {
 +		site := &sites[n]
-+		i, seen := byTarget[site.to.Name]
++		name := fmt.Sprintf("%s.%s/%d", site.module, site.function, site.arity)
++		i, seen := byTarget[name]
 +		if !seen {
-+			i = len(calls)
-+			byTarget[site.to.Name] = i
-+			calls = append(calls, protocol.CallHierarchyOutgoingCall{To: site.to})
++			i = -1
++			for _, def := range site.defs {
++				if to, ok := s.definitionItem(files, site.module, site.function, def); ok {
++					i = len(calls)
++					calls = append(calls, protocol.CallHierarchyOutgoingCall{To: to})
++					break
++				}
++			}
++			byTarget[name] = i
 +		}
-+		calls[i].FromRanges = append(calls[i].FromRanges, site.from)
++		if i >= 0 {
++			calls[i].FromRanges = append(calls[i].FromRanges, site.from)
++		}
 +	}
 +	return calls, nil
 +}
 +
-+// outgoingSite is one resolved call: its target and where it is made.
++// outgoingSite is one resolved call: the function it reaches, that
++// function's definition rows, and where the call is made.
 +type outgoingSite struct {
-+	to   protocol.CallHierarchyItem
-+	from protocol.Range
++	module, function string
++	arity            int
++	defs             []store.LookupResult
++	from             protocol.Range
 +}
 +
 +// outgoingSites returns the resolved calls in the clauses of id in one file,
@@ -2742,8 +2802,8 @@ index 0000000..188f434
 +			if parser.IsElixirKeyword(occ.Name) {
 +				continue
 +			}
-+			if to, ok := s.callTarget(moduleOf(occ), occ, clauses[c].Module); ok {
-+				sites = append(sites, outgoingSite{to: to, from: s.nameRange(lines, occ)})
++			if module, defs := s.callTarget(moduleOf(occ), occ, clauses[c].Module); len(defs) > 0 {
++				sites = append(sites, outgoingSite{module: module, function: occ.Name, arity: defs[0].Arity, defs: defs, from: s.nameRange(lines, occ)})
 +			}
 +		}
 +	}
@@ -2768,34 +2828,35 @@ index 0000000..188f434
 +}
 +
 +// callTarget resolves one call occurrence, whose resolved module is module,
-+// to the item of the function the call reaches: a callable of the call's
-+// arity that the module defines, injects through use or generates, looked up
-+// as go-to-definition looks it up. A module that exists is not a function,
-+// and a delegate keeps its own identity. A remote call, __MODULE__.f()
-+// included, and an imported call reach only public functions. A bare name
-+// that no scope provides may still be a function the caller's own module
-+// generates.
-+func (s *Server) callTarget(module string, occ *treesitter.FunctionOccurrence, callerModule string) (protocol.CallHierarchyItem, bool) {
++// to the module and definition rows of the function the call reaches: a
++// callable of the call's arity that the module defines, injects through use or
++// generates, looked up as go-to-definition looks it up. A module that exists
++// is not a function, and a delegate keeps its own identity. A remote call,
++// __MODULE__.f() included, and an imported call reach only public functions.
++// A bare name that no scope provides may still be a function the caller's own
++// module generates.
++func (s *Server) callTarget(module string, occ *treesitter.FunctionOccurrence, callerModule string) (string, []store.LookupResult) {
 +	if module == "" {
 +		if occ.Qualifier != "" {
-+			return protocol.CallHierarchyItem{}, false
++			return "", nil
 +		}
 +		module = callerModule
 +	}
 +	external := occ.Qualifier != "" || module != callerModule
 +	locations, err := s.LookupName(module, occ.Name, NameLookupOptions{Kind: NameKindCallable, External: external, Arity: occ.Arity})
 +	if err != nil {
-+		return protocol.CallHierarchyItem{}, false
++		return "", nil
 +	}
++	var defs []store.LookupResult
 +	for _, l := range locations {
 +		// Given only a type or only private functions, the lookup keeps them
 +		// for navigation; the call reaches neither.
 +		if typeKinds[l.Kind] || external && privateKinds[l.Kind] {
 +			continue
 +		}
-+		return s.definitionItem(module, occ.Name, store.LookupResult{FilePath: l.FilePath, Line: l.Line, Kind: l.Kind, Arity: l.Arity}), true
++		defs = append(defs, store.LookupResult{FilePath: l.FilePath, Line: l.Line, Kind: l.Kind, Arity: l.Arity})
 +	}
-+	return protocol.CallHierarchyItem{}, false
++	return module, defs
 +}
 +
 +// nameRange is the protocol range of an occurrence's name token.
@@ -2931,6 +2992,253 @@ index 0000000..a13de5e
 +	bumpDirMtime(t, filepath.Join(server.projectRoot, "_build", "dev", "lib", "my_app", "ebin"))
 +
 +	prepareOne(t, server, "lib/my_app/store.ex:7:21", "MyApp.Store.lookup/1")
++}
+diff --git a/internal/lsp/call_hierarchy_ranges_test.go b/internal/lsp/call_hierarchy_ranges_test.go
+new file mode 100644
+index 0000000..191076c
+--- /dev/null
++++ b/internal/lsp/call_hierarchy_ranges_test.go
+@@ -0,0 +1,241 @@
++package lsp
++
++import (
++	"io/fs"
++	"os"
++	"path/filepath"
++	"sort"
++	"strings"
++	"testing"
++	"unicode/utf16"
++
++	"go.lsp.dev/protocol"
++	"go.lsp.dev/uri"
++)
++
++// rangesSources are the files TestCallHierarchyItemRanges adds to the
++// outgoing fixture, by path relative to the project root.
++var rangesSources = map[string]string{
++	"lib/shop/sizes.ex": `defmodule Shop.Sizes do
++  def größe(value), do: value
++  def measure(value), do: größe(value)
++end
++`,
++	// A def a quote injects through use, as Ecto.Repo injects insert/2.
++	"lib/shop/store_macro.ex": `defmodule Shop.StoreMacro do
++  defmacro __using__(opts) do
++    quote do
++      if unquote(opts)[:writable] do
++        def put(value), do: value
++      end
++    end
++  end
++end
++`,
++	"lib/shop/store.ex": `defmodule Shop.Store do
++  use Shop.StoreMacro, writable: true
++
++  def save(value), do: Shop.Store.put(value)
++end
++`,
++}
++
++// Every call-hierarchy item's range contains its selection range, and both
++// cover real source: the range is the declaration, the selection its name. A
++// generated function has no declaration of its own; its item keeps the
++// function's identity, is anchored at the module that generates it and
++// selects that module's name.
++func TestCallHierarchyItemRanges(t *testing.T) {
++	server := callHierarchyProject(t, "outgoing")
++	server.SetStdlibRoot(filepath.Join(server.projectRoot, "stdlib"))
++	indexAndCompile(t, server, "Shop.Repo", "lib/shop/repo.ex", "defmodule Shop.Repo do\n  use Shop.RepoMacro\nend\n",
++		beamExport{"delete!", 1}, beamExport{"insert!", 1}, beamExport{"one", 1})
++	bumpDirMtime(t, filepath.Join(server.projectRoot, "_build", "dev", "lib", "my_app", "ebin"))
++	sources := fixtureSources(t, "outgoing")
++	for rel, src := range rangesSources {
++		indexFile(t, server.store, server.projectRoot, rel, src)
++		sources[rel] = src
++	}
++
++	anchored := map[string]bool{}
++	for _, item := range hierarchyItems(
++		t, server,
++		"lib/shop/accounts.ex:3:6",  // deliver/1, multiline
++		"lib/shop/accounts.ex:9:6",  // update/2
++		"lib/shop/accounts.ex:19:6", // admit/3, bodiless default head
++		"lib/shop/accounts.ex:35:6", // handle/2, second clause
++		"lib/shop/accounts.ex:46:7", // save_and_clear/1, generated targets
++		"lib/shop/accounts.ex:5:10", // Repo.insert!, a generated function
++		"test/shop/accounts_test.exs:9:7",
++		"lib/shop/sizes.ex:2:28", // größe, a multibyte name
++		"lib/shop/store.ex:3:6",  // save/1, whose target put/1 is a quoted def
++	) {
++		if assertItemGeometry(t, server, sources, item) {
++			anchored[item.Name] = true
++		}
++		if item.Data != nil {
++			assertItemData(t, item)
++		}
++	}
++	// Shop.Repo generates these (its BEAM exports them); nothing else is.
++	want := []string{"Shop.Repo.delete!/1", "Shop.Repo.insert!/1", "Shop.Repo.one/1"}
++	if got := sortedKeys(anchored); strings.Join(got, " ") != strings.Join(want, " ") {
++		t.Errorf("anchored at their module: %v, want %v", got, want)
++	}
++
++	put := outgoing(t, server, prepareOne(t, server, "lib/shop/store.ex:3:6", "Shop.Store.save/1"))
++	if len(put) != 1 || put[0].To.Name != "Shop.Store.put/1" || spanText(put[0].To.SelectionRange) != "4:12-4:15" {
++		t.Errorf("save/1 outgoing = %v, want Shop.Store.put/1 selecting put in the quote at 4:12-4:15", outgoingRows(put))
++	}
++	storeURI := string(uri.File(filepath.Join(server.projectRoot, "lib", "shop", "store.ex")))
++	macroURI := uri.File(filepath.Join(server.projectRoot, "lib", "shop", "store_macro.ex"))
++	if locs := definitionAt(t, server, storeURI, 3, 35); len(locs) != 1 || locs[0].URI != macroURI || locs[0].Range.Start.Line != 4 {
++		t.Errorf("definition of Shop.Store.put = %v, want the quoted def at store_macro.ex line 4", locs)
++	}
++
++	deliver := prepareOne(t, server, "lib/shop/accounts.ex:3:6", "Shop.Accounts.deliver/1")
++	if got := spanText(deliver.Range); got != "3:2-7:5" {
++		t.Fatalf("deliver/1 range = %s, want its declaration 3:2-7:5", got)
++	}
++}
++
++// fixtureSources returns a call hierarchy fixture's files by path relative to
++// the project root, as callHierarchyProject copies them.
++func fixtureSources(t *testing.T, fixture string) map[string]string {
++	t.Helper()
++	sources := map[string]string{}
++	fixtures := os.DirFS(filepath.Join("testdata", "call_hierarchy", fixture))
++	err := fs.WalkDir(fixtures, ".", func(path string, d fs.DirEntry, err error) error {
++		if err != nil || d.IsDir() {
++			return err
++		}
++		content, err := fs.ReadFile(fixtures, path)
++		sources[path] = string(content)
++		return err
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	return sources
++}
++
++// hierarchyItems prepares at each position and returns every item: each
++// prepared item, its outgoing targets and its incoming callers.
++func hierarchyItems(t *testing.T, server *Server, positions ...string) []protocol.CallHierarchyItem {
++	t.Helper()
++	var items []protocol.CallHierarchyItem
++	for _, at := range positions {
++		prepared := prepareAt(t, server, at)
++		if len(prepared) == 0 {
++			t.Fatalf("prepare at %s = none", at)
++		}
++		for i := range prepared {
++			item := prepared[i]
++			items = append(items, item)
++			calls := outgoing(t, server, item)
++			for j := range calls {
++				items = append(items, calls[j].To)
++			}
++			callers := incoming(t, server, item)
++			for j := range callers {
++				items = append(items, callers[j].From)
++			}
++		}
++	}
++	return items
++}
++
++// assertItemGeometry checks one item and reports whether it is a generated
++// function anchored at its module.
++func assertItemGeometry(t *testing.T, server *Server, sources map[string]string, item protocol.CallHierarchyItem) (anchor bool) {
++	t.Helper()
++	r, sel := item.Range, item.SelectionRange
++	if !positionBefore(sel.Start, sel.End) {
++		t.Errorf("%s: selection %s is empty", item.Name, spanText(sel))
++	}
++	if positionBefore(sel.Start, r.Start) || positionBefore(r.End, sel.End) {
++		t.Errorf("%s: range %s does not contain selection %s", item.Name, spanText(r), spanText(sel))
++	}
++	rel, err := filepath.Rel(server.projectRoot, uriToPath(item.URI))
++	src, known := sources[filepath.ToSlash(rel)]
++	if err != nil || !known {
++		t.Errorf("%s: item in %s, a file the test did not write", item.Name, item.URI)
++		return false
++	}
++	lines := strings.Split(src, "\n")
++	selected, declared := rangeSource(lines, sel), rangeSource(lines, r)
++	if item.Data == nil {
++		// A test or setup block spans from its keyword and selects its label
++		// or keyword.
++		if !strings.HasPrefix(declared, item.Detail) || !strings.HasPrefix(selected, `"`) && selected != item.Detail {
++			t.Errorf("%s: range %s starts %q, selection %q, want the %s block and its label", item.Name, spanText(r), firstLine(declared), selected, item.Detail)
++		}
++		return false
++	}
++	if !strings.HasPrefix(declared, "def") {
++		t.Errorf("%s: range %s starts %q, want a declaration", item.Name, spanText(r), firstLine(declared))
++	}
++	id, _ := callHierarchyIdentity(item.Data)
++	if selected == id.function && !strings.HasPrefix(declared, "defmodule") {
++		return false
++	}
++	// A generated function: its module's declaration, selecting the module
++	// name as written there.
++	if strings.HasPrefix(declared, "defmodule "+selected+" ") && strings.HasSuffix("."+id.module, "."+selected) {
++		return true
++	}
++	t.Errorf("%s: range %s starts %q, selection %s is %q, want the function's declaration and name, or for a generated function its module's",
++		item.Name, spanText(r), firstLine(declared), spanText(sel), selected)
++	return false
++}
++
++func positionBefore(a, b protocol.Position) bool {
++	return a.Line < b.Line || a.Line == b.Line && a.Character < b.Character
++}
++
++// rangeSource is the source text a protocol range (UTF-16 columns) covers.
++func rangeSource(lines []string, r protocol.Range) string {
++	var b strings.Builder
++	for line := r.Start.Line; line <= r.End.Line && int(line) < len(lines); line++ {
++		text := lines[line]
++		start, end := 0, len(text)
++		if line == r.Start.Line {
++			start = utf16ToByte(text, r.Start.Character)
++		}
++		if line == r.End.Line {
++			end = utf16ToByte(text, r.End.Character)
++		}
++		if line > r.Start.Line {
++			b.WriteByte('\n')
++		}
++		if start < end {
++			b.WriteString(text[start:end])
++		}
++	}
++	return b.String()
++}
++
++func utf16ToByte(text string, character uint32) int {
++	units := uint32(0)
++	for i, r := range text {
++		if units >= character {
++			return i
++		}
++		units += uint32(len(utf16.Encode([]rune{r})))
++	}
++	return len(text)
++}
++
++func firstLine(text string) string {
++	line, _, _ := strings.Cut(text, "\n")
++	return line
++}
++
++func sortedKeys(set map[string]bool) []string {
++	keys := make([]string, 0, len(set))
++	for key := range set {
++		keys = append(keys, key)
++	}
++	sort.Strings(keys)
++	return keys
 +}
 diff --git a/internal/lsp/call_hierarchy_target_test.go b/internal/lsp/call_hierarchy_target_test.go
 new file mode 100644
@@ -3763,6 +4071,120 @@ index 0000000..4c84fc9
 +	innerF := prepareOne(t, server, "lib/importer.ex:4:8", "MyApp.Importer.Inner.f/2")
 +	assertRows(t, incomingRows(t, server, incoming(t, server, innerF)), nil)
 +}
+diff --git a/internal/lsp/definition_member_test.go b/internal/lsp/definition_member_test.go
+new file mode 100644
+index 0000000..eb2408a
+--- /dev/null
++++ b/internal/lsp/definition_member_test.go
+@@ -0,0 +1,108 @@
++package lsp
++
++import (
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"go.lsp.dev/uri"
++)
++
++// A name after a dot on a runtime value (schema.__schema__(:source),
++// label.size) is a field or a call whose target is not known statically: it is
++// not a variable, not a binding of itself, and not the receiver. Definition
++// there is empty on every character, even when a local function or variable
++// shares the receiver's or the member's name. The receiver itself, true local
++// variables and static qualified calls still navigate.
++func TestDefinitionRuntimeMember(t *testing.T) {
++	server, cleanup := setupTestServer(t)
++	defer cleanup()
++	indexFile(t, server.store, server.projectRoot, "lib/my_app/known.ex", "defmodule MyApp.Known do\n  def fetch(value), do: value\nend\n")
++	src := `defmodule MyApp.Member do
++  alias MyApp.Known
++
++  def schema, do: :local
++  def label, do: "x"
++
++  def source(schema, label) do
++    size = 1
++    total = label.size + size
++    table = schema.__schema__(:source)
++    again = schema.__schema__(:source)
++    Known.fetch("#{schema.__schema__(:prefix)}#{table}#{again}#{total}")
++    Known.fetch(__MODULE__.label())
++    total |> Known.fetch()
++    schema.meta.state
++  end
++
++  def other, do: schema
++end
++`
++	indexFile(t, server.store, server.projectRoot, "lib/my_app/member.ex", src)
++	docURI := string(uri.File(filepath.Join(server.projectRoot, "lib", "my_app", "member.ex")))
++	server.docs.seed(docURI, src)
++	lines := strings.Split(src, "\n")
++
++	// member returns the columns of a receiver's dot and member name on a line.
++	member := func(line int, receiver, name string) []uint32 {
++		start := strings.Index(lines[line], receiver+"."+name) + len(receiver)
++		var cols []uint32
++		for c := start; c < start+1+len(name); c++ {
++			cols = append(cols, uint32(c))
++		}
++		return cols
++	}
++	col := func(line int, needle string) uint32 { return uint32(strings.Index(lines[line], needle)) }
++
++	for _, tc := range []struct {
++		line int
++		cols []uint32
++	}{
++		{8, member(8, "label", "size")},
++		{9, member(9, "schema", "__schema__")},
++		{10, member(10, "schema", "__schema__")},
++		{11, member(11, "schema", "__schema__")},
++		{14, member(14, "schema", "meta")},
++		{14, member(14, "meta", "state")},
++	} {
++		for _, c := range tc.cols {
++			if locs := definitionAt(t, server, docURI, uint32(tc.line), c); len(locs) != 0 {
++				t.Errorf("definition at %d:%d (%q) = line %d, want none", tc.line, c, lines[tc.line][c:], locs[0].Range.Start.Line)
++			}
++		}
++	}
++
++	memberFile := uri.File(filepath.Join(server.projectRoot, "lib", "my_app", "member.ex"))
++	knownFile := uri.File(filepath.Join(server.projectRoot, "lib", "my_app", "known.ex"))
++	for _, tc := range []struct {
++		name     string
++		line     int
++		col      uint32
++		wantURI  uri.URI
++		wantLine uint32
++	}{
++		{"receiver label", 8, col(8, "label") + 2, memberFile, 6},
++		{"receiver schema", 9, col(9, "schema") + 3, memberFile, 6},
++		{"receiver schema in interpolation", 11, col(11, "schema") + 1, memberFile, 6},
++		{"local size", 8, col(8, "+ size") + 3, memberFile, 7},
++		{"local table in interpolation", 11, col(11, "{table") + 2, memberFile, 9},
++		{"static qualified call", 11, col(11, "fetch") + 2, knownFile, 1},
++		{"__MODULE__ call", 12, col(12, "label") + 2, memberFile, 4},
++		{"piped qualified call", 13, col(13, "fetch") + 1, knownFile, 1},
++		{"receiver of a field chain", 14, col(14, "schema") + 2, memberFile, 6},
++		{"bare zero-arity call, middle", 17, col(17, "schema") + 3, memberFile, 3},
++	} {
++		locs := definitionAt(t, server, docURI, uint32(tc.line), tc.col)
++		if len(locs) != 1 || locs[0].URI != tc.wantURI || locs[0].Range.Start.Line != tc.wantLine {
++			t.Errorf("%s: definition at %d:%d = %v, want %s line %d", tc.name, tc.line, tc.col, locs, filepath.Base(string(tc.wantURI)), tc.wantLine)
++		}
++	}
++
++	// The local variable size is not the field in label.size.
++	field := uint32(strings.Index(lines[8], ".size") + 1)
++	for _, loc := range referencesAt(t, server, docURI, 8, col(8, "+ size")+3) {
++		if loc.Range.Start.Line == 8 && loc.Range.Start.Character == field {
++			t.Errorf("references of local size include the field label.size at 8:%d", field)
++		}
++	}
++}
 diff --git a/internal/lsp/documents.go b/internal/lsp/documents.go
 index 8fec7ec..cf84736 100644
 --- a/internal/lsp/documents.go
@@ -4350,7 +4772,7 @@ index 51eabe6..02a7239 100644
  	// Generated items are labelled "name/arity" where the arity is the compiled
  	// macro arity minus the caller environment the compiler prepends. Asserting
 diff --git a/internal/lsp/elixir.go b/internal/lsp/elixir.go
-index 6e3f525..aa16c2c 100644
+index 6e3f525..c260575 100644
 --- a/internal/lsp/elixir.go
 +++ b/internal/lsp/elixir.go
 @@ -7,6 +7,7 @@ import (
@@ -4438,6 +4860,38 @@ index 6e3f525..aa16c2c 100644
  // InTypespec reports whether the given 0-based line sits inside a @type,
  // @typep, @opaque, @spec, @callback or @macrocallback declaration.
  func (tf *TokenizedFile) InTypespec(targetLine int) bool {
+@@ -513,6 +537,13 @@ func expressionAtCursorImpl(tokens []parser.Token, source []byte, lineStarts []i
+ 		lineStart = lineStarts[line]
+ 	}
+ 
++	// A lowercase segment before the cursor's makes the cursor a runtime
++	// value's field or call (user.name, schema.__schema__()), whose target is
++	// not known statically.
++	if lowercaseBefore(tokens, startIdx, cursorIdx) {
++		return CursorContext{}
++	}
++
+ 	var moduleParts []string
+ 	functionName := ""
+ 
+@@ -557,6 +588,17 @@ func expressionAtCursorImpl(tokens []parser.Token, source []byte, lineStarts []i
+ 	}
+ }
+ 
++// lowercaseBefore reports whether a chain segment from start up to, but not
++// including, cursor is a lowercase identifier.
++func lowercaseBefore(tokens []parser.Token, start, cursor int) bool {
++	for i := start; i < cursor; i += 2 {
++		if tokens[i].Kind == parser.TokIdent {
++			return true
++		}
++	}
++	return false
++}
++
+ // ExtractModuleAndFunction splits a dotted expression into module reference and optional function name.
+ // Uppercase-starting parts are module segments, the first lowercase part is the function.
+ // Returns ("Foo.Bar", "baz") for "Foo.Bar.baz", ("Foo.Bar.Baz", "") for "Foo.Bar.Baz",
 diff --git a/internal/lsp/formatter_test.go b/internal/lsp/formatter_test.go
 index 830e5bc..6d12e51 100644
 --- a/internal/lsp/formatter_test.go
@@ -5093,6 +5547,332 @@ index 75f825a..59d940b 100644
  
  	// Line 4 (0-based) is the one holding the accented characters.
  	line := strings.Split(nonASCIISource, "\n")[4]
+diff --git a/internal/lsp/quote_template_test.go b/internal/lsp/quote_template_test.go
+new file mode 100644
+index 0000000..4e55ea7
+--- /dev/null
++++ b/internal/lsp/quote_template_test.go
+@@ -0,0 +1,320 @@
++package lsp
++
++import (
++	"context"
++	"path/filepath"
++	"slices"
++	"strconv"
++	"strings"
++	"testing"
++
++	"go.lsp.dev/protocol"
++	"go.lsp.dev/uri"
++)
++
++// A behaviour module like Application declares a callback, offers an ordinary
++// function with the same name and arity, and injects a default through
++// `quote do @behaviour ...; def ... end`. None of those make the behaviour
++// module its own implementor; only modules that declare or use it are.
++const quoteRunnerSource = `defmodule MyApp.Runner do
++  @callback stop(term) :: term
++
++  defmacro __using__(_opts) do
++    quote location: :keep do
++      @behaviour MyApp.Runner
++
++      def stop(_state), do: :ok
++      def helper(value), do: value
++      defoverridable MyApp.Runner
++    end
++  end
++
++  def stop(app), do: {:stopped, app}
++end
++`
++
++const quoteSQLSource = `defmodule MyApp.SQL do
++  def query!(repo, sql, params \\ []), do: {repo, sql, params}
++
++  defmacro __before_compile__(_env) do
++    quote do
++      def query!(sql, params \\ []), do: MyApp.SQL.query!(__MODULE__, sql, params)
++    end
++  end
++end
++`
++
++func setupQuoteFixture(t *testing.T) *Server {
++	t.Helper()
++	server, cleanup := setupTestServer(t)
++	t.Cleanup(cleanup)
++	root := server.projectRoot
++	indexFile(t, server.store, root, "lib/my_app/runner.ex", quoteRunnerSource)
++	indexFile(t, server.store, root, "lib/my_app/sql.ex", quoteSQLSource)
++	indexFile(t, server.store, root, "lib/my_app/declared_runner.ex", `defmodule MyApp.DeclaredRunner do
++  @behaviour MyApp.Runner
++
++  def stop(_state), do: :declared
++end
++`)
++	indexFile(t, server.store, root, "lib/my_app/used_runner.ex", `defmodule MyApp.UsedRunner do
++  use MyApp.Runner
++
++  def stop(_state), do: :used
++end
++`)
++	indexFile(t, server.store, root, "lib/my_app/plain_runner.ex", `defmodule MyApp.PlainRunner do
++  use MyApp.Runner
++end
++`)
++	return server
++}
++
++func locationKeys(root string, locations []protocol.Location) []string {
++	keys := make([]string, 0, len(locations))
++	for _, loc := range locations {
++		rel, _ := filepath.Rel(root, loc.URI.Filename())
++		keys = append(keys, rel+":"+strconv.Itoa(int(loc.Range.Start.Line)+1))
++	}
++	slices.Sort(keys)
++	return keys
++}
++
++func definitionKeys(t *testing.T, server *Server, source string, line int, needle string) []string {
++	t.Helper()
++	path := filepath.Join(server.projectRoot, "lib", "my_app", "caller.ex")
++	callerURI := string(uri.File(path))
++	server.docs.seed(callerURI, source)
++	text := strings.Split(source, "\n")[line]
++	col := strings.Index(text, needle)
++	if col < 0 {
++		t.Fatalf("no %q on line %d: %q", needle, line, text)
++	}
++	return locationKeys(server.projectRoot, definitionAt(t, server, callerURI, uint32(line), uint32(col)))
++}
++
++func TestImplementationExcludesBehaviourModuleAndQuotedTemplate(t *testing.T) {
++	server := setupQuoteFixture(t)
++	runnerURI := string(uri.File(filepath.Join(server.projectRoot, "lib", "my_app", "runner.ex")))
++	server.docs.seed(runnerURI, quoteRunnerSource)
++
++	locations, err := server.Implementation(context.Background(), &protocol.ImplementationParams{
++		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
++			TextDocument: protocol.TextDocumentIdentifier{URI: protocol.DocumentURI(runnerURI)},
++			Position:     protocol.Position{Line: 1, Character: uint32(strings.Index("  @callback stop(term) :: term", "stop"))},
++		},
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	got := locationKeys(server.projectRoot, locations)
++	want := []string{"lib/my_app/declared_runner.ex:4", "lib/my_app/used_runner.ex:4"}
++	if !slices.Equal(got, want) {
++		t.Fatalf("Implementation = %v, want only declared/used implementors %v", got, want)
++	}
++}
++
++func TestQuotedBehaviourDoesNotMakeDefiningModuleAnImplementor(t *testing.T) {
++	server := setupQuoteFixture(t)
++	implementors, err := server.store.LookupBehaviourImplementors("MyApp.Runner")
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, impl := range implementors {
++		if impl.Module == "MyApp.Runner" {
++			t.Fatalf("quoted @behaviour filed MyApp.Runner as its own implementor: %v", implementors)
++		}
++	}
++}
++
++func TestQualifiedDefinitionSkipsQuotedTemplateOfSameArity(t *testing.T) {
++	server := setupQuoteFixture(t)
++	const caller = "MyApp.SQL.query!(MyApp.Repo, \"select 1\")\nMyApp.Runner.stop(:app)\n"
++	if got, want := definitionKeys(t, server, caller, 0, "query!"), []string{"lib/my_app/sql.ex:2"}; !slices.Equal(got, want) {
++		t.Errorf("SQL.query!/2 = %v, want real def only %v", got, want)
++	}
++	if got, want := definitionKeys(t, server, caller, 1, "stop"), []string{"lib/my_app/runner.ex:14"}; !slices.Equal(got, want) {
++		t.Errorf("Runner.stop/1 = %v, want ordinary API only %v", got, want)
++	}
++}
++
++func TestUseChainStillResolvesQuotedTemplate(t *testing.T) {
++	server := setupQuoteFixture(t)
++	const caller = "MyApp.PlainRunner.stop(:state)\nMyApp.PlainRunner.helper(1)\nMyApp.Runner.helper(1)\n"
++	if got, want := definitionKeys(t, server, caller, 0, "stop"), []string{"lib/my_app/runner.ex:8"}; !slices.Equal(got, want) {
++		t.Errorf("PlainRunner.stop/1 = %v, want injected template %v", got, want)
++	}
++	if got, want := definitionKeys(t, server, caller, 1, "helper"), []string{"lib/my_app/runner.ex:9"}; !slices.Equal(got, want) {
++		t.Errorf("PlainRunner.helper/1 = %v, want injected template %v", got, want)
++	}
++	// helper exists only in the quote, so the provider itself has no helper.
++	if got := definitionKeys(t, server, caller, 2, "helper"); len(got) != 0 {
++		t.Errorf("Runner.helper/1 = %v, want empty for a quote-only function", got)
++	}
++}
++
++func TestQualifiedDefinitionUnknownFunctionIsEmpty(t *testing.T) {
++	server := setupQuoteFixture(t)
++	indexAndCompile(t, server, "MyApp.GenRepo", "lib/my_app/gen_repo.ex",
++		"defmodule MyApp.GenRepo do\n  use SharedLib.Repo\nend\n", beamExport{"query!", 2})
++	bumpDirMtime(t, filepath.Join(server.projectRoot, "_build", "dev", "lib", "my_app", "ebin"))
++
++	const caller = "MyApp.PlainRunner.nonexistent_zz(1)\nMyApp.PlainRunner\nMyApp.GenRepo.query!(\"x\", [])\n" +
++		"MyApp.Runner.stop(:a, :b)\nMyApp.GenRepo.query!(\"x\", [], [])\n"
++	if got := definitionKeys(t, server, caller, 0, "nonexistent_zz"); len(got) != 0 {
++		t.Errorf("unknown qualified function = %v, want empty", got)
++	}
++	if got := definitionKeys(t, server, caller, 3, "stop"); len(got) != 0 {
++		t.Errorf("source function at unknown arity = %v, want empty", got)
++	}
++	if got := definitionKeys(t, server, caller, 4, "query!"); len(got) != 0 {
++		t.Errorf("generated export at unknown arity = %v, want empty", got)
++	}
++	if got, want := definitionKeys(t, server, caller, 1, "PlainRunner"), []string{"lib/my_app/plain_runner.ex:1"}; !slices.Equal(got, want) {
++		t.Errorf("module name = %v, want %v", got, want)
++	}
++	if got, want := definitionKeys(t, server, caller, 2, "query!"), []string{"lib/my_app/gen_repo.ex:1"}; !slices.Equal(got, want) {
++		t.Errorf("BEAM-verified generated export = %v, want module anchor %v", got, want)
++	}
++}
++
++// Ecto.Repo injects insert!/2 through `quote bind_quoted: ... do`. Omitting
++// quoted rows from the provider's index must keep that template as the target
++// of a consumer's call, for Definition and for outgoing calls, with a range
++// that contains the selected name.
++func TestQuotedProviderTargetKeptForConsumerCalls(t *testing.T) {
++	server, cleanup := setupTestServer(t)
++	t.Cleanup(cleanup)
++	root := server.projectRoot
++	indexFile(t, server.store, root, "lib/my_app/repo_base.ex", `defmodule MyApp.RepoBase do
++  defmacro __using__(opts) do
++    quote bind_quoted: [opts: opts] do
++      @otp_app opts[:otp_app]
++
++      def insert!(struct, opts \\ []) do
++        MyApp.RepoBase.Schema.insert!(__MODULE__, struct, opts)
++      end
++    end
++  end
++end
++`)
++	indexFile(t, server.store, root, "lib/my_app/repo.ex", `defmodule MyApp.Repo do
++  use MyApp.RepoBase, otp_app: :my_app
++end
++`)
++	const accounts = `defmodule MyApp.Accounts do
++  def save(user), do: MyApp.Repo.insert!(user)
++end
++`
++	indexFile(t, server.store, root, "lib/my_app/accounts.ex", accounts)
++	accountsURI := uri.File(filepath.Join(root, "lib", "my_app", "accounts.ex"))
++	server.docs.seed(string(accountsURI), accounts)
++
++	const want = "lib/my_app/repo_base.ex:6"
++	callLine := strings.Split(accounts, "\n")[1]
++	if got := locationKeys(root, definitionAt(t, server, string(accountsURI), 1, uint32(strings.Index(callLine, "insert!")))); !slices.Equal(got, []string{want}) {
++		t.Errorf("Definition MyApp.Repo.insert! = %v, want template %s", got, want)
++	}
++
++	items, err := server.PrepareCallHierarchy(context.Background(), &protocol.CallHierarchyPrepareParams{
++		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
++			TextDocument: protocol.TextDocumentIdentifier{URI: accountsURI},
++			Position:     protocol.Position{Line: 1, Character: 6},
++		},
++	})
++	if err != nil || len(items) != 1 {
++		t.Fatalf("prepare save/1 = %v, %v", items, err)
++	}
++	calls, err := server.OutgoingCalls(context.Background(), &protocol.CallHierarchyOutgoingCallsParams{Item: items[0]})
++	if err != nil {
++		t.Fatal(err)
++	}
++	var found bool
++	for _, call := range calls {
++		if !strings.Contains(call.To.Name, "insert!") {
++			continue
++		}
++		found = true
++		to := call.To
++		key := locationKeys(root, []protocol.Location{{URI: to.URI, Range: to.SelectionRange}})
++		if !slices.Equal(key, []string{want}) {
++			t.Errorf("outgoing insert! selection at %v, want %s", key, want)
++		}
++		sel, rng := to.SelectionRange, to.Range
++		const line = `      def insert!(struct, opts \\ []) do`
++		if name := line[sel.Start.Character:min(int(sel.End.Character), len(line))]; name != "insert!" {
++			t.Errorf("outgoing insert! selection text %q (%v), want insert!", name, sel)
++		}
++		if rng.Start.Line > sel.Start.Line || (rng.Start.Line == sel.Start.Line && rng.Start.Character > sel.Start.Character) ||
++			rng.End.Line < sel.End.Line || (rng.End.Line == sel.End.Line && rng.End.Character < sel.End.Character) {
++			t.Errorf("outgoing insert! range %v does not contain selection %v", rng, sel)
++		}
++	}
++	if !found {
++		t.Fatalf("outgoing calls from save/1 = %+v, want MyApp.Repo.insert!", calls)
++	}
++}
++
++// Plug.Router formats quote options across lines (`quote bind_quoted: [...]
++// do`), and small macros open the quote on their own head line (`defmacro
++// ..., do: quote do`). Both quote bodies are templates; the definitions after
++// them are real.
++func TestQuoteBlockFoundAcrossOptionLinesAndHeadLines(t *testing.T) {
++	server, cleanup := setupTestServer(t)
++	t.Cleanup(cleanup)
++	indexFile(t, server.store, server.projectRoot, "lib/my_app/router_base.ex", `defmodule MyApp.RouterBase do
++  defmacro __using__(opts) do
++    quote bind_quoted: [
++            opts: Keyword.merge(opts, [
++              plug: true
++            ])
++          ] do
++      def injected(conn, opts), do: {conn, opts}
++    end
++  end
++
++  def real(conn), do: conn
++end
++`)
++	indexFile(t, server.store, server.projectRoot, "lib/my_app/inline_base.ex", `defmodule MyApp.InlineBase do
++  defmacro __using__(_opts), do: quote do
++    def inline_injected, do: :ok
++  end
++
++  def inline_real, do: :ok
++
++  @ast quote do
++    def attr_injected, do: :ok
++  end
++
++  def attr_real, do: :ok
++
++  defp wrap(x), do: quote(do: unquote(x))
++  def after_quote(conn) do
++    conn
++  end
++end
++`)
++	const caller = "MyApp.RouterBase.injected(conn, [])\nMyApp.RouterBase.real(conn)\n" +
++		"MyApp.InlineBase.inline_injected()\nMyApp.InlineBase.inline_real()\n" +
++		"MyApp.InlineBase.attr_injected()\nMyApp.InlineBase.attr_real()\nMyApp.InlineBase.after_quote(conn)\n"
++	for _, tc := range []struct {
++		line   int
++		needle string
++		want   []string
++	}{
++		{0, "injected", nil},
++		{1, "real", []string{"lib/my_app/router_base.ex:12"}},
++		{2, "inline_injected", nil},
++		{3, "inline_real", []string{"lib/my_app/inline_base.ex:6"}},
++		{4, "attr_injected", nil},
++		{5, "attr_real", []string{"lib/my_app/inline_base.ex:12"}},
++		// A quote without a block must not claim the next statement's do.
++		{6, "after_quote", []string{"lib/my_app/inline_base.ex:15"}},
++	} {
++		got := definitionKeys(t, server, caller, tc.line, tc.needle)
++		if len(got) != len(tc.want) || (len(got) > 0 && !slices.Equal(got, tc.want)) {
++			t.Errorf("Definition %s = %v, want %v", strings.Split(caller, "\n")[tc.line], got, tc.want)
++		}
++	}
++}
 diff --git a/internal/lsp/rename_test.go b/internal/lsp/rename_test.go
 index a5874ec..b979c24 100644
 --- a/internal/lsp/rename_test.go
@@ -5801,7 +6581,7 @@ index a5874ec..b979c24 100644
  	edit := renameAt(t, server, defURI, 0, uint32(strings.Index(defContent, "ABTest")), "AbTest")
  	server.index.backgroundWork.Wait()
 diff --git a/internal/lsp/server.go b/internal/lsp/server.go
-index 0499a21..b7f48ba 100644
+index 0499a21..77c55d8 100644
 --- a/internal/lsp/server.go
 +++ b/internal/lsp/server.go
 @@ -274,7 +274,7 @@ func ServeStream(server *Server, rwc io.ReadWriteCloser) error {
@@ -5908,7 +6688,7 @@ index 0499a21..b7f48ba 100644
  			s.debugf("Definition: found %d result(s) via current file use chain for %s", len(results), functionName)
  			return storeResultsToLocations(byKindForContext(tf, lineNum, results)), nil
  		}
-@@ -1275,8 +1275,9 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1275,15 +1275,18 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  	s.debugf("Definition: qualified call resolved %q -> %q", moduleRef, fullModule)
  
  	if functionName != "" {
@@ -5918,16 +6698,21 @@ index 0499a21..b7f48ba 100644
 +		if cursor.inTypespec {
  			kind = NameKindType
  		}
++		// No module fallback: a module that exists does not prove the function
++		// does. Source, the use chain or a compiled export must know it.
  		results, err := s.LookupName(fullModule, functionName, NameLookupOptions{
-@@ -1284,6 +1285,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
- 			FollowDelegates:  s.followDelegates,
- 			External:         fullModule != extractEnclosingModuleFromTokens(tf.source, tf.tokens, lineNum),
- 			FallbackToModule: true,
-+			Arity:            cursor.arity,
+-			Kind:             kind,
+-			FollowDelegates:  s.followDelegates,
+-			External:         fullModule != extractEnclosingModuleFromTokens(tf.source, tf.tokens, lineNum),
+-			FallbackToModule: true,
++			Kind:            kind,
++			FollowDelegates: s.followDelegates,
++			External:        fullModule != extractEnclosingModuleFromTokens(tf.source, tf.tokens, lineNum),
++			Arity:           cursor.arity,
  		})
  		if err != nil {
  			return nil, nil
-@@ -2535,12 +2537,14 @@ func (s *Server) parseUsingFile(filePath, moduleName string) *usingCacheEntry {
+@@ -2535,12 +2538,14 @@ func (s *Server) parseUsingFile(filePath, moduleName string) *usingCacheEntry {
  
  // lookupThroughUseOf looks up functionName through the `use` declarations in
  // fullModule's source file. This handles qualified calls like M.func() where
@@ -5945,7 +6730,7 @@ index 0499a21..b7f48ba 100644
  	modResults, err := s.store.LookupModule(fullModule)
  	if err != nil || len(modResults) == 0 {
  		return nil
-@@ -2549,7 +2553,7 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
+@@ -2549,7 +2554,7 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
  	if !ok {
  		return nil
  	}
@@ -5954,7 +6739,7 @@ index 0499a21..b7f48ba 100644
  }
  
  // lookupThroughUse searches for functionName in definitions injected by `use`
-@@ -2557,15 +2561,15 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
+@@ -2557,15 +2562,15 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
  // priority over imported ones. Later `use` declarations shadow earlier ones.
  // Transitive use chains (use inside __using__ body) are followed recursively.
  func (s *Server) lookupThroughUse(text, functionName string, aliases map[string]string) []store.LookupResult {
@@ -5973,7 +6758,7 @@ index 0499a21..b7f48ba 100644
  			return result
  		}
  	}
-@@ -2577,7 +2581,7 @@ func (s *Server) lookupThroughUseWithFollow(text, functionName string, aliases m
+@@ -2577,7 +2582,7 @@ func (s *Server) lookupThroughUseWithFollow(text, functionName string, aliases m
  // consumerOpts are the keyword args from the `use Module, key: Val` call and
  // are used to resolve dynamic imports like `import unquote(mod)`.
  func (s *Server) lookupInUsingEntry(moduleName, functionName string, consumerOpts map[string]string, visited map[string]bool) []store.LookupResult {
@@ -5982,7 +6767,7 @@ index 0499a21..b7f48ba 100644
  }
  
  // bodyFor picks the injected body for a `use` call. An ordinary __using__ has a
-@@ -2607,13 +2611,12 @@ func usingVisitKey(moduleName, which string) string {
+@@ -2607,13 +2612,12 @@ func usingVisitKey(moduleName, which string) string {
  	return moduleName + "\x00" + which
  }
  
@@ -6002,7 +6787,7 @@ index 0499a21..b7f48ba 100644
  	visitKey := usingVisitKey(moduleName, which)
  	if visited[visitKey] {
  		return nil
-@@ -2630,23 +2633,20 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2630,23 +2634,20 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  	}
  
  	// Inline defs take priority: directly injected by the quote do block
@@ -6030,7 +6815,7 @@ index 0499a21..b7f48ba 100644
  		}
  		if err != nil || len(results) == 0 {
  			continue
-@@ -2665,19 +2665,23 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2665,19 +2666,23 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  		}
  		switch b.kind {
  		case "import":
@@ -6056,7 +6841,7 @@ index 0499a21..b7f48ba 100644
  				return result
  			}
  		}
-@@ -2686,7 +2690,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2686,7 +2691,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  	// Transitive uses: use Module inside the __using__ body (double-use chains)
  	for k := len(body.transCalls) - 1; k >= 0; k-- {
  		call := body.transCalls[k]
@@ -6065,7 +6850,7 @@ index 0499a21..b7f48ba 100644
  			return result
  		}
  	}
-@@ -2694,7 +2698,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2694,7 +2699,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  		if body.hasTransCall(body.transUses[k]) {
  			continue
  		}
@@ -6074,7 +6859,7 @@ index 0499a21..b7f48ba 100644
  			return result
  		}
  	}
-@@ -2703,15 +2707,12 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2703,15 +2708,12 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  }
  
  // resolveModuleViaUseChain returns the module name that provides functionName
@@ -6096,7 +6881,7 @@ index 0499a21..b7f48ba 100644
  	visitKey := usingVisitKey(moduleName, which)
  	if visited[visitKey] {
  		return ""
-@@ -2729,12 +2730,12 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2729,12 +2731,12 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  
  	// Functions defined directly in the quote do block belong to the module
  	// that injected them, not to any imported module.
@@ -6111,7 +6896,7 @@ index 0499a21..b7f48ba 100644
  			return body.imports[j]
  		}
  	}
-@@ -2749,11 +2750,11 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2749,11 +2751,11 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  		}
  		switch b.kind {
  		case "import":
@@ -6125,7 +6910,7 @@ index 0499a21..b7f48ba 100644
  				return m
  			}
  		}
-@@ -2761,7 +2762,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2761,7 +2763,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  
  	for k := len(body.transCalls) - 1; k >= 0; k-- {
  		call := body.transCalls[k]
@@ -6134,7 +6919,7 @@ index 0499a21..b7f48ba 100644
  			return mod
  		}
  	}
-@@ -2769,7 +2770,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2769,7 +2771,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  		if body.hasTransCall(body.transUses[k]) {
  			continue
  		}
@@ -6143,7 +6928,7 @@ index 0499a21..b7f48ba 100644
  			return mod
  		}
  	}
-@@ -3645,7 +3646,7 @@ func (s *Server) addCompletionsFromUsingFor(moduleName, which string, consumerOp
+@@ -3645,7 +3647,7 @@ func (s *Server) addCompletionsFromUsingFor(moduleName, which string, consumerOp
  // Mirrors the go-to-definition priority: current file modules → imports → use chains → Kernel.
  // Callers should pass pre-computed aliases to avoid redundant ExtractAliases scans.
  func (s *Server) resolveBareFunctionModule(filePath, text string, tf *TokenizedFile, lineNum int, functionName string, aliases map[string]string) string {
@@ -6152,7 +6937,7 @@ index 0499a21..b7f48ba 100644
  	return module
  }
  
-@@ -3654,21 +3655,30 @@ func (s *Server) resolveBareFunctionModule(filePath, text string, tf *TokenizedF
+@@ -3654,21 +3656,30 @@ func (s *Server) resolveBareFunctionModule(filePath, text string, tf *TokenizedF
  // distinguish a consumer override from a function supplied by its use chain:
  // both resolve to the consumer module, but only the latter should expand across
  // other consumers of the injector.
@@ -6191,7 +6976,7 @@ index 0499a21..b7f48ba 100644
  			return mod, false
  		}
  	}
-@@ -3678,20 +3688,20 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
+@@ -3678,20 +3689,20 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
  	useCalls := tf.ExtractUsesWithOpts(aliases)
  	for i := len(useCalls) - 1; i >= 0; i-- {
  		uc := useCalls[i]
@@ -6215,7 +7000,7 @@ index 0499a21..b7f48ba 100644
  			return mod, false
  		}
  	}
-@@ -3699,6 +3709,21 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
+@@ -3699,6 +3710,21 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
  	return "", false
  }
  
@@ -6237,7 +7022,7 @@ index 0499a21..b7f48ba 100644
  func resolveModule(moduleRef string, aliases map[string]string) string {
  	if resolved, ok := aliases[moduleRef]; ok {
  		return resolved
-@@ -5054,38 +5079,33 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
+@@ -5054,38 +5080,33 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
  			return nil, nil
  		}
  
@@ -6287,7 +7072,7 @@ index 0499a21..b7f48ba 100644
  			return s.hoverFromFile(functionName, results[0])
  		}
  
-@@ -5114,15 +5134,8 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
+@@ -5114,15 +5135,8 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
  	fullModule := s.resolveModuleWithNesting(moduleRef, aliases, uriToPath(protocol.DocumentURI(docURI)), lineNum)
  
  	if functionName != "" {
@@ -6305,6 +7090,20 @@ index 0499a21..b7f48ba 100644
  			return s.hoverFromFile(functionName, hits[0])
  		}
  		// Nothing in the index: the function may exist only in the compiled module.
+@@ -5186,10 +5200,9 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
+ 	}
+ 	callbackArity := callbacks[0].Arity
+ 
+-	// Always include the current module as a candidate — handles the common pattern
+-	// where @callback and def live in the same module. LookupFunctionInModules will
+-	// simply return nothing for it if no matching def exists.
+-	modules := []string{currentModule}
++	// A same-name function in the behaviour module itself is its own API, not
++	// an implementation; only modules that declare or use the behaviour count.
++	var modules []string
+ 	implementors, err := s.store.LookupBehaviourImplementors(currentModule)
+ 	if err == nil {
+ 		for _, impl := range implementors {
 @@ -5420,6 +5433,8 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  	// below. They carry the bare type uses (`@type t :: schema | embedded`)
  	// that the call-shaped scan cannot see.
@@ -9381,6 +10180,99 @@ index 6ba6441..320c8c0 100644
  	}
  }
  
+diff --git a/internal/parser/parser_tokenized.go b/internal/parser/parser_tokenized.go
+index efaffbf..f7ef394 100644
+--- a/internal/parser/parser_tokenized.go
++++ b/internal/parser/parser_tokenized.go
+@@ -18,6 +18,11 @@ func parseTextFromTokens(path string, source []byte, tokens, interp []Token) ([]
+ 
+ 	var moduleStack []moduleFrame
+ 	depth := 0
++	// quoteDepth is the depth of the open outermost `quote ... do` block, 0
++	// outside one. Code there is a template for the module that expands it.
++	// quoteDo is the index of the `do` that opens the next quote block.
++	quoteDepth := 0
++	quoteDo := -1
+ 	aliases := map[string]string{}
+ 	injectors := map[string]bool{}
+ 
+@@ -50,6 +55,21 @@ func parseTextFromTokens(path string, source []byte, tokens, interp []Token) ([]
+ 		return ""
+ 	}
+ 
++	// trackQuote updates the quote state for the token at j, after depth has
++	// been tracked for it. Both token paths call it. A bare `quote` finds its
++	// block's `do` past options that may span lines; that `do` opens the block.
++	trackQuote := func(j int) {
++		switch {
++		case quoteDepth > 0:
++		case tokens[j].Kind == TokIdent && tokenText(tokens[j]) == "quote" && (j == 0 || tokens[j-1].Kind != TokDot):
++			if doIdx, _, ok := ScanForwardToMacroCallBlockDo(tokens, n, j+1); ok {
++				quoteDo = doIdx
++			}
++		case j == quoteDo:
++			quoteDepth, quoteDo = depth, -1
++		}
++	}
++
+ 	// processModuleDef handles defmodule/defprotocol/defimpl.
+ 	// It collects the module name, scans forward to consume the TokDo token,
+ 	// increments depth, and pushes the module frame with the post-increment depth.
+@@ -218,7 +238,11 @@ func parseTextFromTokens(path string, source []byte, tokens, interp []Token) ([]
+ 					aliases = frame.savedAliases
+ 					injectors = frame.savedInjectors
+ 				}
++				if prevDepth == quoteDepth {
++					quoteDepth = 0
++				}
+ 			}
++			trackQuote(j)
+ 		}
+ 	}
+ 
+@@ -254,11 +278,15 @@ func parseTextFromTokens(path string, source []byte, tokens, interp []Token) ([]
+ 				aliases = frame.savedAliases
+ 				injectors = frame.savedInjectors
+ 			}
++			if prevDepth == quoteDepth {
++				quoteDepth = 0
++			}
+ 			i++
+ 			continue
+ 
+ 		case TokDo, TokFn:
+ 			TrackBlockDepth(tok.Kind, &depth)
++			trackQuote(i)
+ 			i++
+ 			continue
+ 
+@@ -283,6 +311,9 @@ func parseTextFromTokens(path string, source []byte, tokens, interp []Token) ([]
+ 				i++
+ 				continue
+ 			}
++			if quoteDepth > 0 {
++				goto extractRefsForLine
++			}
+ 			kind := tokenText(tok)
+ 			defLine := tok.Line
+ 			declarationIdx := i
+@@ -502,7 +533,7 @@ func parseTextFromTokens(path string, source []byte, tokens, interp []Token) ([]
+ 
+ 		case TokAttrBehaviour:
+ 			cm := currentModule()
+-			if cm != "" {
++			if cm != "" && quoteDepth == 0 {
+ 				attrLine := tok.Line
+ 				i++
+ 				j := nextSig(i)
+@@ -636,6 +667,7 @@ func parseTextFromTokens(path string, source []byte, tokens, interp []Token) ([]
+ 			continue
+ 
+ 		case TokIdent:
++			trackQuote(i)
+ 			cm := currentModule()
+ 			if cm != "" && len(injectors) > 0 {
+ 				isStatementStart := i == 0 || tokens[i-1].Kind == TokEOL || tokens[i-1].Kind == TokComment
 diff --git a/internal/store/store.go b/internal/store/store.go
 index ac6c873..c437398 100644
 --- a/internal/store/store.go
@@ -10080,10 +10972,10 @@ index 0000000..11840a6
 +}
 diff --git a/internal/treesitter/owners.go b/internal/treesitter/owners.go
 new file mode 100644
-index 0000000..6f30595
+index 0000000..6878336
 --- /dev/null
 +++ b/internal/treesitter/owners.go
-@@ -0,0 +1,297 @@
+@@ -0,0 +1,379 @@
 +package treesitter
 +
 +import (
@@ -10205,6 +11097,88 @@ index 0000000..6f30595
 +	}
 +	walk(s.root)
 +	return clauses
++}
++
++// declarationKeywords are the calls an index row for a function points at.
++var declarationKeywords = map[string]bool{
++	"def": true, "defp": true, "defmacro": true, "defmacrop": true,
++	"defguard": true, "defguardp": true, "defdelegate": true,
++}
++
++// ParseSyntax parses src for declaration geometry only. Unlike ParseSource it
++// keeps a tree recovered from a syntax error: a declaration's span is still
++// its own.
++func ParseSyntax(src []byte) (*Source, bool) {
++	root, cleanup := parseElixir(src)
++	if root == nil {
++		return nil, false
++	}
++	return &Source{root: root, src: src, cleanup: cleanup}, true
++}
++
++// Declaration returns the declaration an index row on row points at: the
++// def-family call starting there that defines name, with the span of its
++// name, or else the defmodule call starting there, with the span of its module
++// name. Keyword says which; Module and Arity are not set. It reads syntax only,
++// as the index does, so a def in a quote counts.
++func (s *Source) Declaration(row uint, name string) (Owner, bool) {
++	var def, module Owner
++	var walk func(n *tree_sitter.Node) bool
++	walk = func(n *tree_sitter.Node) bool {
++		if n.StartPosition().Row > row || n.EndPosition().Row < row {
++			return false
++		}
++		if n.Kind() == "call" && n.StartPosition().Row == row {
++			var ok bool
++			if def, ok = s.functionDeclaration(n, name); ok {
++				return true
++			}
++			if module.Keyword == "" {
++				module, _ = s.moduleDeclaration(n)
++			}
++		}
++		for i := uint(0); i < n.NamedChildCount(); i++ {
++			if walk(n.NamedChild(i)) {
++				return true
++			}
++		}
++		return false
++	}
++	if walk(s.root) {
++		return def, true
++	}
++	return module, module.Keyword != ""
++}
++
++// functionDeclaration returns call as the def-family declaration of name.
++func (s *Source) functionDeclaration(call *tree_sitter.Node, name string) (Owner, bool) {
++	keyword := bareCallName(call, s.src)
++	if !declarationKeywords[keyword] {
++		return Owner{}, false
++	}
++	head := s.headName(call)
++	if head == nil || head.Utf8Text(s.src) != name {
++		return Owner{}, false
++	}
++	return Owner{
++		Keyword: keyword, Name: name, Start: call.StartPosition(), End: call.EndPosition(),
++		NameStart: head.StartPosition(), NameEnd: head.EndPosition(),
++	}, true
++}
++
++// moduleDeclaration returns call as a defmodule declaration named by an alias.
++func (s *Source) moduleDeclaration(call *tree_sitter.Node) (Owner, bool) {
++	if bareCallName(call, s.src) != "defmodule" {
++		return Owner{}, false
++	}
++	alias := firstArgument(call)
++	if alias == nil || alias.Kind() != "alias" {
++		return Owner{}, false
++	}
++	return Owner{
++		Keyword: "defmodule", Name: alias.Utf8Text(s.src), Start: call.StartPosition(), End: call.EndPosition(),
++		NameStart: alias.StartPosition(), NameEnd: alias.EndPosition(),
++	}, true
 +}
 +
 +// Calls returns the call occurrences inside a clause, in source order: its
@@ -10382,15 +11356,32 @@ index 0000000..6f30595
 +	return nil
 +}
 diff --git a/internal/treesitter/variables.go b/internal/treesitter/variables.go
-index c00de05..7ab576c 100644
+index c00de05..885e449 100644
 --- a/internal/treesitter/variables.go
 +++ b/internal/treesitter/variables.go
-@@ -256,6 +256,11 @@ func isFunctionNameInCall(node *tree_sitter.Node, src []byte) bool {
+@@ -194,7 +194,10 @@ func resolveVariableScope(root *tree_sitter.Node, src []byte, line, col uint) *r
+ 	// This ensures bare function calls fall through to function reference lookup.
+ 	// Exception: if the cursor is on an assignment target (LHS of =), it is
+ 	// unambiguously a variable binding regardless of other occurrences.
+-	if !isAssignmentTarget(cursorNode, src) && !variableDefinedInScope(scope, src, varName, line, col) {
++	// The cursor's own token is excluded by its start, wherever in it the
++	// cursor sits.
++	start := cursorNode.StartPosition()
++	if !isAssignmentTarget(cursorNode, src) && !variableDefinedInScope(scope, src, varName, start.Row, start.Column) {
+ 		return nil
+ 	}
+ 
+@@ -256,6 +259,16 @@ func isFunctionNameInCall(node *tree_sitter.Node, src []byte) bool {
  		return false
  	}
  
 +	// `&name/2` and `value |> name` call a function without a call node.
 +	if _, ok := captureArity(node, src); ok || isPipeTarget(node, src) {
++		return true
++	}
++
++	// `user.name` and `schema.__schema__()`: a field or remote call name.
++	if parent.Kind() == "dot" && sameNode(parent.ChildByFieldName("right"), node) {
 +		return true
 +	}
 +

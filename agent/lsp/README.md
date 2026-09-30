@@ -3,7 +3,8 @@
 Coding sessions get one **Dexter** language server per worktree: a single Go
 binary built from the pinned upstream revision plus one local patch. Claude uses
 it through Claude Code's native LSP tool. Codex calls the same binary's `query`
-command. Both attach to the same per-worktree daemon and the same handlers.
+command. Both attach to the same per-worktree daemon and use the same handlers,
+but native clients can filter the results they display (see below).
 There is no adapter, MCP server, editor process or second index.
 
 This is a read-only beta. Rename and other edits are not offered.
@@ -79,8 +80,8 @@ the index under `.dexter/`.
 
 ## Operations
 
-Positions are 1-based line and character (UTF-16). Results carry Dexter's
-native LSP JSON, whose ranges are 0-based.
+Positions are 1-based line and character (UTF-16). The bound CLI returns Dexter's
+raw LSP JSON, whose ranges are 0-based. Claude displays its own formatted results.
 
 | Claude native LSP | Codex `"$TIPS_DEXTER" query …` |
 |---|---|
@@ -101,6 +102,20 @@ sources; a file from another checkout is refused with `does not belong to
 workspace`. The stock `lookup` and `references <module>` name searches are
 unchanged.
 
+### Claude native dependency navigation
+
+Claude Code 2.1.285 filters Git-ignored locations from native `goToDefinition`,
+`goToImplementation`, `findReferences` and `workspaceSymbol` results. This can
+hide dependency sources under `deps/` even when Dexter returns them correctly.
+Hover, document symbols and call hierarchy do not use that client filter. The nine operations
+therefore do not have identical displayed results across native and CLI clients.
+
+For ignored dependency locations, use the existing bound CLI `definition`,
+`implementation`, `references` or `workspace-symbols` operation in the same
+worktree, for example `"$TIPS_DEXTER" query definition lib/example.ex 12 8`.
+Do not change `.gitignore`, rewrite result URIs or start another language server.
+A native “No definition found” message is not proof of an indexing failure.
+
 ## Limits
 
 - Freshness is not strict. The daemon watches saved files, but an empty answer
@@ -111,6 +126,12 @@ unchanged.
   (`Edit`, `mix format`, generators, shell rewrites) by size and mtime.
   Save before navigating; unsaved editor buffers are not supported.
   One writer per worktree.
+- Call hierarchy selects one callable identity, `Module.function/arity`. A
+  definition with default arguments prepares its maximum arity; prepare at a
+  lower-arity call to inspect that callable's incoming calls. The hierarchy
+  follows written source calls, not generated runtime wrapper edges.
+  References at a default-argument head may cover multiple arities: compare
+  them with incoming calls only at the same selected arity.
 - Call hierarchy answers are standard LSP items and carry no reasons: a call
   the resolver cannot own is omitted without a completeness indicator. When
   completeness matters, cross-check
@@ -128,6 +149,13 @@ unchanged.
     (`fun.()`), field access, operators and language forms (`if`, `case`).
   Text that moved since the index was built is re-checked and dropped when the
   occurrence no longer matches.
+- A known generated export can resolve to its module declaration when its
+  function source location cannot be resolved. This is a module anchor, not the function
+  body. Hierarchy items retain the callable identity and select the real module
+  token within its declaration. Dexter does not reconstruct arbitrary
+  compile-time macro expansion.
+- Implementation lookup is callback-based; this beta does not provide general
+  `defprotocol`/`defimpl` traversal.
 - Diagnostics are syntax only; use Mix compile, Credo and tests for the rest.
 - Rename, code actions and formatting through Dexter are not offered.
 - Correctness is bounded by the patch's recorded cases; see
