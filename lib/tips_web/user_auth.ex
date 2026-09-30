@@ -262,7 +262,7 @@ defmodule TipsWeb.UserAuth do
   end
 
   # The root and the editor routes of the frontend design; ids are positive integers.
-  @return_to ~r"\A/(editor/(tips/new|tips/[1-9]\d{0,17}/edit|tips/[1-9]\d{0,17}/reviews/new|reviews/[1-9]\d{0,17}/edit))?\z"
+  @return_to ~r"\A/(editor/(tips/new|tips/[1-9]\d*/edit|tips/[1-9]\d*/reviews/new|reviews/[1-9]\d*/edit))?\z"
 
   @doc """
   Returns `path` if it is an allowed local return destination, otherwise `nil`.

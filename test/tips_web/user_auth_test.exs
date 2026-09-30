@@ -27,7 +27,10 @@ defmodule TipsWeb.UserAuthTest do
             "/editor/tips/new",
             "/editor/tips/42/edit",
             "/editor/tips/7/reviews/new",
-            "/editor/reviews/9/edit"
+            "/editor/reviews/9/edit",
+            "/editor/tips/9223372036854775807/edit",
+            "/editor/tips/9223372036854775807/reviews/new",
+            "/editor/reviews/9223372036854775807/edit"
           ] do
         assert UserAuth.allowed_return_to(path) == path
       end
