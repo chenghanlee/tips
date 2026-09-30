@@ -40,8 +40,7 @@ pin plus patch. By behaviour, with the test files that hold them:
 - Arity-aware navigation: `internal/lsp/arity_integration_test.go`
   (`TestArity_InversionMatrix` is the matrix), `internal/lsp/hover_test.go`,
   `internal/treesitter/arity_test.go`.
-- References through imports and local types:
-  `internal/lsp/import_references_local_types_test.go`.
+- References through imports: `internal/lsp/import_references_test.go`.
 - Call hierarchy owners and sites: `internal/lsp/call_hierarchy_test.go`
   (`TestCallHierarchyIncomingOwners` and `TestCallHierarchyOutgoing` are the
   fixtures' matrices), `internal/lsp/call_hierarchy_generated_arity_test.go`.

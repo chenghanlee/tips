@@ -114,7 +114,7 @@ unchanged.
   reference with no matching range by hand: it may be a call the hierarchy
   left out, or a reference the heuristic over-counted (injected defs). A
   function reached only through a `use` chain with no indexed row can be
-  missing from both. Parent-name resolution stays Dexter's heuristic.
+  missing from both.
   Omitted on purpose:
   - incoming: calls in typespecs, quote bodies and defs inside `quote`, files
     that do not parse cleanly, top-level and module-body calls, test labels
