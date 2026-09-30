@@ -88,6 +88,30 @@ defmodule TipsWeb.UserLive.RegistrationTest do
     end
   end
 
+  describe "initial connection" do
+    test "the form is disabled with connecting feedback until the socket connects",
+         %{conn: conn} do
+      # Disconnected render: nothing typed before the first join can be overwritten by it.
+      dead = conn |> get(~p"/users/register") |> html_response(200) |> LazyHTML.from_document()
+
+      for selector <- ["#user_handle", "#user_email", "button[type=submit]"] do
+        assert dead
+               |> LazyHTML.query("#registration_form fieldset[disabled] #{selector}")
+               |> Enum.count() == 1,
+               "#{selector} is not inside the disabled fieldset"
+      end
+
+      assert dead |> LazyHTML.query("#registration-connecting") |> LazyHTML.text() =~ "Connecting"
+
+      # Connected render: the same fields are enabled and the feedback is gone.
+      {:ok, lv, _html} = live(conn, ~p"/users/register")
+
+      assert has_element?(lv, "#registration_form fieldset #user_handle")
+      refute has_element?(lv, "#registration_form fieldset[disabled]")
+      refute has_element?(lv, "#registration-connecting")
+    end
+  end
+
   describe "handle suggestion" do
     test "editing or clearing a suggestion survives validation and recovery", %{conn: conn} do
       {:ok, lv, _html} = live(conn, ~p"/users/register")

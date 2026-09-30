@@ -29,33 +29,44 @@ defmodule TipsWeb.UserLive.Registration do
           phx-change="validate"
           class="space-y-4"
         >
-          <UI.field
-            field={@form[:handle]}
-            label="Handle"
-            autocomplete="nickname"
-            spellcheck="false"
-            helper="Your public name. You can keep this suggestion or choose another; it can't be changed after you sign up."
-          />
-          <UI.field
-            field={@form[:email]}
-            type="email"
-            label="Email"
-            autocomplete="username"
-            spellcheck="false"
-            phx-mounted={JS.focus()}
-          />
+          <%!-- Disabled until the first join, which would overwrite anything typed earlier. --%>
+          <fieldset disabled={!@connected} class="space-y-4">
+            <UI.field
+              field={@form[:handle]}
+              label="Handle"
+              autocomplete="nickname"
+              spellcheck="false"
+              helper="Your public name. You can keep this suggestion or choose another; it can't be changed after you sign up."
+            />
+            <UI.field
+              field={@form[:email]}
+              type="email"
+              label="Email"
+              autocomplete="username"
+              spellcheck="false"
+              phx-mounted={JS.focus()}
+            />
 
-          <UI.notice :if={@email_registered} id="email-registered" role="status">
-            This email is already registered. <.link
-              navigate={@log_in_path}
-              class="font-semibold underline"
-              phx-no-format
-            >Sign in</.link> instead.
-          </UI.notice>
+            <UI.notice :if={@email_registered} id="email-registered" role="status">
+              This email is already registered. <.link
+                navigate={@log_in_path}
+                class="font-semibold underline"
+                phx-no-format
+              >Sign in</.link> instead.
+            </UI.notice>
 
-          <UI.button size="lg" class="w-full" phx-disable-with="Creating account...">
-            Create an account
-          </UI.button>
+            <UI.button type="submit" size="lg" class="w-full" phx-disable-with="Creating account...">
+              Create an account
+            </UI.button>
+          </fieldset>
+          <p
+            :if={!@connected}
+            id="registration-connecting"
+            role="status"
+            class="text-center text-sm text-muted-foreground"
+          >
+            Connecting…
+          </p>
         </.form>
       </div>
     </Layouts.app>
@@ -82,6 +93,7 @@ defmodule TipsWeb.UserLive.Registration do
       socket
       |> assign(
         page_title: "Register",
+        connected: connected?(socket),
         return_to: return_to,
         log_in_path: with_return_to(~p"/users/log-in", return_to),
         client_ip: ClientIdentity.from_socket(socket),
