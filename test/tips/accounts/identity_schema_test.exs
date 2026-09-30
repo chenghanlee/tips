@@ -229,7 +229,7 @@ defmodule Tips.Accounts.IdentitySchemaTest do
         user = insert_user()
         fresh = Accounts.generate_user_session_token(user)
         expired = Accounts.generate_user_session_token(user)
-        offset_user_token(expired, -(14 * 24 + 1), :hour)
+        offset_user_token(expired, -(60 * 24 + 1), :hour)
 
         assert {%{id: id}, _inserted_at} = Accounts.get_user_by_session_token(fresh)
         assert id == user.id

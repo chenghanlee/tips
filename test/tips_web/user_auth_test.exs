@@ -507,7 +507,7 @@ defmodule TipsWeb.UserAuthTest do
 
   defp delete_account(user) do
     Repo.update_all(from(u in Accounts.User, where: u.id == ^user.id),
-      set: [deleted_at: DateTime.utc_now(:second)]
+      set: [deleted_at: DateTime.utc_now(:second), handle: nil, email: nil]
     )
   end
 

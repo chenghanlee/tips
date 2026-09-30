@@ -301,12 +301,97 @@ defmodule Tips.Accounts do
   ## Session
 
   @doc """
-  Generates a session token.
+  Generates a session token after genuine authentication.
+
+  The token records the current time as `authenticated_at`. Without a
+  predecessor it starts a new session family. Given the browser's current
+  session token, it keeps that token's family when the token is a valid
+  session of the same account, and starts a new family otherwise. Background
+  renewal must use `renew_user_session_token/2` instead.
   """
-  def generate_user_session_token(user) do
-    {token, user_token} = UserToken.build_session_token(user)
+  def generate_user_session_token(user, predecessor_token \\ nil)
+
+  def generate_user_session_token(%User{id: user_id}, nil) do
+    insert_session_token!(user_id, Ecto.UUID.generate(), DateTime.utc_now(:second))
+  end
+
+  def generate_user_session_token(%User{id: user_id}, predecessor_token) do
+    {:ok, token} =
+      Repo.transact(fn ->
+        family =
+          case lock_valid_predecessor(user_id, predecessor_token) do
+            %UserToken{session_family_id: family} -> family
+            nil -> Ecto.UUID.generate()
+          end
+
+        {:ok, insert_session_token!(user_id, family, DateTime.utc_now(:second))}
+      end)
+
+    token
+  end
+
+  @doc """
+  Renews a session from its predecessor token without authenticating again.
+
+  Locks the account, then requires the predecessor to be an unexpired session
+  of the same, non-deleted account. The successor copies the predecessor's
+  family and `authenticated_at` from the database; the predecessor stays valid
+  until it expires. Returns `{:error, :unauthenticated}` and creates nothing
+  otherwise.
+  """
+  @spec renew_user_session_token(User.t(), binary()) ::
+          {:ok, binary()} | {:error, :unauthenticated}
+  def renew_user_session_token(%User{id: user_id}, predecessor_token) do
+    Repo.transact(fn ->
+      case lock_valid_predecessor(user_id, predecessor_token) do
+        %UserToken{session_family_id: family, authenticated_at: authenticated_at} ->
+          {:ok, insert_session_token!(user_id, family, authenticated_at)}
+
+        nil ->
+          {:error, :unauthenticated}
+      end
+    end)
+  end
+
+  # Account lock first, then the predecessor under the shared validity definition.
+  defp lock_valid_predecessor(user_id, token) do
+    account =
+      from(u in User,
+        where: u.id == ^user_id and is_nil(u.deleted_at),
+        lock: "FOR NO KEY UPDATE",
+        select: u.id
+      )
+
+    if Repo.one(account) do
+      Repo.one(
+        from(t in UserToken.valid_session_token_query(token), where: t.user_id == ^user_id)
+      )
+    end
+  end
+
+  defp insert_session_token!(user_id, family, authenticated_at) do
+    {token, user_token} = UserToken.build_session_token(user_id, family, authenticated_at)
     Repo.insert!(user_token)
     token
+  end
+
+  @doc """
+  Deletes up to `limit` expired tokens, oldest first, and returns the count.
+
+  Expiry uses each context's validity, so pruning an expired session never
+  touches younger sessions of the same family.
+  """
+  @spec prune_expired_user_tokens(pos_integer()) :: non_neg_integer()
+  def prune_expired_user_tokens(limit \\ 1000) when is_integer(limit) and limit > 0 do
+    expired =
+      from(t in UserToken.expired_tokens_query(),
+        order_by: [asc: t.inserted_at, asc: t.id],
+        limit: ^limit,
+        select: t.id
+      )
+
+    {count, _} = Repo.delete_all(from(t in UserToken, where: t.id in subquery(expired)))
+    count
   end
 
   @doc """

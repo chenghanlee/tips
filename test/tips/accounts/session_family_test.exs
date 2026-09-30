@@ -72,7 +72,11 @@ defmodule Tips.Accounts.SessionFamilyTest do
     test "a full ban does not reject renewal" do
       user = user_fixture()
       predecessor = Accounts.generate_user_session_token(user)
-      Repo.update_all(from(u in User, where: u.id == ^user.id), set: [ban: :full])
+      banned_at = DateTime.utc_now(:second)
+
+      Repo.update_all(from(u in User, where: u.id == ^user.id),
+        set: [ban: :full, banned_at: banned_at]
+      )
 
       assert {:ok, _token} = Accounts.renew_user_session_token(user, predecessor)
     end
@@ -99,7 +103,11 @@ defmodule Tips.Accounts.SessionFamilyTest do
       user = user_fixture()
       predecessor = Accounts.generate_user_session_token(user)
       deleted_at = DateTime.utc_now(:second)
-      Repo.update_all(from(u in User, where: u.id == ^user.id), set: [deleted_at: deleted_at])
+
+      Repo.update_all(from(u in User, where: u.id == ^user.id),
+        set: [deleted_at: deleted_at, handle: nil, email: nil]
+      )
+
       count = token_count()
 
       assert {:error, :unauthenticated} = Accounts.renew_user_session_token(user, predecessor)
