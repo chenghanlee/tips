@@ -20,7 +20,7 @@ indent-style = "space"
 line-ending = "lf"
 
 [tool.pyright]
-include = ["*.py", "tests", "../lsp/dexter/dx.py", "../lsp/dexter/dexter_client", "../lsp/dexter/tests"]
+include = ["*.py", "tests"]
 extraPaths = ["../..", "../lsp/dexter"]
 exclude = [".venv", ".ruff_cache", ".pytest_cache", "dist"]
 pythonVersion = "3.12"

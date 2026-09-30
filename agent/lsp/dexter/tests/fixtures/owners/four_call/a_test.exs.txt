@@ -1,7 +1,0 @@
-defmodule MyApp.ATest do
-  use ExUnit.Case
-
-  test "a1" do
-    assert MyApp.Admission.admit(1) == 1
-  end
-end

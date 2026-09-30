@@ -89,18 +89,17 @@ Read provider settings by path from main checkout's `.env`; only the user adds n
 **Checks.** Trust CI only for commands actually run. For `agent/teams` Python changes, CI is the evidence: open the exact-head `checks` run, verify these four steps passed and link the run in your round.
 
 ```sh
-ruff check agent/teams agent/lsp/dexter
-ruff format --check agent/teams agent/lsp/dexter
+ruff check agent/teams
+ruff format --check agent/teams
 pyright --project agent/teams/pyproject.toml
 python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
-python3 -m unittest discover -s agent/lsp/dexter/tests -v
 ```
 
 Developers run these before pushing, in their worktree, if Ruff and Pyright are already on `PATH`; otherwise use CI. Agents never install them. Scripts use only standard-library dependencies. Tests use disposable Git repositories, fake Herdr and owned child processes, never live teams. Tests need permission to run `ps` and signal their own children.
 
-Dexter client changes also require a local [real-server test run](../lsp/dexter/README.md#tests) with `DEXTER_BINARY` and `DEXTER_ELIXIR_LIB_ROOT` set and zero skipped tests; CI skips 16 of the 25 adapter tests without those inputs.
+Provisioning changes also require the real-daemon harness test with `TIPS_TEST_REAL_DEXTER` and `DEXTER_ELIXIR_LIB_ROOT` set (see the [LSP guide](../lsp/README.md)); CI runs it in the `dexter` job against the freshly built binary.
 
-The reviewed `# noqa: S603` boundaries are `team.py:execute`, `StopAgentTest.client`, and Dexter [protocol.py](../lsp/dexter/dexter_client/protocol.py)'s `command`/`spawn_process`: variable argument lists, no shell, resolved executable, fixed or test-owned arguments. Dexter validates its binary checksum before dispatch; its Git/Elixir calls use fixed verbs. These are per-call exceptions, not a disabled security rule. Suppress nothing else. When these calls change, tech leads review trusted executable selection and arguments; passing lint cannot prove subprocess safety. Settings: [pyproject.toml](pyproject.toml). If checks are pending, report them as pending without waiting; the tech lead's timed pre-merge wait checks completion. Users decide secret rotation; never rewrite history.
+The reviewed `# noqa: S603` boundaries are `team.py:execute` and `StopAgentTest.client`: variable argument lists, no shell, resolved executable, fixed or test-owned arguments. These are per-call exceptions, not a disabled security rule. Suppress nothing else. When these calls change, tech leads review trusted executable selection and arguments; passing lint cannot prove subprocess safety. Settings: [pyproject.toml](pyproject.toml). If checks are pending, report them as pending without waiting; the tech lead's timed pre-merge wait checks completion. Users decide secret rotation; never rewrite history.
 
 **Secrets.** Never put credentials in logs, issues, PRs, handoffs or chat. Ordinary PR CI needs no production secrets.
 

@@ -1,9 +1,0 @@
-defmodule MyApp.CTest do
-  use ExUnit.Case
-
-  test "c1" do
-    assert MyApp.Admission.admit(4) == 4
-  end
-
-  defp helper2, do: :ok
-end
