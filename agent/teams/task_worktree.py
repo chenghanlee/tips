@@ -345,7 +345,7 @@ enabled = true
                         "lspServers": {
                             "dexter": {
                                 "command": str(self.binary),
-                                "args": ["--root", str(self.worktree), "lsp", str(self.worktree)],
+                                "args": ["--root", str(self.worktree), "lsp"],
                                 "env": {"DEXTER_ELIXIR_LIB_ROOT": sources},
                                 "extensionToLanguage": {
                                     ".ex": "elixir",

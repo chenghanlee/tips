@@ -467,7 +467,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
             "dexter"
         ]
         assert server["command"] == str(self.root / "agent/lsp/dexter/vendor/dexter")
-        assert server["args"] == ["--root", str(self.wt), "lsp", str(self.wt)]
+        assert server["args"] == ["--root", str(self.wt), "lsp"]
         assert server["env"] == {"DEXTER_ELIXIR_LIB_ROOT": str(self.root / "fixture-stdlib/lib")}
         assert set(server["extensionToLanguage"]) == {".ex", ".exs", ".heex"}
         s = self.state()

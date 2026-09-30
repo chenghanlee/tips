@@ -61,7 +61,7 @@ in a subdirectory or monorepo.
 - `.dexter/dexter.sh`: `exec vendor/dexter --root <worktree> "$@"` with the
   selected sources exported. Its absolute path is `TIPS_DEXTER` in the session.
 - For Claude, `.dexter/claude-plugin/`: a plugin loaded with `--plugin-dir` whose
-  LSP server runs the same binary with `--root <worktree> lsp <worktree>` and the
+  LSP server runs the same binary with `--root <worktree> lsp` and the
   same sources. Known alternative language-server plugins are disabled in the
   worktree settings.
 - For Codex, `.codex/config.toml` with the Mix check plugins.

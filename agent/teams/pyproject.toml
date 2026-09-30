@@ -21,7 +21,7 @@ line-ending = "lf"
 
 [tool.pyright]
 include = ["*.py", "tests"]
-extraPaths = ["../..", "../lsp/dexter"]
+extraPaths = ["../.."]
 exclude = [".venv", ".ruff_cache", ".pytest_cache", "dist"]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
