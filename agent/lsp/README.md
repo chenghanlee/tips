@@ -44,6 +44,15 @@ holds `VERSION` and `lib/elixir/lib/enum.ex`), or point `DEXTER_ELIXIR_LIB_ROOT`
 at another checkout's `lib/`. A Homebrew installation has no sources. Provisioning
 refuses to start unless the tree's `VERSION` matches the worktree's toolchain.
 
+## Bound checkout
+
+`--root` must be the exact checkout Dexter serves, and the command works from
+any caller directory. Each leaf worktree gets its own daemon and index, and
+leaf worktrees run concurrently. A checkout that contains another checkout,
+including the main Tips checkout with its linked worktrees under
+`.worktrees/`, is refused. Out of this beta: an application in a subdirectory
+or monorepo, and a root or source directory reached through a symlink.
+
 ## Team provisioning
 
 `agent/teams/task_worktree.py` writes, per worktree:
@@ -82,8 +91,11 @@ native LSP JSON, whose ranges are 0-based.
 | `outgoingCalls` | `outgoing-calls <file> <line> <column>` |
 
 `query` waits up to `--wait <duration>` (default 30s) for a cold index and exits
-non-zero with the reason on stderr. Files are relative to the worktree. The stock
-`lookup` and `references <module>` name searches are unchanged.
+non-zero with the reason on stderr. Files are relative to the worktree. Queries
+admit the bound worktree, its dependency sources and the configured Elixir
+sources; a file from another checkout is refused with `does not belong to
+workspace`. The stock `lookup` and `references <module>` name searches are
+unchanged.
 
 ## Limits
 
@@ -98,8 +110,12 @@ non-zero with the reason on stderr. Files are relative to the worktree. The stoc
   adapter's `unavailable` list, `unresolved_count`, exactly-once accounting and
   `freshness` field are gone: a call the resolver cannot own is omitted without
   a completeness indicator. When completeness matters, cross-check
-  `findReferences` against the `fromRanges` of `incomingCalls`; a reference
-  with no matching range is a call the hierarchy left out. Omitted on purpose:
+  `findReferences` against the `fromRanges` of `incomingCalls` and review each
+  reference with no matching range by hand: it may be a call the hierarchy
+  left out, or a reference the heuristic over-counted (injected defs). A
+  function reached only through a `use` chain with no indexed row can be
+  missing from both. Parent-name resolution stays Dexter's heuristic.
+  Omitted on purpose:
   - incoming: calls in typespecs, quote bodies and defs inside `quote`, files
     that do not parse cleanly, top-level and module-body calls, test labels
     built by interpolation, modules named by a variable, heads named by

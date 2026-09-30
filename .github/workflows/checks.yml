@@ -152,7 +152,7 @@ jobs:
         env:
           TIPS_TEST_REAL_DEXTER: ${{ github.workspace }}/agent/lsp/dexter
           DEXTER_ELIXIR_LIB_ROOT: ${{ github.workspace }}/tmp/elixir-source/lib
-        run: python3 -m unittest agent/teams/tests/test_task_worktree.py -k real_daemons -v
+        run: python3 -m unittest discover -s agent/teams/tests -t agent/teams -p test_task_worktree.py -k real_daemons -v
   release:
     name: release
     runs-on: ubuntu-latest
