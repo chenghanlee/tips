@@ -40,7 +40,10 @@ defmodule TipsWeb.EditorContractFixtures do
       mode: :new,
       target: target,
       submission_key: key,
-      intent: %{attrs: Keyword.get(opts, :attrs, attrs(kind)), uploads: opts[:uploads] || []},
+      intent: %{
+        attrs: Keyword.get(opts, :attrs, attrs(kind)),
+        uploads: Keyword.get(opts, :uploads, [])
+      },
       base: nil,
       expected_version: nil
     }

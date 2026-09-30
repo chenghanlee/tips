@@ -15,6 +15,7 @@ defmodule TipsWeb.EditorContractTest.Consumer do
   def submission_intent(%{attrs: attrs, uploads: uploads}),
     do: %{attrs: attrs, uploads: Enum.map(uploads, &attachment/1)}
 
+  @spec attachment(EditorContract.media()) :: Content.attachment()
   defp attachment({:retained, _media_id, _description} = retained), do: retained
   defp attachment({:staged_video, _media_id} = video), do: video
   defp attachment({:missing_image, slot, _image}), do: {:missing_image, slot}
@@ -25,23 +26,34 @@ defmodule TipsWeb.EditorContractTest.Consumer do
   """
   @spec restore(EditorContract.identity(), EditorContract.restore_request(), boolean()) ::
           EditorContract.restore_reply()
-  def restore(current, %{identity: recovered, record: record}, pristine?) do
-    status =
-      cond do
-        recovered != current or not readable?(current, record) -> :rejected
-        pristine? -> :restored
-        true -> :preserved
-      end
+  def restore(current, %{identity: recovered, record: record}, pristine?),
+    do: %{
+      status: status(current, recovered, record, pristine?),
+      storage: record.storage,
+      draft: record.draft
+    }
 
-    %{status: status, storage: record.storage, draft: record.draft}
+  @spec status(
+          EditorContract.identity(),
+          EditorContract.identity(),
+          EditorContract.draft_record(),
+          boolean()
+        ) :: EditorContract.restore_status()
+  defp status(current, recovered, record, pristine?) do
+    cond do
+      recovered != current or not readable?(current, record) -> :rejected
+      pristine? -> :restored
+      true -> :preserved
+    end
   end
 
   # A form reads its own slot, or a handoff record whose target is this form.
+  @spec readable?(EditorContract.identity(), EditorContract.draft_record()) :: boolean()
   defp readable?(%{account_id: account_id, target: target}, %{storage: storage} = record),
     do: storage.account_id == account_id and target in [storage.slot, record.target]
 
   @doc "Continue as edit: K keeps its slot and guard and becomes an edit of the exact item."
-  @spec handoff(EditorContract.record(), Content.edit_form()) :: EditorContract.handoff()
+  @spec handoff(EditorContract.draft_record(), Content.edit_form()) :: EditorContract.handoff()
   def handoff(%{mode: :new, target: :new_tip} = k, %{kind: :tip} = form), do: hand_off(k, form)
 
   def handoff(
@@ -50,6 +62,7 @@ defmodule TipsWeb.EditorContractTest.Consumer do
       ),
       do: hand_off(k, form)
 
+  @spec hand_off(EditorContract.draft_record(), Content.edit_form()) :: EditorContract.handoff()
   defp hand_off(k, %{kind: kind, id: id, base: base, edit_version: version}) do
     %{
       storage: k.storage,
@@ -63,7 +76,7 @@ defmodule TipsWeb.EditorContractTest.Consumer do
   submission asks the hook to clear it; everything else preserves the proposal.
   """
   @spec clear_request(
-          EditorContract.record(),
+          EditorContract.draft_record(),
           {:ok, Content.publication_receipt() | Content.edit_receipt() | nil}
           | {:error, Content.lookup_error() | Content.publication_error() | Content.edit_error()}
         ) :: {:clear, EditorContract.clear_request()} | :preserve
@@ -84,23 +97,50 @@ defmodule TipsWeb.EditorContractTest.Consumer do
 
   def clear_request(_record, _result), do: :preserve
 
+  @spec publishes?(EditorContract.target(), Content.publication_receipt()) :: boolean()
   defp publishes?(:new_tip, %{kind: :tip}), do: true
   defp publishes?({:new_review, tip_id}, %{kind: :review, tip_id: tip_id}), do: true
   defp publishes?(_target, _receipt), do: false
 
-  defp clear(%{storage: storage, draft: draft, target: target}, receipt),
-    do:
-      {:clear, %{submitted: %{storage: storage, draft: draft, target: target}, receipt: receipt}}
+  @spec clear(
+          EditorContract.draft_record(),
+          Content.publication_receipt() | Content.edit_receipt()
+        ) ::
+          {:clear, EditorContract.clear_request()}
+  defp clear(record, receipt), do: {:clear, %{submitted: submitted(record), receipt: receipt}}
+
+  @spec submitted(EditorContract.draft_record()) :: EditorContract.submitted_draft()
+  defp submitted(%{storage: storage, draft: draft, target: target}),
+    do: %{storage: storage, draft: draft, target: target}
 
   @doc """
   Whether the hook's revision-guarded clear removes the stored record. A clear
   request is an instruction: a newer revision, another draft or no record stays.
   """
-  @spec clears?(EditorContract.record() | nil, EditorContract.clear_request()) :: boolean()
-  def clears?(%{storage: storage, draft: draft}, %{submitted: %{storage: storage, draft: draft}}),
-    do: true
+  @spec clears?(EditorContract.draft_record() | nil, EditorContract.clear_request()) :: boolean()
+  def clears?(nil, _request), do: false
+  def clears?(stored, %{submitted: submitted}), do: guard(stored) == guard(submitted)
 
-  def clears?(_stored, _request), do: false
+  # The browser CAS key: storage slot, draft UUID and revision together.
+  @spec guard(EditorContract.draft_record() | EditorContract.submitted_draft()) ::
+          {EditorContract.storage_identity(), EditorContract.draft_pair()}
+  defp guard(%{storage: storage, draft: draft}), do: {storage, draft}
+
+  @doc "The DOM id of the form and hook element, shared by every target of one kind."
+  @spec dom_id(EditorContract.identity()) :: String.t()
+  def dom_id(%{account_id: account_id, target: target}),
+    do: "editor-#{account_id}-#{kind(target)}"
+
+  @spec kind(EditorContract.target()) :: Content.kind()
+  defp kind(:new_tip), do: :tip
+  defp kind({:new_review, _tip_id}), do: :review
+  defp kind({:edit, kind, _id}), do: kind
+
+  @doc "The named Reselect slots a restored record renders, in selection order."
+  @spec missing_images(EditorContract.draft_record()) ::
+          [{Content.slot(), EditorContract.image_descriptor()}]
+  def missing_images(%{intent: %{uploads: uploads}}),
+    do: for({:missing_image, slot, image} <- uploads || [], do: {slot, image})
 end
 
 defmodule TipsWeb.EditorContractTest do
@@ -125,7 +165,7 @@ defmodule TipsWeb.EditorContractTest do
     storage_identity: "EditorStorageIdentity",
     draft_pair: "EditorDraftPair",
     intent: "EditorIntent",
-    record: "EditorRecord",
+    draft_record: "EditorRecord",
     restore_request: "EditorRestoreRequest",
     restore_reply: "EditorRestoreReply",
     handoff: "EditorHandoff",
@@ -133,7 +173,14 @@ defmodule TipsWeb.EditorContractTest do
     clear_request: "EditorClearRequest"
   ]
 
+  # Every public declaration; unions are checked by their tags below.
+  @public_types Keyword.keys(@wire_types) ++
+                  [:target, :mode, :image_descriptor, :media, :restore_status]
+
   test "tip and review new edit recovered and handoff envelopes preserve all identities" do
+    {:ok, types} = Code.Typespec.fetch_types(EditorContract)
+    assert Enum.sort(for {:type, {name, _ast, []}} <- types, do: name) == Enum.sort(@public_types)
+
     for {type, typedef} <- @wire_types do
       assert js_keys(typedef) == Enum.map(declared_keys(EditorContract, type), &to_string/1),
              typedef
@@ -155,7 +202,7 @@ defmodule TipsWeb.EditorContractTest do
       %{record: handed} = Consumer.handoff(new, form(row))
 
       for record <- [new, edit, handed] do
-        assert Map.keys(record) |> Enum.sort() == declared_keys(EditorContract, :record)
+        assert Map.keys(record) |> Enum.sort() == declared_keys(EditorContract, :draft_record)
         assert wire_keys(record) == js_keys("EditorRecord")
       end
 
@@ -206,11 +253,12 @@ defmodule TipsWeb.EditorContractTest do
       assert Map.keys(payload["intent"]) |> Enum.sort() == js_keys("EditorIntent")
       assert %{"intent" => %{"attrs" => wire_attrs, "uploads" => []}} = payload
 
-      assert Map.keys(wire_attrs) |> Enum.sort() ==
-               Enum.sort(Enum.map(editable_fields(kind), &to_string/1))
+      assert Enum.all?(all_keys(payload), &is_binary/1)
+      fields = declared_keys(Content, :"#{kind}_attrs")
+      assert Map.keys(wire_attrs) |> Enum.sort() == Enum.map(fields, &to_string/1)
 
       # Every field travels exactly as typed, including null, empty and whitespace.
-      for field <- editable_fields(kind) do
+      for field <- fields do
         assert Map.fetch!(wire_attrs, to_string(field)) === Map.fetch!(attrs, field), "#{field}"
       end
 
@@ -235,7 +283,7 @@ defmodule TipsWeb.EditorContractTest do
         intent: proposal
       )
 
-    assert Map.keys(record) |> Enum.sort() == declared_keys(EditorContract, :record)
+    assert Map.keys(record) |> Enum.sort() == declared_keys(EditorContract, :draft_record)
     assert wire_keys(record) == js_keys("EditorRecord")
     assert Map.keys(record.base.attrs) |> Enum.sort() == declared_keys(Content, :tip_attrs)
 
@@ -308,24 +356,29 @@ defmodule TipsWeb.EditorContractTest do
                  expected_version: form.edit_version
              }
 
+    # K keeps its slot, draft id, pre-write revision and key. The hook's guarded
+    # write of this record advances the revision (#75); nothing here performs it.
+    assert %{storage: %{slot: :new_tip}, draft: %{revision: 6}} = handed
+    assert handed.draft.draft_id == tip.submission_key
     assert handed.intent == k.intent
     refute handed.storage == e.storage
 
-    # The hook's CAS write advances K's revision; K's later save clears only K.
-    stored_k = %{handed | draft: %{handed.draft | revision: handed.draft.revision + 1}}
+    # K's confirmed edit clears only K; E keeps its own slot, draft and base.
+    e_before = e
 
     assert {:clear, request} =
-             Consumer.clear_request(stored_k, {:ok, edit_receipt(tip, :updated)})
+             Consumer.clear_request(handed, {:ok, edit_receipt(tip, :updated)})
 
-    assert Consumer.clears?(stored_k, request)
+    assert Consumer.clears?(handed, request)
     refute Consumer.clears?(e, request)
+    assert e == e_before
 
     # Restore at either route surfaces K without advancing its base or version.
     for target <- [:new_tip, edit_target] do
       current = identity(author.id, target)
 
-      assert Consumer.restore(current, %{identity: current, record: stored_k}, true) ==
-               %{status: :restored, storage: k.storage, draft: stored_k.draft}
+      assert Consumer.restore(current, %{identity: current, record: handed}, true) ==
+               %{status: :restored, storage: k.storage, draft: k.draft}
     end
 
     # A handoff never crosses kinds or parents.
@@ -366,7 +419,7 @@ defmodule TipsWeb.EditorContractTest do
 
     assert [
              %{"tag" => "retained", "media_id" => 11, "description" => "Before"} = retained,
-             %{"tag" => "missing_image", "slot" => "slot-2", "filename" => "diagram.png"} = first,
+             %{"tag" => "missing_image", "slot" => "slot-2"} = first,
              %{"tag" => "staged_video", "media_id" => 12} = video,
              %{"tag" => "missing_image", "slot" => "slot-4", "description" => nil} = second
            ] = wire_uploads
@@ -375,6 +428,19 @@ defmodule TipsWeb.EditorContractTest do
     assert Enum.sort(Map.keys(video)) == js_keys("EditorStagedVideo")
     assert Enum.sort(Map.keys(first)) == js_keys("EditorMissingImage")
     assert Enum.sort(Map.keys(second)) == js_keys("EditorMissingImage")
+
+    assert first == %{
+             "tag" => "missing_image",
+             "slot" => "slot-2",
+             "filename" => "diagram.png",
+             "type" => "image/png",
+             "size" => 48_213,
+             "description" => "Request and response"
+           }
+
+    assert [{"slot-2", %{filename: "diagram.png"}}, {"slot-4", %{description: nil}}] =
+             Consumer.missing_images(record)
+
     assert wire_uploads |> JSON.encode!() |> JSON.decode!() == wire_uploads
 
     # Browser metadata maps to Content slots; the same filename proves nothing.
@@ -404,6 +470,11 @@ defmodule TipsWeb.EditorContractTest do
     # No bytes, server paths, provider URLs or tokens reach the browser record.
     keys = record |> wire() |> all_keys()
     assert Enum.filter(keys, &(&1 in ~w(path bytes data url uri token key object_key))) == []
+
+    refute Enum.any?(
+             all_strings(wire(record)),
+             &(String.starts_with?(&1, "/") or &1 =~ "://")
+           )
   end
 
   test "created and equivalent receipts permit only the submitted draft pair to be cleared" do
@@ -435,18 +506,24 @@ defmodule TipsWeb.EditorContractTest do
 
       assert Enum.sort(Map.keys(wire_receipt)) == js_keys("EditorPublicationReceipt")
 
-      # Only the exact submitted pair clears; newer or replaced records stay.
+      # Receipt guard: identity, key and outcome must all name this submission.
+      other_kind = if receipt.kind == :tip, do: :review, else: :tip
+
+      for changed <- [
+            %{receipt | submission_key: Ecto.UUID.generate()},
+            %{receipt | outcome: :existing_different},
+            %{receipt | kind: other_kind}
+          ] do
+        assert Consumer.clear_request(record, {:ok, changed}) == :preserve
+      end
+
+      # Storage guard: only the same slot, draft UUID and revision clears.
       assert Consumer.clears?(record, request)
       refute Consumer.clears?(%{record | draft: draft(Ecto.UUID.generate(), 3)}, request)
       refute Consumer.clears?(%{record | draft: %{record.draft | revision: 4}}, request)
+      refute Consumer.clears?(%{record | storage: storage(author.id + 1, target)}, request)
+      refute Consumer.clears?(%{record | storage: storage(author.id, {:new_review, 1})}, request)
       refute Consumer.clears?(nil, request)
-
-      # Another key never clears.
-      assert Consumer.clear_request(
-               %{record | submission_key: Ecto.UUID.generate()},
-               {:ok, receipt}
-             ) ==
-               :preserve
     end
 
     # The same key under another parent names another publication.
@@ -455,6 +532,13 @@ defmodule TipsWeb.EditorContractTest do
 
     assert Consumer.clear_request(moved, {:ok, publication_receipt(review, :created)}) ==
              :preserve
+
+    parent_moved = %{publication_receipt(review, :created) | tip_id: tip.id + 1_000}
+
+    review_record =
+      new_record(author.id, {:new_review, tip.id}, submission_key: review.submission_key)
+
+    assert Consumer.clear_request(review_record, {:ok, parent_moved}) == :preserve
 
     # A confirmed edit clears only its own target.
     edit = edit_record(author.id, {:edit, :tip, tip.id}, edit_base(tip, []), tip.edit_version)
@@ -561,6 +645,27 @@ defmodule TipsWeb.EditorContractTest do
     assert Consumer.restore(review_form, %{identity: review_form, record: record}, true).status ==
              :rejected
 
+    # The DOM id is per account and kind, so another parent or item shares it.
+    # Both identities travel, and the recovered one stays distinct.
+    base = %{attrs: tip_attrs(), uploads: []}
+
+    for {mounted, stale, stale_record} <- [
+          {{:new_review, 3}, {:new_review, 4}, new_record(9, {:new_review, 4})},
+          {{:edit, :tip, 5}, {:edit, :tip, 6}, edit_record(9, {:edit, :tip, 6}, base, 1)}
+        ] do
+      current = identity(9, mounted)
+      recovered = %{identity: identity(9, stale), record: stale_record}
+
+      assert Consumer.dom_id(current) == Consumer.dom_id(recovered.identity)
+      assert wire(recovered)["identity"] != wire(current)
+      assert Consumer.restore(current, recovered, true).status == :rejected
+
+      # A stale record behind a current-looking identity is still not this form's.
+      assert Consumer.restore(current, %{recovered | identity: current}, true).status == :rejected
+    end
+
+    assert Consumer.dom_id(identity(9, {:edit, :review, 2})) == "editor-9-review"
+
     # Restored settles recovery only: the pending key still needs its lookup.
     assert Consumer.clear_request(record, {:ok, nil}) == :preserve
 
@@ -616,6 +721,11 @@ defmodule TipsWeb.EditorContractTest do
 
   defp all_keys(list) when is_list(list), do: Enum.flat_map(list, &all_keys/1)
   defp all_keys(_value), do: []
+
+  defp all_strings(map) when is_map(map), do: Enum.flat_map(Map.values(map), &all_strings/1)
+  defp all_strings(list) when is_list(list), do: Enum.flat_map(list, &all_strings/1)
+  defp all_strings(value) when is_binary(value), do: [value]
+  defp all_strings(_value), do: []
 
   # The sorted `@property` names of one `@typedef` in the JavaScript contract.
   defp js_keys(typedef) do
