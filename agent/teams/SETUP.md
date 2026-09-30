@@ -36,7 +36,7 @@ claude plugin install --scope user mix-credo@elixir-agent-tools
 
 Codex discovers linked `.agents/skills`; never also install Codex `elixir-dev`. Claude loads the same five skills through `elixir-dev`. Generated configs enable both Mix check plugins. Follow plugin trust prompts. Generated client configuration disables known language-server plugins. Remove any separately configured legacy Elixir MCP server before the pilot. Unrelated MCP servers remain available in coding sessions.
 
-Build the pinned Dexter source with the [LSP guide](../lsp/README.md#build-and-validate); this branch's build explicitly applies the local argument-count patch in a temporary copy. Put matching Elixir sources in the main checkout's `agent/lsp/vendor/elixir-<version>/` (the source tree contains `VERSION` and `lib/elixir/lib/enum.ex`), or set `DEXTER_ELIXIR_LIB_ROOT` to their `lib/` directory. Provisioning selects the target worktree's Elixir version and remembers the source path. Keep the shared tools/sources independent of task worktrees.
+Build Dexter with the [LSP guide](../lsp/README.md#build): the pinned source plus the local patch, one binary. Put matching Elixir sources in the main checkout's `agent/lsp/vendor/elixir-<version>/` (the source tree contains `lib/elixir/lib/enum.ex`), or set `DEXTER_ELIXIR_LIB_ROOT` to their `lib/` directory. Provisioning selects the target worktree's Elixir version and binds the source path into the worktree's generated files. Keep the shared tools/sources independent of task worktrees.
 
 Codex must be allowed to connect to Dexter's local Unix socket. The tested macOS `workspace-write` sandbox denies it with network access disabled; the reviewer verified access with network access enabled or a scoped `--allow-unix-socket /private/tmp/dexter-<uid>` sandbox allowance. Check the installed Codex sandbox options and set the narrowest suitable user-owned permission before the pilot. With approval policy `never`, a denied connection cannot escalate. The launcher does not change sandbox settings.
 
@@ -52,11 +52,11 @@ Do not run it while another live agent owns `lead-tpm`. The lead TPM starts and 
 
 ## Configuration
 
-Edit [config.toml](config.toml): team limits; client/model/effort per role; port/database allocation; permissions; coordinator compaction; time budgets. Scripts read the canonical main checkout's file. Use `TIPS_TEAM_CONFIG=/absolute/path` for staged configuration in a disposable pilot. Settings apply next launch. `timeouts.dexter_startup_seconds` bounds provisioning and `dexter_tool_seconds` bounds each adapter operation; neither requires rebuilding Dexter.
+Edit [config.toml](config.toml): team limits; client/model/effort per role; port/database allocation; permissions; coordinator compaction; time budgets. Scripts read the canonical main checkout's file. Use `TIPS_TEAM_CONFIG=/absolute/path` for staged configuration in a disposable pilot. Settings apply next launch. `timeouts.dexter_startup_seconds` bounds the provisioning warm-up; it does not require rebuilding Dexter.
 
-Both harnesses use the generated `$TIPS_DX` shell command. Existing shell approval
-and sandbox policies remain in force; no MCP-specific permission exception is
-added. Claude uses the configured permission mode. Coordinators run without LSP;
+Codex uses the generated `$TIPS_DEXTER` command; Claude uses its native LSP tool
+through the generated plugin. Existing shell approval and sandbox policies remain
+in force; no MCP-specific permission exception is added. Claude uses the configured permission mode. Coordinators run without LSP;
 coding launches do not inherit coordinator compaction settings.
 
 | Allocation | Components |
@@ -64,7 +64,7 @@ coding launches do not inherit coordinator compaction settings.
 | Database suffix | `team.db_suffix_prefix`, team number, `roles.<role>.db_suffix` |
 | Test port | `team.port_base` + team number × `team.port_stride` + role `port_offset` |
 
-Both clients invoke a generated worktree-bound command pointing to the shared Dexter adapter; reviewed revisions need not contain the adapter. The helper eagerly starts Dexter even when invoked without `--start`. For staged pilots, `TIPS_DEXTER_HOME` selects the shared adapter/build directory. Configuration/tooling changes require disposable pilots verifying both client and LSP roots in each actual client. Before scaling, measure simultaneous cold-start capacity; configured team limits do not verify it.
+Generated worktree files point at the shared Dexter binary; reviewed revisions need not contain the build. The helper warms up Dexter even when invoked without `--start`. For staged pilots, `TIPS_DEXTER_HOME` selects the shared build directory. Configuration/tooling changes require disposable pilots verifying both client and LSP roots in each actual client. Before scaling, measure simultaneous cold-start capacity; configured team limits do not verify it.
 
 Set database connection limits in [compose.yaml](../../compose.yaml), overridden by `TIPS_DB_MAX_CONNECTIONS`. Recreate the database service to apply changes, only with no teams running. Agent launch settings never restart PostgreSQL or existing clients.
 
@@ -86,8 +86,6 @@ and no `--review-ref`. For example, with your assigned task/team/pane values:
 agent/teams/task_worktree.py "$TASK" --team "$N" --role lead --pane "$PANE" --share --start
 ```
 
-Both sessions receive the same bound `$TIPS_DX`; neither owns the shared daemon.
-Existing configurations cannot change while a teammate is running. Coordinate
-native source writes, and pause them during an in-place rename. The adapter's
-lock covers cooperating writes only. Independent review still requires a reviewer
+Both sessions share the same bound Dexter; neither owns the shared daemon.
+Existing configurations cannot change while a teammate is running. Independent review still requires a reviewer
 who did not implement the change; sharing a checkout does not waive that rule.

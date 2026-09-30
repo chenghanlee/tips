@@ -243,14 +243,32 @@ class WorktreeTask:
         home = Path(
             os.environ.get("TIPS_DEXTER_HOME", str(self.root / "agent/lsp/dexter"))
         ).resolve()
-        self.adapter = home / "dx.py"
         self.binary = home / "vendor/dexter"
-        self.wrapper = self.worktree / ".dexter/dx/command.sh"
-        if not self.adapter.is_file() or not (self.root / ".agents/skills").is_dir():
-            raise RefusalError("Shared Dexter adapter or skills directory is missing.")
+        self.wrapper = self.worktree / ".dexter/dexter.sh"
+        self.plugin = self.worktree / ".dexter/claude-plugin"
+        if not (self.root / ".agents/skills").is_dir():
+            raise RefusalError("Shared skills directory is missing.")
         if not os.access(self.binary, os.X_OK):
-            raise RefusalError(f"Missing executable: {self.binary}; build stock Dexter first.")
-        self.target_env["TIPS_DX"] = str(self.wrapper)
+            raise RefusalError(f"Missing executable: {self.binary}; run agent/lsp/dexter/build.sh.")
+        self.target_env["TIPS_DEXTER"] = str(self.wrapper)
+
+    def elixir_sources(self) -> Path:
+        """The Elixir standard-library sources Dexter indexes for this worktree."""
+        explicit = os.environ.get("DEXTER_ELIXIR_LIB_ROOT")
+        if explicit:
+            sources = Path(explicit)
+        else:
+            version = run(
+                ["elixir", "--short-version"],
+                cwd=self.worktree if self.worktree.is_dir() else self.root,
+                timeout=self.timeouts["dexter_startup_seconds"],
+            )
+            if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?", version):
+                raise RefusalError(f"Unexpected Elixir version: {version!r}")
+            sources = self.root / "agent/lsp/vendor" / f"elixir-{version}" / "lib"
+        if not (sources / "elixir/lib/enum.ex").is_file():
+            raise RefusalError(f"Elixir sources are missing at {sources}; see agent/lsp/README.md.")
+        return sources.resolve()
 
     def fetch(self) -> None:
         # Review heads are often pushed after main's last fetch; fetch before resolving them.
@@ -290,19 +308,14 @@ class WorktreeTask:
             self.old_head = git("-C", self.worktree, "rev-parse", "HEAD")
 
     def prepare_config(self) -> None:
-        command = shlex.join([sys.executable, str(self.adapter)])
-        binding = shlex.join(
-            [
-                "--root",
-                str(self.worktree),
-                "--binary",
-                str(self.binary),
-                "--timeout",
-                str(self.timeouts["dexter_tool_seconds"]),
-            ]
-        )
+        sources = str(self.elixir_sources())
         self.desired = {
-            self.wrapper: "#!/bin/sh\nexec " + command + ' "$@" ' + binding + "\n",
+            self.wrapper: (
+                "#!/bin/sh\n"
+                f"export DEXTER_ELIXIR_LIB_ROOT={shlex.quote(sources)}\n"
+                f"exec {shlex.quote(str(self.binary))} --root {shlex.quote(str(self.worktree))}"
+                ' "$@"\n'
+            ),
             self.worktree / ".dexter/.gitignore": "*\n",
         }
         if self.kind == "codex":
@@ -314,6 +327,30 @@ enabled = true
             config += '\n[plugins."elixir-lsp@elixir-agent-tools"]\nenabled = false\n'
             self.desired[self.worktree / ".codex/config.toml"] = config
         else:
+            # Claude's native LSP tool runs the same binary against the same daemon.
+            self.desired[self.plugin / ".claude-plugin/plugin.json"] = (
+                json.dumps(
+                    {
+                        "name": "tips-dexter",
+                        "description": "Dexter language server bound to this worktree",
+                        "version": "1.0.0",
+                        "lspServers": {
+                            "dexter": {
+                                "command": str(self.binary),
+                                "args": ["--root", str(self.worktree), "lsp", str(self.worktree)],
+                                "env": {"DEXTER_ELIXIR_LIB_ROOT": sources},
+                                "extensionToLanguage": {
+                                    ".ex": "elixir",
+                                    ".exs": "elixir",
+                                    ".heex": "phoenix-heex",
+                                },
+                            }
+                        },
+                    },
+                    indent=2,
+                )
+                + "\n"
+            )
             self.desired[self.worktree / ".claude/settings.local.json"] = (
                 json.dumps(
                     {
@@ -329,50 +366,47 @@ enabled = true
             )
 
     def language_brief(self) -> str:
+        if self.kind == "codex":
+            tools = (
+                f"Language tools for this session: {self.wrapper} is Dexter bound to "
+                f"{self.worktree}; run it via your shell tool, for example "
+                f"{self.wrapper} query references lib/example.ex 12 8 (1-based line and "
+                "column). Read agent/lsp/README.md for the nine read-only operations. "
+            )
+        else:
+            tools = (
+                "Language tools for this session: the native LSP tool is Dexter bound to "
+                f"{self.worktree}; use it for definitions, references, hover, symbols and "
+                "call hierarchy. Read agent/lsp/README.md for its limits. "
+            )
         return (
-            f"Language tools for this session: use {self.wrapper} via your shell tool "
-            f"with JSON on stdin. This command is bound to {self.worktree}; "
-            f"read {self.adapter.parent / 'README.md'} for all operations. "
-            "Use Dexter LSP through this command, not native LSP or the old MCP bridge. "
-            "Use write with expected_sha256 for cooperating source edits. Native Edit, "
-            "apply_patch and shell writes bypass the shared lock. Rename is an immediate "
-            "mutation; do not overlap it with native teammate writes. Freshness is unverified; "
-            "empty results are not proof of absence. After every dx mutation, run Mix "
-            "compile and Credo on edited Elixir files, plus relevant tests: Bash-based "
-            "dx edits do not trigger native edit hooks. Do not stop the shared daemon "
-            "when this agent exits. Do not run git clean -x: it deletes TIPS_DX, the "
-            "index and recovery snapshots while the daemon may still run. "
+            tools + "Do not start another Elixir language server. Freshness is unverified; "
+            "empty results are not proof of absence. Do not stop the shared daemon when "
+            "this agent exits, and do not run git clean -x: it deletes the bound command "
+            "and the index while the daemon may still run. "
             "Read the team operating agreement and your role card, then await assignment."
         )
 
     def start_language_server(self) -> None:
-        env = {**os.environ, **self.target_env}
-        if self.teammates:
-            # A joining agent uses the existing worktree configuration; it must
-            # not replace the shared daemon's environment between teammate calls.
-            env.pop("DEXTER_ELIXIR_LIB_ROOT", None)
-        elif (
-            not env.get("DEXTER_ELIXIR_LIB_ROOT")
-            and not (self.worktree / ".dexter/dx/stdlib.json").exists()
-        ):
-            version = run(
-                ["elixir", "--short-version"],
-                cwd=self.worktree,
-                env=env,
-                timeout=self.timeouts["dexter_startup_seconds"],
-            )
-            if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?", version):
-                raise RefusalError(f"Unexpected Elixir version: {version!r}")
-            env["DEXTER_ELIXIR_LIB_ROOT"] = str(
-                self.root / "agent/lsp/vendor" / f"elixir-{version}" / "lib"
-            )
+        # The bound command carries the binary, root and Elixir sources; a
+        # missing or wrong source tree fails here, before any client starts.
         output = run(
-            ["/bin/sh", self.wrapper, "start"],
-            timeout=self.timeouts["dexter_startup_seconds"],
-            env=env,
+            [
+                "/bin/sh",
+                self.wrapper,
+                "query",
+                "workspace-symbols",
+                "--wait",
+                f"{self.timeouts['dexter_startup_seconds']}s",
+                "MixProject",
+            ],
+            timeout=self.timeouts["dexter_startup_seconds"] + 5,
+            env={**os.environ, **self.target_env},
             input_text="",
         )
-        print(f"Dexter provisioning: {output}")
+        if not json.loads(output):
+            raise RefusalError("Dexter indexed no MixProject module; inspect the daemon log.")
+        print(f"Dexter provisioning: index ready for {self.worktree}")
 
     def check_target_tree(self) -> None:
         self.target_tree = git(
@@ -614,6 +648,8 @@ enabled = true
                 self.policies["claude_permission_mode"],
                 "--effort",
                 self.effort,
+                "--plugin-dir",
+                str(self.plugin),
                 "--append-system-prompt",
                 self.language_brief(),
             ]

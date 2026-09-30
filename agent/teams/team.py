@@ -388,7 +388,6 @@ def validate_settings(path: Path, value: Config) -> None:
         "shell_seconds",
         "checks_minutes",
         "dexter_startup_seconds",
-        "dexter_tool_seconds",
     ):
         if type(value["timeouts"][key]) is not int or value["timeouts"][key] <= 0:
             raise RuntimeError(f"{path}: timeouts.{key} must be a positive integer")
@@ -632,7 +631,7 @@ def stop_team(target: str) -> None:
     check_worktrees(roots)
     check_shared_owners(roots, panes)
     for root in sorted(roots):
-        wrapper = root / ".dexter/dx/command.sh"
+        wrapper = root / ".dexter/dexter.sh"
         if wrapper.is_file():
             result = execute(
                 ["/bin/sh", wrapper, "stop"],
@@ -641,8 +640,6 @@ def stop_team(target: str) -> None:
             )
             if result.returncode:
                 raise RuntimeError(result.stderr or result.stdout)
-    for root in sorted(roots):
-        preserve_recovery(root)
     if roots or panes:
         drop_databases(target)
     for root in sorted(roots):
@@ -695,16 +692,6 @@ def check_worktrees(roots: set[Path]) -> None:
             raise RuntimeError(
                 f"Unmerged worktree {root}; remaining resources preserved"
             ) from error
-
-
-def preserve_recovery(root: Path) -> None:
-    snapshots = root / ".dexter/dx/snapshots"
-    if snapshots.exists():
-        recovery = main / "tmp/dexter-recovery"
-        recovery.mkdir(parents=True, exist_ok=True)
-        destination = Path(tempfile.mkdtemp(prefix=root.name + "-", dir=recovery)) / "snapshots"
-        snapshots.rename(destination)
-        print(f"Recovery snapshots preserved: {destination}")
 
 
 def drop_databases(target: str) -> None:

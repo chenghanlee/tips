@@ -1,77 +1,97 @@
 # Agent language tools
 
-The team launcher uses one **Dexter daemon per worktree**, shared by
-Codex and Claude through our Python `dx` adapter. Each workflow gets a fresh LSP
-session. There is no MCP bridge, editor process, or custom watcher. This branch
-has one explicit local backend patch for function argument-count lookups.
-This remains a prototype: strict saved-index freshness and concurrent native-write
-rename safety are not established. See [validation](dexter/VALIDATION.md).
+Coding sessions get one **Dexter** language server per worktree: a single Go
+binary built from the pinned upstream revision plus one local patch. Claude uses
+it through Claude Code's native LSP tool. Codex calls the same binary's `query`
+command. Both attach to the same per-worktree daemon and the same handlers.
+There is no adapter, MCP server, editor process or second index.
 
-## Build and validate
+This is a read-only beta. Rename and other edits are not offered.
 
-Follow [Dexter setup](dexter/README.md#build-and-run): build the pinned source and
-reviewed local patch with `dexter/build.sh`, provide matching Elixir sources using
-`DEXTER_ELIXIR_LIB_ROOT`, and run the real-server tests. Keep the adapter, binary,
-and stdlib sources outside retiring task worktrees. The installed Homebrew release
-currently lacks the required daemon commands; the pinned source build is separate.
+## Build
 
-## Team integration
-
-`agent/teams/task_worktree.py` generates a tiny bound command at
-`.dexter/dx/command.sh`, runs `start` immediately after provisioning, and exports
-its absolute path as `TIPS_DX` to the launched agent. Both harnesses use it:
+Requires Go 1.26.3 and Git. `build.sh` needs a Git repository that contains the
+pinned upstream commit; its checkout is not read:
 
 ```sh
-printf '%s\n' '{"file":"lib/example.ex","line":12,"column":8}' | "$TIPS_DX" hover
+git clone https://github.com/remoteoss/dexter tmp/dexter-upstream
+bash agent/lsp/dexter/build.sh tmp/dexter-upstream
 ```
 
-The command binds the exact worktree, shared executable, and timeout. Changing
-shell directories does not reroot it. All Dexter LSP workflows are available;
-see the [workflow table](dexter/README.md#available-workflows). The launcher passes
-startup instructions and disables known language-server plugins in each client's
-project settings. New coding sessions do not configure the old MCP bridge;
-unrelated inherited MCP servers remain available. Codex must trust the project
-to load its project settings. Remove any separately configured legacy Elixir MCP
-server before this pilot; the launcher does not rewrite global configuration.
-The launcher does not change user-wide settings or shell approvals. A shell
-denial must be reported, not bypassed.
+The script exports the pin, applies `dexter/patches/dexter-go.patch` in a
+temporary copy, builds `dexter/vendor/dexter` and writes `dexter/vendor/build.json`
+with the pin, patch checksum, binary checksum and the local build id. The id is
+the SHA-256 of the pin and patch checksum and is linked into the binary:
 
-Provisioning requires the shared `agent/lsp/dexter/vendor/dexter` build. Set
-`TIPS_DEXTER_HOME` to an absolute adapter directory for a staged prototype pilot.
-At first provisioning, sources default to the main checkout's
-`agent/lsp/vendor/elixir-<version>/lib`, using the target worktree's
-`elixir --short-version`. `DEXTER_ELIXIR_LIB_ROOT` overrides that default;
-`dx` validates and remembers the selection per tree. Subsequent provisioning
-keeps the saved selection, and a joining teammate cannot replace it.
-A provisioning failure preserves the checkout and does not launch a coding agent.
-Successful startup is not a promise of fresh results or successful compilation.
+```sh
+agent/lsp/dexter/vendor/dexter version   # 0.7.2, then: local_build_id <id>
+```
 
-Same-team agents can explicitly join a task branch with `--share` and distinct
-roles/panes. It cannot be combined with `--review-ref`; independent reviewers
-still get their own detached worktrees by default. Shared agents must not change
-configuration or switch the shared branch while teammates run. Main remains
-merge-only while it contains nested team worktrees.
+A daemon and a client with different ids refuse each other and nothing replaces
+the running daemon. Before rebuilding over active teams, stop each worktree's
+daemon with its bound command, build, then re-provision.
 
-`team.py stop N` stops team clients, then calls each unique worktree's `dx stop`
-before dropping databases/removing clean, merged worktrees. Recovery snapshots
-move to a unique directory under the main checkout's `tmp/dexter-recovery/`;
-retirement prints that path and never prunes it. A failed move preserves the
-worktree and databases. That recovery directory is not disposable by default;
-retention is local and best-effort, so move needed copies before cleaning `tmp/`.
-A known external
-Herdr teammate or a Dexter stop refusal preserves the worktree. Individual agent
-exit never requests daemon shutdown. Unregistered/external clients remain outside
-the team ownership contract: do not retire a tree they still use.
+`--keep <dir>` leaves the prepared source in place for `go test ./...`.
+[patches/README.md](dexter/patches/README.md) records what the patch changes and
+the Go static-analysis rule for it.
 
-Do not run `git clean -x` in team worktrees: it removes the bound command, index
-and recovery snapshots while the daemon may still be running. At merge, remove
-the main checkout's user-owned legacy MCP entry that points to the deleted
-`launch_worktree_lsp.sh`; this branch does not edit ignored local settings.
+## Elixir sources
 
-Run Mix compilation, Credo on edited Elixir files, and relevant tests after
-`dx` mutations: shell-based edits do not trigger the native edit hooks.
-Dexter's formatter
-provides syntax diagnostics only. Per-worktree locks order cooperating `dx` writes;
-native editing tools bypass them. Do not overlap native edits with an in-place
-rename. The full limitations and recovery evidence are in the
-[adapter guide](dexter/README.md#honest-limits).
+Dexter indexes the Elixir standard library from source. Put the release matching
+`elixir --short-version` in the main checkout's ignored `agent/lsp/vendor/elixir-<version>/`
+(from the [Elixir repository](https://github.com/elixir-lang/elixir); the tree
+holds `lib/elixir/lib/enum.ex`), or point `DEXTER_ELIXIR_LIB_ROOT` at another
+checkout's `lib/`. A Homebrew installation has no sources. Provisioning refuses
+to start without them.
+
+## Team provisioning
+
+`agent/teams/task_worktree.py` writes, per worktree:
+
+- `.dexter/dexter.sh`: `exec vendor/dexter --root <worktree> "$@"` with the
+  selected sources exported. Its absolute path is `TIPS_DEXTER` in the session.
+- For Claude, `.dexter/claude-plugin/`: a plugin loaded with `--plugin-dir` whose
+  LSP server runs the same binary with `--root <worktree> lsp <worktree>` and the
+  same sources. Known alternative language-server plugins are disabled in the
+  worktree settings.
+- For Codex, `.codex/config.toml` with the Mix check plugins.
+
+Provisioning then runs `dexter.sh query workspace-symbols --wait <timeout> MixProject`
+and refuses to launch a client if the index does not answer. `team.py stop`
+runs `dexter.sh stop` per worktree before retiring it; an attached client keeps
+the daemon alive and the worktree is preserved. A daemon idles out after fifteen
+minutes without clients and restarts from its index on the next request.
+Do not run `git clean -x` in a team worktree: it removes the bound command and
+the index under `.dexter/`.
+
+## Operations
+
+Positions are 1-based line and character (UTF-16). Results carry Dexter's
+native LSP JSON, whose ranges are 0-based.
+
+| Claude native LSP | Codex `"$TIPS_DEXTER" query …` |
+|---|---|
+| `goToDefinition` | `definition <file> <line> <column>` |
+| `findReferences` | `references <file> <line> <column> [--include-declaration]` |
+| `hover` | `hover <file> <line> <column>` |
+| `documentSymbol` | `symbols <file>` |
+| `workspaceSymbol` | `workspace-symbols [search]` |
+| `goToImplementation` | `implementation <file> <line> <column>` |
+| `prepareCallHierarchy` | `prepare-call-hierarchy <file> <line> <column>` |
+| `incomingCalls` | `incoming-calls <file> <line> <column>` |
+| `outgoingCalls` | `outgoing-calls <file> <line> <column>` |
+
+`query` waits up to `--wait <duration>` (default 30s) for a cold index and exits
+non-zero with the reason on stderr. Files are relative to the worktree. The stock
+`lookup` and `references <module>` name searches are unchanged.
+
+## Limits
+
+- Freshness is not strict: the daemon watches saved files, but an empty answer
+  is not proof of absence. Rerun after large checkouts or generated code.
+- Claude's native tool sees saved files. After `Edit`, formatting or generators,
+  results reflect the file on disk.
+- Diagnostics are syntax only; use Mix compile, Credo and tests for the rest.
+- Rename, code actions and formatting through Dexter are not offered.
+- Correctness is bounded by the patch's recorded cases; see
+  [patches/README.md](dexter/patches/README.md).

@@ -29,6 +29,7 @@ class FixtureState(TypedDict):
     wrong_start_root: str
     shell_timeout: bool
     dexter_fails: bool
+    dexter_empty: bool
     dexter_stdlib: str | None
 
 
@@ -50,7 +51,6 @@ launch_seconds = 120
 shutdown_seconds = 15
 shell_seconds = 15
 dexter_startup_seconds = 60
-dexter_tool_seconds = 120
 checks_minutes = 30
 
 [launch]
@@ -218,7 +218,7 @@ if a[:2] == ["agent", "start"]:
             "TIPS_CHECK_TIMEOUT_SECONDS",
             "TIPS_TEAM_CONFIG",
             "TIPS_PROVIDER_ENV_FILE",
-            "TIPS_DX",
+            "TIPS_DEXTER",
         ]
     }
     state["launch_argv"] = a
@@ -239,22 +239,23 @@ if a[:2] == ["agent", "start"]:
 reply({"error": "unhandled fake Herdr command: " + repr(a)}, 2)
 """
 )
-FAKE_DX = r"""import argparse, json, os, sys
+# Stands in for the built binary: the last --root wins, as in Dexter's CLI.
+FAKE_DEXTER = r"""#!/usr/bin/env python3
+import json, os, sys
 from pathlib import Path
-parser = argparse.ArgumentParser()
-parser.add_argument('--root')
-parser.add_argument('--binary')
-parser.add_argument('--timeout')
-parser.add_argument('operation')
-args = parser.parse_args()
-root = args.root
+argv, root = sys.argv[1:], os.getcwd()
+while '--root' in argv:
+    i = argv.index('--root')
+    root = argv[i + 1]
+    del argv[i : i + 2]
 state_path = Path(os.environ['FAKE_HERDR_STATE'])
 state = json.loads(state_path.read_text())
-state['events'].append(['dexter', root, args.operation])
+state['events'].append(['dexter', root, *argv])
 state['dexter_stdlib'] = os.environ.get('DEXTER_ELIXIR_LIB_ROOT')
 state_path.write_text(json.dumps(state))
-print(json.dumps({'ok': not state.get('dexter_fails'), 'root': root}))
-sys.exit(1 if state.get('dexter_fails') else 0)
+if state.get('dexter_fails'):
+    sys.exit(1)
+print('[]' if state.get('dexter_empty') else json.dumps([{'name': 'Fixture.MixProject'}]))
 """
 
 FAKE_STOP = r"""import json,os,subprocess,sys
@@ -286,7 +287,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
             os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1", HERDR_ENV="1"
         )
         self.env.pop("TIPS_TEAM_CONFIG", None)
-        self.env.setdefault("DEXTER_ELIXIR_LIB_ROOT", str(self.root / "fixture-stdlib"))
+        self.env["DEXTER_ELIXIR_LIB_ROOT"] = str(self.root / "fixture-stdlib")
         for k in (
             "TIPS_DB_SUFFIX",
             "TIPS_TEST_PORT",
@@ -303,14 +304,15 @@ class WorktreeIntegrationTest(unittest.TestCase):
             ".agents/skills",
             "agent/lsp/dexter/vendor",
             "fakebin",
+            "fixture-stdlib/elixir/lib",
         ):
             (self.root / d).mkdir(parents=True)
+        (self.root / "fixture-stdlib/elixir/lib/enum.ex").write_text("defmodule Enum do\nend\n")
         (self.root / ".gitignore").write_text(
             ".codex/\n.claude/\n.agents/\n.dexter/\nagent/lsp/dexter/vendor/\n.worktrees/\nfakebin/\nsta"
-            "te.json\nstop.py\n"
+            "te.json\nstop.py\nfixture-stdlib/\n"
         )
         shutil.copy(TEAMS / "task_worktree.py", self.root / "agent/teams/task_worktree.py")
-        (self.root / "agent/lsp/dexter/dx.py").write_text(FAKE_DX)
         (self.root / "agent/teams/team.py").write_text(
             (TEAMS / "team.py").read_text()
             + (
@@ -322,7 +324,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
         (self.root / "agent/teams/config.toml").write_text(CONFIG)
         (self.root / "tracked.txt").write_text("base\n")
         binary = self.root / "agent/lsp/dexter/vendor/dexter"
-        binary.write_text("#!/bin/sh\nexit 0\n")
+        binary.write_text(FAKE_DEXTER)
         binary.chmod(0o755)
         self.git("add", ".")
         self.commit("base")
@@ -439,8 +441,9 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call()
         path = self.wt / ".codex/config.toml"
         assert "mcp_servers" not in tomllib.loads(path.read_text())
-        assert str(self.wt) in (self.wt / ".dexter/dx/command.sh").read_text()
+        assert str(self.wt) in (self.wt / ".dexter/dexter.sh").read_text()
         assert not (self.wt / ".claude").exists()
+        assert not (self.wt / ".dexter/claude-plugin").exists()
         before = path.stat().st_mtime_ns
         self.call()
         assert before == path.stat().st_mtime_ns
@@ -455,7 +458,16 @@ class WorktreeIntegrationTest(unittest.TestCase):
         ]
         for name in ("elixir-lsp@elixir-agent-tools", "elixir-ls@skills-dir", "dexter-lsp@dexter"):
             assert plugins[name] is False
+        plugin = self.wt / ".dexter/claude-plugin"
+        server = json.loads((plugin / ".claude-plugin/plugin.json").read_text())["lspServers"][
+            "dexter"
+        ]
+        assert server["command"] == str(self.root / "agent/lsp/dexter/vendor/dexter")
+        assert server["args"] == ["--root", str(self.wt), "lsp", str(self.wt)]
+        assert server["env"] == {"DEXTER_ELIXIR_LIB_ROOT": str(self.root / "fixture-stdlib")}
+        assert set(server["extensionToLanguage"]) == {".ex", ".exs", ".heex"}
         s = self.state()
+        assert s["launch_argv"][s["launch_argv"].index("--plugin-dir") + 1] == str(plugin)
         assert s["launch_env"] == {
             "PGPORT": "5433",
             "TIPS_DB_SUFFIX": "_t6r",
@@ -466,7 +478,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
             "TIPS_CHECK_TIMEOUT_SECONDS": "1800",
             "TIPS_TEAM_CONFIG": str(self.root / "agent/teams/config.toml"),
             "TIPS_PROVIDER_ENV_FILE": str(self.root / ".env"),
-            "TIPS_DX": str(self.wt / ".dexter/dx/command.sh"),
+            "TIPS_DEXTER": str(self.wt / ".dexter/dexter.sh"),
         }
         assert s["cwd"] == str(self.wt)
         assert "fixture-test" in s["launch_argv"]
@@ -654,9 +666,14 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.save(s)
         self.call("--start", ok=False)
 
-    def test_missing_tool_and_invalid_team_refused(self) -> None:
+    def test_missing_tool_sources_and_invalid_team_refused(self) -> None:
         self.call("--start", team="7", ok=False)
         assert not self.wt.exists()
+        self.env["DEXTER_ELIXIR_LIB_ROOT"] = str(self.root / "no-sources")
+        result = self.call("--start", ok=False)
+        assert "Elixir sources are missing" in result.stderr
+        assert not self.wt.exists()
+        self.env["DEXTER_ELIXIR_LIB_ROOT"] = str(self.root / "fixture-stdlib")
         (self.root / "agent/lsp/dexter/vendor/dexter").unlink()
         self.call("--start", ok=False)
         assert not self.wt.exists()
@@ -668,6 +685,11 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call("--start", ok=False)
         assert not any(e[:2] == ["agent", "start"] for e in self.state()["events"])
         assert self.wt.exists()
+        state = self.state()
+        state["dexter_fails"], state["dexter_empty"] = False, True
+        self.save(state)
+        assert "no MixProject" in self.call("--start", ok=False).stderr
+        assert not any(e[:2] == ["agent", "start"] for e in self.state()["events"])
 
     def test_shell_setup_failure_never_starts_agent(self) -> None:
         s = self.state()
@@ -687,24 +709,14 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert not any(e[0] == "stop_agent" for e in self.state()["events"])
         assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 1
 
-    def test_canonical_adapter_not_needed_in_reviewed_commit(self) -> None:
-        self.git("rm", "agent/lsp/dexter/dx.py")
-        self.commit("old revision without adapter")
-        old = self.git("rev-parse", "HEAD")
-        (self.root / "agent/lsp/dexter").mkdir(exist_ok=True)
-        (self.root / "agent/lsp/dexter/dx.py").write_text(FAKE_DX)
-        self.call("--start", ref=old)
-        wrapper = (self.wt / ".dexter/dx/command.sh").read_text()
-        assert str(self.root / "agent/lsp/dexter/dx.py") in wrapper
-        assert not (self.wt / "agent/lsp/dexter/dx.py").exists()
-
     def test_kind_mismatch_and_configurable_dexter_timeout(self) -> None:
         self.call("--kind", "claude", ok=False)
         assert not self.wt.exists()
         path = self.root / "agent/teams/config.toml"
-        path.write_text(CONFIG.replace("dexter_tool_seconds = 120", "dexter_tool_seconds = 180"))
+        path.write_text(CONFIG.replace("dexter_startup_seconds = 60", "dexter_startup_seconds = 7"))
         self.call()
-        assert "--timeout 180" in (self.wt / ".dexter/dx/command.sh").read_text()
+        assert "--wait" in self.state()["events"][-1]
+        assert "7s" in self.state()["events"][-1]
 
     def test_role_inferred_from_agent_name_and_policy_from_config(self) -> None:
         path = self.root / "agent/teams/config.toml"
@@ -872,16 +884,27 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call("--agent", "team-3-dev", ok=False)
         assert not self.wt.exists()
 
-    def test_wrapper_explicit_root_is_used_from_main(self) -> None:
+    def test_bound_command_keeps_its_root_and_sources_from_anywhere(self) -> None:
         self.call()
-        result = execute(
-            ["/bin/sh", self.wt / ".dexter/dx/command.sh", "hover", "--root", self.root],
+        env = dict(self.env)
+        env.pop("DEXTER_ELIXIR_LIB_ROOT")
+        execute(
+            ["/bin/sh", self.wt / ".dexter/dexter.sh", "query", "hover", "a.ex", "1", "1"],
             cwd=self.root,
-            env=self.env,
+            env=env,
             input_text="",
             check=True,
         )
-        assert json.loads(result.stdout)["root"] == str(self.wt)
+        assert self.state()["events"][-1] == [
+            "dexter",
+            str(self.wt),
+            "query",
+            "hover",
+            "a.ex",
+            "1",
+            "1",
+        ]
+        assert self.state()["dexter_stdlib"] == str(self.root / "fixture-stdlib")
 
     def test_codex_disables_old_lsp_without_changing_approval_policy(self) -> None:
         self.call("--start")
@@ -893,35 +916,50 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert "mcp_servers.elixir-lsp.enabled=false" not in self.state()["launch_argv"]
         assert "approval_policy" not in cfg
         assert "never" in self.state()["launch_argv"]
-        assert str(self.wt / ".dexter/dx/command.sh") in self.state()["launch_argv"][-1]
+        assert str(self.wt / ".dexter/dexter.sh") in self.state()["launch_argv"][-1]
 
-    def test_dexter_starts_at_provisioning_and_client_uses_bound_command(self) -> None:
+    def test_dexter_warms_up_at_provisioning_and_client_uses_bound_command(self) -> None:
         self.call()
-        wrapper = self.wt / ".dexter/dx/command.sh"
+        wrapper = self.wt / ".dexter/dexter.sh"
         assert wrapper.is_file()
         starts = [e for e in self.state()["events"] if e[0] == "dexter"]
-        assert starts[-1][1:] == [str(self.wt), "start"]
+        assert starts[-1][1:] == [
+            str(self.wt),
+            "query",
+            "workspace-symbols",
+            "--wait",
+            "60s",
+            "MixProject",
+        ]
+        assert self.state()["dexter_stdlib"] == str(self.root / "fixture-stdlib")
         self.call("--start")
-        assert self.state()["launch_env"]["TIPS_DX"] == str(wrapper)
+        assert self.state()["launch_env"]["TIPS_DEXTER"] == str(wrapper)
         assert str(wrapper) in self.state()["launch_argv"][-1]
 
-    def test_stdlib_default_uses_target_toolchain_and_preserves_saved_config(self) -> None:
+    def test_stdlib_default_uses_target_toolchain_and_keeps_the_bound_sources(self) -> None:
         self.env.pop("DEXTER_ELIXIR_LIB_ROOT", None)
         elixir = self.root / "fakebin/elixir"
         elixir.write_text(
-            '#!/bin/sh\ntest "$PWD" = "$EXPECTED_WORKTREE" || exit 1\nprintf "1.2.3\\n"\n'
+            '#!/bin/sh\nprintf "%s\\n" "$PWD" >> "$ELIXIR_CWD_LOG"\nprintf "1.2.3\\n"\n'
         )
         elixir.chmod(0o755)
-        self.env["EXPECTED_WORKTREE"] = str(self.wt)
+        self.env["ELIXIR_CWD_LOG"] = str(self.root / "elixir-cwd")
+        sources = self.root / "agent/lsp/vendor/elixir-1.2.3/lib"
+        self.call(ok=False)
+        assert not self.wt.exists()
+        (sources / "elixir/lib").mkdir(parents=True)
+        (sources / "elixir/lib/enum.ex").write_text("")
         self.call()
-        assert self.state()["dexter_stdlib"] == str(self.root / "agent/lsp/vendor/elixir-1.2.3/lib")
-        (self.wt / ".dexter/dx/stdlib.json").write_text('{"root":"saved-by-dx"}')
-        elixir.unlink()
+        assert self.state()["dexter_stdlib"] == str(sources)
         self.call()
-        assert self.state()["dexter_stdlib"] is None
-        self.env["DEXTER_ELIXIR_LIB_ROOT"] = str(self.root / "explicit-sources")
-        self.call()
-        assert self.state()["dexter_stdlib"] == self.env["DEXTER_ELIXIR_LIB_ROOT"]
+        assert (self.root / "elixir-cwd").read_text().splitlines() == [str(self.root)] * 2 + [
+            str(self.wt)
+        ]
+        # The worktree keeps the sources it was bound to; a different selection
+        # is a configuration change, refused while the files exist.
+        self.env["DEXTER_ELIXIR_LIB_ROOT"] = str(self.root / "fixture-stdlib")
+        assert "Refusing to overwrite" in self.call(ok=False).stderr
+        assert str(sources) in (self.wt / ".dexter/dexter.sh").read_text()
 
     @unittest.skipUnless(
         os.environ.get("TIPS_TEST_REAL_CODEX"), "opt-in installed Codex config check"
@@ -997,16 +1035,13 @@ class WorktreeIntegrationTest(unittest.TestCase):
         changed.replace(roots[0] / "sample.ex")
         for root, doc in zip(roots, ("First tree only", "Original documentation"), strict=True):
             result = execute(
-                ["/bin/sh", root / ".dexter/dx/command.sh", "hover", "--root", self.root],
+                ["/bin/sh", root / ".dexter/dexter.sh", "query", "hover", "sample.ex", "3", "8"],
                 cwd=self.root,
                 env=self.env,
-                input_text=json.dumps({"file": "sample.ex", "line": 3, "column": 8}),
+                input_text="",
                 check=True,
             )
-            report = json.loads(result.stdout)
-            assert report["root"] == str(root)
-            assert doc in json.dumps(report["result"])
-            assert report["stdlib"]["status"] == "configured"
+            assert doc in json.dumps(json.loads(result.stdout))
 
     def test_symlinked_dexter_state_is_refused_before_writing(self) -> None:
         self.call()
@@ -1027,7 +1062,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
         state["agents"] = [first]
         self.save(state)
         self.call("--start", "--share", role="test", task="29-shared", ref=False)
-        assert self.state()["launch_env"]["TIPS_DX"] == str(root / ".dexter/dx/command.sh")
+        assert self.state()["launch_env"]["TIPS_DEXTER"] == str(root / ".dexter/dexter.sh")
         assert {a["agent"] for a in self.state()["agents"]} == {"codex", "claude"}
         assert not any(e[0] == "stop_agent" for e in self.state()["events"])
 
