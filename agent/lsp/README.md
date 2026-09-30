@@ -87,10 +87,25 @@ non-zero with the reason on stderr. Files are relative to the worktree. The stoc
 
 ## Limits
 
-- Freshness is not strict: the daemon watches saved files, but an empty answer
+- Freshness is not strict. The daemon watches saved files, but an empty answer
   is not proof of absence. Rerun after large checkouts or generated code.
-- Claude's native tool sees saved files. After `Edit`, formatting or generators,
-  results reflect the file on disk.
+- Claude's native tool sees the file on disk when it opens a buffer, and an
+  open buffer follows later disk changes (`Edit`, `mix format`, generators,
+  shell rewrites) by size and mtime. A buffer with real unsaved changes belongs
+  to that session alone, so native answers can differ from `query` answers on
+  the same worktree until the buffer is saved. One writer per worktree.
+- Call hierarchy answers are standard LSP items and carry no reasons. The old
+  adapter's `unavailable` list, `unresolved_count`, exactly-once accounting and
+  `freshness` field are gone: a call the resolver cannot own is omitted, never
+  mis-owned, and nothing in the answer says so. Omitted on purpose:
+  - incoming: calls in typespecs, quote bodies and defs inside `quote`, files
+    that do not parse cleanly, top-level and module-body calls, test labels
+    built by interpolation, modules named by a variable, heads named by
+    `unquote`;
+  - outgoing: Erlang module calls (`:ets`, `:crypto`), anonymous calls
+    (`fun.()`), field access, operators and language forms (`if`, `case`).
+  Text that moved since the index was built is re-checked and dropped when the
+  occurrence no longer matches.
 - Diagnostics are syntax only; use Mix compile, Credo and tests for the rest.
 - Rename, code actions and formatting through Dexter are not offered.
 - Correctness is bounded by the patch's recorded cases; see
