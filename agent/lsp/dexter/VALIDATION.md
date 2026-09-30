@@ -361,7 +361,7 @@ sources; the supported and unsupported forms are listed in
 
 The patch extension covers imported bare captures, one-line imported calls,
 aliased imports and bare local type definitions
-([patch record](patches/README.md#reference-discovery-and-local-types-2026-09-30);
+([patch record](patches/README.md#retained-tests);
 triage in the main checkout's `tmp/dexter-reference-triage/TRIAGE.md`).
 
 Fixture and oracle: the references/type-definition fixture at commit `6958b68`

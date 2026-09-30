@@ -106,10 +106,9 @@ unchanged.
   shell rewrites) by size and mtime. A buffer with real unsaved changes belongs
   to that session alone, so native answers can differ from `query` answers on
   the same worktree until the buffer is saved. One writer per worktree.
-- Call hierarchy answers are standard LSP items and carry no reasons. The old
-  adapter's `unavailable` list, `unresolved_count`, exactly-once accounting and
-  `freshness` field are gone: a call the resolver cannot own is omitted without
-  a completeness indicator. When completeness matters, cross-check
+- Call hierarchy answers are standard LSP items and carry no reasons: a call
+  the resolver cannot own is omitted without a completeness indicator. When
+  completeness matters, cross-check
   `findReferences` against the `fromRanges` of `incomingCalls` and review each
   reference with no matching range by hand: it may be a call the hierarchy
   left out, or a reference the heuristic over-counted (injected defs). A
@@ -124,6 +123,10 @@ unchanged.
     (`fun.()`), field access, operators and language forms (`if`, `case`).
   Text that moved since the index was built is re-checked and dropped when the
   occurrence no longer matches.
+- Admission fails closed: an unreadable directory anywhere under the worktree
+  outside the usual exclusions (`deps/`, `_build/` and the like) refuses
+  `query` and native startup with a permission error. Fix the permission or
+  remove the directory; there is no skip option.
 - Diagnostics are syntax only; use Mix compile, Credo and tests for the rest.
 - Rename, code actions and formatting through Dexter are not offered.
 - Correctness is bounded by the patch's recorded cases; see
