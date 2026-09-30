@@ -50,8 +50,9 @@ refuses to start unless the tree's `VERSION` matches the worktree's toolchain.
 any caller directory. Each leaf worktree gets its own daemon and index, and
 leaf worktrees run concurrently. A checkout that contains another checkout,
 including the main Tips checkout with its linked worktrees under
-`.worktrees/`, is refused. Out of this beta: an application in a subdirectory
-or monorepo, and a root or source directory reached through a symlink.
+`.worktrees/`, is refused. A root reached through a symlink is admitted only
+under the exact spelling it was bound with. Out of this beta: an application
+in a subdirectory or monorepo.
 
 ## Team provisioning
 

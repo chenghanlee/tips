@@ -10,7 +10,7 @@ source branch; nobody edits it by hand.
 patch in a copy, and builds with
 `-ldflags "-X github.com/remoteoss/dexter/internal/version.LocalBuildID=<id>"`
 where `<id>` is the SHA-256 of the bytes `"<pin>\n<patch sha256>\n"`. It
-asserts `dexter version` prints `0.7.2` and `local_build_id <id>`, then writes
+asserts that `dexter version` reports that id, then writes
 `../vendor/build.json` (upstream, patch sha, id, binary sha, Go version).
 A frontend and a daemon with different ids refuse each other, so stop a
 worktree's daemon with its current `.dexter/dexter.sh stop` before replacing
@@ -35,36 +35,21 @@ the binary, and re-provision afterwards.
 ## Retained tests
 
 Run in the source tree with `go test ./... -count=1`; CI does the same on the
-pin plus patch.
+pin plus patch. By behaviour, with the test files that hold them:
 
-- `internal/lsp`: `TestArityMatching`, `TestArity_InversionMatrix`,
-  `TestArity_LocalSameNameDifferentArity`,
-  `TestArity_NonASCIIBeforeCallsUsesUTF16Columns`,
-  `TestArity_UndefinedArityIsNotAnotherArity`,
-  `TestArity_UndefinedCallDoesNotFallThroughToType`,
-  `TestReferences_ExplicitImportsFindEveryUse`,
-  `TestCallHierarchyArity`, `TestCallHierarchyImportedArity`,
-  `TestCallHierarchyIncomingOwners`, `TestCallHierarchyIncomingFollowUps`,
-  `TestCallHierarchyIncomingRechecksIdentity`,
-  `TestCallHierarchyNestedModuleResumes`, `TestCallHierarchyOutgoing`,
-  `TestCallHierarchyStaleIndex`,
-  `TestPrepareCallHierarchyGeneratedFunctionUsesCallArity`,
-  `TestPrepareCallHierarchyGeneratedAfterNestedModule`,
-  `TestDocumentStore_FollowsSameSizeRewrite`,
-  `TestDocumentStore_FollowSavedUnderConcurrentRewrites`,
-  `TestDocumentStore_ReloadedBufferIsNotTheEditorsText`,
-  `TestDocumentStore_ReloadLosesToANewerDidChange`.
-- `internal/workspace`: `TestDocumentsFollowSavedFilesAndKeepUnsavedBuffers`.
-- `internal/treesitter`: `TestFunctionOccurrenceAt`,
-  `TestFunctionOccurrenceAt_BareName`,
-  `TestFunctionOccurrences_ReportsEveryOccurrenceOnALine`,
-  `TestFunctionOccurrences_DelegateHeads`.
-- `internal/daemon`: `TestEnsureRefusesAnotherBuildWithoutReplacingIt`,
-  `TestPipeHandshakeRefusesOtherBuildsBeforeContract`.
-- root: `TestQuery_WorktreeIsolationAndLSPHandlers`,
-  `TestQuery_RejectsWrongRootsFilesAndWrites`,
-  `TestQuery_NativeExactRootAdmission`, `TestQuery_LibraryNavigation`,
-  `TestQuery_RepeatedSavedFileReads`.
+- Arity-aware navigation: `internal/lsp/arity_integration_test.go`
+  (`TestArity_InversionMatrix` is the matrix), `internal/lsp/hover_test.go`,
+  `internal/treesitter/arity_test.go`.
+- References through imports and local types:
+  `internal/lsp/import_references_local_types_test.go`.
+- Call hierarchy owners and sites: `internal/lsp/call_hierarchy_test.go`
+  (`TestCallHierarchyIncomingOwners` and `TestCallHierarchyOutgoing` are the
+  fixtures' matrices), `internal/lsp/call_hierarchy_generated_arity_test.go`.
+- Saved-file following and unsaved buffers: `internal/lsp/documents_test.go`,
+  `internal/workspace/saved_file_sync_test.go`.
+- Build identity handshake: `internal/daemon/*_test.go`.
+- `query` contract, root admission and library navigation:
+  `query_integration_test.go`.
 
 The Elixir fixtures under `internal/lsp/testdata/` are the recorded cases;
 correctness is claimed for those constructs and no others.
