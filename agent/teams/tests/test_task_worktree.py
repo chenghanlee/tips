@@ -1030,17 +1030,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
             self.call(
                 "--start", "--pane", f"wA:p{team}D", role="dev", team=team, task=task, ref=False
             )
-            self.call(
-                "--start",
-                "--share",
-                "--pane",
-                f"wA:p{team}T",
-                role="test",
-                team=team,
-                task=task,
-                ref=False,
-            )
-        assert len(self.state()["agents"]) == 4
+        assert len(self.state()["agents"]) == 2
         changed = roots[0] / ".replace"
         changed.write_text(source.replace("Original documentation", "First tree only"))
         changed.replace(roots[0] / "sample.ex")
@@ -1064,17 +1054,18 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call("--start", "--force", ok=False)
         assert snapshot(elsewhere) == before
 
-    def test_explicit_mixed_harness_teammate_can_join_same_tree(self) -> None:
+    def test_second_team_agent_cannot_join_a_live_task_tree(self) -> None:
         self.call("--start", role="dev", task="29-shared", ref=False)
-        root = self.root / ".worktrees/29-shared"
         first = self.state()["agents"][0]
         first["pane_id"] = "wA:pC"
         state = self.state()
         state["agents"] = [first]
         self.save(state)
-        self.call("--start", "--share", role="test", task="29-shared", ref=False)
-        assert self.state()["launch_env"]["TIPS_DEXTER"] == str(root / ".dexter/dexter.sh")
-        assert {a["agent"] for a in self.state()["agents"]} == {"codex", "claude"}
+        refused = self.call("--start", role="test", task="29-shared", ref=False, ok=False)
+        assert "Conflicting live agent" in refused.stderr
+        unknown = self.call("--share", role="test", task="29-shared", ref=False, ok=False)
+        assert unknown.returncode == 2, unknown.stderr
+        assert [a["pane_id"] for a in self.state()["agents"]] == ["wA:pC"]
         assert not any(e[0] == "stop_agent" for e in self.state()["events"])
 
 

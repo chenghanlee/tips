@@ -69,7 +69,6 @@ Perform main-checkout Git administration a sandboxed tech lead cannot. Relay den
 ## Lost session or environment
 
 - Running client missing launch variables: rerun its helper command at current SHA; reuse session and reapply environment.
-- For a shared worktree, retain `--share` when rerunning either teammate's helper command.
 - Absent client, except developer: rerun role command with `--start` at current head; helper launches a fresh client.
 - Running tester at same SHA: helper reuses, never replaces. Rejected design: use `--start` at new head to stop old client and verify descendant exit.
 - Lost developer: Not defined. Inspect Git and pane evidence first; never reset or stash anyone's work.

@@ -30,6 +30,8 @@ agent/lsp/dexter/vendor/dexter version   # 0.7.2, then: local_build_id <id>
 A daemon and a client with different ids refuse each other and nothing replaces
 the running daemon. Before rebuilding over active teams, stop each worktree's
 daemon with its bound command, build, then re-provision.
+The build refuses to replace a binary used by a running daemon and aborts if
+it cannot inspect processes. Keep agents stopped until the build finishes.
 
 `--keep <dir>` leaves the prepared source in place for `go test ./...`.
 [patches/README.md](dexter/patches/README.md) records what the patch changes and
@@ -48,12 +50,12 @@ refuses to start unless the tree's `VERSION` matches the worktree's toolchain.
 
 `--root` must be the exact checkout Dexter serves: a directory holding `.git`
 or `mix.exs`, never one with only a `.dexter/` index. The command works from
-any caller directory. Each leaf worktree gets its own daemon and index, and
-leaf worktrees run concurrently. A checkout that contains another checkout,
-including the main Tips checkout with its linked worktrees under
-`.worktrees/`, is refused. A root reached through a symlink is admitted only
-under the exact spelling it was bound with. Out of this beta: an application
-in a subdirectory or monorepo.
+any caller directory. Each worktree gets its own daemon and index, and
+worktrees run concurrently. Nested checkouts, including scratch clones and
+linked worktrees under `.worktrees/`, are excluded from the parent's index
+and watcher. Dependency sources under `deps/` remain available. A root reached
+through a symlink is admitted only under the exact spelling it was bound with.
+Out of this beta: an application in a subdirectory or monorepo.
 
 ## Team provisioning
 
@@ -103,11 +105,12 @@ unchanged.
 
 - Freshness is not strict. The daemon watches saved files, but an empty answer
   is not proof of absence. Rerun after large checkouts or generated code.
-- Claude's native tool sees the file on disk when it opens a buffer, and an
-  open buffer follows later disk changes (`Edit`, `mix format`, generators,
-  shell rewrites) by size and mtime. A buffer with real unsaved changes belongs
-  to that session alone, so native answers can differ from `query` answers on
-  the same worktree until the buffer is saved. One writer per worktree.
+- File-backed navigation uses saved disk text in both Claude and Codex.
+  Document notifications invalidate cached text; they cannot replace newer
+  disk contents with an older buffer. Cached files follow later disk changes
+  (`Edit`, `mix format`, generators, shell rewrites) by size and mtime.
+  Save before navigating; unsaved editor buffers are not supported.
+  One writer per worktree.
 - Call hierarchy answers are standard LSP items and carry no reasons: a call
   the resolver cannot own is omitted without a completeness indicator. When
   completeness matters, cross-check
@@ -125,10 +128,6 @@ unchanged.
     (`fun.()`), field access, operators and language forms (`if`, `case`).
   Text that moved since the index was built is re-checked and dropped when the
   occurrence no longer matches.
-- Admission fails closed: an unreadable directory anywhere under the worktree
-  outside the usual exclusions (`deps/`, `_build/` and the like) refuses
-  `query` and native startup with a permission error. Fix the permission or
-  remove the directory; there is no skip option.
 - Diagnostics are syntax only; use Mix compile, Credo and tests for the rest.
 - Rename, code actions and formatting through Dexter are not offered.
 - Correctness is bounded by the patch's recorded cases; see

@@ -14,7 +14,9 @@ asserts that `dexter version` reports that id, then writes
 `../vendor/build.json` (upstream, patch sha, id, binary sha, Go version).
 A frontend and a daemon with different ids refuse each other, so stop a
 worktree's daemon with its current `.dexter/dexter.sh stop` before replacing
-the binary, and re-provision afterwards.
+the binary, and re-provision afterwards. The build checks for running daemons
+before compilation and immediately before installing the verified binary;
+failed process inspection aborts the build. Keep agents stopped during the build.
 
 ## What the patch adds
 
@@ -26,9 +28,10 @@ the binary, and re-provision afterwards.
   through explicit imports; incoming calls credited to their lexical owner
   (def clause, `test`, `setup`, `setup_all`); one outgoing site per call
   occurrence across every clause, guards and defaults included.
-- Open documents follow later saved changes by size and mtime; an unsaved
-  buffer stays with its session.
-- Root admission: the exact leaf checkout (a `.git` checkout or a Mix project
+- File-backed navigation is disk-authoritative. Notifications invalidate
+  cached snapshots; reads load disk text and follow later changes by size and
+  mtime. Unsaved editor buffers are not supported.
+- Root admission: the exact checkout (a `.git` checkout or a Mix project
   with `mix.exs`; a directory holding only an index is refused), its
   dependency sources and the configured Elixir sources; anything else is
   refused.
@@ -45,24 +48,29 @@ pin plus patch. By behaviour, with the test files that hold them:
 - References through imports: `internal/lsp/import_references_test.go`.
 - Call hierarchy owners and sites: `internal/lsp/call_hierarchy_test.go`
   (`TestCallHierarchyIncomingOwners` and `TestCallHierarchyOutgoing` are the
-  fixtures' matrices), `internal/lsp/call_hierarchy_generated_arity_test.go`.
-- Saved-file following and unsaved buffers: `internal/lsp/documents_test.go`,
+  fixtures' matrices), `internal/lsp/call_hierarchy_generated_arity_test.go`,
+  `internal/lsp/call_hierarchy_target_test.go`.
+- Disk-backed documents and notification ordering: `internal/lsp/documents_test.go`,
   `internal/workspace/saved_file_sync_test.go`.
 - Build identity handshake: `internal/daemon/*_test.go`.
 - `query` contract, root admission and library navigation:
   `query_integration_test.go`, `lsp_integration_test.go`.
+- Nested checkout exclusion and watcher events:
+  `internal/workspace/nested_checkout_test.go`,
+  `internal/workspace/nested_checkout_darwin_test.go`, `internal/parser/parser_test.go`.
+
+The build-script safety checks run from Tips with
+`python3 agent/lsp/dexter/test_build.py`.
 
 The Elixir fixtures under `internal/lsp/testdata/` are the recorded cases;
 correctness is claimed for those constructs and no others.
 
 ## Limits
 
-- Refusing a checkout that contains another checkout, including the main Tips
-  checkout with `.worktrees/`, is local beta policy. Upstream already skips
-  linked worktrees when indexing; this beta refuses the parent outright.
+- Nested checkouts are excluded from indexing and watching. Request membership
+  checks still refuse their files; dependency sources remain available.
 - A root reached through a symlink is admitted only under the exact spelling
   it was bound with.
-- An unreadable directory outside the indexer's exclusions refuses startup.
 - Not offered: rename, code actions, formatting, type definition, strict
   freshness. Nothing here is a compatibility promise toward any earlier
   adapter or fix.

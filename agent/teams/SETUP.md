@@ -75,17 +75,3 @@ Follow [shared Checks](README.md#shared-rules): check commands, CI evidence, tes
 ## Milestones
 
 Read the [Project 15 readme](https://github.com/users/chenghanlee/projects/15) with `gh project view 15 --owner chenghanlee`. Milestones, gate issues and dev-adapter policy live there, never mirrored here. Gates name environment, revision, evidence and unresolved blockers.
-
-## Sharing a task worktree
-
-Keep separate reviewer worktrees by default. To deliberately join the developer's
-worktree, use the same task slug with `--share`, a different coding role/pane,
-and no `--review-ref`. For example, with your assigned task/team/pane values:
-
-```sh
-agent/teams/task_worktree.py "$TASK" --team "$N" --role lead --pane "$PANE" --share --start
-```
-
-Both sessions share the same bound Dexter; neither owns the shared daemon.
-Existing configurations cannot change while a teammate is running. Independent review still requires a reviewer
-who did not implement the change; sharing a checkout does not waive that rule.

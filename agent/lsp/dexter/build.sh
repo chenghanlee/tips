@@ -18,6 +18,14 @@ ldflags_var=github.com/remoteoss/dexter/internal/version.LocalBuildID
 
 fail() { echo "build.sh: $*" >&2; exit 1; }
 sha256() { if command -v sha256sum >/dev/null; then sha256sum "$1"; else shasum -a 256 "$1"; fi | cut -d' ' -f1; }
+check_idle_binary() {
+  local processes
+  processes="$(ps -A -ww -o args=)" \
+    || fail "cannot inspect processes; stop worktree daemons and retry where ps is available"
+  if printf '%s\n' "$processes" | grep -F -- "$vendor/dexter daemon " >/dev/null; then
+    fail "running daemon uses $vendor/dexter; stop it with its bound .dexter/dexter.sh stop, then rebuild and re-provision"
+  fi
+}
 
 repository="${1:-}"
 keep=""
@@ -32,6 +40,7 @@ test -n "$repository" || fail "usage: build.sh <dexter-git-repository> [--keep <
 git -C "$repository" cat-file -e "$upstream^{commit}" 2>/dev/null || fail "$repository does not contain upstream commit $upstream"
 test -s "$patch_file" || fail "missing $patch_file"
 command -v go >/dev/null || fail "go is not installed"
+check_idle_binary
 
 patch_sha="$(sha256 "$patch_file")"
 build_id="$(printf '%s\n%s\n' "$upstream" "$patch_sha" | { if command -v sha256sum >/dev/null; then sha256sum; else shasum -a 256; fi; } | cut -d' ' -f1)"
@@ -51,15 +60,17 @@ git -C "$source_dir" init -q
 git -C "$source_dir" apply --check "$patch_file"
 git -C "$source_dir" apply "$patch_file"
 
-echo 'Active worktrees: stop their daemons with the existing bound command before replacing this build; re-provision them after it.' >&2
-mkdir -p "$vendor"
-(cd "$source_dir" && go build -trimpath -buildvcs=false -ldflags "-X $ldflags_var=$build_id" -o "$vendor/dexter" ./cmd/)
+(cd "$source_dir" && go build -trimpath -buildvcs=false -ldflags "-X $ldflags_var=$build_id" -o "$source_dir/dexter" ./cmd/)
 
-version_output="$("$vendor/dexter" version)"
+version_output="$("$source_dir/dexter" version)"
 printf '%s\n' "$version_output" | grep -qw -- "$build_id" \
   || fail "built binary does not report local build id $build_id; 'dexter version' printed: $version_output"
 
-binary_sha="$(sha256 "$vendor/dexter")"
+binary_sha="$(sha256 "$source_dir/dexter")"
+# Recheck after compilation, immediately before replacing the shared executable.
+check_idle_binary
+mkdir -p "$vendor"
+mv "$source_dir/dexter" "$vendor/dexter"
 cat > "$vendor/build.json" <<JSON
 {
   "upstream": "$upstream",

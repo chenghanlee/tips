@@ -64,7 +64,6 @@ class Arguments(argparse.Namespace):
     start: bool
     force: bool
     ui: bool
-    share: bool
 
 
 def parse_arguments() -> Arguments:
@@ -83,11 +82,6 @@ def parse_arguments() -> Arguments:
     )
     parser.add_argument("--review-ref")
     parser.add_argument(
-        "--share",
-        action="store_true",
-        help="Join a same-team task worktree; no review-ref or checkout advancement",
-    )
-    parser.add_argument(
         "--ui",
         action="store_true",
         help="Launch the lead with roles.lead_ui (issues labelled ui); lead role only",
@@ -102,10 +96,6 @@ def parse_arguments() -> Arguments:
 
 
 def validate_arguments(args: Arguments) -> tuple[str, str]:
-    if args.share and args.review_ref:
-        raise RefusalError(
-            "--share cannot advance a review checkout; join its task branch instead."
-        )
     if not re.fullmatch(r"[0-9]+-[a-z0-9]+(?:-[a-z0-9]+)*", args.task):
         raise RefusalError("Task must be <issue>-<slug>.")
     if not re.fullmatch(r"w[A-Za-z0-9]+:p[A-Za-z0-9]+", args.pane):
@@ -139,11 +129,9 @@ class WorktreeTask:
     desired: dict[Path, str]
     changed: list[Path]
     owner: Entity | None
-    teammates: list[Entity]
 
     def __init__(self, args: Arguments) -> None:
         self.args = args
-        self.teammates = []
         self.role_name, self.agent_name = validate_arguments(self.args)
         self.root = Path(git("rev-parse", "--path-format=absolute", "--git-common-dir")).parent
         if Path.cwd() != self.root:
@@ -481,15 +469,6 @@ enabled = true
             if not relevant:
                 continue
             if (
-                agent_root == str(self.worktree)
-                and pane != self.args.pane
-                and self.args.share
-                and re.fullmatch(f"team-{self.args.team}-(dev|lead|test)", agent.get("name") or "")
-                and agent.get("name") != self.agent_name
-            ):
-                self.teammates.append(agent)
-                continue
-            if (
                 agent.get("pane_id") != self.args.pane
                 or agent_root != str(self.worktree)
                 or agent.get("agent") != self.kind
@@ -515,10 +494,6 @@ enabled = true
                 )
 
     def reuse_or_stop_owner(self) -> bool:
-        if self.teammates and any(path.exists() for path in self.changed):
-            raise RefusalError(
-                "Shared client configuration changed; stop teammates before reconfiguring."
-            )
         if self.owner is None:
             return False
         if not self.old_head:
