@@ -46,7 +46,8 @@ refuses to start unless the tree's `VERSION` matches the worktree's toolchain.
 
 ## Bound checkout
 
-`--root` must be the exact checkout Dexter serves, and the command works from
+`--root` must be the exact checkout Dexter serves: a directory holding `.git`
+or `mix.exs`, never one with only a `.dexter/` index. The command works from
 any caller directory. Each leaf worktree gets its own daemon and index, and
 leaf worktrees run concurrently. A checkout that contains another checkout,
 including the main Tips checkout with its linked worktrees under

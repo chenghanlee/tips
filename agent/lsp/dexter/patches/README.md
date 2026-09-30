@@ -28,8 +28,10 @@ the binary, and re-provision afterwards.
   occurrence across every clause, guards and defaults included.
 - Open documents follow later saved changes by size and mtime; an unsaved
   buffer stays with its session.
-- Root admission: the exact leaf checkout, its dependency sources and the
-  configured Elixir sources; anything else is refused.
+- Root admission: the exact leaf checkout (a `.git` checkout or a Mix project
+  with `mix.exs`; a directory holding only an index is refused), its
+  dependency sources and the configured Elixir sources; anything else is
+  refused.
 - The build identity handshake above.
 
 ## Retained tests
@@ -39,7 +41,7 @@ pin plus patch. By behaviour, with the test files that hold them:
 
 - Arity-aware navigation: `internal/lsp/arity_integration_test.go`
   (`TestArity_InversionMatrix` is the matrix), `internal/lsp/hover_test.go`,
-  `internal/treesitter/arity_test.go`.
+  `internal/lsp/server_test.go`, `internal/treesitter/arity_test.go`.
 - References through imports: `internal/lsp/import_references_test.go`.
 - Call hierarchy owners and sites: `internal/lsp/call_hierarchy_test.go`
   (`TestCallHierarchyIncomingOwners` and `TestCallHierarchyOutgoing` are the
@@ -48,7 +50,7 @@ pin plus patch. By behaviour, with the test files that hold them:
   `internal/workspace/saved_file_sync_test.go`.
 - Build identity handshake: `internal/daemon/*_test.go`.
 - `query` contract, root admission and library navigation:
-  `query_integration_test.go`.
+  `query_integration_test.go`, `lsp_integration_test.go`.
 
 The Elixir fixtures under `internal/lsp/testdata/` are the recorded cases;
 correctness is claimed for those constructs and no others.
