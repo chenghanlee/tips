@@ -254,20 +254,28 @@ class WorktreeTask:
 
     def elixir_sources(self) -> Path:
         """The Elixir standard-library sources Dexter indexes for this worktree."""
+        version = run(
+            ["elixir", "--short-version"],
+            cwd=self.worktree if self.worktree.is_dir() else self.root,
+            timeout=self.timeouts["dexter_startup_seconds"],
+        )
+        if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?", version):
+            raise RefusalError(f"Unexpected Elixir version: {version!r}")
         explicit = os.environ.get("DEXTER_ELIXIR_LIB_ROOT")
-        if explicit:
-            sources = Path(explicit)
-        else:
-            version = run(
-                ["elixir", "--short-version"],
-                cwd=self.worktree if self.worktree.is_dir() else self.root,
-                timeout=self.timeouts["dexter_startup_seconds"],
+        sources = (
+            Path(explicit)
+            if explicit
+            else self.root / "agent/lsp/vendor" / f"elixir-{version}" / "lib"
+        )
+        recorded = sources.parent / "VERSION"
+        if (
+            not (sources / "elixir/lib/enum.ex").is_file()
+            or not recorded.is_file()
+            or recorded.read_text().strip() != version
+        ):
+            raise RefusalError(
+                f"Elixir {version} sources are missing at {sources}; see agent/lsp/README.md."
             )
-            if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?", version):
-                raise RefusalError(f"Unexpected Elixir version: {version!r}")
-            sources = self.root / "agent/lsp/vendor" / f"elixir-{version}" / "lib"
-        if not (sources / "elixir/lib/enum.ex").is_file():
-            raise RefusalError(f"Elixir sources are missing at {sources}; see agent/lsp/README.md.")
         return sources.resolve()
 
     def fetch(self) -> None:

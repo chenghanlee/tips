@@ -40,9 +40,9 @@ the Go static-analysis rule for it.
 Dexter indexes the Elixir standard library from source. Put the release matching
 `elixir --short-version` in the main checkout's ignored `agent/lsp/vendor/elixir-<version>/`
 (from the [Elixir repository](https://github.com/elixir-lang/elixir); the tree
-holds `lib/elixir/lib/enum.ex`), or point `DEXTER_ELIXIR_LIB_ROOT` at another
-checkout's `lib/`. A Homebrew installation has no sources. Provisioning refuses
-to start without them.
+holds `VERSION` and `lib/elixir/lib/enum.ex`), or point `DEXTER_ELIXIR_LIB_ROOT`
+at another checkout's `lib/`. A Homebrew installation has no sources. Provisioning
+refuses to start unless the tree's `VERSION` matches the worktree's toolchain.
 
 ## Team provisioning
 

@@ -287,7 +287,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
             os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1", HERDR_ENV="1"
         )
         self.env.pop("TIPS_TEAM_CONFIG", None)
-        self.env["DEXTER_ELIXIR_LIB_ROOT"] = str(self.root / "fixture-stdlib")
+        self.env["DEXTER_ELIXIR_LIB_ROOT"] = str(self.root / "fixture-stdlib/lib")
         for k in (
             "TIPS_DB_SUFFIX",
             "TIPS_TEST_PORT",
@@ -304,10 +304,14 @@ class WorktreeIntegrationTest(unittest.TestCase):
             ".agents/skills",
             "agent/lsp/dexter/vendor",
             "fakebin",
-            "fixture-stdlib/elixir/lib",
+            "fixture-stdlib/lib/elixir/lib",
         ):
             (self.root / d).mkdir(parents=True)
-        (self.root / "fixture-stdlib/elixir/lib/enum.ex").write_text("defmodule Enum do\nend\n")
+        (self.root / "fixture-stdlib/lib/elixir/lib/enum.ex").write_text("defmodule Enum do\nend\n")
+        (self.root / "fixture-stdlib/VERSION").write_text("1.2.3\n")
+        elixir = self.root / "fakebin/elixir"
+        elixir.write_text('#!/bin/sh\nprintf "1.2.3\\n"\n')
+        elixir.chmod(0o755)
         (self.root / ".gitignore").write_text(
             ".codex/\n.claude/\n.agents/\n.dexter/\nagent/lsp/dexter/vendor/\n.worktrees/\nfakebin/\nsta"
             "te.json\nstop.py\nfixture-stdlib/\n"
@@ -464,7 +468,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
         ]
         assert server["command"] == str(self.root / "agent/lsp/dexter/vendor/dexter")
         assert server["args"] == ["--root", str(self.wt), "lsp", str(self.wt)]
-        assert server["env"] == {"DEXTER_ELIXIR_LIB_ROOT": str(self.root / "fixture-stdlib")}
+        assert server["env"] == {"DEXTER_ELIXIR_LIB_ROOT": str(self.root / "fixture-stdlib/lib")}
         assert set(server["extensionToLanguage"]) == {".ex", ".exs", ".heex"}
         s = self.state()
         assert s["launch_argv"][s["launch_argv"].index("--plugin-dir") + 1] == str(plugin)
@@ -671,9 +675,13 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert not self.wt.exists()
         self.env["DEXTER_ELIXIR_LIB_ROOT"] = str(self.root / "no-sources")
         result = self.call("--start", ok=False)
-        assert "Elixir sources are missing" in result.stderr
+        assert "Elixir 1.2.3 sources are missing" in result.stderr
         assert not self.wt.exists()
-        self.env["DEXTER_ELIXIR_LIB_ROOT"] = str(self.root / "fixture-stdlib")
+        self.env["DEXTER_ELIXIR_LIB_ROOT"] = str(self.root / "fixture-stdlib/lib")
+        (self.root / "fixture-stdlib/VERSION").write_text("9.9.9\n")
+        assert "Elixir 1.2.3 sources are missing" in self.call("--start", ok=False).stderr
+        assert not self.wt.exists()
+        (self.root / "fixture-stdlib/VERSION").write_text("1.2.3\n")
         (self.root / "agent/lsp/dexter/vendor/dexter").unlink()
         self.call("--start", ok=False)
         assert not self.wt.exists()
@@ -904,7 +912,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
             "1",
             "1",
         ]
-        assert self.state()["dexter_stdlib"] == str(self.root / "fixture-stdlib")
+        assert self.state()["dexter_stdlib"] == str(self.root / "fixture-stdlib/lib")
 
     def test_codex_disables_old_lsp_without_changing_approval_policy(self) -> None:
         self.call("--start")
@@ -931,7 +939,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
             "60s",
             "MixProject",
         ]
-        assert self.state()["dexter_stdlib"] == str(self.root / "fixture-stdlib")
+        assert self.state()["dexter_stdlib"] == str(self.root / "fixture-stdlib/lib")
         self.call("--start")
         assert self.state()["launch_env"]["TIPS_DEXTER"] == str(wrapper)
         assert str(wrapper) in self.state()["launch_argv"][-1]
@@ -949,6 +957,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert not self.wt.exists()
         (sources / "elixir/lib").mkdir(parents=True)
         (sources / "elixir/lib/enum.ex").write_text("")
+        (sources.parent / "VERSION").write_text("1.2.3\n")
         self.call()
         assert self.state()["dexter_stdlib"] == str(sources)
         self.call()
@@ -957,7 +966,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
         ]
         # The worktree keeps the sources it was bound to; a different selection
         # is a configuration change, refused while the files exist.
-        self.env["DEXTER_ELIXIR_LIB_ROOT"] = str(self.root / "fixture-stdlib")
+        self.env["DEXTER_ELIXIR_LIB_ROOT"] = str(self.root / "fixture-stdlib/lib")
         assert "Refusing to overwrite" in self.call(ok=False).stderr
         assert str(sources) in (self.wt / ".dexter/dexter.sh").read_text()
 
@@ -995,7 +1004,9 @@ class WorktreeIntegrationTest(unittest.TestCase):
     @unittest.skipUnless(os.environ.get("TIPS_TEST_REAL_DEXTER"), "opt-in stock Dexter integration")
     def test_two_mixed_teams_use_isolated_real_daemons(self) -> None:
         self.env["TIPS_DEXTER_HOME"] = os.environ["TIPS_TEST_REAL_DEXTER"]
+        self.env["DEXTER_ELIXIR_LIB_ROOT"] = os.environ["DEXTER_ELIXIR_LIB_ROOT"]
         self.env["DEXTER_DAEMON_IDLE_TIMEOUT"] = "5s"
+        (self.root / "fakebin/elixir").unlink()  # the real toolchain must match the sources
         source = (
             'defmodule Sample do\n  @doc "Original documentation"\n'
             "  def greet(name), do: name\nend\n"
