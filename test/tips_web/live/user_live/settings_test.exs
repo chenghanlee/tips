@@ -59,6 +59,29 @@ defmodule TipsWeb.UserLive.SettingsTest do
       assert Accounts.get_user_by_email(user.email)
     end
 
+    test "settings ignores forged handle changes", %{conn: conn, user: user} do
+      {:ok, lv, _html} = live(conn, ~p"/users/settings")
+
+      result =
+        lv
+        |> element("#email_form")
+        |> render_submit(%{"user" => %{"email" => unique_user_email(), "handle" => "Renamed"}})
+
+      assert result =~ "A link to confirm your email"
+
+      lv
+      |> element("#password_form")
+      |> render_submit(%{
+        "user" => %{
+          "password" => valid_user_password(),
+          "password_confirmation" => valid_user_password(),
+          "handle" => "Renamed"
+        }
+      })
+
+      assert Tips.Repo.reload!(user).handle == user.handle
+    end
+
     test "renders errors with invalid data (phx-change)", %{conn: conn} do
       {:ok, lv, _html} = live(conn, ~p"/users/settings")
 

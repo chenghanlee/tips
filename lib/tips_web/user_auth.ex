@@ -261,6 +261,24 @@ defmodule TipsWeb.UserAuth do
     end)
   end
 
+  # The root and the editor routes of the frontend design; ids are positive integers.
+  @return_to ~r"\A/(editor/(tips/new|tips/[1-9]\d{0,17}/edit|tips/[1-9]\d{0,17}/reviews/new|reviews/[1-9]\d{0,17}/edit))?\z"
+
+  @doc """
+  Returns `path` if it is an allowed local return destination, otherwise `nil`.
+
+  Only the root and the editor routes are allowed. The whole path must match,
+  so schemes, `//`, backslashes, percent escapes, queries and control
+  characters are rejected. Check every carrier with it when accepting and when
+  consuming a destination.
+  """
+  @spec allowed_return_to(term()) :: String.t() | nil
+  def allowed_return_to(path) when is_binary(path) do
+    if path =~ @return_to, do: path
+  end
+
+  def allowed_return_to(_path), do: nil
+
   @doc "Returns the path to redirect to after log in."
   # the user was already logged in, redirect to settings
   def signed_in_path(%Plug.Conn{assigns: %{current_scope: %Scope{user: %Accounts.User{}}}}) do

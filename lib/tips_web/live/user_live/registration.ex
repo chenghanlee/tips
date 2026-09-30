@@ -3,6 +3,8 @@ defmodule TipsWeb.UserLive.Registration do
 
   alias Tips.Accounts
   alias Tips.Accounts.User
+  alias Tips.AdmissionLimiter
+  alias TipsWeb.{ClientIdentity, UserAuth}
 
   @impl true
   def render(assigns) do
@@ -13,7 +15,7 @@ defmodule TipsWeb.UserLive.Registration do
           <h1 class="text-2xl font-semibold">Register for an account</h1>
           <p class="text-sm text-muted-foreground">
             Already registered? <.link
-              navigate={~p"/users/log-in"}
+              navigate={@log_in_path}
               class="font-semibold text-foreground underline"
               phx-no-format
             >Log in</.link> to your account now.
@@ -27,7 +29,13 @@ defmodule TipsWeb.UserLive.Registration do
           phx-change="validate"
           class="space-y-4"
         >
-          <UI.field field={@form[:handle]} label="Handle" />
+          <UI.field
+            field={@form[:handle]}
+            label="Handle"
+            autocomplete="nickname"
+            spellcheck="false"
+            helper="Your public name. You can keep this suggestion or choose another; it can't be changed after you sign up."
+          />
           <UI.field
             field={@form[:email]}
             type="email"
@@ -36,6 +44,14 @@ defmodule TipsWeb.UserLive.Registration do
             spellcheck="false"
             phx-mounted={JS.focus()}
           />
+
+          <UI.notice :if={@email_registered} id="email-registered" role="status">
+            This email is already registered. <.link
+              navigate={@log_in_path}
+              class="font-semibold underline"
+              phx-no-format
+            >Sign in</.link> instead.
+          </UI.notice>
 
           <UI.button size="lg" class="w-full" phx-disable-with="Creating account...">
             Create an account
@@ -49,36 +65,47 @@ defmodule TipsWeb.UserLive.Registration do
   @impl true
   def mount(_params, _session, %{assigns: %{current_scope: %{user: user}}} = socket)
       when not is_nil(user) do
-    {:ok, redirect(socket, to: TipsWeb.UserAuth.signed_in_path(socket))}
+    {:ok, redirect(socket, to: UserAuth.signed_in_path(socket))}
   end
 
-  def mount(_params, _session, socket) do
-    changeset = Accounts.change_user_registration(%User{}, %{}, validate_unique: false)
+  def mount(params, session, socket) do
+    return_to =
+      UserAuth.allowed_return_to(params["return_to"]) ||
+        UserAuth.allowed_return_to(session["user_return_to"])
 
-    {:ok, socket |> assign(:page_title, "Register") |> assign_form(changeset),
-     temporary_assigns: [form: nil]}
+    changeset =
+      Accounts.change_user_registration(%User{}, %{handle: Accounts.suggest_handle()},
+        validate_unique: false
+      )
+
+    socket =
+      socket
+      |> assign(
+        page_title: "Register",
+        return_to: return_to,
+        log_in_path: with_return_to(~p"/users/log-in", return_to),
+        client_ip: ClientIdentity.from_socket(socket),
+        limiter: session["admission_limiter"] || AdmissionLimiter
+      )
+      |> assign_form(changeset)
+
+    {:ok, socket, temporary_assigns: [form: nil]}
   end
 
   @impl true
   def handle_event("save", %{"user" => user_params}, socket) do
-    case Accounts.register_user(user_params) do
-      {:ok, user} ->
-        {:ok, _} =
-          Accounts.deliver_login_instructions(
-            user,
-            &url(~p"/users/log-in/#{&1}")
-          )
+    changeset = Accounts.change_user_registration(%User{}, user_params, validate_unique: false)
 
-        {:noreply,
-         socket
-         |> put_flash(
-           :info,
-           "An email was sent to #{user.email}, please access it to confirm your account."
-         )
-         |> push_navigate(to: ~p"/users/log-in")}
-
+    with {:ok, %User{email: email}} <- Ecto.Changeset.apply_action(changeset, :insert),
+         :ok <- admit(socket.assigns, email),
+         {:ok, user} <- Accounts.register_user(user_params) do
+      {:noreply, deliver_confirmation(socket, user)}
+    else
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign_form(socket, changeset)}
+
+      {:error, reason} ->
+        {:noreply, reject(socket, changeset, reason)}
     end
   end
 
@@ -87,8 +114,79 @@ defmodule TipsWeb.UserLive.Registration do
     {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
   end
 
-  defp assign_form(socket, %Ecto.Changeset{} = changeset) do
-    form = to_form(changeset, as: "user")
-    assign(socket, form: form)
+  # Only the transport peer from mount identifies the client; event params never do.
+  defp admit(%{client_ip: {:ok, ip}, limiter: limiter}, email),
+    do: AdmissionLimiter.check_auth(email, ip, limiter)
+
+  defp admit(%{client_ip: {:error, :invalid_identity}}, _email), do: {:error, :no_client_ip}
+
+  defp reject(socket, changeset, :invalid_identity) do
+    changeset = Ecto.Changeset.add_error(changeset, :email, "is invalid")
+    assign_form(socket, Map.put(changeset, :action, :insert))
   end
+
+  defp reject(socket, changeset, reason) do
+    socket
+    |> put_flash(:error, rejection_message(reason))
+    |> assign_form(Map.put(changeset, :action, :insert))
+  end
+
+  defp rejection_message({:rate_limited, seconds}),
+    do: "Too many sign-up attempts. Try again in #{seconds(seconds)}."
+
+  defp rejection_message({:capacity, seconds}),
+    do: "Sign-up is busy right now. Try again in #{seconds(seconds)}."
+
+  defp rejection_message(:no_client_ip),
+    do: "We couldn't identify your connection. Reload the page and try again."
+
+  defp seconds(1), do: "1 second"
+  defp seconds(n), do: "#{n} seconds"
+
+  defp deliver_confirmation(socket, user) do
+    return_to = socket.assigns.return_to
+    url_fun = &with_return_to(url(~p"/users/log-in/#{&1}"), return_to)
+
+    case Accounts.deliver_login_instructions(user, url_fun) do
+      {:ok, _email} ->
+        socket
+        |> put_flash(
+          :info,
+          "An email was sent to #{user.email}, please access it to confirm your account."
+        )
+        |> push_navigate(to: socket.assigns.log_in_path)
+
+      {:error, _reason} ->
+        socket
+        |> put_flash(:email, user.email)
+        |> put_flash(
+          :error,
+          "Your account was created, but we couldn't confirm that the email was sent. " <>
+            "Request a new link below."
+        )
+        |> push_navigate(to: socket.assigns.log_in_path)
+    end
+  end
+
+  defp with_return_to(path, nil), do: path
+  defp with_return_to(path, return_to), do: path <> "?" <> URI.encode_query(return_to: return_to)
+
+  defp assign_form(socket, %Ecto.Changeset{} = changeset) do
+    assign(socket,
+      form: to_form(changeset, as: "user"),
+      email_registered: email_registered?(changeset)
+    )
+  end
+
+  defp email_registered?(%Ecto.Changeset{action: action, errors: errors}) when action != nil do
+    Enum.any?(errors, fn
+      {:email, {_message, meta}} ->
+        meta[:validation] == :unsafe_unique or meta[:constraint] == :unique
+
+      _error ->
+        false
+    end)
+  end
+
+  defp email_registered?(_changeset), do: false
 end
