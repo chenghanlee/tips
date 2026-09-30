@@ -1,7 +1,9 @@
 # Dexter agent prototype
 
-Experimental. **This branch carries one local Dexter patch for argument-count
-lookups. This is not yet a fully correct production integration.**
+Experimental. **This branch carries one local Dexter patch. It began as the
+argument-count correction and is extended here for imported captures, one-line
+imported calls, aliased imports and bare local type lookups. This is not yet a
+fully correct production integration.**
 
 Both Codex and Claude run `dx.py` through their existing shell tool. It speaks the
 standard LSP protocol to `dexter lsp`. That frontend connects to Dexter's
@@ -28,7 +30,11 @@ server, editor, gateway, first-party file watcher or second index.
 The local backend correction is kept separately in `patches/function-arity.patch`;
 the adapter does not implement function resolution. The patch also corrects
 generated call-hierarchy labels such as `Repo.query!(sql, [])` to `/2`; graph
-follow-ups remain name-based. Codex, Claude and third-party
+follow-ups remain name-based. Its extension on this branch admits imported
+captures and one-line imported calls as reference candidates, resolves `import`
+of an `alias ... as:` name, and resolves a bare local type for `type-definition`;
+see [references and type definitions](#references-and-type-definitions). No second
+resolver, adapter, process or schema is added for these. Codex, Claude and third-party
 libraries are unchanged. MCP would change transport; it would not
 remove responsibility for LSP sessions, notifications, follow-ups and edits.
 
@@ -158,7 +164,7 @@ line-level.
 | Commands | Input beyond `file` |
 | --- | --- |
 | `definition`, `type-definition`, `declaration`, `implementation`, `hover`, `highlights`, `signature`, `prepare-rename` | `line`, `column` |
-| `references` | `line`, `column`, optional `include_declaration` |
+| `references` | `line`, `column`, optional `include_declaration`; see [references and type definitions](#references-and-type-definitions) |
 | `symbols`, `folding`, `diagnostics` | no position needed |
 | `workspace-symbols` | `query`; no file |
 | `completion` | position; optional `select` index or exact label resolves the item in the same session |
@@ -336,6 +342,31 @@ warm request per query: `elapsed_ms` 377-428 and client wall time 436-488 ms, co
 warm alike, measured as request totals only. See
 [VALIDATION.md](VALIDATION.md#outgoing-call-sites-2026-09-30).
 
+### References and type definitions
+
+`references` and `type-definition` send the stock requests; the packaged binary
+carries the corrections. Beyond the argument-count filtering above, the patch on
+this branch finds three forms that were missing before:
+
+- imported bare captures (`&normalize/1`) and bare imported calls after a
+  one-line head (`def run(s), do: normalize(s)`) in files that import the module;
+- bare calls through an aliased import (`alias Refs.Target, as: T` then `import T`),
+  a regression of the arity patch against stock;
+- `type-definition` at a bare local type such as `t()` inside a `@type` or
+  `@spec`, including a parent module's type after a nested module closes.
+  Qualified and aliased type names were already correct.
+
+Result shapes are unchanged. Files that import the target module are now
+whole-file candidates in addition to the defining files and the indexed rows;
+there is no whole-workspace scan. Consumers that receive a function through
+`use` without an import are not covered, and imported calls inside string
+interpolation are unverified. Known limit: a type parameter that shares its
+name with a module type (`t` in `@type wrap(t)` next to `@type t`) resolves to
+the module type; the lookup has no parameter scoping. Fixture results are in
+[VALIDATION.md](VALIDATION.md#references-and-local-types-2026-09-30). No
+completeness figure is claimed.
+
+
 ### Edits and follow-ups
 
 - Formatting and code actions return proposals unless `apply: true` is provided.
@@ -416,8 +447,9 @@ One fresh session discards per-session caches, not the shared daemon's stale dat
 Known upstream limitations include silent partial rename writes. Stock outgoing
 calls are no longer requested; `outgoing-calls` lists source call sites and prepares
 each one, with the unsupported forms in [outgoing calls](#outgoing-calls). Results are preserved as
-returned. The argument-count patch does not establish safe multi-arity rename,
-complete call hierarchy, or strict index freshness. See the
+returned. The local patch, including its reference-discovery and local-type extension,
+does not establish safe multi-arity rename, complete call hierarchy, complete
+reference discovery, or strict index freshness. See the
 [patch validation record](patches/README.md) before relying on a particular construct.
 
 ## Client structure

@@ -1,8 +1,12 @@
-# Local function-arity correction
+# Local Dexter correction
 
 This is the one local upstream patch authorized for this experiment. The base is
-Dexter `cd099f31b7701803292584887bb614628f721b0a`. It does not change Codex,
-Claude, the Python adapter's resolution behavior, or third-party libraries.
+Dexter `cd099f31b7701803292584887bb614628f721b0a`. It began as the function-arity
+correction below. On 2026-09-30 the human separately approved extending the same
+patch for reference discovery and local types; see
+[that section](#reference-discovery-and-local-types-2026-09-30). It does not
+change Codex, Claude, the Python adapter's resolution behavior, or third-party
+libraries.
 
 ## Problem and approach
 
@@ -133,15 +137,53 @@ function name without arity; correct labels do not make those graphs arity-aware
 The outgoing prototype also groups by module and function, so sites of different
 arities can still share one label. Those are separate limitations.
 
+## Reference discovery and local types (2026-09-30)
+
+Purpose: three reference and type lookups that returned nothing or dropped rows
+on the ordinary path. In a file that imports the module, the indexer had no row
+for a bare capture (`&normalize/1`) or a bare call after a one-line head, and
+the query scanned whole files only when they define the function. With
+`alias Refs.Target, as: T` then `import T`, the arity patch's per-occurrence
+module filter read the written name `T` and rejected a row stock kept.
+`TypeDefinition` looked up a bare local `t()` with an empty module qualifier.
+Root-cause record: main checkout `tmp/dexter-reference-triage/TRIAGE.md`.
+
+Change: files with an import row for the target module join the existing
+occurrence scan and module/arity filter; import names resolve through the
+existing alias map before that filter; `TypeDefinition` uses the enclosing
+module for a bare name inside a typespec and keeps the qualified path. No
+parser, resolver, index, service, schema or process is added; defining files
+and indexed rows are processed as before, and there is no whole-workspace scan.
+Production change: 21 added and 3 removed lines in `arity_navigation.go` and
+`server.go`, plus one 242-line regression test file.
+
+
+On the saved fixture all 40 reference executions and 14 of 15 type-definition
+queries match the fixed oracle; the one wrong row is the type parameter `t` of
+`@type wrap(t)`, which resolves to the module's `@type t`. Details and checks:
+[VALIDATION.md](../VALIDATION.md#references-and-local-types-2026-09-30).
+
+Boundaries: no type-parameter scoping; `use`-injected consumers without an
+import row are outside the change, and imported calls inside interpolation are
+unverified. The alias fix changes the shared bare-name provider resolution that
+definition, hover, call-hierarchy preparation and rename also use; no
+rename-safety guarantee follows, and freshness is unchanged. The cost of
+scanning importing files on a large repository is unmeasured.
+
 ## Exact artifacts
 
 - Base: `cd099f31b7701803292584887bb614628f721b0a`.
-- Patch SHA-256: `cf465ffd10665d12838621fa7998d189e65abeeb22521b3813bfddddb10624ef`.
-- Tested macOS arm64 binary SHA-256: `d4ac1fd543e5f3efd31876faa4e19e379c5e24836906c1b7333fd7f009ff0251`.
+- Patched source: Dexter branch `fix/reference-imports-local-types` at `b266703`;
+  `git diff cd099f31..b266703` is the packaged patch.
+- Patch SHA-256: `185e67dfaf9d56e24c0922f7237edce095e2764f5249794a1743689dc0d7add9`.
+- macOS arm64 binary SHA-256: `7f01cbf2807e7b1ff1eb668fc3550aa9008198210e32d71c1b94383a2cc60fca`,
+  built with `build.sh` from the stock archive plus this patch; `vendor/build.json`
+  records both checksums.
 - Build: Go 1.26.3, `go build -trimpath -buildvcs=false ./cmd/`.
+- Superseded arity-only artifacts: patch `cf465ffd…`, binary `d4ac1fd5…`.
 
-The combined patch touches 12 Go files: 2,619 added and 136 removed lines,
-including 1,520 added test lines. It is one backend patch; it adds no integration process
+The patch touches 13 Go files: 2,879 added and 136 removed lines, most of them
+tests. It is one backend patch; it adds no integration process
 or library dependency. Keep its regression tests when re-pinning.
 
 Detailed local evidence is in the main checkout's ignored
@@ -156,8 +198,9 @@ stopped. No existing team's binary or daemon was replaced.
 ## Boundaries
 
 This change does not establish safe multi-arity rename, complete call hierarchy,
-signature-help overload handling, import `only:`/`except:` semantics in every
-provider conflict, arbitrary macro expansion, or strict saved-index freshness.
+complete reference discovery, signature-help overload handling, import
+`only:`/`except:` semantics in every provider conflict, arbitrary macro expansion,
+or strict saved-index freshness.
 Unknown syntax must be reported as an unverified boundary; a name-based fallback
 is not proof of a correct result. The separate alias-shadowing code-action bug
 is outside this patch.
@@ -169,7 +212,9 @@ function rename still matches by name across argument counts. Do not use this
 patch as evidence that renaming one overload is safe.
 
 Identity references exclude occurrences whose module the static resolver cannot
-establish. This can reduce recall compared with stock injector expansion. The
+establish. This can reduce recall compared with stock injector expansion; the
+aliased-import case of that exclusion is closed by the extension, `use`-injected
+consumers without an import row are not. The
 Hammox/Mox regression deliberately excludes calls resolving to the other provider;
 it is a module-identity correction even though both calls have three arguments.
 A callback head is its own declaration for definition and hover; references at

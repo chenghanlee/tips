@@ -1,8 +1,12 @@
 # Prototype validation
 
 The original record below describes the stock-backend prototype. The local
-argument-count correction has a separate [patch validation record](patches/README.md)
-with its final binary, tests, measured cost and remaining limits.
+patch (argument counts, then the 2026-09-30 reference-discovery and local-type
+extension) has a separate [patch validation record](patches/README.md) with its
+final binary, tests, measured cost and remaining limits. The extension's
+fixture results are in [references and local
+types](#references-and-local-types-2026-09-30).
+
 
 2026-09-29. Branch `experiment/dexter-agent-prototype`.
 
@@ -352,3 +356,64 @@ Runner and receipts:
 (`run_integrated.py`, `evidence/integrated.json`). No accuracy percentage is claimed for the population of Elixir
 sources; the supported and unsupported forms are listed in
 [the contract](README.md#outgoing-calls).
+
+## References and local types (2026-09-30)
+
+The patch extension covers imported bare captures, one-line imported calls,
+aliased imports and bare local type definitions
+([patch record](patches/README.md#reference-discovery-and-local-types-2026-09-30);
+triage in the main checkout's `tmp/dexter-reference-triage/TRIAGE.md`).
+
+Fixture and oracle: the references/type-definition fixture at commit `6958b68`
+(20 reference positions, each with `include_declaration` false and true; 15
+type-definition positions) and hand-derived `expected.json` (SHA-256 prefix
+`92a0570c`), written from source before any run and held fixed. Scores are by
+`file:line:column` at the name start; missing, wrong, duplicate and unsupported
+rows are counted separately. `NA1` (aliased-import cursor), `TP1` (type
+parameter) and `TN3` (parent type after a nested module closes) were diagnostic
+controls, reported beside the ordinary rows.
+
+Before, on the arity-only binary `d4ac1fd5` (backend rows, 2026-09-30): the
+ordinary `normalize/1` positions returned 30 of 34 sites, missing the imported
+captures `importer.ex:8` and `capture_only.ex:6` and both aliased-import calls
+`aliased_importer.ex:7` and `:10`; `put/3` missed the capture `importer.ex:11`;
+`NA1` returned nothing; `type-definition` returned nothing at the bare local
+types `TD1`, `TS1`, `TN1`, `TN2`, `TN3`. No wrong references.
+
+After, packaged binary `7f01cbf2` on a fresh clone of the fixture, one run per
+cell, backend only (p15, 2026-09-30 12:49; independently rescored from the 55
+raw reports against the same oracle):
+
+| set | queries | expected rows | found | missing | wrong | duplicate |
+|---|---|---|---|---|---|---|
+| references, ordinary `N1`-`N9` | 9 x 2 | 34 each | 34 each | 0 | 0 | 0 |
+| references, arity/declaration `P*`, `F*`, `K`, `D` | 10 x 2 | per oracle (`P3`, `P3c` 5) | all | 0 | 0 | 0 |
+| references, aliased-import cursor `NA1` | 1 x 2 | 34 each | 34 each | 0 | 0 | 0 |
+| type-definition, ordinary `TD*`, `TB`, `TF*`, `TS*`, `TN1`, `TN2` | 12 | per oracle | 12 correct | 0 | 0 | |
+| type-definition, controls `TP2`, `TN3` | 2 | per oracle | 2 correct | 0 | 0 | |
+| type-definition, control `TP1` | 1 | empty | `typed.ex:4` | 0 | 1 | |
+
+Declaration rows appear only with `include_declaration: true` and match the
+expected head lines. `TP1` is the one wrong row: the type parameter `t` in
+`@type wrap(t)` resolves to the module's `@type t` because the bare-local
+branch has no parameter scoping. It is recorded as a bounded limit; its
+frequency in real code is unknown and no further check was added for it.
+
+Warm `elapsed_ms` medians on this fixture: references 57.0 ms (n=40),
+type-definition 47.1 ms (n=15); the arity-only rows from the earlier run measured
+51.5 and 43.4 ms under different load. These are not a paired cost of the
+patch, and the cost of scanning importing files on a large repository is not
+measured.
+
+Checks: 16 handler subtests with pre-fix failures recorded first; full
+`go test ./...` passed with normal process permissions after a sandboxed attempt
+failed three existing process-discovery cases; `go vet`, upstream lint using
+the existing compatible analyzer, and module tidy diff clean; 37 adapter tests
+passed on the packaged binary; Ruff check and format on 17 files and strict
+Pyright clean. Evidence:
+main checkout `tmp/dexter-reference-triage/patch-followup/` (`RESULT.md`,
+`evidence/summary.json`, `evidence/raw/`, `root-checks/`).
+
+Not established: reference completeness over Elixir sources, `use`-injected
+consumers without an import row, interpolation, type-parameter scoping, rename
+safety, index freshness. No accuracy percentage is claimed.

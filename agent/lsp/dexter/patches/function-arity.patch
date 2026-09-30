@@ -1163,10 +1163,10 @@ index 0000000..6155a0f
 +}
 diff --git a/internal/lsp/arity_navigation.go b/internal/lsp/arity_navigation.go
 new file mode 100644
-index 0000000..827e58d
+index 0000000..9b50d8b
 --- /dev/null
 +++ b/internal/lsp/arity_navigation.go
-@@ -0,0 +1,375 @@
+@@ -0,0 +1,386 @@
 +// Package lsp implements Dexter's language server.
 +package lsp
 +
@@ -1334,8 +1334,8 @@ index 0000000..827e58d
 +	// module and the modules whose __using__ injects it (or the facade).
 +	modules map[string]bool
 +	// files maps each candidate file to its candidate 1-based lines. A nil
-+	// set means the whole file: it defines the function, and its bare
-+	// intra-module calls are not indexed.
++	// set means the whole file: it defines the function or imports its
++	// module, and the index misses some of its bare calls.
 +	files map[string]map[int]bool
 +}
 +
@@ -1362,7 +1362,9 @@ index 0000000..827e58d
 +}
 +
 +// addDefinitionFiles marks the files that define module.function for a
-+// whole-file scan, as findBareCallRefs does for the name search.
++// whole-file scan, as findBareCallRefs does for the name search, and the
++// files that import module: the index has no row for an imported
++// &function/arity or a call after a one-line def head.
 +func (g occurrenceGroup) addDefinitionFiles(s *Server, module, function string) {
 +	defs, err := s.store.LookupFunction(module, function)
 +	if err != nil {
@@ -1370,6 +1372,15 @@ index 0000000..827e58d
 +	}
 +	for _, d := range defs {
 +		g.files[d.FilePath] = nil
++	}
++	refs, err := s.store.LookupReferences(module, "")
++	if err != nil {
++		return
++	}
++	for _, r := range refs {
++		if r.Kind == "import" {
++			g.files[r.FilePath] = nil
++		}
 +	}
 +}
 +
@@ -1755,6 +1766,254 @@ index 3495319..3ec5b8c 100644
  	}
  
  	// line 8 is `@spec build(schema()) :: schema()` — col 14 is on the type
+diff --git a/internal/lsp/import_references_local_types_test.go b/internal/lsp/import_references_local_types_test.go
+new file mode 100644
+index 0000000..4f42155
+--- /dev/null
++++ b/internal/lsp/import_references_local_types_test.go
+@@ -0,0 +1,242 @@
++package lsp
++
++import (
++	"context"
++	"maps"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"go.lsp.dev/protocol"
++)
++
++// Explicit imports of SharedLib.Pinger (arity matrix fixture) that the index
++// does not list as calls: a capture beside an indexed call, a capture in a file
++// with no other call, a one-line def body, and an import through an alias.
++
++// file: lib/my_app/ping_user.ex
++const importPingUserSrc = `defmodule MyApp.PingUser do
++  import SharedLib.Pinger
++
++  def calls(x) do
++    two = ping(x, :h)
++    captured = &ping/2
++    {two, captured}
++  end
++
++  def one_line(a, b), do: ping(a, b)
++end
++`
++
++// file: lib/my_app/ping_capture.ex
++const importPingCaptureSrc = `defmodule MyApp.PingCapture do
++  import SharedLib.Pinger
++
++  def pinger do
++    &ping/2
++  end
++end
++`
++
++// file: lib/my_app/ping_alias.ex
++const importPingAliasSrc = `defmodule MyApp.PingAlias do
++  alias SharedLib.Pinger, as: P
++  import P
++
++  def aliased(x) do
++    ping(x, :f)
++  end
++end
++`
++
++// Decoys: a local ping/1 capture in an importing file, and a same-arity local
++// ping/2 in a module that does not import Pinger.
++
++// file: lib/my_app/ping_arity.ex
++const importPingAritySrc = `defmodule MyApp.PingArity do
++  import SharedLib.Pinger
++
++  def ping(a), do: {:arity_ping, a}
++
++  def local_capture do
++    &ping/1
++  end
++end
++`
++
++// file: lib/my_app/ping_decoy.ex
++const importPingDecoySrc = `defmodule MyApp.PingDecoy do
++  def ping(a, b), do: {:decoy_ping, a, b}
++
++  def own(x) do
++    called = ping(x, :z)
++    captured = &ping/2
++    {called, captured}
++  end
++end
++`
++
++var importReferenceFiles = map[string]string{
++	"lib/my_app/ping_user.ex":    importPingUserSrc,
++	"lib/my_app/ping_capture.ex": importPingCaptureSrc,
++	"lib/my_app/ping_alias.ex":   importPingAliasSrc,
++	"lib/my_app/ping_arity.ex":   importPingAritySrc,
++	"lib/my_app/ping_decoy.ex":   importPingDecoySrc,
++}
++
++// Bare local types, qualified controls, a nested module, and names that are
++// not types at the cursor.
++
++// file: lib/my_app/typed.ex
++const localTypedSrc = `defmodule MyApp.Typed do
++  @type t :: %{name: String.t()}
++  @type status :: atom()
++
++  @spec build(String.t()) :: t()
++  def build(name), do: %{name: name}
++
++  @spec status(term()) :: status()
++  def status(x), do: x
++
++  def check(x), do: {build(x), status(x)}
++end
++`
++
++// file: lib/my_app/type_user.ex
++const localTypeUserSrc = `defmodule MyApp.TypeUser do
++  alias MyApp.Typed
++
++  @spec make(String.t()) :: Typed.t()
++  def make(name), do: Typed.build(name)
++
++  @spec again(MyApp.Typed.t()) :: boolean()
++  def again(_value), do: true
++end
++`
++
++// file: lib/my_app/outer.ex
++const localOuterSrc = `defmodule MyApp.Outer do
++  @type t :: integer()
++
++  @spec a() :: t()
++  def a, do: 1
++
++  defmodule Inner do
++    @type t :: binary()
++
++    @spec i() :: t()
++    def i, do: "i"
++  end
++
++  @spec b() :: t()
++  def b, do: 2
++end
++`
++
++var localTypeFiles = map[string]string{
++	"lib/my_app/typed.ex":     localTypedSrc,
++	"lib/my_app/type_user.ex": localTypeUserSrc,
++	"lib/my_app/outer.ex":     localOuterSrc,
++}
++
++// Register the sources so aritySite and arityAt can read them.
++func init() {
++	maps.Copy(aritySingleFiles, importReferenceFiles)
++	maps.Copy(aritySingleFiles, localTypeFiles)
++}
++
++func TestReferences_ExplicitImportsFindEveryUse(t *testing.T) {
++	server, cleanup := setupArityMatrix(t)
++	defer cleanup()
++	root := server.projectRoot
++	for rel, src := range importReferenceFiles {
++		indexFile(t, server.store, root, rel, src)
++	}
++
++	user := func(text string) aritySite { return aritySite{"lib/my_app/ping_user.ex", text} }
++	pingerHead := aritySite{"lib/shared_lib/pinger.ex", "def ping(a, b), do: {:shared_ping, a, b}"}
++	plainCall := aritySite{"lib/my_app/importer.ex", "ping(:a, :b)"}
++	aliasedCall := aritySite{"lib/my_app/ping_alias.ex", "ping(x, :f)"}
++	calls := []aritySite{
++		plainCall,
++		{"lib/my_app/only_importer.ex", "ping(:c, :d)"},
++		user("two = ping(x, :h)"),
++		user("captured = &ping/2"),
++		user("def one_line(a, b), do: ping(a, b)"),
++		{"lib/my_app/ping_capture.ex", "&ping/2"},
++		aliasedCall,
++	}
++
++	// Exact lists: a decoy line (importer.ex ping(:a), ping_arity.ex &ping/1,
++	// ping_decoy.ex ping(x, :z) and &ping/2) fails the comparison.
++	runArityReferences(t, server, "references/", []arityReferenceCase{
++		{"ping/2 head without declarations", arityAt{pingerHead, "ping", 1}, false, calls},
++		{"ping/2 head with declarations", arityAt{pingerHead, "ping", 1}, true, append([]aritySite{pingerHead}, calls...)},
++		{"plain imported call", arityAt{plainCall, "ping", 1}, false, calls},
++		{"call through an aliased import", arityAt{aliasedCall, "ping", 1}, false, calls},
++	})
++
++	t.Run("references/every location spans the name", func(t *testing.T) {
++		uri, line, col := arityAt{pingerHead, "ping", 1}.resolve(t, root)
++		for _, loc := range arityReferences(t, server, uri, line, col, false) {
++			rel, _ := filepath.Rel(root, strings.TrimPrefix(string(loc.URI), "file://"))
++			text := strings.Split(aritySrc(t, rel), "\n")[loc.Range.Start.Line]
++			r := loc.Range
++			if r.End.Line != r.Start.Line || r.Start.Character > r.End.Character ||
++				int(r.End.Character) > len(text) || text[r.Start.Character:r.End.Character] != "ping" {
++				t.Errorf("%s:%d range %v does not span ping", rel, r.Start.Line, r)
++			}
++		}
++	})
++}
++
++func TestTypeDefinition_BareLocalTypes(t *testing.T) {
++	server, cleanup := setupTestServer(t)
++	defer cleanup()
++	root := server.projectRoot
++	for rel, src := range localTypeFiles {
++		indexFile(t, server.store, root, rel, src)
++	}
++
++	typed := func(text string) aritySite { return aritySite{"lib/my_app/typed.ex", text} }
++	user := func(text string) aritySite { return aritySite{"lib/my_app/type_user.ex", text} }
++	outer := func(text string) aritySite { return aritySite{"lib/my_app/outer.ex", text} }
++	typeT := typed("@type t :: %{name: String.t()}")
++	typeStatus := typed("@type status :: atom()")
++	outerT := outer("@type t :: integer()")
++	innerT := outer("@type t :: binary()")
++
++	for _, tc := range []struct {
++		name string
++		at   arityAt
++		want []aritySite
++	}{
++		{"bare local t()", arityAt{typed("@spec build(String.t()) :: t()"), ":: t()", 3}, []aritySite{typeT}},
++		{"bare local status() beside a status/1 function", arityAt{typed("@spec status(term()) :: status()"), ":: status()", 3}, []aritySite{typeStatus}},
++		{"nested: parent t() before the nested module", arityAt{outer("@spec a() :: t()"), ":: t()", 3}, []aritySite{outerT}},
++		{"nested: nested module t()", arityAt{outer("@spec i() :: t()"), ":: t()", 3}, []aritySite{innerT}},
++		{"nested: parent t() after the nested module ends", arityAt{outer("@spec b() :: t()"), ":: t()", 3}, []aritySite{outerT}},
++		{"control: qualified alias Typed.t()", arityAt{user("@spec make(String.t()) :: Typed.t()"), "Typed.t", 6}, []aritySite{typeT}},
++		{"control: qualified full MyApp.Typed.t()", arityAt{user("@spec again(MyApp.Typed.t()) :: boolean()"), "Typed.t", 6}, []aritySite{typeT}},
++		{"control: qualified function Typed.build is not a type", arityAt{user("def make(name), do: Typed.build(name)"), "build", 1}, nil},
++		{"control: ordinary status(x) call beside a status type", arityAt{typed("def check(x), do: {build(x), status(x)}"), "status(x)", 1}, nil},
++		{"control: local function build(x) is not a type", arityAt{typed("def check(x), do: {build(x), status(x)}"), "build(x)", 1}, nil},
++		{"control: built-in atom()", arityAt{typeStatus, "atom", 1}, nil},
++	} {
++		t.Run("type definition/"+tc.name, func(t *testing.T) {
++			uri, line, col := tc.at.resolve(t, root)
++			result, err := server.TypeDefinition(context.Background(), &protocol.TypeDefinitionParams{
++				TextDocumentPositionParams: protocol.TextDocumentPositionParams{
++					TextDocument: protocol.TextDocumentIdentifier{URI: protocol.DocumentURI(uri)},
++					Position:     protocol.Position{Line: line, Character: col},
++				},
++			})
++			if err != nil {
++				t.Fatal(err)
++			}
++			if got, want := arityLocKeys(root, result), aritySiteKeys(t, tc.want...); !sameKeys(got, want) {
++				t.Errorf("type definition = %v, want %v", got, want)
++			}
++		})
++	}
++}
 diff --git a/internal/lsp/name_navigation.go b/internal/lsp/name_navigation.go
 index 4e380f0..cd7fe5f 100644
 --- a/internal/lsp/name_navigation.go
@@ -1869,7 +2128,7 @@ index 4e380f0..cd7fe5f 100644
  		return
  	}
 diff --git a/internal/lsp/server.go b/internal/lsp/server.go
-index afc3241..ad699f8 100644
+index afc3241..e1e87a9 100644
 --- a/internal/lsp/server.go
 +++ b/internal/lsp/server.go
 @@ -1154,8 +1154,15 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
@@ -2174,16 +2433,20 @@ index afc3241..ad699f8 100644
  		return mod, true
  	}
  
-@@ -3619,7 +3622,7 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
+@@ -3618,8 +3621,11 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
+ 
  	// Explicit imports (direct definitions only — fast store lookup)
  	imports := tf.ExtractImports()
++	for i, mod := range imports {
++		imports[i] = resolveModule(mod, aliases)
++	}
  	for _, mod := range imports {
 -		if results, err := s.store.LookupPublicFunction(mod, functionName); err == nil && len(results) > 0 {
 +		if results, err := s.store.LookupPublicFunction(mod, functionName); err == nil && len(filterArity(results, arity)) > 0 {
  			return mod, false
  		}
  	}
-@@ -3629,20 +3632,20 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
+@@ -3629,20 +3635,20 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
  	useCalls := tf.ExtractUsesWithOpts(aliases)
  	for i := len(useCalls) - 1; i >= 0; i-- {
  		uc := useCalls[i]
@@ -2207,7 +2470,7 @@ index afc3241..ad699f8 100644
  			return mod, false
  		}
  	}
-@@ -5005,38 +5008,33 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
+@@ -5005,38 +5011,33 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
  			return nil, nil
  		}
  
@@ -2257,7 +2520,7 @@ index afc3241..ad699f8 100644
  			return s.hoverFromFile(functionName, results[0])
  		}
  
-@@ -5065,15 +5063,8 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
+@@ -5065,15 +5066,8 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
  	fullModule := s.resolveModuleWithNesting(moduleRef, aliases, uriToPath(protocol.DocumentURI(docURI)), lineNum)
  
  	if functionName != "" {
@@ -2275,7 +2538,7 @@ index afc3241..ad699f8 100644
  			return s.hoverFromFile(functionName, hits[0])
  		}
  		// Nothing in the index: the function may exist only in the compiled module.
-@@ -5371,6 +5362,8 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5371,6 +5365,8 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  	// below. They carry the bare type uses (`@type t :: schema | embedded`)
  	// that the call-shaped scan cannot see.
  	var typespecOccurrences []protocol.Location
@@ -2284,7 +2547,7 @@ index afc3241..ad699f8 100644
  
  	if moduleRef == "" {
  		if functionName == "" {
-@@ -5414,7 +5407,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5414,7 +5410,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		}
  
  		// Bare function — resolve to its defining module
@@ -2293,7 +2556,7 @@ index afc3241..ad699f8 100644
  		s.debugf("References: resolved bare %q -> %q", functionName, fullModule)
  		if fullModule == "" {
  			currentModule := s.store.LookupEnclosingModule(uriToPath(protocol.DocumentURI(docURI)), lineNum+1)
-@@ -5464,7 +5457,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5464,7 +5460,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		useCalls := tf.ExtractUsesWithOpts(aliases)
  		for i := len(useCalls) - 1; i >= 0; i-- {
  			uc := useCalls[i]
@@ -2302,7 +2565,7 @@ index afc3241..ad699f8 100644
  				injectors = append(injectors, uc.Module)
  				s.debugf("References: opt-binding injector for %s: %s", functionName, uc.Module)
  				break
-@@ -5475,7 +5468,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5475,7 +5471,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  	kind := NameKindCallable
  	if functionName == "" {
  		kind = NameKindAny
@@ -2311,7 +2574,7 @@ index afc3241..ad699f8 100644
  		kind = NameKindType
  	}
  	semantic, err := s.ReferenceNames(fullModule, functionName, NameReferenceOptions{
-@@ -5485,15 +5478,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5485,15 +5481,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		ExcludeStdlib:      true,
  		InjectorModules:    injectors,
  		GeneratedProvider:  generatedProvider,
@@ -2331,7 +2594,7 @@ index afc3241..ad699f8 100644
  	}
  	seen := make(map[refKey]struct{}, len(semantic))
  	var locations []protocol.Location
-@@ -5507,19 +5504,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5507,19 +5507,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  			if line == lineNum && !params.Context.IncludeDeclaration {
  				continue
  			}
@@ -2354,7 +2617,18 @@ index afc3241..ad699f8 100644
  		})
  	}
  
-@@ -7110,6 +7107,14 @@ func (s *Server) PrepareCallHierarchy(ctx context.Context, params *protocol.Call
+@@ -7004,6 +7004,10 @@ func (s *Server) TypeDefinition(ctx context.Context, params *protocol.TypeDefini
+ 	aliases := tf.ExtractAliasesInScope(lineNum)
+ 	s.mergeAliasesFromUseTokenized(tf, aliases)
+ 	fullModule := s.resolveModuleWithNesting(typeCtx.ModuleRef, aliases, uriToPath(protocol.DocumentURI(docURI)), lineNum)
++	// A bare name is a local type only inside a typespec; elsewhere it is a call.
++	if typeCtx.ModuleRef == "" && tf.InTypespec(lineNum) {
++		fullModule = extractEnclosingModuleFromTokens(tf.source, tf.tokens, lineNum)
++	}
+ 
+ 	results, err := s.store.LookupFunction(fullModule, typeName)
+ 	if err != nil {
+@@ -7110,6 +7114,14 @@ func (s *Server) PrepareCallHierarchy(ctx context.Context, params *protocol.Call
  
  	r := defResults[0]
  	if len(generatedFunctions) > 0 {
