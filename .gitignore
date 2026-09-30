@@ -54,3 +54,4 @@ npm-debug.log
 
 # Dexter workspace index and prototype client state
 /.dexter/
+docs/implementation/handoffs/
