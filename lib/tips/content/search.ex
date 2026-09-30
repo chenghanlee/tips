@@ -23,9 +23,16 @@ defmodule Tips.Content.Search do
 
   ## Label rebuilds
 
-  After changing a curated label, the maintenance caller rebuilds every
-  affected contribution in the same transaction, calling the writer for each
-  id. A retired label still referenced by content is indexed like any other.
+  Curated labels are stable in the MVP; a label change is rare, controlled
+  maintenance, not a live edit. Before it starts, pause every content writer
+  and let in-flight content transactions finish. Keep them paused until the
+  maintenance transaction commits or rolls back. Otherwise a publication,
+  edit or retag that read the old label, or moved content into the label,
+  can keep a stale document. Nothing here enforces this precondition.
+
+  In one transaction, the maintenance caller changes the label, selects the
+  affected ids, locks them in the shared lock order and calls the writer for
+  each. A retired label still referenced by content is indexed like any other.
   Affected ids:
 
     * tag: tips with `tag_id` = the tag;
