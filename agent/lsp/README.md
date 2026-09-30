@@ -82,10 +82,8 @@ native LSP JSON, whose ranges are 0-based.
 | `outgoingCalls` | `outgoing-calls <file> <line> <column>` |
 
 `query` waits up to `--wait <duration>` (default 30s) for a cold index and exits
-non-zero with the reason on stderr. File paths resolve against the current
-directory, so run it from the worktree; files outside the bound root are
-rejected. The stock `lookup` and `references <module>` name searches are
-unchanged.
+non-zero with the reason on stderr. Files are relative to the worktree. The stock
+`lookup` and `references <module>` name searches are unchanged.
 
 ## Limits
 
