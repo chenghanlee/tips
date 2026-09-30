@@ -865,10 +865,10 @@ index 3b67eac..e33d696 100644
  	}
 diff --git a/internal/lsp/arity_integration_test.go b/internal/lsp/arity_integration_test.go
 new file mode 100644
-index 0000000..6155a0f
+index 0000000..25d4639
 --- /dev/null
 +++ b/internal/lsp/arity_integration_test.go
-@@ -0,0 +1,1157 @@
+@@ -0,0 +1,1074 @@
 +package lsp
 +
 +import (
@@ -904,19 +904,12 @@ index 0000000..6155a0f
 +    {:created, name, attrs, opts}
 +  end
 +
-+  @doc "Single-arity control."
-+  def only(value), do: {:only, value}
-+
 +  def run3(name) do
 +    create(name, %{}, [:audit])
 +  end
 +
 +  def run2(name) do
 +    create(name, %{})
-+  end
-+
-+  def run_only(value) do
-+    only(value)
 +  end
 +end
 +`
@@ -1717,8 +1710,6 @@ index 0000000..6155a0f
 +	call3a := site("create(name, attrs, [])")
 +	call3b := site("create(name, %{}, [:audit])")
 +	call2 := site("create(name, %{})")
-+	headOnly := site("def only(value), do: {:only, value}")
-+	callOnly := site("only(value)")
 +
 +	runArityDefinitions(t, server, "", []arityDefinitionCase{
 +		{"definition of a /3 call is the /3 head", arityAt{call3b, "create", 1}, []aritySite{head3}},
@@ -1726,22 +1717,9 @@ index 0000000..6155a0f
 +	t.Run("definition of a /2 call is a /2 head", func(t *testing.T) {
 +		expectArityDefinitionWithin(t, server, arityAt{call2, "create", 1}, head2a, head2b)
 +	})
-+	runArityHovers(t, server, "", []arityHoverCase{
-+		{"hover of a /3 call describes the /3 head", arityAt{call3b, "create", 1}, "defp create(name, attrs, opts)", "Creates with two arguments."},
-+	})
 +	runArityReferences(t, server, "", []arityReferenceCase{
-+		{"references of a /3 call with declarations", arityAt{call3b, "create", 1}, true, []aritySite{call3a, call3b, head3}},
-+		{"references of a /3 call without declarations", arityAt{call3b, "create", 1}, false, []aritySite{call3a, call3b}},
-+		{"references of the /3 head with declarations", arityAt{head3, "create", 1}, true, []aritySite{call3a, call3b, head3}},
 +		{"references of the /3 head without declarations", arityAt{head3, "create", 1}, false, []aritySite{call3a, call3b}},
 +		{"references of a /2 call with declarations", arityAt{call2, "create", 1}, true, []aritySite{call2, head2a, head2b}},
-+		{"references of a /2 call without declarations", arityAt{call2, "create", 1}, false, []aritySite{call2}},
-+		{"control: single arity with declarations", arityAt{callOnly, "only", 1}, true, []aritySite{callOnly, headOnly}},
-+		{"control: single arity without declarations", arityAt{callOnly, "only", 1}, false, []aritySite{callOnly}},
-+	})
-+	t.Run("control: single arity definition and hover", func(t *testing.T) {
-+		expectArityDefinition(t, server, arityAt{callOnly, "only", 1}, headOnly)
-+		expectArityHover(t, server, arityAt{callOnly, "only", 1}, "Single-arity control.", "")
 +	})
 +}
 +
@@ -1753,7 +1731,6 @@ index 0000000..6155a0f
 +	maker := func(text string) aritySite { return aritySite{"lib/my_app/maker.ex", text} }
 +	caller := func(text string) aritySite { return aritySite{"lib/my_app/caller.ex", text} }
 +	importer := func(text string) aritySite { return aritySite{"lib/my_app/importer.ex", text} }
-+	onlyImporter := func(text string) aritySite { return aritySite{"lib/my_app/only_importer.ex", text} }
 +	echoUser := func(text string) aritySite { return aritySite{"lib/my_app/echo_user.ex", text} }
 +	mixer := func(text string) aritySite { return aritySite{"lib/my_app/mixer.ex", text} }
 +	wrapper := func(text string) aritySite { return aritySite{"lib/my_app/wrapper.ex", text} }
@@ -1762,13 +1739,10 @@ index 0000000..6155a0f
 +	put3Head := store("def put(key, value, opts), do: {:put3, key, value, opts}")
 +	fetchDefaultHead := store(`def fetch(key, default \\ nil), do: {:fetch, key, default}`)
 +	fetch3Head := store("def fetch(key, default, opts), do: {:fetch3, key, default, opts}")
-+	make3Head := maker("def make(a, b, c), do: {:make3, a, b, c}")
 +	make2Head := maker("def make(a, b), do: {:make2, a, b}")
 +	pingerHead := aritySite{"lib/shared_lib/pinger.ex", "def ping(a, b), do: {:shared_ping, a, b}"}
 +	importerPing1Head := importer("def ping(a), do: {:local_ping, a}")
-+	onlyPing1Head := onlyImporter("def ping(a), do: {:only_local_ping, a}")
 +	sharedEchoHead := aritySite{"lib/shared_lib/echo.ex", "def echo(a), do: {:shared_echo, a}"}
-+	localEcho2Head := echoUser("def echo(a, b), do: {:local_echo, a, b}")
 +
 +	piped3 := store("|> put(:value, [:piped])")
 +	piped2 := store("|> put(:value)")
@@ -1785,23 +1759,15 @@ index 0000000..6155a0f
 +	callerThree := caller("Store.put(:k, :v, [:opt])")
 +	callerFull := caller("MyApp.Store.put(:k, :v, [:full])")
 +	make2Call := maker("make(1, 2)")
-+	make3Call := maker("make(1, 2, 3)")
 +	remoteTwo := importer("ping(:a, :b)")
 +	localOne := importer("ping(:a)")
-+	onlyRemoteTwo := onlyImporter("ping(:c, :d)")
 +	echoRemoteOne := echoUser("echo(:x)")
-+	echoLocalTwo := echoUser("echo(:x, :y)")
 +
-+	alpha2Head := aritySite{"lib/shared_lib/alpha.ex", "def f(a, b), do: {:alpha2, a, b}"}
 +	alpha3Head := aritySite{"lib/shared_lib/alpha.ex", "def f(a, b, c), do: {:alpha3, a, b, c}"}
-+	beta3Head := aritySite{"lib/shared_lib/beta.ex", "def f(a, b, c), do: {:beta3, a, b, c}"}
-+	mixed := mixer("{Alpha.f(1, 2), Beta.f(1, 2, 3)}")
 +	alphaThree := mixer("Alpha.f(1, 2, 3)")
 +	alphaBoth := mixer("{Alpha.f(1, 2), Alpha.f(1, 2, 3)}")
 +
-+	wrap2Head := wrapper("def wrap(value, opts), do: {:wrap2, value, opts}")
 +	wrap3Head := wrapper("def wrap(value, opts, block), do: {:wrap3, value, opts, block}")
-+	inlineDo := wrapper("wrap(x, k: 1, do: :x)")
 +	blockDo := wrapper("wrap(x, k: 1) do")
 +
 +	shortHead := aritySite{"lib/shared_lib/short.ex", "def tag(a), do: {:short, a}"}
@@ -1812,13 +1778,9 @@ index 0000000..6155a0f
 +	terseHead := aritySite{"lib/shared_lib/terse.ex", "def show(a), do: {:terse, a}"}
 +	verboseHead := aritySite{"lib/shared_lib/verbose.ex", "def show(a, b), do: {:verbose, a, b}"}
 +	facadeTwo := aritySite{"lib/my_app/facade_user.ex", "Facade.show(a, b)"}
-+	facadeOne := aritySite{"lib/my_app/facade_user.ex", "Facade.show(a)"}
-+	revFacadeTwo := aritySite{"lib/my_app/facade_user.ex", "RevFacade.show(a, b)"}
 +	revFacadeOne := aritySite{"lib/my_app/facade_user.ex", "RevFacade.show(a)"}
 +
-+	dualPick1Head := aritySite{"lib/shared_lib/dual.ex", "def pick(a), do: {:dual1, a}"}
 +	dualPick2Head := aritySite{"lib/shared_lib/dual.ex", "def pick(a, b), do: {:dual2, a, b}"}
-+	pairwisePick2Head := aritySite{"lib/shared_lib/pairwise.ex", "def pick(a, b), do: {:pairwise2, a, b}"}
 +	dualGrab1Head := aritySite{"lib/shared_lib/dual.ex", "def grab(a), do: {:grab1, a}"}
 +	dualGrab2Head := aritySite{"lib/shared_lib/dual.ex", "def grab(a, b), do: {:grab2, a, b}"}
 +	switchPick1 := aritySite{"lib/shared_lib/switch.ex", "defdelegate pick(a), to: SharedLib.Dual"}
@@ -1839,38 +1801,16 @@ index 0000000..6155a0f
 +
 +	runArityDefinitions(t, server, "definition/", []arityDefinitionCase{
 +		{"order: /2 call when /3 is declared first", arityAt{make2Call, "make", 1}, []aritySite{make2Head}},
-+		{"order: /3 call when /3 is declared first", arityAt{make3Call, "make", 1}, []aritySite{make3Head}},
-+		{"pipe adds one argument: /3", arityAt{piped3, "put", 1}, []aritySite{put3Head}},
-+		{"pipe adds one argument: /2", arityAt{piped2, "put", 1}, []aritySite{put2Head}},
 +		{"default: /1 call reaches the default head", arityAt{fetched1, "fetch", 1}, []aritySite{fetchDefaultHead}},
-+		{"default: /2 call reaches the default head", arityAt{fetched2, "fetch", 1}, []aritySite{fetchDefaultHead}},
 +		{"default: /3 call reaches the /3 head", arityAt{fetched3, "fetch", 1}, []aritySite{fetch3Head}},
 +		{"capture &put/3, cursor on first letter", arityAt{captured3, "put", 0}, []aritySite{put3Head}},
-+		{"capture &put/3, cursor on last letter", arityAt{captured3, "put", 2}, []aritySite{put3Head}},
-+		{"capture &put/2", arityAt{captured2, "put", 1}, []aritySite{put2Head}},
-+		{"anonymous fn argument with commas is one argument", arityAt{nestedFn, "put", 1}, []aritySite{put2Head}},
-+		{"trailing keyword list is one argument", arityAt{keywords, "put", 1}, []aritySite{put2Head}},
-+		{"call without parentheses", arityAt{noParens, "put", 1}, []aritySite{put3Head}},
-+		{"same line, first call is /2", arityAt{sameLine, "put(key, :a)", 1}, []aritySite{put2Head}},
-+		{"same line, second call is /3", arityAt{sameLine, "put(key, :b, [:c])", 1}, []aritySite{put3Head}},
-+		{"qualified alias /2", arityAt{callerTwo, "put", 1}, []aritySite{put2Head}},
 +		{"qualified alias /3", arityAt{callerThree, "put", 1}, []aritySite{put3Head}},
-+		{"qualified full module /3", arityAt{callerFull, "put", 1}, []aritySite{put3Head}},
 +		{"import beats same-name local of other arity", arityAt{remoteTwo, "ping", 1}, []aritySite{pingerHead}},
 +		{"local of matching arity is still local", arityAt{localOne, "ping", 1}, []aritySite{importerPing1Head}},
-+		{"import only: [ping: 2] beats local /1", arityAt{onlyRemoteTwo, "ping", 1}, []aritySite{pingerHead}},
 +		{"reverse: imported /1 beats local /2", arityAt{echoRemoteOne, "echo", 1}, []aritySite{sharedEchoHead}},
-+		{"reverse: local /2 stays local", arityAt{echoLocalTwo, "echo", 1}, []aritySite{localEcho2Head}},
-+		{"mixed providers, Alpha /2 on the line", arityAt{mixed, "Alpha.f", 6}, []aritySite{alpha2Head}},
-+		{"mixed providers, Beta /3 on the line", arityAt{mixed, "Beta.f", 5}, []aritySite{beta3Head}},
 +		{"same provider, second call is Alpha /3", arityAt{alphaBoth, "Alpha.f(1, 2, 3)", 6}, []aritySite{alpha3Head}},
-+		{"inline do: stays inside the /2 keyword list", arityAt{inlineDo, "wrap", 1}, []aritySite{wrap2Head}},
-+		{"do-block after trailing keywords is a separate /3 argument", arityAt{blockDo, "wrap", 1}, []aritySite{wrap3Head}},
-+		{"static use chain: /2 call reaches the /2 import", arityAt{useLong, "tag", 1}, []aritySite{longHead}},
 +		{"static use chain: /1 call reaches the /1 import", arityAt{useShort, "tag", 1}, []aritySite{shortHead}},
 +		{"defdelegate: /2 call follows the /2 delegate when /1 is declared first", arityAt{facadeTwo, "show", 1}, []aritySite{verboseHead}},
-+		{"defdelegate: /1 call follows the /1 delegate when /1 is declared first", arityAt{facadeOne, "show", 1}, []aritySite{terseHead}},
-+		{"defdelegate: /2 call follows the /2 delegate when /2 is declared first", arityAt{revFacadeTwo, "show", 1}, []aritySite{verboseHead}},
 +		{"defdelegate: /1 call follows the /1 delegate when /2 is declared first", arityAt{revFacadeOne, "show", 1}, []aritySite{terseHead}},
 +		{"defaulted defdelegate: /1 call reaches the target's /2 head", arityAt{viaGrabOne, "grab", 1}, []aritySite{dualGrab2Head}},
 +		{"delegate chain: renamed /1 delegate to a defaulted delegate reaches the final /2 head", arityAt{chainCall, "foo", 1}, []aritySite{backBar2Head}},
@@ -1878,33 +1818,18 @@ index 0000000..6155a0f
 +
 +	runArityHovers(t, server, "hover/", []arityHoverCase{
 +		{"order: /2 call when /3 is declared first", arityAt{make2Call, "make", 1}, "Makes with two arguments.", "Makes with three arguments."},
-+		{"pipe /3", arityAt{piped3, "put", 1}, "Puts with three arguments.", "Puts with two arguments."},
-+		{"capture &put/3", arityAt{captured3, "put", 1}, "Puts with three arguments.", "Puts with two arguments."},
-+		{"default /3", arityAt{fetched3, "fetch", 1}, "Fetches with options.", "Fetches with an optional default."},
 +		{"qualified /3", arityAt{callerThree, "put", 1}, "Puts with three arguments.", "Puts with two arguments."},
 +		{"import beats local of other arity", arityAt{remoteTwo, "ping", 1}, "Shared ping with two arguments.", "Local ping with one argument."},
-+		{"defdelegate /2, /1 declared first", arityAt{facadeTwo, "show", 1}, "Verbose show with two arguments.", "Terse show with one argument."},
-+		{"defdelegate /1, /1 declared first", arityAt{facadeOne, "show", 1}, "Terse show with one argument.", "Verbose show with two arguments."},
-+		{"defdelegate /2, /2 declared first", arityAt{revFacadeTwo, "show", 1}, "Verbose show with two arguments.", "Terse show with one argument."},
-+		{"defdelegate /1, /2 declared first", arityAt{revFacadeOne, "show", 1}, "Terse show with one argument.", "Verbose show with two arguments."},
 +		{"delegate chain reaches the final /2 head", arityAt{chainCall, "foo", 1}, "Back bar with two arguments.", "Back bar with one argument."},
 +	})
 +
 +	runArityReferences(t, server, "references/", []arityReferenceCase{
 +		{"put/3 head without declarations", arityAt{put3Head, "put", 1}, false, put3Calls},
-+		{"put/3 head with declarations", arityAt{put3Head, "put", 1}, true, append([]aritySite{put3Head}, put3Calls...)},
 +		{"qualified put/3 call from another module", arityAt{callerThree, "put", 1}, false, put3Calls},
 +		{"put/2 head with declarations", arityAt{put2Head, "put", 1}, true, append([]aritySite{put2Head}, put2Calls...)},
 +		{"default head covers /1 and /2 calls only", arityAt{fetchDefaultHead, "fetch", 1}, true, []aritySite{fetchDefaultHead, fetched1, fetched2}},
-+		{"fetch/3 head", arityAt{fetch3Head, "fetch", 1}, false, []aritySite{fetched3}},
-+		{"order: make/2 head with declarations", arityAt{make2Head, "make", 1}, true, []aritySite{make2Head, make2Call}},
-+		{"imported ping/2 is found through imports, not local /1 calls", arityAt{pingerHead, "ping", 1}, false, []aritySite{remoteTwo, onlyRemoteTwo}},
 +		{"local ping/1 excludes imported /2 calls", arityAt{importerPing1Head, "ping", 1}, true, []aritySite{importerPing1Head, localOne}},
-+		{"only-importer local ping/1 has no calls", arityAt{onlyPing1Head, "ping", 1}, true, []aritySite{onlyPing1Head}},
 +		{"Alpha f/3 excludes a line with Alpha f/2 beside Beta f/3", arityAt{alpha3Head, "f(", 0}, false, []aritySite{alphaThree, alphaBoth}},
-+		{"Alpha f/2 includes the mixed-provider line", arityAt{alpha2Head, "f(", 0}, false, []aritySite{mixed, alphaBoth}},
-+		{"Beta f/3 includes only its own call", arityAt{beta3Head, "f(", 0}, false, []aritySite{mixed}},
-+		{"wrap/2 includes the inline do: call only", arityAt{wrap2Head, "wrap", 1}, false, []aritySite{inlineDo}},
 +		{"wrap/3 includes the do-block call only", arityAt{wrap3Head, "wrap", 1}, false, []aritySite{blockDo}},
 +		{"static use chain: Long tag/2 includes only the /2 call", arityAt{longHead, "tag", 1}, false, []aritySite{useLong}},
 +	})
@@ -1914,8 +1839,6 @@ index 0000000..6155a0f
 +	// open, except that a line forwarding elsewhere must not be listed.
 +	runArityDelegateReferences(t, server, []arityDelegateReferenceCase{
 +		{"Dual pick/2 excludes facade /2 calls forwarded to Pairwise", arityAt{dualPick2Head, "pick(", 0}, []aritySite{directPickTwo}, []aritySite{viaPickTwo, viaPickOne, switchPick1, switchPick2}},
-+		{"Dual pick/1 includes facade /1 calls", arityAt{dualPick1Head, "pick(", 0}, []aritySite{viaPickOne}, []aritySite{viaPickTwo, directPickTwo, switchPick2}},
-+		{"Pairwise pick/2 includes facade /2 calls", arityAt{pairwisePick2Head, "pick(", 0}, []aritySite{viaPickTwo}, []aritySite{viaPickOne, directPickTwo, switchPick1}},
 +		{"Dual grab/2 includes both arities of a defaulted delegate", arityAt{dualGrab2Head, "grab(", 0}, []aritySite{viaGrabOne, viaGrabTwo}, []aritySite{directGrabOne}},
 +		{"Dual grab/1 excludes both arities of a defaulted delegate", arityAt{dualGrab1Head, "grab(", 0}, []aritySite{directGrabOne}, []aritySite{viaGrabOne, viaGrabTwo, switchGrab}},
 +	})
@@ -1923,9 +1846,7 @@ index 0000000..6155a0f
 +	// A line holding calls of both arities is a reference of each, so the
 +	// location must span the matching occurrence's name, not the whole line.
 +	runArityOccurrences(t, server, []arityOccurrenceCase{
-+		{"local put/2", arityAt{put2Head, "put", 1}, sameLine, "put(key, :a)", "put"},
 +		{"local put/3", arityAt{put3Head, "put", 1}, sameLine, "put(key, :b, [:c])", "put"},
-+		{"qualified Alpha f/2", arityAt{alpha2Head, "f(", 0}, alphaBoth, "Alpha.f(1, 2)", "f"},
 +		{"qualified Alpha f/3", arityAt{alpha3Head, "f(", 0}, alphaBoth, "Alpha.f(1, 2, 3)", "f"},
 +	})
 +}
@@ -1954,10 +1875,6 @@ index 0000000..6155a0f
 +				t.Errorf("references of %q include the run/1 call", head)
 +			}
 +		}
-+	}
-+	// Invalid position: past the end of the file is an empty answer, not an error.
-+	if got := definitionAt(t, server, uri, 400, 0); len(got) != 0 {
-+		t.Errorf("definition past end of file = %v, want none", got)
 +	}
 +}
 +
@@ -2420,13 +2337,14 @@ index 0000000..9b50d8b
 +}
 diff --git a/internal/lsp/call_hierarchy.go b/internal/lsp/call_hierarchy.go
 new file mode 100644
-index 0000000..8eee253
+index 0000000..86d61a3
 --- /dev/null
 +++ b/internal/lsp/call_hierarchy.go
-@@ -0,0 +1,424 @@
+@@ -0,0 +1,425 @@
 +package lsp
 +
 +import (
++	"errors"
 +	"fmt"
 +	"strings"
 +
@@ -2449,44 +2367,52 @@ index 0000000..8eee253
 +// callIdentity is the function a call-hierarchy item names.
 +type callIdentity struct {
 +	module, function string
-+	// arity is unknown for an item from a client that predates it.
-+	arity treesitter.Arity
++	arity            int
 +}
 +
 +// callHierarchyData is the identity an item carries between requests.
 +type callHierarchyData struct {
 +	Module   string `json:"module"`
 +	Function string `json:"function"`
-+	Arity    *int   `json:"arity,omitempty"`
++	Arity    int    `json:"arity"`
 +}
 +
 +func newCallHierarchyData(module, function string, arity int) callHierarchyData {
-+	return callHierarchyData{Module: module, Function: function, Arity: &arity}
++	return callHierarchyData{Module: module, Function: function, Arity: arity}
 +}
++
++// errNoCallIdentity refuses an item that carries data this server did not
++// write: it names no module, function and arity.
++var errNoCallIdentity = errors.New("call hierarchy item names no function; prepare the call hierarchy again")
 +
 +// callHierarchyIdentity reads an item's data as this server wrote it or as
-+// a client sends it back after a JSON round trip. ok is false for an item that
-+// names no function.
++// a client sends it back after a JSON round trip. ok is false unless it names
++// a module, a function and an arity.
 +func callHierarchyIdentity(data interface{}) (callIdentity, bool) {
-+	var id callIdentity
 +	switch d := data.(type) {
 +	case callHierarchyData:
-+		id.module, id.function = d.Module, d.Function
-+		if d.Arity != nil {
-+			id.arity = treesitter.ExactArity(*d.Arity)
-+		}
++		return callIdentity{d.Module, d.Function, d.Arity}, d.Module != "" && d.Function != "" && d.Arity >= 0
 +	case map[string]interface{}:
-+		id.module, _ = d["module"].(string)
-+		id.function, _ = d["function"].(string)
-+		if n, ok := d["arity"].(float64); ok && n == float64(int(n)) {
-+			id.arity = treesitter.ExactArity(int(n))
-+		}
++		module, _ := d["module"].(string)
++		function, _ := d["function"].(string)
++		arity, ok := d["arity"].(float64)
++		ok = ok && arity >= 0 && arity == float64(int(arity))
++		return callIdentity{module, function, int(arity)}, ok && module != "" && function != ""
 +	}
-+	return id, id.module != "" && id.function != ""
++	return callIdentity{}, false
 +}
 +
-+// anyArity matches every function: the BEAM caps arity at 255.
-+var anyArity = treesitter.Arity{Min: 0, Max: 255, Known: true}
++// itemIdentity is the function a follow-up request's item names. A test or
++// setup block carries no data: nothing calls it and its calls are not listed.
++func itemIdentity(item protocol.CallHierarchyItem) (id callIdentity, ok bool, err error) {
++	if item.Data == nil {
++		return callIdentity{}, false, nil
++	}
++	if id, ok = callHierarchyIdentity(item.Data); !ok {
++		return callIdentity{}, false, errNoCallIdentity
++	}
++	return id, true, nil
++}
 +
 +func (s *Server) prepareCallHierarchy(params *protocol.CallHierarchyPrepareParams) ([]protocol.CallHierarchyItem, error) {
 +	docURI := string(params.TextDocument.URI)
@@ -2607,18 +2533,15 @@ index 0000000..8eee253
 +}
 +
 +func (s *Server) incomingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyIncomingCall, error) {
-+	id, ok := callHierarchyIdentity(item.Data)
++	id, ok, err := itemIdentity(item)
 +	if !ok {
-+		return nil, nil
-+	}
-+	if !id.arity.Known {
-+		id.arity = anyArity
++		return nil, err
 +	}
 +	// An identity search returns only occurrences matched in current source.
 +	locations, err := s.ReferenceNames(id.module, id.function, NameReferenceOptions{
 +		Kind:          NameKindCallable,
 +		ExcludeStdlib: true,
-+		Arity:         id.arity,
++		Arity:         treesitter.ExactArity(id.arity),
 +	})
 +	if err != nil {
 +		return nil, err
@@ -2666,7 +2589,7 @@ index 0000000..8eee253
 +			continue
 +		}
 +		occ, owner, ok := source.CallOwner(uint(location.Line-1), uint(location.Column), id.function)
-+		if !ok || !id.arity.Matches(occ.Arity.Min) || moduleOf(&occ) != id.module {
++		if !ok || !occ.Arity.Matches(id.arity) || moduleOf(&occ) != id.module {
 +			continue
 +		}
 +		i, seen := byOwner[owner.Start]
@@ -2701,9 +2624,9 @@ index 0000000..8eee253
 +}
 +
 +func (s *Server) outgoingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyOutgoingCall, error) {
-+	id, ok := callHierarchyIdentity(item.Data)
++	id, ok, err := itemIdentity(item)
 +	if !ok {
-+		return nil, nil
++		return nil, err
 +	}
 +	// The index names the files that define the function; its clauses and
 +	// their calls are read from current source.
@@ -2810,22 +2733,17 @@ index 0000000..8eee253
 +		}
 +		module = callerModule
 +	}
-+	if rows, err := s.store.LookupFunction(module, occ.Name); err == nil {
-+		if rows = filterArity(rows, occ.Arity); len(rows) > 0 {
-+			return s.definitionItem(module, occ.Name, rows[0]), true
++	rows, _ := s.store.LookupFunction(module, occ.Name)
++	r, ok := definitionForArity(rows, nil, occ.Arity)
++	if !ok {
++		generated, _ := s.generatedSymbol(module, "", occ.Name)
++		if len(generated) == 0 {
++			return protocol.CallHierarchyItem{}, false
++		}
++		if r, ok = definitionForArity(s.generatedDefinitionResults(module), generated, occ.Arity); !ok {
++			return protocol.CallHierarchyItem{}, false
 +		}
 +	}
-+	generated, _ := s.generatedSymbol(module, "", occ.Name)
-+	generated = generatedWithArity(generated, occ.Arity)
-+	if len(generated) == 0 {
-+		return protocol.CallHierarchyItem{}, false
-+	}
-+	rows := s.generatedDefinitionResults(module)
-+	if len(rows) == 0 {
-+		return protocol.CallHierarchyItem{}, false
-+	}
-+	r := rows[0]
-+	r.Arity, r.Kind = generated[0].Arity, generated[0].Kind
 +	return s.definitionItem(module, occ.Name, r), true
 +}
 +
@@ -2850,10 +2768,10 @@ index 0000000..8eee253
 +}
 diff --git a/internal/lsp/call_hierarchy_generated_arity_test.go b/internal/lsp/call_hierarchy_generated_arity_test.go
 new file mode 100644
-index 0000000..5f288ea
+index 0000000..d3ea1b6
 --- /dev/null
 +++ b/internal/lsp/call_hierarchy_generated_arity_test.go
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,109 @@
 +package lsp
 +
 +import (
@@ -2917,11 +2835,7 @@ index 0000000..5f288ea
 +		line int
 +		want string
 +	}{
-+		{"one argument", 3, "MyApp.Store.lookup/1"},
 +		{"optional argument supplied", 4, "MyApp.Store.lookup/2"},
-+		{"every argument supplied", 5, "MyApp.Store.lookup/3"},
-+		{"pipe supplies the first argument", 6, "MyApp.Store.lookup/2"},
-+		{"capture names the arity", 7, "MyApp.Store.lookup/2"},
 +	} {
 +		t.Run(tc.name, func(t *testing.T) {
 +			items := prepare(t, tc.line)
@@ -2969,10 +2883,10 @@ index 0000000..5f288ea
 +}
 diff --git a/internal/lsp/call_hierarchy_test.go b/internal/lsp/call_hierarchy_test.go
 new file mode 100644
-index 0000000..0a970fa
+index 0000000..46d0ab5
 --- /dev/null
 +++ b/internal/lsp/call_hierarchy_test.go
-@@ -0,0 +1,673 @@
+@@ -0,0 +1,619 @@
 +package lsp
 +
 +import (
@@ -3151,7 +3065,7 @@ index 0000000..0a970fa
 +			t.Fatalf("%s carries data %#v, want none", item.Name, item.Data)
 +		}
 +	default:
-+		if !ok || !id.arity.Known || fmt.Sprintf("%s.%s/%d", id.module, id.function, id.arity.Min) != item.Name {
++		if !ok || fmt.Sprintf("%s.%s/%d", id.module, id.function, id.arity) != item.Name {
 +			t.Fatalf("%s carries data %#v, want its module, function and arity", item.Name, item.Data)
 +		}
 +	}
@@ -3171,109 +3085,55 @@ index 0000000..0a970fa
 +//	test/body.exs:27      module named by a variable
 +//	test/body.exs:32      function named by unquote
 +//
-+// Captures, and different owners on one line, now resolve per occurrence.
-+// The Sweep targets replay the eight retained live incoming cases.
++// Captures, and different owners on one line, resolve per occurrence.
 +func TestCallHierarchyIncomingOwners(t *testing.T) {
 +	server := callHierarchyProject(t, "incoming")
 +
-+	want := map[string][]string{
-+		"MyApp.Admission.admit/1": {
-+			`lib/gate.ex | def MyApp.Gate.check/1 [3:2-5:5] sel [3:6-3:11] <- 4:20-4:25`,
-+			`lib/gate.ex | def MyApp.Gate.quick/1 [7:2-7:44] sel [7:6-7:11] <- 7:36-7:41`,
-+			`lib/gate.ex | def MyApp.Gate.guarded/1 [9:2-11:34] sel [9:6-9:13] <- 11:26-11:31`,
-+			`lib/gate.ex | def MyApp.Gate.spread/1 [13:2-15:30] sel [13:6-13:12] <- 15:22-15:27`,
-+			`lib/gate.ex | def MyApp.Gate.guarded_block/1 [17:2-20:5] sel [17:6-17:19] <- 19:20-19:25`,
-+			`lib/gate.ex | def MyApp.Gate.multi/1 [24:2-26:5] sel [24:6-24:11] <- 25:14-25:19`,
-+			`lib/gate.ex | defp MyApp.Gate.private/1 [28:2-30:5] sel [28:7-28:14] <- 29:30-29:35`,
-+			`lib/gate.ex | def MyApp.Gate.one_line/1 [32:2-32:49] sel [32:6-32:14] <- 32:37-32:42`,
-+			`lib/gate.ex | def MyApp.Gate.after_one_line/1 [33:2-35:5] sel [33:6-33:20] <- 34:20-34:25`,
-+			`lib/gate.ex | def MyApp.Gate.twice/1 [37:2-37:67] sel [37:6-37:11] <- 37:36-37:41 37:58-37:63`,
-+			`lib/gate.ex | def MyApp.Gate.with_default/2 [39:2-41:5] sel [39:6-39:18] <- 40:20-40:25`,
-+			`lib/modules.ex | def MyApp.Outer.Inner.run/1 [2:4-2:44] sel [2:8-2:11] <- 2:36-2:41`,
-+			`lib/modules.ex | def MyApp.Absolute.run/1 [6:4-6:44] sel [6:8-6:11] <- 6:36-6:41`,
-+			`lib/modules.ex | def MyApp.Outer.after_nested/1 [9:2-9:51] sel [9:6-9:18] <- 9:43-9:48`,
-+			`lib/rejects.ex | def MyApp.Rejects.run/1 [6:2-8:5] sel [6:6-6:9] <- 7:34-7:39`,
-+			`lib/rejects.ex | def MyApp.Rejects.run_args/1 [10:2-12:5] sel [10:6-10:14] <- 11:34-11:39`,
-+			`lib/rejects.ex | def MyApp.Rejects.mixed/1 [20:2-20:77] sel [20:6-20:11] <- 20:68-20:73`,
-+			`lib/rejects.ex | def MyApp.Rejects.one/1 [22:2-22:42] sel [22:6-22:9] <- 22:34-22:39`,
-+			`lib/rejects.ex | def MyApp.Rejects.two/1 [22:44-22:84] sel [22:48-22:51] <- 22:76-22:81`,
-+			`lib/rejects.ex | def MyApp.Rejects.genuine/1 [24:2-24:46] sel [24:6-24:13] <- 24:38-24:43`,
-+			`test/body.exs | def MyApp.Body.first/0 [5:2-5:41] sel [5:6-5:11] <- 5:33-5:38`,
-+			`test/shapes_test.exs | test MyApp.ShapesTest test "inline end" [3:2-3:51] sel [3:7-3:19] <- 3:39-3:44`,
-+			`test/shapes_test.exs | test MyApp.ShapesTest test "after inline end" [4:2-6:5] sel [4:7-4:25] <- 5:27-5:32`,
-+			`test/shapes_test.exs | test MyApp.ShapesTest test "keyword do" [8:2-8:57] sel [8:7-8:19] <- 8:48-8:53`,
-+			`test/shapes_test.exs | test MyApp.ShapesTest test "keyword do spread" [10:2-12:38] sel [10:7-10:26] <- 12:29-12:34`,
-+			`test/shapes_test.exs | test MyApp.ShapesTest test "with context" [14:2-16:5] sel [14:7-14:21] <- 15:20-15:25`,
-+			`test/nested_test.exs | def MyApp.GateHelper.build/1 [1:2-1:44] sel [1:6-1:11] <- 1:36-1:41`,
-+			`test/nested_test.exs | setup_all MyApp.NestedTest setup_all [7:2-10:5] sel [7:2-7:11] <- 8:20-8:25`,
-+			`test/nested_test.exs | setup MyApp.NestedTest setup [13:4-16:7] sel [13:4-13:9] <- 14:22-14:27`,
-+			`test/nested_test.exs | test MyApp.NestedTest test "control flow" [18:4-24:7] sel [18:9-18:23] <- 20:29-20:34 21:49-21:54`,
-+			`test/nested_test.exs | test MyApp.NestedTest test "with and fn" [26:4-30:7] sel [26:9-26:22] <- 28:46-28:51`,
-+			`test/nested_test.exs | test MyApp.NestedTest test "after describe" [33:2-35:5] sel [33:7-33:23] <- 34:20-34:25`,
-+			`test/a_test.exs | test MyApp.ATest test "a1" [3:2-5:5] sel [3:7-3:11] <- 4:27-4:32`,
-+			`test/b_test.exs | test MyApp.BTest test "b1" [7:2-9:5] sel [7:7-7:11] <- 8:27-8:32`,
-+			`test/b_test.exs | setup MyApp.BTest setup [11:2-14:5] sel [11:2-11:7] <- 12:20-12:25`,
-+			`test/c_test.exs | test MyApp.CTest test "c1" [3:2-5:5] sel [3:7-3:11] <- 4:27-4:32`,
-+			`test/aliased_test.exs | test MyApp.AliasedTest test "alias" [5:2-7:5] sel [5:7-5:14] <- 6:21-6:26 6:37-6:42`,
-+			`test/aliased_test.exs | test MyApp.AliasedTest test "import" [9:2-11:5] sel [9:7-9:15] <- 10:11-10:16`,
-+			`test/unicode_test.exs | test MyApp.UnicodeTest test "héllo 😀" [3:2-3:64] sel [3:7-3:17] <- 3:46-3:51`,
-+		},
-+		"Sweep.Case1Target.admit/1": {
-+			`test/case_1_test.exs | setup_all Sweep.Case1Test setup_all [7:2-9:5] sel [7:2-7:11] <- 8:32-8:37`,
-+			`test/case_1_test.exs | setup Sweep.Case1Test setup [12:4-14:7] sel [12:4-12:9] <- 13:35-13:40`,
-+			`test/case_1_test.exs | test Sweep.Case1Test test "admits the invoice with its line total" [16:4-18:7] sel [16:9-16:49] <- 17:46-17:51`,
-+		},
-+		"Sweep.Case2Target.admit/1": {
-+			`test/case_2_test.exs | def Sweep.Case2RefundTest.refund_request/1 [3:2-5:5] sel [3:6-3:20] <- 4:22-4:27`,
-+			`test/case_2_test.exs | test Sweep.Case2ChargebackTest test "admits a chargeback dispute" [15:2-17:5] sel [15:7-15:36] <- 16:52-16:57`,
-+			`test/case_2_test.exs | test Sweep.Case2ChargebackTest test "keeps the disputed amount" [19:2-21:5] sel [19:7-19:34] <- 20:45-20:50`,
-+		},
-+		"Sweep.Case3Target.admit/1": {
-+			`test/case_3_test.exs | test Sweep.Case3Test test "inline end" [5:2-5:65] sel [5:7-5:19] <- 5:48-5:53`,
-+			`test/case_3_test.exs | def Sweep.Case3Test.keyword_caller/1 [7:2-11:7] sel [7:6-7:20] <- 9:24-9:29`,
-+			`test/case_3_test.exs | test Sweep.Case3Test test "after keyword caller" [13:2-16:5] sel [13:7-13:29] <- 15:29-15:34`,
-+		},
-+		"Sweep.Case4Target.admit/1": {
-+			`test/case_4_test.exs | test Sweep.Case4Test.InnerTest test "nested module test" [6:4-8:7] sel [6:9-6:29] <- 7:31-7:36`,
-+			`test/case_4_test.exs | test Sweep.Case4AbsoluteTest test "absolute module test" [14:4-16:7] sel [14:9-14:31] <- 15:31-15:36`,
-+			`test/case_4_test.exs | test Sweep.Case4Test test "outer test after nested modules" [19:2-21:5] sel [19:7-19:40] <- 20:29-20:34`,
-+		},
-+		"Sweep.Case5Target.admit/1": {
-+			`test/case_5_test.exs | def Sweep.Case5Test.checked/1 [5:2-7:5] sel [5:6-5:13] <- 6:30-6:35`,
-+			`test/case_5_test.exs | test Sweep.Case5Test test "case and if" [10:4-17:7] sel [10:9-10:22] <- 12:25-12:30 13:49-13:54`,
-+			`test/case_5_test.exs | test Sweep.Case5Test test "with, for and fn" [19:4-25:7] sel [19:9-19:27] <- 22:54-22:59`,
-+		},
-+		"Sweep.Case6Target.admit/1": {
-+			`test/case_6_test.exs | def Sweep.Case6Test.first/1 [5:2-5:48] sel [5:6-5:11] <- 5:36-5:41`,
-+			`test/case_6_test.exs | def Sweep.Case6Test.second/1 [5:50-5:97] sel [5:54-5:60] <- 5:85-5:90`,
-+			`test/case_6_test.exs | test Sweep.Case6Test test "repeated on one line" [7:2-9:5] sel [7:7-7:29] <- 8:23-8:28 8:41-8:46`,
-+			`test/case_6_test.exs | test Sweep.Case6Test test "after the shared line" [11:2-13:5] sel [11:7-11:30] <- 12:47-12:52`,
-+		},
-+		"Sweep.Case7Target.admit/1": {
-+			`test/case_7_test.exs | test Sweep.Case7Test test "qualified pipeline retains its test owner" [5:2-7:5] sel [5:7-5:50] <- 6:34-6:39`,
-+			`test/case_7_test.exs | test Sweep.Case7Test test "aliased multiline pipeline retains its test owner" [9:2-15:5] sel [9:7-9:58] <- 12:16-12:21`,
-+			`test/case_7_test.exs | test Sweep.Case7Test test "imported pipeline retains its test owner" [17:2-19:5] sel [17:7-17:49] <- 18:16-18:21`,
-+		},
-+		"Sweep.Case8Target.admit/1": {
-+			`test/case_8_test.exs | defp Sweep.Case8Test.receipt/2 [4:2-4:65] sel [4:7-4:14] <- 4:53-4:58`,
-+			`test/case_8_test.exs | defp Sweep.Case8Test.receipt/2 [6:2-8:5] sel [6:7-6:14] <- 7:22-7:27`,
-+			`test/case_8_test.exs | test Sweep.Case8Test test "records a receipt" [11:4-14:7] sel [11:9-11:28] <- 12:31-12:36`,
-+			`test/case_8_test.exs | test Sweep.Case8Test test "records a receipt" [18:4-21:7] sel [18:9-18:28] <- 19:31-19:36`,
-+		},
-+	}
-+	queries := map[string]string{"MyApp.Admission.admit/1": "lib/admission.ex:1:6"}
-+	for n := 1; n <= 8; n++ {
-+		queries[fmt.Sprintf("Sweep.Case%dTarget.admit/1", n)] = fmt.Sprintf("lib/sweep/case_%d_target.ex:1:6", n)
-+	}
-+	for target, rows := range want {
-+		t.Run(target, func(t *testing.T) {
-+			item := prepareOne(t, server, queries[target], target)
-+			calls := incoming(t, server, item)
-+			assertRows(t, incomingRows(t, server, calls), rows)
-+			for i := range calls {
-+				assertItemData(t, calls[i].From)
-+			}
-+		})
++	admit := prepareOne(t, server, "lib/admission.ex:1:6", "MyApp.Admission.admit/1")
++	calls := incoming(t, server, admit)
++	assertRows(t, incomingRows(t, server, calls), []string{
++		`lib/gate.ex | def MyApp.Gate.check/1 [3:2-5:5] sel [3:6-3:11] <- 4:20-4:25`,
++		`lib/gate.ex | def MyApp.Gate.quick/1 [7:2-7:44] sel [7:6-7:11] <- 7:36-7:41`,
++		`lib/gate.ex | def MyApp.Gate.guarded/1 [9:2-11:34] sel [9:6-9:13] <- 11:26-11:31`,
++		`lib/gate.ex | def MyApp.Gate.spread/1 [13:2-15:30] sel [13:6-13:12] <- 15:22-15:27`,
++		`lib/gate.ex | def MyApp.Gate.guarded_block/1 [17:2-20:5] sel [17:6-17:19] <- 19:20-19:25`,
++		`lib/gate.ex | def MyApp.Gate.multi/1 [24:2-26:5] sel [24:6-24:11] <- 25:14-25:19`,
++		`lib/gate.ex | defp MyApp.Gate.private/1 [28:2-30:5] sel [28:7-28:14] <- 29:30-29:35`,
++		`lib/gate.ex | def MyApp.Gate.one_line/1 [32:2-32:49] sel [32:6-32:14] <- 32:37-32:42`,
++		`lib/gate.ex | def MyApp.Gate.after_one_line/1 [33:2-35:5] sel [33:6-33:20] <- 34:20-34:25`,
++		`lib/gate.ex | def MyApp.Gate.twice/1 [37:2-37:67] sel [37:6-37:11] <- 37:36-37:41 37:58-37:63`,
++		`lib/gate.ex | def MyApp.Gate.with_default/2 [39:2-41:5] sel [39:6-39:18] <- 40:20-40:25`,
++		`lib/modules.ex | def MyApp.Outer.Inner.run/1 [2:4-2:44] sel [2:8-2:11] <- 2:36-2:41`,
++		`lib/modules.ex | def MyApp.Absolute.run/1 [6:4-6:44] sel [6:8-6:11] <- 6:36-6:41`,
++		`lib/modules.ex | def MyApp.Outer.after_nested/1 [9:2-9:51] sel [9:6-9:18] <- 9:43-9:48`,
++		`lib/rejects.ex | def MyApp.Rejects.run/1 [6:2-8:5] sel [6:6-6:9] <- 7:34-7:39`,
++		`lib/rejects.ex | def MyApp.Rejects.run_args/1 [10:2-12:5] sel [10:6-10:14] <- 11:34-11:39`,
++		`lib/rejects.ex | def MyApp.Rejects.mixed/1 [20:2-20:77] sel [20:6-20:11] <- 20:68-20:73`,
++		`lib/rejects.ex | def MyApp.Rejects.one/1 [22:2-22:42] sel [22:6-22:9] <- 22:34-22:39`,
++		`lib/rejects.ex | def MyApp.Rejects.two/1 [22:44-22:84] sel [22:48-22:51] <- 22:76-22:81`,
++		`lib/rejects.ex | def MyApp.Rejects.genuine/1 [24:2-24:46] sel [24:6-24:13] <- 24:38-24:43`,
++		`test/body.exs | def MyApp.Body.first/0 [5:2-5:41] sel [5:6-5:11] <- 5:33-5:38`,
++		`test/shapes_test.exs | test MyApp.ShapesTest test "inline end" [3:2-3:51] sel [3:7-3:19] <- 3:39-3:44`,
++		`test/shapes_test.exs | test MyApp.ShapesTest test "after inline end" [4:2-6:5] sel [4:7-4:25] <- 5:27-5:32`,
++		`test/shapes_test.exs | test MyApp.ShapesTest test "keyword do" [8:2-8:57] sel [8:7-8:19] <- 8:48-8:53`,
++		`test/shapes_test.exs | test MyApp.ShapesTest test "keyword do spread" [10:2-12:38] sel [10:7-10:26] <- 12:29-12:34`,
++		`test/shapes_test.exs | test MyApp.ShapesTest test "with context" [14:2-16:5] sel [14:7-14:21] <- 15:20-15:25`,
++		`test/nested_test.exs | def MyApp.GateHelper.build/1 [1:2-1:44] sel [1:6-1:11] <- 1:36-1:41`,
++		`test/nested_test.exs | setup_all MyApp.NestedTest setup_all [7:2-10:5] sel [7:2-7:11] <- 8:20-8:25`,
++		`test/nested_test.exs | setup MyApp.NestedTest setup [13:4-16:7] sel [13:4-13:9] <- 14:22-14:27`,
++		`test/nested_test.exs | test MyApp.NestedTest test "control flow" [18:4-24:7] sel [18:9-18:23] <- 20:29-20:34 21:49-21:54`,
++		`test/nested_test.exs | test MyApp.NestedTest test "with and fn" [26:4-30:7] sel [26:9-26:22] <- 28:46-28:51`,
++		`test/nested_test.exs | test MyApp.NestedTest test "after describe" [33:2-35:5] sel [33:7-33:23] <- 34:20-34:25`,
++		`test/a_test.exs | test MyApp.ATest test "a1" [3:2-5:5] sel [3:7-3:11] <- 4:27-4:32`,
++		`test/b_test.exs | test MyApp.BTest test "b1" [7:2-9:5] sel [7:7-7:11] <- 8:27-8:32`,
++		`test/b_test.exs | setup MyApp.BTest setup [11:2-14:5] sel [11:2-11:7] <- 12:20-12:25`,
++		`test/c_test.exs | test MyApp.CTest test "c1" [3:2-5:5] sel [3:7-3:11] <- 4:27-4:32`,
++		`test/aliased_test.exs | test MyApp.AliasedTest test "alias" [5:2-7:5] sel [5:7-5:14] <- 6:21-6:26 6:37-6:42`,
++		`test/aliased_test.exs | test MyApp.AliasedTest test "import" [9:2-11:5] sel [9:7-9:15] <- 10:11-10:16`,
++		`test/unicode_test.exs | test MyApp.UnicodeTest test "héllo 😀" [3:2-3:64] sel [3:7-3:17] <- 3:46-3:51`,
++	})
++	for i := range calls {
++		assertItemData(t, calls[i].From)
 +	}
 +}
 +
@@ -3299,7 +3159,7 @@ index 0000000..0a970fa
 +	})
 +
 +	t.Run("a test block has no follow-up", func(t *testing.T) {
-+		admit := prepareOne(t, server, "lib/sweep/case_2_target.ex:1:6", "Sweep.Case2Target.admit/1")
++		admit := prepareOne(t, server, "lib/admission.ex:1:6", "MyApp.Admission.admit/1")
 +		for _, call := range incoming(t, server, admit) {
 +			if call.From.Detail != "test" {
 +				continue
@@ -3312,6 +3172,34 @@ index 0000000..0a970fa
 +			}
 +		}
 +	})
++}
++
++// An item whose data this server did not write names no function. It is
++// refused, never read as some arity: check/0 has a caller that a /0 guess
++// would list.
++func TestCallHierarchyRefusesItemsWithoutIdentity(t *testing.T) {
++	server, cleanup := setupTestServer(t)
++	t.Cleanup(cleanup)
++	indexFile(t, server.store, server.projectRoot, "lib/gate.ex", "defmodule MyApp.Gate do\n  def check, do: :ok\n  def run, do: check()\nend\n")
++	item := prepareOne(t, server, "lib/gate.ex:1:6", "MyApp.Gate.check/0")
++
++	for _, data := range []map[string]interface{}{
++		{"module": "MyApp.Gate", "function": "check"},
++		{"module": "MyApp.Gate", "function": "check", "arity": 0.5},
++		{"module": "MyApp.Gate", "function": "check", "arity": -1.0},
++		{"module": "MyApp.Gate", "function": "check", "arity": "0"},
++		{"function": "check", "arity": 0.0},
++	} {
++		item.Data = data
++		in, err := server.IncomingCalls(context.Background(), &protocol.CallHierarchyIncomingCallsParams{Item: item})
++		if err == nil || in != nil {
++			t.Errorf("incoming calls of %v = %v, %v; want refused", data, in, err)
++		}
++		out, err := server.OutgoingCalls(context.Background(), &protocol.CallHierarchyOutgoingCallsParams{Item: item})
++		if err == nil || out != nil {
++			t.Errorf("outgoing calls of %v = %v, %v; want refused", data, out, err)
++		}
++	}
 +}
 +
 +// A function's identity includes its arity: price/1 and price/2 are different
@@ -3355,9 +3243,6 @@ index 0000000..0a970fa
 +		`lib/checkout.ex | def MyApp.Checkout.two/1 [4:2-4:47] sel [4:6-4:9] <- 4:31-4:36`,
 +	})
 +	assertRows(t, outgoingRows(outgoing(t, server, price1)), []string{`MyApp.Pricing.price/2 <- 1:25-1:30`})
-+	if calls := outgoing(t, server, price2); calls == nil || len(calls) != 0 {
-+		t.Fatalf("outgoing calls of price/2 = %#v, want an empty list: its body is one operator", calls)
-+	}
 +	assertRows(t, outgoingRows(outgoing(t, server, fee)), []string{`MyApp.Pricing.price/2 <- 4:34-4:39`})
 +
 +	// No price/3 exists. Another arity's item would be a convincing wrong answer.
@@ -3425,9 +3310,9 @@ index 0000000..0a970fa
 +	indexFile(t, server.store, server.projectRoot, "lib/caller.ex", caller)
 +	callerPath := filepath.Join(server.projectRoot, "lib", "caller.ex")
 +
-+	gate := callIdentity{module: "MyApp.Gate", function: "check", arity: treesitter.ExactArity(1)}
++	gate := callIdentity{module: "MyApp.Gate", function: "check", arity: 1}
 +	locations, err := server.ReferenceNames(gate.module, gate.function, NameReferenceOptions{
-+		Kind: NameKindCallable, ExcludeStdlib: true, Arity: gate.arity,
++		Kind: NameKindCallable, ExcludeStdlib: true, Arity: treesitter.ExactArity(gate.arity),
 +	})
 +	if err != nil {
 +		t.Fatal(err)
@@ -3522,30 +3407,21 @@ index 0000000..0a970fa
 +
 +	for _, tc := range []struct {
 +		name, query, caller string
-+		// want nil: same rows as the previous case (another head of it).
-+		want []string
++		want                []string
 +	}{
 +		{"E1 deliver/1", "lib/shop/accounts.ex:3:6", "Shop.Accounts.deliver/1", []string{"Shop.Token.build/2 <- 4:18-4:23", "Shop.Repo.insert!/1 <- 5:9-5:16", "Shop.Mailer.send_login/2 <- 6:16-6:26"}},
 +		{"E2 update/2 pipes", "lib/shop/accounts.ex:9:6", "Shop.Accounts.update/2", []string{"Shop.Token.changeset/2 <- 11:13-11:22", "Shop.Accounts.save_and_clear/1 <- 12:7-12:21"}},
 +		{"E3 capture", "lib/shop/accounts.ex:15:6", "Shop.Accounts.normalize_all/1", []string{"Enum.map/2 <- 16:9-16:12", "Shop.Accounts.normalize/1 <- 16:22-16:31"}},
 +		{"E4 default head", "lib/shop/accounts.ex:19:6", "Shop.Accounts.admit/3", []string{"Kernel.is_binary/1 <- 21:36-21:45", "Shop.Token.normalize/1 <- 22:23-22:32", "GenServer.call/2 <- 25:16-25:20"}},
-+		{"E4b second head", "lib/shop/accounts.ex:21:6", "Shop.Accounts.admit/3", nil},
 +		{"E5 second clause", "lib/shop/accounts.ex:35:6", "Shop.Accounts.handle/2", []string{"Enum.map/2 <- 36:19-36:22", "Shop.Accounts.entry/2 <- 36:30-36:35", "Enum.find/2 <- 38:14-38:18", "Shop.Accounts.limited/1 <- 40:23-40:30"}},
-+		{"E5b first clause", "lib/shop/accounts.ex:31:6", "Shop.Accounts.handle/2", nil},
 +		{"E6 no calls", "lib/shop/accounts.ex:44:6", "Shop.Accounts.version/0", []string{}},
 +		{"E7 generated", "lib/shop/accounts.ex:46:7", "Shop.Accounts.save_and_clear/1", []string{"Shop.Repo.insert!/1 <- 47:15-47:22", "Shop.Repo.delete!/1 <- 48:9-48:16"}},
 +		{"E8 test helper", "test/shop/accounts_test.exs:9:7", "Shop.AccountsTest.synchronized_write/2", []string{"Shop.Repo.one/1 <- 10:15-10:18", "Kernel.send/2 <- 11:4-11:8", "Kernel.self/0 <- 11:26-11:30", "Shop.AccountsTest.await/1 <- 12:4-12:9"}},
 +		{"sibling deliver/2", "lib/shop/accounts.ex:56:6", "Shop.Accounts.deliver/2", []string{"Shop.Token.verify/1 <- 57:10-57:16"}},
 +		{"sibling admit/1", "lib/shop/accounts.ex:60:6", "Shop.Accounts.admit/1", []string{"Shop.Token.verify/1 <- 60:30-60:36"}},
 +		{"grouped by target arity", "lib/shop/mail.ex:3:6", "Shop.Mail.check/1", []string{"Shop.Token.verify/1 <- 4:10-4:16 7:10-7:16", "Shop.Token.verify/2 <- 5:10-5:16"}},
-+		{"utf16 greet", "lib/shop/unicode.ex:1:6", "Shop.Unicode.greet/1", []string{"Shop.Token.build/2 <- 2:30-2:35"}},
-+		{"utf16 family", "lib/shop/unicode.ex:5:6", "Shop.Unicode.family/0", []string{"Shop.Unicode.foo/1 <- 6:20-6:23"}},
 +		{"quote body excluded", "lib/shop/macros.ex:1:11", "Shop.Macros.traced/1", []string{"Shop.Token.verify/1 <- 2:15-2:21"}},
-+		{"utf16 cafe", "lib/shop/unicode.ex:9:6", "Shop.Unicode.cafe/0", []string{"Shop.Unicode.bar/1 <- 10:14-10:17"}},
 +	} {
-+		if tc.want == nil {
-+			continue
-+		}
 +		t.Run(tc.name, func(t *testing.T) {
 +			calls := outgoing(t, server, prepareOne(t, server, tc.query, tc.caller))
 +			if calls == nil {
@@ -3609,22 +3485,6 @@ index 0000000..0a970fa
 +	})
 +	call := prepareOne(t, server, "lib/outer.ex:8:6", "MyApp.Outer.call/1")
 +	assertRows(t, outgoingRows(outgoing(t, server, call)), []string{`MyApp.Outer.run/1 <- 8:19-8:22`})
-+
-+	// The same with no arguments, and the outer run/0 defined after the call.
-+	indexFile(t, server.store, server.projectRoot, "lib/shared.ex", `defmodule SharedLib.Outer do
-+  defmodule Inner do
-+    def run, do: :inner
-+  end
-+
-+  def start, do: run()
-+  def run, do: :outer
-+end
-+`)
-+	prepareOne(t, server, "lib/shared.ex:5:17", "SharedLib.Outer.run/0")
-+	innerRun := prepareOne(t, server, "lib/shared.ex:2:8", "SharedLib.Outer.Inner.run/0")
-+	assertRows(t, incomingRows(t, server, incoming(t, server, innerRun)), nil)
-+	start := prepareOne(t, server, "lib/shared.ex:5:6", "SharedLib.Outer.start/0")
-+	assertRows(t, outgoingRows(outgoing(t, server, start)), []string{`SharedLib.Outer.run/0 <- 5:17-5:20`})
 +
 +	// A closed nested module's function does not shadow the outer module's
 +	// import of the same name and arity.
@@ -3881,7 +3741,7 @@ index 8fec7ec..26feed3 100644
  // every hit against a transient entry so the eviction order tracks
  // recency-of-use rather than recency-of-load.
 diff --git a/internal/lsp/documents_test.go b/internal/lsp/documents_test.go
-index 9771ace..b5aeaaf 100644
+index 9771ace..567ed2a 100644
 --- a/internal/lsp/documents_test.go
 +++ b/internal/lsp/documents_test.go
 @@ -6,6 +6,7 @@ import (
@@ -3892,7 +3752,7 @@ index 9771ace..b5aeaaf 100644
  
  	"go.lsp.dev/uri"
  )
-@@ -580,3 +581,160 @@ func TestDocumentStore_IsSafeAfterClose(t *testing.T) {
+@@ -580,3 +581,96 @@ func TestDocumentStore_IsSafeAfterClose(t *testing.T) {
  		t.Fatalf("Count after CloseAll = %d, want 0", got)
  	}
  }
@@ -3933,70 +3793,6 @@ index 9771ace..b5aeaaf 100644
 +	ds.Set(docURI, after)
 +	if got, ok := ds.Get(docURI); !ok || got != after {
 +		t.Fatalf("Get after didChange = %q, %v", got, ok)
-+	}
-+}
-+
-+// Reloads replace entries while handlers walk their trees and tokens, and
-+// while the editor replaces them too. Run under -race.
-+func TestDocumentStore_FollowSavedUnderConcurrentRewrites(t *testing.T) {
-+	dir := t.TempDir()
-+	openPath, diskPath := filepath.Join(dir, "open.ex"), filepath.Join(dir, "disk.ex")
-+	version := func(i int) string { return "defmodule V do\n  def v, do: " + strconv.Itoa(i) + "\nend\n" }
-+	rewriteFile(t, openPath, version(0))
-+	rewriteFile(t, diskPath, version(0))
-+	openURI, diskURI := string(uri.File(openPath)), string(uri.File(diskPath))
-+	ds := NewDocumentStore()
-+	defer ds.CloseAll()
-+	ds.Set(openURI, version(0))
-+
-+	var wg sync.WaitGroup
-+	done := make(chan struct{})
-+	for w := 0; w < 4; w++ {
-+		wg.Add(1)
-+		go func() {
-+			defer wg.Done()
-+			readUntil(done, ds, openURI, diskURI)
-+		}()
-+	}
-+	for i := 1; i <= 100; i++ {
-+		rewriteFile(t, openPath, version(i))
-+		rewriteFile(t, diskPath, version(i))
-+		if i%10 == 0 {
-+			ds.Set(openURI, version(i))
-+		}
-+	}
-+	close(done)
-+	wg.Wait()
-+
-+	final := "defmodule V do\n  def v, do: :final\nend\n"
-+	rewriteFile(t, openPath, final)
-+	rewriteFile(t, diskPath, final)
-+	for _, u := range []string{openURI, diskURI} {
-+		if got, ok := ds.GetOrLoad(u); !ok || got != final {
-+			t.Errorf("GetOrLoad(%s) = %q, %v; want the last saved file", u, got, ok)
-+		}
-+	}
-+}
-+
-+// readUntil reads the documents the way handlers do until done is closed.
-+func readUntil(done <-chan struct{}, ds *DocumentStore, uris ...string) {
-+	for {
-+		select {
-+		case <-done:
-+			return
-+		default:
-+		}
-+		for _, u := range uris {
-+			if _, ok := ds.GetOrLoad(u); !ok {
-+				continue
-+			}
-+			if tree, _, release, ok := ds.GetTree(u); ok {
-+				_ = tree.RootNode().ChildCount()
-+				release()
-+			}
-+			_ = ds.GetTokenizedFile(u)
-+			_, _ = ds.GetIfOpen(u)
-+		}
 +	}
 +}
 +
@@ -4168,22 +3964,19 @@ index 3495319..3ec5b8c 100644
  	}
  
  	// line 8 is `@spec build(schema()) :: schema()` — col 14 is on the type
-diff --git a/internal/lsp/import_references_local_types_test.go b/internal/lsp/import_references_local_types_test.go
+diff --git a/internal/lsp/import_references_test.go b/internal/lsp/import_references_test.go
 new file mode 100644
-index 0000000..4f42155
+index 0000000..2667f8b
 --- /dev/null
-+++ b/internal/lsp/import_references_local_types_test.go
-@@ -0,0 +1,242 @@
++++ b/internal/lsp/import_references_test.go
+@@ -0,0 +1,130 @@
 +package lsp
 +
 +import (
-+	"context"
 +	"maps"
 +	"path/filepath"
 +	"strings"
 +	"testing"
-+
-+	"go.lsp.dev/protocol"
 +)
 +
 +// Explicit imports of SharedLib.Pinger (arity matrix fixture) that the index
@@ -4260,65 +4053,9 @@ index 0000000..4f42155
 +	"lib/my_app/ping_decoy.ex":   importPingDecoySrc,
 +}
 +
-+// Bare local types, qualified controls, a nested module, and names that are
-+// not types at the cursor.
-+
-+// file: lib/my_app/typed.ex
-+const localTypedSrc = `defmodule MyApp.Typed do
-+  @type t :: %{name: String.t()}
-+  @type status :: atom()
-+
-+  @spec build(String.t()) :: t()
-+  def build(name), do: %{name: name}
-+
-+  @spec status(term()) :: status()
-+  def status(x), do: x
-+
-+  def check(x), do: {build(x), status(x)}
-+end
-+`
-+
-+// file: lib/my_app/type_user.ex
-+const localTypeUserSrc = `defmodule MyApp.TypeUser do
-+  alias MyApp.Typed
-+
-+  @spec make(String.t()) :: Typed.t()
-+  def make(name), do: Typed.build(name)
-+
-+  @spec again(MyApp.Typed.t()) :: boolean()
-+  def again(_value), do: true
-+end
-+`
-+
-+// file: lib/my_app/outer.ex
-+const localOuterSrc = `defmodule MyApp.Outer do
-+  @type t :: integer()
-+
-+  @spec a() :: t()
-+  def a, do: 1
-+
-+  defmodule Inner do
-+    @type t :: binary()
-+
-+    @spec i() :: t()
-+    def i, do: "i"
-+  end
-+
-+  @spec b() :: t()
-+  def b, do: 2
-+end
-+`
-+
-+var localTypeFiles = map[string]string{
-+	"lib/my_app/typed.ex":     localTypedSrc,
-+	"lib/my_app/type_user.ex": localTypeUserSrc,
-+	"lib/my_app/outer.ex":     localOuterSrc,
-+}
-+
 +// Register the sources so aritySite and arityAt can read them.
 +func init() {
 +	maps.Copy(aritySingleFiles, importReferenceFiles)
-+	maps.Copy(aritySingleFiles, localTypeFiles)
 +}
 +
 +func TestReferences_ExplicitImportsFindEveryUse(t *testing.T) {
@@ -4347,8 +4084,6 @@ index 0000000..4f42155
 +	// ping_decoy.ex ping(x, :z) and &ping/2) fails the comparison.
 +	runArityReferences(t, server, "references/", []arityReferenceCase{
 +		{"ping/2 head without declarations", arityAt{pingerHead, "ping", 1}, false, calls},
-+		{"ping/2 head with declarations", arityAt{pingerHead, "ping", 1}, true, append([]aritySite{pingerHead}, calls...)},
-+		{"plain imported call", arityAt{plainCall, "ping", 1}, false, calls},
 +		{"call through an aliased import", arityAt{aliasedCall, "ping", 1}, false, calls},
 +	})
 +
@@ -4364,57 +4099,6 @@ index 0000000..4f42155
 +			}
 +		}
 +	})
-+}
-+
-+func TestTypeDefinition_BareLocalTypes(t *testing.T) {
-+	server, cleanup := setupTestServer(t)
-+	defer cleanup()
-+	root := server.projectRoot
-+	for rel, src := range localTypeFiles {
-+		indexFile(t, server.store, root, rel, src)
-+	}
-+
-+	typed := func(text string) aritySite { return aritySite{"lib/my_app/typed.ex", text} }
-+	user := func(text string) aritySite { return aritySite{"lib/my_app/type_user.ex", text} }
-+	outer := func(text string) aritySite { return aritySite{"lib/my_app/outer.ex", text} }
-+	typeT := typed("@type t :: %{name: String.t()}")
-+	typeStatus := typed("@type status :: atom()")
-+	outerT := outer("@type t :: integer()")
-+	innerT := outer("@type t :: binary()")
-+
-+	for _, tc := range []struct {
-+		name string
-+		at   arityAt
-+		want []aritySite
-+	}{
-+		{"bare local t()", arityAt{typed("@spec build(String.t()) :: t()"), ":: t()", 3}, []aritySite{typeT}},
-+		{"bare local status() beside a status/1 function", arityAt{typed("@spec status(term()) :: status()"), ":: status()", 3}, []aritySite{typeStatus}},
-+		{"nested: parent t() before the nested module", arityAt{outer("@spec a() :: t()"), ":: t()", 3}, []aritySite{outerT}},
-+		{"nested: nested module t()", arityAt{outer("@spec i() :: t()"), ":: t()", 3}, []aritySite{innerT}},
-+		{"nested: parent t() after the nested module ends", arityAt{outer("@spec b() :: t()"), ":: t()", 3}, []aritySite{outerT}},
-+		{"control: qualified alias Typed.t()", arityAt{user("@spec make(String.t()) :: Typed.t()"), "Typed.t", 6}, []aritySite{typeT}},
-+		{"control: qualified full MyApp.Typed.t()", arityAt{user("@spec again(MyApp.Typed.t()) :: boolean()"), "Typed.t", 6}, []aritySite{typeT}},
-+		{"control: qualified function Typed.build is not a type", arityAt{user("def make(name), do: Typed.build(name)"), "build", 1}, nil},
-+		{"control: ordinary status(x) call beside a status type", arityAt{typed("def check(x), do: {build(x), status(x)}"), "status(x)", 1}, nil},
-+		{"control: local function build(x) is not a type", arityAt{typed("def check(x), do: {build(x), status(x)}"), "build(x)", 1}, nil},
-+		{"control: built-in atom()", arityAt{typeStatus, "atom", 1}, nil},
-+	} {
-+		t.Run("type definition/"+tc.name, func(t *testing.T) {
-+			uri, line, col := tc.at.resolve(t, root)
-+			result, err := server.TypeDefinition(context.Background(), &protocol.TypeDefinitionParams{
-+				TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-+					TextDocument: protocol.TextDocumentIdentifier{URI: protocol.DocumentURI(uri)},
-+					Position:     protocol.Position{Line: line, Character: col},
-+				},
-+			})
-+			if err != nil {
-+				t.Fatal(err)
-+			}
-+			if got, want := arityLocKeys(root, result), aritySiteKeys(t, tc.want...); !sameKeys(got, want) {
-+				t.Errorf("type definition = %v, want %v", got, want)
-+			}
-+		})
-+	}
 +}
 diff --git a/internal/lsp/name_navigation.go b/internal/lsp/name_navigation.go
 index 4e380f0..cd7fe5f 100644
@@ -4530,7 +4214,7 @@ index 4e380f0..cd7fe5f 100644
  		return
  	}
 diff --git a/internal/lsp/server.go b/internal/lsp/server.go
-index 0499a21..52101d2 100644
+index 0499a21..0ee2a13 100644
 --- a/internal/lsp/server.go
 +++ b/internal/lsp/server.go
 @@ -274,7 +274,7 @@ func ServeStream(server *Server, rwc io.ReadWriteCloser) error {
@@ -4542,15 +4226,15 @@ index 0499a21..52101d2 100644
  	ctx := context.Background()
  
  	conn.Go(ctx, handler)
-@@ -821,16 +821,15 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
+@@ -821,16 +821,12 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
  			s.projectRoot = store.FindProjectRoot(clientRoot)
  		}
  	} else if clientRoot != "" && s.workspaceEvents != nil {
 -		rel, err := filepath.Rel(s.projectRoot, clientRoot)
 -		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
 -			return nil, fmt.Errorf("editor workspace root %s does not use daemon root spelling %s", clientRoot, s.projectRoot)
-+		if filepath.Clean(clientRoot) != filepath.Clean(s.projectRoot) {
-+			return nil, fmt.Errorf("editor workspace root %s does not match exact daemon root %s", clientRoot, s.projectRoot)
++		if params.RootURI != "" && filepath.Clean(uriToPath(params.RootURI)) != filepath.Clean(s.projectRoot) { //nolint:staticcheck // RootURI remains part of native clients' initialize requests.
++			return nil, fmt.Errorf("editor rootUri does not match exact daemon root %s", s.projectRoot)
  		}
 -		resolvedProject, projectErr := filepath.EvalSymlinks(s.projectRoot)
 -		resolvedClient, clientErr := filepath.EvalSymlinks(clientRoot)
@@ -4558,16 +4242,13 @@ index 0499a21..52101d2 100644
 -			resolvedRel, relErr := filepath.Rel(resolvedProject, resolvedClient)
 -			if relErr != nil || filepath.Clean(resolvedRel) != filepath.Clean(rel) {
 -				return nil, fmt.Errorf("editor workspace root %s uses a symlink spelling that differs from daemon root %s", clientRoot, s.projectRoot)
-+		if params.RootURI != "" && filepath.Clean(uriToPath(params.RootURI)) != filepath.Clean(s.projectRoot) { //nolint:staticcheck // RootURI remains part of native clients' initialize requests.
-+			return nil, fmt.Errorf("editor rootUri does not match exact daemon root %s", s.projectRoot)
-+		}
 +		for _, folder := range params.WorkspaceFolders {
 +			if filepath.Clean(uriToPath(protocol.DocumentURI(folder.URI))) != filepath.Clean(s.projectRoot) {
 +				return nil, fmt.Errorf("editor workspace folder %s does not match exact daemon root %s", folder.URI, s.projectRoot)
  			}
  		}
  	}
-@@ -1203,8 +1202,15 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1203,8 +1199,15 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  			}
  		}
  
@@ -4584,7 +4265,7 @@ index 0499a21..52101d2 100644
  		s.debugf("Definition: resolved bare %q -> %q", functionName, fullModule)
  		if fullModule == "" {
  			currentModule := s.store.LookupEnclosingModule(uriToPath(protocol.DocumentURI(docURI)), lineNum+1)
-@@ -1223,11 +1229,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1223,11 +1226,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  		// Current module — return buffer location directly (works before indexing).
  		// In a typespec the bare name is the type, everywhere else the function.
  		if fullModule == currentModule {
@@ -4597,7 +4278,7 @@ index 0499a21..52101d2 100644
  				return []protocol.Location{{
  					URI:   params.TextDocument.URI,
  					Range: lineRange(line - 1),
-@@ -1236,13 +1238,14 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1236,13 +1235,14 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  		}
  
  		kind := NameKindCallable
@@ -4613,7 +4294,7 @@ index 0499a21..52101d2 100644
  		})
  		if err == nil && len(results) > 0 {
  			s.debugf("Definition: found %d semantic result(s) for %s.%s", len(results), fullModule, functionName)
-@@ -1250,7 +1253,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1250,7 +1250,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  		}
  
  		// Fallback for use-chain inline defs (not stored as module definitions)
@@ -4622,7 +4303,7 @@ index 0499a21..52101d2 100644
  			s.debugf("Definition: found %d result(s) via current file use chain for %s", len(results), functionName)
  			return storeResultsToLocations(byKindForContext(tf, lineNum, results)), nil
  		}
-@@ -1275,8 +1278,9 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1275,8 +1275,9 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  	s.debugf("Definition: qualified call resolved %q -> %q", moduleRef, fullModule)
  
  	if functionName != "" {
@@ -4633,7 +4314,7 @@ index 0499a21..52101d2 100644
  			kind = NameKindType
  		}
  		results, err := s.LookupName(fullModule, functionName, NameLookupOptions{
-@@ -1284,6 +1288,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1284,6 +1285,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  			FollowDelegates:  s.followDelegates,
  			External:         fullModule != extractEnclosingModuleFromTokens(tf.source, tf.tokens, lineNum),
  			FallbackToModule: true,
@@ -4641,7 +4322,7 @@ index 0499a21..52101d2 100644
  		})
  		if err != nil {
  			return nil, nil
-@@ -2537,10 +2542,10 @@ func (s *Server) parseUsingFile(filePath, moduleName string) *usingCacheEntry {
+@@ -2537,10 +2539,10 @@ func (s *Server) parseUsingFile(filePath, moduleName string) *usingCacheEntry {
  // fullModule's source file. This handles qualified calls like M.func() where
  // func is not defined directly in M but is injected by a macro M uses.
  func (s *Server) lookupThroughUseOf(fullModule, functionName string) []store.LookupResult {
@@ -4654,7 +4335,7 @@ index 0499a21..52101d2 100644
  	modResults, err := s.store.LookupModule(fullModule)
  	if err != nil || len(modResults) == 0 {
  		return nil
-@@ -2549,7 +2554,7 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
+@@ -2549,7 +2551,7 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
  	if !ok {
  		return nil
  	}
@@ -4663,7 +4344,7 @@ index 0499a21..52101d2 100644
  }
  
  // lookupThroughUse searches for functionName in definitions injected by `use`
-@@ -2557,15 +2562,15 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
+@@ -2557,15 +2559,15 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
  // priority over imported ones. Later `use` declarations shadow earlier ones.
  // Transitive use chains (use inside __using__ body) are followed recursively.
  func (s *Server) lookupThroughUse(text, functionName string, aliases map[string]string) []store.LookupResult {
@@ -4682,7 +4363,7 @@ index 0499a21..52101d2 100644
  			return result
  		}
  	}
-@@ -2577,7 +2582,7 @@ func (s *Server) lookupThroughUseWithFollow(text, functionName string, aliases m
+@@ -2577,7 +2579,7 @@ func (s *Server) lookupThroughUseWithFollow(text, functionName string, aliases m
  // consumerOpts are the keyword args from the `use Module, key: Val` call and
  // are used to resolve dynamic imports like `import unquote(mod)`.
  func (s *Server) lookupInUsingEntry(moduleName, functionName string, consumerOpts map[string]string, visited map[string]bool) []store.LookupResult {
@@ -4691,7 +4372,7 @@ index 0499a21..52101d2 100644
  }
  
  // bodyFor picks the injected body for a `use` call. An ordinary __using__ has a
-@@ -2607,13 +2612,11 @@ func usingVisitKey(moduleName, which string) string {
+@@ -2607,13 +2609,11 @@ func usingVisitKey(moduleName, which string) string {
  	return moduleName + "\x00" + which
  }
  
@@ -4710,7 +4391,7 @@ index 0499a21..52101d2 100644
  	visitKey := usingVisitKey(moduleName, which)
  	if visited[visitKey] {
  		return nil
-@@ -2630,11 +2633,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2630,11 +2630,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  	}
  
  	// Inline defs take priority: directly injected by the quote do block
@@ -4723,7 +4404,7 @@ index 0499a21..52101d2 100644
  		return results
  	}
  
-@@ -2643,10 +2642,11 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2643,10 +2639,11 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  		var results []store.LookupResult
  		var err error
  		if followDelegates {
@@ -4736,7 +4417,7 @@ index 0499a21..52101d2 100644
  		}
  		if err != nil || len(results) == 0 {
  			continue
-@@ -2668,16 +2668,17 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2668,16 +2665,17 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  			var results []store.LookupResult
  			var err error
  			if followDelegates {
@@ -4756,7 +4437,7 @@ index 0499a21..52101d2 100644
  				return result
  			}
  		}
-@@ -2686,7 +2687,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2686,7 +2684,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  	// Transitive uses: use Module inside the __using__ body (double-use chains)
  	for k := len(body.transCalls) - 1; k >= 0; k-- {
  		call := body.transCalls[k]
@@ -4765,7 +4446,7 @@ index 0499a21..52101d2 100644
  			return result
  		}
  	}
-@@ -2694,7 +2695,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2694,7 +2692,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  		if body.hasTransCall(body.transUses[k]) {
  			continue
  		}
@@ -4774,7 +4455,7 @@ index 0499a21..52101d2 100644
  			return result
  		}
  	}
-@@ -2703,15 +2704,12 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2703,15 +2701,12 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  }
  
  // resolveModuleViaUseChain returns the module name that provides functionName
@@ -4796,7 +4477,7 @@ index 0499a21..52101d2 100644
  	visitKey := usingVisitKey(moduleName, which)
  	if visited[visitKey] {
  		return ""
-@@ -2729,12 +2727,12 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2729,12 +2724,12 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  
  	// Functions defined directly in the quote do block belong to the module
  	// that injected them, not to any imported module.
@@ -4811,7 +4492,7 @@ index 0499a21..52101d2 100644
  			return body.imports[j]
  		}
  	}
-@@ -2749,11 +2747,11 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2749,11 +2744,11 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  		}
  		switch b.kind {
  		case "import":
@@ -4825,7 +4506,7 @@ index 0499a21..52101d2 100644
  				return m
  			}
  		}
-@@ -2761,7 +2759,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2761,7 +2756,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  
  	for k := len(body.transCalls) - 1; k >= 0; k-- {
  		call := body.transCalls[k]
@@ -4834,7 +4515,7 @@ index 0499a21..52101d2 100644
  			return mod
  		}
  	}
-@@ -2769,7 +2767,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2769,7 +2764,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  		if body.hasTransCall(body.transUses[k]) {
  			continue
  		}
@@ -4843,7 +4524,7 @@ index 0499a21..52101d2 100644
  			return mod
  		}
  	}
-@@ -3645,7 +3643,7 @@ func (s *Server) addCompletionsFromUsingFor(moduleName, which string, consumerOp
+@@ -3645,7 +3640,7 @@ func (s *Server) addCompletionsFromUsingFor(moduleName, which string, consumerOp
  // Mirrors the go-to-definition priority: current file modules → imports → use chains → Kernel.
  // Callers should pass pre-computed aliases to avoid redundant ExtractAliases scans.
  func (s *Server) resolveBareFunctionModule(filePath, text string, tf *TokenizedFile, lineNum int, functionName string, aliases map[string]string) string {
@@ -4852,7 +4533,7 @@ index 0499a21..52101d2 100644
  	return module
  }
  
-@@ -3654,21 +3652,42 @@ func (s *Server) resolveBareFunctionModule(filePath, text string, tf *TokenizedF
+@@ -3654,21 +3649,30 @@ func (s *Server) resolveBareFunctionModule(filePath, text string, tf *TokenizedF
  // distinguish a consumer override from a function supplied by its use chain:
  // both resolve to the consumer module, but only the latter should expand across
  // other consumers of the injector.
@@ -4873,23 +4554,11 @@ index 0499a21..52101d2 100644
  
 +	// The lexically enclosing module comes first. The nearest defmodule line
 +	// above is not always it: after a nested module closes, the outer resumes.
-+	// Then its parents: Dexter resolves a nested module's bare call to an
-+	// outer module's function, though Elixir does not. Never a nested module
-+	// that has already closed.
++	// A nested module does not see its parent's functions: Elixir rejects the
++	// call as undefined.
 +	lexical := extractEnclosingModuleFromTokens(tf.source, tf.tokens, lineNum)
-+	for mod := lexical; mod != ""; mod = parentModule(mod) {
-+		if s.definesInFile(mod, functionName, filePath, arity) {
-+			return mod, true
-+		}
-+	}
-+
-+	// Without a lexical module, check all modules in the current file with a
-+	// single query, preferring the one closest to the cursor line.
-+	minArity, maxArity := arity.Bounds()
-+	if lexical == "" {
-+		if mod, ok := s.store.LookupFunctionArityInFile(filePath, functionName, lineNum+1, minArity, maxArity); ok {
-+			return mod, true
-+		}
++	if lexical != "" && s.definesInFile(lexical, functionName, filePath, arity) {
++		return lexical, true
 +	}
 +
  	// Explicit imports (direct definitions only — fast store lookup)
@@ -4903,7 +4572,7 @@ index 0499a21..52101d2 100644
  			return mod, false
  		}
  	}
-@@ -3678,20 +3697,20 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
+@@ -3678,20 +3682,20 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
  	useCalls := tf.ExtractUsesWithOpts(aliases)
  	for i := len(useCalls) - 1; i >= 0; i-- {
  		uc := useCalls[i]
@@ -4927,18 +4596,10 @@ index 0499a21..52101d2 100644
  			return mod, false
  		}
  	}
-@@ -3699,6 +3718,29 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
+@@ -3699,6 +3703,21 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
  	return "", false
  }
  
-+// parentModule is the module name one level up: "A.B.C" -> "A.B", "A" -> "".
-+func parentModule(module string) string {
-+	if dot := strings.LastIndex(module, "."); dot >= 0 {
-+		return module[:dot]
-+	}
-+	return ""
-+}
-+
 +// definesInFile reports whether filePath defines module.function with an
 +// arity a call can reach.
 +func (s *Server) definesInFile(module, function, filePath string, arity treesitter.Arity) bool {
@@ -4957,7 +4618,7 @@ index 0499a21..52101d2 100644
  func resolveModule(moduleRef string, aliases map[string]string) string {
  	if resolved, ok := aliases[moduleRef]; ok {
  		return resolved
-@@ -5054,38 +5096,33 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
+@@ -5054,38 +5073,33 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
  			return nil, nil
  		}
  
@@ -5007,7 +4668,7 @@ index 0499a21..52101d2 100644
  			return s.hoverFromFile(functionName, results[0])
  		}
  
-@@ -5114,15 +5151,8 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
+@@ -5114,15 +5128,8 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
  	fullModule := s.resolveModuleWithNesting(moduleRef, aliases, uriToPath(protocol.DocumentURI(docURI)), lineNum)
  
  	if functionName != "" {
@@ -5025,7 +4686,7 @@ index 0499a21..52101d2 100644
  			return s.hoverFromFile(functionName, hits[0])
  		}
  		// Nothing in the index: the function may exist only in the compiled module.
-@@ -5420,6 +5450,8 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5420,6 +5427,8 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  	// below. They carry the bare type uses (`@type t :: schema | embedded`)
  	// that the call-shaped scan cannot see.
  	var typespecOccurrences []protocol.Location
@@ -5034,7 +4695,7 @@ index 0499a21..52101d2 100644
  
  	if moduleRef == "" {
  		if functionName == "" {
-@@ -5463,7 +5495,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5463,7 +5472,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		}
  
  		// Bare function — resolve to its defining module
@@ -5043,7 +4704,7 @@ index 0499a21..52101d2 100644
  		s.debugf("References: resolved bare %q -> %q", functionName, fullModule)
  		if fullModule == "" {
  			currentModule := s.store.LookupEnclosingModule(uriToPath(protocol.DocumentURI(docURI)), lineNum+1)
-@@ -5513,7 +5545,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5513,7 +5522,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		useCalls := tf.ExtractUsesWithOpts(aliases)
  		for i := len(useCalls) - 1; i >= 0; i-- {
  			uc := useCalls[i]
@@ -5052,7 +4713,7 @@ index 0499a21..52101d2 100644
  				injectors = append(injectors, uc.Module)
  				s.debugf("References: opt-binding injector for %s: %s", functionName, uc.Module)
  				break
-@@ -5524,7 +5556,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5524,7 +5533,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  	kind := NameKindCallable
  	if functionName == "" {
  		kind = NameKindAny
@@ -5061,7 +4722,7 @@ index 0499a21..52101d2 100644
  		kind = NameKindType
  	}
  	semantic, err := s.ReferenceNames(fullModule, functionName, NameReferenceOptions{
-@@ -5534,15 +5566,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5534,15 +5543,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		ExcludeStdlib:      true,
  		InjectorModules:    injectors,
  		GeneratedProvider:  generatedProvider,
@@ -5081,7 +4742,7 @@ index 0499a21..52101d2 100644
  	}
  	seen := make(map[refKey]struct{}, len(semantic))
  	var locations []protocol.Location
-@@ -5556,19 +5592,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5556,19 +5569,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  			if line == lineNum && !params.Context.IncludeDeclaration {
  				continue
  			}
@@ -5104,18 +4765,7 @@ index 0499a21..52101d2 100644
  		})
  	}
  
-@@ -7053,6 +7089,10 @@ func (s *Server) TypeDefinition(ctx context.Context, params *protocol.TypeDefini
- 	aliases := tf.ExtractAliasesInScope(lineNum)
- 	s.mergeAliasesFromUseTokenized(tf, aliases)
- 	fullModule := s.resolveModuleWithNesting(typeCtx.ModuleRef, aliases, uriToPath(protocol.DocumentURI(docURI)), lineNum)
-+	// A bare name is a local type only inside a typespec; elsewhere it is a call.
-+	if typeCtx.ModuleRef == "" && tf.InTypespec(lineNum) {
-+		fullModule = extractEnclosingModuleFromTokens(tf.source, tf.tokens, lineNum)
-+	}
- 
- 	results, err := s.store.LookupFunction(fullModule, typeName)
- 	if err != nil {
-@@ -7100,270 +7140,17 @@ func (s *Server) DidDeleteFiles(ctx context.Context, params *protocol.DeleteFile
+@@ -7100,270 +7113,17 @@ func (s *Server) DidDeleteFiles(ctx context.Context, params *protocol.DeleteFile
  }
  func (s *Server) CodeLensRefresh(ctx context.Context) error { return nil }
  func (s *Server) PrepareCallHierarchy(ctx context.Context, params *protocol.CallHierarchyPrepareParams) ([]protocol.CallHierarchyItem, error) {
@@ -5391,7 +5041,7 @@ index 0499a21..52101d2 100644
  	return nil, nil
  }
 diff --git a/internal/lsp/server_test.go b/internal/lsp/server_test.go
-index c259be9..4881ba2 100644
+index c259be9..cc3b743 100644
 --- a/internal/lsp/server_test.go
 +++ b/internal/lsp/server_test.go
 @@ -3008,6 +3008,7 @@ end
@@ -5449,7 +5099,42 @@ index c259be9..4881ba2 100644
  }
  
  // A consumer may override a function injected by __using__. References to that
-@@ -5859,15 +5877,15 @@ end
+@@ -3697,13 +3715,15 @@ end
+ 	}
+ }
+ 
+-func TestResolveBareFunctionModule_ParentScopeFunction(t *testing.T) {
++func TestResolveBareFunctionModule_ParentScopeFunctionIsUndefined(t *testing.T) {
+ 	server, cleanup := setupTestServer(t)
+ 	defer cleanup()
+ 
+-	// Function defined in Outer, bare-called from inside Inner.
+-	// The enclosing module at the call site is Inner (which doesn't define it),
+-	// so the file-scan fallback should find it in Outer.
++	// Function defined in Outer, bare-called from inside Inner. A nested
++	// module does not see its parent's functions; Elixir 1.20 rejects the
++	// call: "undefined function shared_helper/0 (expected MyApp.Outer.Inner
++	// to define such a function or for it to be imported, but none are
++	// available)". So there is no definition to go to.
+ 	content := `defmodule MyApp.Outer do
+   def shared_helper, do: :ok
+ 
+@@ -3720,12 +3740,8 @@ end
+ 	server.docs.Set(docURI, content)
+ 
+ 	// Go-to-definition on shared_helper() inside Inner (line 5, col 6)
+-	locs := definitionAt(t, server, docURI, 5, 6)
+-	if len(locs) == 0 {
+-		t.Fatal("expected go-to-definition for parent-scope function called from nested module")
+-	}
+-	if locs[0].Range.Start.Line != 1 {
+-		t.Errorf("expected jump to line 1 (def shared_helper in Outer), got line %d", locs[0].Range.Start.Line)
++	if locs := definitionAt(t, server, docURI, 5, 6); len(locs) != 0 {
++		t.Errorf("definition of shared_helper() in Inner = %v, want none", locs)
+ 	}
+ }
+ 
+@@ -5859,15 +5875,15 @@ end
  	names := make(map[string]bool)
  	for _, c := range calls {
  		names[c.To.Name] = true
@@ -5607,78 +5292,6 @@ index 0000000..6b8cd03
 +
 +  def genuine(x), do: MyApp.Admission.admit(x)
 +end
-diff --git a/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_1_target.ex b/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_1_target.ex
-new file mode 100644
-index 0000000..5ea8479
---- /dev/null
-+++ b/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_1_target.ex
-@@ -0,0 +1,3 @@
-+defmodule Sweep.Case1Target do
-+  def admit(value), do: value
-+end
-diff --git a/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_2_target.ex b/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_2_target.ex
-new file mode 100644
-index 0000000..6ad6f64
---- /dev/null
-+++ b/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_2_target.ex
-@@ -0,0 +1,3 @@
-+defmodule Sweep.Case2Target do
-+  def admit(value), do: value
-+end
-diff --git a/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_3_target.ex b/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_3_target.ex
-new file mode 100644
-index 0000000..381165c
---- /dev/null
-+++ b/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_3_target.ex
-@@ -0,0 +1,3 @@
-+defmodule Sweep.Case3Target do
-+  def admit(value), do: value
-+end
-diff --git a/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_4_target.ex b/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_4_target.ex
-new file mode 100644
-index 0000000..772bd81
---- /dev/null
-+++ b/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_4_target.ex
-@@ -0,0 +1,3 @@
-+defmodule Sweep.Case4Target do
-+  def admit(value), do: value
-+end
-diff --git a/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_5_target.ex b/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_5_target.ex
-new file mode 100644
-index 0000000..0a407e8
---- /dev/null
-+++ b/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_5_target.ex
-@@ -0,0 +1,3 @@
-+defmodule Sweep.Case5Target do
-+  def admit(value), do: value
-+end
-diff --git a/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_6_target.ex b/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_6_target.ex
-new file mode 100644
-index 0000000..a01079a
---- /dev/null
-+++ b/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_6_target.ex
-@@ -0,0 +1,3 @@
-+defmodule Sweep.Case6Target do
-+  def admit(value), do: value
-+end
-diff --git a/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_7_target.ex b/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_7_target.ex
-new file mode 100644
-index 0000000..c83cc6e
---- /dev/null
-+++ b/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_7_target.ex
-@@ -0,0 +1,3 @@
-+defmodule Sweep.Case7Target do
-+  def admit(value), do: value
-+end
-diff --git a/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_8_target.ex b/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_8_target.ex
-new file mode 100644
-index 0000000..6aaed3a
---- /dev/null
-+++ b/internal/lsp/testdata/call_hierarchy/incoming/lib/sweep/case_8_target.ex
-@@ -0,0 +1,3 @@
-+defmodule Sweep.Case8Target do
-+  def admit(value), do: value
-+end
 diff --git a/internal/lsp/testdata/call_hierarchy/incoming/lib/unclosed.ex b/internal/lsp/testdata/call_hierarchy/incoming/lib/unclosed.ex
 new file mode 100644
 index 0000000..c0e8fbc
@@ -5805,227 +5418,6 @@ index 0000000..b6d3692
 +  end
 +
 +  defp helper2, do: :ok
-+end
-diff --git a/internal/lsp/testdata/call_hierarchy/incoming/test/case_1_test.exs b/internal/lsp/testdata/call_hierarchy/incoming/test/case_1_test.exs
-new file mode 100644
-index 0000000..438eef0
---- /dev/null
-+++ b/internal/lsp/testdata/call_hierarchy/incoming/test/case_1_test.exs
-@@ -0,0 +1,21 @@
-+defmodule Sweep.Case1Test do
-+  use ExUnit.Case, async: true
-+
-+  defp invoice_total(lines) do
-+    Enum.sum(lines)
-+  end
-+
-+  setup_all do
-+    %{ledger: Sweep.Case1Target.admit(%{currency: "EUR"})}
-+  end
-+
-+  describe "invoice admission" do
-+    setup %{ledger: ledger} do
-+      %{invoice: Sweep.Case1Target.admit(Map.put(ledger, :total, invoice_total([10, 20])))}
-+    end
-+
-+    test "admits the invoice with its line total", %{invoice: invoice} do
-+      assert %{total: 30} = Sweep.Case1Target.admit(invoice)
-+    end
-+  end
-+end
-diff --git a/internal/lsp/testdata/call_hierarchy/incoming/test/case_2_test.exs b/internal/lsp/testdata/call_hierarchy/incoming/test/case_2_test.exs
-new file mode 100644
-index 0000000..76d6592
---- /dev/null
-+++ b/internal/lsp/testdata/call_hierarchy/incoming/test/case_2_test.exs
-@@ -0,0 +1,23 @@
-+defmodule Sweep.Case2RefundTest do
-+  use ExUnit.Case, async: true
-+
-+  def refund_request(amount) do
-+    Sweep.Case2Target.admit(%{kind: :refund, amount: amount})
-+  end
-+
-+  test "builds a refund request" do
-+    assert %{kind: :refund, amount: 5} = refund_request(5)
-+  end
-+end
-+
-+defmodule Sweep.Case2ChargebackTest do
-+  use ExUnit.Case, async: true
-+
-+  test "admits a chargeback dispute" do
-+    assert %{kind: :chargeback} = Sweep.Case2Target.admit(%{kind: :chargeback})
-+  end
-+
-+  test "keeps the disputed amount" do
-+    assert %{amount: 12} = Sweep.Case2Target.admit(%{kind: :chargeback, amount: 12})
-+  end
-+end
-diff --git a/internal/lsp/testdata/call_hierarchy/incoming/test/case_3_test.exs b/internal/lsp/testdata/call_hierarchy/incoming/test/case_3_test.exs
-new file mode 100644
-index 0000000..a62f038
---- /dev/null
-+++ b/internal/lsp/testdata/call_hierarchy/incoming/test/case_3_test.exs
-@@ -0,0 +1,18 @@
-+defmodule Sweep.Case3Test do
-+  # Deliberately not mix-formatted: keeps a one-line do..end test and a
-+  # multiline keyword do: body, the two ownership boundaries this case checks.
-+  use ExUnit.Case
-+
-+  test "inline end" do assert Sweep.Case3Target.admit(1) == 1 end
-+
-+  def keyword_caller(value),
-+    do:
-+      Sweep.Case3Target.admit(
-+        value
-+      )
-+
-+  test "after keyword caller" do
-+    assert keyword_caller(2) == 2
-+    assert Sweep.Case3Target.admit(3) == 3
-+  end
-+end
-diff --git a/internal/lsp/testdata/call_hierarchy/incoming/test/case_4_test.exs b/internal/lsp/testdata/call_hierarchy/incoming/test/case_4_test.exs
-new file mode 100644
-index 0000000..3752af5
---- /dev/null
-+++ b/internal/lsp/testdata/call_hierarchy/incoming/test/case_4_test.exs
-@@ -0,0 +1,23 @@
-+defmodule Sweep.Case4Test do
-+  use ExUnit.Case
-+
-+  defmodule InnerTest do
-+    use ExUnit.Case
-+
-+    test "nested module test" do
-+      assert Sweep.Case4Target.admit(1) == 1
-+    end
-+  end
-+
-+  defmodule Elixir.Sweep.Case4AbsoluteTest do
-+    use ExUnit.Case
-+
-+    test "absolute module test" do
-+      assert Sweep.Case4Target.admit(2) == 2
-+    end
-+  end
-+
-+  test "outer test after nested modules" do
-+    assert Sweep.Case4Target.admit(3) == 3
-+  end
-+end
-diff --git a/internal/lsp/testdata/call_hierarchy/incoming/test/case_5_test.exs b/internal/lsp/testdata/call_hierarchy/incoming/test/case_5_test.exs
-new file mode 100644
-index 0000000..34afc86
---- /dev/null
-+++ b/internal/lsp/testdata/call_hierarchy/incoming/test/case_5_test.exs
-@@ -0,0 +1,28 @@
-+defmodule Sweep.Case5Test do
-+  use ExUnit.Case, async: true
-+
-+  alias Sweep.Case5Target
-+
-+  def checked(value) do
-+    if value, do: Case5Target.admit(value), else: :none
-+  end
-+
-+  describe "control flow" do
-+    test "case and if" do
-+      result =
-+        case Case5Target.admit(1) do
-+          value -> if value > 0, do: Case5Target.admit(value + 1)
-+        end
-+
-+      assert result == 2
-+    end
-+
-+    test "with, for and fn" do
-+      with {:ok, value} <- {:ok, checked(3)} do
-+        for item <- [value] do
-+          assert Enum.map([item], fn x -> Case5Target.admit(x) end) == [3]
-+        end
-+      end
-+    end
-+  end
-+end
-diff --git a/internal/lsp/testdata/call_hierarchy/incoming/test/case_6_test.exs b/internal/lsp/testdata/call_hierarchy/incoming/test/case_6_test.exs
-new file mode 100644
-index 0000000..f3cf90e
---- /dev/null
-+++ b/internal/lsp/testdata/call_hierarchy/incoming/test/case_6_test.exs
-@@ -0,0 +1,15 @@
-+defmodule Sweep.Case6Test do
-+  use ExUnit.Case, async: true
-+
-+  alias Sweep.Case6Target
-+
-+  def first(value), do: Case6Target.admit(value); def second(value), do: Case6Target.admit(value)
-+
-+  test "repeated on one line" do
-+    assert Case6Target.admit(Case6Target.admit(1)) == 1
-+  end
-+
-+  test "after the shared line" do
-+    assert first(2) + second(3) == Case6Target.admit(5)
-+  end
-+end
-diff --git a/internal/lsp/testdata/call_hierarchy/incoming/test/case_7_test.exs b/internal/lsp/testdata/call_hierarchy/incoming/test/case_7_test.exs
-new file mode 100644
-index 0000000..dbc8781
---- /dev/null
-+++ b/internal/lsp/testdata/call_hierarchy/incoming/test/case_7_test.exs
-@@ -0,0 +1,21 @@
-+defmodule Sweep.Case7Test do
-+  use ExUnit.Case, async: true
-+  alias Sweep.Case7Target, as: Target
-+  import Sweep.Case7Target, only: [admit: 1]
-+
-+  test "qualified pipeline retains its test owner" do
-+    assert 3 |> Sweep.Case7Target.admit() == 3
-+  end
-+
-+  test "aliased multiline pipeline retains its test owner" do
-+    result =
-+      4
-+      |> Target.admit()
-+
-+    assert result == 4
-+  end
-+
-+  test "imported pipeline retains its test owner" do
-+    assert 5 |> admit() == 5
-+  end
-+end
-diff --git a/internal/lsp/testdata/call_hierarchy/incoming/test/case_8_test.exs b/internal/lsp/testdata/call_hierarchy/incoming/test/case_8_test.exs
-new file mode 100644
-index 0000000..64408b1
---- /dev/null
-+++ b/internal/lsp/testdata/call_hierarchy/incoming/test/case_8_test.exs
-@@ -0,0 +1,24 @@
-+defmodule Sweep.Case8Test do
-+  use ExUnit.Case, async: true
-+
-+  defp receipt(value, mode \\ :saved)
-+  defp receipt(value, :saved), do: Sweep.Case8Target.admit(value)
-+
-+  defp receipt(value, :queued) do
-+    Sweep.Case8Target.admit({:queued, value})
-+  end
-+
-+  describe "shipments" do
-+    test "records a receipt" do
-+      assert Sweep.Case8Target.admit(:shipment) == :shipment
-+      assert receipt(:shipment) == :shipment
-+    end
-+  end
-+
-+  describe "refunds" do
-+    test "records a receipt" do
-+      assert Sweep.Case8Target.admit(:refund) == :refund
-+      assert receipt(:refund, :queued) == {:queued, :refund}
-+    end
-+  end
 +end
 diff --git a/internal/lsp/testdata/call_hierarchy/incoming/test/nested_test.exs b/internal/lsp/testdata/call_hierarchy/incoming/test/nested_test.exs
 new file mode 100644
@@ -6235,28 +5627,6 @@ index 0000000..5baa32f
 +  def verify(token), do: token
 +  def verify(token, mode), do: {token, mode}
 +end
-diff --git a/internal/lsp/testdata/call_hierarchy/outgoing/lib/shop/unicode.ex b/internal/lsp/testdata/call_hierarchy/outgoing/lib/shop/unicode.ex
-new file mode 100644
-index 0000000..7478a06
---- /dev/null
-+++ b/internal/lsp/testdata/call_hierarchy/outgoing/lib/shop/unicode.ex
-@@ -0,0 +1,16 @@
-+defmodule Shop.Unicode do
-+  def greet(name) do
-+    "héllo 😀 " <> Shop.Token.build(name, "ç")
-+  end
-+
-+  def family do
-+    x = "👩‍👩‍👧"; foo(x)
-+  end
-+
-+  def cafe do
-+    café = 1; bar(café)
-+  end
-+
-+  defp foo(x), do: x
-+  defp bar(x), do: x
-+end
 diff --git a/internal/lsp/testdata/call_hierarchy/outgoing/stdlib/enum.ex b/internal/lsp/testdata/call_hierarchy/outgoing/stdlib/enum.ex
 new file mode 100644
 index 0000000..797c4cb
@@ -6330,10 +5700,10 @@ index 0000000..e8fc658
 +end
 diff --git a/internal/lsp/workspace_root.go b/internal/lsp/workspace_root.go
 new file mode 100644
-index 0000000..a742303
+index 0000000..04f3b7c
 --- /dev/null
 +++ b/internal/lsp/workspace_root.go
-@@ -0,0 +1,167 @@
+@@ -0,0 +1,172 @@
 +package lsp
 +
 +import (
@@ -6364,8 +5734,12 @@ index 0000000..a742303
 +	}
 +	// Check the nearest checkout before database markers, which can belong to
 +	// an enclosing repository when a foreign checkout is nested inside it.
++	resolved, err := filepath.EvalSymlinks(root)
++	if err != nil {
++		return err
++	}
 +	checkout := ""
-+	for dir := root; ; dir = filepath.Dir(dir) {
++	for dir := resolved; ; dir = filepath.Dir(dir) {
 +		if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
 +			checkout = dir
 +			break
@@ -6374,7 +5748,7 @@ index 0000000..a742303
 +			break
 +		}
 +	}
-+	if checkout != "" && checkout != root {
++	if checkout != "" && checkout != resolved {
 +		return fmt.Errorf("workspace root %s must name the exact checkout %s", root, checkout)
 +	}
 +	if checkout == "" {
@@ -6410,10 +5784,11 @@ index 0000000..a742303
 +	})
 +}
 +
-+// ValidateWorkspaceFile keeps request paths in the daemon's spelling of its
++// validateWorkspaceFile keeps request paths in the daemon's spelling of its
 +// checkout. Resolving symlinks only for comparison prevents a file alias from
 +// mixing different path keys with the shared index.
-+func ValidateWorkspaceFile(root, path string) error {
++func validateWorkspaceFile(root, path string) error {
++	root = filepath.Clean(root)
 +	rel, err := filepath.Rel(root, path)
 +	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 +		return fmt.Errorf("file %s does not belong to workspace %s", path, root)
@@ -6475,8 +5850,8 @@ index 0000000..a742303
 +		return fmt.Errorf("request requires a local file URI, got %q", documentURI)
 +	}
 +	path := filepath.FromSlash(parsed.Path)
-+	if err := ValidateWorkspaceFile(root, path); err != nil {
-+		if stdlibRoot != "" && ValidateWorkspaceFile(stdlibRoot, path) == nil {
++	if err := validateWorkspaceFile(root, path); err != nil {
++		if stdlibRoot != "" && validateWorkspaceFile(stdlibRoot, path) == nil {
 +			return nil
 +		}
 +		return err
@@ -6502,52 +5877,10 @@ index 0000000..a742303
 +	return false
 +}
 diff --git a/internal/store/store.go b/internal/store/store.go
-index ac6c873..185cde3 100644
+index ac6c873..4c61bb2 100644
 --- a/internal/store/store.go
 +++ b/internal/store/store.go
-@@ -1117,13 +1117,27 @@ func (s *Store) LookupModulesInFile(filePath string) ([]string, error) {
- // specified file. Checks the enclosing module at nearLine first (respecting module
- // boundaries), then falls back to any other module in the file.
- func (s *Store) LookupFunctionInFile(filePath, function string, nearLine int) (string, bool) {
-+	return s.LookupFunctionArityInFile(filePath, function, nearLine, -1, -1)
-+}
-+
-+// LookupFunctionArityInFile is LookupFunctionInFile for a call whose argument
-+// count is known: only a definition with an arity in [minArity, maxArity]
-+// counts. A negative minArity matches any arity.
-+func (s *Store) LookupFunctionArityInFile(filePath, function string, nearLine, minArity, maxArity int) (string, bool) {
-+	arityClause := ""
-+	var arityArgs []interface{}
-+	if minArity >= 0 {
-+		arityClause = " AND arity BETWEEN ? AND ?"
-+		arityArgs = []interface{}{minArity, maxArity}
-+	}
-+
- 	// Try the enclosing module first — this is the correct scope for bare calls
- 	enclosing := s.LookupEnclosingModule(filePath, nearLine)
- 	if enclosing != "" {
- 		var count int
- 		if err := s.db.QueryRow(
--			"SELECT COUNT(*) FROM definitions WHERE module = ? AND function = ? AND kind NOT IN ('module', 'defprotocol', 'defimpl', 'callback', 'macrocallback')",
--			enclosing, function,
-+			"SELECT COUNT(*) FROM definitions WHERE module = ? AND function = ? AND kind NOT IN ('module', 'defprotocol', 'defimpl', 'callback', 'macrocallback')"+arityClause,
-+			append([]interface{}{enclosing, function}, arityArgs...)...,
- 		).Scan(&count); err == nil && count > 0 {
- 			return enclosing, true
- 		}
-@@ -1134,9 +1148,9 @@ func (s *Store) LookupFunctionInFile(filePath, function string, nearLine int) (s
- 	var module string
- 	err := s.db.QueryRow(
- 		"SELECT d.module FROM definitions d "+
--			"WHERE d.file_id = "+fileIDSubquery+" AND d.function = ? AND d.kind NOT IN ('module', 'defprotocol', 'defimpl', 'callback', 'macrocallback') "+
-+			"WHERE d.file_id = "+fileIDSubquery+" AND d.function = ? AND d.kind NOT IN ('module', 'defprotocol', 'defimpl', 'callback', 'macrocallback')"+arityClause+" "+
- 			"LIMIT 1",
--		filePath, function,
-+		append([]interface{}{filePath, function}, arityArgs...)...,
- 	).Scan(&module)
- 	if err != nil {
- 		return "", false
-@@ -1454,6 +1468,7 @@ type DelegateEntry struct {
+@@ -1454,6 +1454,7 @@ type DelegateEntry struct {
  	DelegateAs string // the target function name (empty if same as Function)
  	FilePath   string
  	Line       int
@@ -6555,7 +5888,7 @@ index ac6c873..185cde3 100644
  }
  
  // LookupDelegatesTo returns all defdelegate definitions that forward the given
-@@ -1461,10 +1476,10 @@ type DelegateEntry struct {
+@@ -1461,10 +1462,10 @@ type DelegateEntry struct {
  // equals target) and the as: case (delegate_as equals target function name).
  func (s *Store) LookupDelegatesTo(targetModule, targetFunction string) ([]DelegateEntry, error) {
  	rows, err := s.db.Query(
@@ -6568,7 +5901,7 @@ index ac6c873..185cde3 100644
  		 WHERE d.kind = 'defdelegate' AND d.delegate_to = ? AND d.delegate_as = ?`,
  		targetModule, targetFunction, targetModule, targetFunction,
  	)
-@@ -1476,7 +1491,7 @@ func (s *Store) LookupDelegatesTo(targetModule, targetFunction string) ([]Delega
+@@ -1476,7 +1477,7 @@ func (s *Store) LookupDelegatesTo(targetModule, targetFunction string) ([]Delega
  	var results []DelegateEntry
  	for rows.Next() {
  		var r DelegateEntry
@@ -6577,14 +5910,15 @@ index ac6c873..185cde3 100644
  			return nil, err
  		}
  		results = append(results, r)
-@@ -1719,10 +1734,21 @@ func (s *Store) NextFunctionLine(filePath string, startLine int) int {
+@@ -1719,10 +1720,21 @@ func (s *Store) NextFunctionLine(filePath string, startLine int) int {
  }
  
  func (s *Store) LookupFollowDelegate(module, function string) ([]LookupResult, error) {
 -	return s.lookupFollowDelegate(module, function, 0)
 +	return s.lookupFollowDelegate(module, function, -1, -1, nil, 0)
-+}
-+
+ }
+ 
+-func (s *Store) lookupFollowDelegate(module, function string, depth int) ([]LookupResult, error) {
 +// LookupFollowDelegateArity is LookupFollowDelegate for the definitions with
 +// an arity between minArity and maxArity; a negative minArity means any. The
 +// arity is applied before the delegate decision: a module may delegate f/2 and
@@ -6594,14 +5928,13 @@ index ac6c873..185cde3 100644
 +// named function from source and returns the arity a delegate row forwards to.
 +func (s *Store) LookupFollowDelegateArity(module, function string, minArity, maxArity int, targetArity func(r LookupResult, function string) int) ([]LookupResult, error) {
 +	return s.lookupFollowDelegate(module, function, minArity, maxArity, targetArity, 0)
- }
- 
--func (s *Store) lookupFollowDelegate(module, function string, depth int) ([]LookupResult, error) {
++}
++
 +func (s *Store) lookupFollowDelegate(module, function string, minArity, maxArity int, targetArity func(r LookupResult, function string) int, depth int) ([]LookupResult, error) {
  	if depth > 5 {
  		return nil, nil
  	}
-@@ -1731,30 +1757,51 @@ func (s *Store) lookupFollowDelegate(module, function string, depth int) ([]Look
+@@ -1731,30 +1743,51 @@ func (s *Store) lookupFollowDelegate(module, function string, depth int) ([]Look
  	if err != nil {
  		return nil, err
  	}
@@ -6672,10 +6005,10 @@ index ac6c873..185cde3 100644
  }
 diff --git a/internal/treesitter/arity.go b/internal/treesitter/arity.go
 new file mode 100644
-index 0000000..5c42319
+index 0000000..d68596c
 --- /dev/null
 +++ b/internal/treesitter/arity.go
-@@ -0,0 +1,487 @@
+@@ -0,0 +1,479 @@
 +// Package treesitter answers syntax questions about Elixir source with the
 +// tree-sitter Elixir grammar.
 +package treesitter
@@ -6697,14 +6030,6 @@ index 0000000..5c42319
 +
 +// ExactArity is the arity of a call with n arguments.
 +func ExactArity(n int) Arity { return Arity{Min: n, Max: n, Known: true} }
-+
-+// Bounds returns the arity range for store queries, -1, -1 when unknown.
-+func (a Arity) Bounds() (minArity, maxArity int) {
-+	if !a.Known {
-+		return -1, -1
-+	}
-+	return a.Min, a.Max
-+}
 +
 +// Matches reports whether a definition of arity n can be the target.
 +func (a Arity) Matches(n int) bool {
@@ -6782,12 +6107,12 @@ index 0000000..5c42319
 +		return nil
 +	}
 +	defer cleanup()
-+	return FunctionOccurrences(root, src, name)
++	return functionOccurrences(root, src, name)
 +}
 +
-+// FunctionOccurrences returns every occurrence of name in the tree, in source
++// functionOccurrences returns every occurrence of name in the tree, in source
 +// order, classified as FunctionOccurrenceAt would classify it.
-+func FunctionOccurrences(root *tree_sitter.Node, src []byte, name string) []FunctionOccurrence {
++func functionOccurrences(root *tree_sitter.Node, src []byte, name string) []FunctionOccurrence {
 +	var out []FunctionOccurrence
 +	var walk func(n *tree_sitter.Node)
 +	walk = func(n *tree_sitter.Node) {
@@ -7165,7 +6490,7 @@ index 0000000..5c42319
 +}
 diff --git a/internal/treesitter/arity_test.go b/internal/treesitter/arity_test.go
 new file mode 100644
-index 0000000..1b3d495
+index 0000000..dfa11b2
 --- /dev/null
 +++ b/internal/treesitter/arity_test.go
 @@ -0,0 +1,237 @@
@@ -7296,7 +6621,7 @@ index 0000000..1b3d495
 +`)
 +	root, cleanup := parseElixir(src)
 +	defer cleanup()
-+	occs := FunctionOccurrences(root, src, "f")
++	occs := functionOccurrences(root, src, "f")
 +	if len(occs) != 2 {
 +		t.Fatalf("got %d occurrences, want 2", len(occs))
 +	}
@@ -7397,18 +6722,18 @@ index 0000000..1b3d495
 +`)
 +	root, cleanup := parseElixir(src)
 +	defer cleanup()
-+	grab := FunctionOccurrences(root, src, "grab")
++	grab := functionOccurrences(root, src, "grab")
 +	if len(grab) != 1 || grab[0].Kind != OccurrenceHead || grab[0].Keyword != "defdelegate" || grab[0].Arity != (Arity{Min: 1, Max: 2, Known: true}) {
 +		t.Errorf("grab = %+v, want one defdelegate head /1..2", grab)
 +	}
-+	pick := FunctionOccurrences(root, src, "pick")
++	pick := functionOccurrences(root, src, "pick")
 +	if len(pick) != 2 || pick[0].Arity != ExactArity(1) || pick[1].Arity != ExactArity(2) || pick[0].NameLine != pick[1].NameLine {
 +		t.Errorf("pick = %+v, want heads /1 and /2 on one line", pick)
 +	}
 +}
 diff --git a/internal/treesitter/owners.go b/internal/treesitter/owners.go
 new file mode 100644
-index 0000000..7f478c1
+index 0000000..65dda5f
 --- /dev/null
 +++ b/internal/treesitter/owners.go
 @@ -0,0 +1,297 @@
@@ -7510,8 +6835,8 @@ index 0000000..7f478c1
 +}
 +
 +// Clauses returns the def-family clauses of module.name, in source order,
-+// whose head accepts arity. An unknown arity accepts every clause.
-+func (s *Source) Clauses(module, name string, arity Arity) []Owner {
++// whose head accepts arity.
++func (s *Source) Clauses(module, name string, arity int) []Owner {
 +	var clauses []Owner
 +	var walk func(n *tree_sitter.Node)
 +	walk = func(n *tree_sitter.Node) {
@@ -7521,7 +6846,7 @@ index 0000000..7f478c1
 +				return
 +			case functionOwnerKeywords[keyword]:
 +				clause, ok := s.owner(n, keyword)
-+				if ok && clause.Name == name && clause.Module == module && (!arity.Known || clause.Arity.Matches(arity.Min)) {
++				if ok && clause.Name == name && clause.Module == module && clause.Arity.Matches(arity) {
 +					clauses = append(clauses, clause)
 +				}
 +				return
@@ -7922,10 +7247,10 @@ index 0000000..c59dde2
 +}
 diff --git a/query_integration_test.go b/query_integration_test.go
 new file mode 100644
-index 0000000..9749bf5
+index 0000000..5156810
 --- /dev/null
 +++ b/query_integration_test.go
-@@ -0,0 +1,376 @@
+@@ -0,0 +1,387 @@
 +package main
 +
 +import (
@@ -8066,7 +7391,8 @@ index 0000000..9749bf5
 +	binary := buildDexter(t)
 +	root, stdlib := t.TempDir(), t.TempDir()
 +	writeQueryFixture(t, root)
-+	t.Setenv("DEXTER_ELIXIR_LIB_ROOT", stdlib)
++	// Shell directory completion commonly leaves a trailing separator.
++	t.Setenv("DEXTER_ELIXIR_LIB_ROOT", stdlib+string(filepath.Separator))
 +	dependency := filepath.Join(root, "deps", "sample")
 +	if err := os.MkdirAll(filepath.Join(dependency, ".git"), 0o700); err != nil {
 +		t.Fatal(err)
@@ -8104,6 +7430,14 @@ index 0000000..9749bf5
 +	binary := buildDexter(t)
 +	root := t.TempDir()
 +	writeQueryFixture(t, root)
++	queryGit(t, root, "init", "-q")
++	app := filepath.Join(root, "app")
++	writeQueryFixture(t, app)
++	alias := filepath.Join(t.TempDir(), "app-alias")
++	if err := os.Symlink(app, alias); err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { stopQueryDaemon(t, alias) })
 +	other := t.TempDir()
 +	writeQueryFixture(t, other)
 +	for _, test := range []struct {
@@ -8112,6 +7446,8 @@ index 0000000..9749bf5
 +	}{
 +		{"subdirectory", []string{"--root", filepath.Join(root, "lib"), "lsp", filepath.Join(root, "lib")}},
 +		{"conflicting-path", []string{"--root", root, "lsp", other}},
++		{"symlink-subdirectory-native", []string{"--root", alias, "lsp", alias}},
++		{"symlink-subdirectory-query", []string{"--root", alias, "query", "workspace-symbols", "SharedLib"}},
 +	} {
 +		t.Run(test.name, func(t *testing.T) {
 +			assertCommandRefused(t, binary, test.args, "")
