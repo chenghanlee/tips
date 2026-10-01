@@ -264,6 +264,9 @@ class WorktreeTask:
         if not os.access(self.binary, os.X_OK):
             raise RefusalError(f"Missing executable: {self.binary}; run agent/lsp/dexter/build.sh.")
         self.target_env["TIPS_DEXTER"] = str(self.wrapper)
+        if self.kind == "codex":
+            # Codex's sandbox cannot write the shared Hex cache in the home directory.
+            self.target_env["HEX_HOME"] = str(self.worktree / "tmp/hex")
 
     def elixir_sources(self) -> Path:
         """The Elixir standard-library sources Dexter indexes for this worktree."""

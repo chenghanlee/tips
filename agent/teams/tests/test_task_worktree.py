@@ -215,6 +215,7 @@ if a[:2] == ["agent", "start"]:
             "TIPS_TEAM_CONFIG",
             "TIPS_PROVIDER_ENV_FILE",
             "TIPS_DEXTER",
+            "HEX_HOME",
         ]
     }
     state["launch_argv"] = a
@@ -316,6 +317,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
             "MIX_ENV",
             "MIX_TEST_PARTITION",
             "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE",
+            "HEX_HOME",
         ):
             self.env.pop(k, None)
         self.git("init", "-q", "-b", "main")
@@ -511,6 +513,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
             "TIPS_TEAM_CONFIG": str(self.root / "agent/teams/config.toml"),
             "TIPS_PROVIDER_ENV_FILE": str(self.root / ".env"),
             "TIPS_DEXTER": str(self.wt / ".dexter/dexter.sh"),
+            "HEX_HOME": None,
         }
         assert s["cwd"] == str(self.wt)
         assert "fixture-test" in s["launch_argv"]
@@ -521,6 +524,8 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call("--start")
         assert "fixture-lead" in self.state()["launch_argv"]
         s = self.state()
+        # Codex's sandbox cannot write the shared Hex cache; Claude keeps the default.
+        assert s["launch_env"]["HEX_HOME"] == str(self.wt / "tmp/hex")
         s["agents"] = []
         self.save(s)
         cfg = self.root / "agent/teams/config.toml"
