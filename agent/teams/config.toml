@@ -41,13 +41,11 @@ effort = "high"
 db_suffix = "_dev-lead"
 port_offset = 2
 
-# Lead for issues labelled `ui`; launched with --ui. Shares the lead partition.
+# Lead client for issues labelled `ui`; launched with --ui. Port and database are roles.lead's.
 [roles.lead_ui]
 kind = "claude"
 model = "fable"
 effort = "high"
-db_suffix = "_dev-lead"
-port_offset = 2
 
 [roles.tpm]
 kind = "claude"

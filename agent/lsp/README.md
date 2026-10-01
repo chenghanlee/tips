@@ -65,9 +65,10 @@ Out of this beta: an application in a subdirectory or monorepo.
 - `.dexter/dexter.sh`: `exec vendor/dexter --root <worktree> "$@"` with the
   selected sources exported. Its absolute path is `TIPS_DEXTER` in the session.
 - For Claude, `.dexter/claude-plugin/`: a plugin loaded with `--plugin-dir` whose
-  LSP server runs the same binary with `--root <worktree> lsp` and the
-  same sources. Known alternative language-server plugins are disabled by the
-  launch command's `--settings` override, including in linked worktrees.
+  LSP server runs `dexter.sh`: first the warm-up query below, then, only if it
+  succeeds, `dexter.sh lsp`. Known alternative language-server plugins are
+  disabled by the launch command's `--settings` override, including in linked
+  worktrees.
 - For Codex, `.codex/config.toml` with the Mix check plugins.
 
 Provisioning then runs `dexter.sh query workspace-symbols --wait <timeout> MixProject`
@@ -77,6 +78,34 @@ the daemon alive and the worktree is preserved. A daemon idles out after fifteen
 minutes without clients and restarts from its index on the next request.
 Do not run `git clean -x` in a team worktree: it removes the bound command and
 the index under `.dexter/`.
+
+The daemon belongs to the worktree, not to a client. A daemon started by
+Claude's long-lived LSP proxy would be that client's child, and `team.py`
+refuses to stop a client while one of its children survives. So Claude's
+launch starts the daemon through the short-lived warm-up query and attaches
+the proxy afterwards.
+
+- If the warm-up fails or times out, the proxy does not start. The reason is
+  on the LSP server's stderr and that session has no native LSP until Claude
+  starts the server again; whether Claude retries has not been verified live.
+  `"$TIPS_DEXTER" query` still works.
+- The plugin's `startupTimeout` is a policy cap: the full warm-up (`--wait`
+  plus Dexter's 30 seconds to reach the daemon), then 30 seconds for the proxy
+  to attach and answer. It is not the proxy's proven maximum: the proxy
+  connects twice before `initialize`, each time with its own bound. A slower
+  start is reported as failed.
+- Known gaps: `team.py` refuses a client stop, and preserves everything,
+  while the daemon is that client's descendant. Two cases: a daemon that exits
+  after the warm-up and before the proxy attaches is started by the proxy;
+  and a client stopped during a cold warm-up still has the query and the
+  daemon it started as descendants. The recovery is the same: wait for the
+  client's children to exit (a warm-up ends within `--wait` plus 30 seconds),
+  then run the stop again. The daemon is then nobody's child and still serves
+  the worktree. Do not use `dexter.sh stop` to hurry this: it refuses while
+  the query is attached, and retirement runs it anyway. Measured with the
+  real binary and stop code against a Herdr fixture, not a live client.
+  The same refusal and retry apply to any `query` that starts the daemon, in
+  either client, for example the first one after the daemon idled out.
 
 ## Operations
 

@@ -20,6 +20,7 @@ from team import (
     Config,
     Entity,
     HerdrResult,
+    Role,
     execute,
     load_config,
     occupant,
@@ -51,6 +52,35 @@ def run(
 
 def git(*args: str | Path) -> str:
     return run(["git", *map(str, args)])
+
+
+# Claude's LSP launch: "$0" is the bound command, "$@" the warm-up query. A daemon
+# started by the long-lived proxy stays that client's child, and team.stop refuses
+# to leave a client's child running. So a short-lived query starts the daemon and
+# the proxy follows only when it succeeds. The LSP stream is the proxy's alone.
+CLAUDE_LSP_LAUNCH = '/bin/sh "$0" "$@" </dev/null >/dev/null && exec /bin/sh "$0" lsp'
+# Dexter's query gives up this long after --wait: its allowance to reach the daemon.
+DEXTER_CONNECT_SECONDS = 30
+
+
+def bound_command(binary: Path, root: Path, sources: Path | str) -> str:
+    """The worktree's Dexter command: the one place naming binary, root and sources."""
+    return (
+        "#!/bin/sh\n"
+        f"export DEXTER_ELIXIR_LIB_ROOT={shlex.quote(str(sources))}\n"
+        f"exec {shlex.quote(str(binary))} --root {shlex.quote(str(root))}"
+        ' "$@"\n'
+    )
+
+
+def warm_up_query(startup_seconds: int) -> list[str]:
+    """Bound-command arguments that start the daemon and wait for its index."""
+    return ["query", "workspace-symbols", "--wait", f"{startup_seconds}s", "MixProject"]
+
+
+def claude_lsp_launch(wrapper: Path, startup_seconds: int) -> list[str]:
+    """Claude's LSP server command: the bound command, warmed up, then its proxy."""
+    return ["/bin/sh", "-c", CLAUDE_LSP_LAUNCH, str(wrapper), *warm_up_query(startup_seconds)]
 
 
 class Arguments(argparse.Namespace):
@@ -116,7 +146,7 @@ class WorktreeTask:
     root: Path
     config_path: Path
     config: Config
-    role: CodingRole
+    role: Role
     role_name: str
     agent_name: str
     issue: str
@@ -146,14 +176,16 @@ class WorktreeTask:
             self.config["timeouts"],
             self.config["launch"],
         )
-        self.role = cast(CodingRole, self.config["roles"][self.role_key()])
+        self.role = self.config["roles"][self.role_key()]
+        # A UI lead replaces only the client: the port and database stay the lead's.
+        partition = cast(CodingRole, self.config["roles"][self.role_name])
         self.kind = self.role["kind"]
         self.check_settings()
         self.model, self.effort = (self.role["model"], self.role["effort"])
         self.port = (
             self.team["port_base"]
             + self.team["port_stride"] * self.args.team
-            + self.role["port_offset"]
+            + partition["port_offset"]
         )
         if not 1 <= self.port <= 65535:
             raise RefusalError("Configured role port is outside the TCP port range.")
@@ -161,7 +193,7 @@ class WorktreeTask:
             "PGPORT": str(self.team["postgres_port"]),
             "TIPS_DB_SUFFIX": self.team["db_suffix_prefix"]
             + str(self.args.team)
-            + self.role["db_suffix"],
+            + partition["db_suffix"],
             "TIPS_TEST_PORT": str(self.port),
             "MIX_ENV": "test",
             "TIPS_CHECK_TIMEOUT_SECONDS": str(self.timeouts["checks_minutes"] * 60),
@@ -304,14 +336,9 @@ class WorktreeTask:
             self.old_head = git("-C", self.worktree, "rev-parse", "HEAD")
 
     def prepare_config(self) -> None:
-        sources = str(self.elixir_sources())
+        sources = self.elixir_sources()
         self.desired = {
-            self.wrapper: (
-                "#!/bin/sh\n"
-                f"export DEXTER_ELIXIR_LIB_ROOT={shlex.quote(sources)}\n"
-                f"exec {shlex.quote(str(self.binary))} --root {shlex.quote(str(self.worktree))}"
-                ' "$@"\n'
-            ),
+            self.wrapper: bound_command(self.binary, self.worktree, sources),
             self.worktree / ".dexter/.gitignore": "*\n",
         }
         if self.kind == "codex":
@@ -320,10 +347,10 @@ enabled = true
 [plugins."mix-credo@elixir-agent-tools"]
 enabled = true
 """
-            config += '\n[plugins."elixir-lsp@elixir-agent-tools"]\nenabled = false\n'
             self.desired[self.worktree / ".codex/config.toml"] = config
         else:
-            # Claude's native LSP tool runs the same binary against the same daemon.
+            seconds = self.timeouts["dexter_startup_seconds"]
+            launch = claude_lsp_launch(self.wrapper, seconds)
             self.desired[self.plugin / ".claude-plugin/plugin.json"] = (
                 json.dumps(
                     {
@@ -332,9 +359,12 @@ enabled = true
                         "version": "1.0.0",
                         "lspServers": {
                             "dexter": {
-                                "command": str(self.binary),
-                                "args": ["--root", str(self.worktree), "lsp"],
-                                "env": {"DEXTER_ELIXIR_LIB_ROOT": sources},
+                                "command": launch[0],
+                                "args": launch[1:],
+                                # A policy cap, not the proxy's proven maximum: the full
+                                # warm-up, then as long again for the proxy to attach and
+                                # answer. Claude Code 2.1.286 sets no limit without one.
+                                "startupTimeout": (seconds + 2 * DEXTER_CONNECT_SECONDS) * 1000,
                                 "extensionToLanguage": {
                                     ".ex": "elixir",
                                     ".exs": "elixir",
@@ -373,17 +403,12 @@ enabled = true
     def start_language_server(self) -> None:
         # The bound command carries the binary, root and Elixir sources; a
         # missing or wrong source tree fails here, before any client starts.
+        # The query ends itself within --wait plus its connection allowance, so a
+        # valid slow start is never cut short; the margin only catches a hung query.
+        seconds = self.timeouts["dexter_startup_seconds"]
         output = run(
-            [
-                "/bin/sh",
-                self.wrapper,
-                "query",
-                "workspace-symbols",
-                "--wait",
-                f"{self.timeouts['dexter_startup_seconds']}s",
-                "MixProject",
-            ],
-            timeout=self.timeouts["dexter_startup_seconds"] + 5,
+            ["/bin/sh", self.wrapper, *warm_up_query(seconds)],
+            timeout=seconds + DEXTER_CONNECT_SECONDS + 5,
             env={**os.environ, **self.target_env},
             input_text="",
         )
