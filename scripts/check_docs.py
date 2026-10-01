@@ -23,7 +23,6 @@ def check_local_links():
 
 ROLES = {
     "Lead TPM": "lead-tpm",
-    "Team TPM": "team-tpm",
     "Tech lead": "tech-lead",
     "Developer": "developer",
     "Tester": "tester",

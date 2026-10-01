@@ -65,8 +65,8 @@ Edit [config.toml](config.toml): team limits; client/model/effort per role; port
 
 Codex uses the generated `$TIPS_DEXTER` command; Claude uses its native LSP tool
 through the generated plugin. Existing shell approval and sandbox policies remain
-in force; no MCP-specific permission exception is added. Claude uses the configured permission mode. Coordinators run without LSP;
-coding launches do not inherit coordinator compaction settings.
+in force; no MCP-specific permission exception is added. Claude uses the configured permission mode. The lead TPM runs without LSP;
+coding launches do not inherit its compaction setting.
 
 | Allocation | Components |
 |---|---|

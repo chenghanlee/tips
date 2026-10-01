@@ -47,12 +47,6 @@ kind = "claude"
 model = "fable"
 effort = "high"
 
-[roles.tpm]
-kind = "claude"
-model = "fable"
-effort = "medium"
-compaction_percent = 35
-
 [roles.lead_tpm]
 kind = "claude"
 model = "fable"

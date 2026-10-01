@@ -87,11 +87,10 @@ class Arguments(argparse.Namespace):
     task: str
     team: int
     pane: str
-    agent: str | None
-    role: str | None
-    kind: str | None
+    role: str
     review_ref: str | None
     start: bool
+    restart: bool
     force: bool
     ui: bool
 
@@ -105,11 +104,7 @@ def parse_arguments() -> Arguments:
     parser.add_argument("task")
     parser.add_argument("--team", required=True, type=int)
     parser.add_argument("--pane", required=True)
-    parser.add_argument("--agent")
-    parser.add_argument("--role", choices=["dev", "lead", "test"])
-    parser.add_argument(
-        "--kind", choices=["codex", "claude"], help="Must match the configured role kind"
-    )
+    parser.add_argument("--role", required=True, choices=["dev", "lead", "test"])
     parser.add_argument("--review-ref")
     parser.add_argument(
         "--ui",
@@ -118,27 +113,25 @@ def parse_arguments() -> Arguments:
     )
     parser.add_argument("--start", action="store_true")
     parser.add_argument(
+        "--restart",
+        action="store_true",
+        help="Stop this role's client in its existing worktree, verify its exit, then launch",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Replace differing selected-client configuration while no client is running",
     )
-    return parser.parse_args(namespace=Arguments())
+    args = parser.parse_args(namespace=Arguments())
+    args.start = args.start or args.restart
+    return args
 
 
-def validate_arguments(args: Arguments) -> tuple[str, str]:
+def validate_arguments(args: Arguments) -> None:
     if not re.fullmatch(r"[0-9]+-[a-z0-9]+(?:-[a-z0-9]+)*", args.task):
         raise RefusalError("Task must be <issue>-<slug>.")
     if not re.fullmatch(r"w[A-Za-z0-9]+:p[A-Za-z0-9]+", args.pane):
         raise RefusalError("Invalid Herdr pane ID.")
-    inferred = re.fullmatch(r"team-([0-9]+)-(dev|lead|test)", args.agent or "")
-    role_name = args.role or (inferred.group(2) if inferred else "dev")
-    if inferred and (int(inferred.group(1)) != args.team or inferred.group(2) != role_name):
-        raise RefusalError("Agent name must match its requested team and role.")
-    agent_name = args.agent or f"team-{args.team}-{role_name}"
-    if not re.fullmatch(r"[a-z][a-z0-9_-]{0,31}", agent_name):
-        raise RefusalError("Invalid Herdr agent name.")
-
-    return role_name, agent_name
 
 
 class WorktreeTask:
@@ -162,11 +155,13 @@ class WorktreeTask:
 
     def __init__(self, args: Arguments) -> None:
         self.args = args
-        self.role_name, self.agent_name = validate_arguments(self.args)
+        validate_arguments(self.args)
+        self.role_name = self.args.role
+        self.agent_name = f"team-{self.args.team}-{self.role_name}"
         self.root = Path(git("rev-parse", "--path-format=absolute", "--git-common-dir")).parent
         if Path.cwd() != self.root:
             raise RefusalError(f"Run from the main checkout: {self.root}")
-        require_git_admin(self.root / ".git", f"team-{self.args.team}-tpm")
+        require_git_admin(self.root / ".git")
         self.config_path = Path(
             os.environ.get("TIPS_TEAM_CONFIG", str(self.root / "agent/teams/config.toml"))
         ).resolve()
@@ -218,8 +213,6 @@ class WorktreeTask:
         return "lead_ui"
 
     def check_settings(self) -> None:
-        if self.kind not in ("codex", "claude") or (self.args.kind and self.args.kind != self.kind):
-            raise RefusalError("--kind must match the configured role.kind.")
         if not 1 <= self.args.team <= self.team["max_teams"]:
             raise RefusalError(f"Team must be between 1 and {self.team['max_teams']}.")
 
@@ -506,6 +499,11 @@ enabled = true
                 )
 
     def reuse_or_stop_owner(self) -> bool:
+        if self.args.restart:
+            if not self.old_head:
+                raise RefusalError("--restart needs this role's existing worktree; use --start.")
+            # Also with no listed owner: a refused stop may already have ended the client.
+            return self.stop_owner()
         if self.owner is None:
             return False
         if not self.old_head:
@@ -520,9 +518,15 @@ enabled = true
         if self.role_name == "lead" or not self.args.start:
             return self.advance_in_place()
         # An explicit --start on a running tester replaces it with a fresh session.
+        return self.stop_owner()
+
+    def stop_owner(self) -> bool:
+        """Stop the running client under team.stop's guards; a fresh one is launched next."""
         stop_agent(self.args.pane, str(self.worktree))
         # A final save during shutdown must block checkout advancement.
-        if git("-C", self.worktree, "status", "--porcelain", "--untracked-files=all"):
+        if self.review_sha and git(
+            "-C", self.worktree, "status", "--porcelain", "--untracked-files=all"
+        ):
             raise RefusalError("Review checkout became dirty during shutdown; preserving it.")
         return False
 
