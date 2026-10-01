@@ -835,7 +835,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert self.git("-C", str(wt), "rev-parse", "HEAD") == head
         assert self.git("-C", str(wt), "branch", "--show-current") == "task/29-dev"
 
-    def test_refused_restart_stop_preserves_the_session_and_launches_nothing(self) -> None:
+    def test_refused_restart_stop_launches_nothing(self) -> None:
         self.call("--start")
         s = self.state()
         s["stop_fails"] = True
@@ -845,7 +845,36 @@ class WorktreeIntegrationTest(unittest.TestCase):
         events = self.state()["events"][before:]
         assert any(e[0] == "stop_agent" for e in events)
         assert not any(e[:2] in (["agent", "start"], ["pane", "run"]) for e in events)
-        assert [a["name"] for a in self.state()["agents"]] == ["team-3-lead"]
+
+    def test_restart_retry_after_the_client_is_gone_still_passes_the_stop_guard(self) -> None:
+        self.call("--start", role="dev", task="29-dev", ref=False)
+        # A refused stop can end the client and leave its children: no owner is listed.
+        s = self.state()
+        s["agents"] = []
+        s["stop_fails"] = True
+        self.save(s)
+        before = len(self.state()["events"])
+        self.call("--restart", role="dev", task="29-dev", ref=False, ok=False)
+        events = self.state()["events"][before:]
+        assert any(e[0] == "stop_agent" for e in events)
+        assert not any(e[:2] in (["agent", "start"], ["pane", "run"]) for e in events)
+        s = self.state()
+        s["stop_fails"] = False
+        self.save(s)
+        before = len(self.state()["events"])
+        self.call("--restart", role="dev", task="29-dev", ref=False)
+        events = self.state()["events"][before:]
+        stopped, launched = (
+            next(i for i, e in enumerate(events) if e[: len(key)] == key)
+            for key in (["stop_agent"], ["agent", "start"])
+        )
+        assert stopped < launched
+
+    def test_restart_needs_the_existing_worktree(self) -> None:
+        result = self.call("--restart", role="dev", task="29-dev", ref=False, ok=False)
+        assert "use --start" in result.stderr
+        assert not (self.root / ".worktrees/29-dev").exists()
+        assert not any(e[0] == "stop_agent" for e in self.state()["events"])
 
     def test_last_edit_during_shutdown_prevents_advance(self) -> None:
         task, wt = "28-review-team-3-test", self.root / ".worktrees/28-review-team-3-test"

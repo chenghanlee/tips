@@ -115,7 +115,7 @@ def parse_arguments() -> Arguments:
     parser.add_argument(
         "--restart",
         action="store_true",
-        help="Stop this role's running client, verify its exit, then launch a fresh one",
+        help="Stop this role's client in its existing worktree, verify its exit, then launch",
     )
     parser.add_argument(
         "--force",
@@ -499,12 +499,15 @@ enabled = true
                 )
 
     def reuse_or_stop_owner(self) -> bool:
+        if self.args.restart:
+            if not self.old_head:
+                raise RefusalError("--restart needs this role's existing worktree; use --start.")
+            # Also with no listed owner: a refused stop may already have ended the client.
+            return self.stop_owner()
         if self.owner is None:
             return False
         if not self.old_head:
             raise RefusalError("Live session has no matching Git worktree.")
-        if self.args.restart:
-            return self.stop_owner()
         if self.changed:
             raise RefusalError(
                 "Client configuration changed while its session is running; "
