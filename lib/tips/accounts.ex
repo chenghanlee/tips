@@ -184,6 +184,19 @@ defmodule Tips.Accounts do
 
   ## User registration
 
+  @handle_words ~w(amber birch cedar cloud coral delta ember fern harbor heron juniper
+                   lake maple meadow orbit pebble pine river sage slate spruce stone tide willow)
+
+  @doc """
+  Suggests a handle: a neutral word and a random four-digit suffix, such as
+  `"maple-4821"`.
+
+  It reserves nothing and does not check availability: the unique index decides
+  at registration.
+  """
+  @spec suggest_handle() :: String.t()
+  def suggest_handle, do: "#{Enum.random(@handle_words)}-#{Enum.random(1000..9999)}"
+
   @doc """
   Registers a user.
 
