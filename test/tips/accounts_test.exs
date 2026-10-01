@@ -267,6 +267,12 @@ defmodule Tips.AccountsTest do
       # one time use only
       assert {:error, :not_found} = Accounts.login_user_by_magic_link(encoded_token)
     end
+
+    test "returns not found for tokens that are not valid Base64" do
+      for token <- ["%", "a"] do
+        assert {:error, :not_found} = Accounts.login_user_by_magic_link(token)
+      end
+    end
   end
 
   describe "delete_user_session_token/1" do

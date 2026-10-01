@@ -294,21 +294,24 @@ defmodule Tips.Accounts do
      delete all of them for best security practices.
   """
   def login_user_by_magic_link(token) do
-    {:ok, query} = UserToken.verify_magic_link_token_query(token)
-
-    case Repo.one(query) do
-      {%User{confirmed_at: nil} = user, _token} ->
-        user
-        |> User.confirm_changeset()
-        |> update_user_and_delete_all_tokens()
-
-      {user, token} ->
-        Repo.delete!(token)
-        {:ok, {user, []}}
-
-      nil ->
-        {:error, :not_found}
+    with {:ok, query} <- UserToken.verify_magic_link_token_query(token),
+         {user, user_token} <- Repo.one(query) do
+      log_in_by_magic_link(user, user_token)
+    else
+      # :error is an undecodable token, nil an unknown or expired one
+      result when result in [:error, nil] -> {:error, :not_found}
     end
+  end
+
+  defp log_in_by_magic_link(%User{confirmed_at: nil} = user, _user_token) do
+    user
+    |> User.confirm_changeset()
+    |> update_user_and_delete_all_tokens()
+  end
+
+  defp log_in_by_magic_link(user, user_token) do
+    Repo.delete!(user_token)
+    {:ok, {user, []}}
   end
 
   @doc ~S"""
