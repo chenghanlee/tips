@@ -20,6 +20,7 @@ from team import (
     Config,
     Entity,
     HerdrResult,
+    Role,
     execute,
     load_config,
     occupant,
@@ -145,7 +146,7 @@ class WorktreeTask:
     root: Path
     config_path: Path
     config: Config
-    role: CodingRole
+    role: Role
     role_name: str
     agent_name: str
     issue: str
@@ -175,14 +176,16 @@ class WorktreeTask:
             self.config["timeouts"],
             self.config["launch"],
         )
-        self.role = cast(CodingRole, self.config["roles"][self.role_key()])
+        self.role = self.config["roles"][self.role_key()]
+        # A UI lead replaces only the client: the port and database stay the lead's.
+        partition = cast(CodingRole, self.config["roles"][self.role_name])
         self.kind = self.role["kind"]
         self.check_settings()
         self.model, self.effort = (self.role["model"], self.role["effort"])
         self.port = (
             self.team["port_base"]
             + self.team["port_stride"] * self.args.team
-            + self.role["port_offset"]
+            + partition["port_offset"]
         )
         if not 1 <= self.port <= 65535:
             raise RefusalError("Configured role port is outside the TCP port range.")
@@ -190,7 +193,7 @@ class WorktreeTask:
             "PGPORT": str(self.team["postgres_port"]),
             "TIPS_DB_SUFFIX": self.team["db_suffix_prefix"]
             + str(self.args.team)
-            + self.role["db_suffix"],
+            + partition["db_suffix"],
             "TIPS_TEST_PORT": str(self.port),
             "MIX_ENV": "test",
             "TIPS_CHECK_TIMEOUT_SECONDS": str(self.timeouts["checks_minutes"] * 60),
@@ -344,7 +347,6 @@ enabled = true
 [plugins."mix-credo@elixir-agent-tools"]
 enabled = true
 """
-            config += '\n[plugins."elixir-lsp@elixir-agent-tools"]\nenabled = false\n'
             self.desired[self.worktree / ".codex/config.toml"] = config
         else:
             seconds = self.timeouts["dexter_startup_seconds"]

@@ -826,14 +826,26 @@ class TeamLifecycleTest(unittest.TestCase):
         assert "Read agent/teams/README.md" in prompt
         assert "task_worktree.py" not in prompt
 
-    def test_lead_ui_must_share_lead_partition(self) -> None:
+    def test_lead_ui_needs_client_settings_only_and_retirement_drops_the_lead_partition(
+        self,
+    ) -> None:
         (self.repo / "agent/teams/config.toml").write_text(
             CONFIG + '\n[roles.lead_ui]\nkind = "claude"\nmodel = ""\neffort = "high"\n'
-            'db_suffix = "l"\nport_offset = 1\n'
         )
         r = self.run_team("start", "1")
-        assert r.returncode != 0
-        assert "roles.lead_ui must share" in r.stderr
+        assert r.returncode == 0, r.stderr
+        state = json.loads(self.state.read_text())
+        state["panes"][0].pop("agent")
+        self.state.write_text(json.dumps(state))
+        (self.bin / "docker").write_text(
+            '#!/bin/sh\nprintf "%s\\n" "$*" >> "$DOCKER_LOG"\ncase "$*" in *SELEC'
+            'T*) printf "tips_test_t1l\\ntips_test_t2l\\n";; esac\n'
+        )
+        r = self.run_team("stop", "1")
+        assert r.returncode == 0, r.stderr
+        calls = (self.root / "docker-calls").read_text()
+        assert 'DROP DATABASE "tips_test_t1l"' in calls
+        assert 'DROP DATABASE "tips_test_t2l"' not in calls
 
     def test_lead_start_applies_config_but_has_no_stop_subcommand(self) -> None:
         r = self.run_team("start", "lead")

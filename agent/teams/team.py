@@ -86,7 +86,6 @@ ProcessRows = dict[int, tuple[int, str]]
 # Disable alternate language paths in launched clients, without editing user settings.
 NATIVE_LSP_PLUGINS = {
     "elixir-lsp@elixir-agent-tools": False,
-    "elixir-ls@skills-dir": False,
     "dexter-lsp@dexter": False,
 }
 main: Path
@@ -367,7 +366,7 @@ def validate_config_fields(path: Path, value: Config) -> None:
     for name in ("dev", "test", "lead", "tpm", "lead_tpm"):
         validate_role_fields(roles.get(name), f"{path}: roles.{name}", name)
     if "lead_ui" in roles:
-        validate_role_fields(roles["lead_ui"], f"{path}: roles.lead_ui", "lead")
+        validate_role_fields(roles["lead_ui"], f"{path}: roles.lead_ui", "lead_ui")
 
 
 def validate_role_fields(value: object, label: str, name: str) -> None:
@@ -397,18 +396,6 @@ def validate_settings(path: Path, value: Config) -> None:
         role = value["roles"].get(name)
         if role is not None and role["kind"] not in ("codex", "claude"):
             raise RuntimeError(f"{path}: invalid role {name}")
-    validate_lead_ui(path, value)
-
-
-def validate_lead_ui(path: Path, value: Config) -> None:
-    """The UI lead replaces the lead for one issue, so it must share the lead's partition."""
-    ui = value["roles"].get("lead_ui")
-    if ui is None:
-        return
-    lead = cast(CodingRole, value["roles"]["lead"])
-    ui = cast(CodingRole, ui)
-    if ui["port_offset"] != lead["port_offset"] or ui["db_suffix"] != lead["db_suffix"]:
-        raise RuntimeError(f"{path}: roles.lead_ui must share roles.lead port_offset and db_suffix")
 
 
 def validate_allocations(path: Path, value: Config) -> None:

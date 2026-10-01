@@ -104,6 +104,17 @@ the proxy afterwards.
   the worktree. Do not use `dexter.sh stop` to hurry this: it refuses while
   the query is attached, and retirement runs it anyway. Measured with the
   real binary and stop code against a Herdr fixture, not a live client.
+  The same refusal and retry apply to any `query` that starts the daemon, in
+  either client, for example the first one after the daemon idled out.
+
+Open decision: native LSP stays Claude's default. The CLI path is required
+for Codex, so the native path is the extra one. The first pilot runs the same
+navigation tasks through both, against the same acceptance criteria:
+navigation success including ignored dependencies, elapsed time, tool calls,
+output size, shell permission friction, and start and recovery, with the same
+tolerated cold-start refusal and retry for both. Native stays if it measures
+better; a genuine tie moves Claude to the CLI and removes the generated
+plugin. Missing or inconclusive measurements are not a tie.
 
 ## Operations
 

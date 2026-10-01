@@ -490,8 +490,11 @@ class WorktreeIntegrationTest(unittest.TestCase):
         plugins = json.loads(argv[argv.index("--settings") + 1])["enabledPlugins"]
         assert plugins["mix-compile@elixir-agent-tools"] is True
         assert plugins["mix-credo@elixir-agent-tools"] is True
-        for name in ("elixir-lsp@elixir-agent-tools", "elixir-ls@skills-dir", "dexter-lsp@dexter"):
-            assert plugins[name] is False
+        # Only language servers a supported installation can provide are disabled.
+        assert {name for name, enabled in plugins.items() if not enabled} == {
+            "elixir-lsp@elixir-agent-tools",
+            "dexter-lsp@dexter",
+        }
         plugin = self.wt / ".dexter/claude-plugin"
         server = json.loads((plugin / ".claude-plugin/plugin.json").read_text())["lspServers"][
             "dexter"
@@ -604,11 +607,12 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call("--ui", ok=False)
         (self.root / "agent/teams/config.toml").write_text(
             CONFIG + '\n[roles.lead_ui]\nkind = "claude"\nmodel = "fixture-ui"\neffort = "high"\n'
-            'db_suffix = "l"\nport_offset = 2\n'
         )
         self.call("--ui", "--start")
         assert "fixture-ui" in self.state()["launch_argv"]
+        # The UI lead changes the client only; port and database stay the lead's.
         assert self.state()["launch_env"]["TIPS_TEST_PORT"] == "4132"
+        assert self.state()["launch_env"]["TIPS_DB_SUFFIX"] == "_t3l"
         p = self.call("--ui", role="dev", task="29-dev", ref=False, ok=False)
         assert "--ui applies only to the lead role" in p.stderr
         self.commit("next")
@@ -976,13 +980,14 @@ class WorktreeIntegrationTest(unittest.TestCase):
         ]
         assert self.state()["dexter_stdlib"] == str(self.root / "fixture-stdlib/lib")
 
-    def test_codex_disables_old_lsp_without_changing_approval_policy(self) -> None:
+    def test_codex_config_names_no_language_server_and_keeps_approval_policy(self) -> None:
         self.call("--start")
         cfg = tomllib.loads((self.wt / ".codex/config.toml").read_text())
         assert "mcp_servers" not in cfg
-        assert cfg["plugins"]["elixir-lsp@elixir-agent-tools"] == {"enabled": False}
-        assert "elixir-ls@skills-dir" not in cfg["plugins"]
-        assert "dexter-lsp@dexter" not in cfg["plugins"]
+        assert set(cfg["plugins"]) == {
+            "mix-compile@elixir-agent-tools",
+            "mix-credo@elixir-agent-tools",
+        }
         assert "mcp_servers.elixir-lsp.enabled=false" not in self.state()["launch_argv"]
         assert "approval_policy" not in cfg
         assert "never" in self.state()["launch_argv"]

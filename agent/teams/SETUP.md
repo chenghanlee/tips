@@ -61,7 +61,7 @@ Do not run it while another live agent owns `lead-tpm`. The lead TPM starts and 
 
 ## Configuration
 
-Edit [config.toml](config.toml): team limits; client/model/effort per role; port/database allocation; permissions; coordinator compaction; time budgets. Scripts read the canonical main checkout's file. Use `TIPS_TEAM_CONFIG=/absolute/path` for staged configuration in a disposable pilot. Settings apply next launch. `timeouts.dexter_startup_seconds` bounds the index wait of the provisioning warm-up and of each Claude LSP start; it does not require rebuilding Dexter.
+Edit [config.toml](config.toml): team limits; client/model/effort per role; port/database allocation; permissions; coordinator compaction; time budgets. Scripts read the canonical main checkout's file. Use `TIPS_TEAM_CONFIG=/absolute/path` for staged configuration in a disposable pilot. Settings apply next launch. `timeouts.dexter_startup_seconds` bounds the index wait of the provisioning warm-up and of each Claude LSP start; it does not require rebuilding Dexter. The same value limits Elixir version detection and the daemon stop at retirement: a run that exceeds it is ended, even a valid slow one. `roles.lead_ui` sets the client, model and effort only; a UI lead uses `roles.lead`'s port and database.
 
 Codex uses the generated `$TIPS_DEXTER` command; Claude uses its native LSP tool
 through the generated plugin. Existing shell approval and sandbox policies remain
