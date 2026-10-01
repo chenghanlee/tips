@@ -816,6 +816,37 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert self.git("-C", str(wt), "branch", "--show-current") == "task/29-dev"
         assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 2
 
+    def test_restart_stops_a_running_developer_then_relaunches_with_work_untouched(self) -> None:
+        self.call("--start", role="dev", task="29-dev", ref=False)
+        wt = self.root / ".worktrees/29-dev"
+        (wt / "tracked.txt").write_text("unfinished work\n")
+        head = self.git("-C", str(wt), "rev-parse", "HEAD")
+        before = len(self.state()["events"])
+        self.call("--restart", role="dev", task="29-dev", ref=False)
+        events = self.state()["events"][before:]
+        stopped, setup, launched = (
+            next(i for i, e in enumerate(events) if e[: len(key)] == key)
+            for key in (["stop_agent"], ["pane", "run"], ["agent", "start"])
+        )
+        assert events[stopped] == ["stop_agent", "wA:pB", str(wt), head]
+        # The exit is verified first; the fresh client then gets its environment again.
+        assert stopped < setup < launched
+        assert (wt / "tracked.txt").read_text() == "unfinished work\n"
+        assert self.git("-C", str(wt), "rev-parse", "HEAD") == head
+        assert self.git("-C", str(wt), "branch", "--show-current") == "task/29-dev"
+
+    def test_refused_restart_stop_preserves_the_session_and_launches_nothing(self) -> None:
+        self.call("--start")
+        s = self.state()
+        s["stop_fails"] = True
+        self.save(s)
+        before = len(self.state()["events"])
+        self.call("--restart", ok=False)
+        events = self.state()["events"][before:]
+        assert any(e[0] == "stop_agent" for e in events)
+        assert not any(e[:2] in (["agent", "start"], ["pane", "run"]) for e in events)
+        assert [a["name"] for a in self.state()["agents"]] == ["team-3-lead"]
+
     def test_last_edit_during_shutdown_prevents_advance(self) -> None:
         task, wt = "28-review-team-3-test", self.root / ".worktrees/28-review-team-3-test"
         self.call("--start", role="test", task=task)

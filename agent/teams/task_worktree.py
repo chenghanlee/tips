@@ -90,6 +90,7 @@ class Arguments(argparse.Namespace):
     role: str
     review_ref: str | None
     start: bool
+    restart: bool
     force: bool
     ui: bool
 
@@ -112,11 +113,18 @@ def parse_arguments() -> Arguments:
     )
     parser.add_argument("--start", action="store_true")
     parser.add_argument(
+        "--restart",
+        action="store_true",
+        help="Stop this role's running client, verify its exit, then launch a fresh one",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Replace differing selected-client configuration while no client is running",
     )
-    return parser.parse_args(namespace=Arguments())
+    args = parser.parse_args(namespace=Arguments())
+    args.start = args.start or args.restart
+    return args
 
 
 def validate_arguments(args: Arguments) -> None:
@@ -495,6 +503,8 @@ enabled = true
             return False
         if not self.old_head:
             raise RefusalError("Live session has no matching Git worktree.")
+        if self.args.restart:
+            return self.stop_owner()
         if self.changed:
             raise RefusalError(
                 "Client configuration changed while its session is running; "
@@ -505,9 +515,15 @@ enabled = true
         if self.role_name == "lead" or not self.args.start:
             return self.advance_in_place()
         # An explicit --start on a running tester replaces it with a fresh session.
+        return self.stop_owner()
+
+    def stop_owner(self) -> bool:
+        """Stop the running client under team.stop's guards; a fresh one is launched next."""
         stop_agent(self.args.pane, str(self.worktree))
         # A final save during shutdown must block checkout advancement.
-        if git("-C", self.worktree, "status", "--porcelain", "--untracked-files=all"):
+        if self.review_sha and git(
+            "-C", self.worktree, "status", "--porcelain", "--untracked-files=all"
+        ):
             raise RefusalError("Review checkout became dirty during shutdown; preserving it.")
         return False
 

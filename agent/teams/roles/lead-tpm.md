@@ -89,7 +89,7 @@ After Herdr restore, run `herdr agent list`. If your pane has no name, run `herd
 
 A client keeps the environment and root it was launched with; the helper never changes a running client. Before acting, inspect Git and pane evidence under shared Recovery; never reset or stash anyone's work.
 
-- Running client with missing or wrong launch variables: rerunning its helper command at the same SHA only reports the session. Have it record shared Recovery state at a handoff, then ask the user to exit that client. Confirm with `herdr pane process-info --pane <pane>` that only the shell remains, then rerun the role command with `--start` on the same task or SHA. The helper refuses a pane that still holds a client.
+- Running client with missing or wrong launch variables: rerunning its helper command at the same SHA only reports the session. After it records shared Recovery state at a handoff, rerun the role command with `--restart` on the same task or SHA. The helper stops that client, verifies that it and its child processes exited, then launches a fresh one; a developer's branch and uncommitted work stay as they are. A refused stop preserves everything: wait for the named processes to exit and retry, or report the refusal to the user. If your client denies the command, the user exits that client; never bypass.
 - Absent client: rerun the role command with `--start`. Reviewers start at the current head; a developer restarts on its existing branch and worktree, unchanged.
 - Running tester at same SHA: helper reuses, never replaces. Rejected design: use `--start` at new head to stop old client and verify descendant exit.
 
