@@ -20,6 +20,47 @@ defmodule TipsWeb.UserAuthTest do
     %{user: %{user_fixture() | authenticated_at: DateTime.utc_now(:second)}, conn: conn}
   end
 
+  describe "allowed_return_to/1" do
+    test "admits only the root and the four editor route shapes" do
+      for path <- [
+            "/",
+            "/editor/tips/new",
+            "/editor/tips/42/edit",
+            "/editor/tips/7/reviews/new",
+            "/editor/reviews/9/edit",
+            "/editor/tips/9223372036854775807/edit",
+            "/editor/tips/9223372036854775807/reviews/new",
+            "/editor/reviews/9223372036854775807/edit"
+          ] do
+        assert UserAuth.allowed_return_to(path) == path
+      end
+
+      for path <- [
+            nil,
+            "",
+            42,
+            "https://evil.example/",
+            "//evil.example",
+            "/\\evil.example",
+            "/%2F%2Fevil.example",
+            "/editor/tips/new?x=1",
+            "/editor/tips/new#frag",
+            "/editor/tips/new/",
+            "/editor/tips/0/edit",
+            "/editor/tips/-1/edit",
+            "/editor/tips/01/edit",
+            "/editor/tips/abc/edit",
+            "/editor/tips/1/reviews/2/edit",
+            "/editor/tips/new\n",
+            "/editor/tips/new\u0000",
+            "/users/settings",
+            "/tips/1/slug"
+          ] do
+        assert UserAuth.allowed_return_to(path) == nil, "admitted #{inspect(path)}"
+      end
+    end
+  end
+
   describe "log_in_user/3" do
     test "stores the user token in the session", %{conn: conn, user: user} do
       conn = UserAuth.log_in_user(conn, user)
