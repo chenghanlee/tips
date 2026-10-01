@@ -5,8 +5,8 @@ defmodule Tips.Content do
   ## Publication and edit contract
 
   These operations are reserved. They do not exist yet: #73 implements
-  publication, #74 edits, #72 the comparator and #65 media claims. Their
-  inputs and results are the types below.
+  publication, #74 edits and #65 media claims. Their inputs and results are
+  the types below. The comparator exists: `compare_intents/3`.
 
     * `publish_tip(scope, submission_key, attrs, uploads)` returns
       `{:ok, t:publication_receipt/0}` or `{:error, t:publication_error/0}`.
@@ -163,7 +163,7 @@ defmodule Tips.Content do
   """
 
   alias Tips.Accounts
-  alias Tips.Content.Projection
+  alias Tips.Content.{Intent, Projection}
 
   @typedoc "A content kind."
   @type kind :: :tip | :review
@@ -318,4 +318,33 @@ defmodule Tips.Content do
           | :media_changes
           | :media_cleanup_jobs
           | :review_notification
+
+  @doc """
+  Compares two editable intents of one `kind`: a saved intent or edit base
+  against a submitted one, or an editor's original base against the latest.
+
+  Each side is a `t:intent/0`, possibly incomplete, or `nil`. Only the kind's
+  editable fields and the ordered selection count; any other key is ignored.
+
+    * `:equivalent`: both are complete and would save the same content.
+    * `:different`: both are complete and at least one editable value differs.
+    * `:unknown`: either side is `nil`, lacks a field or the selection, or has
+      an `:image_file`, `:missing_image` or malformed value. This wins over
+      any difference.
+
+  This compares; it does not validate fields, check media ownership or
+  authorize a write. See "Complete intent and comparison" above.
+
+      iex> attrs = %{body: "Worked", model_id: nil, model_other: nil,
+      ...>           environment_id: nil, prompt: " ", output: nil}
+      iex> saved = %{attrs: %{attrs | prompt: nil}, uploads: [{:retained, 12, nil}]}
+      iex> Tips.Content.compare_intents(:review, saved, %{attrs: attrs, uploads: [{:staged_video, 12}]})
+      :equivalent
+      iex> Tips.Content.compare_intents(:review, saved, %{attrs: attrs, uploads: []})
+      :different
+      iex> Tips.Content.compare_intents(:review, saved, %{attrs: attrs, uploads: nil})
+      :unknown
+  """
+  @spec compare_intents(kind(), intent() | map() | nil, intent() | map() | nil) :: comparison()
+  defdelegate compare_intents(kind, saved_or_base, submitted), to: Intent, as: :compare
 end
