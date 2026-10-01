@@ -5285,6 +5285,445 @@ index 3495319..1c4a1cd 100644
  
  	// col 16 is on admin_url inside the interpolation
  	h := hoverAt(t, server, fileURI, 4, 16)
+diff --git a/internal/lsp/implementation_callback_test.go b/internal/lsp/implementation_callback_test.go
+new file mode 100644
+index 0000000..a3bd763
+--- /dev/null
++++ b/internal/lsp/implementation_callback_test.go
+@@ -0,0 +1,122 @@
++package lsp
++
++import (
++	"context"
++	"path/filepath"
++	"slices"
++	"strings"
++	"testing"
++
++	"go.lsp.dev/protocol"
++	"go.lsp.dev/uri"
++)
++
++// implementationAt runs Implementation on the first line containing marker,
++// with the cursor on name.
++func implementationAt(t *testing.T, server *Server, rel, source, marker, name string) []string {
++	t.Helper()
++	for line, text := range strings.Split(source, "\n") {
++		if !strings.Contains(text, marker) {
++			continue
++		}
++		locations, err := server.Implementation(context.Background(), &protocol.ImplementationParams{
++			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
++				TextDocument: protocol.TextDocumentIdentifier{URI: uri.File(filepath.Join(server.projectRoot, rel))},
++				Position:     protocol.Position{Line: uint32(line), Character: uint32(strings.Index(text, name))},
++			},
++		})
++		if err != nil {
++			t.Fatal(err)
++		}
++		return locationKeys(server.projectRoot, locations)
++	}
++	t.Fatalf("no line contains %q", marker)
++	return nil
++}
++
++// A behaviour declares callback cast/1 and offers an ordinary cast/2. Only the
++// callback head asks for implementations.
++func TestImplementationOnlyFromCallbackHead(t *testing.T) {
++	server, cleanup := setupTestServer(t)
++	t.Cleanup(cleanup)
++	const contract = `defmodule Sample.Type do
++  @callback cast(term()) :: term()
++  def cast(value), do: value
++  def cast(type, value), do: {type, value}
++end
++`
++	indexFile(t, server.store, server.projectRoot, "lib/type.ex", contract)
++	indexFile(t, server.store, server.projectRoot, "lib/impl.ex", `defmodule Sample.Impl do
++  @behaviour Sample.Type
++  def cast(value), do: value
++  def cast(type, value), do: {type, value}
++end
++`)
++	// The CLI asks about files no editor opened: the first request loads it.
++	if _, _, release, open := server.docs.GetTree(string(uri.File(filepath.Join(server.projectRoot, "lib", "type.ex")))); open {
++		release()
++		t.Fatal("lib/type.ex is already open; want a cold first request")
++	}
++	if got, want := implementationAt(t, server, "lib/type.ex", contract, "@callback cast", "cast"), []string{"lib/impl.ex:3"}; !slices.Equal(got, want) {
++		t.Errorf("@callback cast/1 = %v, want %v", got, want)
++	}
++	for _, marker := range []string{"def cast(value)", "def cast(type, value)"} {
++		if got := implementationAt(t, server, "lib/type.ex", contract, marker, "cast"); len(got) != 0 {
++			t.Errorf("ordinary head %q = %v, want empty", marker, got)
++		}
++	}
++}
++
++// Two callbacks share a name; each head selects its own arity, whichever
++// comes first in the source.
++func TestImplementationCallbackHeadArity(t *testing.T) {
++	one := "  @callback run(term()) :: term()\n"
++	two := "  @callback run(term(), term()) :: term()\n"
++	for label, heads := range map[string]string{"one_first": one + two, "two_first": two + one} {
++		t.Run(label, func(t *testing.T) {
++			server, cleanup := setupTestServer(t)
++			t.Cleanup(cleanup)
++			contract := "defmodule Sample.Contract do\n" + heads + "end\n"
++			indexFile(t, server.store, server.projectRoot, "lib/contract.ex", contract)
++			indexFile(t, server.store, server.projectRoot, "lib/worker.ex", `defmodule Sample.Worker do
++  @behaviour Sample.Contract
++  def run(value), do: value
++  def run(a, b), do: {a, b}
++end
++`)
++			for marker, want := range map[string]string{"@callback run(term())": "lib/worker.ex:3", "@callback run(term(), term())": "lib/worker.ex:4"} {
++				if got := implementationAt(t, server, "lib/contract.ex", contract, marker, "run"); !slices.Equal(got, []string{want}) {
++					t.Errorf("%s = %v, want [%s]", marker, got, want)
++				}
++			}
++		})
++	}
++}
++
++// A zero-arity callback may omit the parentheses. A name in a callback's
++// return type is a type, not a callback head.
++func TestImplementationZeroArityCallbackHead(t *testing.T) {
++	server, cleanup := setupTestServer(t)
++	t.Cleanup(cleanup)
++	const contract = `defmodule Sample.Kind do
++  @callback type :: name
++  @callback name() :: atom()
++end
++`
++	indexFile(t, server.store, server.projectRoot, "lib/kind.ex", contract)
++	indexFile(t, server.store, server.projectRoot, "lib/kinded.ex", `defmodule Sample.Kinded do
++  @behaviour Sample.Kind
++  def type, do: :atom
++  def name, do: :sample
++end
++`)
++	if got, want := implementationAt(t, server, "lib/kind.ex", contract, "@callback type", "type"), []string{"lib/kinded.ex:3"}; !slices.Equal(got, want) {
++		t.Errorf("@callback type = %v, want %v", got, want)
++	}
++	if got, want := implementationAt(t, server, "lib/kind.ex", contract, "@callback name()", "name"), []string{"lib/kinded.ex:4"}; !slices.Equal(got, want) {
++		t.Errorf("@callback name() = %v, want %v", got, want)
++	}
++	if got := implementationAt(t, server, "lib/kind.ex", contract, ":: name", "name"); len(got) != 0 {
++		t.Errorf("return type name = %v, want empty", got)
++	}
++}
+diff --git a/internal/lsp/implementation_membership_test.go b/internal/lsp/implementation_membership_test.go
+new file mode 100644
+index 0000000..82c893a
+--- /dev/null
++++ b/internal/lsp/implementation_membership_test.go
+@@ -0,0 +1,305 @@
++package lsp
++
++import (
++	"context"
++	"path/filepath"
++	"slices"
++	"strings"
++	"testing"
++
++	"go.lsp.dev/protocol"
++	"go.lsp.dev/uri"
++)
++
++const membershipViewSource = `defmodule Sample.View do
++  @callback render(term()) :: term()
++
++  defmacro __using__(opts) do
++    quote bind_quoted: [opts: opts] do
++      @behaviour Sample.View
++    end
++  end
++end
++`
++
++// Declares the callback but its __using__ injects no @behaviour.
++const membershipHelpersSource = `defmodule Sample.Helpers do
++  @callback render(term()) :: term()
++
++  defmacro __using__(_opts) do
++    quote do
++      import Sample.Helpers
++    end
++  end
++end
++`
++
++var membershipFiles = map[string]string{
++	"lib/view.ex":    membershipViewSource,
++	"lib/helpers.ex": membershipHelpersSource,
++	"lib/web.ex": `defmodule Sample.Web do
++  def live_view do
++    quote do
++      use Sample.View
++    end
++  end
++
++  def controller do
++    quote do
++      import Sample.Web
++    end
++  end
++
++  def html do
++    quote do
++      import Sample.Web
++    end
++  end
++
++  def live_view_via do
++    quote do
++      use Sample.Web, :live_view
++    end
++  end
++
++  def loop_a do
++    quote do
++      use Sample.Web, :loop_b
++    end
++  end
++
++  def loop_b do
++    quote do
++      use Sample.Web, :loop_a
++    end
++  end
++
++  def render(value), do: value
++
++  defmacro __using__(which) when is_atom(which) do
++    apply(__MODULE__, which, [])
++  end
++end
++`,
++	"lib/plain_web.ex": `defmodule Sample.PlainWeb do
++  defmacro __using__(_opts) do
++    quote do
++      use Sample.View
++      def render(value), do: value
++    end
++  end
++end
++`,
++	"lib/declared.ex": `defmodule Sample.Declared do
++  @behaviour Sample.View
++  def render(value), do: value
++end
++`,
++	"lib/direct.ex": `defmodule Sample.Direct do
++  use Sample.View
++  def render(value), do: value
++end
++`,
++	"lib/wrapped_live.ex": `defmodule Sample.WrappedLive do
++  use Sample.Web, :live_view
++  def render(value), do: value
++end
++`,
++	"lib/wrapped_via.ex": `defmodule Sample.WrappedVia do
++  use Sample.Web, :live_view_via
++  def render(value), do: value
++end
++`,
++	"lib/aliased.ex": `defmodule Sample.Aliased do
++  alias Sample.Web
++  use Web, :live_view
++  def render(value), do: value
++end
++`,
++	"lib/plain_wrapped.ex": `defmodule Sample.PlainWrapped do
++  use Sample.PlainWeb
++  def render(value), do: value
++end
++`,
++	"lib/siblings.ex": `defmodule Sample.SibA do
++  use Sample.View
++  def render(value), do: value
++end
++
++defmodule Sample.SibB do
++  def render(value), do: value
++end
++`,
++	"lib/wrapped_controller.ex": `defmodule Sample.WrappedController do
++  use Sample.Web, :controller
++  def render(value), do: value
++end
++`,
++	"lib/wrapped_html.ex": `defmodule Sample.WrappedHTML do
++  use Sample.Web, :html
++  def render(value), do: value
++end
++`,
++	"lib/wrapped_unknown.ex": `defmodule Sample.WrappedUnknown do
++  use Sample.Web, :nope
++  def render(value), do: value
++end
++`,
++	"lib/wrapped_bare.ex": `defmodule Sample.WrappedBare do
++  use Sample.Web
++  def render(value), do: value
++end
++`,
++	"lib/wrapped_loop.ex": `defmodule Sample.WrappedLoop do
++  use Sample.Web, :loop_a
++  def render(value), do: value
++end
++`,
++	"lib/outer.ex": `defmodule Sample.Outer do
++  def render(value), do: value
++
++  defmodule Inner do
++    use Sample.View
++  end
++end
++`,
++	"lib/private.ex": `defmodule Sample.Private do
++  @behaviour Sample.View
++  defp render(value), do: value
++end
++`,
++	"lib/wrong_arity.ex": `defmodule Sample.WrongArity do
++  @behaviour Sample.View
++  def render(value, other), do: {value, other}
++end
++`,
++	"lib/unrelated.ex": `defmodule Sample.Unrelated do
++  def render(value), do: value
++end
++`,
++	"lib/pair.ex": `defmodule Sample.PairB do
++  @callback render(term()) :: term()
++  defmacro __using__(_opts) do
++    quote do
++      @behaviour Sample.PairB
++    end
++  end
++end
++
++defmodule Sample.PairC do
++  @callback render(term()) :: term()
++  defmacro __using__(_opts) do
++    quote do
++      @behaviour Sample.PairC
++    end
++  end
++end
++`,
++	"lib/pair_c_user.ex": `defmodule Sample.PairCUser do
++  use Sample.PairC
++  def render(value), do: value
++end
++`,
++	"lib/helpers_user.ex": `defmodule Sample.HelpersUser do
++  use Sample.Helpers
++  def render(value), do: value
++end
++`,
++}
++
++func setupMembershipFixture(t *testing.T) *Server {
++	t.Helper()
++	s, cleanup := setupTestServer(t)
++	t.Cleanup(cleanup)
++	for path, src := range membershipFiles {
++		indexFile(t, s.store, s.projectRoot, path, src)
++	}
++	return s
++}
++
++func membershipImplementationAt(t *testing.T, s *Server, rel, marker, name string) []string {
++	t.Helper()
++	src := membershipFiles[rel]
++	for line, text := range strings.Split(src, "\n") {
++		if !strings.Contains(text, marker) {
++			continue
++		}
++		u := string(uri.File(filepath.Join(s.projectRoot, rel)))
++		got, err := s.Implementation(context.Background(), &protocol.ImplementationParams{
++			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
++				TextDocument: protocol.TextDocumentIdentifier{URI: protocol.DocumentURI(u)},
++				Position:     protocol.Position{Line: uint32(line), Character: uint32(strings.Index(text, name))},
++			},
++		})
++		if err != nil {
++			t.Fatal(err)
++		}
++		return locationKeys(s.projectRoot, got)
++	}
++	t.Fatalf("missing marker %q in %s", marker, rel)
++	return nil
++}
++
++func TestImplementationMembershipFollowsSelectedUseChain(t *testing.T) {
++	s := setupMembershipFixture(t)
++	got := membershipImplementationAt(t, s, "lib/view.ex", "@callback render", "render")
++	want := []string{
++		"lib/aliased.ex:4",
++		"lib/declared.ex:3",
++		"lib/direct.ex:3",
++		"lib/plain_wrapped.ex:3",
++		"lib/siblings.ex:3",
++		"lib/wrapped_live.ex:3",
++		"lib/wrapped_via.ex:3",
++	}
++	if !slices.Equal(got, want) {
++		t.Errorf("render/1 implementors:\n got %v\nwant %v", got, want)
++	}
++}
++
++func TestImplementationMembershipRequiresInjectedBehaviour(t *testing.T) {
++	s := setupMembershipFixture(t)
++	// v1 documented false positive: reaching the callback is not adoption.
++	got := membershipImplementationAt(t, s, "lib/helpers.ex", "@callback render", "render")
++	if want := []string{"lib/helpers_user.ex:3"}; !slices.Equal(got, want) {
++		t.Errorf("v1 approximation changed: got %v want %v", got, want)
++	}
++}
++
++// Two behaviours in one file declare the same callback; a consumer of one must
++// not be admitted for the other.
++func TestImplementationMembershipSameFileBehaviours(t *testing.T) {
++	s := setupMembershipFixture(t)
++	if got := membershipImplementationAtFirst(t, s, "lib/pair.ex", "Sample.PairB", "@callback render", "render"); len(got) != 0 {
++		t.Errorf("PairB admitted a PairC consumer: %v", got)
++	}
++	if got, want := membershipImplementationAtFirst(t, s, "lib/pair.ex", "Sample.PairC", "@callback render", "render"), []string{"lib/pair_c_user.ex:3"}; !slices.Equal(got, want) {
++		t.Errorf("PairC implementors: got %v want %v", got, want)
++	}
++}
++
++// membershipImplementationAtFirst queries the first marker after the line that
++// contains after, for files holding several modules.
++func membershipImplementationAtFirst(t *testing.T, s *Server, rel, after, marker, name string) []string {
++	t.Helper()
++	lines := strings.Split(membershipFiles[rel], "\n")
++	start := slices.IndexFunc(lines, func(l string) bool { return strings.Contains(l, after) })
++	for line := start; start >= 0 && line < len(lines); line++ {
++		if !strings.Contains(lines[line], marker) {
++			continue
++		}
++		u := string(uri.File(filepath.Join(s.projectRoot, rel)))
++		got, err := s.Implementation(context.Background(), &protocol.ImplementationParams{
++			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
++				TextDocument: protocol.TextDocumentIdentifier{URI: protocol.DocumentURI(u)},
++				Position:     protocol.Position{Line: uint32(line), Character: uint32(strings.Index(lines[line], name))},
++			},
++		})
++		if err != nil {
++			t.Fatal(err)
++		}
++		return locationKeys(s.projectRoot, got)
++	}
++	t.Fatalf("missing %q after %q in %s", marker, after, rel)
++	return nil
++}
 diff --git a/internal/lsp/import_references_test.go b/internal/lsp/import_references_test.go
 new file mode 100644
 index 0000000..2667f8b
@@ -5549,10 +5988,10 @@ index 75f825a..59d940b 100644
  	line := strings.Split(nonASCIISource, "\n")[4]
 diff --git a/internal/lsp/quote_template_test.go b/internal/lsp/quote_template_test.go
 new file mode 100644
-index 0000000..4e55ea7
+index 0000000..7b66df8
 --- /dev/null
 +++ b/internal/lsp/quote_template_test.go
-@@ -0,0 +1,320 @@
+@@ -0,0 +1,307 @@
 +package lsp
 +
 +import (
@@ -5666,19 +6105,6 @@ index 0000000..4e55ea7
 +	want := []string{"lib/my_app/declared_runner.ex:4", "lib/my_app/used_runner.ex:4"}
 +	if !slices.Equal(got, want) {
 +		t.Fatalf("Implementation = %v, want only declared/used implementors %v", got, want)
-+	}
-+}
-+
-+func TestQuotedBehaviourDoesNotMakeDefiningModuleAnImplementor(t *testing.T) {
-+	server := setupQuoteFixture(t)
-+	implementors, err := server.store.LookupBehaviourImplementors("MyApp.Runner")
-+	if err != nil {
-+		t.Fatal(err)
-+	}
-+	for _, impl := range implementors {
-+		if impl.Module == "MyApp.Runner" {
-+			t.Fatalf("quoted @behaviour filed MyApp.Runner as its own implementor: %v", implementors)
-+		}
 +	}
 +}
 +
@@ -6581,7 +7007,7 @@ index a5874ec..b979c24 100644
  	edit := renameAt(t, server, defURI, 0, uint32(strings.Index(defContent, "ABTest")), "AbTest")
  	server.index.backgroundWork.Wait()
 diff --git a/internal/lsp/server.go b/internal/lsp/server.go
-index 0499a21..77c55d8 100644
+index 0499a21..949682f 100644
 --- a/internal/lsp/server.go
 +++ b/internal/lsp/server.go
 @@ -274,7 +274,7 @@ func ServeStream(server *Server, rwc io.ReadWriteCloser) error {
@@ -7090,21 +7516,125 @@ index 0499a21..77c55d8 100644
  			return s.hoverFromFile(functionName, hits[0])
  		}
  		// Nothing in the index: the function may exist only in the compiled module.
-@@ -5186,10 +5200,9 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
+@@ -5167,6 +5181,12 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
+ 	if functionName == "" {
+ 		return nil, nil
  	}
- 	callbackArity := callbacks[0].Arity
++	// Only a @callback head asks for implementations, of its own arity.
++	cursor := s.functionNameAt(docURI, tf, lineNum, col, functionName)
++	if !cursor.callback {
++		return nil, nil
++	}
++	callbackArity := cursor.arity.Min
+ 
+ 	// Find the module enclosing the cursor via the store — this correctly handles
+ 	// files with defmodule lines inside heredocs/doc examples.
+@@ -5179,33 +5199,85 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
+ 
+ 	s.debugf("Implementation: module=%s function=%s", currentModule, functionName)
+ 
+-	// Only proceed if this function is a declared callback in the current module.
+-	callbacks, err := s.store.LookupCallbackDef(currentModule, functionName)
+-	if err != nil || len(callbacks) == 0 {
++	definers, err := s.store.LookupPublicDefiners(functionName, callbackArity)
++	if err != nil {
+ 		return nil, nil
+ 	}
+-	callbackArity := callbacks[0].Arity
  
 -	// Always include the current module as a candidate — handles the common pattern
 -	// where @callback and def live in the same module. LookupFunctionInModules will
 -	// simply return nothing for it if no matching def exists.
 -	modules := []string{currentModule}
-+	// A same-name function in the behaviour module itself is its own API, not
-+	// an implementation; only modules that declare or use the behaviour count.
-+	var modules []string
- 	implementors, err := s.store.LookupBehaviourImplementors(currentModule)
- 	if err == nil {
- 		for _, impl := range implementors {
-@@ -5420,6 +5433,8 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+-	implementors, err := s.store.LookupBehaviourImplementors(currentModule)
+-	if err == nil {
+-		for _, impl := range implementors {
+-			if impl.Module != currentModule {
+-				modules = append(modules, impl.Module)
+-			}
++	// A definer is only a candidate. A same-name function in the behaviour
++	// module itself is its own API, and any other module counts only if its
++	// own source reaches the queried callback.
++	adopts := make(map[string]bool)
++	var results []store.LookupResult
++	for _, d := range definers {
++		if d.Module == currentModule {
++			continue
++		}
++		ok, checked := adopts[d.Module]
++		if !checked {
++			ok = s.moduleReachesCallback(d.Module, d.FilePath, currentModule, functionName, callbackArity)
++			adopts[d.Module] = ok
++		}
++		if ok {
++			results = append(results, d)
+ 		}
+ 	}
+ 
+-	s.debugf("Implementation: %d implementor modules, arity=%d", len(modules), callbackArity)
++	s.debugf("Implementation: %d definers, %d checked modules, %d results", len(definers), len(adopts), len(results))
++	return storeResultsToLocations(results), nil
++}
+ 
+-	results, err := s.store.LookupFunctionInModules(modules, functionName, callbackArity)
+-	if err != nil {
+-		return nil, nil
++// moduleReachesCallback reports whether module's own body declares
++// `@behaviour behaviour`, or has a `use` whose selected __using__ chain reaches
++// behaviour's own declaration of the queried callback name/arity. Only
++// directives at the module body's block depth count, which leaves out nested
++// modules, functions, quotes and do...end blocks. A `use` in an inline do: is
++// also skipped; an @behaviour in an inline do: is not.
++//
++// Reaching the callback is an approximation of adoption: a `use` of a module
++// that declares the callback but whose __using__ injects no @behaviour still
++// counts, as does `use B, :unknown_atom` when B itself declares it.
++func (s *Server) moduleReachesCallback(module, path, behaviour, functionName string, arity int) bool {
++	text, _, ok := s.readFileText(path)
++	if !ok {
++		return false
+ 	}
+-	return storeResultsToLocations(results), nil
++	text, ok = sourceForModule(text, module)
++	if !ok {
++		return false
++	}
++	source := []byte(text)
++	tokens := parser.Tokenize(source)
++	n := len(tokens)
++	aliases := extractAliasesFromTokens(source, tokens, -1)
++
++	depthAt := make([]int, n)
++	depth := 0
++	for i := 0; i < n; i++ {
++		parser.TrackBlockDepth(tokens[i].Kind, &depth)
++		depthAt[i] = depth
++		if tokens[i].Kind != parser.TokAttrBehaviour || depth != 1 {
++			continue
++		}
++		name, _ := tokCollectModuleName(source, tokens, n, tokNextSig(tokens, n, i+1))
++		if parser.ResolveModuleRef(name, aliases, module) == behaviour {
++			return true
++		}
++	}
++
++	for _, call := range extractUsesWithOptsFromTokens(source, tokens, aliases) {
++		if call.local || depthAt[call.token] != 1 {
++			continue
++		}
++		var reached []store.CallbackResult
++		s.collectCallbacksInChainFor(call.Module, call.dispatchAtom(), functionName, arity, make(map[string]bool), &reached)
++		for _, cb := range reached {
++			if s.store.LookupEnclosingModule(cb.FilePath, cb.Line) == behaviour {
++				return true
++			}
++		}
++	}
++	return false
+ }
+ func (s *Server) OnTypeFormatting(ctx context.Context, params *protocol.DocumentOnTypeFormattingParams) ([]protocol.TextEdit, error) {
+ 	return nil, nil
+@@ -5420,6 +5492,8 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  	// below. They carry the bare type uses (`@type t :: schema | embedded`)
  	// that the call-shaped scan cannot see.
  	var typespecOccurrences []protocol.Location
@@ -7113,7 +7643,7 @@ index 0499a21..77c55d8 100644
  
  	if moduleRef == "" {
  		if functionName == "" {
-@@ -5463,7 +5478,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5463,7 +5537,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		}
  
  		// Bare function — resolve to its defining module
@@ -7122,7 +7652,7 @@ index 0499a21..77c55d8 100644
  		s.debugf("References: resolved bare %q -> %q", functionName, fullModule)
  		if fullModule == "" {
  			currentModule := s.store.LookupEnclosingModule(uriToPath(protocol.DocumentURI(docURI)), lineNum+1)
-@@ -5513,7 +5528,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5513,7 +5587,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		useCalls := tf.ExtractUsesWithOpts(aliases)
  		for i := len(useCalls) - 1; i >= 0; i-- {
  			uc := useCalls[i]
@@ -7131,7 +7661,7 @@ index 0499a21..77c55d8 100644
  				injectors = append(injectors, uc.Module)
  				s.debugf("References: opt-binding injector for %s: %s", functionName, uc.Module)
  				break
-@@ -5524,7 +5539,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5524,7 +5598,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  	kind := NameKindCallable
  	if functionName == "" {
  		kind = NameKindAny
@@ -7140,7 +7670,7 @@ index 0499a21..77c55d8 100644
  		kind = NameKindType
  	}
  	semantic, err := s.ReferenceNames(fullModule, functionName, NameReferenceOptions{
-@@ -5534,15 +5549,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5534,15 +5608,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		ExcludeStdlib:      true,
  		InjectorModules:    injectors,
  		GeneratedProvider:  generatedProvider,
@@ -7160,7 +7690,7 @@ index 0499a21..77c55d8 100644
  	}
  	seen := make(map[refKey]struct{}, len(semantic))
  	var locations []protocol.Location
-@@ -5556,19 +5575,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5556,19 +5634,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  			if line == lineNum && !params.Context.IncludeDeclaration {
  				continue
  			}
@@ -7183,7 +7713,7 @@ index 0499a21..77c55d8 100644
  		})
  	}
  
-@@ -7100,270 +7119,17 @@ func (s *Server) DidDeleteFiles(ctx context.Context, params *protocol.DeleteFile
+@@ -7100,270 +7178,17 @@ func (s *Server) DidDeleteFiles(ctx context.Context, params *protocol.DeleteFile
  }
  func (s *Server) CodeLensRefresh(ctx context.Context) error { return nil }
  func (s *Server) PrepareCallHierarchy(ctx context.Context, params *protocol.CallHierarchyPrepareParams) ([]protocol.CallHierarchyItem, error) {
@@ -10274,10 +10804,93 @@ index efaffbf..f7ef394 100644
  			if cm != "" && len(injectors) > 0 {
  				isStatementStart := i == 0 || tokens[i-1].Kind == TokEOL || tokens[i-1].Kind == TokComment
 diff --git a/internal/store/store.go b/internal/store/store.go
-index ac6c873..c437398 100644
+index ac6c873..2cbaa45 100644
 --- a/internal/store/store.go
 +++ b/internal/store/store.go
-@@ -1719,10 +1719,21 @@ func (s *Store) NextFunctionLine(filePath string, startLine int) int {
+@@ -1256,38 +1256,23 @@ func (s *Store) LookupBehavioursForFile(filePath string) ([]string, error) {
+ 	return modules, rows.Err()
+ }
+ 
+-// BehaviourImplementorResult holds an implementing module and its source file.
+-type BehaviourImplementorResult struct {
+-	Module   string
+-	FilePath string
+-}
+-
+-// LookupBehaviourImplementors returns all modules that declare @behaviour or `use` the given module.
+-// Uses a correlated subquery to find the nearest enclosing defmodule for each ref,
+-// avoiding a cross-product when a file defines multiple modules.
+-func (s *Store) LookupBehaviourImplementors(behaviourModule string) ([]BehaviourImplementorResult, error) {
+-	rows, err := s.db.Query(`
+-		SELECT DISTINCT d.module, f.path
+-		FROM refs r
+-		JOIN files f ON f.id = r.file_id
+-		JOIN definitions d ON d.file_id = r.file_id AND d.function = '' AND d.kind IN ('module', 'defprotocol')
+-			AND d.line = (
+-				SELECT MAX(d2.line) FROM definitions d2
+-				WHERE d2.file_id = r.file_id AND d2.function = '' AND d2.kind IN ('module', 'defprotocol') AND d2.line <= r.line
+-			)
+-		WHERE r.module = ? AND r.kind IN ('behaviour', 'use')
+-		ORDER BY d.module`,
+-		behaviourModule,
++// LookupPublicDefiners returns every public function definition of
++// function/arity, with its module. It finds candidates only; it says nothing
++// about which behaviour, if any, the module adopts.
++func (s *Store) LookupPublicDefiners(function string, arity int) ([]LookupResult, error) {
++	rows, err := s.db.Query(
++		"SELECT d.module, f.path, d.line, d.kind, d.arity FROM definitions d JOIN files f ON f.id = d.file_id WHERE d.function = ? AND d.arity = ? AND d.kind IN ('def', 'defdelegate') ORDER BY f.path, d.line",
++		function, arity,
+ 	)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+ 	defer func() { _ = rows.Close() }()
+ 
+-	var results []BehaviourImplementorResult
++	var results []LookupResult
+ 	for rows.Next() {
+-		var r BehaviourImplementorResult
+-		if err := rows.Scan(&r.Module, &r.FilePath); err != nil {
++		var r LookupResult
++		if err := rows.Scan(&r.Module, &r.FilePath, &r.Line, &r.Kind, &r.Arity); err != nil {
+ 			return nil, err
+ 		}
+ 		results = append(results, r)
+@@ -1295,33 +1280,6 @@ func (s *Store) LookupBehaviourImplementors(behaviourModule string) ([]Behaviour
+ 	return results, rows.Err()
+ }
+ 
+-// LookupFunctionInModules returns definitions of a function across multiple modules in a single query.
+-// If arity >= 0, filters by exact arity match.
+-func (s *Store) LookupFunctionInModules(modules []string, function string, arity int) ([]LookupResult, error) {
+-	if len(modules) == 0 {
+-		return nil, nil
+-	}
+-	placeholders := make([]string, len(modules))
+-	args := make([]interface{}, 0, len(modules)+2)
+-	for i, mod := range modules {
+-		placeholders[i] = "?"
+-		args = append(args, mod)
+-	}
+-	args = append(args, function)
+-
+-	query := "SELECT f.path, d.line, d.kind, d.arity, d.delegate_to, d.delegate_as FROM definitions d JOIN files f ON f.id = d.file_id WHERE d.module IN (" +
+-		strings.Join(placeholders, ",") +
+-		") AND d.function = ? AND d.kind NOT IN ('module', 'defprotocol', 'defimpl', 'callback', 'macrocallback')"
+-
+-	if arity >= 0 {
+-		query += " AND d.arity = ?"
+-		args = append(args, arity)
+-	}
+-
+-	query += " ORDER BY d.line"
+-	return s.queryLookup(query, args...)
+-}
+-
+ func (s *Store) queryLookup(query string, args ...interface{}) ([]LookupResult, error) {
+ 	rows, err := s.db.Query(query, args...)
+ 	if err != nil {
+@@ -1719,10 +1677,21 @@ func (s *Store) NextFunctionLine(filePath string, startLine int) int {
  }
  
  func (s *Store) LookupFollowDelegate(module, function string) ([]LookupResult, error) {
@@ -10301,7 +10914,7 @@ index ac6c873..c437398 100644
  	if depth > 5 {
  		return nil, nil
  	}
-@@ -1731,30 +1742,51 @@ func (s *Store) lookupFollowDelegate(module, function string, depth int) ([]Look
+@@ -1731,30 +1700,51 @@ func (s *Store) lookupFollowDelegate(module, function string, depth int) ([]Look
  	if err != nil {
  		return nil, err
  	}
@@ -10372,10 +10985,10 @@ index ac6c873..c437398 100644
  }
 diff --git a/internal/treesitter/arity.go b/internal/treesitter/arity.go
 new file mode 100644
-index 0000000..71b11fb
+index 0000000..d0b9de8
 --- /dev/null
 +++ b/internal/treesitter/arity.go
-@@ -0,0 +1,412 @@
+@@ -0,0 +1,414 @@
 +// Package treesitter answers syntax questions about Elixir source with the
 +// tree-sitter Elixir grammar.
 +package treesitter
@@ -10555,7 +11168,7 @@ index 0000000..71b11fb
 +}
 +
 +// classifyBareName classifies a name without a call node: a capture, a pipe
-+// target, a zero-arity definition head or a name in a typespec.
++// target, a zero-arity definition or callback head, or a name in a typespec.
 +func classifyBareName(occ FunctionOccurrence, ident *tree_sitter.Node, src []byte) FunctionOccurrence {
 +	if n, ok := captureArity(ident, src); ok {
 +		occ.Kind, occ.Arity = OccurrenceCall, ExactArity(n)
@@ -10564,6 +11177,9 @@ index 0000000..71b11fb
 +	} else if keyword, _ := definitionHeadCall(ident, src); keyword != "" {
 +		// `def f do` / `def f, do: ...`: a zero-arity head.
 +		occ.Kind, occ.Arity, occ.Keyword = OccurrenceHead, ExactArity(0), keyword
++	} else if attr, _ := typespecHeadAttribute(ident, src); attr == "callback" || attr == "macrocallback" {
++		// `@callback f :: t`: a zero-arity callback head.
++		occ.Kind, occ.Arity = OccurrenceCallbackHead, ExactArity(0)
 +	} else if inTypespec(ident, src) {
 +		occ.Kind = OccurrenceTypespec
 +	}
@@ -10709,11 +11325,10 @@ index 0000000..71b11fb
 +	return target.Utf8Text(src), true
 +}
 +
-+// typespecHeadAttribute returns the attribute name when call is the head of a
-+// @spec/@callback/@type declaration: `@spec f(a) :: t`, optionally followed by
-+// a `when` clause.
-+func typespecHeadAttribute(call *tree_sitter.Node, src []byte) (string, bool) {
-+	node := call
++// typespecHeadAttribute returns the attribute name when node is the head of a
++// @spec/@callback/@type declaration: `@spec f(a) :: t` or `@callback f :: t`,
++// optionally followed by a `when` clause.
++func typespecHeadAttribute(node *tree_sitter.Node, src []byte) (string, bool) {
 +	parent := node.Parent()
 +	if parent == nil || parent.Kind() != "binary_operator" || operatorText(parent, src) != "::" ||
 +		!sameNode(parent.ChildByFieldName("left"), node) {
@@ -10790,10 +11405,10 @@ index 0000000..71b11fb
 +}
 diff --git a/internal/treesitter/arity_test.go b/internal/treesitter/arity_test.go
 new file mode 100644
-index 0000000..11840a6
+index 0000000..48cf1e5
 --- /dev/null
 +++ b/internal/treesitter/arity_test.go
-@@ -0,0 +1,176 @@
+@@ -0,0 +1,179 @@
 +package treesitter
 +
 +import (
@@ -10814,6 +11429,7 @@ index 0000000..11840a6
 +  def ping, do: :pong
 +  @spec save(term, term) :: :ok
 +  @callback cast(term) :: term
++  @callback size :: put
 +  @type t(a) :: {a, put}
 +
 +  def calls(key) do
@@ -10851,6 +11467,8 @@ index 0000000..11840a6
 +		{"head without parentheses", "def ping, do: :pong", "ping", OccurrenceHead, ExactArity(0), ""},
 +		{"spec head names the function", "@spec save(term, term) :: :ok", "save", OccurrenceSpecHead, ExactArity(2), ""},
 +		{"callback head", "@callback cast(term) :: term", "cast", OccurrenceCallbackHead, ExactArity(1), ""},
++		{"callback head without parentheses", "@callback size :: put", "size", OccurrenceCallbackHead, ExactArity(0), ""},
++		{"name in a callback return type", "@callback size :: put", "put", OccurrenceTypespec, Arity{}, ""},
 +		{"type head", "@type t(a) :: {a, put}", "t(", OccurrenceTypespec, Arity{}, ""},
 +		{"name in a type body", "@type t(a) :: {a, put}", "put}", OccurrenceTypespec, Arity{}, ""},
 +		{"call", "put(key, :v)", "put", OccurrenceCall, ExactArity(2), ""},

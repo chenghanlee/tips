@@ -154,8 +154,26 @@ A native “No definition found” message is not proof of an indexing failure.
   body. Hierarchy items retain the callable identity and select the real module
   token within its declaration. Dexter does not reconstruct arbitrary
   compile-time macro expansion.
-- Implementation lookup is callback-based; this beta does not provide general
-  `defprotocol`/`defimpl` traversal.
+- Implementation lookup starts at the selected `@callback` head and uses its
+  exact arity, including zero-arity forms such as `@callback type :: t` and
+  `@callback type() :: t`. Ordinary function heads and call sites return no
+  implementations, even when a callback shares the name.
+- Implementation results are indexed public `def`/`defdelegate` source
+  definitions with the selected name and arity. Direct behaviour declarations,
+  simple `use` wrappers and Phoenix-style atom dispatch are supported. Only
+  the selected wrapper branch is followed; a controller or component branch
+  does not inherit a sibling `live_view` branch's callbacks.
+- Wrapper membership is an approximation: a selected `use` chain reaching the
+  queried behaviour's callback is treated as adoption. It can include a module
+  whose provider declares the callback but injects no `@behaviour`, including
+  an unknown dispatch atom passed directly to that provider. Error frequency
+  has not been measured; implementation lists are not guaranteed complete.
+- Implementation lookup can omit behaviour/use directives inside block
+  conditionals, such as `if Code.ensure_loaded?(Plug) do ... end`. An
+  `@behaviour` inside inline `do:` syntax is not excluded and may be counted
+  even when it is not adopted. Arbitrary macro expansion, generated-only
+  implementations, macrocallback implementation matching and general
+  `defprotocol`/`defimpl` traversal are outside this beta's supported scope.
 - Diagnostics are syntax only; use Mix compile, Credo and tests for the rest.
 - Rename, code actions and formatting through Dexter are not offered.
 - Correctness is bounded by the patch's recorded cases; see
