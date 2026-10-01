@@ -34,9 +34,20 @@ claude plugin install --scope user mix-compile@elixir-agent-tools
 claude plugin install --scope user mix-credo@elixir-agent-tools
 ```
 
-Codex discovers linked `.agents/skills`; never also install Codex `elixir-dev`. Claude loads the same five skills through `elixir-dev`. Generated configs enable both Mix check plugins. Follow plugin trust prompts. Tips uses a patched LSP bridge; generated Claude config disables upstream `elixir-lsp`.
+Codex discovers linked `.agents/skills`; never also install Codex `elixir-dev`. Claude loads the same five skills through `elixir-dev`. Generated configs enable both Mix check plugins. Follow plugin trust prompts. Claude launches use `--settings` to disable known language-server plugins, including in linked worktrees; existing local settings files are preserved. Remove any separately configured legacy Elixir MCP server before the pilot. Unrelated MCP servers remain available in coding sessions.
 
-Build shared Expert/MCP bridge binaries with the [LSP guide](../lsp/README.md#build-and-validate), then start new client sessions. Keep installed binaries independent of task worktrees.
+Build Dexter with the [LSP guide](../lsp/README.md#build): the pinned source plus the local patch, one binary. Put matching Elixir sources in the main checkout's `agent/lsp/vendor/elixir-<version>/` (the source tree contains `lib/elixir/lib/enum.ex`), or set `DEXTER_ELIXIR_LIB_ROOT` to their `lib/` directory. Provisioning selects the target worktree's Elixir version and binds the source path into the worktree's generated files. Keep the shared tools/sources independent of task worktrees.
+
+Merge the Dexter integration, including root `AGENTS.md` and `CLAUDE.md`, into
+`origin/main` before provisioning normal tasks. New developer branches start from
+the helper's freshly fetched `origin/main` and inherit these instructions from that
+commit; installing the binary alone does not update them. Existing task branches
+must merge the updated `origin/main`, and review refs must include the instructions,
+before starting a Dexter session. With teams stopped, update the canonical checkout
+and build its pinned Dexter before launching new teams. The helper does not copy
+instructions over a task branch's files.
+
+Codex must be allowed to connect to Dexter's local Unix socket. The tested macOS `workspace-write` sandbox denies it with network access disabled; the reviewer verified access with network access enabled or a scoped `--allow-unix-socket /private/tmp/dexter-<uid>` sandbox allowance. Check the installed Codex sandbox options and set the narrowest suitable user-owned permission before the pilot. With approval policy `never`, a denied connection cannot escalate. The launcher does not change sandbox settings.
 
 ## Starting the lead TPM
 
@@ -50,22 +61,25 @@ Do not run it while another live agent owns `lead-tpm`. The lead TPM starts and 
 
 ## Configuration
 
-Edit [config.toml](config.toml): team limits; client/model/effort per role; port/database allocation; permissions; coordinator compaction; time budgets. Scripts read the canonical main checkout's file. Use `TIPS_TEAM_CONFIG=/absolute/path` for staged configuration in a disposable pilot. Settings apply next launch. When changing the corresponding client timeout, rebuild/retest the bridge: its request deadline is compiled in.
+Edit [config.toml](config.toml): team limits; client/model/effort per role; port/database allocation; permissions; coordinator compaction; time budgets. Scripts read the canonical main checkout's file. Use `TIPS_TEAM_CONFIG=/absolute/path` for staged configuration in a disposable pilot. Settings apply next launch. `timeouts.dexter_startup_seconds` bounds the provisioning warm-up; it does not require rebuilding Dexter.
 
-Codex config applies `launch.codex_lsp_approval_mode` only to four enabled LSP tools via [per-tool MCP settings](https://developers.openai.com/codex/mcp), preserving overall approval/sandbox policies. Codex approval policy neither changes nor guarantees its sandbox. Claude permission mode uses the same config. Coordinator launches use configured compaction; coding launches do not inherit it.
+Codex uses the generated `$TIPS_DEXTER` command; Claude uses its native LSP tool
+through the generated plugin. Existing shell approval and sandbox policies remain
+in force; no MCP-specific permission exception is added. Claude uses the configured permission mode. Coordinators run without LSP;
+coding launches do not inherit coordinator compaction settings.
 
 | Allocation | Components |
 |---|---|
 | Database suffix | `team.db_suffix_prefix`, team number, `roles.<role>.db_suffix` |
 | Test port | `team.port_base` + team number × `team.port_stride` + role `port_offset` |
 
-Both clients invoke main checkout's LSP wrapper with the assigned absolute worktree root; reviewed revisions need not contain the wrapper. Configuration/tooling changes require disposable pilots verifying both client and LSP roots in each actual client. Before scaling, measure simultaneous cold-start capacity; configured team limits do not verify it.
+Generated worktree files point at the shared Dexter binary; reviewed revisions need not contain the build. The helper warms up Dexter even when invoked without `--start`. For staged pilots, `TIPS_DEXTER_HOME` selects the shared build directory. Configuration/tooling changes require disposable pilots verifying both client and LSP roots in each actual client. Before scaling, measure simultaneous cold-start capacity; configured team limits do not verify it.
 
 Set database connection limits in [compose.yaml](../../compose.yaml), overridden by `TIPS_DB_MAX_CONNECTIONS`. Recreate the database service to apply changes, only with no teams running. Agent launch settings never restart PostgreSQL or existing clients.
 
 ## Check changes to these scripts
 
-Follow [shared Checks](README.md#shared-rules): four commands, CI evidence, test constraints and `# noqa: S603` limits. [pyproject.toml](pyproject.toml) uses the harness's Python profile: strict types, complexity limit 10, same lint rules. Only Python files under `tests/` get the test-assertion exception. For optional local developer checks, install Ruff/Pyright yourself; agents never install them.
+Follow [shared Checks](README.md#shared-rules): check commands, CI evidence, test constraints and `# noqa: S603` limits. [pyproject.toml](pyproject.toml) uses the harness's Python profile: strict types, complexity limit 10, same lint rules. Only Python files under `tests/` get the test-assertion exception. For optional local developer checks, install Ruff/Pyright yourself; agents never install them.
 
 ## Milestones
 

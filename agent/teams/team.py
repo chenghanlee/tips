@@ -17,9 +17,6 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import NotRequired, TypedDict, cast
 
-# CLI settings outrank project-local files, which linked worktrees read from the main checkout.
-CLAUDE_PLUGIN_SETTINGS = json.dumps({"enabledPlugins": {"elixir-lsp@elixir-agent-tools": False}})
-
 
 class Role(TypedDict):
     """Role settings; resource fields are used only by coding roles."""
@@ -86,6 +83,12 @@ class HerdrResult(TypedDict):
 
 
 ProcessRows = dict[int, tuple[int, str]]
+# Disable alternate language paths in launched clients, without editing user settings.
+NATIVE_LSP_PLUGINS = {
+    "elixir-lsp@elixir-agent-tools": False,
+    "elixir-ls@skills-dir": False,
+    "dexter-lsp@dexter": False,
+}
 main: Path
 cfg: Config
 
@@ -118,6 +121,7 @@ def execute(
     env: dict[str, str] | None = None,
     timeout: float | None = None,
     check: bool = False,
+    input_text: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run a resolved executable without a shell and capture its output."""
     # Reviewed S603: callers pass fixed tool names; command_args resolves argv[0], no shell.
@@ -129,6 +133,7 @@ def execute(
         check=check,
         text=True,
         capture_output=True,
+        input=input_text,
     )
 
 
@@ -356,7 +361,7 @@ def validate_config_fields(path: Path, value: Config) -> None:
         require_type(settings.get(key), str, f"{path}: team.{key}")
     object_fields(fields.get("timeouts"), f"{path}: timeouts")
     policies = object_fields(fields.get("launch"), f"{path}: launch")
-    for key in ("codex_approval", "codex_lsp_approval_mode", "claude_permission_mode"):
+    for key in ("codex_approval", "claude_permission_mode"):
         require_type(policies.get(key), str, f"{path}: launch.{key}")
     roles = object_fields(fields.get("roles"), f"{path}: roles")
     for name in ("dev", "test", "lead", "tpm", "lead_tpm"):
@@ -382,8 +387,7 @@ def validate_settings(path: Path, value: Config) -> None:
         "shutdown_seconds",
         "shell_seconds",
         "checks_minutes",
-        "mcp_startup_seconds",
-        "mcp_tool_seconds",
+        "dexter_startup_seconds",
     ):
         if type(value["timeouts"][key]) is not int or value["timeouts"][key] <= 0:
             raise RuntimeError(f"{path}: timeouts.{key} must be a positive integer")
@@ -394,8 +398,6 @@ def validate_settings(path: Path, value: Config) -> None:
         if role is not None and role["kind"] not in ("codex", "claude"):
             raise RuntimeError(f"{path}: invalid role {name}")
     validate_lead_ui(path, value)
-    if value["launch"]["codex_lsp_approval_mode"] not in ("auto", "prompt", "writes", "approve"):
-        raise RuntimeError(f"{path}: invalid Codex LSP approval mode")
 
 
 def validate_lead_ui(path: Path, value: Config) -> None:
@@ -506,7 +508,7 @@ def coordinator(pane: Entity, name: str, role: str) -> None:
             "--effort",
             spec["effort"],
             "--settings",
-            CLAUDE_PLUGIN_SETTINGS,
+            json.dumps({"enabledPlugins": NATIVE_LSP_PLUGINS}),
             "--strict-mcp-config",
             "--mcp-config",
             '{"mcpServers":{}}',
@@ -619,6 +621,7 @@ def stop_team(target: str) -> None:
     names = [f"team-{target}-{r}" for r in roles]
     panes = pane_roles(workspace, names)
     roots = owned_worktrees(panes)
+    check_shared_owners(roots, panes)
     if roots:
         require_git_admin(main / ".git", "lead-tpm")
         git("fetch", "origin")
@@ -626,6 +629,17 @@ def stop_team(target: str) -> None:
     for pane in panes.values():
         stop(pane["pane_id"], pane_occupant(pane["pane_id"])[0])
     check_worktrees(roots)
+    check_shared_owners(roots, panes)
+    for root in sorted(roots):
+        wrapper = root / ".dexter/dexter.sh"
+        if wrapper.is_file():
+            result = execute(
+                ["/bin/sh", wrapper, "stop"],
+                timeout=cfg["timeouts"]["dexter_startup_seconds"],
+                input_text="",
+            )
+            if result.returncode:
+                raise RuntimeError(result.stderr or result.stdout)
     if roots or panes:
         drop_databases(target)
     for root in sorted(roots):
@@ -633,6 +647,15 @@ def stop_team(target: str) -> None:
     herdr("workspace", "close", workspace["workspace_id"])
     print(f"{label}: closed; main checkout status follows")
     print(git("status", "--short") or "Main checkout clean")
+
+
+def check_shared_owners(roots: set[Path], panes: dict[str, Entity]) -> None:
+    """Do not retire a worktree still used by an agent outside this team."""
+    owned_panes = {pane["pane_id"] for pane in panes.values()}
+    for agent in herdr("agent", "list")["agents"]:
+        pane = agent["pane_id"]
+        if pane not in owned_panes and pane_occupant(pane)[0] in roots:
+            raise RuntimeError(f"Worktree still shared with {agent.get('name') or pane}; preserved")
 
 
 def owned_worktrees(panes: dict[str, Entity]) -> set[Path]:

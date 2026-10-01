@@ -1,111 +1,180 @@
-# Elixir language server
+# Agent language tools
 
-Codex and Claude use Expert through an MCP bridge. Each coding client runs its own
-bridge and Expert in its assigned worktree. Clients share installed binaries and
-the engine preparation cache. TPMs run without an LSP.
+Coding sessions get one **Dexter** language server per worktree: a single Go
+binary built from the pinned upstream revision plus one local patch. Claude uses
+it through Claude Code's native LSP tool. Codex calls the same binary's `query`
+command. Both attach to the same per-worktree daemon and use the same handlers,
+but native clients can filter the results they display (see below).
+There is no adapter, MCP server, editor process or second index.
 
-## Files
+This is a read-only beta. Rename and other edits are not offered.
 
-| File | Purpose |
+## Build
+
+Requires Go 1.26.3 and Git. `build.sh` needs a Git repository that contains the
+pinned upstream commit; its checkout is not read:
+
+```sh
+git clone https://github.com/remoteoss/dexter tmp/dexter-upstream
+bash agent/lsp/dexter/build.sh tmp/dexter-upstream
+```
+
+The script exports the pin, applies `dexter/patches/dexter-go.patch` in a
+temporary copy, builds `dexter/vendor/dexter` and writes `dexter/vendor/build.json`
+with the pin, patch checksum, binary checksum and the local build id. The id is
+the SHA-256 of the pin and patch checksum and is linked into the binary:
+
+```sh
+agent/lsp/dexter/vendor/dexter version   # 0.7.2, then: local_build_id <id>
+```
+
+A daemon and a client with different ids refuse each other and nothing replaces
+the running daemon. Before rebuilding over active teams, stop each worktree's
+daemon with its bound command, build, then re-provision.
+The build refuses to replace a binary used by a running daemon and aborts if
+it cannot inspect processes. Keep agents stopped until the build finishes.
+
+`--keep <dir>` leaves the prepared source in place for `go test ./...`.
+[patches/README.md](dexter/patches/README.md) records what the patch changes and
+the Go static-analysis rule for it.
+
+## Elixir sources
+
+Dexter indexes the Elixir standard library from source. Put the release matching
+`elixir --short-version` in the main checkout's ignored `agent/lsp/vendor/elixir-<version>/`
+(from the [Elixir repository](https://github.com/elixir-lang/elixir); the tree
+holds `VERSION` and `lib/elixir/lib/enum.ex`), or point `DEXTER_ELIXIR_LIB_ROOT`
+at another checkout's `lib/`. A Homebrew installation has no sources. Provisioning
+refuses to start unless the tree's `VERSION` matches the worktree's toolchain.
+
+## Bound checkout
+
+`--root` must be the exact checkout Dexter serves: a directory holding `.git`
+or `mix.exs`, never one with only a `.dexter/` index. The command works from
+any caller directory. Each worktree gets its own daemon and index, and
+worktrees run concurrently. Nested checkouts, including scratch clones and
+linked worktrees under `.worktrees/`, are excluded from the parent's index
+and watcher. Dependency sources under `deps/` remain available. A root reached
+through a symlink is admitted only under the exact spelling it was bound with.
+Out of this beta: an application in a subdirectory or monorepo.
+
+## Team provisioning
+
+`agent/teams/task_worktree.py` writes, per worktree:
+
+- `.dexter/dexter.sh`: `exec vendor/dexter --root <worktree> "$@"` with the
+  selected sources exported. Its absolute path is `TIPS_DEXTER` in the session.
+- For Claude, `.dexter/claude-plugin/`: a plugin loaded with `--plugin-dir` whose
+  LSP server runs the same binary with `--root <worktree> lsp` and the
+  same sources. Known alternative language-server plugins are disabled by the
+  launch command's `--settings` override, including in linked worktrees.
+- For Codex, `.codex/config.toml` with the Mix check plugins.
+
+Provisioning then runs `dexter.sh query workspace-symbols --wait <timeout> MixProject`
+and refuses to launch a client if the index does not answer. `team.py stop`
+runs `dexter.sh stop` per worktree before retiring it; an attached client keeps
+the daemon alive and the worktree is preserved. A daemon idles out after fifteen
+minutes without clients and restarts from its index on the next request.
+Do not run `git clean -x` in a team worktree: it removes the bound command and
+the index under `.dexter/`.
+
+## Operations
+
+Positions are 1-based line and character (UTF-16). The bound CLI returns Dexter's
+raw LSP JSON, whose ranges are 0-based. Claude displays its own formatted results.
+
+| Claude native LSP | Codex `"$TIPS_DEXTER" query …` |
 |---|---|
-| `launch_worktree_lsp.sh` | Start the bridge and Expert in the supplied worktree. |
-| `build_install_expert.sh` | Build, test and install patched Expert. |
-| `build_install_mcp_bridge.sh` | Build, test and install the patched MCP bridge. |
-| `patches/expert-reference-results.patch` | Distinguish reference results, index readiness and failures. |
-| `patches/expert-generated-data.patch` | Keep per-checkout logs, indexes and builds under `_build/expert/`. |
-| `patches/expert-worktree-isolation.patch` | Isolate project indexes and serialize shared engine preparation. |
-| `patches/mcp-bridge-tools-and-lifecycle.patch` | Fix navigation, document synchronization, deadlines and process cleanup. |
+| `goToDefinition` | `definition <file> <line> <column>` |
+| `findReferences` | `references <file> <line> <column> [--include-declaration]` |
+| `hover` | `hover <file> <line> <column>` |
+| `documentSymbol` | `symbols <file>` |
+| `workspaceSymbol` | `workspace-symbols [search]` |
+| `goToImplementation` | `implementation <file> <line> <column>` |
+| `prepareCallHierarchy` | `prepare-call-hierarchy <file> <line> <column>` |
+| `incomingCalls` | `incoming-calls <file> <line> <column>` |
+| `outgoingCalls` | `outgoing-calls <file> <line> <column>` |
 
-Existing installed binaries can run without the patch files. A new teammate needs
-the patches to reproduce those working binaries. Deleting them would leave our
-fixes only inside the current installation, unless recovered from Git history.
-Keep the patches in `patches/`; the build scripts apply them before compiling.
+`query` waits up to `--wait <duration>` (default 30s) for a cold index and exits
+non-zero with the reason on stderr. Files are relative to the worktree. Queries
+admit the bound worktree, its dependency sources and the configured Elixir
+sources; a file from another checkout is refused with `does not belong to
+workspace`. The stock `lookup` and `references <module>` name searches are
+unchanged.
 
-`vendor/` holds the installed binaries and versioned Expert releases. It is ignored
-by Git and shared from the main checkout. Per-worktree generated data belongs in
-`_build/expert/`.
+### Claude native dependency navigation
 
-## Build and validate
+Claude Code 2.1.285 filters Git-ignored locations from native `goToDefinition`,
+`goToImplementation`, `findReferences` and `workspaceSymbol` results. This can
+hide dependency sources under `deps/` even when Dexter returns them correctly.
+Hover, document symbols and call hierarchy do not use that client filter. The nine operations
+therefore do not have identical displayed results across native and CLI clients.
 
-Install the tools listed in the [local development guide](../../docs/development/local-development.md).
-Builds also require Git, Bash, `patch`, Python 3.12, Go and `unbuffer` (Expect).
-Build from a worktree and set the shared installation directory explicitly:
+For ignored dependency locations, use the existing bound CLI `definition`,
+`implementation`, `references` or `workspace-symbols` operation in the same
+worktree, for example `"$TIPS_DEXTER" query definition lib/example.ex 12 8`.
+Do not change `.gitignore`, rewrite result URIs or start another language server.
+A native “No definition found” message is not proof of an indexing failure.
 
-```bash
-export TIPS_ELIXIR_TOOLS=/absolute/path/to/main/agent/lsp/vendor
-agent/lsp/build_install_expert.sh
-agent/lsp/build_install_mcp_bridge.sh
-```
+## Limits
 
-The scripts fetch pinned sources, apply patches and run affected tests before
-installation. Expert installs a versioned release; the bridge replaces its binary
-atomically. An existing Expert release is not overwritten. Installing tools does
-not restart clients. Restart a client to load new binaries.
-
-## Start and use
-
-Use the [team workflow](../teams/README.md) to provision and launch clients.
-The helper generates the selected client's config from [config.toml](../teams/config.toml).
-It calls the main checkout's wrapper with the assigned absolute worktree path.
-Older review commits do not need their own copy of the wrapper.
-
-Configure the MCP client to invoke the wrapper with its worktree path:
-
-```bash
-/absolute/path/to/main/agent/lsp/launch_worktree_lsp.sh /absolute/path/to/worktree
-```
-
-It finds binaries in the main checkout's `agent/lsp/vendor/bin`, unless
-`TIPS_ELIXIR_TOOLS` specifies another tools directory. Install Mix dependencies
-in each worktree. Elixir and Erlang must be on the client's `PATH`.
-
-- Brief agents after client launch. Expert builds and indexes in the background.
-- Do not add a compile-ready gate or start another LSP as a probe.
-- A running reviewer's checkout advances in place and its LSP keeps the same
-  root. A client is stopped, with all owned descendants verified to exit, only
-  when a reviewer session is replaced or a worktree is deleted; the team scripts
-  do both (see the Team TPM and Lead TPM cards in the
-  [agent teams guide](../teams/README.md)). Conversation reset does not reroot
-  the LSP.
-- After wrapper path changes, regenerate client configs before their next launch.
-  Update standalone client configs when the new path exists in main.
-
-## Tool behavior
-
-- Source files must belong to the Expert session's workspace. An outside file
-  returns a workspace-mismatch error with both paths. Use a session rooted at
-  that file's project; retrying the current session will not load it.
-  Definition results may still point to external dependency source files.
-- `definition`, `references` and `hover` take `filePath`, `line` and `column`.
-  Positions are 1-based; columns use UTF-16 code units.
-- References belong to the project selected by the source file. Query a call site
-  in the application to find its uses of a dependency.
-- References retry only `index_not_ready`. Other failures and timeouts are errors,
-  not successful empty results.
-- Keep the client tool timeout aligned with the bridge's compiled deadline.
-  The helper rejects a conflicting setting. Queued calls can wait before that
-  handler deadline starts.
-- Diagnostics without document versions cannot confirm an exact edit match.
-  A timeout can leave stale diagnostics. Inspect the reported result.
-- Expert logs, indexes and builds are in the assigned worktree's `_build/expert/`
-  directory. Installed binaries remain in the main checkout's `agent/lsp/vendor/`.
-  Removing `_build/` also removes this generated data; Expert recreates it.
-- After installing this version, restart old LSP sessions before removing their
-  obsolete `.expert/` directories. Do not move or delete data used by a live server.
-
-## Check changes
-
-```bash
-python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
-```
-
-Before adopting launcher or tool changes, pilot both real clients in disposable
-worktrees. Check client cwd, actual LSP workspace, exact reference results,
-reviewer revision advance and complete descendant exit. Config inspection alone
-does not prove the running root. Do not infer full team capacity from a small pilot.
-
-In the same pilot, each client must create a file and use its normal shell to
-stage, commit and push to a disposable remote. Verify clean worktrees, matching
-local/remote SHAs and receipt of the explicit Herdr handoff. Preserve permission
-errors and report them to the TPM; do not use an API workaround. Follow the
-[handoff instructions](../teams/README.md#shared-rules). No hooks or `--wait`.
+- Freshness is not strict. The daemon watches saved files, but an empty answer
+  is not proof of absence. Rerun after large checkouts or generated code.
+- File-backed navigation uses saved disk text in both Claude and Codex.
+  Document notifications invalidate cached text; they cannot replace newer
+  disk contents with an older buffer. Cached files follow later disk changes
+  (`Edit`, `mix format`, generators, shell rewrites) by size and mtime.
+  Save before navigating; unsaved editor buffers are not supported.
+  One writer per worktree.
+- Call hierarchy selects one callable identity, `Module.function/arity`. A
+  definition with default arguments prepares its maximum arity; prepare at a
+  lower-arity call to inspect that callable's incoming calls. The hierarchy
+  follows written source calls, not generated runtime wrapper edges.
+  References at a default-argument head may cover multiple arities: compare
+  them with incoming calls only at the same selected arity.
+- Call hierarchy answers are standard LSP items and carry no reasons: a call
+  the resolver cannot own is omitted without a completeness indicator. When
+  completeness matters, cross-check
+  `findReferences` against the `fromRanges` of `incomingCalls` and review each
+  reference with no matching range by hand: it may be a call the hierarchy
+  left out, or a reference the heuristic over-counted (injected defs). A
+  function reached only through a `use` chain with no indexed row can be
+  missing from both.
+  Omitted on purpose:
+  - incoming: calls in typespecs, quote bodies and defs inside `quote`, files
+    that do not parse cleanly, top-level and module-body calls, test labels
+    built by interpolation, modules named by a variable, heads named by
+    `unquote`;
+  - outgoing: Erlang module calls (`:ets`, `:crypto`), anonymous calls
+    (`fun.()`), field access, operators and language forms (`if`, `case`).
+  Text that moved since the index was built is re-checked and dropped when the
+  occurrence no longer matches.
+- A known generated export can resolve to its module declaration when its
+  function source location cannot be resolved. This is a module anchor, not the function
+  body. Hierarchy items retain the callable identity and select the real module
+  token within its declaration. Dexter does not reconstruct arbitrary
+  compile-time macro expansion.
+- Implementation lookup starts at the selected `@callback` head and uses its
+  exact arity, including zero-arity forms such as `@callback type :: t` and
+  `@callback type() :: t`. Ordinary function heads and call sites return no
+  implementations, even when a callback shares the name.
+- Implementation results are indexed public `def`/`defdelegate` source
+  definitions with the selected name and arity. Direct behaviour declarations,
+  simple `use` wrappers and Phoenix-style atom dispatch are supported. Only
+  the selected wrapper branch is followed; a controller or component branch
+  does not inherit a sibling `live_view` branch's callbacks.
+- Wrapper membership is an approximation: a selected `use` chain reaching the
+  queried behaviour's callback is treated as adoption. It can include a module
+  whose provider declares the callback but injects no `@behaviour`, including
+  an unknown dispatch atom passed directly to that provider. Error frequency
+  has not been measured; implementation lists are not guaranteed complete.
+- Implementation lookup can omit behaviour/use directives inside block
+  conditionals, such as `if Code.ensure_loaded?(Plug) do ... end`. An
+  `@behaviour` inside inline `do:` syntax is not excluded and may be counted
+  even when it is not adopted. Arbitrary macro expansion, generated-only
+  implementations, macrocallback implementation matching and general
+  `defprotocol`/`defimpl` traversal are outside this beta's supported scope.
+- Diagnostics are syntax only; use Mix compile, Credo and tests for the rest.
+- Rename, code actions and formatting through Dexter are not offered.
+- Correctness is bounded by the patch's recorded cases; see
+  [patches/README.md](dexter/patches/README.md).
