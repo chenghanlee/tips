@@ -58,7 +58,7 @@ def git(*args: str | Path) -> str:
 # to leave a client's child running. So a short-lived query starts the daemon and
 # the proxy follows only when it succeeds. The LSP stream is the proxy's alone.
 CLAUDE_LSP_LAUNCH = '/bin/sh "$0" "$@" </dev/null >/dev/null && exec /bin/sh "$0" lsp'
-# Dexter's query allows this long to reach the daemon, on top of --wait.
+# Dexter's query gives up this long after --wait: its allowance to reach the daemon.
 DEXTER_CONNECT_SECONDS = 30
 
 
@@ -359,8 +359,9 @@ enabled = true
                             "dexter": {
                                 "command": launch[0],
                                 "args": launch[1:],
-                                # The warm-up may take --wait plus the connection allowance;
-                                # the proxy then gets as long again to attach and initialize.
+                                # A policy cap, not the proxy's proven maximum: the full
+                                # warm-up, then as long again for the proxy to attach and
+                                # answer. Claude Code 2.1.286 sets no limit without one.
                                 "startupTimeout": (seconds + 2 * DEXTER_CONNECT_SECONDS) * 1000,
                                 "extensionToLanguage": {
                                     ".ex": "elixir",
@@ -400,9 +401,12 @@ enabled = true
     def start_language_server(self) -> None:
         # The bound command carries the binary, root and Elixir sources; a
         # missing or wrong source tree fails here, before any client starts.
+        # The query ends itself within --wait plus its connection allowance, so a
+        # valid slow start is never cut short; the margin only catches a hung query.
+        seconds = self.timeouts["dexter_startup_seconds"]
         output = run(
-            ["/bin/sh", self.wrapper, *warm_up_query(self.timeouts["dexter_startup_seconds"])],
-            timeout=self.timeouts["dexter_startup_seconds"] + 5,
+            ["/bin/sh", self.wrapper, *warm_up_query(seconds)],
+            timeout=seconds + DEXTER_CONNECT_SECONDS + 5,
             env={**os.environ, **self.target_env},
             input_text="",
         )

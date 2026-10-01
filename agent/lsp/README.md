@@ -89,13 +89,21 @@ the proxy afterwards.
   on the LSP server's stderr and that session has no native LSP until Claude
   starts the server again; whether Claude retries has not been verified live.
   `"$TIPS_DEXTER" query` still works.
-- The plugin's `startupTimeout` allows the `--wait` bound, Dexter's 30-second
-  connection allowance and the proxy's own start.
-- Known gaps: a daemon that exits after the warm-up and before the proxy
-  attaches is started by the proxy, and the later client stop refuses. A
-  client stopped while its warm-up still waits for the index can be refused
-  too. In both cases run `dexter.sh stop` once that client has exited and
-  retry.
+- The plugin's `startupTimeout` is a policy cap: the full warm-up (`--wait`
+  plus Dexter's 30 seconds to reach the daemon), then 30 seconds for the proxy
+  to attach and answer. It is not the proxy's proven maximum: the proxy
+  connects twice before `initialize`, each time with its own bound. A slower
+  start is reported as failed.
+- Known gaps: `team.py` refuses a client stop, and preserves everything,
+  while the daemon is that client's descendant. Two cases: a daemon that exits
+  after the warm-up and before the proxy attaches is started by the proxy;
+  and a client stopped during a cold warm-up still has the query and the
+  daemon it started as descendants. The recovery is the same: wait for the
+  client's children to exit (a warm-up ends within `--wait` plus 30 seconds),
+  then run the stop again. The daemon is then nobody's child and still serves
+  the worktree. Do not use `dexter.sh stop` to hurry this: it refuses while
+  the query is attached, and retirement runs it anyway. Measured with the
+  real binary and stop code against a Herdr fixture, not a live client.
 
 ## Operations
 

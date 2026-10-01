@@ -32,6 +32,7 @@ class FixtureState(TypedDict):
     dexter_empty: bool
     dexter_stdlib: str | None
     dexter_query_stdin: str
+    dexter_query_budget: float
 
 
 TEAMS = Path(__file__).resolve().parents[1]
@@ -270,6 +271,20 @@ MIX_PROJECT = (
     '  def project, do: [app: :fixture, version: "0.1.0"]\nend\n'
 )
 
+# Appended to the fixture's team.py: records the time allowed to the Dexter warm-up.
+RECORD_QUERY_BUDGET = r"""
+import json
+from pathlib import Path
+real_execute = execute
+def execute(args, **options):
+    result = real_execute(args, **options)
+    if 'workspace-symbols' in args:
+        p = Path(os.environ['FAKE_HERDR_STATE']); s = json.loads(p.read_text())
+        s['dexter_query_budget'] = options.get('timeout')
+        p.write_text(json.dumps(s))
+    return result
+"""
+
 FAKE_STOP = r"""import json,os,subprocess,sys
 from pathlib import Path
 p=Path(os.environ['FAKE_HERDR_STATE']); s=json.loads(p.read_text())
@@ -336,6 +351,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
                 'bprocess.run([sys.executable, os.environ["FAKE_STOP"], pane, root'
                 ']).returncode:\n        raise RuntimeError("stop failed")\n'
             )
+            + RECORD_QUERY_BUDGET
         )
         (self.root / "agent/teams/config.toml").write_text(CONFIG)
         (self.root / "tracked.txt").write_text("base\n")
@@ -769,6 +785,8 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call()
         assert "--wait" in self.state()["events"][-1]
         assert "7s" in self.state()["events"][-1]
+        # Dexter itself gives up 30 s after --wait; only a hung query is killed from outside.
+        assert 7 + 30 < self.state()["dexter_query_budget"] <= 7 + 30 + 10
 
     def test_role_inferred_from_agent_name_and_policy_from_config(self) -> None:
         path = self.root / "agent/teams/config.toml"

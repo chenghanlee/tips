@@ -353,8 +353,14 @@ while True: time.sleep(.05)
             timeout=60,
         )
         assert started.returncode == 0, started.stderr
-        # A cold start: the warm-up took no request bytes and wrote no reply bytes.
-        assert started.stdout.startswith("Content-Length: ")
+        # A cold start: the warm-up took no request bytes and wrote no reply bytes,
+        # so the first frame on the stream is the proxy's answer to initialize.
+        # Text mode reads the header's CRLF line ends as LF.
+        header, _, frames = started.stdout.partition("\n\n")
+        assert header.startswith("Content-Length: "), started.stdout[:200]
+        reply, _ = json.JSONDecoder().raw_decode(frames)
+        assert reply["id"] == 1, reply
+        assert "capabilities" in reply["result"], reply
 
 
 class GitAdminGuardTest(unittest.TestCase):
