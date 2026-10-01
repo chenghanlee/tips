@@ -339,7 +339,7 @@ class WorktreeTask:
         }
         if self.kind == "codex":
             config = """[plugins."mix-compile@elixir-agent-tools"]
-enabled = true
+enabled = false
 [plugins."mix-credo@elixir-agent-tools"]
 enabled = true
 """
@@ -657,7 +657,7 @@ enabled = true
                 json.dumps(
                     {
                         "enabledPlugins": {
-                            "mix-compile@elixir-agent-tools": True,
+                            "mix-compile@elixir-agent-tools": False,
                             "mix-credo@elixir-agent-tools": True,
                             **NATIVE_LSP_PLUGINS,
                         }

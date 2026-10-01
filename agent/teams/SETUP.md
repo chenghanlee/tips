@@ -24,17 +24,15 @@ From the main checkout, install plugins for clients you use:
 ```bash
 # Codex
 codex plugin marketplace add "$PWD/agent/elixir-agent-tools"
-codex plugin add mix-compile@elixir-agent-tools
 codex plugin add mix-credo@elixir-agent-tools
 
 # Claude Code (user scope makes the installations available across worktrees)
 claude plugin marketplace add "$PWD/agent/elixir-agent-tools"
 claude plugin install --scope user elixir-dev@elixir-agent-tools
-claude plugin install --scope user mix-compile@elixir-agent-tools
 claude plugin install --scope user mix-credo@elixir-agent-tools
 ```
 
-Codex discovers linked `.agents/skills`; never also install Codex `elixir-dev`. Claude loads the same five skills through `elixir-dev`. Generated configs enable both Mix check plugins. Follow plugin trust prompts. Claude launches use `--settings` to disable known language-server plugins, including in linked worktrees; existing local settings files are preserved. Launchers do not disable a legacy `mcp_servers.elixir-lsp` entry. Remove it before the pilot, including from the main checkout's `.codex/config.toml`, but only once the main checkout has this revision of `team.py`. An earlier `team.py` passes an override for that entry to Codex coordinators, and Codex refuses to start (`invalid transport`) when the entry is missing. Unrelated MCP servers remain available in coding sessions.
+Codex discovers linked `.agents/skills`; never also install Codex `elixir-dev`. Claude loads the same five skills through `elixir-dev`. Generated settings disable the automatic compile hook and enable Credo for both clients. Run explicit Mix checks after edits. Follow plugin trust prompts. Claude launches use `--settings` to disable known language-server plugins, including in linked worktrees; existing local settings files are preserved. Launchers do not disable a legacy `mcp_servers.elixir-lsp` entry. Remove it before the pilot, including from the main checkout's `.codex/config.toml`, but only once the main checkout has this revision of `team.py`. An earlier `team.py` passes an override for that entry to Codex coordinators, and Codex refuses to start (`invalid transport`) when the entry is missing. Unrelated MCP servers remain available in coding sessions.
 
 Build Dexter with the [LSP guide](../lsp/README.md#build): the pinned source plus the local patch, one binary. Put matching Elixir sources in the main checkout's `agent/lsp/vendor/elixir-<version>/` (the source tree contains `lib/elixir/lib/enum.ex`), or set `DEXTER_ELIXIR_LIB_ROOT` to their `lib/` directory. Provisioning selects the target worktree's Elixir version and binds the source path into the worktree's generated files. Keep the shared tools/sources independent of task worktrees.
 
