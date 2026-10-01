@@ -7,3 +7,6 @@ d5f46322090dd09133dc5827ae8fd314af637c21:test/tips/provider_config_test.exs:gene
 # offline redaction check (synthetic_key/0), not a committed private key.
 # Decision: https://github.com/chenghanlee/tips/issues/61#issuecomment-5794717226
 0487970ec9dc86f4aca7b0007fe3e34e50fd3f30:scripts/media_probe/provider.exs:private-key:1927
+# PR #268 (#72): synthetic submission-key UUID in published commit 1c94990, not a
+# credential. The test now generates the value.
+1c94990037805cbfa459ac02f9dd1245984ecf98:test/tips/content/intent_test.exs:generic-api-key:177
