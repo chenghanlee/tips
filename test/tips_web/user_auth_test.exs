@@ -1,15 +1,18 @@
 defmodule TipsWeb.UserAuthTest do
   use TipsWeb.ConnCase, async: true
 
+  import Ecto.Query
+
   alias Phoenix.LiveView
   alias Tips.Accounts
   alias Tips.Accounts.Scope
+  alias Tips.Repo
   alias TipsWeb.UserAuth
 
   import Tips.AccountsFixtures
 
   @remember_me_cookie "_tips_web_user_remember_me"
-  @remember_me_cookie_max_age 60 * 60 * 24 * 14
+  @remember_me_cookie_max_age 60 * 60 * 24 * 60
 
   setup %{conn: conn} do
     conn =
@@ -18,6 +21,47 @@ defmodule TipsWeb.UserAuthTest do
       |> init_test_session(%{})
 
     %{user: %{user_fixture() | authenticated_at: DateTime.utc_now(:second)}, conn: conn}
+  end
+
+  describe "allowed_return_to/1" do
+    test "admits only the root and the four editor route shapes" do
+      for path <- [
+            "/",
+            "/editor/tips/new",
+            "/editor/tips/42/edit",
+            "/editor/tips/7/reviews/new",
+            "/editor/reviews/9/edit",
+            "/editor/tips/9223372036854775807/edit",
+            "/editor/tips/9223372036854775807/reviews/new",
+            "/editor/reviews/9223372036854775807/edit"
+          ] do
+        assert UserAuth.allowed_return_to(path) == path
+      end
+
+      for path <- [
+            nil,
+            "",
+            42,
+            "https://evil.example/",
+            "//evil.example",
+            "/\\evil.example",
+            "/%2F%2Fevil.example",
+            "/editor/tips/new?x=1",
+            "/editor/tips/new#frag",
+            "/editor/tips/new/",
+            "/editor/tips/0/edit",
+            "/editor/tips/-1/edit",
+            "/editor/tips/01/edit",
+            "/editor/tips/abc/edit",
+            "/editor/tips/1/reviews/2/edit",
+            "/editor/tips/new\n",
+            "/editor/tips/new\u0000",
+            "/users/settings",
+            "/tips/1/slug"
+          ] do
+        assert UserAuth.allowed_return_to(path) == nil, "admitted #{inspect(path)}"
+      end
+    end
   end
 
   describe "log_in_user/3" do
@@ -42,6 +86,41 @@ defmodule TipsWeb.UserAuthTest do
         |> UserAuth.log_in_user(user)
 
       assert get_session(conn, :to_be_removed)
+    end
+
+    test "re-authenticating retains the browser family and advances recency", %{
+      conn: conn,
+      user: user
+    } do
+      token = Accounts.generate_user_session_token(user)
+      %{family: family} = token_row(token)
+      override_token_authenticated_at(token, DateTime.add(DateTime.utc_now(:second), -1, :hour))
+
+      conn =
+        conn
+        |> put_session(:user_token, token)
+        |> UserAuth.fetch_current_scope_for_user([])
+        |> UserAuth.log_in_user(user)
+
+      assert new_token = get_session(conn, :user_token)
+      refute new_token == token
+      assert %{family: ^family} = token_row(new_token)
+      assert {session_user, _} = Accounts.get_user_by_session_token(new_token)
+      assert Accounts.sudo_mode?(session_user)
+    end
+
+    test "logging in as another account starts a fresh family", %{conn: conn, user: user} do
+      other_token = Accounts.generate_user_session_token(user_fixture())
+      %{family: other_family} = token_row(other_token)
+
+      conn =
+        conn
+        |> put_session(:user_token, other_token)
+        |> UserAuth.fetch_current_scope_for_user([])
+        |> UserAuth.log_in_user(user)
+
+      assert %{family: family} = token_row(get_session(conn, :user_token))
+      refute family == other_family
     end
 
     test "clears session when user does not match when re-authenticating", %{
@@ -162,7 +241,10 @@ defmodule TipsWeb.UserAuthTest do
         conn |> put_session(:user_token, user_token) |> UserAuth.fetch_current_scope_for_user([])
 
       assert conn.assigns.current_scope.user.id == user.id
-      assert conn.assigns.current_scope.user.authenticated_at == user.authenticated_at
+
+      assert conn.assigns.current_scope.user.authenticated_at ==
+               token_row(user_token).authenticated_at
+
       assert get_session(conn, :user_token) == user_token
     end
 
@@ -179,7 +261,10 @@ defmodule TipsWeb.UserAuthTest do
         |> UserAuth.fetch_current_scope_for_user([])
 
       assert conn.assigns.current_scope.user.id == user.id
-      assert conn.assigns.current_scope.user.authenticated_at == user.authenticated_at
+
+      assert conn.assigns.current_scope.user.authenticated_at ==
+               token_row(user_token).authenticated_at
+
       assert get_session(conn, :user_token) == user_token
       assert get_session(conn, :user_remember_me)
 
@@ -194,30 +279,81 @@ defmodule TipsWeb.UserAuthTest do
       refute conn.assigns.current_scope
     end
 
-    test "reissues a new token after a few days and refreshes cookie", %{conn: conn, user: user} do
+    test "does not renew just before seven days", %{conn: conn, user: user} do
+      token = Accounts.generate_user_session_token(user)
+      backdate_token(token, -7, :day, 60)
+
+      conn = conn |> put_session(:user_token, token) |> UserAuth.fetch_current_scope_for_user([])
+
+      assert conn.assigns.current_scope.user.id == user.id
+      assert get_session(conn, :user_token) == token
+      assert token_count(user) == 1
+    end
+
+    test "renews at seven days through a real signed remember-me cookie", %{
+      conn: conn,
+      user: user
+    } do
       logged_in_conn =
         conn |> fetch_cookies() |> UserAuth.log_in_user(user, %{"remember_me" => "true"})
 
-      token = logged_in_conn.cookies[@remember_me_cookie]
-      %{value: signed_token} = logged_in_conn.resp_cookies[@remember_me_cookie]
-
-      offset_user_token(token, -10, :day)
-      {user, _} = Accounts.get_user_by_session_token(token)
+      token = get_session(logged_in_conn, :user_token)
+      %{family: family} = token_row(token)
+      stale = DateTime.add(DateTime.utc_now(:second), -1, :hour)
+      override_token_authenticated_at(token, stale)
+      backdate_token(token, -7, :day)
 
       conn =
-        conn
-        |> put_session(:user_token, token)
-        |> put_session(:user_remember_me, true)
-        |> put_req_cookie(@remember_me_cookie, signed_token)
+        logged_in_conn
+        |> recycle()
+        |> Map.replace!(:secret_key_base, TipsWeb.Endpoint.config(:secret_key_base))
+        |> init_test_session(%{})
         |> UserAuth.fetch_current_scope_for_user([])
 
       assert conn.assigns.current_scope.user.id == user.id
-      assert conn.assigns.current_scope.user.authenticated_at == user.authenticated_at
+      assert conn.assigns.current_scope.user.authenticated_at == stale
       assert new_token = get_session(conn, :user_token)
-      assert new_token != token
-      assert %{value: new_signed_token, max_age: max_age} = conn.resp_cookies[@remember_me_cookie]
-      assert new_signed_token != signed_token
-      assert max_age == @remember_me_cookie_max_age
+      refute new_token == token
+      assert %{family: ^family, authenticated_at: ^stale} = token_row(new_token)
+
+      assert %{value: new_signed_token, max_age: @remember_me_cookie_max_age} =
+               conn.resp_cookies[@remember_me_cookie]
+
+      conn =
+        conn
+        |> recycle()
+        |> Map.replace!(:secret_key_base, TipsWeb.Endpoint.config(:secret_key_base))
+        |> init_test_session(%{})
+        |> UserAuth.fetch_current_scope_for_user([])
+
+      assert conn.req_cookies[@remember_me_cookie] == new_signed_token
+      assert conn.assigns.current_scope.user.id == user.id
+      assert get_session(conn, :user_token) == new_token
+      assert token_count(user) == 2
+    end
+
+    test "a rejected renewal leaves the request unauthenticated without a new token", %{
+      conn: conn,
+      user: user
+    } do
+      token = Accounts.generate_user_session_token(user)
+      backdate_token(token, -7, :day)
+      delete_account(user)
+
+      conn = conn |> put_session(:user_token, token) |> UserAuth.fetch_current_scope_for_user([])
+
+      assert conn.assigns.current_scope == nil
+      assert token_count(user) == 1
+    end
+
+    test "sessions expire at 60 days", %{conn: conn, user: user} do
+      token = Accounts.generate_user_session_token(user)
+      backdate_token(token, -60, :day)
+
+      conn = conn |> put_session(:user_token, token) |> UserAuth.fetch_current_scope_for_user([])
+
+      assert conn.assigns.current_scope == nil
+      assert token_count(user) == 1
     end
   end
 
@@ -309,8 +445,8 @@ defmodule TipsWeb.UserAuthTest do
 
     test "redirects when authentication is too old", %{conn: conn, user: user} do
       eleven_minutes_ago = DateTime.utc_now(:second) |> DateTime.add(-11, :minute)
-      user = %{user | authenticated_at: eleven_minutes_ago}
       user_token = Accounts.generate_user_session_token(user)
+      override_token_authenticated_at(user_token, eleven_minutes_ago)
       {user, token_inserted_at} = Accounts.get_user_by_session_token(user_token)
       assert DateTime.compare(token_inserted_at, user.authenticated_at) == :gt
       session = conn |> put_session(:user_token, user_token) |> get_session()
@@ -397,5 +533,33 @@ defmodule TipsWeb.UserAuthTest do
         topic: "users_sessions:dG9rZW4y"
       }
     end
+  end
+
+  defp token_row(token) do
+    %{session_family_id: family, authenticated_at: authenticated_at} =
+      Repo.get_by!(Accounts.UserToken, token: token, context: "session")
+
+    %{family: family, authenticated_at: authenticated_at}
+  end
+
+  defp token_count(user) do
+    Repo.aggregate(from(t in Accounts.UserToken, where: t.user_id == ^user.id), :count)
+  end
+
+  defp delete_account(user) do
+    Repo.update_all(from(u in Accounts.User, where: u.id == ^user.id),
+      set: [deleted_at: DateTime.utc_now(:second), handle: nil, email: nil]
+    )
+  end
+
+  # Moves `inserted_at` to `amount` `unit`s ago, then `extra_seconds` closer to now.
+  defp backdate_token(token, amount, unit, extra_seconds \\ 0) do
+    inserted_at =
+      DateTime.utc_now(:second) |> DateTime.add(amount, unit) |> DateTime.add(extra_seconds)
+
+    assert {1, nil} =
+             Repo.update_all(from(t in Accounts.UserToken, where: t.token == ^token),
+               set: [inserted_at: inserted_at]
+             )
   end
 end

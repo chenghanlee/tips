@@ -15,23 +15,10 @@ defmodule Tips.AccountsTest do
       %{id: id} = user = user_fixture()
       assert %User{id: ^id} = Accounts.get_user_by_email(user.email)
     end
-  end
 
-  describe "get_user_by_email_and_password/2" do
-    test "does not return the user if the email does not exist" do
-      refute Accounts.get_user_by_email_and_password("unknown@example.com", "hello world!")
-    end
-
-    test "does not return the user if the password is not valid" do
-      user = user_fixture() |> set_password()
-      refute Accounts.get_user_by_email_and_password(user.email, "invalid")
-    end
-
-    test "returns the user if the email and password are valid" do
-      %{id: id} = user = user_fixture() |> set_password()
-
-      assert %User{id: ^id} =
-               Accounts.get_user_by_email_and_password(user.email, valid_user_password())
+    test "ignores email case and surrounding whitespace" do
+      %{id: id} = user = user_fixture()
+      assert %User{id: ^id} = Accounts.get_user_by_email("  #{String.upcase(user.email)}\n")
     end
   end
 
@@ -77,13 +64,16 @@ defmodule Tips.AccountsTest do
       assert "has already been taken" in errors_on(changeset).email
     end
 
-    test "registers users without password" do
+    test "registers unconfirmed users by email, ignoring password attributes" do
       email = unique_user_email()
-      {:ok, user} = Accounts.register_user(valid_user_attributes(email: email))
+
+      {:ok, user} =
+        Accounts.register_user(valid_user_attributes(email: email, password: "hello world!"))
+
       assert user.email == email
-      assert is_nil(user.hashed_password)
       assert is_nil(user.confirmed_at)
-      assert is_nil(user.password)
+      refute Map.has_key?(user, :password)
+      refute Map.has_key?(user, :hashed_password)
     end
   end
 
@@ -180,78 +170,6 @@ defmodule Tips.AccountsTest do
     end
   end
 
-  describe "change_user_password/3" do
-    test "returns a user changeset" do
-      assert %Ecto.Changeset{} = changeset = Accounts.change_user_password(%User{})
-      assert changeset.required == [:password]
-    end
-
-    test "allows fields to be set" do
-      changeset =
-        Accounts.change_user_password(
-          %User{},
-          %{
-            "password" => "new valid password"
-          },
-          hash_password: false
-        )
-
-      assert changeset.valid?
-      assert get_change(changeset, :password) == "new valid password"
-      assert is_nil(get_change(changeset, :hashed_password))
-    end
-  end
-
-  describe "update_user_password/2" do
-    setup do
-      %{user: user_fixture()}
-    end
-
-    test "validates password", %{user: user} do
-      {:error, changeset} =
-        Accounts.update_user_password(user, %{
-          password: "not valid",
-          password_confirmation: "another"
-        })
-
-      assert %{
-               password: ["should be at least 12 character(s)"],
-               password_confirmation: ["does not match password"]
-             } = errors_on(changeset)
-    end
-
-    test "validates maximum values for password for security", %{user: user} do
-      too_long = String.duplicate("db", 100)
-
-      {:error, changeset} =
-        Accounts.update_user_password(user, %{password: too_long})
-
-      assert "should be at most 72 character(s)" in errors_on(changeset).password
-    end
-
-    test "updates the password", %{user: user} do
-      {:ok, {user, expired_tokens}} =
-        Accounts.update_user_password(user, %{
-          password: "new valid password"
-        })
-
-      assert expired_tokens == []
-      assert is_nil(user.password)
-      assert Accounts.get_user_by_email_and_password(user.email, "new valid password")
-    end
-
-    test "deletes all tokens for the given user", %{user: user} do
-      _ = Accounts.generate_user_session_token(user)
-
-      {:ok, {_, _}} =
-        Accounts.update_user_password(user, %{
-          password: "new valid password"
-        })
-
-      refute Repo.get_by(UserToken, user_id: user.id)
-    end
-  end
-
   describe "generate_user_session_token/1" do
     setup do
       %{user: user_fixture()}
@@ -273,12 +191,11 @@ defmodule Tips.AccountsTest do
       end
     end
 
-    test "duplicates the authenticated_at of given user in new token", %{user: user} do
-      user = %{user | authenticated_at: DateTime.add(DateTime.utc_now(:second), -3600)}
-      token = Accounts.generate_user_session_token(user)
+    test "mints current recency, ignoring the caller's authenticated_at", %{user: user} do
+      stale = DateTime.add(DateTime.utc_now(:second), -3600)
+      token = Accounts.generate_user_session_token(%{user | authenticated_at: stale})
       assert user_token = Repo.get_by(UserToken, token: token)
-      assert user_token.authenticated_at == user.authenticated_at
-      assert DateTime.compare(user_token.inserted_at, user.authenticated_at) == :gt
+      assert DateTime.after?(user_token.authenticated_at, stale)
     end
   end
 
@@ -350,13 +267,9 @@ defmodule Tips.AccountsTest do
       assert {:error, :not_found} = Accounts.login_user_by_magic_link(encoded_token)
     end
 
-    test "raises when unconfirmed user has password set" do
-      user = unconfirmed_user_fixture()
-      {1, nil} = Repo.update_all(User, set: [hashed_password: "hashed"])
-      {encoded_token, _hashed_token} = generate_user_magic_link_token(user)
-
-      assert_raise RuntimeError, ~r/magic link log in is not allowed/, fn ->
-        Accounts.login_user_by_magic_link(encoded_token)
+    test "returns not found for tokens that are not valid Base64" do
+      for token <- ["%", "a"] do
+        assert {:error, :not_found} = Accounts.login_user_by_magic_link(token)
       end
     end
   end
@@ -386,12 +299,6 @@ defmodule Tips.AccountsTest do
       assert user_token.user_id == user.id
       assert user_token.sent_to == user.email
       assert user_token.context == "login"
-    end
-  end
-
-  describe "inspect/2 for the User module" do
-    test "does not include password" do
-      refute inspect(%User{password: "123456"}) =~ "password: \"123456\""
     end
   end
 end

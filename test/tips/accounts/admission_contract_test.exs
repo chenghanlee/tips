@@ -86,7 +86,7 @@ defmodule Tips.Accounts.AdmissionContractTest do
 
     test "an expired session row does not authenticate" do
       token = Accounts.generate_user_session_token(user_fixture())
-      set_token_inserted_at(token, DateTime.add(DateTime.utc_now(:second), -15, :day))
+      set_token_inserted_at(token, DateTime.add(DateTime.utc_now(:second), -60, :day))
 
       assert Accounts.get_user_by_session_token(token) == nil
     end

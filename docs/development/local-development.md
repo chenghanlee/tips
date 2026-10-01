@@ -8,7 +8,7 @@ integrations are separate tasks.
 
 Install Elixir **1.20.4**, Erlang/OTP **29.1**, Python **3.11+**, Docker with Compose, and a C build
 toolchain (Xcode Command Line Tools on macOS, or a C compiler and `make` on Linux)
-for the generated bcrypt dependency. Python runs documentation checks and optional
+for native dependencies such as `lazy_html`. Python runs documentation checks and optional
 agent tooling. See the [toolchain guide](toolchain.md)
 for all dependency and asset pins. Start the shared extension-enabled PostgreSQL
 **18.6** server from the main checkout with `docker compose up -d --wait db`.
@@ -133,7 +133,7 @@ These directories are ignored. Keep the committed lockfile.
 ### Local application release
 
 The Dockerfile builds the pinned Elixir/OTP release on Debian bookworm with the
-C toolchain for bcrypt, then runs it as a non-root user in Debian slim. Docker
+C toolchain, then runs it as a non-root user in Debian slim. Docker
 Compose publishes the app only on `127.0.0.1:4300` and the database on
 `127.0.0.1:5433` (`TIPS_APP_PORT` / `TIPS_DB_PORT` override those host ports).
 `PHX_HOST` defaults to `localhost`; the smoke sets `tips.example` to test the

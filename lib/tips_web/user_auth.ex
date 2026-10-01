@@ -9,11 +9,10 @@ defmodule TipsWeb.UserAuth do
   import Phoenix.Controller
 
   alias Tips.Accounts
-  alias Tips.Accounts.Scope
+  alias Tips.Accounts.{Scope, UserToken}
 
-  # Make the remember me cookie valid for 14 days. This should match
-  # the session validity setting in UserToken.
-  @max_cookie_age_in_days 14
+  # The remember me cookie lives as long as the session token it carries.
+  @max_cookie_age_in_days UserToken.session_validity_in_days()
   @remember_me_cookie "_tips_web_user_remember_me"
   @remember_me_options [
     sign: true,
@@ -21,13 +20,9 @@ defmodule TipsWeb.UserAuth do
     same_site: "Lax"
   ]
 
-  # How old the session token should be before a new one is issued. When a request is made
-  # with a session token older than this value, then a new session token will be created
-  # and the session and remember-me cookies (if set) will be updated with the new token.
-  # Lowering this value will result in more tokens being created by active users. Increasing
-  # it will result in less time before a session token expires for a user to get issued a new
-  # token. This can be set to a value greater than `@max_cookie_age_in_days` to disable
-  # the reissuing of tokens completely.
+  # How old the session token should be before it is renewed. When a request is made
+  # with a session token at least this old, a successor token in the same session family
+  # is created and the session and remember-me cookies (if set) are updated with it.
   @session_reissue_age_in_days 7
 
   @doc """
@@ -67,16 +62,17 @@ defmodule TipsWeb.UserAuth do
   @doc """
   Authenticates the user by looking into the session and remember me token.
 
-  Will reissue the session token if it is older than the configured age.
+  Renews the session token once it reaches the configured age. A rejected
+  renewal leaves the request unauthenticated.
   """
   def fetch_current_scope_for_user(conn, _opts) do
     with {token, conn} <- ensure_user_token(conn),
-         {user, token_inserted_at} <- Accounts.get_user_by_session_token(token) do
-      conn
-      |> assign(:current_scope, Scope.for_user(user))
-      |> maybe_reissue_user_session_token(user, token_inserted_at)
+         {user, token_inserted_at} <- Accounts.get_user_by_session_token(token),
+         {:ok, conn} <- maybe_renew_user_session_token(conn, user, token, token_inserted_at) do
+      assign(conn, :current_scope, Scope.for_user(user))
     else
       nil -> assign(conn, :current_scope, Scope.for_user(nil))
+      {:error, :unauthenticated} -> assign(conn, :current_scope, Scope.for_user(nil))
     end
   end
 
@@ -94,27 +90,34 @@ defmodule TipsWeb.UserAuth do
     end
   end
 
-  # Reissue the session token if it is older than the configured reissue age.
-  defp maybe_reissue_user_session_token(conn, user, token_inserted_at) do
+  # Renew the session token once it reaches the configured reissue age. Renewal keeps the
+  # family and authentication recency; it never falls back to issuing a fresh token.
+  defp maybe_renew_user_session_token(conn, user, token, token_inserted_at) do
     token_age = DateTime.diff(DateTime.utc_now(:second), token_inserted_at, :day)
 
     if token_age >= @session_reissue_age_in_days do
-      create_or_extend_session(conn, user, %{})
+      with {:ok, new_token} <- Accounts.renew_user_session_token(user, token) do
+        remember_me = get_session(conn, :user_remember_me)
+
+        {:ok,
+         conn
+         |> put_token_in_session(new_token)
+         |> maybe_write_remember_me_cookie(new_token, %{}, remember_me)}
+      end
     else
-      conn
+      {:ok, conn}
     end
   end
 
-  # This function is the one responsible for creating session tokens
-  # and storing them safely in the session and cookies. It may be called
-  # either when logging in, during sudo mode, or to renew a session which
-  # will soon expire.
+  # This function creates session tokens after genuine authentication: logging in
+  # or re-authenticating for sudo mode. The browser's current token lets the new
+  # token keep the same session family.
   #
   # When the session is created, rather than extended, the renew_session
   # function will clear the session to avoid fixation attacks. See the
   # renew_session function to customize this behaviour.
   defp create_or_extend_session(conn, user, params) do
-    token = Accounts.generate_user_session_token(user)
+    token = Accounts.generate_user_session_token(user, get_session(conn, :user_token))
     remember_me = get_session(conn, :user_remember_me)
 
     conn
@@ -260,6 +263,24 @@ defmodule TipsWeb.UserAuth do
       Scope.for_user(user)
     end)
   end
+
+  # The root and the editor routes of the frontend design; ids are positive integers.
+  @return_to ~r"\A/(editor/(tips/new|tips/[1-9]\d*/edit|tips/[1-9]\d*/reviews/new|reviews/[1-9]\d*/edit))?\z"
+
+  @doc """
+  Returns `path` if it is an allowed local return destination, otherwise `nil`.
+
+  Only the root and the editor routes are allowed. The whole path must match,
+  so schemes, `//`, backslashes, percent escapes, queries and control
+  characters are rejected. Check every carrier with it when accepting and when
+  consuming a destination.
+  """
+  @spec allowed_return_to(term()) :: String.t() | nil
+  def allowed_return_to(path) when is_binary(path) do
+    if path =~ @return_to, do: path
+  end
+
+  def allowed_return_to(_path), do: nil
 
   @doc "Returns the path to redirect to after log in."
   # the user was already logged in, redirect to settings

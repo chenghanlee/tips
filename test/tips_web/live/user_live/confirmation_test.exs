@@ -19,6 +19,7 @@ defmodule TipsWeb.UserLive.ConfirmationTest do
 
       {:ok, _lv, html} = live(conn, ~p"/users/log-in/#{token}")
       assert html =~ "Confirm and stay logged in"
+      refute String.downcase(html) =~ "password"
     end
 
     test "renders login page for confirmed user", %{conn: conn, confirmed_user: user} do

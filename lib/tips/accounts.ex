@@ -149,24 +149,6 @@ defmodule Tips.Accounts do
   end
 
   @doc """
-  Gets a user by email and password.
-
-  ## Examples
-
-      iex> get_user_by_email_and_password("foo@example.com", "correct_password")
-      %User{}
-
-      iex> get_user_by_email_and_password("foo@example.com", "invalid_password")
-      nil
-
-  """
-  def get_user_by_email_and_password(email, password)
-      when is_binary(email) and is_binary(password) do
-    user = Repo.get_by(User, email: User.normalize_email(email))
-    if User.valid_password?(user, password), do: user
-  end
-
-  @doc """
   Gets a single user.
 
   Raises `Ecto.NoResultsError` if the User does not exist.
@@ -183,6 +165,19 @@ defmodule Tips.Accounts do
   def get_user!(id), do: Repo.get!(User, id)
 
   ## User registration
+
+  @handle_words ~w(amber birch cedar cloud coral delta ember fern harbor heron juniper
+                   lake maple meadow orbit pebble pine river sage slate spruce stone tide willow)
+
+  @doc """
+  Suggests a handle: a neutral word and a random four-digit suffix, such as
+  `"maple-4821"`.
+
+  It reserves nothing and does not check availability: the unique index decides
+  at registration.
+  """
+  @spec suggest_handle() :: String.t()
+  def suggest_handle, do: "#{Enum.random(@handle_words)}-#{Enum.random(1000..9999)}"
 
   @doc """
   Registers a user.
@@ -263,50 +258,100 @@ defmodule Tips.Accounts do
     end)
   end
 
-  @doc """
-  Returns an `%Ecto.Changeset{}` for changing the user password.
-
-  See `Tips.Accounts.User.password_changeset/3` for a list of supported options.
-
-  ## Examples
-
-      iex> change_user_password(user)
-      %Ecto.Changeset{data: %User{}}
-
-  """
-  def change_user_password(user, attrs \\ %{}, opts \\ []) do
-    User.password_changeset(user, attrs, opts)
-  end
-
-  @doc """
-  Updates the user password.
-
-  Returns a tuple with the updated user, as well as a list of expired tokens.
-
-  ## Examples
-
-      iex> update_user_password(user, %{password: ...})
-      {:ok, {%User{}, [...]}}
-
-      iex> update_user_password(user, %{password: "too short"})
-      {:error, %Ecto.Changeset{}}
-
-  """
-  def update_user_password(user, attrs) do
-    user
-    |> User.password_changeset(attrs)
-    |> update_user_and_delete_all_tokens()
-  end
-
   ## Session
 
   @doc """
-  Generates a session token.
+  Generates a session token after genuine authentication.
+
+  The token records the current time as `authenticated_at`. Without a
+  predecessor it starts a new session family. Given the browser's current
+  session token, it keeps that token's family when the token is a valid
+  session of the same account, and starts a new family otherwise. Background
+  renewal must use `renew_user_session_token/2` instead.
   """
-  def generate_user_session_token(user) do
-    {token, user_token} = UserToken.build_session_token(user)
+  def generate_user_session_token(user, predecessor_token \\ nil)
+
+  def generate_user_session_token(%User{id: user_id}, nil) do
+    insert_session_token!(user_id, Ecto.UUID.generate(), DateTime.utc_now(:second))
+  end
+
+  def generate_user_session_token(%User{id: user_id}, predecessor_token) do
+    {:ok, token} =
+      Repo.transact(fn ->
+        family =
+          case lock_valid_predecessor(user_id, predecessor_token) do
+            %UserToken{session_family_id: family} -> family
+            nil -> Ecto.UUID.generate()
+          end
+
+        {:ok, insert_session_token!(user_id, family, DateTime.utc_now(:second))}
+      end)
+
+    token
+  end
+
+  @doc """
+  Renews a session from its predecessor token without authenticating again.
+
+  Locks the account, then requires the predecessor to be an unexpired session
+  of the same, non-deleted account. The successor copies the predecessor's
+  family and `authenticated_at` from the database; the predecessor stays valid
+  until it expires. Returns `{:error, :unauthenticated}` and creates nothing
+  otherwise.
+  """
+  @spec renew_user_session_token(User.t(), binary()) ::
+          {:ok, binary()} | {:error, :unauthenticated}
+  def renew_user_session_token(%User{id: user_id}, predecessor_token) do
+    Repo.transact(fn ->
+      case lock_valid_predecessor(user_id, predecessor_token) do
+        %UserToken{session_family_id: family, authenticated_at: authenticated_at} ->
+          {:ok, insert_session_token!(user_id, family, authenticated_at)}
+
+        nil ->
+          {:error, :unauthenticated}
+      end
+    end)
+  end
+
+  # Account lock first, then the predecessor under the shared validity definition.
+  defp lock_valid_predecessor(user_id, token) do
+    account =
+      from(u in User,
+        where: u.id == ^user_id and is_nil(u.deleted_at),
+        lock: "FOR NO KEY UPDATE",
+        select: u.id
+      )
+
+    if Repo.one(account) do
+      Repo.one(
+        from(t in UserToken.valid_session_token_query(token), where: t.user_id == ^user_id)
+      )
+    end
+  end
+
+  defp insert_session_token!(user_id, family, authenticated_at) do
+    {token, user_token} = UserToken.build_session_token(user_id, family, authenticated_at)
     Repo.insert!(user_token)
     token
+  end
+
+  @doc """
+  Deletes up to `limit` expired tokens, oldest first, and returns the count.
+
+  Expiry uses each context's validity, so pruning an expired session never
+  touches younger sessions of the same family.
+  """
+  @spec prune_expired_user_tokens(pos_integer()) :: non_neg_integer()
+  def prune_expired_user_tokens(limit \\ 1000) when is_integer(limit) and limit > 0 do
+    expired =
+      from(t in UserToken.expired_tokens_query(),
+        order_by: [asc: t.inserted_at, asc: t.id],
+        limit: ^limit,
+        select: t.id
+      )
+
+    {count, _} = Repo.delete_all(from(t in UserToken, where: t.id in subquery(expired)))
+    count
   end
 
   @doc """
@@ -336,47 +381,35 @@ defmodule Tips.Accounts do
   @doc """
   Logs the user in by magic link.
 
-  There are three cases to consider:
+  There are two cases to consider:
 
   1. The user has already confirmed their email. They are logged in
      and the magic link is expired.
 
-  2. The user has not confirmed their email and no password is set.
-     In this case, the user gets confirmed, logged in, and all tokens -
-     including session ones - are expired. In theory, no other tokens
-     exist but we delete all of them for best security practices.
-
-  3. The user has not confirmed their email but a password is set.
-     This cannot happen in the default implementation but may be the
-     source of security pitfalls. See the "Mixing magic link and password registration" section of
-     `mix help phx.gen.auth`.
+  2. The user has not confirmed their email. In this case, the user
+     gets confirmed, logged in, and all tokens - including session
+     ones - are expired. In theory, no other tokens exist but we
+     delete all of them for best security practices.
   """
   def login_user_by_magic_link(token) do
-    {:ok, query} = UserToken.verify_magic_link_token_query(token)
-
-    case Repo.one(query) do
-      # Prevent session fixation attacks by disallowing magic links for unconfirmed users with password
-      {%User{confirmed_at: nil, hashed_password: hash}, _token} when not is_nil(hash) ->
-        raise """
-        magic link log in is not allowed for unconfirmed users with a password set!
-
-        This cannot happen with the default implementation, which indicates that you
-        might have adapted the code to a different use case. Please make sure to read the
-        "Mixing magic link and password registration" section of `mix help phx.gen.auth`.
-        """
-
-      {%User{confirmed_at: nil} = user, _token} ->
-        user
-        |> User.confirm_changeset()
-        |> update_user_and_delete_all_tokens()
-
-      {user, token} ->
-        Repo.delete!(token)
-        {:ok, {user, []}}
-
-      nil ->
-        {:error, :not_found}
+    with {:ok, query} <- UserToken.verify_magic_link_token_query(token),
+         {user, user_token} <- Repo.one(query) do
+      log_in_by_magic_link(user, user_token)
+    else
+      # :error is an undecodable token, nil an unknown or expired one
+      result when result in [:error, nil] -> {:error, :not_found}
     end
+  end
+
+  defp log_in_by_magic_link(%User{confirmed_at: nil} = user, _user_token) do
+    user
+    |> User.confirm_changeset()
+    |> update_user_and_delete_all_tokens()
+  end
+
+  defp log_in_by_magic_link(user, user_token) do
+    Repo.delete!(user_token)
+    {:ok, {user, []}}
   end
 
   @doc ~S"""

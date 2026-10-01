@@ -111,6 +111,24 @@ defmodule Tips.Accounts.IdentitySchemaTest do
     end
   end
 
+  describe "passwordless identity" do
+    test "users have no password storage column or schema field" do
+      %{rows: rows} =
+        Repo.query!("""
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'users'
+        """)
+
+      columns = List.flatten(rows)
+      fields = User.__schema__(:fields) ++ User.__schema__(:virtual_fields)
+
+      assert "email" in columns
+      assert :email in fields
+      assert Enum.filter(columns, &(&1 =~ "password")) == []
+      assert Enum.filter(fields, &(Atom.to_string(&1) =~ "password")) == []
+    end
+  end
+
   describe "registration boundary" do
     for handle <- [
           nil,
@@ -156,11 +174,6 @@ defmodule Tips.Accounts.IdentitySchemaTest do
                Repo.reload!(user)
 
       assert Accounts.get_user_by_email(" MIXED@EXAMPLE.COM ").id == user.id
-
-      user = set_password(user)
-
-      assert Accounts.get_user_by_email_and_password(" MIXED@EXAMPLE.COM ", valid_user_password()).id ==
-               user.id
     end
 
     test "case-variant duplicate handle returns a changeset error" do
@@ -229,7 +242,7 @@ defmodule Tips.Accounts.IdentitySchemaTest do
         user = insert_user()
         fresh = Accounts.generate_user_session_token(user)
         expired = Accounts.generate_user_session_token(user)
-        offset_user_token(expired, -(14 * 24 + 1), :hour)
+        offset_user_token(expired, -(60 * 24 + 1), :hour)
 
         assert {%{id: id}, _inserted_at} = Accounts.get_user_by_session_token(fresh)
         assert id == user.id
@@ -291,7 +304,7 @@ defmodule Tips.Accounts.IdentitySchemaTest do
       end
     end
 
-    test "session creation persists raw tokens, fresh families and authentication recency" do
+    test "session creation persists raw tokens, fresh families and current authentication recency" do
       recency = ~U[2026-09-20 12:34:56Z]
       user = insert_user() |> Map.put(:authenticated_at, recency)
       first = Accounts.generate_user_session_token(user)
@@ -303,8 +316,8 @@ defmodule Tips.Accounts.IdentitySchemaTest do
       assert {:ok, family} = Ecto.UUID.cast(first_row.session_family_id)
       assert {:ok, other_family} = Ecto.UUID.cast(second_row.session_family_id)
       refute family == other_family
-      assert first_row.authenticated_at == recency
-      assert second_row.authenticated_at == recency
+      assert DateTime.after?(first_row.authenticated_at, recency)
+      assert DateTime.after?(second_row.authenticated_at, recency)
 
       assert {{_, 0}, "Etc/UTC"} =
                {first_row.inserted_at.microsecond, first_row.inserted_at.time_zone}
