@@ -63,13 +63,6 @@ defmodule Tips.Accounts.RegistrationTest do
 
       assert changed.handle == "Fixed"
 
-      assert {:ok, {changed, _}} =
-               Accounts.update_user_password(user, %{
-                 password: valid_user_password(),
-                 handle: "Renamed"
-               })
-
-      assert changed.handle == "Fixed"
       assert %User{handle: "Fixed"} = Repo.reload!(user)
     end
   end

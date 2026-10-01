@@ -21,6 +21,15 @@ defmodule TipsWeb.UserLive.LoginTest do
       refute has_element?(lv, "input[type=password]")
       refute String.downcase(html) =~ "password"
     end
+
+    test "prefills the email carried by registration delivery recovery", %{conn: conn} do
+      email = unique_user_email()
+      conn = init_test_session(conn, %{"phoenix_flash" => %{"email" => email}})
+
+      {:ok, lv, _html} = live(conn, ~p"/users/log-in")
+
+      assert has_element?(lv, ~s|#login_form_magic input[type=email][value="#{email}"]|)
+    end
   end
 
   describe "user login - magic link" do

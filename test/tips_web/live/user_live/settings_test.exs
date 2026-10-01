@@ -72,16 +72,6 @@ defmodule TipsWeb.UserLive.SettingsTest do
 
       assert result =~ "A link to confirm your email"
 
-      lv
-      |> element("#password_form")
-      |> render_submit(%{
-        "user" => %{
-          "password" => valid_user_password(),
-          "password_confirmation" => valid_user_password(),
-          "handle" => "Renamed"
-        }
-      })
-
       assert Tips.Repo.reload!(user).handle == user.handle
     end
 

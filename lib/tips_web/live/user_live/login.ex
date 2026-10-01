@@ -58,7 +58,9 @@ defmodule TipsWeb.UserLive.Login do
 
   @impl true
   def mount(_params, _session, socket) do
-    email = get_in(socket.assigns, [:current_scope, Access.key(:user), Access.key(:email)])
+    email =
+      Phoenix.Flash.get(socket.assigns.flash, :email) ||
+        get_in(socket.assigns, [:current_scope, Access.key(:user), Access.key(:email)])
 
     form = to_form(%{"email" => email}, as: "user")
 
