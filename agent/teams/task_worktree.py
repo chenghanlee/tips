@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import cast
 
 from team import (
+    NATIVE_LSP_PLUGINS,
     CodingRole,
     Config,
     Entity,
@@ -23,7 +24,6 @@ from team import (
     load_config,
     occupant,
     parse_herdr,
-    release_dexter,
     require_git_admin,
     stop_agent,
 )
@@ -34,9 +34,14 @@ class RefusalError(Exception):
 
 
 def run(
-    argv: Sequence[str | Path], *, timeout: float | None = None, env: dict[str, str] | None = None
+    argv: Sequence[str | Path],
+    *,
+    timeout: float | None = None,
+    env: dict[str, str] | None = None,
+    input_text: str | None = None,
+    cwd: Path | None = None,
 ) -> str:
-    result = execute(argv, timeout=timeout, env=env)
+    result = execute(argv, timeout=timeout, env=env, input_text=input_text, cwd=cwd)
     if result.returncode:
         raise RefusalError(
             f"{shlex.join(map(str, argv))} failed: {result.stderr.strip() or result.stdout.strip()}"
@@ -118,7 +123,7 @@ class WorktreeTask:
     worktree: Path
     branch: str
     existing_branch: bool
-    tools: Path
+    wrapper: Path
     review_sha: str | None
     old_head: str | None
     desired: dict[Path, str]
@@ -223,14 +228,43 @@ class WorktreeTask:
                     )
 
     def check_tools(self) -> None:
-        self.tools = Path(
-            os.environ.get("TIPS_ELIXIR_TOOLS", str(self.root / "agent/lsp/vendor"))
+        home = Path(
+            os.environ.get("TIPS_DEXTER_HOME", str(self.root / "agent/lsp/dexter"))
         ).resolve()
+        self.binary = home / "vendor/dexter"
+        self.wrapper = self.worktree / ".dexter/dexter.sh"
+        self.plugin = self.worktree / ".dexter/claude-plugin"
         if not (self.root / ".agents/skills").is_dir():
             raise RefusalError("Shared skills directory is missing.")
-        self.target_env["TIPS_ELIXIR_TOOLS"] = str(self.tools)
-        if self.args.start and not os.access(self.tools / "bin/dexter", os.X_OK):
-            raise RefusalError("Dexter is missing; run agent/lsp/install_dexter.sh.")
+        if not os.access(self.binary, os.X_OK):
+            raise RefusalError(f"Missing executable: {self.binary}; run agent/lsp/dexter/build.sh.")
+        self.target_env["TIPS_DEXTER"] = str(self.wrapper)
+
+    def elixir_sources(self) -> Path:
+        """The Elixir standard-library sources Dexter indexes for this worktree."""
+        version = run(
+            ["elixir", "--short-version"],
+            cwd=self.worktree if self.worktree.is_dir() else self.root,
+            timeout=self.timeouts["dexter_startup_seconds"],
+        )
+        if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?", version):
+            raise RefusalError(f"Unexpected Elixir version: {version!r}")
+        explicit = os.environ.get("DEXTER_ELIXIR_LIB_ROOT")
+        sources = (
+            Path(explicit)
+            if explicit
+            else self.root / "agent/lsp/vendor" / f"elixir-{version}" / "lib"
+        )
+        recorded = sources.parent / "VERSION"
+        if (
+            not (sources / "elixir/lib/enum.ex").is_file()
+            or not recorded.is_file()
+            or recorded.read_text().strip() != version
+        ):
+            raise RefusalError(
+                f"Elixir {version} sources are missing at {sources}; see agent/lsp/README.md."
+            )
+        return sources.resolve()
 
     def fetch(self) -> None:
         # Review heads are often pushed after main's last fetch; fetch before resolving them.
@@ -270,33 +304,92 @@ class WorktreeTask:
             self.old_head = git("-C", self.worktree, "rev-parse", "HEAD")
 
     def prepare_config(self) -> None:
+        sources = str(self.elixir_sources())
+        self.desired = {
+            self.wrapper: (
+                "#!/bin/sh\n"
+                f"export DEXTER_ELIXIR_LIB_ROOT={shlex.quote(sources)}\n"
+                f"exec {shlex.quote(str(self.binary))} --root {shlex.quote(str(self.worktree))}"
+                ' "$@"\n'
+            ),
+            self.worktree / ".dexter/.gitignore": "*\n",
+        }
         if self.kind == "codex":
             config = """[plugins."mix-compile@elixir-agent-tools"]
-enabled = false
+enabled = true
 [plugins."mix-credo@elixir-agent-tools"]
-enabled = false
-
-[shell_environment_policy.set]
+enabled = true
 """
-            config += "".join(
-                f"{key} = {json.dumps(value)}\n" for key, value in self.target_env.items()
-            )
-            self.desired = {self.worktree / ".codex/config.toml": config}
+            config += '\n[plugins."elixir-lsp@elixir-agent-tools"]\nenabled = false\n'
+            self.desired[self.worktree / ".codex/config.toml"] = config
         else:
-            self.desired = {
-                self.worktree / ".claude/settings.local.json": json.dumps(
+            # Claude's native LSP tool runs the same binary against the same daemon.
+            self.desired[self.plugin / ".claude-plugin/plugin.json"] = (
+                json.dumps(
                     {
-                        "enabledPlugins": {
-                            "mix-compile@elixir-agent-tools": False,
-                            "mix-credo@elixir-agent-tools": False,
-                            "elixir-lsp@elixir-agent-tools": False,
-                            "dexter-lsp@dexter": False,
+                        "name": "tips-dexter",
+                        "description": "Dexter language server bound to this worktree",
+                        "version": "1.0.0",
+                        "lspServers": {
+                            "dexter": {
+                                "command": str(self.binary),
+                                "args": ["--root", str(self.worktree), "lsp"],
+                                "env": {"DEXTER_ELIXIR_LIB_ROOT": sources},
+                                "extensionToLanguage": {
+                                    ".ex": "elixir",
+                                    ".exs": "elixir",
+                                    ".heex": "phoenix-heex",
+                                },
+                            }
                         },
                     },
                     indent=2,
                 )
-                + "\n",
-            }
+                + "\n"
+            )
+
+    def language_brief(self) -> str:
+        if self.kind == "codex":
+            tools = (
+                f"Language tools for this session: {self.wrapper} is Dexter bound to "
+                f"{self.worktree}; run it via your shell tool, for example "
+                f"{self.wrapper} query references lib/example.ex 12 8 (1-based line and "
+                "column). Read agent/lsp/README.md for the nine read-only operations. "
+            )
+        else:
+            tools = (
+                "Language tools for this session: the native LSP tool is Dexter bound to "
+                f"{self.worktree}; use it for definitions, references, hover, symbols and "
+                "call hierarchy. Read agent/lsp/README.md for its limits. "
+            )
+        return (
+            tools + "Do not start another Elixir language server. Freshness is unverified; "
+            "empty results are not proof of absence. Do not stop the shared daemon when "
+            "this agent exits, and do not run git clean -x: it deletes the bound command "
+            "and the index while the daemon may still run. "
+            "Read the team operating agreement and your role card, then await assignment."
+        )
+
+    def start_language_server(self) -> None:
+        # The bound command carries the binary, root and Elixir sources; a
+        # missing or wrong source tree fails here, before any client starts.
+        output = run(
+            [
+                "/bin/sh",
+                self.wrapper,
+                "query",
+                "workspace-symbols",
+                "--wait",
+                f"{self.timeouts['dexter_startup_seconds']}s",
+                "MixProject",
+            ],
+            timeout=self.timeouts["dexter_startup_seconds"] + 5,
+            env={**os.environ, **self.target_env},
+            input_text="",
+        )
+        if not json.loads(output):
+            raise RefusalError("Dexter indexed no MixProject module; inspect the daemon log.")
+        print(f"Dexter provisioning: index ready for {self.worktree}")
 
     def check_target_tree(self) -> None:
         self.target_tree = git(
@@ -306,7 +399,8 @@ enabled = false
             or (self.branch if self.existing_branch else "origin/main"),
         )
         selected = [path.relative_to(self.worktree).as_posix() for path in self.desired] + [
-            ".agents/skills"
+            ".agents/skills",
+            ".dexter",
         ]
         for relative in selected:
             if git("ls-tree", self.target_tree, "--", relative):
@@ -314,6 +408,8 @@ enabled = false
                     f"Requested revision tracks generated path {relative}; preserving checkout."
                 )
             parent = str(Path(relative).parent)
+            if parent == ".":
+                continue
             entry = git("ls-tree", self.target_tree, "--", parent)
             if entry and (not entry.startswith("040000 tree ")):
                 raise RefusalError(
@@ -324,8 +420,11 @@ enabled = false
         # Preflight selected files before stopping a client or changing HEAD.
         self.changed = []
         for path, content in self.desired.items():
-            if path.is_symlink() or path.parent.is_symlink():
-                raise RefusalError(f"Refusing symlinked client configuration: {path}")
+            for parent in (path, *path.parents):
+                if parent == self.worktree:
+                    break
+                if parent.is_symlink():
+                    raise RefusalError(f"Refusing symlinked client configuration: {path}")
             if path.exists() and path.read_text() != content and (not self.args.force):
                 raise RefusalError(
                     f"Refusing to overwrite {path}; inspect it before using --force."
@@ -423,6 +522,7 @@ enabled = false
         if not self.review_sha:
             raise RefusalError("A running reviewer advances only to an explicit --review-ref.")
         git("-C", self.worktree, "checkout", "--detach", "--no-overwrite-ignore", self.review_sha)
+        self.start_language_server()
         print(f"Advanced {self.agent_name} in place: {self.worktree} at {self.review_sha}")
         return True
 
@@ -432,13 +532,6 @@ enabled = false
             raise RefusalError("Target pane is not at its shell; nothing will be launched there.")
 
     def checkout(self) -> None:
-        if self.owner is None and not release_dexter(
-            self.worktree, self.tools, self.timeouts["shutdown_seconds"]
-        ):
-            raise RefusalError(
-                "Dexter release unconfirmed; worktree preserved. "
-                "Check its index and attached clients (agent/lsp/README.md)."
-            )
         if not self.worktree.exists():
             if self.review_sha:
                 git("worktree", "add", "--detach", self.worktree, self.review_sha)
@@ -480,6 +573,7 @@ enabled = false
                 temp.unlink(missing_ok=True)
 
     def link_skills(self) -> None:
+        self.wrapper.chmod(0o755)
         self.skills.parent.mkdir(parents=True, exist_ok=True)
         shared_skills = self.root / ".agents/skills"
         if not self.skills.is_symlink() or os.readlink(self.skills) != str(shared_skills):
@@ -487,14 +581,6 @@ enabled = false
             self.skills.symlink_to(shared_skills)
 
     def launch(self) -> None:
-        # Init names this exact root; automatic discovery can prefer a parent's index.
-        if not (self.worktree / ".dexter/dexter.db").is_file():
-            print(
-                run(
-                    [self.tools / "bin/dexter", "init", self.worktree],
-                    timeout=self.timeouts["launch_seconds"],
-                )
-            )
         # Herdr runs separately: exports must execute in the target pane.
         marker = "TIPS_TASK_READY_" + uuid.uuid4().hex
         setup = (
@@ -525,15 +611,28 @@ enabled = false
             if self.model:
                 client += ["-m", self.model]
             client += ["-c", "model_reasoning_effort=" + json.dumps(self.effort)]
+            client.append(self.language_brief())
         else:
             client += [
                 "--permission-mode",
                 self.policies["claude_permission_mode"],
                 "--effort",
                 self.effort,
-                # Linked worktrees may read local settings from the main checkout; pass by path.
+                "--plugin-dir",
+                str(self.plugin),
+                # CLI settings also apply in linked worktrees and preserve user files.
                 "--settings",
-                str(self.worktree / ".claude/settings.local.json"),
+                json.dumps(
+                    {
+                        "enabledPlugins": {
+                            "mix-compile@elixir-agent-tools": True,
+                            "mix-credo@elixir-agent-tools": True,
+                            **NATIVE_LSP_PLUGINS,
+                        }
+                    }
+                ),
+                "--append-system-prompt",
+                self.language_brief(),
             ]
             if self.model:
                 client += ["--model", self.model]
@@ -570,7 +669,7 @@ enabled = false
             f"{self.kind}"
             ", "
             f"{self.worktree}"
-            ". Dexter is available; project checks remain explicit."
+            ". Dexter is started; index freshness is unverified."
         )
 
     def occupant(self, pane: str) -> tuple[Path, bool]:
@@ -599,6 +698,7 @@ def main() -> None:
     task.checkout()
     task.write_config()
     task.link_skills()
+    task.start_language_server()
     print(f"Worktree: {task.worktree}")
     if task.args.start:
         task.launch()

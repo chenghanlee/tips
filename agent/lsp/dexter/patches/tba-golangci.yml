@@ -1,0 +1,182 @@
+# TBA Go lint profile, adapted for the Dexter module.
+# See README.md#required-go-static-analysis for tool pins and adaptations.
+
+version: "2"
+
+run:
+  relative-path-mode: gomod
+  tests: true
+  timeout: 5m
+
+linters:
+  # Start from the curated "standard" set (errcheck, govet, ineffassign, staticcheck, unused),
+  # then add TBA-relevant linters explicitly.
+  default: standard
+
+  enable:
+    # --- Correctness ---
+    - bodyclose       # HTTP response body not closed -> resource leak.
+    - contextcheck    # functions that should propagate context.Context.
+    - durationcheck   # multiplying two time.Durations is almost always a bug.
+    - errorlint       # error wrapping (use errors.Is/As, fmt.Errorf %w).
+    - fatcontext      # nested / in-loop context misuse (relevant: context used widely).
+    - nilaway         # cross-package nil-flow analysis; private module plugin.
+    - nilerr          # `return nil` after error check is almost always a bug.
+    - noctx           # HTTP requests without a context.Context.
+    - reassign        # reassigning another package's vars (e.g. io.EOF) is a footgun.
+    - rowserrcheck    # sql.Rows.Err() must be checked.
+    - sqlclosecheck   # sql.Rows / sql.Stmt must be closed.
+
+    # --- Test hygiene (the consensus "no fake GREEN" seeds) ---
+    - forbidigo       # forbid t.Skip / t.Skipf / t.SkipNow in changed test files (see settings).
+    - testifylint     # cheap to enable; catches testify mistakes if/when it lands.
+    - thelper         # test helpers should call t.Helper() so failures attribute correctly.
+    - tparallel       # detects misuse of t.Parallel().
+
+    # --- Style and clarity (low-FP only) ---
+    - gocritic        # diagnostic + performance + style; noisy checks disabled below.
+    - gocognit        # hard gate cognitive complexity above 20 for v2 harness code.
+    - gocyclo         # hard gate cyclomatic complexity above 20 for v2 harness code.
+    - dupl            # ratchet non-test clone groups at current zero baseline.
+    - misspell        # common English typos in identifiers and strings.
+    - revive          # narrow rule set; see settings.
+    - unconvert       # useless type conversions.
+    - usestdlibvars   # use http.MethodGet/http.StatusOK etc. instead of literals.
+
+    # --- Documentation and comments ---
+    - godoclint       # Go Doc Comment conventions + require docs on exported symbols & packages (see settings).
+
+    # --- Security ---
+    - bidichk         # Unicode bidirectional attack characters (CVE-2021-42574 class).
+    - gosec           # security scanner; noisy checks excluded below.
+
+    # --- Dependencies ---
+    - depguard        # replaces scripts/check-go-deps.py per the borrowed-tooling map.
+
+  settings:
+    errcheck:
+      # Closing Close() failures are rarely actionable in stdlib paths; revisit if needed.
+      exclude-functions:
+        - (io.Closer).Close
+
+    forbidigo:
+      forbid:
+        # No skipping tests in changed code. From the consensus "no fake GREEN" seeds.
+        - pattern: '^t\.Skip(f|Now)?$'
+          msg: 'no skipping tests in changed code (TBA harness consensus: no fake GREEN)'
+        # Print/Println leftovers in production code (allow in tests via exclude below).
+        - pattern: '^(print|println)$'
+          msg: 'use the project logger, not bare print/println'
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+        - style
+      disabled-checks:
+        # Noisy in clean Go; principle is fine but cases are rarely worth a fail.
+        - ifElseChain
+        # Forces struct-by-pointer; conflicts with stdlib idioms (e.g., time.Time).
+        - hugeParam
+        # Style preference; tba uses both forms intentionally.
+        - unnamedResult
+
+    gocognit:
+      min-complexity: 20
+
+    gocyclo:
+      min-complexity: 20
+
+    dupl:
+      threshold: 50
+
+    godoclint:
+      # Enforce Go Doc Comment conventions (https://go.dev/doc/comment).
+      # `basic` = pkg-doc, single-pkg-doc, start-with-name, deprecated (format/style).
+      # require-doc + require-pkg-doc are godoc-lint's "strict" group: the
+      # "docs must exist" rule for exported symbols and packages. ("strict" is a
+      # rule group, NOT a valid `default:` value -- only basic/all/none are -- so
+      # the strict rules are listed under `enable` per the godoc-lint docs.)
+      # _test.go is exempted under exclusions below.
+      # The "all" extras (max-len, no-unused-link, require-stdlib-doclink) stay off:
+      # max-len's 77-char cap is arbitrary and gofumpt does not reflow comments.
+      default: basic
+      enable:
+        - require-doc
+        - require-pkg-doc
+
+    gosec:
+      excludes:
+        # Integer overflow conversions; very high false-positive rate in normal Go.
+        - G115
+        # Already covered by errcheck.
+        - G104
+
+    custom:
+      nilaway:
+        type: module
+        description: Static analysis tool to detect potential nil panics in Go code.
+        settings:
+          include-pkgs: github.com/remoteoss/dexter
+
+    revive:
+      # Narrow ruleset: keep crisp, low-FP rules. The wider revive surface is too noisy
+      # for fail-immediate; graduate individual rules per the Phase 4 promotion model.
+      rules:
+        - name: empty-block
+        # range-val-in-closure intentionally omitted: obsolete on Go 1.22+ (loop vars are
+        # per-iteration). govet's loopclosure already covers the historical footgun.
+        - name: redefines-builtin-id
+        - name: unreachable-code
+        - name: var-declaration
+
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: io/ioutil
+              desc: deprecated; use io, os, or encoding equivalents
+            - pkg: github.com/pkg/errors
+              desc: use stdlib errors (errors.Is/As, fmt.Errorf %w)
+            - pkg: github.com/sirupsen/logrus
+              desc: use the project logger in internal/logging
+            - pkg: go.uber.org/zap
+              desc: use the project logger in internal/logging
+  exclusions:
+    rules:
+      # Tests deliberately leak HTTP bodies via test servers.
+      - path: _test\.go
+        linters:
+          - bodyclose
+      # Print statements are allowed inside tests for diagnostics, but the t.Skip ban
+      # must survive in tests (that's where t.Skip appears). Scope the test-file
+      # exclusion to the print/println message only.
+      - path: _test\.go
+        linters:
+          - forbidigo
+        text: 'use the project logger, not bare print/println'
+      # Test files don't need godoc: exempt _test.go from the doc-comment linter.
+      - path: _test\.go
+        linters:
+          - godoclint
+      # Duplication ratchets are production-code gates; test duplication is
+      # handled separately after the harness cleanup. The v2 complexity gate
+      # intentionally covers tests too.
+      - path: _test\.go
+        linters:
+          - dupl
+      # Generated code: don't lint .pb.go, _gen.go, mock_*.go.
+      - path: \.pb\.go$
+        linters:
+          - all
+      - path: _gen\.go$
+        linters:
+          - all
+      - path: /mock_
+        linters:
+          - all
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports

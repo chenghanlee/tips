@@ -1,183 +1,180 @@
-# Dexter for Tips
+# Agent language tools
 
-**Experimental integration.** Claude and Codex both use Dexter's stock command-line
-interface for named Elixir navigation. The limits below apply.
+Coding sessions get one **Dexter** language server per worktree: a single Go
+binary built from the pinned upstream revision plus one local patch. Claude uses
+it through Claude Code's native LSP tool. Codex calls the same binary's `query`
+command. Both attach to the same per-worktree daemon and use the same handlers,
+but native clients can filter the results they display (see below).
+There is no adapter, MCP server, editor process or second index.
 
-Tips uses unmodified [Dexter](https://github.com/remoteoss/dexter) to find Elixir
-definitions and references. Both clients run its `lookup` and `references`
-commands in a normal shell. Tips sessions disable Dexter's native LSP plugin.
-Hover, diagnostics and cursor-position requests are not provided.
-This integration adds no MCP bridge, wrapper, Neovim adapter, compilation hook or local server patch.
+This is a read-only beta. Rename and other edits are not offered.
 
-Why not the native plugin: in our test, it kept its own copy of each queried file.
-Claude's Edit tool updated that copy; a shell edit (`sed`, `mix format`, generators)
-left it stale, while the CLI returned the new location from the updated index.
+## Build
 
-## Install
-
-Install Git and Go 1.26.1 or newer. From the main checkout:
+Requires Go 1.26.3 and Git. `build.sh` needs a Git repository that contains the
+pinned upstream commit; its checkout is not read:
 
 ```sh
-agent/lsp/install_dexter.sh
+git clone https://github.com/remoteoss/dexter tmp/dexter-upstream
+bash agent/lsp/dexter/build.sh tmp/dexter-upstream
 ```
 
-The installer builds the exact upstream commit in [dexter.rev](dexter.rev),
-without modifying its source. This is an unreleased upstream revision containing
-the shared workspace daemon; the binary's version string alone does not identify it. To use a shared
-installation elsewhere, set `TIPS_ELIXIR_TOOLS` before installing and launching.
-
-`vendor/` is Git-ignored. Rebuild after changing the pin and restart clients before
-using the new binary. Do not mix server versions or upgrade a running workspace's
-daemon in place. The helper uses this pinned path, not an arbitrary system Dexter.
-
-## Use with agent teams
-
-From the assigned worktree root, both clients run:
+The script exports the pin, applies `dexter/patches/dexter-go.patch` in a
+temporary copy, builds `dexter/vendor/dexter` and writes `dexter/vendor/build.json`
+with the pin, patch checksum, binary checksum and the local build id. The id is
+the SHA-256 of the pin and patch checksum and is linked into the binary:
 
 ```sh
-"$TIPS_ELIXIR_TOOLS/bin/dexter" --root "$PWD" lookup --strict --wait 30s Module function
-"$TIPS_ELIXIR_TOOLS/bin/dexter" --root "$PWD" references --wait 30s Module function
+agent/lsp/dexter/vendor/dexter version   # 0.7.2, then: local_build_id <id>
 ```
 
-The [team helper](../teams/README.md) sets `TIPS_ELIXIR_TOOLS` to the installation
-path; it does not change `PATH`. Codex receives it and the team's other values
-through its supported `shell_environment_policy.set` config. This keeps the
-shell's database partition explicit even with a shared Codex daemon.
+A daemon and a client with different ids refuse each other and nothing replaces
+the running daemon. Before rebuilding over active teams, stop each worktree's
+daemon with its bound command, build, then re-provision.
+The build refuses to replace a binary used by a running daemon and aborts if
+it cannot inspect processes. Keep agents stopped until the build finishes.
 
-Claude's launch passes the generated `.claude/settings.local.json` with `--settings`.
-It disables Dexter's native plugin, the old Expert plugin and automatic Mix plugins
-for that session. A linked worktree may read local settings from the main checkout,
-so the helper names the file explicitly. Coordinator sessions disable the native
-plugin too; they do not initialize or own an index.
-Normal formatting, compilation, Credo and tests remain explicit project checks.
+`--keep <dir>` leaves the prepared source in place for `go test ./...`.
+[patches/README.md](dexter/patches/README.md) records what the patch changes and
+the Go static-analysis rule for it.
 
-## Use directly
+## Elixir sources
 
-In your terminal, prepare the worktree and start Claude with Dexter's native plugin
-disabled for this new session only. For Codex, run `codex` instead of the last line.
+Dexter indexes the Elixir standard library from source. Put the release matching
+`elixir --short-version` in the main checkout's ignored `agent/lsp/vendor/elixir-<version>/`
+(from the [Elixir repository](https://github.com/elixir-lang/elixir); the tree
+holds `VERSION` and `lib/elixir/lib/enum.ex`), or point `DEXTER_ELIXIR_LIB_ROOT`
+at another checkout's `lib/`. A Homebrew installation has no sources. Provisioning
+refuses to start unless the tree's `VERSION` matches the worktree's toolchain.
 
-```sh
-cd /absolute/path/to/tips-worktree
+## Bound checkout
 
-# Once per new worktree, before querying (omit if already initialized).
-/absolute/path/to/main/agent/lsp/vendor/bin/dexter init "$PWD"
+`--root` must be the exact checkout Dexter serves: a directory holding `.git`
+or `mix.exs`, never one with only a `.dexter/` index. The command works from
+any caller directory. Each worktree gets its own daemon and index, and
+worktrees run concurrently. Nested checkouts, including scratch clones and
+linked worktrees under `.worktrees/`, are excluded from the parent's index
+and watcher. Dependency sources under `deps/` remain available. A root reached
+through a symlink is admitted only under the exact spelling it was bound with.
+Out of this beta: an application in a subdirectory or monorepo.
 
-claude --settings '{"enabledPlugins":{"dexter-lsp@dexter":false}}'
-```
+## Team provisioning
 
-Inside the agent's shell, both clients query with the pinned binary's absolute path:
+`agent/teams/task_worktree.py` writes, per worktree:
 
-```sh
-/absolute/path/to/main/agent/lsp/vendor/bin/dexter --root "$PWD" lookup --strict --wait 30s Tips.ProviderConfig
-/absolute/path/to/main/agent/lsp/vendor/bin/dexter --root "$PWD" references --wait 30s Tips.ProviderConfig
-```
+- `.dexter/dexter.sh`: `exec vendor/dexter --root <worktree> "$@"` with the
+  selected sources exported. Its absolute path is `TIPS_DEXTER` in the session.
+- For Claude, `.dexter/claude-plugin/`: a plugin loaded with `--plugin-dir` whose
+  LSP server runs the same binary with `--root <worktree> lsp` and the
+  same sources. Known alternative language-server plugins are disabled by the
+  launch command's `--settings` override, including in linked worktrees.
+- For Codex, `.codex/config.toml` with the Mix check plugins.
 
-The `--settings` flag changes only that session and leaves the global plugin
-installed. It does not override a managed policy that requires the plugin. It keeps
-your other plugins, including automatic Mix plugins. The CLI still starts Dexter's
-daemon and BEAM helper; in our Homebrew 0.7.2 test, that helper made the
-`mix-compile` hook skip compilation. Run project checks explicitly.
-A coordinator that needs ad hoc navigation uses these direct instructions.
+Provisioning then runs `dexter.sh query workspace-symbols --wait <timeout> MixProject`
+and refuses to launch a client if the index does not answer. `team.py stop`
+runs `dexter.sh stop` per worktree before retiring it; an attached client keeps
+the daemon alive and the worktree is preserved. A daemon idles out after fifteen
+minutes without clients and restarts from its index on the next request.
+Do not run `git clean -x` in a team worktree: it removes the bound command and
+the index under `.dexter/`.
 
-Team sessions get `TIPS_ELIXIR_TOOLS` from the helper. A direct launch may not
-inherit exports from its terminal under a shared Codex daemon, so use the absolute
-path. Do not assume bare `dexter` selects this installation.
+## Operations
 
-Optional: to avoid passing the flag each launch, run
-`claude plugin disable dexter-lsp@dexter --scope local`. Local scope applies to this
-project on your machine; in a linked worktree, Claude may store it at the main
-checkout, which affects all its worktrees. Undo it with
-`claude plugin enable dexter-lsp@dexter --scope local`. The per-session flag is the default.
+Positions are 1-based line and character (UTF-16). The bound CLI returns Dexter's
+raw LSP JSON, whose ranges are 0-based. Claude displays its own formatted results.
 
-The team helper performs the initial `init` automatically. It matters for nested
-worktrees: this Dexter revision can otherwise prefer an ancestor's existing index
-over a nearer Git/Mix root, even with `--root`. Do not delete `.dexter/` while a
-client is running. Reinitialize before querying again if you removed it.
+| Claude native LSP | Codex `"$TIPS_DEXTER" query …` |
+|---|---|
+| `goToDefinition` | `definition <file> <line> <column>` |
+| `findReferences` | `references <file> <line> <column> [--include-declaration]` |
+| `hover` | `hover <file> <line> <column>` |
+| `documentSymbol` | `symbols <file>` |
+| `workspaceSymbol` | `workspace-symbols [search]` |
+| `goToImplementation` | `implementation <file> <line> <column>` |
+| `prepareCallHierarchy` | `prepare-call-hierarchy <file> <line> <column>` |
+| `incomingCalls` | `incoming-calls <file> <line> <column>` |
+| `outgoingCalls` | `outgoing-calls <file> <line> <column>` |
 
-For a function, append its name after the module. `lookup --strict` prevents fuzzy name
-matching. CLI arguments name a module and optionally a function; they do not select
-an arity or resolve an expression at a call site. Resolve aliases and imports from
-source, then inspect the returned source before edits.
-Lookup follows `defdelegate` to its target by default. Add `--no-follow-delegates`
-when you want the delegating function's own declaration.
-`references Module` finds uses of the module itself, not all calls to its functions;
-name the function to find its callers.
+`query` waits up to `--wait <duration>` (default 30s) for a cold index and exits
+non-zero with the reason on stderr. Files are relative to the worktree. Queries
+admit the bound worktree, its dependency sources and the configured Elixir
+sources; a file from another checkout is refused with `does not belong to
+workspace`. The stock `lookup` and `references <module>` name searches are
+unchanged.
 
-## What the results mean
+### Claude native dependency navigation
 
-Dexter owns parsing, indexing, watching and readiness. `--wait 30s` bounds initial
-index waiting; it does not certify that an answer includes a particular edit.
-Both empty and non-empty results can be incomplete. If initial indexing takes
-longer than the wait, the pinned CLI can return a non-empty subset without a warning.
-Successful exit and silence do not prove indexing finished. Wait for the command
-to exit before reading its result. If a result disagrees with source, report the
-limit and inspect the source; do not repeat the query until it agrees.
+Claude Code 2.1.285 filters Git-ignored locations from native `goToDefinition`,
+`goToImplementation`, `findReferences` and `workspaceSymbol` results. This can
+hide dependency sources under `deps/` even when Dexter returns them correctly.
+Hover, document symbols and call hierarchy do not use that client filter. The nine operations
+therefore do not have identical displayed results across native and CLI clients.
 
-The pinned revision indexes Git-ignored source copies under `tmp/`, including
-files created by Tips' own tests, producing duplicate locations. A copy can
-appear first. There is no stock exclusion setting in this revision. Check the
-path before editing; keep future copied projects outside the working repository.
+For ignored dependency locations, use the existing bound CLI `definition`,
+`implementation`, `references` or `workspace-symbols` operation in the same
+worktree, for example `"$TIPS_DEXTER" query definition lib/example.ex 12 8`.
+Do not change `.gitignore`, rewrite result URIs or start another language server.
+A native “No definition found” message is not proof of an indexing failure.
 
-Homebrew `dexter-lsp` 0.7.2 is not a supported substitute: it has no `stop`,
-`--root` or `--wait`.
+## Limits
 
-Startup found ordinary offline edits, but queries immediately after a live write
-returned stale or missing results in our multi-worktree test. `--wait` waits for
-startup indexing, not for each edit; a later shell command is not a freshness
-guarantee either.
-
-For a known changed file that still returns an old answer, run
-`reindex path/to/file.ex` with the same pinned binary and workspace root used for
-navigation, then inspect the returned source. This recovered the tested offline
-edit that preserved size and modification time. Use the file form: bare or
-directory `reindex` uses modification times and can skip such edits. Reindex
-completion is not proof that parsing and index writes succeeded. It is recovery
-for an observed problem, not a required step after every edit. `init --force`
-deletes and rebuilds the whole index and requires the workspace to be released;
-it is not needed for this tested recovery.
-
-Dexter parses source and may approximate generated code using compiled artifacts.
-`--strict` prevents fuzzy name matching but can still return a module declaration
-for a BEAM-derived function, without marking it as approximate. Our reference tests
-missed a delegated caller and protocol/behaviour implementation callers reached
-through dynamic dispatch. A real Tips query also missed the local capture
-`&fetch_api_key/0`; exit 1 with "No references found" does not prove there are no callers.
-Navigation is useful evidence, not a replacement for
-compilation or tests, and a successful compile
-does not certify reference completeness. There is no required per-file diagnostic
-ritual or synthetic global `current` label.
-
-## Stop and change workspaces
-
-Dexter shares one daemon/index per workspace. Index files live in `.dexter/`; a CLI
-query can leave an intentionally idle daemon. Closing a frontend need not stop it.
-Before deleting or repurposing a workspace, use the supported command:
-
-```sh
-/absolute/path/to/main/agent/lsp/vendor/bin/dexter --root /absolute/path/to/tips-worktree stop
-```
-
-This refuses while clients remain attached. Close those clients and retry; do not
-force another agent off the workspace. The team helper uses this same non-forced
-command during teardown and before reconfiguring an unowned worktree. A refusal
-preserves the worktree. It does not certify unrelated shell jobs have finished.
-Stopping a coordinator in the main checkout leaves that shared index alone;
-the coordinator does not own other users' main-checkout sessions.
-
-If `.dexter/` exists without `dexter.db`, the helper refuses reuse or cleanup:
-Dexter's root discovery could otherwise select an ancestor's index. Close the
-affected clients and have the operator verify that no Dexter process owns that
-worktree before removing the incomplete `.dexter/` directory and rerunning setup.
-Do not use `dexter stop --root` to repair this missing-marker case.
-
-## Check changes
-
-```sh
-python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
-pyright -p agent/teams/pyproject.toml
-python3 scripts/check_docs.py
-```
-
-On an upstream bump, test real CLI navigation from both clients, external edits,
-same-named isolated workspaces, and the non-forced stop contract. Keep the server
-unmodified; report upstream defects instead of growing a compatibility layer.
+- Freshness is not strict. The daemon watches saved files, but an empty answer
+  is not proof of absence. Rerun after large checkouts or generated code.
+- File-backed navigation uses saved disk text in both Claude and Codex.
+  Document notifications invalidate cached text; they cannot replace newer
+  disk contents with an older buffer. Cached files follow later disk changes
+  (`Edit`, `mix format`, generators, shell rewrites) by size and mtime.
+  Save before navigating; unsaved editor buffers are not supported.
+  One writer per worktree.
+- Call hierarchy selects one callable identity, `Module.function/arity`. A
+  definition with default arguments prepares its maximum arity; prepare at a
+  lower-arity call to inspect that callable's incoming calls. The hierarchy
+  follows written source calls, not generated runtime wrapper edges.
+  References at a default-argument head may cover multiple arities: compare
+  them with incoming calls only at the same selected arity.
+- Call hierarchy answers are standard LSP items and carry no reasons: a call
+  the resolver cannot own is omitted without a completeness indicator. When
+  completeness matters, cross-check
+  `findReferences` against the `fromRanges` of `incomingCalls` and review each
+  reference with no matching range by hand: it may be a call the hierarchy
+  left out, or a reference the heuristic over-counted (injected defs). A
+  function reached only through a `use` chain with no indexed row can be
+  missing from both.
+  Omitted on purpose:
+  - incoming: calls in typespecs, quote bodies and defs inside `quote`, files
+    that do not parse cleanly, top-level and module-body calls, test labels
+    built by interpolation, modules named by a variable, heads named by
+    `unquote`;
+  - outgoing: Erlang module calls (`:ets`, `:crypto`), anonymous calls
+    (`fun.()`), field access, operators and language forms (`if`, `case`).
+  Text that moved since the index was built is re-checked and dropped when the
+  occurrence no longer matches.
+- A known generated export can resolve to its module declaration when its
+  function source location cannot be resolved. This is a module anchor, not the function
+  body. Hierarchy items retain the callable identity and select the real module
+  token within its declaration. Dexter does not reconstruct arbitrary
+  compile-time macro expansion.
+- Implementation lookup starts at the selected `@callback` head and uses its
+  exact arity, including zero-arity forms such as `@callback type :: t` and
+  `@callback type() :: t`. Ordinary function heads and call sites return no
+  implementations, even when a callback shares the name.
+- Implementation results are indexed public `def`/`defdelegate` source
+  definitions with the selected name and arity. Direct behaviour declarations,
+  simple `use` wrappers and Phoenix-style atom dispatch are supported. Only
+  the selected wrapper branch is followed; a controller or component branch
+  does not inherit a sibling `live_view` branch's callbacks.
+- Wrapper membership is an approximation: a selected `use` chain reaching the
+  queried behaviour's callback is treated as adoption. It can include a module
+  whose provider declares the callback but injects no `@behaviour`, including
+  an unknown dispatch atom passed directly to that provider. Error frequency
+  has not been measured; implementation lists are not guaranteed complete.
+- Implementation lookup can omit behaviour/use directives inside block
+  conditionals, such as `if Code.ensure_loaded?(Plug) do ... end`. An
+  `@behaviour` inside inline `do:` syntax is not excluded and may be counted
+  even when it is not adopted. Arbitrary macro expansion, generated-only
+  implementations, macrocallback implementation matching and general
+  `defprotocol`/`defimpl` traversal are outside this beta's supported scope.
+- Diagnostics are syntax only; use Mix compile, Credo and tests for the rest.
+- Rename, code actions and formatting through Dexter are not offered.
+- Correctness is bounded by the patch's recorded cases; see
+  [patches/README.md](dexter/patches/README.md).

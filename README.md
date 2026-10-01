@@ -47,8 +47,8 @@ criteria and review evidence in the relevant GitHub issue and PR.
 - [Agent teams](agent/teams/README.md): the shared operating agreement, with one card per
   role under `agent/teams/roles/`; [setup](agent/teams/SETUP.md) covers prerequisites and
   configuration.
-- [Dexter navigation](agent/lsp/README.md): one pinned upstream command-line tool
-  for Claude and Codex Elixir navigation.
+- [Elixir language server](agent/lsp/README.md): one shared Dexter server per worktree,
+  native in Claude and a CLI in Codex.
 
 Agent tooling is separate from the application. You do not need it to run Tips.
 
@@ -73,13 +73,14 @@ Agent tooling is separate from the application. You do not need it to run Tips.
 | `docs/development/` | Setup, testing and toolchain guides |
 | `docs/design/` | Current product and technical requirements |
 | `agent/teams/` | Agent coordination, configuration, instructions and tests |
-| `agent/lsp/` | Pinned upstream Dexter installation and usage |
+| `agent/lsp/` | Agent language-server build script and local patch |
 
-Installed LSP binaries live in ignored `agent/lsp/vendor/`, shared from the main checkout.
+Dexter's binary lives in ignored `agent/lsp/dexter/vendor/`; shared Elixir
+sources live in `agent/lsp/vendor/`.
 
 Keep root files in their standard locations for Mix, Git and Docker.
 Put disposable experiment output in ignored `tmp/` or outside the repository.
-Dexter stores its generated index in `.dexter/`.
+Dexter stores its per-worktree index and bound commands in `.dexter/`.
 
 Leave generated and client-managed folders, such as `_build/`, `deps/`, `.codex/`
 and `.claude/`, in their expected locations.

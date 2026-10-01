@@ -84,17 +84,13 @@ For context recovery, keep issue and branch open. Record base and head SHAs, PR 
 
 **Environment.** The helper applies the role’s configured model, effort, permissions, database suffix and test port in the live target process. It exports `PGPORT`, `TIPS_DB_SUFFIX`, `TIPS_TEST_PORT`, `MIX_ENV`, `TIPS_CHECK_TIMEOUT_SECONDS`, `TIPS_PROVIDER_ENV_FILE`, and links main checkout's `.agents/skills` into each worktree. Preserve these values in tests, including Wallaby.
 
-It also sets `TIPS_ELIXIR_TOOLS` to the shared Dexter installation and leaves `PATH`
-unchanged. Codex's project config declares `TIPS_ELIXIR_TOOLS`, not the launching
-shell's `PATH`. Both clients invoke `"$TIPS_ELIXIR_TOOLS/bin/dexter"`.
+Read provider settings by path from main checkout's `.env`; only the user adds new credentials there. Never write secrets into worktrees. Inspect launch values with `env | grep -E '^(PGPORT|MIX_ENV|TIPS_)'`; macOS `printenv` prints only its first named variable. Provisioning warms up Dexter and exports `TIPS_DEXTER`, bound to the assigned worktree; Claude also loads the generated Dexter plugin for its native LSP tool. Startup is not proof of index freshness. See the [LSP guide](../lsp/README.md). Agents propose defaults and use synthetic fixtures; never fabricate firsthand production content. Real-provider tests require user-authorized invocations quoted on the issue by lead TPM, with scoped secrets; never run automatically on PR code.
 
-Read provider settings by path from main checkout's `.env`; only the user adds new credentials there. Never write secrets into worktrees. Inspect launch values with `env | grep -E '^(PGPORT|MIX_ENV|TIPS_)'`; macOS `printenv` prints only its first named variable. Before database-writing checks, confirm the team/role partition matches config. Startup confirms client launch, not index readiness: Dexter indexes in the background; see [Dexter guide](../lsp/README.md). Agents propose defaults and use synthetic fixtures; never fabricate firsthand production content. Real-provider tests require user-authorized invocations quoted on the issue by lead TPM, with scoped secrets; never run automatically on PR code.
-
-**Code navigation.** Developers, testers and tech leads follow the stock Dexter CLI
-instructions in [AGENTS.md](../../AGENTS.md). Before changing an API, inspect its
-callers; resolve aliases and imports from source and check returned paths before
-editing. Dexter provides named lookup and references, not hover or diagnostics.
-Formatting, compilation, Credo and tests remain explicit project checks.
+**Code navigation.** Before changing a function's name, arity or return shape,
+inspect its callers with Dexter references and list them in the PR comment.
+Use definition on unfamiliar call sites and hover for unfamiliar types or specs.
+Follow [AGENTS.md](../../AGENTS.md) and the [operations table](../lsp/README.md#operations).
+Dexter does not provide compiler diagnostics; run explicit Mix checks after edits.
 
 **Checks.** Trust CI only for commands actually run. For `agent/teams` Python changes, CI is the evidence: open the exact-head `checks` run, verify these four steps passed and link the run in your round.
 
@@ -107,7 +103,9 @@ python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
 
 Developers run these before pushing, in their worktree, if Ruff and Pyright are already on `PATH`; otherwise use CI. Agents never install them. Scripts use only standard-library dependencies. Tests use disposable Git repositories, fake Herdr and owned child processes, never live teams. Tests need permission to run `ps` and signal their own children.
 
-Only `team.py:execute` and `StopAgentTest.client` have reviewed `# noqa: S603` exceptions: variable argument lists, no shell, resolved executable, fixed or test-owned arguments. Suppress nothing else. When these calls change, tech leads review trusted executable selection and arguments; passing lint cannot prove subprocess safety. Settings: [pyproject.toml](pyproject.toml). If checks are pending, report them as pending without waiting; the tech lead's timed pre-merge wait checks completion. Users decide secret rotation; never rewrite history.
+Provisioning changes also require the real-daemon harness test with `TIPS_TEST_REAL_DEXTER` and `DEXTER_ELIXIR_LIB_ROOT` set (see the [LSP guide](../lsp/README.md)); CI runs it in the `dexter` job against the freshly built binary.
+
+The reviewed `# noqa: S603` boundaries are `team.py:execute` and `StopAgentTest.client`: variable argument lists, no shell, resolved executable, fixed or test-owned arguments. These are per-call exceptions, not a disabled security rule. Suppress nothing else. When these calls change, tech leads review trusted executable selection and arguments; passing lint cannot prove subprocess safety. Settings: [pyproject.toml](pyproject.toml). If checks are pending, report them as pending without waiting; the tech lead's timed pre-merge wait checks completion. Users decide secret rotation; never rewrite history.
 
 **Secrets.** Never put credentials in logs, issues, PRs, handoffs or chat. Ordinary PR CI needs no production secrets.
 
@@ -130,7 +128,7 @@ For code changes, first complete the [lead TPM's ad-hoc Codex review](roles/lead
 ## Client constraints
 
 - Codex sandboxes cannot write main checkout's `.git`, so team TPM runs all Git administration there; Claude tech leads follow the same flow. The helper and `team.py stop` reject callers lacking that write access.
-- Codex writes only within its worktree, so chavruta lives in reviewer's `tmp/`. Codex `never` approval rejects tools needing approval. Dexter uses ordinary shell permissions; report unavailable commands rather than bypassing the client's policy.
+- Codex writes only within its worktree, so chavruta lives in reviewer's `tmp/`. Codex `never` approval rejects tools needing approval. Codex runs Dexter through the normal shell tool; generated configuration does not bypass approval or sandbox policies. Report any socket or command denial.
 - Codex reviewers outside teams cannot post to GitHub.
 - Claude auto mode may deny tech-lead `gh pr merge`, developers killing their own LSP children, copying/writing `.env`, or pilots posting issue comments. Treat each as Permission denial.
 - `/new`, `/clear` and `cd` cannot reroot a running client's LSP. Clients cannot stop themselves with `team.py stop`. Optional `--kind` must match configured role kind.

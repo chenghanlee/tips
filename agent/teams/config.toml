@@ -13,6 +13,7 @@ db_suffix_prefix = "_team"
 launch_seconds = 120
 shutdown_seconds = 15
 shell_seconds = 15
+dexter_startup_seconds = 60
 checks_minutes = 30
 
 [launch]

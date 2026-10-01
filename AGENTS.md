@@ -24,16 +24,11 @@ Load only relevant skills. State which skills you are using before making change
 Scope searches to relevant paths and file types; broaden as needed.
 
 - **ripgrep (`rg`)**: Find text: names, strings, errors, config keys, and template content. Use `rg --files -g 'PATTERN'` to find files. Fall back to `grep` if unavailable.
-- **ast-grep**: Find code structures: calls with specific arguments, pipelines, or expressions inside functions. Prefer it over multiline regexes. Read the `ast-grep` skill and verify patterns against known examples.
-- **Dexter**: Use stock Dexter CLI for Elixir navigation. In team worktrees, run from the worktree root (`function` is optional):
-
-  ```sh
-  "$TIPS_ELIXIR_TOOLS/bin/dexter" --root "$PWD" lookup --strict --wait 30s Module function
-  "$TIPS_ELIXIR_TOOLS/bin/dexter" --root "$PWD" references --wait 30s Module function
-  ```
-
-  Direct sessions use the installed absolute binary path. Resolve module/function names from source; arguments do not select arity or resolve a call-site expression. Inspect returned source before editing. Empty and non-empty results may be incomplete, including during indexing; delegated, generated and dynamic callers may be missed. Lookup follows `defdelegate`; use `--no-follow-delegates` to locate the wrapper. Compilation/tests are independent checks, not proof of navigation completeness. Claude does not use the LSP tool for Elixir. See the [Dexter guide](agent/lsp/README.md) for setup and recovery.
+- **ast-grep**: Find code structures: calls with specific arguments, pipelines, or expressions inside functions. Prefer it over multiline regexes. Read the `ast-grep` skill and verify patterns against known examples. Use LSP for symbol resolution.
+- **Dexter LSP**: In provisioned coding sessions, Claude uses the native `LSP` tool and Codex runs `"$TIPS_DEXTER" query <operation> <file> <line> <column>`; both are Dexter bound to the worktree. Read [the operations table](agent/lsp/README.md#operations). Positions are 1-based. Prefer LSP for symbol resolution. Freshness is unverified; do not interpret an empty answer as proven absence. Use normal Mix compile/tests for compiler diagnostics. Report an unavailable tool rather than starting an alternate language server.
 - **mix-credo**: Run `mix credo --strict` on any edited `.ex`/`.exs` files and fix issues you introduced. Skip only if the Credo task is unavailable; report dependency and project failures.
+
+- **Go static analysis**: For every Go change, including carried upstream patches, run the same custom golangci-lint profile as `tiny_big_agents`, including Staticcheck and NilAway. Use the [pinned Dexter profile and instructions](agent/lsp/dexter/patches/README.md#required-go-static-analysis) for Dexter. Keep checks and thresholds enabled; compare with the unchanged baseline, fix findings introduced by our code, and report inherited findings separately. Do not refactor unrelated upstream code to clear its lint debt.
 
 Report unavailable tools and failed checks; use appropriate fallbacks. Failed searches do not establish that no matches exist. LSP and Credo checks do not replace formatting, compilation, or tests.
 

@@ -83,6 +83,12 @@ class HerdrResult(TypedDict):
 
 
 ProcessRows = dict[int, tuple[int, str]]
+# Disable alternate language paths in launched clients, without editing user settings.
+NATIVE_LSP_PLUGINS = {
+    "elixir-lsp@elixir-agent-tools": False,
+    "elixir-ls@skills-dir": False,
+    "dexter-lsp@dexter": False,
+}
 main: Path
 cfg: Config
 
@@ -115,6 +121,7 @@ def execute(
     env: dict[str, str] | None = None,
     timeout: float | None = None,
     check: bool = False,
+    input_text: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run a resolved executable without a shell and capture its output."""
     # Reviewed S603: callers pass fixed tool names; command_args resolves argv[0], no shell.
@@ -126,6 +133,7 @@ def execute(
         check=check,
         text=True,
         capture_output=True,
+        input=input_text,
     )
 
 
@@ -216,7 +224,7 @@ def herdr(*args: str) -> HerdrResult:
 
 
 def processes() -> ProcessRows:
-    # Parent links, not process groups: children can create their own groups.
+    # Parent links, not process groups: Expert engines can create their own groups.
     rows: ProcessRows = {}
     for line in run("ps", "-axo", "pid=,ppid=,stat=,lstart=").splitlines():
         pid, parent, state, started = line.split(None, 3)
@@ -251,20 +259,6 @@ def pane_occupant(pane: str) -> tuple[Path, bool]:
     return occupant(pane, herdr("pane", "process-info", "--pane", pane)["process_info"])
 
 
-def release_dexter(root: Path, tools: Path, timeout: float) -> bool:
-    """Ask the workspace owner to stop; an attached client makes Dexter refuse."""
-    if not (root / ".dexter").exists():
-        return True
-    # Without its exact marker, Dexter can resolve --root to an ancestor's index.
-    if not (root / ".dexter/dexter.db").is_file():
-        return False
-    try:
-        result = execute([tools / "bin/dexter", "stop", "--root", root], timeout=timeout)
-    except subprocess.TimeoutExpired:
-        return False
-    return result.returncode == 0
-
-
 def stop(pane: str, root: str | Path) -> None:
     root = Path(root)
     if not root.is_absolute():
@@ -284,7 +278,7 @@ def stop(pane: str, root: str | Path) -> None:
         raise RuntimeError(f"{pane}: cannot stop the calling agent; ask its TPM to stop it")
     identity = {pid: rows[pid][1] for pid in owned if pid in rows}
     signal_client(pane, current, clients, owned)
-    wait_for_exit(pane, shell, identity, clients, root)
+    wait_for_exit(pane, shell, identity)
     release_name(pane, current)
     print(f"{pane}: client and owned descendants exited")
 
@@ -304,17 +298,10 @@ def signal_client(pane: str, current: Entity, clients: set[int], owned: set[int]
         raise RuntimeError(f"{pane}: agent/process state disagrees; preserved")
 
 
-def wait_for_exit(
-    pane: str, shell: int, identity: dict[int, str], clients: set[int], root: Path
-) -> None:
+def wait_for_exit(pane: str, shell: int, identity: dict[int, str]) -> None:
     deadline = time.monotonic() + cfg["timeouts"]["shutdown_seconds"]
-    tools = Path(os.environ.get("TIPS_ELIXIR_TOOLS", str(main / "agent/lsp/vendor")))
-    # A coordinator does not own other users of the main checkout's shared index.
-    released = root == main.resolve()
     while True:
         rows = processes()
-        if not released and not clients.intersection(rows):
-            released = release_dexter(root, tools, max(0.1, deadline - time.monotonic()))
         # Include children born during graceful shutdown, while their parent is still known.
         for parent in (shell, *identity):
             if parent == shell or rows.get(parent, (None, None))[1] == identity[parent]:
@@ -323,13 +310,10 @@ def wait_for_exit(
         alive = [
             pid for pid, started in identity.items() if rows.get(pid, (None, None))[1] == started
         ]
-        if not alive and released:
+        if not alive:
             return
         if time.monotonic() >= deadline:
-            raise RuntimeError(
-                f"{pane}: surviving owned processes {alive} or Dexter release unconfirmed; "
-                "resources preserved"
-            )
+            raise RuntimeError(f"{pane}: surviving owned processes {alive}; resources preserved")
         time.sleep(0.1)
 
 
@@ -403,6 +387,7 @@ def validate_settings(path: Path, value: Config) -> None:
         "shutdown_seconds",
         "shell_seconds",
         "checks_minutes",
+        "dexter_startup_seconds",
     ):
         if type(value["timeouts"][key]) is not int or value["timeouts"][key] <= 0:
             raise RuntimeError(f"{path}: timeouts.{key} must be a positive integer")
@@ -523,14 +508,7 @@ def coordinator(pane: Entity, name: str, role: str) -> None:
             "--effort",
             spec["effort"],
             "--settings",
-            json.dumps(
-                {
-                    "enabledPlugins": {
-                        "elixir-lsp@elixir-agent-tools": False,
-                        "dexter-lsp@dexter": False,
-                    }
-                }
-            ),
+            json.dumps({"enabledPlugins": NATIVE_LSP_PLUGINS}),
             "--strict-mcp-config",
             "--mcp-config",
             '{"mcpServers":{}}',
@@ -643,6 +621,7 @@ def stop_team(target: str) -> None:
     names = [f"team-{target}-{r}" for r in roles]
     panes = pane_roles(workspace, names)
     roots = owned_worktrees(panes)
+    check_shared_owners(roots, panes)
     if roots:
         require_git_admin(main / ".git", "lead-tpm")
         git("fetch", "origin")
@@ -650,6 +629,17 @@ def stop_team(target: str) -> None:
     for pane in panes.values():
         stop(pane["pane_id"], pane_occupant(pane["pane_id"])[0])
     check_worktrees(roots)
+    check_shared_owners(roots, panes)
+    for root in sorted(roots):
+        wrapper = root / ".dexter/dexter.sh"
+        if wrapper.is_file():
+            result = execute(
+                ["/bin/sh", wrapper, "stop"],
+                timeout=cfg["timeouts"]["dexter_startup_seconds"],
+                input_text="",
+            )
+            if result.returncode:
+                raise RuntimeError(result.stderr or result.stdout)
     if roots or panes:
         drop_databases(target)
     for root in sorted(roots):
@@ -657,6 +647,15 @@ def stop_team(target: str) -> None:
     herdr("workspace", "close", workspace["workspace_id"])
     print(f"{label}: closed; main checkout status follows")
     print(git("status", "--short") or "Main checkout clean")
+
+
+def check_shared_owners(roots: set[Path], panes: dict[str, Entity]) -> None:
+    """Do not retire a worktree still used by an agent outside this team."""
+    owned_panes = {pane["pane_id"] for pane in panes.values()}
+    for agent in herdr("agent", "list")["agents"]:
+        pane = agent["pane_id"]
+        if pane not in owned_panes and pane_occupant(pane)[0] in roots:
+            raise RuntimeError(f"Worktree still shared with {agent.get('name') or pane}; preserved")
 
 
 def owned_worktrees(panes: dict[str, Entity]) -> set[Path]:
