@@ -51,44 +51,6 @@ defmodule TipsWeb.UserLive.Login do
             Log in with email <span aria-hidden="true">→</span>
           </UI.button>
         </.form>
-
-        <div class="flex items-center gap-3 text-sm text-muted-foreground">
-          <span class="h-px flex-1 bg-border"></span> or <span class="h-px flex-1 bg-border"></span>
-        </div>
-
-        <.form
-          :let={f}
-          for={@form}
-          id="login_form_password"
-          action={~p"/users/log-in"}
-          phx-submit="submit_password"
-          phx-trigger-action={@trigger_submit}
-          class="space-y-4"
-        >
-          <UI.field
-            readonly={!!@current_scope}
-            field={f[:email]}
-            type="email"
-            label="Email"
-            autocomplete="username"
-            spellcheck="false"
-          />
-          <UI.field
-            field={@form[:password]}
-            type="password"
-            label="Password"
-            autocomplete="current-password"
-            spellcheck="false"
-          />
-          <div class="space-y-2">
-            <UI.button size="lg" class="w-full" name={@form[:remember_me].name} value="true">
-              Log in and stay logged in <span aria-hidden="true">→</span>
-            </UI.button>
-            <UI.button variant="outline" size="lg" class="w-full">
-              Log in only this time
-            </UI.button>
-          </div>
-        </.form>
       </div>
     </Layouts.app>
     """
@@ -96,20 +58,14 @@ defmodule TipsWeb.UserLive.Login do
 
   @impl true
   def mount(_params, _session, socket) do
-    email =
-      Phoenix.Flash.get(socket.assigns.flash, :email) ||
-        get_in(socket.assigns, [:current_scope, Access.key(:user), Access.key(:email)])
+    email = get_in(socket.assigns, [:current_scope, Access.key(:user), Access.key(:email)])
 
     form = to_form(%{"email" => email}, as: "user")
 
-    {:ok, assign(socket, page_title: "Log in", form: form, trigger_submit: false)}
+    {:ok, assign(socket, page_title: "Log in", form: form)}
   end
 
   @impl true
-  def handle_event("submit_password", _params, socket) do
-    {:noreply, assign(socket, :trigger_submit, true)}
-  end
-
   def handle_event("submit_magic", %{"user" => %{"email" => email}}, socket) do
     if user = Accounts.get_user_by_email(email) do
       Accounts.deliver_login_instructions(

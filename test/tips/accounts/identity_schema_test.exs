@@ -111,6 +111,24 @@ defmodule Tips.Accounts.IdentitySchemaTest do
     end
   end
 
+  describe "passwordless identity" do
+    test "users have no password storage column or schema field" do
+      %{rows: rows} =
+        Repo.query!("""
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'users'
+        """)
+
+      columns = List.flatten(rows)
+      fields = User.__schema__(:fields) ++ User.__schema__(:virtual_fields)
+
+      assert "email" in columns
+      assert :email in fields
+      assert Enum.filter(columns, &(&1 =~ "password")) == []
+      assert Enum.filter(fields, &(Atom.to_string(&1) =~ "password")) == []
+    end
+  end
+
   describe "registration boundary" do
     for handle <- [
           nil,
@@ -156,11 +174,6 @@ defmodule Tips.Accounts.IdentitySchemaTest do
                Repo.reload!(user)
 
       assert Accounts.get_user_by_email(" MIXED@EXAMPLE.COM ").id == user.id
-
-      user = set_password(user)
-
-      assert Accounts.get_user_by_email_and_password(" MIXED@EXAMPLE.COM ", valid_user_password()).id ==
-               user.id
     end
 
     test "case-variant duplicate handle returns a changeset error" do

@@ -65,10 +65,6 @@ defmodule TipsWeb.UserLive.Confirmation do
             </UI.button>
           <% end %>
         </.form>
-
-        <UI.notice :if={!@user.confirmed_at}>
-          Tip: If you prefer passwords, you can enable them in the user settings.
-        </UI.notice>
       </div>
     </Layouts.app>
     """
