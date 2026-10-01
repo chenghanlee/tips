@@ -33,7 +33,7 @@ Scope searches to relevant paths and file types; broaden as needed.
   | Find references to a function or module | `findReferences` / `references` | `rg -F 'name('` |
   | Read docs, spec and signature | `hover` (both) | opening the file |
   | Outline a file | `documentSymbol` / `symbols <file>` | reading the file |
-  | List implementations of a `@callback` | `goToImplementation` / `implementation` | `rg '@behaviour'`, `rg '@impl'` |
+  | List implementations, from the `@callback` head | `goToImplementation` / `implementation` | `rg '@behaviour'`, `rg '@impl'` |
   | Find callers of a function | `incomingCalls` / `incoming-calls` | grepping for callers |
   | Find calls a function makes | `outgoingCalls` / `outgoing-calls` | reading its body |
   | Check which `Module.function/arity` a position selects | `prepareCallHierarchy` / `prepare-call-hierarchy` | |
