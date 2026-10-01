@@ -242,7 +242,7 @@ defmodule Tips.Accounts.IdentitySchemaTest do
         user = insert_user()
         fresh = Accounts.generate_user_session_token(user)
         expired = Accounts.generate_user_session_token(user)
-        offset_user_token(expired, -(14 * 24 + 1), :hour)
+        offset_user_token(expired, -(60 * 24 + 1), :hour)
 
         assert {%{id: id}, _inserted_at} = Accounts.get_user_by_session_token(fresh)
         assert id == user.id
@@ -304,7 +304,7 @@ defmodule Tips.Accounts.IdentitySchemaTest do
       end
     end
 
-    test "session creation persists raw tokens, fresh families and authentication recency" do
+    test "session creation persists raw tokens, fresh families and current authentication recency" do
       recency = ~U[2026-09-20 12:34:56Z]
       user = insert_user() |> Map.put(:authenticated_at, recency)
       first = Accounts.generate_user_session_token(user)
@@ -316,8 +316,8 @@ defmodule Tips.Accounts.IdentitySchemaTest do
       assert {:ok, family} = Ecto.UUID.cast(first_row.session_family_id)
       assert {:ok, other_family} = Ecto.UUID.cast(second_row.session_family_id)
       refute family == other_family
-      assert first_row.authenticated_at == recency
-      assert second_row.authenticated_at == recency
+      assert DateTime.after?(first_row.authenticated_at, recency)
+      assert DateTime.after?(second_row.authenticated_at, recency)
 
       assert {{_, 0}, "Etc/UTC"} =
                {first_row.inserted_at.microsecond, first_row.inserted_at.time_zone}

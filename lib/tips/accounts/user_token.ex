@@ -10,7 +10,7 @@ defmodule Tips.Accounts.UserToken do
   # since someone with access to the email may take over the account.
   @magic_link_validity_in_minutes 15
   @change_email_validity_in_days 7
-  @session_validity_in_days 14
+  @session_validity_in_days 60
 
   schema "users_tokens" do
     field :token, :binary
@@ -42,19 +42,21 @@ defmodule Tips.Accounts.UserToken do
   and devices in the UI and allow users to explicitly expire any
   session they deem invalid.
   """
-  def build_session_token(user) do
+  def build_session_token(user_id, session_family_id, authenticated_at) do
     token = :crypto.strong_rand_bytes(@rand_size)
-    dt = user.authenticated_at || DateTime.utc_now(:second)
-    # Family continuity across reissues belongs to the session lifecycle in #45.
+
     {token,
      %UserToken{
        token: token,
        context: "session",
-       user_id: user.id,
-       authenticated_at: dt,
-       session_family_id: Ecto.UUID.generate()
+       user_id: user_id,
+       authenticated_at: authenticated_at,
+       session_family_id: session_family_id
      }}
   end
+
+  @doc "Session validity, shared by the session query, pruning and the remember-me cookie."
+  def session_validity_in_days, do: @session_validity_in_days
 
   @doc """
   Checks if the token is valid and returns its underlying lookup query.
@@ -65,17 +67,45 @@ defmodule Tips.Accounts.UserToken do
   not expired (after @session_validity_in_days).
   """
   def verify_session_token_query(token) do
-    # Bind UTC instants: ago/2 casts to timestamp, which depends on the DB session zone.
-    cutoff = DateTime.add(DateTime.utc_now(), -@session_validity_in_days, :day)
-
     query =
-      from token in by_token_and_context_query(token, "session"),
+      from token in valid_session_token_query(token),
         join: user in assoc(token, :user),
-        where: token.inserted_at > ^cutoff,
         select: {%{user | authenticated_at: token.authenticated_at}, token.inserted_at}
 
     {:ok, query}
   end
+
+  @doc """
+  Returns the query for the unexpired session row matching `token`.
+  """
+  def valid_session_token_query(token) do
+    from token in by_token_and_context_query(token, "session"),
+      where: token.inserted_at > ^cutoff("session")
+  end
+
+  @doc """
+  Returns the query for expired rows of every known context.
+
+  A row expires when its age reaches its context's validity. Rows of unknown
+  contexts are never matched.
+  """
+  def expired_tokens_query do
+    from token in UserToken,
+      where:
+        (token.context == "session" and token.inserted_at <= ^cutoff("session")) or
+          (token.context == "login" and token.inserted_at <= ^cutoff("login")) or
+          (like(token.context, "change:%") and token.inserted_at <= ^cutoff("change:"))
+  end
+
+  # A row is valid while inserted after its context's cutoff.
+  # Bind UTC instants: ago/2 casts to timestamp, which depends on the DB session zone.
+  defp cutoff("session"), do: DateTime.add(DateTime.utc_now(), -@session_validity_in_days, :day)
+
+  defp cutoff("login"),
+    do: DateTime.add(DateTime.utc_now(), -@magic_link_validity_in_minutes, :minute)
+
+  defp cutoff("change:" <> _),
+    do: DateTime.add(DateTime.utc_now(), -@change_email_validity_in_days, :day)
 
   @doc """
   Builds a token and its hash to be delivered to the user's email.
@@ -120,12 +150,11 @@ defmodule Tips.Accounts.UserToken do
     case Base.url_decode64(token, padding: false) do
       {:ok, decoded_token} ->
         hashed_token = :crypto.hash(@hash_algorithm, decoded_token)
-        cutoff = DateTime.add(DateTime.utc_now(), -@magic_link_validity_in_minutes, :minute)
 
         query =
           from token in by_token_and_context_query(hashed_token, "login"),
             join: user in assoc(token, :user),
-            where: token.inserted_at > ^cutoff,
+            where: token.inserted_at > ^cutoff("login"),
             where: token.sent_to == user.email,
             select: {user, token}
 
@@ -151,11 +180,10 @@ defmodule Tips.Accounts.UserToken do
     case Base.url_decode64(token, padding: false) do
       {:ok, decoded_token} ->
         hashed_token = :crypto.hash(@hash_algorithm, decoded_token)
-        cutoff = DateTime.add(DateTime.utc_now(), -@change_email_validity_in_days, :day)
 
         query =
           from token in by_token_and_context_query(hashed_token, context),
-            where: token.inserted_at > ^cutoff
+            where: token.inserted_at > ^cutoff(context)
 
         {:ok, query}
 

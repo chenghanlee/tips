@@ -191,12 +191,11 @@ defmodule Tips.AccountsTest do
       end
     end
 
-    test "duplicates the authenticated_at of given user in new token", %{user: user} do
-      user = %{user | authenticated_at: DateTime.add(DateTime.utc_now(:second), -3600)}
-      token = Accounts.generate_user_session_token(user)
+    test "mints current recency, ignoring the caller's authenticated_at", %{user: user} do
+      stale = DateTime.add(DateTime.utc_now(:second), -3600)
+      token = Accounts.generate_user_session_token(%{user | authenticated_at: stale})
       assert user_token = Repo.get_by(UserToken, token: token)
-      assert user_token.authenticated_at == user.authenticated_at
-      assert DateTime.compare(user_token.inserted_at, user.authenticated_at) == :gt
+      assert DateTime.after?(user_token.authenticated_at, stale)
     end
   end
 
