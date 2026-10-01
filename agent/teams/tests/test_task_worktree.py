@@ -317,6 +317,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
             "MIX_ENV",
             "MIX_TEST_PARTITION",
             "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE",
+            "HEX_HOME",
         ):
             self.env.pop(k, None)
         self.git("init", "-q", "-b", "main")
