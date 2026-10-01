@@ -35,6 +35,7 @@ Scope searches to relevant paths and file types; broaden as needed.
   - Find what calls a function: `incomingCalls` / `incoming-calls`, instead of grepping callers and reading each one.
   - Find what a function calls: `outgoingCalls` / `outgoing-calls`, instead of reading its body.
   - Check which `Module.function/arity` a position selects for those two: `prepareCallHierarchy` / `prepare-call-hierarchy`.
+  - Search by name with no file position, from either client's shell: `"$TIPS_DEXTER" lookup Module [function]` for the definition and `"$TIPS_DEXTER" references Module [function]` for its uses.
 
   Keep `rg` for text Dexter does not index: strings, comments, config keys and templates.
 - **mix-credo**: Run `mix credo --strict` on any edited `.ex`/`.exs` files and fix issues you introduced. Skip only if the Credo task is unavailable; report dependency and project failures.
