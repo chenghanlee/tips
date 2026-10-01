@@ -368,7 +368,7 @@ class GitAdminGuardTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             common = Path(tmp)
             (common / "HEAD").write_text("ref: refs/heads/main\n")
-            require_git_admin(common, "team-1-tpm")
+            require_git_admin(common)
             assert [path.name for path in common.iterdir()] == ["HEAD"]
             assert (common / "HEAD").read_text() == "ref: refs/heads/main\n"
 
@@ -520,32 +520,44 @@ class TeamLifecycleTest(unittest.TestCase):
         ]
 
     def codex_coordinator_arguments(self) -> list[str]:
-        """The client arguments of a team TPM launched as Codex."""
+        """The client arguments of a lead TPM launched as Codex."""
         path = self.repo / "agent/teams/config.toml"
         path.write_text(
-            CONFIG.replace('[roles.tpm]\nkind = "claude"', '[roles.tpm]\nkind = "codex"')
+            CONFIG.replace('[roles.lead_tpm]\nkind = "claude"', '[roles.lead_tpm]\nkind = "codex"')
         )
-        started = self.run_team("start", "1")
+        started = self.run_team("start", "lead")
         assert started.returncode == 0, started.stderr
         start = next(c for c in self.calls() if c[:2] == ["agent", "start"])
         assert start[start.index("--kind") + 1] == "codex"
         return start[start.index("--") + 1 :]
 
-    def test_start_team_six_and_repeat_reuses_tpm_without_coding_clients(self) -> None:
+    def test_start_team_six_and_repeat_creates_three_shell_panes_and_no_client(self) -> None:
         assert self.run_team("start", "6").returncode == 0
         r = self.run_team("start", "6")
         assert r.returncode == 0, r.stderr
         state = json.loads(self.state.read_text())
-        assert len(state["panes"]) == 4
+        assert [pane["label"] for pane in state["panes"]] == [
+            "team-6-dev",
+            "team-6-test",
+            "team-6-lead",
+        ]
+        assert not any(pane.get("agent") for pane in state["panes"])
+        launches = (["agent", "start"], ["agent", "prompt"], ["pane", "run"])
+        assert not any(c[:2] in launches for c in self.calls())
+
+    def test_start_lead_and_repeat_reuses_the_coordinator(self) -> None:
+        assert self.run_team("start", "lead").returncode == 0
+        r = self.run_team("start", "lead")
+        assert r.returncode == 0, r.stderr
         starts = [c for c in self.calls() if c[:2] == ["agent", "start"]]
         assert len(starts) == 1
-        assert starts[0][2] == "team-6-tpm"
+        assert starts[0][2] == "lead-tpm"
         setups = [c[3] for c in self.calls() if c[:2] == ["pane", "run"]]
         assert "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=35" in setups[0]
         assert "--strict-mcp-config" in starts[0]
 
     def test_narrow_pane_setup_acknowledges_output_but_never_its_echo(self) -> None:
-        r = self.run_team("start", "1")
+        r = self.run_team("start", "lead")
         assert r.returncode == 0, r.stderr
         command = next(c[3] for c in self.calls() if c[:2] == ["pane", "run"])
         wait = next(c for c in self.calls() if c[:2] == ["pane", "wait-output"])
@@ -556,7 +568,7 @@ class TeamLifecycleTest(unittest.TestCase):
 
     def test_lost_setup_output_never_starts_coordinator(self) -> None:
         self.state.write_text(json.dumps({"workspaces": [], "panes": [], "setup_lost": True}))
-        r = self.run_team("start", "1")
+        r = self.run_team("start", "lead")
         assert r.returncode != 0
         assert "timed out waiting for output match" in r.stderr
         assert not any(c[:2] == ["agent", "start"] for c in self.calls())
@@ -590,35 +602,44 @@ class TeamLifecycleTest(unittest.TestCase):
             path.read_text()
             .replace("max_teams = 6", "max_teams = 2")
             .replace('model = ""', 'model = "configured-model"')
-            .replace('effort = "medium"', 'effort = "low"')
+            .replace('effort = "high"', 'effort = "low"')
         )
         assert self.run_team("start", "3").returncode != 0
         assert not (self.root / "calls").exists()
-        r = self.run_team("start", "2")
+        assert self.run_team("start", "2").returncode == 0
+        r = self.run_team("start", "lead")
         assert r.returncode == 0, r.stderr
         start = next(c for c in self.calls() if c[:2] == ["agent", "start"])
         assert "configured-model" in start
         assert "low" in start
 
     def test_conflicting_pane_prevents_reuse(self) -> None:
-        assert self.run_team("start", "1").returncode == 0
+        assert self.run_team("start", "lead").returncode == 0
         state = json.loads(self.state.read_text())
         state["panes"][0]["name"] = "someone-else"
         self.state.write_text(json.dumps(state))
-        r = self.run_team("start", "1")
+        r = self.run_team("start", "lead")
         assert r.returncode != 0
         assert "conflicting" in r.stderr
         assert len([c for c in self.calls() if c[:2] == ["agent", "start"]]) == 1
 
     def test_stop_empty_coding_panes_closes_only_owned_workspace(self) -> None:
         assert self.run_team("start", "1").returncode == 0
-        state = json.loads(self.state.read_text())
-        state["panes"][0].pop("agent")
-        self.state.write_text(json.dumps(state))
         r = self.run_team("stop", "1")
         assert r.returncode == 0, r.stderr
         assert json.loads(self.state.read_text())["workspaces"] == []
         assert (self.root / "docker-calls").exists()
+
+    def test_stop_preserves_a_workspace_holding_a_pane_outside_the_team_roles(self) -> None:
+        assert self.run_team("start", "1").returncode == 0
+        state = json.loads(self.state.read_text())
+        state["panes"].append({"pane_id": "wT:p4", "label": "team-1-tpm", "cwd": str(self.repo)})
+        self.state.write_text(json.dumps(state))
+        r = self.run_team("stop", "1")
+        assert r.returncode != 0
+        assert "Unexpected or duplicate pane wT:p4; preserved" in r.stderr
+        assert json.loads(self.state.read_text())["workspaces"]
+        assert not (self.root / "docker-calls").exists()
 
     def test_stop_dirty_worktree_preserves_workspace_and_database(self) -> None:
         assert self.run_team("start", "1").returncode == 0
@@ -629,7 +650,6 @@ class TeamLifecycleTest(unittest.TestCase):
         )
         (work / "uncommitted").write_text("keep")
         state = json.loads(self.state.read_text())
-        state["panes"][0].pop("agent")
         state["panes"][1]["cwd"] = str(work)
         state["panes"][1]["foreground_cwd"] = "/opt/homebrew/lsp-child"
         self.state.write_text(json.dumps(state))
@@ -652,7 +672,6 @@ class TeamLifecycleTest(unittest.TestCase):
             check=True,
         )
         state = json.loads(self.state.read_text())
-        state["panes"][0].pop("agent")
         state["panes"][1]["cwd"] = str(work)
         state["panes"][1]["foreground_cwd"] = "/opt/homebrew/lsp-child"
         self.state.write_text(json.dumps(state))
@@ -676,7 +695,6 @@ class TeamLifecycleTest(unittest.TestCase):
             '#!/bin/sh\necho "$1" >> "$DEXTER_STOP_LOG"\nexit "${DEXTER_STOP_FAIL:-0}"\n'
         )
         state = json.loads(self.state.read_text())
-        state["panes"][0].pop("agent")
         for pane in state["panes"][1:3]:
             pane["cwd"] = str(work)
         self.state.write_text(json.dumps(state))
@@ -709,7 +727,6 @@ class TeamLifecycleTest(unittest.TestCase):
             )
             assert daemon_pid(work)
             state = json.loads(self.state.read_text())
-            state["panes"][0].pop("agent")
             state["panes"][1]["cwd"] = str(work)
             self.state.write_text(json.dumps(state))
             result = self.run_team("stop", "1")
@@ -744,7 +761,6 @@ class TeamLifecycleTest(unittest.TestCase):
         snapshot.parent.mkdir(parents=True)
         snapshot.write_text('{"files":{"ignored.ex":"saved contents"}}')
         state = json.loads(self.state.read_text())
-        state["panes"][0].pop("agent")
         state["panes"][1]["cwd"] = str(work)
         self.state.write_text(json.dumps(state))
         result = self.run_team("stop", "1")
@@ -764,7 +780,6 @@ class TeamLifecycleTest(unittest.TestCase):
         execute(["git", "-C", str(work), "add", "new"], check=True)
         execute(["git", "-C", str(work), "commit", "-qm", "unmerged"], check=True)
         state = json.loads(self.state.read_text())
-        state["panes"][0].pop("agent")
         state["panes"][1]["cwd"] = str(work)
         state["panes"][1]["foreground_cwd"] = "/opt/homebrew/lsp-child"
         self.state.write_text(json.dumps(state))
@@ -785,7 +800,6 @@ class TeamLifecycleTest(unittest.TestCase):
             check=True,
         )
         state = json.loads(self.state.read_text())
-        state["panes"][0].pop("agent")
         state["panes"][1]["cwd"] = str(work)
         state["panes"][1]["foreground_cwd"] = "/opt/homebrew/lsp-child"
         self.state.write_text(json.dumps(state))
@@ -818,14 +832,6 @@ class TeamLifecycleTest(unittest.TestCase):
         assert "overlapping database" in r.stderr
         assert not (self.root / "docker-calls").exists()
 
-    def test_tpm_brief_routes_readiness_to_lead_tpm(self) -> None:
-        assert self.run_team("start", "1").returncode == 0
-        prompt = next(c[3] for c in self.calls() if c[:2] == ["agent", "prompt"])
-        assert "Report readiness to lead-tpm" in prompt
-        assert "agent/teams/roles/team-tpm.md" in prompt
-        assert "Read agent/teams/README.md" in prompt
-        assert "task_worktree.py" not in prompt
-
     def test_lead_ui_needs_client_settings_only_and_retirement_drops_the_lead_partition(
         self,
     ) -> None:
@@ -834,9 +840,6 @@ class TeamLifecycleTest(unittest.TestCase):
         )
         r = self.run_team("start", "1")
         assert r.returncode == 0, r.stderr
-        state = json.loads(self.state.read_text())
-        state["panes"][0].pop("agent")
-        self.state.write_text(json.dumps(state))
         (self.bin / "docker").write_text(
             '#!/bin/sh\nprintf "%s\\n" "$*" >> "$DOCKER_LOG"\ncase "$*" in *SELEC'
             'T*) printf "tips_test_t1l\\ntips_test_t2l\\n";; esac\n'
@@ -851,8 +854,10 @@ class TeamLifecycleTest(unittest.TestCase):
         r = self.run_team("start", "lead")
         assert r.returncode == 0, r.stderr
         prompt = next(c[3] for c in self.calls() if c[:2] == ["agent", "prompt"])
+        assert "Read agent/teams/README.md" in prompt
         assert "agent/teams/roles/lead-tpm.md" in prompt
         assert "Report readiness to the user" in prompt
+        assert "task_worktree.py" not in prompt
         assert len(json.loads(self.state.read_text())["panes"]) == 1
         r = self.run_team("stop", "lead")
         assert r.returncode != 0
@@ -865,7 +870,6 @@ class TeamLifecycleTest(unittest.TestCase):
             check=True,
         )
         state = json.loads(self.state.read_text())
-        state["panes"][0].pop("agent")
         state["panes"][1]["cwd"] = str(work)
         state["panes"][1]["foreground_cwd"] = "/opt/homebrew/lsp-child"
         self.state.write_text(json.dumps(state))

@@ -32,7 +32,7 @@ Apply shared Findings priorities and probe repair limits. Push repairs and add a
 
 ## Merge
 
-After clean `gh pr update-branch`, ask the tech lead for a TPM fetch. Before another commit, run `git merge --ff-only "origin/task/$TASK"` (`TASK`: readiness task slug). If fast-forward fails, preserve work and report divergence to the tech lead.
+After clean `gh pr update-branch`, ask the tech lead for a lead TPM fetch. Before another commit, run `git merge --ff-only "origin/task/$TASK"` (`TASK`: readiness task slug). If fast-forward fails, preserve work and report divergence to the tech lead.
 
 If the branch update conflicts, request the same fetch, then `git merge origin/main` in your worktree. Resolve, push and hand off; tester reviews conflicted hunks and base delta.
 
@@ -46,7 +46,7 @@ Follow shared Recovery.
 
 ## Lost session or environment
 
-First record shared Recovery state. Check launch values with the shared Environment command. If missing, notify the tech lead and await the helper rerun.
+First record shared Recovery state. Check launch values with the shared Environment command. If missing or wrong, notify the tech lead and await a relaunch: the helper cannot change a running client.
 
 ## Silence
 

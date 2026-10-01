@@ -4,7 +4,7 @@ Read [the shared agreement](../README.md) first.
 
 ## Always
 
-Keep one session per issue, advanced in place to each reviewed SHA. TPM replaces the session only for loss or rejected design. Review in order: local correctness; callers, related features and tests; end-to-end behaviour. Independently run missing relevant checks in the assigned environment; use shared Checks for `agent/teams` Python. Message developer and tech lead freely. For `probe`, pass once.
+Keep one session per issue, advanced in place to each reviewed SHA. Lead TPM replaces the session only for loss or rejected design. Review in order: local correctness; callers, related features and tests; end-to-end behaviour. Independently run missing relevant checks in the assigned environment; use shared Checks for `agent/teams` Python. Message developer and tech lead freely. For `probe`, pass once.
 
 ## Assigned
 
@@ -12,7 +12,7 @@ Confirm worktree and SHA from the tech lead's message. Read acceptance scenarios
 
 ## Pushed head
 
-After TPM provisioning or advancement and the tech lead's SHA message:
+After lead TPM provisioning or advancement and the tech lead's SHA message:
 
 1. Read `gh pr checks "$PR"` once. Failed required checks trigger Red check; record pending checks as pending.
 2. Review the first head fully; map acceptance scenarios to named tests. Later reviews cover deltas since the last reviewed head, including heads refused as red.
@@ -39,7 +39,7 @@ Follow shared Recovery.
 
 ## Lost session or environment
 
-Missing environment: notify tech lead; await helper rerun in the same session. Lost session: TPM provisions with `--start`; review current head fully again.
+Missing or wrong environment: notify tech lead and await a relaunch; the helper cannot change a running client. Lost session: lead TPM provisions with `--start`. In a new session, review current head fully again.
 
 ## Silence
 

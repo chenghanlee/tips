@@ -145,7 +145,7 @@ def run(
     return p.stdout.strip()
 
 
-def require_git_admin(common: Path, caller: str) -> None:
+def require_git_admin(common: Path) -> None:
     """Refuse before Git administration when this process cannot write main's .git.
 
     Create a file to probe: mode bits do not show a client sandbox's write denial.
@@ -156,7 +156,7 @@ def require_git_admin(common: Path, caller: str) -> None:
     except OSError as error:
         raise RuntimeError(
             f"Cannot write {common} ({error.strerror}); "
-            f"ask {caller} to run it from the main checkout."
+            "ask lead-tpm to run it from the main checkout."
         ) from error
 
 
@@ -274,7 +274,7 @@ def stop(pane: str, root: str | Path) -> None:
         raise RuntimeError(f"{pane}: client root does not match {root}; preserved")
     owned = descendants(rows, shell)
     if os.getpid() in owned:
-        raise RuntimeError(f"{pane}: cannot stop the calling agent; ask its TPM to stop it")
+        raise RuntimeError(f"{pane}: cannot stop the calling agent; ask lead-tpm to stop it")
     identity = {pid: rows[pid][1] for pid in owned if pid in rows}
     signal_client(pane, current, clients, owned)
     wait_for_exit(pane, shell, identity)
@@ -363,7 +363,7 @@ def validate_config_fields(path: Path, value: Config) -> None:
     for key in ("codex_approval", "claude_permission_mode"):
         require_type(policies.get(key), str, f"{path}: launch.{key}")
     roles = object_fields(fields.get("roles"), f"{path}: roles")
-    for name in ("dev", "test", "lead", "tpm", "lead_tpm"):
+    for name in ("dev", "test", "lead", "lead_tpm"):
         validate_role_fields(roles.get(name), f"{path}: roles.{name}", name)
     if "lead_ui" in roles:
         validate_role_fields(roles["lead_ui"], f"{path}: roles.lead_ui", "lead_ui")
@@ -376,7 +376,7 @@ def validate_role_fields(value: object, label: str, name: str) -> None:
     if name in ("dev", "test", "lead"):
         require_type(role.get("port_offset"), int, f"{label}.port_offset")
         require_type(role.get("db_suffix"), str, f"{label}.db_suffix")
-    if name in ("tpm", "lead_tpm") or "compaction_percent" in role:
+    if name == "lead_tpm" or "compaction_percent" in role:
         require_type(role.get("compaction_percent"), int, f"{label}.compaction_percent")
 
 
@@ -392,7 +392,7 @@ def validate_settings(path: Path, value: Config) -> None:
             raise RuntimeError(f"{path}: timeouts.{key} must be a positive integer")
     if value["team"]["max_teams"] < 1:
         raise RuntimeError(f"{path}: team.max_teams must be positive")
-    for name in ("dev", "test", "lead", "tpm", "lead_tpm", "lead_ui"):
+    for name in ("dev", "test", "lead", "lead_tpm", "lead_ui"):
         role = value["roles"].get(name)
         if role is not None and role["kind"] not in ("codex", "claude"):
             raise RuntimeError(f"{path}: invalid role {name}")
@@ -420,10 +420,9 @@ def validate_allocations(path: Path, value: Config) -> None:
 
 
 def validate_compaction(path: Path, value: Config) -> None:
-    for role in ("tpm", "lead_tpm"):
-        percent = value["roles"][role].get("compaction_percent")
-        if type(percent) is not int or not 1 <= percent <= 100:
-            raise RuntimeError(f"{path}: invalid coordinator compaction percentage")
+    percent = value["roles"]["lead_tpm"].get("compaction_percent")
+    if type(percent) is not int or not 1 <= percent <= 100:
+        raise RuntimeError(f"{path}: invalid coordinator compaction percentage")
 
 
 def matching_workspace(label: str) -> Entity | None:
@@ -443,8 +442,8 @@ def pane_roles(workspace: Entity, names: list[str]) -> dict[str, Entity]:
     return result
 
 
-def coordinator(pane: Entity, name: str, role: str) -> None:
-    spec = cfg["roles"][role]
+def coordinator(pane: Entity) -> None:
+    name, spec = "lead-tpm", cfg["roles"]["lead_tpm"]
     if pane.get("agent"):
         agent = herdr("agent", "get", pane["pane_id"])["agent"]
         if (
@@ -536,25 +535,20 @@ def coordinator(pane: Entity, name: str, role: str) -> None:
         raise RuntimeError(
             "Coordinator launch returned an unexpected client/root/state; inspect its pane"
         )
-    herdr("agent", "prompt", name, coordinator_brief(name, role))
-
-
-def coordinator_brief(name: str, role: str) -> str:
-    card = "lead-tpm" if role == "lead_tpm" else "team-tpm"
-    report_to = "the user" if role == "lead_tpm" else "lead-tpm"
-    return (
+    herdr(
+        "agent",
+        "prompt",
+        name,
         f"You are {name}. Read agent/teams/README.md, then your card "
-        f"agent/teams/roles/{card}.md. Coordinate from this read-only main "
-        f"checkout. Report readiness to {report_to}; await assignment."
+        "agent/teams/roles/lead-tpm.md. Coordinate from this read-only main "
+        "checkout. Report readiness to the user; await assignment.",
     )
 
 
 def start(target: str) -> None:
     is_lead = target == "lead"
     names = (
-        ["lead-tpm"]
-        if is_lead
-        else [f"team-{target}-{role}" for role in ("tpm", "dev", "test", "lead")]
+        ["lead-tpm"] if is_lead else [f"team-{target}-{role}" for role in ("dev", "test", "lead")]
     )
     label = cfg["team"]["workspace_prefix"] + "-" + target
     workspace = matching_workspace(label)
@@ -569,11 +563,10 @@ def start(target: str) -> None:
         panes = {names[0]: first}
     for index, name in enumerate(names):
         if name not in panes:
-            anchor = panes[names[0 if index < 3 else 1]]
             pane = herdr(
                 "pane",
                 "split",
-                anchor["pane_id"],
+                panes[names[0]]["pane_id"],
                 "--direction",
                 "right" if index == 1 else "down",
                 "--cwd",
@@ -582,14 +575,11 @@ def start(target: str) -> None:
             )["pane"]
             herdr("pane", "rename", pane["pane_id"], name)
             panes[name] = pane
-    coordinator(panes[names[0]], names[0], "lead_tpm" if is_lead else "tpm")
+    if is_lead:
+        coordinator(panes[names[0]])
     for name, pane in panes.items():
         print(f"{name}: {pane['pane_id']}")
-    print(
-        "Coordinator launched; coding panes await assignment."
-        if not is_lead
-        else "Lead TPM launched."
-    )
+    print("Lead TPM launched." if is_lead else "Coding panes await assignment.")
 
 
 def git(*args: str | Path, root: Path | None = None) -> str:
@@ -602,13 +592,12 @@ def stop_team(target: str) -> None:
     if not workspace:
         print(f"{label}: no workspace; nothing removed")
         return
-    roles = ("tpm", "dev", "test", "lead")
-    names = [f"team-{target}-{r}" for r in roles]
+    names = [f"team-{target}-{r}" for r in ("dev", "test", "lead")]
     panes = pane_roles(workspace, names)
     roots = owned_worktrees(panes)
     check_shared_owners(roots, panes)
     if roots:
-        require_git_admin(main / ".git", "lead-tpm")
+        require_git_admin(main / ".git")
         git("fetch", "origin")
     check_worktrees(roots)
     for pane in panes.values():

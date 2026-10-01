@@ -80,12 +80,6 @@ effort = "high"
 db_suffix = "l"
 port_offset = 2
 
-[roles.tpm]
-kind = "claude"
-model = ""
-effort = "medium"
-compaction_percent = 35
-
 [roles.lead_tpm]
 kind = "claude"
 model = ""
@@ -457,13 +451,13 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert not self.wt.exists()
 
     @unittest.skipIf(os.geteuid() == 0, "root bypasses directory permissions")
-    def test_unwritable_main_git_refers_caller_to_team_tpm_before_fetch(self) -> None:
+    def test_unwritable_main_git_refers_caller_to_lead_tpm_before_fetch(self) -> None:
         git_dir = self.root / ".git"
         before = snapshot(git_dir)
         git_dir.chmod(0o555)
         self.addCleanup(git_dir.chmod, 0o755)
         result = self.call("--start", role="dev", task="29-dev", ref=False, ok=False)
-        assert "ask team-3-tpm to run it from the main checkout" in result.stderr
+        assert "ask lead-tpm to run it from the main checkout" in result.stderr
         assert "fetch" not in result.stderr
         assert self.state()["events"] == []
         assert not (self.root / ".worktrees").exists()
@@ -549,7 +543,9 @@ class WorktreeIntegrationTest(unittest.TestCase):
         before = len(self.state()["events"])
         p = self.call("--start", role="test", task=task)
         assert "Already running" in p.stdout
-        assert not any(e[:2] == ["agent", "start"] for e in self.state()["events"][before:])
+        # A rerun reuses the session; it neither restarts it nor reapplies its environment.
+        launches = (["agent", "start"], ["pane", "run"])
+        assert not any(e[:2] in launches for e in self.state()["events"][before:])
         self.commit("next")
         new = self.git("rev-parse", "HEAD")
         self.call("--start", role="test", task=task, ref=new)
@@ -781,9 +777,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert not any(e[0] == "stop_agent" for e in self.state()["events"])
         assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 1
 
-    def test_kind_mismatch_and_configurable_dexter_timeout(self) -> None:
-        self.call("--kind", "claude", ok=False)
-        assert not self.wt.exists()
+    def test_configurable_dexter_timeout(self) -> None:
         path = self.root / "agent/teams/config.toml"
         path.write_text(CONFIG.replace("dexter_startup_seconds = 60", "dexter_startup_seconds = 7"))
         self.call()
@@ -792,25 +786,11 @@ class WorktreeIntegrationTest(unittest.TestCase):
         # Dexter itself gives up 30 s after --wait; only a hung query is killed from outside.
         assert 7 + 30 < self.state()["dexter_query_budget"] <= 7 + 30 + 10
 
-    def test_role_inferred_from_agent_name_and_policy_from_config(self) -> None:
+    def test_launch_takes_model_and_policy_from_config(self) -> None:
         path = self.root / "agent/teams/config.toml"
         path.write_text(CONFIG.replace('codex_approval = "never"', 'codex_approval = "on-request"'))
-        args = [
-            sys.executable,
-            str(self.script),
-            "28-review-team-3-lead",
-            "--team",
-            "3",
-            "--pane",
-            "wA:pB",
-            "--agent",
-            "team-3-lead",
-            "--review-ref",
-            self.base,
-            "--start",
-        ]
-        p = execute(args, cwd=self.root, env=self.env, timeout=20)
-        assert p.returncode == 0, p.stderr
+        self.call("--start")
+        assert "team-3-lead" in self.state()["launch_argv"]
         assert "fixture-lead" in self.state()["launch_argv"]
         assert "on-request" in self.state()["launch_argv"]
 
@@ -821,6 +801,20 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call("--start", role="dev", task="29-dev", ref=False)
         assert (wt / "tracked.txt").read_text() == "unfinished work\n"
         assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 1
+
+    def test_absent_developer_restarts_on_its_branch_with_work_untouched(self) -> None:
+        self.call("--start", role="dev", task="29-dev", ref=False)
+        wt = self.root / ".worktrees/29-dev"
+        (wt / "tracked.txt").write_text("unfinished work\n")
+        head = self.git("-C", str(wt), "rev-parse", "HEAD")
+        s = self.state()
+        s["agents"] = []
+        self.save(s)
+        self.call("--start", role="dev", task="29-dev", ref=False)
+        assert (wt / "tracked.txt").read_text() == "unfinished work\n"
+        assert self.git("-C", str(wt), "rev-parse", "HEAD") == head
+        assert self.git("-C", str(wt), "branch", "--show-current") == "task/29-dev"
+        assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 2
 
     def test_last_edit_during_shutdown_prevents_advance(self) -> None:
         task, wt = "28-review-team-3-test", self.root / ".worktrees/28-review-team-3-test"
@@ -952,11 +946,6 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.git("branch", "task/29-duplicate")
         self.call("--start", role="dev", task="29-latest", ref=False, ok=False)
         assert not (self.root / ".worktrees/29-latest").exists()
-
-    def test_named_agent_must_match_team_and_role(self) -> None:
-        self.call("--agent", "team-2-lead", ok=False)
-        self.call("--agent", "team-3-dev", ok=False)
-        assert not self.wt.exists()
 
     def test_bound_command_keeps_its_root_and_sources_from_anywhere(self) -> None:
         self.call()
