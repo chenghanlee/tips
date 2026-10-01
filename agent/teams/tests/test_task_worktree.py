@@ -484,10 +484,11 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert not (self.wt / ".claude/settings.local.json").exists()
         argv = self.state()["launch_argv"]
         plugins = json.loads(argv[argv.index("--settings") + 1])["enabledPlugins"]
-        assert plugins["mix-compile@elixir-agent-tools"] is True
+        assert plugins["mix-compile@elixir-agent-tools"] is False
         assert plugins["mix-credo@elixir-agent-tools"] is True
-        # Only language servers a supported installation can provide are disabled.
+        # Disable automatic compilation and known alternative language servers.
         assert {name for name, enabled in plugins.items() if not enabled} == {
+            "mix-compile@elixir-agent-tools",
             "elixir-lsp@elixir-agent-tools",
             "dexter-lsp@dexter",
         }
@@ -1042,6 +1043,8 @@ class WorktreeIntegrationTest(unittest.TestCase):
             "mix-compile@elixir-agent-tools",
             "mix-credo@elixir-agent-tools",
         }
+        assert cfg["plugins"]["mix-compile@elixir-agent-tools"]["enabled"] is False
+        assert cfg["plugins"]["mix-credo@elixir-agent-tools"]["enabled"] is True
         assert "mcp_servers.elixir-lsp.enabled=false" not in self.state()["launch_argv"]
         assert "approval_policy" not in cfg
         assert "never" in self.state()["launch_argv"]

@@ -69,7 +69,7 @@ Out of this beta: an application in a subdirectory or monorepo.
   succeeds, `dexter.sh lsp`. Known alternative language-server plugins are
   disabled by the launch command's `--settings` override, including in linked
   worktrees.
-- For Codex, `.codex/config.toml` with the Mix check plugins.
+- For Codex, `.codex/config.toml` with automatic compilation disabled and Credo enabled.
 
 Provisioning then runs `dexter.sh query workspace-symbols --wait <timeout> MixProject`
 and refuses to launch a client if the index does not answer. `team.py stop`
