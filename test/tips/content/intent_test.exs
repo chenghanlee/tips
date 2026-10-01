@@ -174,7 +174,7 @@ defmodule Tips.Content.IntentTest do
       id: 7,
       user_id: 3,
       tip_id: 5,
-      submission_key: "7f1c0f0e-5b1a-4a53-9a43-2f6f0c1f5b11",
+      submission_key: Ecto.UUID.generate(),
       edit_version: 4,
       up_count: 12,
       down_count: 3,
