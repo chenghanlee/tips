@@ -31,6 +31,7 @@ class FixtureState(TypedDict):
     dexter_fails: bool
     dexter_empty: bool
     dexter_stdlib: str | None
+    dexter_query_stdin: str
 
 
 TEAMS = Path(__file__).resolve().parents[1]
@@ -252,11 +253,22 @@ state_path = Path(os.environ['FAKE_HERDR_STATE'])
 state = json.loads(state_path.read_text())
 state['events'].append(['dexter', root, *argv])
 state['dexter_stdlib'] = os.environ.get('DEXTER_ELIXIR_LIB_ROOT')
+if argv[:1] == ['query'] and os.environ.get('FAKE_DEXTER_READS_STDIN'):
+    state['dexter_query_stdin'] = sys.stdin.read()
 state_path.write_text(json.dumps(state))
 if state.get('dexter_fails'):
-    sys.exit(1)
+    sys.exit('fixture Dexter failed')
+if argv[:1] == ['lsp']:
+    # The proxy owns the LSP stream: echo what the client sent.
+    sys.stdout.write(sys.stdin.read())
+    sys.exit(0)
 print('[]' if state.get('dexter_empty') else json.dumps([{'name': 'Fixture.MixProject'}]))
 """
+
+MIX_PROJECT = (
+    "defmodule Fixture.MixProject do\n  use Mix.Project\n"
+    '  def project, do: [app: :fixture, version: "0.1.0"]\nend\n'
+)
 
 FAKE_STOP = r"""import json,os,subprocess,sys
 from pathlib import Path
@@ -468,9 +480,10 @@ class WorktreeIntegrationTest(unittest.TestCase):
         server = json.loads((plugin / ".claude-plugin/plugin.json").read_text())["lspServers"][
             "dexter"
         ]
-        assert server["command"] == str(self.root / "agent/lsp/dexter/vendor/dexter")
-        assert server["args"] == ["--root", str(self.wt), "lsp"]
-        assert server["env"] == {"DEXTER_ELIXIR_LIB_ROOT": str(self.root / "fixture-stdlib/lib")}
+        # The bound command alone carries the binary, root and sources.
+        assert server["command"] == "/bin/sh"
+        assert str(self.wt / ".dexter/dexter.sh") in server["args"]
+        assert "env" not in server
         assert set(server["extensionToLanguage"]) == {".ex", ".exs", ".heex"}
         s = self.state()
         assert s["launch_argv"][s["launch_argv"].index("--plugin-dir") + 1] == str(plugin)
@@ -975,6 +988,38 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert self.state()["launch_env"]["TIPS_DEXTER"] == str(wrapper)
         assert str(wrapper) in self.state()["launch_argv"][-1]
 
+    def test_claude_lsp_starts_the_proxy_only_after_a_successful_warm_up(self) -> None:
+        self.call(role="test")
+        manifest = self.wt / ".dexter/claude-plugin/.claude-plugin/plugin.json"
+        server = json.loads(manifest.read_text())["lspServers"]["dexter"]
+        command = [server["command"], *server["args"]]
+        # Dexter allows 30 s for the daemon connection on top of --wait.
+        assert server["startupTimeout"] >= (60 + 30) * 1000
+
+        def dexter_events() -> list[list[str]]:
+            return [e for e in self.state()["events"] if e[0] == "dexter"]
+
+        warm_up = dexter_events()[-1]
+        env = dict(self.env, FAKE_DEXTER_READS_STDIN="1")
+        env.pop("DEXTER_ELIXIR_LIB_ROOT")
+        started = execute(command, cwd=self.root, env=env, input_text="initialize")
+        assert started.returncode == 0, started.stderr
+        # The same warm-up as provisioning, then the proxy, both through the bound command.
+        assert dexter_events()[-2:] == [warm_up, ["dexter", str(self.wt), "lsp"]]
+        assert self.state()["dexter_stdlib"] == str(self.root / "fixture-stdlib/lib")
+        # The LSP stream belongs to the proxy: the warm-up neither reads nor writes it.
+        assert self.state()["dexter_query_stdin"] == ""
+        assert started.stdout == "initialize"
+        state = self.state()
+        state["dexter_fails"] = True
+        self.save(state)
+        before = len(dexter_events())
+        failed = execute(command, cwd=self.root, env=env, input_text="initialize")
+        assert failed.returncode != 0
+        assert failed.stdout == ""
+        assert "fixture Dexter failed" in failed.stderr
+        assert dexter_events()[before:] == [warm_up]
+
     def test_stdlib_default_uses_target_toolchain_and_keeps_the_bound_sources(self) -> None:
         self.env.pop("DEXTER_ELIXIR_LIB_ROOT", None)
         elixir = self.root / "fakebin/elixir"
@@ -1043,10 +1088,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
             "  def greet(name), do: name\nend\n"
         )
         (self.root / "sample.ex").write_text(source)
-        (self.root / "mix.exs").write_text(
-            "defmodule Fixture.MixProject do\n  use Mix.Project\n"
-            '  def project, do: [app: :fixture, version: "0.1.0"]\nend\n'
-        )
+        (self.root / "mix.exs").write_text(MIX_PROJECT)
         self.git("add", "sample.ex", "mix.exs")
         self.commit("mix fixture")
         self.git("update-ref", "refs/remotes/origin/main", "HEAD")

@@ -8,13 +8,15 @@ import subprocess
 import tempfile
 import time
 import unittest
+from collections.abc import Sequence
 from pathlib import Path
 from typing import cast
 
+from task_worktree import bound_command, claude_lsp_launch
 from team import command_args, execute, require_git_admin
 
 # Fixed fixture values, independent of production tuning; one 40-column pane model.
-from .test_task_worktree import CONFIG, PANE_SCREEN
+from .test_task_worktree import CONFIG, MIX_PROJECT, PANE_SCREEN
 
 SCRIPT = Path(__file__).resolve().parents[1] / "team.py"
 
@@ -78,6 +80,38 @@ else:
 print(json.dumps({"result": r}))
 """
 
+REAL_DEXTER = "opt-in real Dexter: TIPS_TEST_REAL_DEXTER and DEXTER_ELIXIR_LIB_ROOT"
+
+
+def real_bound_command(root: Path) -> Path:
+    """Write the production bound command for root over the real binary."""
+    wrapper = root / ".dexter/dexter.sh"
+    wrapper.parent.mkdir()
+    wrapper.write_text(
+        bound_command(
+            Path(os.environ["TIPS_TEST_REAL_DEXTER"]) / "vendor/dexter",
+            root,
+            os.environ["DEXTER_ELIXIR_LIB_ROOT"],
+        )
+    )
+    return wrapper
+
+
+def daemon_pid(root: Path) -> int | None:
+    """The real daemon serving root, found as Dexter finds it: by its arguments."""
+    rows = execute(["ps", "-A", "-ww", "-o", "pid=,args="], check=True).stdout.splitlines()
+    pids = [int(row.split()[0]) for row in rows if row.rstrip().endswith(f"dexter daemon {root}")]
+    assert len(pids) <= 1, pids
+    return pids[0] if pids else None
+
+
+def wait_until_stopped(root: Path) -> None:
+    for _ in range(100):
+        if daemon_pid(root) is None:
+            return
+        time.sleep(0.05)
+    raise AssertionError(f"Dexter daemon still serves {root}")
+
 
 class StopAgentTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -109,19 +143,28 @@ class StopAgentTest(unittest.TestCase):
             if child_file.exists():
                 with contextlib.suppress(ProcessLookupError):
                     os.kill(int(child_file.read_text()), signal.SIGKILL)
+        wrapper = self.root / ".dexter/dexter.sh"
+        if wrapper.exists():
+            # A real daemon outlives its clients; stop it before its root disappears.
+            execute(["/bin/sh", wrapper, "stop", "--force"], input_text="")
         self.tmp.cleanup()
 
-    def client(self, stubborn: bool = False) -> subprocess.Popen[bytes]:
+    def client(
+        self, stubborn: bool = False, child: Sequence[str | Path] | None = None
+    ) -> subprocess.Popen[bytes]:
         # The child has its own process group, like Expert's engine nodes.
-        child = "import sys; sys.stdin.read()"
+        child = child or ["python3", "-c", "import sys; sys.stdin.read()"]
         code = """import os, signal, subprocess, sys, time
-p=subprocess.Popen([sys.executable,'-c',sys.argv[2]],start_new_session=True,stdin=subprocess.PIPE)
+p=subprocess.Popen(sys.argv[3:],start_new_session=True,stdin=subprocess.PIPE,
+                   stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 open(sys.argv[1],'w').write(str(p.pid))
 def stop(*_):
  p.stdin.close(); status=p.wait(); sys.exit(0 if status == 0 else 99)
-signal.signal(signal.SIGTERM, signal.SIG_IGN if sys.argv[3]=='yes' else stop)
+signal.signal(signal.SIGTERM, signal.SIG_IGN if sys.argv[2]=='yes' else stop)
 while True: time.sleep(.05)
 """
+        for name in ("client", "child"):
+            (self.root / name).unlink(missing_ok=True)
         host = (
             "import subprocess,sys; p=subprocess.Popen(sys.argv[2:]); open(sys"
             '.argv[1],"w").write(str(p.pid)); sys.exit(p.wait())'
@@ -138,8 +181,8 @@ while True: time.sleep(.05)
                     "-c",
                     code,
                     str(self.root / "child"),
-                    child,
                     "yes" if stubborn else "no",
+                    *child,
                 ]
             ),
             cwd=self.root,
@@ -174,6 +217,23 @@ while True: time.sleep(.05)
             env=self.env,
             timeout=8,
         )
+
+    def real_claude_launch(self) -> tuple[Path, list[str]]:
+        """The production bound command and Claude LSP launch for this root, real binary."""
+        (self.root / "mix.exs").write_text(MIX_PROJECT)
+        wrapper = real_bound_command(self.root)
+        return wrapper, claude_lsp_launch(wrapper, 20)
+
+    def wait_for_proxy(self) -> int:
+        """Wait until the client's child is the LSP proxy; return the daemon serving it."""
+        child = (self.root / "child").read_text()
+        for _ in range(600):
+            args = execute(["ps", "-ww", "-o", "args=", "-p", child]).stdout.strip()
+            daemon = daemon_pid(self.root)
+            if args.endswith(" lsp") and daemon:
+                return daemon
+            time.sleep(0.05)
+        raise AssertionError("The LSP proxy did not start")
 
     def test_source_has_no_side_effects(self) -> None:
         r = execute(
@@ -245,6 +305,56 @@ while True: time.sleep(.05)
         assert r.returncode != 0
         assert p.poll() is None
         assert "surviv" in r.stderr.lower()
+
+    @unittest.skipUnless(os.environ.get("TIPS_TEST_REAL_DEXTER"), REAL_DEXTER)
+    def test_client_stop_leaves_real_daemons_from_the_generated_claude_launch(self) -> None:
+        wrapper, launch = self.real_claude_launch()
+        query = ["/bin/sh", wrapper, "query", "workspace-symbols", "--wait", "20s", "MixProject"]
+        daemons: list[int] = []
+        for start in ("cold", "prewarmed"):
+            client = self.client(child=launch)
+            daemons.append(self.wait_for_proxy())
+            stopped = self.stop()
+            assert stopped.returncode == 0, f"{start}: {stopped.stderr}"
+            client.wait(timeout=5)
+            # The daemon belongs to the workspace: it outlives its client and still answers.
+            assert daemon_pid(self.root) == daemons[0], start
+            assert "Fixture.MixProject" in execute(query, input_text="", check=True).stdout
+        assert daemons[0] == daemons[1]
+        # Retirement stops it with the same bound command.
+        execute(["/bin/sh", wrapper, "stop"], input_text="", check=True)
+        wait_until_stopped(self.root)
+
+    @unittest.skipUnless(os.environ.get("TIPS_TEST_REAL_DEXTER"), REAL_DEXTER)
+    def test_direct_proxy_owned_real_daemons_still_block_stop(self) -> None:
+        wrapper, _ = self.real_claude_launch()
+        # Without the warm-up the proxy starts the daemon as its own child.
+        self.client(child=["/bin/sh", wrapper, "lsp"])
+        daemon = self.wait_for_proxy()
+        stopped = self.stop()
+        assert stopped.returncode != 0
+        assert f"surviving owned processes [{daemon}]" in stopped.stderr
+
+    @unittest.skipUnless(os.environ.get("TIPS_TEST_REAL_DEXTER"), REAL_DEXTER)
+    def test_generated_claude_launch_with_real_daemons_keeps_the_lsp_stream_clean(self) -> None:
+        _, launch = self.real_claude_launch()
+        body = json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {"processId": None, "rootUri": self.root.as_uri(), "capabilities": {}},
+            }
+        )
+        started = execute(
+            launch,
+            cwd=self.root,
+            input_text=f"Content-Length: {len(body)}\r\n\r\n{body}",
+            timeout=60,
+        )
+        assert started.returncode == 0, started.stderr
+        # A cold start: the warm-up took no request bytes and wrote no reply bytes.
+        assert started.stdout.startswith("Content-Length: ")
 
 
 class GitAdminGuardTest(unittest.TestCase):
@@ -402,6 +512,18 @@ class TeamLifecycleTest(unittest.TestCase):
             cast(list[str], json.loads(line))
             for line in (self.root / "calls").read_text().splitlines()
         ]
+
+    def codex_coordinator_arguments(self) -> list[str]:
+        """The client arguments of a team TPM launched as Codex."""
+        path = self.repo / "agent/teams/config.toml"
+        path.write_text(
+            CONFIG.replace('[roles.tpm]\nkind = "claude"', '[roles.tpm]\nkind = "codex"')
+        )
+        started = self.run_team("start", "1")
+        assert started.returncode == 0, started.stderr
+        start = next(c for c in self.calls() if c[:2] == ["agent", "start"])
+        assert start[start.index("--kind") + 1] == "codex"
+        return start[start.index("--") + 1 :]
 
     def test_start_team_six_and_repeat_reuses_tpm_without_coding_clients(self) -> None:
         assert self.run_team("start", "6").returncode == 0
@@ -565,6 +687,47 @@ class TeamLifecycleTest(unittest.TestCase):
         assert result.returncode == 0, result.stderr
         assert log.read_text() == "stop\nstop\n"
         assert not work.exists()
+
+    @unittest.skipUnless(os.environ.get("TIPS_TEST_REAL_DEXTER"), REAL_DEXTER)
+    def test_retirement_stops_real_daemons_before_removing_the_worktree(self) -> None:
+        assert self.run_team("start", "1").returncode == 0
+        work = self.repo / ".worktrees/task"
+        execute(["git", "-C", self.repo, "worktree", "add", "-q", "--detach", work], check=True)
+        (self.repo / ".git/info/exclude").write_text(".dexter/\n")
+        wrapper = real_bound_command(work)
+        try:
+            execute(
+                ["/bin/sh", wrapper, "query", "workspace-symbols", "--wait", "20s"],
+                input_text="",
+                check=True,
+            )
+            assert daemon_pid(work)
+            state = json.loads(self.state.read_text())
+            state["panes"][0].pop("agent")
+            state["panes"][1]["cwd"] = str(work)
+            self.state.write_text(json.dumps(state))
+            result = self.run_team("stop", "1")
+            assert result.returncode == 0, result.stderr
+            # Stopping needs the bound command, so it ran before the checkout was removed.
+            wait_until_stopped(work)
+            assert not work.exists()
+        finally:
+            if wrapper.exists():
+                execute(["/bin/sh", wrapper, "stop", "--force"], input_text="")
+
+    def test_codex_coordinator_overrides_no_mcp_server(self) -> None:
+        # A partial mcp_servers override is an invalid transport unless a legacy entry exists.
+        assert not any("mcp_servers" in arg for arg in self.codex_coordinator_arguments())
+
+    @unittest.skipUnless(
+        os.environ.get("TIPS_TEST_REAL_CODEX"), "opt-in installed Codex config check"
+    )
+    def test_installed_codex_accepts_coordinator_arguments_without_a_legacy_entry(self) -> None:
+        arguments = self.codex_coordinator_arguments()
+        assert not (self.repo / ".codex").exists()
+        result = execute(["codex", *arguments, "mcp", "list", "--json"], cwd=self.repo, timeout=30)
+        assert result.returncode == 0, result.stderr
+        assert "elixir-lsp" not in {server["name"] for server in json.loads(result.stdout)}
 
     def test_retirement_removes_ignored_dexter_state_without_relocating_it(self) -> None:
         assert self.run_team("start", "1").returncode == 0

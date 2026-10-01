@@ -65,9 +65,10 @@ Out of this beta: an application in a subdirectory or monorepo.
 - `.dexter/dexter.sh`: `exec vendor/dexter --root <worktree> "$@"` with the
   selected sources exported. Its absolute path is `TIPS_DEXTER` in the session.
 - For Claude, `.dexter/claude-plugin/`: a plugin loaded with `--plugin-dir` whose
-  LSP server runs the same binary with `--root <worktree> lsp` and the
-  same sources. Known alternative language-server plugins are disabled by the
-  launch command's `--settings` override, including in linked worktrees.
+  LSP server runs `dexter.sh`: first the warm-up query below, then, only if it
+  succeeds, `dexter.sh lsp`. Known alternative language-server plugins are
+  disabled by the launch command's `--settings` override, including in linked
+  worktrees.
 - For Codex, `.codex/config.toml` with the Mix check plugins.
 
 Provisioning then runs `dexter.sh query workspace-symbols --wait <timeout> MixProject`
@@ -77,6 +78,24 @@ the daemon alive and the worktree is preserved. A daemon idles out after fifteen
 minutes without clients and restarts from its index on the next request.
 Do not run `git clean -x` in a team worktree: it removes the bound command and
 the index under `.dexter/`.
+
+The daemon belongs to the worktree, not to a client. A daemon started by
+Claude's long-lived LSP proxy would be that client's child, and `team.py`
+refuses to stop a client while one of its children survives. So Claude's
+launch starts the daemon through the short-lived warm-up query and attaches
+the proxy afterwards.
+
+- If the warm-up fails or times out, the proxy does not start. The reason is
+  on the LSP server's stderr and that session has no native LSP until Claude
+  starts the server again; whether Claude retries has not been verified live.
+  `"$TIPS_DEXTER" query` still works.
+- The plugin's `startupTimeout` allows the `--wait` bound, Dexter's 30-second
+  connection allowance and the proxy's own start.
+- Known gaps: a daemon that exits after the warm-up and before the proxy
+  attaches is started by the proxy, and the later client stop refuses. A
+  client stopped while its warm-up still waits for the index can be refused
+  too. In both cases run `dexter.sh stop` once that client has exited and
+  retry.
 
 ## Operations
 

@@ -522,8 +522,6 @@ def coordinator(pane: Entity, name: str, role: str) -> None:
             "-C",
             str(main),
             "-c",
-            "mcp_servers.elixir-lsp.enabled=false",
-            "-c",
             "model_reasoning_effort=" + json.dumps(spec["effort"]),
         ]
         if spec["model"]:

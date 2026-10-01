@@ -34,7 +34,7 @@ claude plugin install --scope user mix-compile@elixir-agent-tools
 claude plugin install --scope user mix-credo@elixir-agent-tools
 ```
 
-Codex discovers linked `.agents/skills`; never also install Codex `elixir-dev`. Claude loads the same five skills through `elixir-dev`. Generated configs enable both Mix check plugins. Follow plugin trust prompts. Claude launches use `--settings` to disable known language-server plugins, including in linked worktrees; existing local settings files are preserved. Remove any separately configured legacy Elixir MCP server before the pilot. Unrelated MCP servers remain available in coding sessions.
+Codex discovers linked `.agents/skills`; never also install Codex `elixir-dev`. Claude loads the same five skills through `elixir-dev`. Generated configs enable both Mix check plugins. Follow plugin trust prompts. Claude launches use `--settings` to disable known language-server plugins, including in linked worktrees; existing local settings files are preserved. Remove any legacy `mcp_servers.elixir-lsp` entry before the pilot, including the main checkout's `.codex/config.toml`: launchers do not disable it. Unrelated MCP servers remain available in coding sessions.
 
 Build Dexter with the [LSP guide](../lsp/README.md#build): the pinned source plus the local patch, one binary. Put matching Elixir sources in the main checkout's `agent/lsp/vendor/elixir-<version>/` (the source tree contains `lib/elixir/lib/enum.ex`), or set `DEXTER_ELIXIR_LIB_ROOT` to their `lib/` directory. Provisioning selects the target worktree's Elixir version and binds the source path into the worktree's generated files. Keep the shared tools/sources independent of task worktrees.
 
@@ -61,7 +61,7 @@ Do not run it while another live agent owns `lead-tpm`. The lead TPM starts and 
 
 ## Configuration
 
-Edit [config.toml](config.toml): team limits; client/model/effort per role; port/database allocation; permissions; coordinator compaction; time budgets. Scripts read the canonical main checkout's file. Use `TIPS_TEAM_CONFIG=/absolute/path` for staged configuration in a disposable pilot. Settings apply next launch. `timeouts.dexter_startup_seconds` bounds the provisioning warm-up; it does not require rebuilding Dexter.
+Edit [config.toml](config.toml): team limits; client/model/effort per role; port/database allocation; permissions; coordinator compaction; time budgets. Scripts read the canonical main checkout's file. Use `TIPS_TEAM_CONFIG=/absolute/path` for staged configuration in a disposable pilot. Settings apply next launch. `timeouts.dexter_startup_seconds` bounds the index wait of the provisioning warm-up and of each Claude LSP start; it does not require rebuilding Dexter.
 
 Codex uses the generated `$TIPS_DEXTER` command; Claude uses its native LSP tool
 through the generated plugin. Existing shell approval and sandbox policies remain
