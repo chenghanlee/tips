@@ -24,20 +24,26 @@ Load only relevant skills. State which skills you are using before making change
 Scope searches to relevant paths and file types; broaden as needed.
 
 - **ripgrep (`rg`)**: Find text: names, strings, errors, config keys, and template content. Use `rg --files -g 'PATTERN'` to find files. Fall back to `grep` if unavailable.
-- **ast-grep**: Find code structures: calls with specific arguments, pipelines, or expressions inside functions. Prefer it over multiline regexes. Read the `ast-grep` skill and verify patterns against known examples. Use LSP for symbol resolution.
-- **Dexter LSP**: In provisioned coding sessions, Claude uses the native `LSP` tool and Codex runs `"$TIPS_DEXTER" query <operation> <file> <line> <column>`; both are Dexter bound to the worktree. Read [the operations table](agent/lsp/README.md#operations). Positions are 1-based. Prefer LSP for symbol resolution. Freshness is unverified; do not interpret an empty answer as proven absence. Use normal Mix compile/tests for compiler diagnostics. Report an unavailable tool rather than starting an alternate language server. For these navigation tasks, try the operation first (Claude name / Codex name), before text search or reading whole files:
-  - Find a module or function by name: `workspaceSymbol` / `workspace-symbols`, before `rg 'defmodule Name'` or `rg 'def name'`.
-  - Go from a call to its definition: `goToDefinition` / `definition`, before grepping for the `def`.
-  - Find indexed references to a function or module: `findReferences` / `references`, before `rg -F 'name('`. Run it before changing a name, arity or return shape.
-  - Read a function's docs, spec and signature: `hover`, before opening its file.
-  - Outline a file's modules and functions: `documentSymbol` / `symbols`, before reading the file.
-  - List a behaviour callback's implementations, starting at its `@callback`: `goToImplementation` / `implementation`, before `rg '@behaviour'` or `rg '@impl'`.
-  - Find what calls a function: `incomingCalls` / `incoming-calls`, before grepping callers and reading each one.
-  - Find what a function calls: `outgoingCalls` / `outgoing-calls`, before reading its body.
-  - Check which `Module.function/arity` a position selects for those two: `prepareCallHierarchy` / `prepare-call-hierarchy`.
-  - Search by name with no file position, from either client's shell: `"$TIPS_DEXTER" lookup Module [function]` for the definition and `"$TIPS_DEXTER" references Module [function]` for its uses.
+- **Dexter LSP**: Elixir code navigation in provisioned coding sessions, bound to your worktree. Try it before `rg` or reading whole files. Claude calls the `LSP` tool; Codex runs `"$TIPS_DEXTER" query <operation> <file> <line> <column>`. Positions are 1-based.
 
-  Results can leave out real references and calls, even on a fresh index: see [the limits](agent/lsp/README.md#limits). When completeness matters, cross-check with `rg` and the source. Keep `rg` for text Dexter does not index: strings, comments, config keys and templates.
+  | Task | Claude / Codex operation | Try before |
+  |---|---|---|
+  | Find a module or function by name | `workspaceSymbol` / `workspace-symbols <name>` | `rg 'defmodule Name'`, `rg 'def name'` |
+  | Go from a call to its definition | `goToDefinition` / `definition` | grepping for the `def` |
+  | Find references to a function or module | `findReferences` / `references` | `rg -F 'name('` |
+  | Read docs, spec and signature | `hover` (both) | opening the file |
+  | Outline a file | `documentSymbol` / `symbols <file>` | reading the file |
+  | List implementations of a `@callback` | `goToImplementation` / `implementation` | `rg '@behaviour'`, `rg '@impl'` |
+  | Find callers of a function | `incomingCalls` / `incoming-calls` | grepping for callers |
+  | Find calls a function makes | `outgoingCalls` / `outgoing-calls` | reading its body |
+  | Check which `Module.function/arity` a position selects | `prepareCallHierarchy` / `prepare-call-hierarchy` | |
+
+  - By name, with no position, from either client's shell: `"$TIPS_DEXTER" lookup Module [function]` finds the definition; `"$TIPS_DEXTER" references Module [function]` finds uses.
+  - Find references before changing a function's name, arity or return shape.
+  - Results can be stale or incomplete; an empty answer is not proof of absence. When completeness matters, cross-check with `rg` and the source.
+  - Dexter reports no compiler errors: run Mix compile and tests.
+  - If Dexter is unavailable, report it. Do not start another language server.
+  - Details: [operations](agent/lsp/README.md#operations), [limits](agent/lsp/README.md#limits).
 - **mix-credo**: Run `mix credo --strict` on any edited `.ex`/`.exs` files and fix issues you introduced. Skip only if the Credo task is unavailable; report dependency and project failures.
 
 - **Go static analysis**: For every Go change, including carried upstream patches, run the same custom golangci-lint profile as `tiny_big_agents`, including Staticcheck and NilAway. Use the [pinned Dexter profile and instructions](agent/lsp/dexter/patches/README.md#required-go-static-analysis) for Dexter. Keep checks and thresholds enabled; compare with the unchanged baseline, fix findings introduced by our code, and report inherited findings separately. Do not refactor unrelated upstream code to clear its lint debt.
