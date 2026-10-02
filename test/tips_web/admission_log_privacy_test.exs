@@ -200,6 +200,120 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
       refute log =~ proof, "log contains the magic-link proof"
     end
 
+    # The router decides what a path is: after HEAD handling, percent-decoding and
+    # empty-segment removal. Every form it serves must log the route pattern.
+    for {form, method, rewrite} <- [
+          {"HEAD", :head, quote(do: & &1)},
+          {"percent-encoded static segment", :get,
+           quote(do: &String.replace(&1, "/users/", "/%75sers/"))},
+          {"percent-encoded token segment", :get,
+           quote(
+             do: fn path ->
+               {prefix, <<char, rest::binary>>} =
+                 String.split_at(path, byte_size(path) - 8)
+
+               prefix <> "%" <> Base.encode16(<<char>>) <> rest
+             end
+           )},
+          {"trailing and doubled slashes", :get,
+           quote(do: &(String.replace(&1, "/users/", "/users//") <> "/"))}
+        ] do
+      test "magic-link #{form} logs the route, not the proof", %{user: user} do
+        {proof, _hashed} = generate_user_magic_link_token(user)
+        path = unquote(rewrite).(~p"/users/log-in/#{proof}")
+
+        log =
+          logged(:info, fn ->
+            assert %Plug.Conn{status: 200} =
+                     dispatch(build_conn(), @endpoint, unquote(method), path)
+          end)
+
+        assert log =~ "GET /users/log-in/:token"
+        assert log =~ "Sent 200 in"
+        refute_credential_path(log, proof, path)
+        assert {:ok, %{session_token: _}} = Accounts.login_user_by_magic_link(proof)
+      end
+
+      test "email-confirmation #{form} logs the route, not the token", %{conn: conn, user: user} do
+        email = unique_user_email()
+
+        confirmation =
+          extract_user_token(fn url ->
+            Accounts.deliver_user_update_email_instructions(
+              %{user | email: email},
+              user.email,
+              url
+            )
+          end)
+
+        path = unquote(rewrite).(~p"/users/settings/confirm-email/#{confirmation}")
+
+        log =
+          logged(:info, fn ->
+            assert %Plug.Conn{status: 302} = dispatch(conn, @endpoint, unquote(method), path)
+          end)
+
+        assert log =~ "GET /users/settings/confirm-email/:token"
+        assert log =~ "Sent 302 in"
+        refute_credential_path(log, confirmation, path)
+        assert Repo.reload!(user).email == email
+      end
+    end
+
+    test "a path the router does not serve is never logged", %{user: user} do
+      {proof, _hashed} = generate_user_magic_link_token(user)
+
+      for {method, path} <- [
+            {:get, "/users/log-in/#{proof}/extra"},
+            {:get, "/USERS/log-in/#{proof}"},
+            {:post, "/users/log-in/#{proof}"},
+            {:delete, "/users/settings/confirm-email/#{proof}"}
+          ] do
+        log =
+          logged(fn ->
+            assert %Plug.Conn{status: 404} = dispatch(build_conn(), @endpoint, method, path)
+          end)
+
+        assert log =~ "Sent 404 in"
+        refute_credential_path(log, proof, path)
+      end
+
+      assert {:ok, %{session_token: _}} = Accounts.login_user_by_magic_link(proof)
+    end
+
+    test "method override cannot turn a credential route into another logged form", %{user: user} do
+      {proof, _hashed} = generate_user_magic_link_token(user)
+      path = ~p"/users/log-in/#{proof}"
+
+      log =
+        logged(fn ->
+          assert %Plug.Conn{status: 404} = post(build_conn(), path, %{"_method" => "delete"})
+        end)
+
+      refute_credential_path(log, proof, path)
+    end
+
+    test "endpoint telemetry still carries start and stop for a credential route", %{user: user} do
+      {proof, _hashed} = generate_user_magic_link_token(user)
+      test = self()
+      handler = {__MODULE__, make_ref()}
+
+      :telemetry.attach_many(
+        handler,
+        [[:phoenix, :endpoint, :start], [:phoenix, :endpoint, :stop]],
+        fn [:phoenix, :endpoint, stage], measurements, _metadata, _config ->
+          if self() == test, do: send(test, {stage, Map.keys(measurements)})
+        end,
+        nil
+      )
+
+      head(build_conn(), ~p"/users/log-in/#{proof}")
+      :telemetry.detach(handler)
+
+      assert_received {:start, [:system_time]}
+      assert_received {:stop, [:duration]}
+    end
+
     test "malformed and unrouted paths neither crash nor detach the request logger", %{
       user: user
     } do
@@ -241,6 +355,13 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
     assert log =~ "MOUNT TipsWeb.AdmissionLogPrivacyTest.PlainLive"
     refute log =~ "Session:"
     assert_private(log, context)
+  end
+
+  # Neither the credential nor the path as requested may appear.
+  defp refute_credential_path(log, credential, path) do
+    refute log =~ credential, "log contains the credential"
+    refute log =~ path, "log contains the requested path"
+    refute log =~ String.slice(credential, -7, 7), "log contains part of the credential"
   end
 
   # Captures `fun`'s log at `level`, then restores the previous level.
