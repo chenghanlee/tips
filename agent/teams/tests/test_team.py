@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import cast
 
-from task_worktree import bound_command, claude_lsp_launch
+from task_worktree import bound_command
 from team import command_args, execute, require_git_admin
 
 # Fixed fixture values, independent of production tuning; one 40-column pane model.
@@ -218,23 +218,6 @@ while True: time.sleep(.05)
             timeout=8,
         )
 
-    def real_claude_launch(self) -> tuple[Path, list[str]]:
-        """The production bound command and Claude LSP launch for this root, real binary."""
-        (self.root / "mix.exs").write_text(MIX_PROJECT)
-        wrapper = real_bound_command(self.root)
-        return wrapper, claude_lsp_launch(wrapper, 20)
-
-    def wait_for_proxy(self) -> int:
-        """Wait until the client's child is the LSP proxy; return the daemon serving it."""
-        child = (self.root / "child").read_text()
-        for _ in range(600):
-            args = execute(["ps", "-ww", "-o", "args=", "-p", child]).stdout.strip()
-            daemon = daemon_pid(self.root)
-            if args.endswith(" lsp") and daemon:
-                return daemon
-            time.sleep(0.05)
-        raise AssertionError("The LSP proxy did not start")
-
     def test_source_has_no_side_effects(self) -> None:
         r = execute(
             [
@@ -307,60 +290,28 @@ while True: time.sleep(.05)
         assert "surviv" in r.stderr.lower()
 
     @unittest.skipUnless(os.environ.get("TIPS_TEST_REAL_DEXTER"), REAL_DEXTER)
-    def test_client_stop_leaves_real_daemons_from_the_generated_claude_launch(self) -> None:
-        wrapper, launch = self.real_claude_launch()
+    def test_client_stop_leaves_real_daemons_started_by_a_client_query(self) -> None:
+        (self.root / "mix.exs").write_text(MIX_PROJECT)
+        wrapper = real_bound_command(self.root)
         query = ["/bin/sh", wrapper, "query", "workspace-symbols", "--wait", "20s", "MixProject"]
-        daemons: list[int] = []
-        for start in ("cold", "prewarmed"):
-            client = self.client(child=launch)
-            daemons.append(self.wait_for_proxy())
-            stopped = self.stop()
-            assert stopped.returncode == 0, f"{start}: {stopped.stderr}"
-            client.wait(timeout=5)
-            # The daemon belongs to the workspace: it outlives its client and still answers.
-            assert daemon_pid(self.root) == daemons[0], start
-            assert "Fixture.MixProject" in execute(query, input_text="", check=True).stdout
-        assert daemons[0] == daemons[1]
+        # A client's query starts the daemon and ends; the daemon is then nobody's child.
+        client = self.client(child=query)
+        child = int((self.root / "child").read_text())
+        for _ in range(600):
+            if daemon_pid(self.root) and execute(["ps", "-p", str(child)]).returncode:
+                break
+            time.sleep(0.05)
+        daemon = daemon_pid(self.root)
+        assert daemon, "The query did not start a daemon"
+        stopped = self.stop()
+        assert stopped.returncode == 0, stopped.stderr
+        client.wait(timeout=5)
+        # The daemon belongs to the workspace: it outlives its client and still answers.
+        assert daemon_pid(self.root) == daemon
+        assert "Fixture.MixProject" in execute(query, input_text="", check=True).stdout
         # Retirement stops it with the same bound command.
         execute(["/bin/sh", wrapper, "stop"], input_text="", check=True)
         wait_until_stopped(self.root)
-
-    @unittest.skipUnless(os.environ.get("TIPS_TEST_REAL_DEXTER"), REAL_DEXTER)
-    def test_direct_proxy_owned_real_daemons_still_block_stop(self) -> None:
-        wrapper, _ = self.real_claude_launch()
-        # Without the warm-up the proxy starts the daemon as its own child.
-        self.client(child=["/bin/sh", wrapper, "lsp"])
-        daemon = self.wait_for_proxy()
-        stopped = self.stop()
-        assert stopped.returncode != 0
-        assert f"surviving owned processes [{daemon}]" in stopped.stderr
-
-    @unittest.skipUnless(os.environ.get("TIPS_TEST_REAL_DEXTER"), REAL_DEXTER)
-    def test_generated_claude_launch_with_real_daemons_keeps_the_lsp_stream_clean(self) -> None:
-        _, launch = self.real_claude_launch()
-        body = json.dumps(
-            {
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "initialize",
-                "params": {"processId": None, "rootUri": self.root.as_uri(), "capabilities": {}},
-            }
-        )
-        started = execute(
-            launch,
-            cwd=self.root,
-            input_text=f"Content-Length: {len(body)}\r\n\r\n{body}",
-            timeout=60,
-        )
-        assert started.returncode == 0, started.stderr
-        # A cold start: the warm-up took no request bytes and wrote no reply bytes,
-        # so the first frame on the stream is the proxy's answer to initialize.
-        # Text mode reads the header's CRLF line ends as LF.
-        header, _, frames = started.stdout.partition("\n\n")
-        assert header.startswith("Content-Length: "), started.stdout[:200]
-        reply, _ = json.JSONDecoder().raw_decode(frames)
-        assert reply["id"] == 1, reply
-        assert "capabilities" in reply["result"], reply
 
 
 class GitAdminGuardTest(unittest.TestCase):

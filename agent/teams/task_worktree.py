@@ -54,13 +54,10 @@ def git(*args: str | Path) -> str:
     return run(["git", *map(str, args)])
 
 
-# Claude's LSP launch: "$0" is the bound command, "$@" the warm-up query. A daemon
-# started by the long-lived proxy stays that client's child, and team.stop refuses
-# to leave a client's child running. So a short-lived query starts the daemon and
-# the proxy follows only when it succeeds. The LSP stream is the proxy's alone.
-CLAUDE_LSP_LAUNCH = '/bin/sh "$0" "$@" </dev/null >/dev/null && exec /bin/sh "$0" lsp'
 # Dexter's query gives up this long after --wait: its allowance to reach the daemon.
 DEXTER_CONNECT_SECONDS = 30
+# A cold Hex cache downloads every package; anything slower is a hung fetch.
+DEPS_FETCH_SECONDS = 300
 
 
 def bound_command(binary: Path, root: Path, sources: Path | str) -> str:
@@ -75,12 +72,7 @@ def bound_command(binary: Path, root: Path, sources: Path | str) -> str:
 
 def warm_up_query(startup_seconds: int) -> list[str]:
     """Bound-command arguments that start the daemon and wait for its index."""
-    return ["query", "workspace-symbols", "--wait", f"{startup_seconds}s", "MixProject"]
-
-
-def claude_lsp_launch(wrapper: Path, startup_seconds: int) -> list[str]:
-    """Claude's LSP server command: the bound command, warmed up, then its proxy."""
-    return ["/bin/sh", "-c", CLAUDE_LSP_LAUNCH, str(wrapper), *warm_up_query(startup_seconds)]
+    return ["query", "workspace-symbols", "--raw", "--wait", f"{startup_seconds}s", "MixProject"]
 
 
 class Arguments(argparse.Namespace):
@@ -258,7 +250,6 @@ class WorktreeTask:
         ).resolve()
         self.binary = home / "vendor/dexter"
         self.wrapper = self.worktree / ".dexter/dexter.sh"
-        self.plugin = self.worktree / ".dexter/claude-plugin"
         if not (self.root / ".agents/skills").is_dir():
             raise RefusalError("Shared skills directory is missing.")
         if not os.access(self.binary, os.X_OK):
@@ -344,72 +335,59 @@ enabled = false
 enabled = true
 """
             self.desired[self.worktree / ".codex/config.toml"] = config
-        else:
-            seconds = self.timeouts["dexter_startup_seconds"]
-            launch = claude_lsp_launch(self.wrapper, seconds)
-            self.desired[self.plugin / ".claude-plugin/plugin.json"] = (
-                json.dumps(
-                    {
-                        "name": "tips-dexter",
-                        "description": "Dexter language server bound to this worktree",
-                        "version": "1.0.0",
-                        "lspServers": {
-                            "dexter": {
-                                "command": launch[0],
-                                "args": launch[1:],
-                                # A policy cap, not the proxy's proven maximum: the full
-                                # warm-up, then as long again for the proxy to attach and
-                                # answer. Claude Code 2.1.286 sets no limit without one.
-                                "startupTimeout": (seconds + 2 * DEXTER_CONNECT_SECONDS) * 1000,
-                                "extensionToLanguage": {
-                                    ".ex": "elixir",
-                                    ".exs": "elixir",
-                                    ".heex": "phoenix-heex",
-                                },
-                            }
-                        },
-                    },
-                    indent=2,
-                )
-                + "\n"
-            )
 
     def language_brief(self) -> str:
-        if self.kind == "codex":
-            tools = (
-                f"Language tools for this session: {self.wrapper} is Dexter bound to "
-                f"{self.worktree}; run it via your shell tool, for example "
-                f"{self.wrapper} query references lib/example.ex 12 8 (1-based line and "
-                "column). Read agent/lsp/README.md for the nine read-only operations. "
-            )
-        else:
-            tools = (
-                "Language tools for this session: the native LSP tool is Dexter bound to "
-                f"{self.worktree}; use it for definitions, references, hover, symbols and "
-                "call hierarchy. Read agent/lsp/README.md for its limits. "
-            )
+        # The binary is shared by every checkout and the guide is not, so the
+        # binary's own help is the contract a lagging checkout can still trust.
         return (
-            tools + "Do not start another Elixir language server. Freshness is unverified; "
+            f"Language tools for this session: {self.wrapper} is Dexter bound to "
+            f"{self.worktree}; run it via your shell tool, for example "
+            f"{self.wrapper} query references lib/example.ex 12 8. Its help is the contract "
+            f"for syntax and output: read {self.wrapper} query --help and "
+            f"{self.wrapper} lookup --help once, and follow them where this checkout's "
+            "guide differs. After fetching dependencies yourself, run "
+            f"{self.wrapper} reindex. "
+            "Do not start another Elixir language server. Freshness is unverified; "
             "empty results are not proof of absence. Do not stop the shared daemon when "
             "this agent exits, and do not run git clean -x: it deletes the bound command "
             "and the index while the daemon may still run. "
             "Read the team operating agreement and your role card, then await assignment."
         )
 
-    def start_language_server(self) -> None:
+    def prepare_index(self) -> None:
+        """Fetch locked dependencies, start the daemon and reconcile its index with the disk."""
+        env = {**os.environ, **self.target_env}
+        # Dexter indexes dependency sources from disk, so a new checkout and a
+        # review head get them before it is asked; --check-locked never rewrites
+        # the lock. A resumed developer worktree keeps its own dependency state:
+        # it may hold an unfinished change that only its agent can resolve.
+        if self.review_sha or not self.old_head:
+            run(
+                ["mix", "deps.get", "--check-locked"],
+                cwd=self.worktree,
+                env=env,
+                timeout=DEPS_FETCH_SECONDS,
+                input_text="",
+            )
+        else:
+            print("Dependencies: left as the resumed developer worktree has them; not fetched.")
         # The bound command carries the binary, root and Elixir sources; a
         # missing or wrong source tree fails here, before any client starts.
         # The query ends itself within --wait plus its connection allowance, so a
         # valid slow start is never cut short; the margin only catches a hung query.
         seconds = self.timeouts["dexter_startup_seconds"]
+        budget = seconds + DEXTER_CONNECT_SECONDS + 5
         output = run(
             ["/bin/sh", self.wrapper, *warm_up_query(seconds)],
-            timeout=seconds + DEXTER_CONNECT_SECONDS + 5,
-            env={**os.environ, **self.target_env},
+            timeout=budget,
+            env=env,
             input_text="",
         )
         if not json.loads(output):
             raise RefusalError("Dexter indexed no MixProject module; inspect the daemon log.")
+        # A daemon that was already running indexed this checkout before the fetch
+        # or the advance, and it does not watch deps/: reconcile it with the disk.
+        run(["/bin/sh", self.wrapper, "reindex"], timeout=budget, env=env, input_text="")
         print(f"Dexter provisioning: index ready for {self.worktree}")
 
     def check_target_tree(self) -> None:
@@ -540,6 +518,10 @@ enabled = true
             )
         if self.args.start and (not owner.get("name")):
             self.herdr("agent", "rename", self.args.pane, self.agent_name)
+        if self.review_sha:
+            # An earlier advance may have moved the checkout and then failed
+            # before its index was ready; preparing it again changes nothing else.
+            self.prepare_index()
         print(
             f"Already running: {self.agent_name} in {self.worktree} ({owner.get('agent_status')})"
         )
@@ -554,7 +536,7 @@ enabled = true
         if not self.review_sha:
             raise RefusalError("A running reviewer advances only to an explicit --review-ref.")
         git("-C", self.worktree, "checkout", "--detach", "--no-overwrite-ignore", self.review_sha)
-        self.start_language_server()
+        self.prepare_index()
         print(f"Advanced {self.agent_name} in place: {self.worktree} at {self.review_sha}")
         return True
 
@@ -650,8 +632,6 @@ enabled = true
                 self.policies["claude_permission_mode"],
                 "--effort",
                 self.effort,
-                "--plugin-dir",
-                str(self.plugin),
                 # CLI settings also apply in linked worktrees and preserve user files.
                 "--settings",
                 json.dumps(
@@ -730,7 +710,7 @@ def main() -> None:
     task.checkout()
     task.write_config()
     task.link_skills()
-    task.start_language_server()
+    task.prepare_index()
     print(f"Worktree: {task.worktree}")
     if task.args.start:
         task.launch()

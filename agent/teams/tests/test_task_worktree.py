@@ -33,6 +33,8 @@ class FixtureState(TypedDict):
     dexter_stdlib: str | None
     dexter_query_stdin: str
     dexter_query_budget: float
+    mix_fails: bool
+    mix_env: dict[str, str | None]
 
 
 TEAMS = Path(__file__).resolve().parents[1]
@@ -261,6 +263,19 @@ if argv[:1] == ['lsp']:
 print('[]' if state.get('dexter_empty') else json.dumps([{'name': 'Fixture.MixProject'}]))
 """
 
+# Stands in for Mix: records where and how dependencies were fetched.
+FAKE_MIX = r"""#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+state_path = Path(os.environ['FAKE_HERDR_STATE'])
+state = json.loads(state_path.read_text())
+state['events'].append(['mix', os.getcwd(), *sys.argv[1:]])
+state['mix_env'] = {k: os.environ.get(k) for k in ('HEX_HOME', 'MIX_ENV')}
+state_path.write_text(json.dumps(state))
+if state.get('mix_fails'):
+    sys.exit('fixture mix failed')
+"""
+
 MIX_PROJECT = (
     "defmodule Fixture.MixProject do\n  use Mix.Project\n"
     '  def project, do: [app: :fixture, version: "0.1.0"]\nend\n'
@@ -359,9 +374,10 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.base = self.git("rev-parse", "HEAD")
         self.git("remote", "add", "origin", str(self.root))
         self.git("update-ref", "refs/remotes/origin/main", self.base)
-        fake = self.root / "fakebin/herdr"
-        fake.write_text(FAKE_HERDR)
-        fake.chmod(0o755)
+        for name, body in (("herdr", FAKE_HERDR), ("mix", FAKE_MIX)):
+            fake = self.root / "fakebin" / name
+            fake.write_text(body)
+            fake.chmod(0o755)
         (self.root / "stop.py").write_text(FAKE_STOP)
         self.state_path = self.root / "state.json"
         self.save({"agents": [], "events": [], "cwd": str(self.root)})
@@ -492,17 +508,13 @@ class WorktreeIntegrationTest(unittest.TestCase):
             "elixir-lsp@elixir-agent-tools",
             "dexter-lsp@dexter",
         }
-        plugin = self.wt / ".dexter/claude-plugin"
-        server = json.loads((plugin / ".claude-plugin/plugin.json").read_text())["lspServers"][
-            "dexter"
-        ]
-        # The bound command alone carries the binary, root and sources.
-        assert server["command"] == "/bin/sh"
-        assert str(self.wt / ".dexter/dexter.sh") in server["args"]
-        assert "env" not in server
-        assert set(server["extensionToLanguage"]) == {".ex", ".exs", ".heex"}
+        # Claude uses the bound command like Codex: no generated plugin, no native server.
+        assert not (self.wt / ".dexter/claude-plugin").exists()
+        assert "--plugin-dir" not in argv
+        brief = argv[argv.index("--append-system-prompt") + 1]
+        assert str(self.wt / ".dexter/dexter.sh") in brief
+        assert "native LSP" not in brief
         s = self.state()
-        assert s["launch_argv"][s["launch_argv"].index("--plugin-dir") + 1] == str(plugin)
         assert s["launch_env"] == {
             "PGPORT": "5433",
             "TIPS_DB_SUFFIX": "_t6r",
@@ -564,8 +576,13 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call("--start")
         self.commit("next")
         new = self.git("rev-parse", "HEAD")
+        before = len(self.state()["events"])
         p = self.call(ref=new)
         assert "Advanced team-3-lead in place" in p.stdout
+        # The new head's dependencies are fetched and the running daemon reconciled.
+        advanced = [e for e in self.state()["events"][before:] if e[0] in ("mix", "dexter")]
+        assert advanced[0] == ["mix", str(self.wt), "deps.get", "--check-locked"]
+        assert [e[2] for e in advanced[1:]] == ["query", "reindex"]
         assert not any(e[0] == "stop_agent" for e in self.state()["events"])
         assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 1
         assert self.git("-C", str(self.wt), "rev-parse", "HEAD") == new
@@ -787,8 +804,10 @@ class WorktreeIntegrationTest(unittest.TestCase):
         path = self.root / "agent/teams/config.toml"
         path.write_text(CONFIG.replace("dexter_startup_seconds = 60", "dexter_startup_seconds = 7"))
         self.call()
-        assert "--wait" in self.state()["events"][-1]
-        assert "7s" in self.state()["events"][-1]
+        warm_up = next(
+            e for e in self.state()["events"] if e[:3] == ["dexter", str(self.wt), "query"]
+        )
+        assert warm_up[-3:] == ["--wait", "7s", "MixProject"]
         # Dexter itself gives up 30 s after --wait; only a hung query is killed from outside.
         assert 7 + 30 < self.state()["dexter_query_budget"] <= 7 + 30 + 10
 
@@ -1054,51 +1073,72 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call()
         wrapper = self.wt / ".dexter/dexter.sh"
         assert wrapper.is_file()
-        starts = [e for e in self.state()["events"] if e[0] == "dexter"]
-        assert starts[-1][1:] == [
-            str(self.wt),
-            "query",
-            "workspace-symbols",
-            "--wait",
-            "60s",
-            "MixProject",
+        starts = [e[1:] for e in self.state()["events"] if e[0] == "dexter"]
+        assert starts == [
+            [str(self.wt), "query", "workspace-symbols", "--raw", "--wait", "60s", "MixProject"],
+            [str(self.wt), "reindex"],
         ]
         assert self.state()["dexter_stdlib"] == str(self.root / "fixture-stdlib/lib")
         self.call("--start")
         assert self.state()["launch_env"]["TIPS_DEXTER"] == str(wrapper)
-        assert str(wrapper) in self.state()["launch_argv"][-1]
+        brief = self.state()["launch_argv"][-1]
+        # Both clients are pointed at the bound command and at its own help.
+        assert f"{wrapper} query --help" in brief
+        assert f"{wrapper} lookup --help" in brief
 
-    def test_claude_lsp_starts_the_proxy_only_after_a_successful_warm_up(self) -> None:
-        self.call(role="test")
-        manifest = self.wt / ".dexter/claude-plugin/.claude-plugin/plugin.json"
-        server = json.loads(manifest.read_text())["lspServers"]["dexter"]
-        command = [server["command"], *server["args"]]
-        # Dexter allows 30 s for the daemon connection on top of --wait.
-        assert server["startupTimeout"] >= (60 + 30) * 1000
+    def test_dependencies_are_fetched_in_the_worktree_before_the_index_is_asked(self) -> None:
+        self.call()
+        events = [e for e in self.state()["events"] if e[0] in ("mix", "dexter")]
+        # The locked fetch runs in the target checkout, with the role's environment.
+        assert events[0] == ["mix", str(self.wt), "deps.get", "--check-locked"]
+        assert [e[2] for e in events[1:]] == ["query", "reindex"]
+        assert self.state()["mix_env"] == {"HEX_HOME": str(self.wt / "tmp/hex"), "MIX_ENV": "test"}
 
-        def dexter_events() -> list[list[str]]:
-            return [e for e in self.state()["events"] if e[0] == "dexter"]
-
-        warm_up = dexter_events()[-1]
-        env = dict(self.env, FAKE_DEXTER_READS_STDIN="1")
-        env.pop("DEXTER_ELIXIR_LIB_ROOT")
-        started = execute(command, cwd=self.root, env=env, input_text="initialize")
-        assert started.returncode == 0, started.stderr
-        # The same warm-up as provisioning, then the proxy, both through the bound command.
-        assert dexter_events()[-2:] == [warm_up, ["dexter", str(self.wt), "lsp"]]
-        assert self.state()["dexter_stdlib"] == str(self.root / "fixture-stdlib/lib")
-        # The LSP stream belongs to the proxy: the warm-up neither reads nor writes it.
-        assert self.state()["dexter_query_stdin"] == ""
-        assert started.stdout == "initialize"
+    def test_resumed_developer_worktree_keeps_its_own_dependency_state(self) -> None:
+        self.call(role="dev", task="29-dev", ref=False)
+        wt = self.root / ".worktrees/29-dev"
+        # A new checkout gets the locked dependencies, like a review checkout.
+        fetches = [e for e in self.state()["events"] if e[0] == "mix"]
+        assert fetches == [["mix", str(wt), "deps.get", "--check-locked"]]
+        # A resumed one may hold an unfinished dependency change that no fetch
+        # can resolve yet: the agent that will finish it must still start.
         state = self.state()
-        state["dexter_fails"] = True
+        state["mix_fails"] = True
         self.save(state)
-        before = len(dexter_events())
-        failed = execute(command, cwd=self.root, env=env, input_text="initialize")
-        assert failed.returncode != 0
-        assert failed.stdout == ""
-        assert "fixture Dexter failed" in failed.stderr
-        assert dexter_events()[before:] == [warm_up]
+        self.call("--start", role="dev", task="29-dev", ref=False)
+        assert [e for e in self.state()["events"] if e[0] == "mix"] == fetches
+        assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 1
+
+    def test_failed_advance_is_prepared_again_at_the_same_head(self) -> None:
+        self.call("--start")
+        self.commit("next")
+        new = self.git("rev-parse", "HEAD")
+        state = self.state()
+        state["mix_fails"] = True
+        self.save(state)
+        result = self.call(ref=new, ok=False)
+        assert "fixture mix failed" in result.stderr
+        assert self.git("-C", str(self.wt), "rev-parse", "HEAD") == new
+        state = self.state()
+        state["mix_fails"] = False
+        self.save(state)
+        before = len(state["events"])
+        result = self.call(ref=new)
+        # The checkout already moved, so only the index is left to prepare.
+        assert "Already running" in result.stdout
+        prepared = [e for e in self.state()["events"][before:] if e[0] in ("mix", "dexter")]
+        assert prepared[0] == ["mix", str(self.wt), "deps.get", "--check-locked"]
+        assert [e[2] for e in prepared[1:]] == ["query", "reindex"]
+
+    def test_failed_dependency_fetch_never_asks_the_index_or_starts_an_agent(self) -> None:
+        state = self.state()
+        state["mix_fails"] = True
+        self.save(state)
+        result = self.call("--start", ok=False)
+        assert "fixture mix failed" in result.stderr
+        assert not any(
+            e[0] == "dexter" or e[:2] == ["agent", "start"] for e in self.state()["events"]
+        )
 
     def test_stdlib_default_uses_target_toolchain_and_keeps_the_bound_sources(self) -> None:
         self.env.pop("DEXTER_ELIXIR_LIB_ROOT", None)
@@ -1189,7 +1229,16 @@ class WorktreeIntegrationTest(unittest.TestCase):
         changed.replace(roots[0] / "sample.ex")
         for root, doc in zip(roots, ("First tree only", "Original documentation"), strict=True):
             result = execute(
-                ["/bin/sh", root / ".dexter/dexter.sh", "query", "hover", "sample.ex", "3", "8"],
+                [
+                    "/bin/sh",
+                    root / ".dexter/dexter.sh",
+                    "query",
+                    "--raw",
+                    "hover",
+                    "sample.ex",
+                    "3",
+                    "8",
+                ],
                 cwd=self.root,
                 env=self.env,
                 input_text="",

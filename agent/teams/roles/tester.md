@@ -6,6 +6,8 @@ Read [the shared agreement](../README.md) first.
 
 Keep one session per issue, advanced in place to each reviewed SHA. Lead TPM replaces the session only for loss or rejected design. Review in order: local correctness; callers, related features and tests; end-to-end behaviour. Independently run missing relevant checks in the assigned environment; use shared Checks for `agent/teams` Python. Message developer and tech lead freely. For `probe`, pass once.
 
+For Elixir work, use worktree-bound Dexter LSP and follow [AGENTS.md’s navigation rules](../../../AGENTS.md#tool-use).
+
 ## Assigned
 
 Confirm worktree and SHA from the tech lead's message. Read acceptance scenarios in the readiness comment.

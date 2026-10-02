@@ -23,27 +23,31 @@ Load only relevant skills. State which skills you are using before making change
 
 Scope searches to relevant paths and file types; broaden as needed.
 
-- **ripgrep (`rg`)**: Find text: names, strings, errors, config keys, and template content. Use `rg --files -g 'PATTERN'` to find files. Fall back to `grep` if unavailable.
-- **Dexter LSP**: Elixir code navigation in provisioned coding sessions, bound to your worktree. Try it before `rg` or reading whole files. Claude calls the `LSP` tool; Codex runs `"$TIPS_DEXTER" query <operation> <file> <line> <column>`. Positions are 1-based.
+- **ripgrep (`rg`)**: Find text in migrations, config, strings, errors, templates and docs. Use `rg --files -g 'PATTERN'` to find files. For Elixir symbols, try Dexter first. Fall back to `grep` if unavailable.
+- **Dexter**: Elixir navigation in provisioned coding sessions, bound to your worktree. Use it before symbol searches or broad source reads; read the source you edit and the boundaries you review. Run `"$TIPS_DEXTER" query <operation> <file> <line> <column>` from your shell. Its help is the contract for syntax, output and caps: read `"$TIPS_DEXTER" query --help` and `"$TIPS_DEXTER" lookup --help` once per session, and follow them where this file differs.
 
-  | Task | Claude / Codex operation | Try before |
+  | Task | Operation | Try before |
   |---|---|---|
-  | Find a module or function by name | `workspaceSymbol` / `workspace-symbols <name>` | `rg 'defmodule Name'`, `rg 'def name'` |
-  | Go from a call to its definition | `goToDefinition` / `definition` | grepping for the `def` |
-  | Find references to a function or module | `findReferences` / `references` | `rg -F 'name('` |
-  | Read docs, spec and signature | `hover` (both) | opening the file |
-  | Outline a file | `documentSymbol` / `symbols <file>` | reading the file |
-  | List implementations, from the `@callback` head | `goToImplementation` / `implementation` | `rg '@behaviour'`, `rg '@impl'` |
-  | Find callers of a function | `incomingCalls` / `incoming-calls` | grepping for callers |
-  | Find calls a function makes | `outgoingCalls` / `outgoing-calls` | reading its body |
-  | Check which `Module.function/arity` a position selects | `prepareCallHierarchy` / `prepare-call-hierarchy` | |
+  | Know the name, not its position | `"$TIPS_DEXTER" lookup Module [function]` | guessing positions after edits |
+  | Find a module or function by name | `workspace-symbols <name>` | `rg 'defmodule Name'`, `rg 'def name'` |
+  | Outline a file, with each name's position | `symbols <file>` | reading the file |
+  | Go from a call to its definition | `definition` | grepping for the `def` |
+  | Find uses of a function or module | `references` | `rg -F 'name('` |
+  | Read docs, spec and signature | `hover` | opening the file |
+  | List implementations, from the `@callback` head | `implementation` | `rg '@behaviour'`, `rg '@impl'` |
+  | Find callers of a function | `incoming-calls` | grepping for callers |
+  | Find calls a function makes | `outgoing-calls` | reading its body |
+  | Check which `Module.function/arity` a position selects | `prepare-call-hierarchy` | |
 
-  - By name, with no position, from either client's shell: `"$TIPS_DEXTER" lookup Module [function]` finds the definition; `"$TIPS_DEXTER" references Module [function]` finds uses.
-  - Find references before changing a function's name, arity or return shape.
-  - Results can be stale or incomplete; an empty answer is not proof of absence. When completeness matters, cross-check with `rg` and the source.
+  - Positions: `lookup` gives the line; `symbols` gives the name's column. Take them again after edits or checkout advancement. Read the `cursor:` line of every positional answer to confirm the token; hierarchy also prints its `selected:` callable.
+  - Before changing or removing any function's name, arity or return shape, private helpers included: run `references` at its definition, and a scoped `rg` for the bare name and for any atom or tuple that dispatches to it. These find candidate uses; source and tests establish the impact. Investigate differences.
+  - Zero rows never means unused. `use Module, :atom`, MFA tuples, `apply` and generated code may have no indexed use.
+  - Call hierarchy explains candidates and does not replace `references`. It covers every clause of the selected callable; at a default-argument head, only the maximum arity.
+  - A client truncation warning or an explicit limit means you have only part of the output; narrow the query or save it to a file.
+  - After you fetch or change dependencies yourself, run `"$TIPS_DEXTER" reindex`.
   - Dexter reports no compiler errors: run Mix compile and tests.
   - If Dexter is unavailable, report it. Do not start another language server.
-  - Details: [operations](agent/lsp/README.md#operations), [limits](agent/lsp/README.md#limits).
+  - Details: [provisioning](agent/lsp/README.md#team-provisioning), [limits](agent/lsp/README.md#limits).
 - **mix-credo**: Run `mix credo --strict` on any edited `.ex`/`.exs` files and fix issues you introduced. Skip only if the Credo task is unavailable; report dependency and project failures.
 
 - **Go static analysis**: For every Go change, including carried upstream patches, run the same custom golangci-lint profile as `tiny_big_agents`, including Staticcheck and NilAway. Use the [pinned Dexter profile and instructions](agent/lsp/dexter/patches/README.md#required-go-static-analysis) for Dexter. Keep checks and thresholds enabled; compare with the unchanged baseline, fix findings introduced by our code, and report inherited findings separately. Do not refactor unrelated upstream code to clear its lint debt.
