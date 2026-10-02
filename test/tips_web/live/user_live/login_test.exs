@@ -53,8 +53,6 @@ defmodule TipsWeb.UserLive.LoginTest do
          %{conn: conn} do
       user = unconfirmed_user_fixture()
       set_registration_deadline(user, -1)
-      conn = Plug.Test.init_test_session(conn, %{"user_return_to" => "/editor/tips/new"})
-
       {:ok, lv, _html} = live(conn, ~p"/users/log-in?return_to=%2Feditor%2Ftips%2Fnew")
 
       html = lv |> form("#login_form_magic", user: %{email: user.email}) |> render_submit()
@@ -67,19 +65,23 @@ defmodule TipsWeb.UserLive.LoginTest do
                ~s|#login_form_magic input[name="user[email]"][value="#{user.email}"]|
              )
 
-      assert has_element?(lv, ~s|a[href="/users/register"]|, "Sign up")
-
       refute Tips.Repo.get_by(Tips.Accounts.UserToken, user_id: user.id)
       Swoosh.TestAssertions.assert_no_email_sent()
 
-      # The stored destination still reaches the registration form's links.
+      # The destination came only from the query string; the signup link carries it on.
       {:ok, register, _html} =
         lv
-        |> element(~s|a[href="/users/register"]|, "Sign up")
+        |> element(~s|a[href="/users/register?return_to=%2Feditor%2Ftips%2Fnew"]|, "Sign up")
         |> render_click()
         |> follow_redirect(conn)
 
       assert has_element?(register, ~s|a[href="/users/log-in?return_to=%2Feditor%2Ftips%2Fnew"]|)
+    end
+
+    test "the signup link drops an external return destination", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/users/log-in?return_to=https%3A%2F%2Fevil.example%2F")
+
+      assert has_element?(lv, ~s|a[href="/users/register"]|, "Sign up")
     end
 
     test "does not disclose if user is registered", %{conn: conn} do

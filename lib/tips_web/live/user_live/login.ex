@@ -3,6 +3,7 @@ defmodule TipsWeb.UserLive.Login do
 
   alias Tips.Accounts
   alias Tips.Accounts.User
+  alias TipsWeb.UserAuth
 
   @impl true
   def render(assigns) do
@@ -16,7 +17,7 @@ defmodule TipsWeb.UserLive.Login do
               You need to reauthenticate to perform sensitive actions on your account.
             <% else %>
               Don't have an account? <.link
-                navigate={~p"/users/register"}
+                navigate={@register_path}
                 class="font-semibold text-foreground underline"
                 phx-no-format
               >Sign up</.link> for an account now.
@@ -58,14 +59,21 @@ defmodule TipsWeb.UserLive.Login do
   end
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(params, session, socket) do
+    # The same validated destination the registration form accepts, so restarting signup
+    # from here keeps it.
+    return_to =
+      UserAuth.allowed_return_to(params["return_to"]) ||
+        UserAuth.allowed_return_to(session["user_return_to"])
+
     email =
       Phoenix.Flash.get(socket.assigns.flash, :email) ||
         get_in(socket.assigns, [:current_scope, Access.key(:user), Access.key(:email)])
 
     form = to_form(%{"email" => email}, as: "user")
 
-    {:ok, assign(socket, page_title: "Log in", form: form)}
+    {:ok,
+     assign(socket, page_title: "Log in", form: form, register_path: register_path(return_to))}
   end
 
   @impl true
@@ -95,6 +103,9 @@ defmodule TipsWeb.UserLive.Login do
          |> push_navigate(to: ~p"/users/log-in")}
     end
   end
+
+  defp register_path(nil), do: ~p"/users/register"
+  defp register_path(return_to), do: ~p"/users/register?#{[return_to: return_to]}"
 
   defp local_mail_adapter? do
     Application.get_env(:tips, Tips.Mailer)[:adapter] == Swoosh.Adapters.Local
