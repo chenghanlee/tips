@@ -6,6 +6,7 @@ defmodule Tips.Accounts.SessionFamilyConcurrencyTest do
 
   import Ecto.Query
   import Tips.AccountsFixtures
+  import Tips.LockSessions
 
   alias Ecto.Adapters.SQL.Sandbox
   alias Tips.Accounts
@@ -224,8 +225,6 @@ defmodule Tips.Accounts.SessionFamilyConcurrencyTest do
     end)
   end
 
-  defp unboxed(fun), do: Sandbox.unboxed_run(Repo, fun)
-
   defp magic_link(user), do: extract_user_token(&Accounts.deliver_login_instructions(user, &1))
 
   defp lock_account(id, nowait) do
@@ -237,95 +236,4 @@ defmodule Tips.Accounts.SessionFamilyConcurrencyTest do
   defp family_tokens(family), do: Repo.all_by(UserToken, session_family_id: family)
 
   defp session_row(token), do: Repo.get_by!(UserToken, token: token, context: "session")
-
-  # One committed transaction on its own backend, driven step by step from the test.
-  # lock_timeout and the idle rollback bound every wait if the test process fails.
-  defp open(supervisor) do
-    parent = self()
-    task = Task.Supervisor.async_nolink(supervisor, fn -> transaction(parent) end)
-    pid = task.pid
-
-    receive do
-      {:backend, ^pid, backend} -> %{task: task, backend: backend}
-    after
-      1_000 -> flunk("transaction did not open")
-    end
-  end
-
-  defp transaction(parent) do
-    Sandbox.unboxed_run(Repo, fn -> Repo.transaction(fn -> announce_and_serve(parent) end) end)
-  end
-
-  defp announce_and_serve(parent) do
-    Repo.query!("SET LOCAL lock_timeout = '2s'")
-    %{rows: [[backend]]} = Repo.query!("SELECT pg_backend_pid()")
-    send(parent, {:backend, self(), backend})
-    serve(parent)
-  end
-
-  defp serve(parent) do
-    receive do
-      {:run, ref, step} ->
-        send(parent, {ref, step.()})
-        serve(parent)
-
-      :commit ->
-        :committed
-    after
-      5_000 -> Repo.rollback(:abandoned)
-    end
-  end
-
-  defp submit(%{task: task}, step) do
-    ref = make_ref()
-    send(task.pid, {:run, ref, step})
-    ref
-  end
-
-  defp await(%{task: task}, ref) do
-    monitor = task.ref
-
-    receive do
-      {^ref, result} -> result
-      {:DOWN, ^monitor, :process, _, reason} -> flunk("transaction exited: #{inspect(reason)}")
-    after
-      3_000 -> flunk("transaction step did not finish")
-    end
-  end
-
-  defp run(session, step), do: await(session, submit(session, step))
-
-  defp commit(%{task: task}) do
-    send(task.pid, :commit)
-    assert {:ok, :committed} = Task.await(task)
-  end
-
-  # A rejected operation aborts the step's enclosing transaction, as nested Ecto
-  # transactions do; a top-level caller simply gets the error.
-  defp roll_back(%{task: task}) do
-    send(task.pid, :commit)
-    assert {:error, :rollback} = Task.await(task)
-  end
-
-  # Observe the real database lock wait instead of relying on a scheduler race.
-  defp await_blocked(waiter, blockers) do
-    blockers = blockers |> List.wrap() |> Enum.map(& &1.backend)
-
-    Sandbox.unboxed_run(Repo, fn ->
-      await_blocked(waiter.backend, blockers, System.monotonic_time(:millisecond) + 1_000)
-    end)
-  end
-
-  defp await_blocked(waiter, blockers, deadline) do
-    %{rows: [[blocked?]]} =
-      Repo.query!("SELECT $1::integer[] && pg_blocking_pids($2::integer)", [blockers, waiter])
-
-    unless blocked? do
-      assert System.monotonic_time(:millisecond) < deadline,
-             "expected backend #{waiter} to wait on #{inspect(blockers)}"
-
-      Process.sleep(10)
-      await_blocked(waiter, blockers, deadline)
-    end
-  end
 end
