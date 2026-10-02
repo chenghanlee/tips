@@ -152,6 +152,62 @@ defmodule Tips.Accounts.RegistrationExpiryConcurrencyTest do
     unboxed(fn -> refute Repo.get(User, user.id) end)
   end
 
+  # The proof is read as valid, then the confirmation waits on the account lock while the
+  # deadline passes and the lock holder deletes the registration.
+  for {winner, delete} <- [
+        cleanup: quote(do: Accounts.expire_unconfirmed_users()),
+        reclaim: quote(do: Accounts.register_user(attrs(var!(prefix), "a")))
+      ] do
+    test "#{winner} deletes a registration whose proof was valid before the lock wait",
+         %{prefix: prefix, supervisor: supervisor} do
+      {user, link} = committed_registration(prefix, "a", 60)
+      winner = open(supervisor)
+      confirmation = open(supervisor)
+      approach_deadline(user)
+      assert [_] = run(winner, fn -> lock_account(user.id, "") end)
+
+      login = submit(confirmation, fn -> Accounts.login_user_by_magic_link(link) end)
+      await_blocked(confirmation, winner)
+      await_deadline(user)
+      assert {:ok, deleted} = run(winner, fn -> unquote(delete) end)
+      commit(winner)
+      assert {:error, :not_found} = await(confirmation, login)
+      roll_back(confirmation)
+
+      unboxed(fn ->
+        refute Repo.get(User, user.id)
+        assert tokens(user) == []
+
+        case deleted do
+          1 -> refute Accounts.get_user_by_email(user.email)
+          %User{id: id} -> assert %User{id: ^id, confirmed_at: nil} = Repo.get!(User, id)
+        end
+      end)
+    end
+  end
+
+  test "resend waiting on cleanup finds the account gone and sends nothing",
+       %{prefix: prefix, supervisor: supervisor} do
+    {user, _link} = committed_registration(prefix, "a", -1)
+    cleanup = open(supervisor)
+    resend = open(supervisor)
+
+    assert {:ok, 1} = run(cleanup, fn -> Accounts.expire_unconfirmed_users() end)
+
+    delivery =
+      submit(resend, fn -> Accounts.deliver_login_instructions(user, &"/users/log-in/#{&1}") end)
+
+    await_blocked(resend, cleanup)
+    commit(cleanup)
+    assert {:error, :not_found} = await(resend, delivery)
+    roll_back(resend)
+
+    unboxed(fn ->
+      refute Repo.get(User, user.id)
+      assert tokens(user) == []
+    end)
+  end
+
   test "reclaim rechecks current confirmation after waiting",
        %{prefix: prefix, supervisor: supervisor} do
     {user, link} = committed_registration(prefix, "a", 60)
