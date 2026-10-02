@@ -369,6 +369,8 @@ enabled = true
                 timeout=DEPS_FETCH_SECONDS,
                 input_text="",
             )
+        else:
+            print("Dependencies: left as the resumed developer worktree has them; not fetched.")
         # The bound command carries the binary, root and Elixir sources; a
         # missing or wrong source tree fails here, before any client starts.
         # The query ends itself within --wait plus its connection allowance, so a

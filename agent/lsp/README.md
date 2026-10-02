@@ -132,7 +132,8 @@ to workspace`. Do not start another language server.
   discovery (`workspace-symbols`, `lookup`, `references`, call hierarchy)
   therefore finds nothing in reviewer scratch tests under `tmp/`; search them
   with `rg`. A query on a scratch file itself, such as `symbols`, still reads
-  it. Configured Elixir sources are indexed even when they lie under `tmp/`.
+  it. Configured Elixir sources are indexed even when they lie under `tmp/`,
+  but not watched there: run `reindex` after changing them.
 - File-backed navigation uses saved disk text.
   Cached files follow later disk changes
   (`Edit`, `mix format`, generators, shell rewrites) by size and mtime.

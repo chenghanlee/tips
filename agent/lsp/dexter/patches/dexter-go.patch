@@ -8078,15 +8078,17 @@ index a5874ec..b979c24 100644
  	server.index.backgroundWork.Wait()
 diff --git a/internal/lsp/scratch_test.go b/internal/lsp/scratch_test.go
 new file mode 100644
-index 0000000..5c00238
+index 0000000..678cb58
 --- /dev/null
 +++ b/internal/lsp/scratch_test.go
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,110 @@
 +package lsp
 +
 +import (
++	"os"
 +	"path/filepath"
 +	"testing"
++	"time"
 +)
 +
 +const scratchWorker = `defmodule Scratch.Worker do
@@ -8136,43 +8138,65 @@ index 0000000..5c00238
 +	}
 +}
 +
-+// A standard library the user configured is indexed wherever it lies, the
-+// scratch directory included: the cold build, the sweep that follows it and a
-+// single-file update must agree.
-+func TestServer_stdlibInScratchSurvivesReindex(t *testing.T) {
++// The configured standard library answers to its own root, not to the
++// workspace's exclusions: a Git clone of Elixir under the scratch directory is
++// indexed by the cold build, kept by the sweep, and refreshed by a single-file
++// update and by a later sweep.
++func TestServer_stdlibCloneInScratchIsIndexedAndRefreshed(t *testing.T) {
 +	server, cleanup := setupTestServer(t)
 +	defer cleanup()
 +
-+	server.SetStdlibRoot(filepath.Join(server.projectRoot, "tmp", "elixir"))
++	clone := filepath.Join(server.projectRoot, "tmp", "elixir")
++	if err := os.MkdirAll(filepath.Join(clone, ".git"), 0o750); err != nil {
++		t.Fatal(err)
++	}
++	server.SetStdlibRoot(filepath.Join(clone, "lib"))
 +	writeTestFile(t, server.projectRoot, "lib/worker.ex", scratchWorker)
-+	stdlib := writeTestFile(t, server.projectRoot, "tmp/elixir/lib/enum.ex", `defmodule Scratch.Enum do
-+  def count(enumerable), do: enumerable
-+end`)
-+
-+	for _, step := range []struct {
-+		name string
-+		run  func()
-+	}{
-+		{"cold build", server.backgroundReindex},
-+		{"sweep", server.backgroundReindex},
-+		{"single-file update", func() { server.ReconcileFile(stdlib) }},
-+	} {
-+		step.run()
-+		server.index.backgroundWork.Wait()
-+		results, err := server.store.LookupFunction("Scratch.Enum", "count")
++	revision := 0
++	write := func(function string) string {
++		path := writeTestFile(t, server.projectRoot, "tmp/elixir/lib/enum.ex",
++			"defmodule Scratch.Enum do\n  def "+function+"(enumerable), do: enumerable\nend\n")
++		// The sweep skips a file whose mtime it has stored.
++		revision++
++		stamp := time.Now().Add(time.Duration(revision) * time.Hour)
++		if err := os.Chtimes(path, stamp, stamp); err != nil {
++			t.Fatal(err)
++		}
++		return path
++	}
++	defined := func(function string) int {
++		results, err := server.store.LookupFunction("Scratch.Enum", function)
 +		if err != nil {
 +			t.Fatal(err)
 +		}
-+		if len(results) != 1 {
-+			t.Fatalf("after the %s Scratch.Enum.count has %d definitions, want 1", step.name, len(results))
-+		}
++		return len(results)
++	}
++	sweep := func() {
++		server.backgroundReindex()
++		server.index.backgroundWork.Wait()
++	}
++
++	write("first")
++	sweep() // cold build
++	sweep()
++	if defined("first") != 1 {
++		t.Fatalf("after the cold build and a sweep Scratch.Enum.first has %d definitions, want 1", defined("first"))
++	}
++	server.ReconcileFile(write("second"))
++	if defined("second") != 1 || defined("first") != 0 {
++		t.Fatalf("after a single-file update: second %d, first %d, want 1 and 0", defined("second"), defined("first"))
++	}
++	write("third")
++	sweep()
++	if defined("third") != 1 || defined("second") != 0 {
++		t.Fatalf("after a sweep of the changed file: third %d, second %d, want 1 and 0", defined("third"), defined("second"))
 +	}
 +}
 diff --git a/internal/lsp/server.go b/internal/lsp/server.go
-index 0499a21..7dbc2ac 100644
+index 0499a21..e6b2ee6 100644
 --- a/internal/lsp/server.go
 +++ b/internal/lsp/server.go
-@@ -258,6 +258,17 @@ func (s *Server) isStdlibPath(path string) bool {
+@@ -258,6 +258,22 @@ func (s *Server) isStdlibPath(path string) bool {
  	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator))
  }
  
@@ -8182,15 +8206,20 @@ index 0499a21..7dbc2ac 100644
 +	return parser.InScratch(s.projectRoot, path) && !s.isStdlibPath(path)
 +}
 +
-+// excluded reports whether the index leaves path out.
++// excluded reports whether the index leaves path out. A file of the configured
++// standard library answers to that root's boundaries, not the workspace's: the
++// library may be a clone below the workspace root, in or out of scratch.
 +func (s *Server) excluded(path string) bool {
-+	return s.inScratch(path) || parser.InNestedCheckout(s.projectRoot, path)
++	if s.isStdlibPath(path) {
++		return parser.InNestedCheckout(s.StdlibRoot(), path)
++	}
++	return parser.Excluded(s.projectRoot, path)
 +}
 +
  // ServeStream runs one preconstructed LSP session over a stream the session is
  // allowed to close. Workspace daemons use this so an editor's `exit`
  // notification ends that session — releasing its registration and its lease on
-@@ -274,7 +285,7 @@ func ServeStream(server *Server, rwc io.ReadWriteCloser) error {
+@@ -274,7 +290,7 @@ func ServeStream(server *Server, rwc io.ReadWriteCloser) error {
  	server.conn = conn
  	server.clientLog = startClientLog(server.client, conn.Done())
  
@@ -8199,7 +8228,7 @@ index 0499a21..7dbc2ac 100644
  	ctx := context.Background()
  
  	conn.Go(ctx, handler)
-@@ -413,7 +424,7 @@ func (s *Server) pruneMissingFiles(seen map[string]struct{}) {
+@@ -413,7 +429,7 @@ func (s *Server) pruneMissingFiles(seen map[string]struct{}) {
  				if !recordedRead {
  					recorded, recordedRead = parser.NestedWorktreeSet(s.projectRoot), true
  				}
@@ -8208,7 +8237,7 @@ index 0499a21..7dbc2ac 100644
  				inWorktree[dir] = in
  			}
  			if !in {
-@@ -510,9 +521,10 @@ func (s *Server) indexOneFile(path string) {
+@@ -510,9 +526,10 @@ func (s *Server) indexOneFile(path string) {
  // indexOneFileLocked is indexOneFile for callers already holding indexWrites.
  // Go's RWMutex is not reentrant, so the two must stay separate.
  func (s *Server) indexOneFileLocked(path string) {
@@ -8222,7 +8251,7 @@ index 0499a21..7dbc2ac 100644
  		return
  	}
  	defs, refs, err := parser.ParseFile(path)
-@@ -599,6 +611,9 @@ func (s *Server) startBackgroundReindex() <-chan struct{} {
+@@ -599,6 +616,9 @@ func (s *Server) startBackgroundReindex() <-chan struct{} {
  		seen := make(map[string]struct{})
  		walkAndIndex := func(root string, indexRefs bool) {
  			_ = parser.WalkElixirFiles(root, func(path string, d fs.DirEntry) error {
@@ -8232,7 +8261,7 @@ index 0499a21..7dbc2ac 100644
  				seen[path] = struct{}{}
  
  				if !isEmpty {
-@@ -821,16 +836,12 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
+@@ -821,16 +841,12 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
  			s.projectRoot = store.FindProjectRoot(clientRoot)
  		}
  	} else if clientRoot != "" && s.workspaceEvents != nil {
@@ -8254,7 +8283,7 @@ index 0499a21..7dbc2ac 100644
  			}
  		}
  	}
-@@ -1203,8 +1214,15 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1203,8 +1219,15 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  			}
  		}
  
@@ -8271,7 +8300,7 @@ index 0499a21..7dbc2ac 100644
  		s.debugf("Definition: resolved bare %q -> %q", functionName, fullModule)
  		if fullModule == "" {
  			currentModule := s.store.LookupEnclosingModule(uriToPath(protocol.DocumentURI(docURI)), lineNum+1)
-@@ -1223,11 +1241,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1223,11 +1246,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  		// Current module — return buffer location directly (works before indexing).
  		// In a typespec the bare name is the type, everywhere else the function.
  		if fullModule == currentModule {
@@ -8284,7 +8313,7 @@ index 0499a21..7dbc2ac 100644
  				return []protocol.Location{{
  					URI:   params.TextDocument.URI,
  					Range: lineRange(line - 1),
-@@ -1236,13 +1250,14 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1236,13 +1255,14 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  		}
  
  		kind := NameKindCallable
@@ -8300,7 +8329,7 @@ index 0499a21..7dbc2ac 100644
  		})
  		if err == nil && len(results) > 0 {
  			s.debugf("Definition: found %d semantic result(s) for %s.%s", len(results), fullModule, functionName)
-@@ -1250,7 +1265,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1250,7 +1270,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  		}
  
  		// Fallback for use-chain inline defs (not stored as module definitions)
@@ -8309,7 +8338,7 @@ index 0499a21..7dbc2ac 100644
  			s.debugf("Definition: found %d result(s) via current file use chain for %s", len(results), functionName)
  			return storeResultsToLocations(byKindForContext(tf, lineNum, results)), nil
  		}
-@@ -1275,15 +1290,18 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1275,15 +1295,18 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  	s.debugf("Definition: qualified call resolved %q -> %q", moduleRef, fullModule)
  
  	if functionName != "" {
@@ -8333,7 +8362,7 @@ index 0499a21..7dbc2ac 100644
  		})
  		if err != nil {
  			return nil, nil
-@@ -2535,12 +2553,14 @@ func (s *Server) parseUsingFile(filePath, moduleName string) *usingCacheEntry {
+@@ -2535,12 +2558,14 @@ func (s *Server) parseUsingFile(filePath, moduleName string) *usingCacheEntry {
  
  // lookupThroughUseOf looks up functionName through the `use` declarations in
  // fullModule's source file. This handles qualified calls like M.func() where
@@ -8351,7 +8380,7 @@ index 0499a21..7dbc2ac 100644
  	modResults, err := s.store.LookupModule(fullModule)
  	if err != nil || len(modResults) == 0 {
  		return nil
-@@ -2549,7 +2569,7 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
+@@ -2549,7 +2574,7 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
  	if !ok {
  		return nil
  	}
@@ -8360,7 +8389,7 @@ index 0499a21..7dbc2ac 100644
  }
  
  // lookupThroughUse searches for functionName in definitions injected by `use`
-@@ -2557,15 +2577,15 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
+@@ -2557,15 +2582,15 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
  // priority over imported ones. Later `use` declarations shadow earlier ones.
  // Transitive use chains (use inside __using__ body) are followed recursively.
  func (s *Server) lookupThroughUse(text, functionName string, aliases map[string]string) []store.LookupResult {
@@ -8379,7 +8408,7 @@ index 0499a21..7dbc2ac 100644
  			return result
  		}
  	}
-@@ -2577,7 +2597,7 @@ func (s *Server) lookupThroughUseWithFollow(text, functionName string, aliases m
+@@ -2577,7 +2602,7 @@ func (s *Server) lookupThroughUseWithFollow(text, functionName string, aliases m
  // consumerOpts are the keyword args from the `use Module, key: Val` call and
  // are used to resolve dynamic imports like `import unquote(mod)`.
  func (s *Server) lookupInUsingEntry(moduleName, functionName string, consumerOpts map[string]string, visited map[string]bool) []store.LookupResult {
@@ -8388,7 +8417,7 @@ index 0499a21..7dbc2ac 100644
  }
  
  // bodyFor picks the injected body for a `use` call. An ordinary __using__ has a
-@@ -2607,13 +2627,12 @@ func usingVisitKey(moduleName, which string) string {
+@@ -2607,13 +2632,12 @@ func usingVisitKey(moduleName, which string) string {
  	return moduleName + "\x00" + which
  }
  
@@ -8408,7 +8437,7 @@ index 0499a21..7dbc2ac 100644
  	visitKey := usingVisitKey(moduleName, which)
  	if visited[visitKey] {
  		return nil
-@@ -2630,23 +2649,20 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2630,23 +2654,20 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  	}
  
  	// Inline defs take priority: directly injected by the quote do block
@@ -8436,7 +8465,7 @@ index 0499a21..7dbc2ac 100644
  		}
  		if err != nil || len(results) == 0 {
  			continue
-@@ -2665,19 +2681,23 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2665,19 +2686,23 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  		}
  		switch b.kind {
  		case "import":
@@ -8462,7 +8491,7 @@ index 0499a21..7dbc2ac 100644
  				return result
  			}
  		}
-@@ -2686,7 +2706,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2686,7 +2711,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  	// Transitive uses: use Module inside the __using__ body (double-use chains)
  	for k := len(body.transCalls) - 1; k >= 0; k-- {
  		call := body.transCalls[k]
@@ -8471,7 +8500,7 @@ index 0499a21..7dbc2ac 100644
  			return result
  		}
  	}
-@@ -2694,7 +2714,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2694,7 +2719,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  		if body.hasTransCall(body.transUses[k]) {
  			continue
  		}
@@ -8480,7 +8509,7 @@ index 0499a21..7dbc2ac 100644
  			return result
  		}
  	}
-@@ -2703,15 +2723,12 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2703,15 +2728,12 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  }
  
  // resolveModuleViaUseChain returns the module name that provides functionName
@@ -8502,7 +8531,7 @@ index 0499a21..7dbc2ac 100644
  	visitKey := usingVisitKey(moduleName, which)
  	if visited[visitKey] {
  		return ""
-@@ -2729,12 +2746,12 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2729,12 +2751,12 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  
  	// Functions defined directly in the quote do block belong to the module
  	// that injected them, not to any imported module.
@@ -8517,7 +8546,7 @@ index 0499a21..7dbc2ac 100644
  			return body.imports[j]
  		}
  	}
-@@ -2749,11 +2766,11 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2749,11 +2771,11 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  		}
  		switch b.kind {
  		case "import":
@@ -8531,7 +8560,7 @@ index 0499a21..7dbc2ac 100644
  				return m
  			}
  		}
-@@ -2761,7 +2778,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2761,7 +2783,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  
  	for k := len(body.transCalls) - 1; k >= 0; k-- {
  		call := body.transCalls[k]
@@ -8540,7 +8569,7 @@ index 0499a21..7dbc2ac 100644
  			return mod
  		}
  	}
-@@ -2769,7 +2786,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2769,7 +2791,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  		if body.hasTransCall(body.transUses[k]) {
  			continue
  		}
@@ -8549,7 +8578,7 @@ index 0499a21..7dbc2ac 100644
  			return mod
  		}
  	}
-@@ -3645,7 +3662,7 @@ func (s *Server) addCompletionsFromUsingFor(moduleName, which string, consumerOp
+@@ -3645,7 +3667,7 @@ func (s *Server) addCompletionsFromUsingFor(moduleName, which string, consumerOp
  // Mirrors the go-to-definition priority: current file modules → imports → use chains → Kernel.
  // Callers should pass pre-computed aliases to avoid redundant ExtractAliases scans.
  func (s *Server) resolveBareFunctionModule(filePath, text string, tf *TokenizedFile, lineNum int, functionName string, aliases map[string]string) string {
@@ -8558,7 +8587,7 @@ index 0499a21..7dbc2ac 100644
  	return module
  }
  
-@@ -3654,21 +3671,30 @@ func (s *Server) resolveBareFunctionModule(filePath, text string, tf *TokenizedF
+@@ -3654,21 +3676,30 @@ func (s *Server) resolveBareFunctionModule(filePath, text string, tf *TokenizedF
  // distinguish a consumer override from a function supplied by its use chain:
  // both resolve to the consumer module, but only the latter should expand across
  // other consumers of the injector.
@@ -8597,7 +8626,7 @@ index 0499a21..7dbc2ac 100644
  			return mod, false
  		}
  	}
-@@ -3678,20 +3704,20 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
+@@ -3678,20 +3709,20 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
  	useCalls := tf.ExtractUsesWithOpts(aliases)
  	for i := len(useCalls) - 1; i >= 0; i-- {
  		uc := useCalls[i]
@@ -8621,7 +8650,7 @@ index 0499a21..7dbc2ac 100644
  			return mod, false
  		}
  	}
-@@ -3699,6 +3725,21 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
+@@ -3699,6 +3730,21 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
  	return "", false
  }
  
@@ -8643,7 +8672,7 @@ index 0499a21..7dbc2ac 100644
  func resolveModule(moduleRef string, aliases map[string]string) string {
  	if resolved, ok := aliases[moduleRef]; ok {
  		return resolved
-@@ -5054,38 +5095,33 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
+@@ -5054,38 +5100,33 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
  			return nil, nil
  		}
  
@@ -8693,7 +8722,7 @@ index 0499a21..7dbc2ac 100644
  			return s.hoverFromFile(functionName, results[0])
  		}
  
-@@ -5114,21 +5150,18 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
+@@ -5114,21 +5155,18 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
  	fullModule := s.resolveModuleWithNesting(moduleRef, aliases, uriToPath(protocol.DocumentURI(docURI)), lineNum)
  
  	if functionName != "" {
@@ -8724,7 +8753,7 @@ index 0499a21..7dbc2ac 100644
  	}
  
  	results, err := s.store.LookupModule(fullModule)
-@@ -5167,6 +5200,12 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
+@@ -5167,6 +5205,12 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
  	if functionName == "" {
  		return nil, nil
  	}
@@ -8737,7 +8766,7 @@ index 0499a21..7dbc2ac 100644
  
  	// Find the module enclosing the cursor via the store — this correctly handles
  	// files with defmodule lines inside heredocs/doc examples.
-@@ -5179,33 +5218,85 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
+@@ -5179,33 +5223,85 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
  
  	s.debugf("Implementation: module=%s function=%s", currentModule, functionName)
  
@@ -8842,7 +8871,7 @@ index 0499a21..7dbc2ac 100644
  }
  func (s *Server) OnTypeFormatting(ctx context.Context, params *protocol.DocumentOnTypeFormattingParams) ([]protocol.TextEdit, error) {
  	return nil, nil
-@@ -5420,6 +5511,8 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5420,6 +5516,8 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  	// below. They carry the bare type uses (`@type t :: schema | embedded`)
  	// that the call-shaped scan cannot see.
  	var typespecOccurrences []protocol.Location
@@ -8851,7 +8880,7 @@ index 0499a21..7dbc2ac 100644
  
  	if moduleRef == "" {
  		if functionName == "" {
-@@ -5463,7 +5556,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5463,7 +5561,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		}
  
  		// Bare function — resolve to its defining module
@@ -8860,7 +8889,7 @@ index 0499a21..7dbc2ac 100644
  		s.debugf("References: resolved bare %q -> %q", functionName, fullModule)
  		if fullModule == "" {
  			currentModule := s.store.LookupEnclosingModule(uriToPath(protocol.DocumentURI(docURI)), lineNum+1)
-@@ -5513,7 +5606,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5513,7 +5611,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		useCalls := tf.ExtractUsesWithOpts(aliases)
  		for i := len(useCalls) - 1; i >= 0; i-- {
  			uc := useCalls[i]
@@ -8869,7 +8898,7 @@ index 0499a21..7dbc2ac 100644
  				injectors = append(injectors, uc.Module)
  				s.debugf("References: opt-binding injector for %s: %s", functionName, uc.Module)
  				break
-@@ -5524,7 +5617,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5524,7 +5622,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  	kind := NameKindCallable
  	if functionName == "" {
  		kind = NameKindAny
@@ -8878,7 +8907,7 @@ index 0499a21..7dbc2ac 100644
  		kind = NameKindType
  	}
  	semantic, err := s.ReferenceNames(fullModule, functionName, NameReferenceOptions{
-@@ -5534,15 +5627,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5534,15 +5632,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		ExcludeStdlib:      true,
  		InjectorModules:    injectors,
  		GeneratedProvider:  generatedProvider,
@@ -8898,7 +8927,7 @@ index 0499a21..7dbc2ac 100644
  	}
  	seen := make(map[refKey]struct{}, len(semantic))
  	var locations []protocol.Location
-@@ -5556,19 +5653,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5556,19 +5658,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  			if line == lineNum && !params.Context.IncludeDeclaration {
  				continue
  			}
@@ -8921,7 +8950,7 @@ index 0499a21..7dbc2ac 100644
  		})
  	}
  
-@@ -7100,270 +7197,17 @@ func (s *Server) DidDeleteFiles(ctx context.Context, params *protocol.DeleteFile
+@@ -7100,270 +7202,17 @@ func (s *Server) DidDeleteFiles(ctx context.Context, params *protocol.DeleteFile
  }
  func (s *Server) CodeLensRefresh(ctx context.Context) error { return nil }
  func (s *Server) PrepareCallHierarchy(ctx context.Context, params *protocol.CallHierarchyPrepareParams) ([]protocol.CallHierarchyItem, error) {

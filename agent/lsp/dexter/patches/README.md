@@ -76,7 +76,7 @@ pin plus patch. By behaviour, with the test files that hold them:
   `internal/lsp/hover_qualified_use_test.go`. Function doc literals and their
   attachment rules: `internal/lsp/hover_doc_literal_test.go`.
 - Root scratch exclusion on every admission path, with configured Elixir
-  sources kept: `internal/lsp/scratch_test.go`, `TestInScratch` in
+  sources kept and refreshed: `internal/lsp/scratch_test.go`, `TestInScratch` in
   `internal/parser/parser_test.go`, `TestWatcherLeavesRootScratchUnwatched` in
   `internal/workspace/watch_test.go`.
 - Captures through the positional search and the removed command:
