@@ -23,7 +23,12 @@ failed process inspection aborts the build. Keep agents stopped during the build
 - `query <operation> <file> <line> <column>`: positional read-only requests on
   the workspace daemon, the nine operations in the
   [LSP guide](../../README.md#operations), `--wait` for a cold index,
-  1-based UTF-16 input, raw LSP JSON output.
+  1-based UTF-16 input and compact output with cursor tokens, directory counts
+  and optional `--limit` with explicit omissions; `--raw` preserves LSP JSON.
+  Empty results leave their cause unknown. Name lookup/reference output uses
+  root-relative paths inside the workspace.
+- Qualified function hover follows `use`-injected source before compiled metadata;
+  unknown functions no longer fall back to module documentation.
 - Arity-aware definition, hover, references and call hierarchy; references
   through explicit imports; incoming calls credited to their lexical owner
   (def clause, `test`, `setup`, `setup_all`); one outgoing site per call
@@ -54,7 +59,12 @@ pin plus patch. By behaviour, with the test files that hold them:
   `internal/workspace/saved_file_sync_test.go`.
 - Build identity handshake: `internal/daemon/*_test.go`.
 - `query` contract, root admission and library navigation:
-  `query_integration_test.go`, `lsp_integration_test.go`.
+  `query_integration_test.go`, `lsp_integration_test.go`. Compact output, raw
+  output and cross-file outgoing sites: `cmd/query_output_test.go`,
+  the compact snapshots and server-cap regression in
+  `query_integration_test.go`, with `testdata/query_compact/` fixtures.
+- Qualified hover through use-injected source and BEAM fallback:
+  `internal/lsp/hover_qualified_use_test.go`.
 - Nested checkout exclusion and watcher events:
   `internal/workspace/nested_checkout_test.go`,
   `internal/workspace/nested_checkout_darwin_test.go`, `internal/parser/parser_test.go`.
@@ -62,7 +72,8 @@ pin plus patch. By behaviour, with the test files that hold them:
 The build-script safety checks run from Tips with
 `python3 agent/lsp/dexter/test_build.py`.
 
-The Elixir fixtures under `internal/lsp/testdata/` are the recorded cases;
+The Elixir fixtures under `internal/lsp/testdata/` and `testdata/query_compact/`
+are navigation test inputs, not Tips application code. They are the recorded cases;
 correctness is claimed for those constructs and no others.
 
 ## Limits

@@ -75,7 +75,7 @@ def bound_command(binary: Path, root: Path, sources: Path | str) -> str:
 
 def warm_up_query(startup_seconds: int) -> list[str]:
     """Bound-command arguments that start the daemon and wait for its index."""
-    return ["query", "workspace-symbols", "--wait", f"{startup_seconds}s", "MixProject"]
+    return ["query", "workspace-symbols", "--raw", "--wait", f"{startup_seconds}s", "MixProject"]
 
 
 def claude_lsp_launch(wrapper: Path, startup_seconds: int) -> list[str]:

@@ -1059,6 +1059,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
             str(self.wt),
             "query",
             "workspace-symbols",
+            "--raw",
             "--wait",
             "60s",
             "MixProject",
@@ -1189,7 +1190,16 @@ class WorktreeIntegrationTest(unittest.TestCase):
         changed.replace(roots[0] / "sample.ex")
         for root, doc in zip(roots, ("First tree only", "Original documentation"), strict=True):
             result = execute(
-                ["/bin/sh", root / ".dexter/dexter.sh", "query", "hover", "sample.ex", "3", "8"],
+                [
+                    "/bin/sh",
+                    root / ".dexter/dexter.sh",
+                    "query",
+                    "--raw",
+                    "hover",
+                    "sample.ex",
+                    "3",
+                    "8",
+                ],
                 cwd=self.root,
                 env=self.env,
                 input_text="",

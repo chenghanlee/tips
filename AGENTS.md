@@ -23,11 +23,13 @@ Load only relevant skills. State which skills you are using before making change
 
 Scope searches to relevant paths and file types; broaden as needed.
 
-- **ripgrep (`rg`)**: Find text: names, strings, errors, config keys, and template content. Use `rg --files -g 'PATTERN'` to find files. Fall back to `grep` if unavailable.
-- **Dexter LSP**: Elixir code navigation in provisioned coding sessions, bound to your worktree. Try it before `rg` or reading whole files. Claude calls the `LSP` tool; Codex runs `"$TIPS_DEXTER" query <operation> <file> <line> <column>`. Positions are 1-based.
+- **ripgrep (`rg`)**: Find text in migrations, config, strings, errors, templates and docs. Use `rg --files -g 'PATTERN'` to find files. For Elixir symbols, try Dexter first. Fall back to `grep` if unavailable.
+- **Dexter LSP**: Elixir navigation in provisioned coding sessions, bound to your worktree. Use it before symbol searches or broad source reads; read the source you edit and the boundaries you review. Claude calls `LSP`; either client can run `"$TIPS_DEXTER" query <operation> <file> <line> <column>`. CLI positions and compact output are 1-based UTF-16; `--raw` returns 0-based LSP JSON.
 
   | Task | Claude / Codex operation | Try before |
   |---|---|---|
+  | Know the name, not its current position | Shell in either client: `"$TIPS_DEXTER" lookup Module [function]` | guessing positions after edits |
+  | Find uses by name | Shell in either client: `"$TIPS_DEXTER" references Module [function]` | a multi-pattern symbol search |
   | Find a module or function by name | `workspaceSymbol` / `workspace-symbols <name>` | `rg 'defmodule Name'`, `rg 'def name'` |
   | Go from a call to its definition | `goToDefinition` / `definition` | grepping for the `def` |
   | Find references to a function or module | `findReferences` / `references` | `rg -F 'name('` |
@@ -38,9 +40,10 @@ Scope searches to relevant paths and file types; broaden as needed.
   | Find calls a function makes | `outgoingCalls` / `outgoing-calls` | reading its body |
   | Check which `Module.function/arity` a position selects | `prepareCallHierarchy` / `prepare-call-hierarchy` | |
 
-  - By name, with no position, from either client's shell: `"$TIPS_DEXTER" lookup Module [function]` finds the definition; `"$TIPS_DEXTER" references Module [function]` finds uses.
-  - Find references before changing a function's name, arity or return shape.
-  - Results can be stale or incomplete; an empty answer is not proof of absence. When completeness matters, cross-check with `rg` and the source.
+  - After edits or checkout advancement, refresh symbols or use name lookup. Put the column on the intended name; `def`, `defp` and indentation have different columns. Check the CLI's cursor token; hierarchy also reports its selected callable/arity.
+  - Find references before changing any function's name, arity or return shape, including private helpers. Incoming calls name calling tests, but at a default-argument head cover only the maximum arity; use references or query a lower-arity call too. Then cross-check the same names with scoped `rg` and source; investigate differences.
+  - For Claude dependency navigation: use native hover; use the CLI for definition, references, implementation and workspace symbols into `deps/`. Native filtering can hide valid locations.
+  - Results can be incomplete. Empty answers and initial index readiness prove neither absence nor freshness. A client truncation warning or an explicit limit means you have only part of the output; narrow the query or save it to a file. Navigation finds code; source inspection and tests establish correctness.
   - Dexter reports no compiler errors: run Mix compile and tests.
   - If Dexter is unavailable, report it. Do not start another language server.
   - Details: [operations](agent/lsp/README.md#operations), [limits](agent/lsp/README.md#limits).

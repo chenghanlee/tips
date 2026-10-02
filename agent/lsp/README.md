@@ -71,7 +71,7 @@ Out of this beta: an application in a subdirectory or monorepo.
   worktrees.
 - For Codex, `.codex/config.toml` with automatic compilation disabled and Credo enabled.
 
-Provisioning then runs `dexter.sh query workspace-symbols --wait <timeout> MixProject`
+Provisioning then runs `dexter.sh query workspace-symbols --raw --wait <timeout> MixProject`
 and refuses to launch a client if the index does not answer. `team.py stop`
 runs `dexter.sh stop` per worktree before retiring it; an attached client keeps
 the daemon alive and the worktree is preserved. A daemon idles out after fifteen
@@ -109,8 +109,20 @@ the proxy afterwards.
 
 ## Operations
 
-Positions are 1-based line and character (UTF-16). The bound CLI returns Dexter's
-raw LSP JSON, whose ranges are 0-based. Claude displays its own formatted results.
+Positions are 1-based line and character (UTF-16). The CLI defaults to compact
+output with 1-based locations, a lexical cursor token, counts before rows and
+current-disk source excerpts. Hierarchy queries also report the selected callable.
+Claude displays its own formatted results.
+
+All returned rows are shown by default. `--limit N` optionally bounds list rows;
+`--limit 0` prints all. Hover prints its markdown text and does not accept a limit.
+Narrow broad queries or save full output to a file if the client clips it.
+`--raw` returns unabridged LSP JSON with 0-based ranges and cannot be combined
+with `--limit`. Scripts parsing JSON must pass `--raw`. Counts describe returned
+rows, not every possible match; grouping clauses can reduce the row count.
+Workspace symbol search is capped at 50 by the server, including with `--raw`
+or `--limit 0`. At that count, compact output warns that more may exist; narrow
+the search. Empty lists print `0 rows`; empty hover prints `no hover`.
 
 | Claude native LSP | Codex `"$TIPS_DEXTER" query …` |
 |---|---|
@@ -124,12 +136,38 @@ raw LSP JSON, whose ranges are 0-based. Claude displays its own formatted result
 | `incomingCalls` | `incoming-calls <file> <line> <column>` |
 | `outgoingCalls` | `outgoing-calls <file> <line> <column>` |
 
+Either client can also use `"$TIPS_DEXTER" lookup Module [function]` to find a
+definition, or `"$TIPS_DEXTER" references Module [function]` to find uses without
+coordinates. Paths inside the workspace are relative to its bound root in both
+commands; external paths remain absolute. These name searches can span arities. Injected definitions may point
+into the provider's source; that position is not a substitute for the consuming
+module's callable identity.
+
 `query` waits up to `--wait <duration>` (default 30s) for a cold index and exits
 non-zero with the reason on stderr. Files are relative to the worktree. Queries
 admit the bound worktree, its dependency sources and the configured Elixir
 sources; a file from another checkout is refused with `does not belong to
-workspace`. The stock `lookup` and `references <module>` name searches are
-unchanged.
+workspace`. By-name `lookup` and `references` exit non-zero when nothing is
+found; an empty positional `query` result exits zero.
+
+### Choose the next operation
+
+- Change an API: references → incoming calls → inspect source → update consumers.
+  Follow [AGENTS.md](../../AGENTS.md#tool-use) for private helpers and cross-checks.
+- After edits or checkout advancement: refresh symbols or use name lookup.
+  Copy the name's column; there is no universal column for a definition.
+- Empty answer: check the cursor token and source availability. For dependency
+  navigation, ensure the task's dependencies exist and probe a known definition
+  with name lookup. One successful probe does not establish complete coverage.
+
+For several symbols, batch independent native calls or one CLI command per name;
+inspect each result and exit status. Read the source you edit or review.
+
+References may include ignored scratch files; directory counts expose those rows.
+CLI references omit declarations unless `--include-declaration` is set; native
+clients may include them. Line-only locations omit a column; column 1 need not
+select the name. Excerpts show current disk text, not an index snapshot, and mark
+any clipped text. Locations and clause positions are never clipped.
 
 ### Claude native dependency navigation
 
@@ -139,9 +177,12 @@ hide dependency sources under `deps/` even when Dexter returns them correctly.
 Hover, document symbols and call hierarchy do not use that client filter. The nine operations
 therefore do not have identical displayed results across native and CLI clients.
 
-For ignored dependency locations, use the existing bound CLI `definition`,
-`implementation`, `references` or `workspace-symbols` operation in the same
-worktree, for example `"$TIPS_DEXTER" query definition lib/example.ex 12 8`.
+- Use native hover for dependency docs.
+- Use the bound CLI for definition, implementation, references and workspace
+  symbols into ignored dependencies, e.g. `"$TIPS_DEXTER" query definition lib/example.ex 12 8`.
+- Native “No definition found” can mean client filtering; verify through the CLI
+  and check that dependency source exists before diagnosing the index.
+
 Do not change `.gitignore`, rewrite result URIs or start another language server.
 A native “No definition found” message is not proof of an indexing failure.
 
@@ -183,6 +224,8 @@ A native “No definition found” message is not proof of an indexing failure.
   body. Hierarchy items retain the callable identity and select the real module
   token within its declaration. Dexter does not reconstruct arbitrary
   compile-time macro expansion.
+  Function hover follows available `use`-injected source before compiled metadata;
+  an unresolved function returns no hover instead of its module's documentation.
 - Implementation lookup starts at the selected `@callback` head and uses its
   exact arity, including zero-arity forms such as `@callback type :: t` and
   `@callback type() :: t`. Ordinary function heads and call sites return no

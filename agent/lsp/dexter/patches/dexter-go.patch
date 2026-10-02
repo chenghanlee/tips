@@ -1,5 +1,5 @@
 diff --git a/cmd/main.go b/cmd/main.go
-index ce8da11..38d1932 100644
+index ce8da11..6deb734 100644
 --- a/cmd/main.go
 +++ b/cmd/main.go
 @@ -14,6 +14,7 @@ import (
@@ -70,6 +70,24 @@ index ce8da11..38d1932 100644
  // sameDir reports whether two paths name the same directory. Stat is the
  // authority so a symlinked spelling (or a case-insensitive filesystem) cannot
  // sneak a home directory past the check.
+@@ -491,7 +477,7 @@ func cmdLookup(projectRoot string, module string, function string, strict bool,
+ 		}
+ 	}
+ 	for _, r := range result.Locations {
+-		fmt.Printf("%s:%d\n", r.FilePath, r.Line)
++		fmt.Printf("%s:%d\n", queryDisplayPath(projectRoot, r.FilePath), r.Line)
+ 	}
+ }
+ 
+@@ -521,7 +507,7 @@ func cmdReferences(projectRoot string, module string, function string, opts quer
+ 		os.Exit(1)
+ 	}
+ 	for _, r := range result.Locations {
+-		fmt.Printf("%s:%d\n", r.FilePath, r.Line)
++		fmt.Printf("%s:%d\n", queryDisplayPath(projectRoot, r.FilePath), r.Line)
+ 	}
+ }
+ 
 @@ -668,8 +654,6 @@ func cmdStopIncompatible(ctx context.Context, root string, e *daemon.Incompatibl
  // frontend. The daemon starts on demand: it belongs to the workspace, not to
  // this editor, the CLI, or any other frontend that happens to reach it first.
@@ -81,10 +99,10 @@ index ce8da11..38d1932 100644
  	if err := daemon.ProxyLSP(context.Background(), projectRoot, os.Stdin, os.Stdout); err != nil {
 diff --git a/cmd/query.go b/cmd/query.go
 new file mode 100644
-index 0000000..9043aa5
+index 0000000..fa1ce3e
 --- /dev/null
 +++ b/cmd/query.go
-@@ -0,0 +1,173 @@
+@@ -0,0 +1,227 @@
 +package main
 +
 +import (
@@ -106,23 +124,29 @@ index 0000000..9043aa5
 +func newQueryCommand() *cobra.Command {
 +	var wait time.Duration
 +	var includeDeclaration bool
++	var output queryOutputOptions
 +	cmd := &cobra.Command{
 +		Use:   "query <operation> [file line column | search]",
 +		Short: "Run a read-only positional query through the workspace daemon",
 +		Long: "Operations: definition, references, hover, symbols, workspace-symbols, implementation, prepare-call-hierarchy, incoming-calls, outgoing-calls.\n" +
 +			"File paths are relative to --root. Input line and column are 1-based UTF-16.\n" +
-+			"Output is raw LSP JSON with native 0-based UTF-16 ranges. symbols takes only a file; workspace-symbols takes an optional search.",
++			"Output is compact with 1-based locations; --raw returns native 0-based LSP JSON. symbols takes only a file; workspace-symbols takes an optional search.",
 +		Args: cobra.MinimumNArgs(1),
 +		RunE: func(cmd *cobra.Command, args []string) error {
-+			return cmdQuery(cmd, args, wait, includeDeclaration)
++			if err := output.validate(cmd); err != nil {
++				return err
++			}
++			return cmdQuery(cmd, args, wait, includeDeclaration, output)
 +		},
 +	}
 +	cmd.Flags().DurationVar(&wait, "wait", 30*time.Second, "Wait up to this long for initial index readiness (timeout is an error)")
 +	cmd.Flags().BoolVar(&includeDeclaration, "include-declaration", false, "Include declarations in references")
++	cmd.Flags().BoolVar(&output.raw, "raw", false, "Return unmodified LSP JSON with 0-based ranges instead of compact output")
++	cmd.Flags().IntVar(&output.limit, "limit", 0, "Maximum compact rows; 0 prints all")
 +	return cmd
 +}
 +
-+func cmdQuery(cmd *cobra.Command, args []string, wait time.Duration, includeDeclaration bool) error {
++func cmdQuery(cmd *cobra.Command, args []string, wait time.Duration, includeDeclaration bool, output queryOutputOptions) error {
 +	root, err := os.Getwd()
 +	if err != nil {
 +		return err
@@ -157,8 +181,13 @@ index 0000000..9043aa5
 +	if err != nil {
 +		return err
 +	}
++	var prepared json.RawMessage
++	if args[0] == "prepare-call-hierarchy" {
++		prepared = result
++	}
 +	if args[0] == "incoming-calls" || args[0] == "outgoing-calls" {
-+		result, err = followQueryHierarchy(query, args[0], result)
++		prepared = result
++		result, err = followQueryHierarchy(query, args[0], result, !output.raw)
 +		if err != nil {
 +			return err
 +		}
@@ -166,7 +195,17 @@ index 0000000..9043aa5
 +	if len(result) == 0 {
 +		result = json.RawMessage("null")
 +	}
-+	_, err = fmt.Fprintln(cmd.OutOrStdout(), string(result))
++	return output.print(cmd, root, args, result, prepared)
++}
++
++func (output queryOutputOptions) print(cmd *cobra.Command, root string, args []string, result, prepared json.RawMessage) error {
++	if !output.raw {
++		if args[0] == "hover" && cmd.Flags().Changed("limit") {
++			return fmt.Errorf("--limit does not apply to hover text")
++		}
++		return printCompactQuery(cmd.OutOrStdout(), root, args, result, prepared, output)
++	}
++	_, err := fmt.Fprintln(cmd.OutOrStdout(), string(result))
 +	return err
 +}
 +
@@ -227,7 +266,7 @@ index 0000000..9043aa5
 +}
 +
 +// Sequence prepare and follow-up without interpreting opaque backend identity.
-+func followQueryHierarchy(query func(string, any) (json.RawMessage, error), operation string, prepared json.RawMessage) (json.RawMessage, error) {
++func followQueryHierarchy(query func(string, any) (json.RawMessage, error), operation string, prepared json.RawMessage, compact bool) (json.RawMessage, error) {
 +	var items []json.RawMessage
 +	if err := json.Unmarshal(prepared, &items); err != nil {
 +		return nil, err
@@ -254,9 +293,443 @@ index 0000000..9043aa5
 +		if next != nil && calls == nil {
 +			calls = []json.RawMessage{}
 +		}
++		if compact && operation == "outgoing-calls" {
++			next, err = attachOutgoingSource(item, next)
++			if err != nil {
++				return nil, err
++			}
++		}
 +		calls = append(calls, next...)
 +	}
 +	return json.Marshal(calls)
++}
++
++// Keep each prepared target attached to its own outgoing sites for presentation.
++func attachOutgoingSource(prepared json.RawMessage, calls []json.RawMessage) ([]json.RawMessage, error) {
++	var item protocol.CallHierarchyItem
++	if err := json.Unmarshal(prepared, &item); err != nil {
++		return nil, err
++	}
++	for i, raw := range calls {
++		var call map[string]json.RawMessage
++		if err := json.Unmarshal(raw, &call); err != nil {
++			return nil, err
++		}
++		if call == nil {
++			return nil, fmt.Errorf("outgoing call result is null")
++		}
++		source, err := json.Marshal(item.URI)
++		if err != nil {
++			return nil, err
++		}
++		call["sourceURI"] = source
++		calls[i], err = json.Marshal(call)
++		if err != nil {
++			return nil, err
++		}
++	}
++	return calls, nil
++}
+diff --git a/cmd/query_output.go b/cmd/query_output.go
+new file mode 100644
+index 0000000..931fd7e
+--- /dev/null
++++ b/cmd/query_output.go
+@@ -0,0 +1,366 @@
++package main
++
++import (
++	"encoding/json"
++	"fmt"
++	"io"
++	"os"
++	"path/filepath"
++	"sort"
++	"strconv"
++	"strings"
++	"unicode"
++
++	"github.com/spf13/cobra"
++	"go.lsp.dev/protocol"
++)
++
++type queryOutputOptions struct {
++	raw   bool
++	limit int
++}
++
++func (o queryOutputOptions) validate(cmd *cobra.Command) error {
++	if o.limit < 0 {
++		return fmt.Errorf("--limit must be nonnegative")
++	}
++	if o.raw && cmd.Flags().Changed("limit") {
++		return fmt.Errorf("--limit cannot be combined with --raw")
++	}
++	return nil
++}
++
++// queryRow is a presentation row, not an additional resolver or index entry.
++type queryRow struct {
++	label, path string
++	position    protocol.Position
++	lineOnly    bool
++	depth       int
++	excerpt     bool
++}
++
++func printCompactQuery(w io.Writer, root string, args []string, raw, prepared json.RawMessage, options queryOutputOptions) error {
++	if args[0] == "hover" {
++		return printCompactHover(w, root, args, raw)
++	}
++	rows, err := compactQueryRows(args[0], raw)
++	if err != nil {
++		return err
++	}
++	if args[0] == "symbols" {
++		path := args[1]
++		if !filepath.IsAbs(path) {
++			path = filepath.Join(root, path)
++		}
++		for i := range rows {
++			rows[i].path = path
++		}
++	}
++	sources := querySources{}
++	var out strings.Builder
++	fmt.Fprintf(&out, "query %s\n", strings.Join(args, " "))
++	if len(args) == 4 {
++		printQueryCursor(&out, root, args, sources)
++	}
++	if err := printPreparedQuery(&out, prepared); err != nil {
++		return err
++	}
++
++	end := len(rows)
++	if options.limit > 0 {
++		end = min(end, options.limit)
++	}
++	fmt.Fprintf(&out, "%d rows", len(rows))
++	if groups := queryDirectoryCounts(root, rows); groups != "" {
++		fmt.Fprintf(&out, ": %s", groups)
++	}
++	// SearchSymbols caps its SQL result at 50 before rendering. This is a
++	// returned count, not proof that exactly 50 symbols matched the search.
++	if args[0] == "workspace-symbols" && len(rows) == 50 {
++		out.WriteString("; server limit reached; more may exist; narrow search")
++	}
++	out.WriteString("\n")
++	if end < len(rows) {
++		fmt.Fprintf(&out, "showing %d of %d; omitted=%d; pass --limit 0\n", end, len(rows), len(rows)-end)
++	}
++	for i, row := range rows {
++		if i >= end {
++			break
++		}
++		printQueryRow(&out, root, row, sources)
++	}
++	_, err = io.WriteString(w, out.String())
++	return err
++}
++
++func printPreparedQuery(out *strings.Builder, prepared json.RawMessage) error {
++	if len(prepared) == 0 {
++		return nil
++	}
++	var items []protocol.CallHierarchyItem
++	if err := json.Unmarshal(prepared, &items); err != nil {
++		return err
++	}
++	if len(items) == 0 {
++		out.WriteString("selected: no callable at cursor\n")
++	}
++	for i := range items {
++		fmt.Fprintf(out, "selected: %s\n", items[i].Name)
++	}
++	return nil
++}
++
++func printCompactHover(w io.Writer, root string, args []string, raw json.RawMessage) error {
++	var out strings.Builder
++	fmt.Fprintf(&out, "query %s\n", strings.Join(args, " "))
++	printQueryCursor(&out, root, args, querySources{})
++	if string(raw) == "null" {
++		out.WriteString("no hover\n")
++	} else {
++		var hover protocol.Hover
++		if err := json.Unmarshal(raw, &hover); err != nil {
++			return err
++		}
++		// Preserve markdown, whitespace and Elixir escapes; no invented row structure.
++		for _, line := range strings.Split(hover.Contents.Value, "\n") {
++			fmt.Fprintln(&out, cleanQueryText(line))
++		}
++	}
++	_, err := io.WriteString(w, out.String())
++	return err
++}
++
++func printQueryCursor(out *strings.Builder, root string, args []string, sources querySources) {
++	line, _ := strconv.ParseUint(args[2], 10, 32)
++	column, _ := strconv.ParseUint(args[3], 10, 32)
++	path := args[1]
++	if !filepath.IsAbs(path) {
++		path = filepath.Join(root, path)
++	}
++	source, ok := sources.line(path, uint32(line)-1)
++	if !ok {
++		out.WriteString("cursor: line not in file or source unavailable\n")
++		return
++	}
++	fmt.Fprintf(out, "cursor: %s | %s\n", cleanQueryText(queryCursorToken(source, uint32(column)-1)), compactText(strings.TrimSpace(source)))
++}
++
++func queryCursorToken(source string, column uint32) string {
++	runes := []rune(source)
++	pos, units := 0, uint32(0)
++	for pos < len(runes) && units < column {
++		if runes[pos] > 0xffff {
++			units++
++		}
++		units++
++		pos++
++	}
++	if pos >= len(runes) || units != column {
++		return "[no token at position]"
++	}
++	identifier := func(r rune) bool { return unicode.IsLetter(r) || unicode.IsDigit(r) || strings.ContainsRune("_!?", r) }
++	if !identifier(runes[pos]) {
++		return string(runes[pos])
++	}
++	first, last := pos, pos+1
++	for first > 0 && identifier(runes[first-1]) {
++		first--
++	}
++	for last < len(runes) && identifier(runes[last]) {
++		last++
++	}
++	return string(runes[first:last])
++}
++
++func queryDirectoryCounts(root string, rows []queryRow) string {
++	counts := map[string]int{}
++	for _, row := range rows {
++		if row.path == "" {
++			continue
++		}
++		rel, err := filepath.Rel(root, row.path)
++		group := "external"
++		if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
++			group = strings.SplitN(rel, string(filepath.Separator), 2)[0]
++		}
++		counts[group]++
++	}
++	var groups []string
++	for group, count := range counts {
++		groups = append(groups, fmt.Sprintf("%s %d", group, count))
++	}
++	sort.Strings(groups)
++	return strings.Join(groups, ", ")
++}
++
++func printQueryRow(out *strings.Builder, root string, row queryRow, sources querySources) {
++	if row.path == "" {
++		fmt.Fprintln(out, cleanQueryText(row.label))
++		return
++	}
++	path := queryDisplayPath(root, row.path)
++	fmt.Fprintf(out, "%s%s:%d", strings.Repeat("  ", row.depth), path, row.position.Line+1)
++	if !row.lineOnly {
++		fmt.Fprintf(out, ":%d", row.position.Character+1)
++	}
++	if row.label != "" {
++		fmt.Fprintf(out, " %s", cleanQueryText(row.label))
++	}
++	if !row.excerpt {
++		out.WriteString("\n")
++		return
++	}
++	source, ok := sources.line(row.path, row.position.Line)
++	if !ok {
++		source = "[source unavailable]"
++	}
++	fmt.Fprintf(out, " | %s\n", compactText(strings.TrimSpace(source)))
++}
++
++func compactQueryRows(operation string, raw json.RawMessage) ([]queryRow, error) {
++	if string(raw) == "null" {
++		return nil, nil
++	}
++	switch operation {
++	case "symbols":
++		var symbols []protocol.DocumentSymbol
++		if err := json.Unmarshal(raw, &symbols); err != nil {
++			return nil, err
++		}
++		return documentQueryRows(symbols, 0), nil
++	default:
++		return locationQueryRows(operation, raw)
++	}
++}
++
++func documentQueryRows(symbols []protocol.DocumentSymbol, depth int) []queryRow {
++	rows := []queryRow{}
++	groups := map[string]int{}
++	for i := range symbols {
++		symbol := &symbols[i]
++		label := symbol.Name
++		if symbol.Detail != "" && !strings.HasPrefix(label, symbol.Detail+" ") {
++			label = symbol.Detail + " " + label
++		}
++		key := fmt.Sprintf("%s:%s", symbol.Kind, label)
++		if index, ok := groups[key]; ok && symbol.Kind == protocol.SymbolKindFunction {
++			rows[index].label += fmt.Sprintf("; clause %d:%d", symbol.SelectionRange.Start.Line+1, symbol.SelectionRange.Start.Character+1)
++		} else {
++			groups[key] = len(rows)
++			rows = append(rows, queryRow{label: label, position: symbol.SelectionRange.Start, depth: depth})
++		}
++		rows = append(rows, documentQueryRows(symbol.Children, depth+1)...)
++	}
++	return rows
++}
++
++// The union mirrors the read-only LSP response shapes; it never infers a target.
++type queryLocation struct {
++	Name           string                      `json:"name"`
++	Detail         string                      `json:"detail"`
++	URI            protocol.DocumentURI        `json:"uri"`
++	Range          protocol.Range              `json:"range"`
++	SelectionRange protocol.Range              `json:"selectionRange"`
++	Location       protocol.Location           `json:"location"`
++	From           *protocol.CallHierarchyItem `json:"from"`
++	To             *protocol.CallHierarchyItem `json:"to"`
++	SourceURI      protocol.DocumentURI        `json:"sourceURI"`
++	FromRanges     []protocol.Range            `json:"fromRanges"`
++}
++
++func locationQueryRows(operation string, raw json.RawMessage) ([]queryRow, error) {
++	var locations []queryLocation
++	if err := json.Unmarshal(raw, &locations); err != nil {
++		return nil, err
++	}
++	var rows []queryRow
++	for i := range locations {
++		rows = append(rows, locationRows(operation, &locations[i])...)
++	}
++	sort.SliceStable(rows, func(i, j int) bool {
++		a, b := rows[i], rows[j]
++		if a.path != b.path {
++			return a.path < b.path
++		}
++		if a.position.Line != b.position.Line {
++			return a.position.Line < b.position.Line
++		}
++		if a.position.Character != b.position.Character {
++			return a.position.Character < b.position.Character
++		}
++		return a.label < b.label
++	})
++	return rows, nil
++}
++
++func locationRows(operation string, item *queryLocation) []queryRow {
++	if item.From != nil {
++		var rows []queryRow
++		for _, r := range item.FromRanges {
++			rows = append(rows, queryRow{label: item.From.Name, path: item.From.URI.Filename(), position: r.Start, excerpt: true})
++		}
++		return rows
++	}
++	if item.To != nil {
++		var rows []queryRow
++		for _, r := range item.FromRanges {
++			rows = append(rows, queryRow{label: item.To.Name, path: item.SourceURI.Filename(), position: r.Start, excerpt: true})
++		}
++		return rows
++	}
++
++	location := protocol.Location{URI: item.URI, Range: item.Range}
++	if item.Location.URI != "" {
++		location = item.Location
++	}
++	if operation == "prepare-call-hierarchy" {
++		location.Range = item.SelectionRange
++	}
++	return []queryRow{{label: strings.TrimSpace(item.Name + " " + item.Detail), path: location.URI.Filename(), position: location.Range.Start, lineOnly: location.Range.Start.Character == 0 && location.Range.Start == location.Range.End, excerpt: operation == "references"}}
++}
++
++// Source excerpts describe current disk text, not the index snapshot.
++type querySources map[string][]string
++
++func (sources querySources) line(path string, line uint32) (string, bool) {
++	lines, found := sources[path]
++	if !found {
++		data, err := os.ReadFile(path) // #nosec G304 -- admitted local source location, read only
++		if err == nil {
++			lines = strings.Split(string(data), "\n")
++		}
++		sources[path] = lines
++	}
++	if uint64(line) >= uint64(len(lines)) {
++		return "", false
++	}
++	return lines[line], true
++}
++
++func cleanQueryText(text string) string {
++	return strings.Map(func(r rune) rune {
++		if r == '\t' {
++			return ' '
++		}
++		if unicode.IsControl(r) {
++			return -1
++		}
++		return r
++	}, text)
++}
++
++func compactText(text string) string {
++	text = cleanQueryText(text)
++	runes := []rune(text)
++	if len(runes) > 220 {
++		return string(runes[:220]) + " … [clipped]"
++	}
++	return text
++}
++
++func queryDisplayPath(root, path string) string {
++	if rel, err := filepath.Rel(root, path); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
++		return rel
++	}
++	return path
++}
+diff --git a/cmd/query_output_test.go b/cmd/query_output_test.go
+new file mode 100644
+index 0000000..a838ff4
+--- /dev/null
++++ b/cmd/query_output_test.go
+@@ -0,0 +1,23 @@
++package main
++
++import "testing"
++
++func TestQueryCursorUTF16AndWrongTargets(t *testing.T) {
++	for _, test := range []struct {
++		source string
++		column uint32
++		want   string
++	}{
++		{"  defp run(value), do: value", 7, "run"},
++		{"    user_return_to = get_session(conn)", 6, "user_return_to"},
++		{"  def run do", 10, "do"},
++		{"  UserToken.valid()", 5, "UserToken"},
++		{"\"😀\"; Repo.transact()", 11, "transact"},
++		{"😀", 1, "[no token at position]"},
++		{"", 0, "[no token at position]"},
++	} {
++		if got := queryCursorToken(test.source, test.column); got != test.want {
++			t.Errorf("%q:%d = %q; want %q", test.source, test.column, got, test.want)
++		}
++	}
 +}
 diff --git a/docs/daemon.md b/docs/daemon.md
 index 597d442..93e3212 100644
@@ -311,6 +784,40 @@ index 597d442..93e3212 100644
  implementing the SDK's `Transport`/`Connection` pair over the socket — about the
  same newline-delimited JSON framing the LSP stream already avoids by proxying
  bytes — and that implementation tracks SDK internals. Worth revisiting only if
+diff --git a/integration_test.go b/integration_test.go
+index 970680d..eb70887 100644
+--- a/integration_test.go
++++ b/integration_test.go
+@@ -672,17 +672,17 @@ func TestIntegration_RootFlagRunsFromAnotherDirectory(t *testing.T) {
+ 	runDexter(t, binary, elsewhere, "init", "--root", root)
+ 
+ 	out := runDexter(t, binary, elsewhere, "lookup", "--root", root, "MyApp.Repo")
+-	if want := filepath.Join(root, "lib/my_app/repo.ex") + ":1"; !strings.Contains(out, want) {
++	if want := "lib/my_app/repo.ex:1"; out != want {
+ 		t.Errorf("lookup --root = %q, want it to contain %q", out, want)
+ 	}
+ 
+ 	out = runDexter(t, binary, elsewhere, "lookup", "-C", root, "MyApp.Repo", "get")
+-	if want := filepath.Join(root, "lib/my_app/repo.ex") + ":2"; !strings.Contains(out, want) {
++	if want := "lib/my_app/repo.ex:2"; out != want {
+ 		t.Errorf("lookup -C = %q, want it to contain %q", out, want)
+ 	}
+ 
+ 	out = runDexter(t, binary, elsewhere, "references", "--root", root, "MyApp.Repo", "get")
+-	if want := filepath.Join(root, "lib/my_app/workers/direct_worker.ex") + ":3"; !strings.Contains(out, want) {
++	if want := "lib/my_app/workers/direct_worker.ex:3"; out != want {
+ 		t.Errorf("references --root = %q, want it to contain %q", out, want)
+ 	}
+ 
+@@ -704,7 +704,7 @@ end
+ 	runDexter(t, binary, elsewhere, "reindex", "--root", root, "lib/my_app/repo.ex")
+ 
+ 	out = runDexter(t, binary, elsewhere, "lookup", "--root", root, "MyApp.Repo", "all")
+-	if want := filepath.Join(root, "lib/my_app/repo.ex") + ":2"; !strings.Contains(out, want) {
++	if want := "lib/my_app/repo.ex:2"; out != want {
+ 		t.Errorf("lookup after relative reindex --root = %q, want it to contain %q", out, want)
+ 	}
+ }
 diff --git a/internal/daemon/build_identity_test.go b/internal/daemon/build_identity_test.go
 new file mode 100644
 index 0000000..ccc18dd
@@ -5049,6 +5556,142 @@ index 73f3ebc..0f2497c 100644
  	indexed, err := f.server.store.LookupReferences("SharedLib.Resource", "generated_lookup")
  	if err != nil || len(indexed) != 1 {
  		t.Fatalf("test setup expected one injector reference, got %v, %v", indexed, err)
+diff --git a/internal/lsp/hover_qualified_use_test.go b/internal/lsp/hover_qualified_use_test.go
+new file mode 100644
+index 0000000..a409234
+--- /dev/null
++++ b/internal/lsp/hover_qualified_use_test.go
+@@ -0,0 +1,130 @@
++package lsp
++
++import (
++	"strings"
++	"testing"
++)
++
++// A function a module gets through `use` has no row of its own and, before
++// the project compiles, no BEAM either. Hover on Module.function must reach
++// it through the use chain as definition does, and must never answer a
++// function token with the module's declaration.
++func setupQualifiedUseHover(t *testing.T) (*Server, string, func()) {
++	t.Helper()
++	server, cleanup := setupTestServer(t)
++
++	indexFile(t, server.store, server.projectRoot, "lib/provider.ex", `defmodule MyApp.Provider do
++  defmacro __using__(opts) do
++    quote do
++      if unquote(opts)[:transactions] do
++        def transact(fun_or_multi, opts \\ []) do
++          {fun_or_multi, opts}
++        end
++      end
++    end
++  end
++end
++`)
++	indexFile(t, server.store, server.projectRoot, "lib/repo.ex", `defmodule MyApp.Repo do
++  use MyApp.Provider, transactions: true
++end
++`)
++
++	uri := "file:///accounts.ex"
++	server.docs.seed(uri, `defmodule MyApp.Accounts do
++  alias MyApp.Repo
++
++  def login do
++    Repo.transact(fn -> :ok end)
++  end
++
++  def other do
++    Repo.missing(1)
++  end
++
++  def arities do
++    Repo.transact(fn -> :ok end, timeout: 1)
++    Repo.transact(1, 2, 3)
++  end
++end`)
++	return server, uri, cleanup
++}
++
++func TestHover_QualifiedUseInjectedDef(t *testing.T) {
++	server, uri, cleanup := setupQualifiedUseHover(t)
++	defer cleanup()
++
++	// Line 4, col 9 is the 't' of transact in "    Repo.transact(".
++	hover := hoverAt(t, server, uri, 4, 9)
++	if hover == nil {
++		t.Fatal("expected hover for a use-injected function called through its module")
++		return
++	}
++	value := hover.Contents.Value
++	if !strings.Contains(value, "def transact(fun_or_multi, opts") {
++		t.Errorf("expected the injected def's signature, got %q", value)
++	}
++	if strings.Contains(value, "defmodule") {
++		t.Errorf("a function token must not hover as its module, got %q", value)
++	}
++
++	// Hover documents the line definition navigates to.
++	locations := definitionAt(t, server, uri, 4, 9)
++	if len(locations) != 1 || !strings.HasSuffix(string(locations[0].URI), "lib/provider.ex") || locations[0].Range.Start.Line != 4 {
++		t.Errorf("expected definition at lib/provider.ex line 5, got %+v", locations)
++	}
++	// Line 12 passes both arguments of transact/2.
++	hover = hoverAt(t, server, uri, 12, 9)
++	if hover == nil || !strings.Contains(hover.Contents.Value, "def transact(fun_or_multi, opts") {
++		t.Errorf("expected the injected def for a full-arity call, got %+v", hover)
++	}
++
++	// Line 13 passes three arguments: no injected clause accepts them.
++	if hover = hoverAt(t, server, uri, 13, 9); hover != nil {
++		t.Errorf("an arity no clause accepts must not hover, got %q", hover.Contents.Value)
++	}
++	if locations := definitionAt(t, server, uri, 13, 9); len(locations) != 0 {
++		t.Errorf("definition and hover must agree on an unreachable arity, got %+v", locations)
++	}
++}
++
++func TestHover_QualifiedUnknownFunctionIsNotItsModule(t *testing.T) {
++	server, uri, cleanup := setupQualifiedUseHover(t)
++	defer cleanup()
++
++	// Line 8, col 9 is the 'm' of missing in "    Repo.missing(1)".
++	if hover := hoverAt(t, server, uri, 8, 9); hover != nil {
++		t.Errorf("a function no source or BEAM knows must not hover as its module, got %q", hover.Contents.Value)
++	}
++	if locations := definitionAt(t, server, uri, 8, 9); len(locations) != 0 {
++		t.Errorf("definition and hover must agree on an unknown function, got %+v", locations)
++	}
++}
++
++// A function only the compiled module knows still hovers from the BEAM when
++// called through its module, and a name the BEAM lacks does not become the
++// module either.
++func TestHover_QualifiedCompiledOnlyFunction(t *testing.T) {
++	server, cleanup := setupTestServer(t)
++	defer cleanup()
++
++	const module = "MyApp.Accounts.User"
++	writeTestModuleBEAM(t, server, module, "lib/my_app/accounts/user.ex", beamExport{"get_by_id", 1})
++
++	uri := "file:///caller.ex"
++	server.docs.seed(uri, `defmodule MyApp.Caller do
++  def call do
++    MyApp.Accounts.User.get_by_id(1)
++    MyApp.Accounts.User.absent(1)
++  end
++end`)
++
++	// Line 2, col 24 is the 'g' of get_by_id.
++	hover := hoverAt(t, server, uri, 2, 24)
++	if hover == nil || !strings.Contains(hover.Contents.Value, "def get_by_id(") {
++		t.Errorf("expected the compiled function's signature, got %+v", hover)
++	}
++	if hover := hoverAt(t, server, uri, 3, 24); hover != nil {
++		t.Errorf("a function the BEAM lacks must not hover as its module, got %q", hover.Contents.Value)
++	}
++}
 diff --git a/internal/lsp/hover_test.go b/internal/lsp/hover_test.go
 index 3495319..1c4a1cd 100644
 --- a/internal/lsp/hover_test.go
@@ -7007,7 +7650,7 @@ index a5874ec..b979c24 100644
  	edit := renameAt(t, server, defURI, 0, uint32(strings.Index(defContent, "ABTest")), "AbTest")
  	server.index.backgroundWork.Wait()
 diff --git a/internal/lsp/server.go b/internal/lsp/server.go
-index 0499a21..949682f 100644
+index 0499a21..9d44050 100644
 --- a/internal/lsp/server.go
 +++ b/internal/lsp/server.go
 @@ -274,7 +274,7 @@ func ServeStream(server *Server, rwc io.ReadWriteCloser) error {
@@ -7498,7 +8141,7 @@ index 0499a21..949682f 100644
  			return s.hoverFromFile(functionName, results[0])
  		}
  
-@@ -5114,15 +5135,8 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
+@@ -5114,21 +5135,18 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
  	fullModule := s.resolveModuleWithNesting(moduleRef, aliases, uriToPath(protocol.DocumentURI(docURI)), lineNum)
  
  	if functionName != "" {
@@ -7515,8 +8158,21 @@ index 0499a21..949682f 100644
 +		if hits := byKindForContext(tf, lineNum, s.hoverLookup(fullModule, functionName, cursor)); len(hits) > 0 {
  			return s.hoverFromFile(functionName, hits[0])
  		}
- 		// Nothing in the index: the function may exist only in the compiled module.
-@@ -5167,6 +5181,12 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
+-		// Nothing in the index: the function may exist only in the compiled module.
+-		if hover := s.hoverFromGenerated(fullModule, "", functionName); hover != nil {
+-			return hover, nil
++		// No row of its own: the module's use chain may inject it, as
++		// definition resolves it, before any BEAM exists.
++		if hits := byKindForContext(tf, lineNum, s.lookupThroughUseOfWithFollow(fullModule, functionName, s.followDelegates, cursor.arity)); len(hits) > 0 {
++			return s.hoverFromFile(functionName, hits[0])
+ 		}
++		// Nothing in source: the function may exist only in the compiled module.
++		// No module fallback: a module that exists does not prove the function does.
++		return s.hoverFromGenerated(fullModule, "", functionName), nil
+ 	}
+ 
+ 	results, err := s.store.LookupModule(fullModule)
+@@ -5167,6 +5185,12 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
  	if functionName == "" {
  		return nil, nil
  	}
@@ -7529,7 +8185,7 @@ index 0499a21..949682f 100644
  
  	// Find the module enclosing the cursor via the store — this correctly handles
  	// files with defmodule lines inside heredocs/doc examples.
-@@ -5179,33 +5199,85 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
+@@ -5179,33 +5203,85 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
  
  	s.debugf("Implementation: module=%s function=%s", currentModule, functionName)
  
@@ -7634,7 +8290,7 @@ index 0499a21..949682f 100644
  }
  func (s *Server) OnTypeFormatting(ctx context.Context, params *protocol.DocumentOnTypeFormattingParams) ([]protocol.TextEdit, error) {
  	return nil, nil
-@@ -5420,6 +5492,8 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5420,6 +5496,8 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  	// below. They carry the bare type uses (`@type t :: schema | embedded`)
  	// that the call-shaped scan cannot see.
  	var typespecOccurrences []protocol.Location
@@ -7643,7 +8299,7 @@ index 0499a21..949682f 100644
  
  	if moduleRef == "" {
  		if functionName == "" {
-@@ -5463,7 +5537,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5463,7 +5541,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		}
  
  		// Bare function — resolve to its defining module
@@ -7652,7 +8308,7 @@ index 0499a21..949682f 100644
  		s.debugf("References: resolved bare %q -> %q", functionName, fullModule)
  		if fullModule == "" {
  			currentModule := s.store.LookupEnclosingModule(uriToPath(protocol.DocumentURI(docURI)), lineNum+1)
-@@ -5513,7 +5587,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5513,7 +5591,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		useCalls := tf.ExtractUsesWithOpts(aliases)
  		for i := len(useCalls) - 1; i >= 0; i-- {
  			uc := useCalls[i]
@@ -7661,7 +8317,7 @@ index 0499a21..949682f 100644
  				injectors = append(injectors, uc.Module)
  				s.debugf("References: opt-binding injector for %s: %s", functionName, uc.Module)
  				break
-@@ -5524,7 +5598,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5524,7 +5602,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  	kind := NameKindCallable
  	if functionName == "" {
  		kind = NameKindAny
@@ -7670,7 +8326,7 @@ index 0499a21..949682f 100644
  		kind = NameKindType
  	}
  	semantic, err := s.ReferenceNames(fullModule, functionName, NameReferenceOptions{
-@@ -5534,15 +5608,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5534,15 +5612,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		ExcludeStdlib:      true,
  		InjectorModules:    injectors,
  		GeneratedProvider:  generatedProvider,
@@ -7690,7 +8346,7 @@ index 0499a21..949682f 100644
  	}
  	seen := make(map[refKey]struct{}, len(semantic))
  	var locations []protocol.Location
-@@ -5556,19 +5634,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5556,19 +5638,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  			if line == lineNum && !params.Context.IncludeDeclaration {
  				continue
  			}
@@ -7713,7 +8369,7 @@ index 0499a21..949682f 100644
  		})
  	}
  
-@@ -7100,270 +7178,17 @@ func (s *Server) DidDeleteFiles(ctx context.Context, params *protocol.DeleteFile
+@@ -7100,270 +7182,17 @@ func (s *Server) DidDeleteFiles(ctx context.Context, params *protocol.DeleteFile
  }
  func (s *Server) CodeLensRefresh(ctx context.Context) error { return nil }
  func (s *Server) PrepareCallHierarchy(ctx context.Context, params *protocol.CallHierarchyPrepareParams) ([]protocol.CallHierarchyItem, error) {
@@ -12643,15 +13299,16 @@ index 56fad77..74150d1 100644
  // daemonLogs returns what the workspace daemon logged for root. The daemon exits
 diff --git a/query_integration_test.go b/query_integration_test.go
 new file mode 100644
-index 0000000..11f7618
+index 0000000..ad58b5a
 --- /dev/null
 +++ b/query_integration_test.go
-@@ -0,0 +1,408 @@
+@@ -0,0 +1,502 @@
 +package main
 +
 +import (
 +	"bytes"
 +	"context"
++	"embed"
 +	"encoding/json"
 +	"fmt"
 +	"os"
@@ -12728,6 +13385,95 @@ index 0000000..11f7618
 +	raw, err := runQuery(binary, leaf, "definition", "lib/worker.ex", "6", "47")
 +	if err != nil || !strings.Contains(string(raw), leaf) {
 +		t.Fatalf("second workspace after disconnect and shutdown = %s, %v", raw, err)
++	}
++}
++
++//go:embed testdata/query_compact/*.golden
++var compactSnapshots embed.FS
++
++// Exact output snapshots replace the per-operation matcher framework. Keep
++// fixtures away from the cap: which rows survive a server cap is not a contract.
++func TestQuery_CompactSnapshots(t *testing.T) {
++	binary := buildDexter(t)
++	root := t.TempDir()
++	fixture := filepath.Join("testdata", "query_compact")
++	if err := os.CopyFS(root, os.DirFS(filepath.Join(fixture, "project"))); err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { stopQueryDaemon(t, root) })
++	for _, test := range []struct {
++		name string
++		args []string
++	}{
++		{"references", []string{"references", "lib/worker.ex", "3", "7"}},
++		{"limited", []string{"references", "lib/worker.ex", "3", "7", "--limit", "3"}},
++		{"definition", []string{"definition", "lib/caller.ex", "6", "12"}},
++		{"hover", []string{"hover", "lib/caller.ex", "6", "12"}},
++		{"empty-hover", []string{"hover", "lib/worker.ex", "9", "14"}},
++		{"outline", []string{"symbols", "test/many_test.exs"}},
++		{"clauses", []string{"symbols", "lib/many.ex"}},
++		{"workspace", []string{"workspace-symbols", "fetch"}},
++		{"incoming", []string{"incoming-calls", "lib/caller.ex", "6", "12"}},
++		{"outgoing", []string{"outgoing-calls", "lib/via.ex", "2", "26"}},
++		{"prepare", []string{"prepare-call-hierarchy", "lib/worker.ex", "3", "7"}},
++		{"empty-location", []string{"definition", "lib/worker.ex", "99", "1"}},
++	} {
++		t.Run(test.name, func(t *testing.T) {
++			got, err := runCompactQuery(binary, root, test.args[0], test.args[1:]...)
++			if err != nil {
++				t.Fatal(err)
++			}
++			want, err := compactSnapshots.ReadFile("testdata/query_compact/" + test.name + ".golden")
++			if err != nil {
++				t.Fatal(err)
++			}
++			if !bytes.Equal(got, want) {
++				t.Errorf("compact output mismatch\nwant:\n%s\ngot:\n%s", want, got)
++			}
++		})
++	}
++	// Each invalid combination must fail; no separate fixture or boundary sweep.
++	for _, args := range [][]string{
++		{"references", "lib/worker.ex", "3", "7", "--limit", "-1"},
++		{"references", "lib/worker.ex", "3", "7", "--raw", "--limit", "3"},
++		{"hover", "lib/worker.ex", "3", "7", "--limit", "3"},
++	} {
++		if _, err := runCompactQuery(binary, root, args[0], args[1:]...); err == nil {
++			t.Errorf("query accepted %v", args)
++		}
++	}
++}
++
++// The server caps symbol search before presentation; never claim a complete total.
++func TestQuery_CompactServerCap(t *testing.T) {
++	binary := buildDexter(t)
++	root := t.TempDir()
++	writeQueryFixture(t, root)
++	var source strings.Builder
++	source.WriteString("defmodule CapFixture do\n")
++	for i := 0; i < 51; i++ {
++		fmt.Fprintf(&source, "  def match_%02d(), do: :ok\n", i)
++	}
++	source.WriteString("end\n")
++	if err := os.WriteFile(filepath.Join(root, "lib", "cap.ex"), []byte(source.String()), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { stopQueryDaemon(t, root) })
++	for _, test := range []struct {
++		search, count string
++		capped        bool
++	}{
++		{"CapFixture.match_", "50 rows", true},
++		{"CapFixture.match_50", "1 rows", false},
++	} {
++		out, err := runCompactQuery(binary, root, "workspace-symbols", test.search)
++		if err != nil {
++			t.Fatal(err)
++		}
++		marker := strings.Contains(string(out), "server limit reached; more may exist; narrow search")
++		if !strings.Contains(string(out), test.count) || marker != test.capped {
++			t.Errorf("search %s: %s", test.search, out)
++		}
 +	}
 +}
 +
@@ -12995,6 +13741,10 @@ index 0000000..11f7618
 +}
 +
 +func runQuery(binary, root, operation string, args ...string) ([]byte, error) {
++	return runCompactQuery(binary, root, operation, append(args, "--raw")...)
++}
++
++func runCompactQuery(binary, root, operation string, args ...string) ([]byte, error) {
 +	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 +	defer cancel()
 +	cmd := exec.CommandContext(ctx, binary, append([]string{"--root", root, "query", operation}, args...)...) // #nosec G204 -- test-owned binary and fixture arguments
@@ -13055,3 +13805,284 @@ index 0000000..11f7618
 +	}
 +	t.Error("test daemon did not release workspace")
 +}
+diff --git a/testdata/query_compact/clauses.golden b/testdata/query_compact/clauses.golden
+new file mode 100644
+index 0000000..8026b6e
+--- /dev/null
++++ b/testdata/query_compact/clauses.golden
+@@ -0,0 +1,4 @@
++query symbols lib/many.ex
++2 rows: lib 2
++lib/many.ex:1:11 defmodule Fx.Many
++  lib/many.ex:2:7 def pick/1; clause 3:7; clause 4:7; clause 5:7; clause 6:7; clause 7:7; clause 8:7; clause 9:7; clause 10:7; clause 11:7; clause 12:7; clause 13:7; clause 14:7; clause 15:7; clause 16:7; clause 17:7; clause 18:7; clause 19:7; clause 20:7; clause 21:7
+diff --git a/testdata/query_compact/definition.golden b/testdata/query_compact/definition.golden
+new file mode 100644
+index 0000000..a3feffd
+--- /dev/null
++++ b/testdata/query_compact/definition.golden
+@@ -0,0 +1,4 @@
++query definition lib/caller.ex 6 12
++cursor: fetch | Worker.fetch(v)
++1 rows: lib 1
++lib/worker.ex:3
+diff --git a/testdata/query_compact/empty-hover.golden b/testdata/query_compact/empty-hover.golden
+new file mode 100644
+index 0000000..c68d976
+--- /dev/null
++++ b/testdata/query_compact/empty-hover.golden
+@@ -0,0 +1,3 @@
++query hover lib/worker.ex 9 14
++cursor: value | def run(value) do
++no hover
+diff --git a/testdata/query_compact/empty-location.golden b/testdata/query_compact/empty-location.golden
+new file mode 100644
+index 0000000..2883c9c
+--- /dev/null
++++ b/testdata/query_compact/empty-location.golden
+@@ -0,0 +1,3 @@
++query definition lib/worker.ex 99 1
++cursor: line not in file or source unavailable
++0 rows
+diff --git a/testdata/query_compact/hover.golden b/testdata/query_compact/hover.golden
+new file mode 100644
+index 0000000..3345d61
+--- /dev/null
++++ b/testdata/query_compact/hover.golden
+@@ -0,0 +1,7 @@
++query hover lib/caller.ex 6 12
++cursor: fetch | Worker.fetch(v)
++```elixir
++def fetch(value, opts \\ []), do: {value, opts}
++```
++
++Fetches with a default.
+diff --git a/testdata/query_compact/incoming.golden b/testdata/query_compact/incoming.golden
+new file mode 100644
+index 0000000..a925807
+--- /dev/null
++++ b/testdata/query_compact/incoming.golden
+@@ -0,0 +1,11 @@
++query incoming-calls lib/caller.ex 6 12
++cursor: fetch | Worker.fetch(v)
++selected: Fx.Worker.fetch/1
++7 rows: lib 6, test 1
++lib/caller.ex:6:12 Fx.Caller.go/1 | Worker.fetch(v)
++lib/long.ex:2:25 Fx.Long.go/0 | def go, do: Fx.Worker.fetch("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx … [clipped]
++lib/long.ex:3:26 Fx.Long.tab/0 | def tab, do: Fx.Worker.fetch(:tab)
++lib/worker.ex:11:15 Fx.Worker.run/1 | fetched = fetch(value)
++lib/worker.ex:13:27 Fx.Worker.run/1 | héllo = "😀"; again = fetch(héllo)
++lib/worker.ex:17:23 Fx.Worker.helper/1 | defp helper(x), do: fetch(x)
++test/worker_test.exs:4:22 Fx.WorkerTest test "fetch default" | assert Fx.Worker.fetch(1) == {1, []}
+diff --git a/testdata/query_compact/limited.golden b/testdata/query_compact/limited.golden
+new file mode 100644
+index 0000000..fd274f4
+--- /dev/null
++++ b/testdata/query_compact/limited.golden
+@@ -0,0 +1,7 @@
++query references lib/worker.ex 3 7
++cursor: fetch | def fetch(value, opts \\ []), do: {value, opts}
++10 rows: lib 8, scratch 1, test 1
++showing 3 of 10; omitted=7; pass --limit 0
++lib/caller.ex:6:12 | Worker.fetch(v)
++lib/caller.ex:7:12 | Worker.fetch(v, b: 2)
++lib/long.ex:2:25 | def go, do: Fx.Worker.fetch("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx … [clipped]
+diff --git a/testdata/query_compact/outgoing.golden b/testdata/query_compact/outgoing.golden
+new file mode 100644
+index 0000000..cdf5d42
+--- /dev/null
++++ b/testdata/query_compact/outgoing.golden
+@@ -0,0 +1,7 @@
++query outgoing-calls lib/via.ex 2 26
++cursor: go | def via, do: Fx.Caller.go(1)
++selected: Fx.Caller.go/1
++3 rows: lib 3
++lib/caller.ex:5:12 Fx.Worker.run/1 | Worker.run(v)
++lib/caller.ex:6:12 Fx.Worker.fetch/1 | Worker.fetch(v)
++lib/caller.ex:7:12 Fx.Worker.fetch/2 | Worker.fetch(v, b: 2)
+diff --git a/testdata/query_compact/outline.golden b/testdata/query_compact/outline.golden
+new file mode 100644
+index 0000000..9777261
+--- /dev/null
++++ b/testdata/query_compact/outline.golden
+@@ -0,0 +1,7 @@
++query symbols test/many_test.exs
++5 rows: test 5
++test/many_test.exs:1:11 defmodule Fx.ManyTest
++  test/many_test.exs:4:3 describe a
++    test/many_test.exs:5:5 test same
++  test/many_test.exs:10:3 describe b
++    test/many_test.exs:11:5 test same
+diff --git a/testdata/query_compact/prepare.golden b/testdata/query_compact/prepare.golden
+new file mode 100644
+index 0000000..a68103d
+--- /dev/null
++++ b/testdata/query_compact/prepare.golden
+@@ -0,0 +1,5 @@
++query prepare-call-hierarchy lib/worker.ex 3 7
++cursor: fetch | def fetch(value, opts \\ []), do: {value, opts}
++selected: Fx.Worker.fetch/2
++1 rows: lib 1
++lib/worker.ex:3:7 Fx.Worker.fetch/2 def
+diff --git a/testdata/query_compact/project/lib/caller.ex b/testdata/query_compact/project/lib/caller.ex
+new file mode 100644
+index 0000000..716fa81
+--- /dev/null
++++ b/testdata/query_compact/project/lib/caller.ex
+@@ -0,0 +1,9 @@
++defmodule Fx.Caller do
++  alias Fx.Worker
++
++  def go(v) do
++    Worker.run(v)
++    Worker.fetch(v)
++    Worker.fetch(v, b: 2)
++  end
++end
+diff --git a/testdata/query_compact/project/lib/long.ex b/testdata/query_compact/project/lib/long.ex
+new file mode 100644
+index 0000000..2afd662
+--- /dev/null
++++ b/testdata/query_compact/project/lib/long.ex
+@@ -0,0 +1,4 @@
++defmodule Fx.Long do
++  def go, do: Fx.Worker.fetch("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
++  def tab, do:	Fx.Worker.fetch(:tab)
++end
+diff --git a/testdata/query_compact/project/lib/many.ex b/testdata/query_compact/project/lib/many.ex
+new file mode 100644
+index 0000000..f10f7b9
+--- /dev/null
++++ b/testdata/query_compact/project/lib/many.ex
+@@ -0,0 +1,22 @@
++defmodule Fx.Many do
++  def pick(0), do: 0
++  def pick(1), do: 1
++  def pick(2), do: 2
++  def pick(3), do: 3
++  def pick(4), do: 4
++  def pick(5), do: 5
++  def pick(6), do: 6
++  def pick(7), do: 7
++  def pick(8), do: 8
++  def pick(9), do: 9
++  def pick(10), do: 10
++  def pick(11), do: 11
++  def pick(12), do: 12
++  def pick(13), do: 13
++  def pick(14), do: 14
++  def pick(15), do: 15
++  def pick(16), do: 16
++  def pick(17), do: 17
++  def pick(18), do: 18
++  def pick(19), do: 19
++end
+diff --git a/testdata/query_compact/project/lib/via.ex b/testdata/query_compact/project/lib/via.ex
+new file mode 100644
+index 0000000..80cb8bb
+--- /dev/null
++++ b/testdata/query_compact/project/lib/via.ex
+@@ -0,0 +1,3 @@
++defmodule Fx.Via do
++  def via, do: Fx.Caller.go(1)
++end
+diff --git a/testdata/query_compact/project/lib/worker.ex b/testdata/query_compact/project/lib/worker.ex
+new file mode 100644
+index 0000000..d157a41
+--- /dev/null
++++ b/testdata/query_compact/project/lib/worker.ex
+@@ -0,0 +1,18 @@
++defmodule Fx.Worker do
++  @doc "Fetches with a default."
++  def fetch(value, opts \\ []), do: {value, opts}
++
++  def classify(0), do: :zero
++  def classify(n) when n > 0, do: :pos
++  def classify(_), do: :neg
++
++  def run(value) do
++    label = "say \"hi\"\tnow"
++    fetched = fetch(value)
++    other = fetch(value, a: 1)
++    héllo = "😀"; again = fetch(héllo)
++    {label, fetched, other, again, classify(value), helper(value)}
++  end
++
++  defp helper(x), do: fetch(x)
++end
+diff --git a/testdata/query_compact/project/mix.exs b/testdata/query_compact/project/mix.exs
+new file mode 100644
+index 0000000..1f6302a
+--- /dev/null
++++ b/testdata/query_compact/project/mix.exs
+@@ -0,0 +1,2 @@
++defmodule Fx.MixProject do
++end
+diff --git a/testdata/query_compact/project/scratch/probe.exs b/testdata/query_compact/project/scratch/probe.exs
+new file mode 100644
+index 0000000..bddd6e0
+--- /dev/null
++++ b/testdata/query_compact/project/scratch/probe.exs
+@@ -0,0 +1 @@
++Fx.Worker.fetch(9)
+diff --git a/testdata/query_compact/project/test/many_test.exs b/testdata/query_compact/project/test/many_test.exs
+new file mode 100644
+index 0000000..88e314b
+--- /dev/null
++++ b/testdata/query_compact/project/test/many_test.exs
+@@ -0,0 +1,15 @@
++defmodule Fx.ManyTest do
++  use ExUnit.Case
++
++  describe "a" do
++    test "same" do
++      Fx.Many.pick(1)
++    end
++  end
++
++  describe "b" do
++    test "same" do
++      Fx.Many.pick(1)
++    end
++  end
++end
+diff --git a/testdata/query_compact/project/test/worker_test.exs b/testdata/query_compact/project/test/worker_test.exs
+new file mode 100644
+index 0000000..31b2e58
+--- /dev/null
++++ b/testdata/query_compact/project/test/worker_test.exs
+@@ -0,0 +1,6 @@
++defmodule Fx.WorkerTest do
++  use ExUnit.Case
++  test "fetch default" do
++    assert Fx.Worker.fetch(1) == {1, []}
++  end
++end
+diff --git a/testdata/query_compact/references.golden b/testdata/query_compact/references.golden
+new file mode 100644
+index 0000000..a479041
+--- /dev/null
++++ b/testdata/query_compact/references.golden
+@@ -0,0 +1,13 @@
++query references lib/worker.ex 3 7
++cursor: fetch | def fetch(value, opts \\ []), do: {value, opts}
++10 rows: lib 8, scratch 1, test 1
++lib/caller.ex:6:12 | Worker.fetch(v)
++lib/caller.ex:7:12 | Worker.fetch(v, b: 2)
++lib/long.ex:2:25 | def go, do: Fx.Worker.fetch("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx … [clipped]
++lib/long.ex:3:26 | def tab, do: Fx.Worker.fetch(:tab)
++lib/worker.ex:11:15 | fetched = fetch(value)
++lib/worker.ex:12:13 | other = fetch(value, a: 1)
++lib/worker.ex:13:27 | héllo = "😀"; again = fetch(héllo)
++lib/worker.ex:17:23 | defp helper(x), do: fetch(x)
++scratch/probe.exs:1:11 | Fx.Worker.fetch(9)
++test/worker_test.exs:4:22 | assert Fx.Worker.fetch(1) == {1, []}
+diff --git a/testdata/query_compact/workspace.golden b/testdata/query_compact/workspace.golden
+new file mode 100644
+index 0000000..2e2267a
+--- /dev/null
++++ b/testdata/query_compact/workspace.golden
+@@ -0,0 +1,4 @@
++query workspace-symbols fetch
++2 rows: lib 2
++lib/worker.ex:3 Fx.Worker.fetch/1
++lib/worker.ex:3 Fx.Worker.fetch/2

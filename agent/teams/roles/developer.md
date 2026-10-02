@@ -6,6 +6,8 @@ Read [the shared agreement](../README.md) first.
 
 Own the branch, worktree and PR until merge; never switch issues earlier. Implement with AGENTS.md's integration-first TDD. For `agent/teams` changes, follow shared Checks.
 
+For Elixir work, use worktree-bound Dexter LSP and follow [AGENTS.md’s navigation rules](../../../AGENTS.md#tool-use).
+
 ## Assigned
 
 1. Confirm worktree and SHA and read the linked contract.
