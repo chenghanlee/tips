@@ -4,6 +4,7 @@ defmodule TipsWeb.UserLive.Settings do
   on_mount {TipsWeb.UserAuth, :require_sudo_mode}
 
   alias Tips.Accounts
+  alias TipsWeb.UserAuth
 
   @impl true
   def render(assigns) do
@@ -75,11 +76,18 @@ defmodule TipsWeb.UserLive.Settings do
     {:noreply, assign(socket, email_form: email_form)}
   end
 
-  def handle_event("update_email", params, socket) do
-    %{"user" => user_params} = params
-    user = socket.assigns.current_scope.user
-    true = Accounts.sudo_mode?(user)
+  def handle_event("update_email", %{"user" => user_params}, socket) do
+    with {:ok, socket} <- UserAuth.readmit(socket),
+         %{user: user} = socket.assigns.current_scope,
+         {:sudo, true} <- {:sudo, Accounts.sudo_mode?(user)} do
+      {:noreply, request_email_change(socket, user, user_params)}
+    else
+      {:error, :unauthenticated} -> {:noreply, UserAuth.require_login(socket)}
+      {:sudo, false} -> {:noreply, UserAuth.require_reauthentication(socket)}
+    end
+  end
 
+  defp request_email_change(socket, user, user_params) do
     case Accounts.change_user_email(user, user_params) do
       %{valid?: true} = changeset ->
         Accounts.deliver_user_update_email_instructions(
@@ -89,10 +97,10 @@ defmodule TipsWeb.UserLive.Settings do
         )
 
         info = "A link to confirm your email change has been sent to the new address."
-        {:noreply, socket |> put_flash(:info, info)}
+        put_flash(socket, :info, info)
 
       changeset ->
-        {:noreply, assign(socket, :email_form, to_form(changeset, action: :insert))}
+        assign(socket, :email_form, to_form(changeset, action: :insert))
     end
   end
 end

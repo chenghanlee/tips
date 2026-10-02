@@ -591,6 +591,21 @@ defmodule TipsWeb.UserAuthTest do
       assert [_per_request_authentication] = queries
     end
 
+    test "stacked mount hooks admit the session once", %{user: user} do
+      session = %{"user_token" => Accounts.generate_user_session_token(user)}
+
+      {{:cont, socket}, queries} =
+        token_queries(fn ->
+          {:cont, socket} =
+            UserAuth.on_mount(:require_authenticated, %{}, session, connected_socket())
+
+          UserAuth.on_mount(:require_sudo_mode, %{}, session, socket)
+        end)
+
+      assert [%SessionRef{}] = private_values(socket, SessionRef)
+      assert [_mount_admission] = queries
+    end
+
     test "renewal moves new mounts to the successor; the earlier socket stays admitted until logout",
          %{conn: conn, user: user} do
       token = Accounts.generate_user_session_token(user)

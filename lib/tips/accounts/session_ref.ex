@@ -3,9 +3,9 @@ defmodule Tips.Accounts.SessionRef do
   Server-private reference to the session row that admitted a LiveView.
 
   It holds the `users_tokens` row id and the mounted user id, never the bearer
-  token. Only Accounts creates it, from a session token it has just verified
-  (`get_scope_by_session_token/1`, #47). Re-admission (`readmit_scope/1`, #47)
-  queries that row, binds both ids and applies the session validity definition.
+  token. Only `Tips.Accounts.get_scope_by_session_token/1` creates it, from a
+  session token it has just verified. `Tips.Accounts.readmit_scope/1` queries
+  that row, binds both ids and applies the session validity definition.
 
   This struct is not a security proof. Never build it from request, event or
   job payloads. Keep it out of render assigns, templates, events, public

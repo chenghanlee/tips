@@ -158,10 +158,12 @@ defmodule TipsWeb.UserLive.SettingsTest do
       assert message == "You must log in to access this page."
     end
   end
+
   describe "connected settings cannot send email after revocation without disconnect" do
     setup :mounted_settings
 
     test "a revoked family is redirected to log in and nothing is sent", %{
+      conn: conn,
       lv: lv,
       user: user,
       token: token
@@ -169,10 +171,9 @@ defmodule TipsWeb.UserLive.SettingsTest do
       # Rows are deleted; the disconnect broadcast is never delivered to this socket.
       assert {:ok, [_family]} = Accounts.revoke_user_session_family(token)
 
-      assert {:error, {:redirect, %{to: to, flash: flash}}} = submit_email(lv)
+      assert {:ok, conn} = lv |> submit_email() |> follow_redirect(conn, ~p"/users/log-in")
 
-      assert to == ~p"/users/log-in"
-      assert %{"error" => "You must log in to access this page."} = flash
+      assert conn.resp_body =~ "You must log in to access this page."
       assert change_email_tokens(user) == []
     end
 
@@ -208,6 +209,7 @@ defmodule TipsWeb.UserLive.SettingsTest do
       {proof, _hashed} = generate_user_magic_link_token(other)
 
       switched = post(conn, ~p"/users/log-in", %{"user" => %{"token" => proof}})
+
       assert {%User{id: other_id}, _} =
                Accounts.get_user_by_session_token(get_session(switched, :user_token))
 
@@ -227,7 +229,7 @@ defmodule TipsWeb.UserLive.SettingsTest do
       forged = %{
         "user" => %{"email" => unique_user_email(), "id" => other.id},
         "user_id" => other.id,
-        "user_token" => other_token,
+        "user_token" => Base.url_encode64(other_token),
         "session_ref" => %{"token_id" => other_token_id, "user_id" => other.id}
       }
 
@@ -243,15 +245,24 @@ defmodule TipsWeb.UserLive.SettingsTest do
   describe "stale sudo redirects without a crash" do
     setup :mounted_settings
 
-    test "authentication older than the sudo window", %{lv: lv, user: user, token: token} do
-      override_token_authenticated_at(token, DateTime.add(DateTime.utc_now(:second), -21, :minute))
+    test "authentication older than the sudo window", %{
+      conn: conn,
+      lv: lv,
+      user: user,
+      token: token
+    } do
+      override_token_authenticated_at(
+        token,
+        DateTime.add(DateTime.utc_now(:second), -21, :minute)
+      )
 
-      assert {:error, {:redirect, %{to: to, flash: flash}}} = submit_email(lv)
+      ref = Process.monitor(lv.pid)
 
-      assert to == ~p"/users/log-in"
-      assert %{"error" => "You must re-authenticate to access this page."} = flash
+      assert {:ok, conn} = lv |> submit_email() |> follow_redirect(conn, ~p"/users/log-in")
+
+      assert conn.resp_body =~ "You must re-authenticate to access this page."
       assert change_email_tokens(user) == []
-      refute Process.alive?(lv.pid) and :sys.get_state(lv.pid) == :crashed
+      assert_receive {:DOWN, ^ref, :process, _pid, {:shutdown, _redirect}}
     end
   end
 
@@ -284,17 +295,23 @@ defmodule TipsWeb.UserLive.SettingsTest do
     end
 
     test "an existing socket cannot confirm with stale sudo", %{
+      conn: conn,
       lv: lv,
       user: user,
       token: token,
       confirmation: confirmation
     } do
-      override_token_authenticated_at(token, DateTime.add(DateTime.utc_now(:second), -11, :minute))
+      override_token_authenticated_at(
+        token,
+        DateTime.add(DateTime.utc_now(:second), -11, :minute)
+      )
 
-      assert {:error, {:redirect, %{to: "/users/log-in", flash: flash}}} =
-               live_redirect(lv, to: ~p"/users/settings/confirm-email/#{confirmation}")
+      assert {:ok, conn} =
+               lv
+               |> live_redirect(to: ~p"/users/settings/confirm-email/#{confirmation}")
+               |> follow_redirect(conn, ~p"/users/log-in")
 
-      assert %{"error" => "You must re-authenticate to access this page."} = flash
+      assert conn.resp_body =~ "You must re-authenticate to access this page."
       assert Repo.reload!(user).email == user.email
     end
 
@@ -304,13 +321,14 @@ defmodule TipsWeb.UserLive.SettingsTest do
       confirmation: confirmation
     } do
       Repo.update_all(from(u in User, where: u.id == ^user.id),
-        set: [deleted_at: DateTime.utc_now(:second)]
+        set: [deleted_at: DateTime.utc_now(:second), handle: nil, email: nil]
       )
 
       assert {:error, {:redirect, %{to: "/users/log-in"}}} =
                live(conn, ~p"/users/settings/confirm-email/#{confirmation}")
 
-      assert Repo.reload!(user).email == user.email
+      assert %User{email: nil} = Repo.reload!(user)
+      assert [%UserToken{}] = change_email_tokens(user)
     end
 
     test "a current session confirms from an existing socket", %{
@@ -344,7 +362,8 @@ defmodule TipsWeb.UserLive.SettingsTest do
     end
 
     test "a privileged submit runs one admission query", %{lv: lv} do
-      assert [_readmission] = token_queries(lv, fn -> submit_email(lv) end) |> Enum.filter(&(&1 =~ "SELECT"))
+      assert [_readmission] =
+               token_queries(lv, fn -> submit_email(lv) end) |> Enum.filter(&(&1 =~ "SELECT"))
     end
 
     test "the reference stays in private state; no bearer or reference is rendered", %{

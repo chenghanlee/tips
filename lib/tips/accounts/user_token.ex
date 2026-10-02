@@ -59,28 +59,39 @@ defmodule Tips.Accounts.UserToken do
   def session_validity_in_days, do: @session_validity_in_days
 
   @doc """
-  Checks if the token is valid and returns its underlying lookup query.
-
-  The query returns the user found by the token, if any, along with the token's creation time.
-
-  The token is valid if it matches the value in the database and it has
-  not expired (after @session_validity_in_days).
+  Returns the query for the unexpired session row matching the bearer `token`.
   """
-  def verify_session_token_query(token) do
-    query =
-      from token in valid_session_token_query(token),
-        join: user in assoc(token, :user),
-        select: {%{user | authenticated_at: token.authenticated_at}, token.inserted_at}
-
-    {:ok, query}
+  def valid_session_token_query(token) do
+    valid_session(from token in UserToken, where: token.token == ^token)
   end
 
   @doc """
-  Returns the query for the unexpired session row matching `token`.
+  Returns the query for the unexpired session row with id `token_id` that
+  belongs to `user_id`.
   """
-  def valid_session_token_query(token) do
-    from token in by_token_and_context_query(token, "session"),
-      where: token.inserted_at > ^cutoff("session")
+  def valid_session_row_query(token_id, user_id) do
+    valid_session(
+      from token in UserToken, where: token.id == ^token_id and token.user_id == ^user_id
+    )
+  end
+
+  # The session validity definition: a "session" row that has not expired.
+  defp valid_session(query) do
+    from token in query,
+      where: token.context == "session" and token.inserted_at > ^cutoff("session")
+  end
+
+  @doc """
+  Turns a valid-session query into the admission lookup.
+
+  It returns `{user, token_id, token_inserted_at}` for an undeleted account.
+  The user carries current account state and the row's `authenticated_at`.
+  """
+  def admission_query(valid_session_query) do
+    from token in valid_session_query,
+      join: user in assoc(token, :user),
+      where: is_nil(user.deleted_at),
+      select: {%{user | authenticated_at: token.authenticated_at}, token.id, token.inserted_at}
   end
 
   @doc """

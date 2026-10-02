@@ -76,11 +76,13 @@ defmodule Tips.Accounts.AdmissionContractTest do
     # Moderation action: fresh admission, then eligibility on the locked account.
     def moderate(%SessionRef{} = ref) do
       with {:ok, %Scope{user: %User{id: user_id}}} <- Accounts.readmit_scope(ref) do
-        Repo.transact(fn ->
-          with :ok <- user_id |> lock_account() |> Accounts.check_eligibility(:moderate) do
-            {:ok, :moderated}
-          end
-        end)
+        Repo.transact(fn -> moderate_locked(user_id) end)
+      end
+    end
+
+    defp moderate_locked(user_id) do
+      with :ok <- user_id |> lock_account() |> Accounts.check_eligibility(:moderate) do
+        {:ok, :moderated}
       end
     end
 
@@ -210,7 +212,9 @@ defmodule Tips.Accounts.AdmissionContractTest do
     end
 
     test "a row in another context is rejected", %{token: token, ref: ref} do
-      Repo.update_all(from(t in UserToken, where: t.token == ^token), set: [context: "login"])
+      Repo.update_all(from(t in UserToken, where: t.token == ^token),
+        set: [context: "login", session_family_id: nil, authenticated_at: nil]
+      )
 
       assert {:error, :unauthenticated} = Accounts.readmit_scope(ref)
     end
@@ -294,12 +298,12 @@ defmodule Tips.Accounts.AdmissionContractTest do
       assert {:ok, %Scope{user: %User{role: :user, ban: nil, confirmed_at: %DateTime{}}}} =
                Accounts.readmit_scope(ref)
 
-      user |> moderator() |> ban()
+      banned = user |> moderator() |> ban()
 
       assert {:ok, %Scope{user: %User{role: :moderator, ban: :full}}} =
                Accounts.readmit_scope(ref)
 
-      update_user(user, role: :user, ban: nil, banned_at: nil, confirmed_at: nil)
+      update_user(banned, role: :user, ban: nil, banned_at: nil, confirmed_at: nil)
 
       assert {:ok, %Scope{user: %User{role: :user, ban: nil, confirmed_at: nil}}} =
                Accounts.readmit_scope(ref)
@@ -322,9 +326,9 @@ defmodule Tips.Accounts.AdmissionContractTest do
 
     test "a moderator read follows the current role", %{user: user, ref: ref} do
       assert {:error, :forbidden} = CallerExamples.read_moderation_queue(ref)
-      moderator(user)
+      promoted = moderator(user)
       assert {:ok, :queue} = CallerExamples.read_moderation_queue(ref)
-      update_user(user, role: :user)
+      update_user(promoted, role: :user)
       assert {:error, :forbidden} = CallerExamples.read_moderation_queue(ref)
     end
   end
@@ -582,11 +586,10 @@ defmodule Tips.Accounts.AdmissionContractTest do
       %{user: user} = admitted()
       args = %{"user_id" => user.id}
 
-      ban(user)
+      banned = ban(user)
       assert {:error, :forbidden} = CallerExamples.perform_worker(args)
 
-      update_user(user, ban: nil, banned_at: nil)
-      soft_delete(user)
+      banned |> update_user(ban: nil, banned_at: nil) |> soft_delete()
       assert {:error, :unauthenticated} = CallerExamples.perform_worker(args)
     end
   end

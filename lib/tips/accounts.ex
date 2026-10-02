@@ -25,11 +25,12 @@ defmodule Tips.Accounts do
 
   ### Session validity
 
-  `get_user_by_session_token/1`, through
-  `Tips.Accounts.UserToken.verify_session_token_query/1`, is the only session
-  validity definition: a matching `"session"` row that has not expired.
-  Deleting the row revokes it. Controllers, LiveViews, renewal and pruning
-  reuse it; do not add a second expiry constant or query.
+  `Tips.Accounts.UserToken` holds the only session validity definition: a
+  `"session"` row that has not expired. Deleting the row revokes it. Bearer
+  lookup, row-reference lookup, renewal and pruning reuse it; do not add a
+  second expiry constant or query. Admission
+  (`Tips.Accounts.UserToken.admission_query/1`) also requires an undeleted
+  account.
 
   ### Session revocation
 
@@ -51,22 +52,26 @@ defmodule Tips.Accounts do
   lost. Inside a caller's transaction these helpers join it and roll back with
   it. Lock participating accounts in ascending id order before calling them.
 
-  ### Runtime admission (#47, not implemented yet)
+  ### Runtime admission
 
-  These signatures are reserved. They do not exist yet.
+    * `get_scope_by_session_token/1` admits a bearer token. Controllers call
+      it on every request and LiveViews call it at mount, through
+      `TipsWeb.UserAuth`. It returns the scope and a
+      `Tips.Accounts.SessionRef` to the admitting row.
+    * `readmit_scope/1` admits that reference again. It queries the referenced
+      row, binds the row id and the mounted user id, applies the same validity
+      definition and loads current account state: role, ban, confirmation and
+      the row's authentication recency.
 
-    * `get_scope_by_session_token(token)` returns
-      `{:ok, Scope.t(), SessionRef.t(), token_inserted_at}` or
-      `{:error, :unauthenticated}`. It uses the validity definition above and
-      also rejects deleted accounts.
-    * `readmit_scope(session_ref)` returns `{:ok, Scope.t()}` or
-      `{:error, :unauthenticated}`. It queries the referenced row, binds both
-      ids, applies the same validity definition and loads current account
-      state.
+  Both return `{:error, :unauthenticated}` for an expired or revoked session,
+  a deleted account and malformed input.
 
-  A LiveView keeps its `SessionRef` in private state and re-admits before
-  every mutation and privileged read. Controllers keep per-request
-  authentication.
+  A LiveView keeps its `SessionRef` in private state and re-admits with
+  `TipsWeb.UserAuth.readmit/1` before every mutation and privileged read.
+  Controllers keep per-request authentication. Rendering, form validation and
+  public reads run no token query. Work admitted before a revocation may
+  finish. Admission is not eligibility: a full ban or missing confirmation
+  never fails admission.
 
   ### Operation eligibility
 
@@ -105,7 +110,7 @@ defmodule Tips.Accounts do
   import Ecto.Query, warn: false
   alias Tips.Repo
 
-  alias Tips.Accounts.{User, UserNotifier, UserToken}
+  alias Tips.Accounts.{Scope, SessionRef, User, UserNotifier, UserToken}
 
   @typedoc "Standard rejection reasons for business operations, or invalid input."
   @type operation_error ::
@@ -119,6 +124,9 @@ defmodule Tips.Accounts do
   @type operation_result(value) :: {:ok, value} | {:error, operation_error()}
 
   @type operation :: :contribute | :moderate | :delete_own_content | :delete_account
+
+  # Positive bigint ids; anything else cannot name a row.
+  @row_ids 1..9_223_372_036_854_775_807
 
   ## Eligibility
 
@@ -384,15 +392,63 @@ defmodule Tips.Accounts do
   end
 
   @doc """
-  Gets the user with the given signed token.
+  Admits the bearer of a session token.
 
-  If the token is valid `{user, token_inserted_at}` is returned, otherwise `nil` is returned.
-  This is the session validity definition; see the "Admission contract" section.
+  Returns the current scope, the private reference to the admitting row and
+  the row's insertion time. See "Runtime admission" in the module
+  documentation.
+  """
+  @spec get_scope_by_session_token(term()) ::
+          {:ok, Scope.t(), SessionRef.t(), DateTime.t()} | {:error, :unauthenticated}
+  def get_scope_by_session_token(token) when is_binary(token) do
+    with {:ok, %Scope{user: user} = scope, token_id, token_inserted_at} <-
+           admit(UserToken.valid_session_token_query(token)) do
+      {:ok, scope, %SessionRef{token_id: token_id, user_id: user.id}, token_inserted_at}
+    end
+  end
+
+  def get_scope_by_session_token(_token), do: {:error, :unauthenticated}
+
+  @doc """
+  Admits a mounted session again and returns its current scope.
+
+  The reference must be the one `get_scope_by_session_token/1` returned.
+  Anything else, including ids outside the database range, is rejected. See
+  "Runtime admission" in the module documentation.
+  """
+  @spec readmit_scope(term()) :: {:ok, Scope.t()} | {:error, :unauthenticated}
+  def readmit_scope(%SessionRef{token_id: token_id, user_id: user_id})
+      when token_id in @row_ids and user_id in @row_ids do
+    with {:ok, scope, _token_id, _token_inserted_at} <-
+           admit(UserToken.valid_session_row_query(token_id, user_id)) do
+      {:ok, scope}
+    end
+  end
+
+  def readmit_scope(_session_ref), do: {:error, :unauthenticated}
+
+  defp admit(valid_session_query) do
+    case Repo.one(UserToken.admission_query(valid_session_query)) do
+      {%User{} = user, token_id, token_inserted_at} ->
+        {:ok, Scope.for_user(user), token_id, token_inserted_at}
+
+      nil ->
+        {:error, :unauthenticated}
+    end
+  end
+
+  @doc """
+  Gets the user with the given session token.
+
+  Returns `{user, token_inserted_at}` when `get_scope_by_session_token/1`
+  admits the token, otherwise `nil`.
   """
   @spec get_user_by_session_token(binary()) :: {User.t(), DateTime.t()} | nil
   def get_user_by_session_token(token) do
-    {:ok, query} = UserToken.verify_session_token_query(token)
-    Repo.one(query)
+    case get_scope_by_session_token(token) do
+      {:ok, %Scope{user: user}, _session_ref, token_inserted_at} -> {user, token_inserted_at}
+      {:error, :unauthenticated} -> nil
+    end
   end
 
   @doc """
