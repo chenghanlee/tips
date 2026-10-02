@@ -333,7 +333,7 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
       refute log =~ proof, "log contains the magic-link proof"
     end
 
-    test "other paths keep the framework's request lines", %{conn: conn} do
+    test "routes without a token keep their request path and status lines", %{conn: conn} do
       log = logged(:info, fn -> assert conn |> get(~p"/users/settings") |> html_response(200) end)
 
       assert log =~ "GET /users/settings"

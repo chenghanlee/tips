@@ -1,55 +1,54 @@
 defmodule TipsWeb.RequestLogger do
   @moduledoc """
-  Endpoint request lines for routes that carry a credential in the path.
+  The endpoint's request lines, written only from what the router decided.
 
-  Phoenix's endpoint logger prints the full request path. The magic-link and
-  email-confirmation routes carry their token as a path segment, so for any
-  route with a `token` path parameter `level/1` turns that logger off and this
-  one logs the route pattern in place of the path:
+  Phoenix's endpoint logger prints the raw request path when the request
+  starts, before routing. The magic-link and email-confirmation routes carry
+  their token as a path segment, and any check made before routing can
+  disagree with the router (HEAD handling, percent-decoding, empty segments).
+  So the endpoint's `Plug.Telemetry` has `log: false` and this module logs:
 
       GET /users/log-in/:token
       Sent 200 in 12ms
 
-  Every other request keeps Phoenix's own lines. Endpoint telemetry is
-  unchanged for all requests.
+  The first line is written when the router dispatches, from its own match:
+  the route pattern when the route has a `token` path parameter, the request
+  path otherwise. The method is the one the router matched, so a HEAD request
+  logs as GET. The second line is written for every request. A request the
+  router does not serve gets no path line: its path is never logged.
+
+  Endpoint and router telemetry are unchanged.
   """
 
   require Logger
 
-  @events [[:phoenix, :endpoint, :start], [:phoenix, :endpoint, :stop]]
+  @events [[:phoenix, :router_dispatch, :start], [:phoenix, :endpoint, :stop]]
 
   @doc "Attaches the logger. Call it once, when the application starts."
   def attach do
     :telemetry.attach_many(__MODULE__, @events, &__MODULE__.handle_event/4, nil)
   end
 
-  @doc """
-  The `Plug.Telemetry` `:log` option of the endpoint: `false` for a request
-  this module logs, `:info` otherwise.
-  """
-  @spec level(Plug.Conn.t()) :: Logger.level() | false
-  def level(conn), do: if(credential_route(conn), do: false, else: :info)
-
   @doc false
-  def handle_event([:phoenix, :endpoint, :start], _measurements, %{conn: conn}, _config) do
-    if route = credential_route(conn), do: Logger.info([conn.method, ?\s, route])
+  def handle_event([:phoenix, :router_dispatch, :start], _measurements, metadata, _config) do
+    %{conn: conn, route: route, path_params: path_params} = metadata
+    Logger.info([conn.method, ?\s, logged_path(conn, route, path_params)])
   end
 
   def handle_event([:phoenix, :endpoint, :stop], %{duration: duration}, %{conn: conn}, _config) do
-    if credential_route(conn) do
-      milliseconds = System.convert_time_unit(duration, :native, :millisecond)
-      Logger.info("Sent #{conn.status} in #{milliseconds}ms")
-    end
+    Logger.info("Sent #{conn.status} in #{format_duration(duration)}")
   end
 
-  # The route pattern when a path parameter of the matched route is a token.
-  defp credential_route(%Plug.Conn{method: method, request_path: path, host: host}) do
-    with %{route: route, path_params: path_params} <-
-           Phoenix.Router.route_info(TipsWeb.Router, method, path, host),
-         true <- Enum.any?(Map.keys(path_params), &String.contains?(&1, "token")) do
-      route
-    else
-      _no_route_or_no_token -> nil
+  defp logged_path(conn, route, path_params) do
+    if Enum.any?(Map.keys(path_params), &String.contains?(&1, "token")),
+      do: route,
+      else: conn.request_path
+  end
+
+  defp format_duration(native) do
+    case System.convert_time_unit(native, :native, :microsecond) do
+      microseconds when microseconds >= 1000 -> "#{div(microseconds, 1000)}ms"
+      microseconds -> "#{microseconds}µs"
     end
   end
 end
