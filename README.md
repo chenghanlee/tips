@@ -48,7 +48,7 @@ criteria and review evidence in the relevant GitHub issue and PR.
   role under `agent/teams/roles/`; [setup](agent/teams/SETUP.md) covers prerequisites and
   configuration.
 - [Elixir language server](agent/lsp/README.md): one shared Dexter server per worktree,
-  native in Claude and a CLI in Codex.
+  used as a CLI by Claude and Codex.
 
 Agent tooling is separate from the application. You do not need it to run Tips.
 

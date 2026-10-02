@@ -59,11 +59,11 @@ Do not run it while another live agent owns `lead-tpm`. The lead TPM starts and 
 
 ## Configuration
 
-Edit [config.toml](config.toml): team limits; client/model/effort per role; port/database allocation; permissions; coordinator compaction; time budgets. Scripts read the canonical main checkout's file. Use `TIPS_TEAM_CONFIG=/absolute/path` for staged configuration in a disposable pilot. Settings apply next launch. `timeouts.dexter_startup_seconds` bounds the index wait of the provisioning warm-up and of each Claude LSP start; it does not require rebuilding Dexter. The same value limits Elixir version detection and the daemon stop at retirement: a run that exceeds it is ended, even a valid slow one. `roles.lead_ui` sets the client, model and effort only; a UI lead uses `roles.lead`'s port and database.
+Edit [config.toml](config.toml): team limits; client/model/effort per role; port/database allocation; permissions; coordinator compaction; time budgets. Scripts read the canonical main checkout's file. Use `TIPS_TEAM_CONFIG=/absolute/path` for staged configuration in a disposable pilot. Settings apply next launch. `timeouts.dexter_startup_seconds` bounds the index wait of the provisioning warm-up; it does not require rebuilding Dexter. The same value limits Elixir version detection and the daemon stop at retirement: a run that exceeds it is ended, even a valid slow one. `roles.lead_ui` sets the client, model and effort only; a UI lead uses `roles.lead`'s port and database.
 
-Codex uses the generated `$TIPS_DEXTER` command; Claude uses its native LSP tool
-through the generated plugin. Existing shell approval and sandbox policies remain
-in force; no MCP-specific permission exception is added. Claude uses the configured permission mode. The lead TPM runs without LSP;
+Claude and Codex both use the generated `$TIPS_DEXTER` command from their shell tool.
+Existing shell approval and sandbox policies remain in force; no permission exception
+is added. Claude uses the configured permission mode. The lead TPM runs without Dexter;
 coding launches do not inherit its compaction setting.
 
 | Allocation | Components |
@@ -71,7 +71,7 @@ coding launches do not inherit its compaction setting.
 | Database suffix | `team.db_suffix_prefix`, team number, `roles.<role>.db_suffix` |
 | Test port | `team.port_base` + team number × `team.port_stride` + role `port_offset` |
 
-Generated worktree files point at the shared Dexter binary; reviewed revisions need not contain the build. The helper warms up Dexter even when invoked without `--start`. For staged pilots, `TIPS_DEXTER_HOME` selects the shared build directory. Configuration/tooling changes require disposable pilots verifying both client and LSP roots in each actual client. Before scaling, measure simultaneous cold-start capacity; configured team limits do not verify it.
+Generated worktree files point at the shared Dexter binary; reviewed revisions need not contain the build. The helper fetches locked dependencies and warms up Dexter even when invoked without `--start`. For staged pilots, `TIPS_DEXTER_HOME` selects the shared build directory. Configuration/tooling changes require disposable pilots verifying both the client root and the `TIPS_DEXTER` root in each actual client. Before scaling, measure simultaneous cold-start capacity; configured team limits do not verify it.
 
 Set database connection limits in [compose.yaml](../../compose.yaml), overridden by `TIPS_DB_MAX_CONNECTIONS`. Recreate the database service to apply changes, only with no teams running. Agent launch settings never restart PostgreSQL or existing clients.
 
