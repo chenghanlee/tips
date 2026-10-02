@@ -3,7 +3,8 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
   Debug-level log evidence for #47: the session bearer and the private row
   reference never reach the logs on the admission paths.
 
-  Not async: it lowers the global Logger level while it captures.
+  Not async: `logged/2` lowers the global Logger level while it captures, and
+  restores it before returning.
   """
   use TipsWeb.ConnCase, async: false
 
@@ -15,11 +16,15 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
   alias Tips.Accounts.{SessionRef, UserToken}
   alias Tips.Repo
 
-  setup %{conn: conn} do
-    level = Logger.level()
-    Logger.configure(level: :debug)
-    on_exit(fn -> Logger.configure(level: level) end)
+  # A LiveView outside `TipsWeb.live_view/0`, as LiveDashboard's pages are.
+  defmodule PlainLive do
+    use Phoenix.LiveView
 
+    def render(assigns), do: ~H"<p id=\"plain\">plain</p>"
+  end
+
+  # Fixtures run at the configured level; only `logged/2` lowers it.
+  setup %{conn: conn} do
     user = user_fixture()
     conn = log_in_user(conn, user)
     token = get_session(conn, :user_token)
@@ -34,14 +39,14 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
   end
 
   test "controller bearer admission logs the request, not the bearer", %{conn: conn} = context do
-    log = capture_log(fn -> assert conn |> get(~p"/users/settings") |> html_response(200) end)
+    log = logged(fn -> assert conn |> get(~p"/users/settings") |> html_response(200) end)
 
     assert log =~ "GET /users/settings"
     assert_private(log, context)
   end
 
   test "a connected settings mount logs the view, not its session", %{conn: conn} = context do
-    log = capture_log(fn -> assert {:ok, _lv, _html} = live(conn, ~p"/users/settings") end)
+    log = logged(fn -> assert {:ok, _lv, _html} = live(conn, ~p"/users/settings") end)
 
     assert log =~ "MOUNT TipsWeb.UserLive.Settings"
     assert_private(log, context)
@@ -52,7 +57,7 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
     {:ok, lv, _html} = live(conn, ~p"/users/settings")
 
     log =
-      capture_log(fn ->
+      logged(fn ->
         assert lv
                |> form("#email_form", %{"user" => %{"email" => unique_user_email()}})
                |> render_submit() =~ "A link to confirm your email"
@@ -76,7 +81,7 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
     }
 
     log =
-      capture_log(fn ->
+      logged(fn ->
         for event <- [&render_change/2, &render_submit/2] do
           assert lv |> element("#email_form") |> event.(forged) =~ "must have the @ sign"
         end
@@ -95,7 +100,7 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
     Repo.update_all(UserToken, set: [inserted_at: backdated])
 
     {renewed, log} =
-      with_log(fn ->
+      logged_result(fn ->
         renewed = get(conn, ~p"/users/settings")
         assert html_response(renewed, 200)
         assert renewed |> delete(~p"/users/log-out") |> redirected_to() == ~p"/"
@@ -119,7 +124,9 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
     {proof, _hashed} = generate_user_magic_link_token(user)
 
     {conn, log} =
-      with_log(fn -> post(build_conn(), ~p"/users/log-in", %{"user" => %{"token" => proof}}) end)
+      logged_result(fn ->
+        post(build_conn(), ~p"/users/log-in", %{"user" => %{"token" => proof}})
+      end)
 
     assert log =~ "POST /users/log-in"
     assert log =~ "[FILTERED]"
@@ -129,6 +136,104 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
       token: get_session(conn, :user_token),
       ref: %SessionRef{token_id: 0, user_id: 0}
     })
+  end
+
+  describe "credential URL segments" do
+    for level <- [:info, :debug] do
+      test "magic-link GET at #{level} logs the route, not the proof", %{user: user} do
+        {proof, _hashed} = generate_user_magic_link_token(user)
+
+        log =
+          logged(unquote(level), fn ->
+            assert build_conn() |> get(~p"/users/log-in/#{proof}") |> html_response(200)
+          end)
+
+        assert log =~ "GET /users/log-in/:token"
+        assert log =~ "Sent 200 in"
+        refute log =~ proof, "log contains the magic-link proof"
+        # The page only rendered; the logged request left the proof usable.
+        assert {:ok, %{session_token: _}} = Accounts.login_user_by_magic_link(proof)
+      end
+
+      test "email-confirmation GET at #{level} logs the route, not the token",
+           %{conn: conn, user: user} = context do
+        email = unique_user_email()
+
+        confirmation =
+          extract_user_token(fn url ->
+            Accounts.deliver_user_update_email_instructions(
+              %{user | email: email},
+              user.email,
+              url
+            )
+          end)
+
+        log =
+          logged(unquote(level), fn ->
+            assert conn
+                   |> get(~p"/users/settings/confirm-email/#{confirmation}")
+                   |> redirected_to() == ~p"/users/settings"
+          end)
+
+        assert log =~ "GET /users/settings/confirm-email/:token"
+        assert log =~ "Sent 302 in"
+        refute log =~ confirmation, "log contains the email-change token"
+        assert Repo.reload!(user).email == email
+        assert_private(log, context)
+      end
+    end
+
+    test "connected mounts on credential routes log the view only", %{conn: conn, user: user} do
+      {proof, _hashed} = generate_user_magic_link_token(user)
+
+      log =
+        logged(fn ->
+          assert {:ok, _lv, _html} = live(build_conn(), ~p"/users/log-in/#{proof}")
+        end)
+
+      assert log =~ "MOUNT TipsWeb.UserLive.Confirmation"
+      refute log =~ proof, "log contains the magic-link proof"
+
+      log = logged(fn -> assert conn |> get(~p"/users/log-in/#{proof}") |> html_response(200) end)
+      refute log =~ proof, "log contains the magic-link proof"
+    end
+
+    test "other paths keep the framework's request lines", %{conn: conn} do
+      log = logged(:info, fn -> assert conn |> get(~p"/users/settings") |> html_response(200) end)
+
+      assert log =~ "GET /users/settings"
+      assert log =~ "Sent 200 in"
+      refute log =~ ":token"
+    end
+  end
+
+  test "a LiveView outside the TipsWeb macro does not log its session",
+       %{conn: conn, token: token} = context do
+    assert PlainLive.__live__().log == Phoenix.LiveDashboard.PageLive.__live__().log
+
+    log =
+      logged(fn ->
+        assert {:ok, _lv, _html} =
+                 live_isolated(conn, PlainLive, session: %{"user_token" => token})
+      end)
+
+    assert log =~ "MOUNT TipsWeb.AdmissionLogPrivacyTest.PlainLive"
+    refute log =~ "Session:"
+    assert_private(log, context)
+  end
+
+  # Captures `fun`'s log at `level`, then restores the previous level.
+  defp logged(level \\ :debug, fun), do: fun |> logged_result(level) |> elem(1)
+
+  defp logged_result(fun, level \\ :debug) do
+    previous = Logger.level()
+    Logger.configure(level: level)
+
+    try do
+      with_log(fun)
+    after
+      Logger.configure(level: previous)
+    end
   end
 
   # Failure messages name the leak; they never print the log or the values.
