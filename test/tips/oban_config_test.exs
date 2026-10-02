@@ -30,4 +30,11 @@ defmodule Tips.ObanConfigTest do
     assert %{queue: "maintenance", max_attempts: 1} =
              ExpireRegistrations.new(%{}).changes
   end
+
+  test "terminal jobs are pruned after seven days" do
+    config = Keyword.put(Application.fetch_env!(:tips, Oban), :testing, :disabled)
+
+    assert %Oban.Config{plugins: plugins} = Oban.Config.new(config)
+    assert {Oban.Pruner, max_age: {7, :days}} = List.keyfind(plugins, Oban.Pruner, 0)
+  end
 end
