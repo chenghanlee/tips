@@ -85,7 +85,11 @@ defmodule TipsWeb.UserLive.Confirmation do
     else
       {:ok,
        socket
-       |> put_flash(:error, "Magic link is invalid or it has expired.")
+       |> put_flash(
+         :error,
+         "Magic link is invalid or it has expired. " <>
+           "If you signed up more than seven days ago without confirming, register again."
+       )
        |> push_navigate(to: ~p"/users/log-in")}
     end
   end

@@ -10,6 +10,8 @@ defmodule TipsWeb.UserSessionControllerTest do
   alias Tips.Repo
 
   @remember_me_cookie "_tips_web_user_remember_me"
+  @invalid_link "The link is invalid or it has expired. " <>
+                  "If you signed up more than seven days ago without confirming, register again."
 
   setup do
     %{unconfirmed_user: unconfirmed_user_fixture(), user: user_fixture()}
@@ -29,7 +31,7 @@ defmodule TipsWeb.UserSessionControllerTest do
         assert redirected_to(conn) == ~p"/users/log-in"
 
         assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
-                 "The link is invalid or it has expired."
+                 @invalid_link
 
         refute get_session(conn, :user_token)
         refute conn.resp_cookies["_tips_web_user_remember_me"]
@@ -58,7 +60,7 @@ defmodule TipsWeb.UserSessionControllerTest do
         assert redirected_to(conn) == ~p"/users/log-in"
 
         assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
-                 "The link is invalid or it has expired."
+                 @invalid_link
 
         refute get_session(conn, :user_token)
         assert all_tokens() == tokens
@@ -162,6 +164,30 @@ defmodule TipsWeb.UserSessionControllerTest do
       assert response =~ ~p"/users/log-out"
     end
 
+    test "expired registration cannot establish a session and offers restart signup", %{
+      conn: conn,
+      unconfirmed_user: user
+    } do
+      {token, _hashed_token} = generate_user_magic_link_token(user)
+      set_registration_deadline(user, 0)
+      tokens = all_tokens()
+
+      conn =
+        post(conn, ~p"/users/log-in", %{
+          "user" => %{"token" => token, "remember_me" => "true"},
+          "_action" => "confirmed"
+        })
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) == @invalid_link
+      refute get_session(conn, :user_token)
+      refute conn.resp_cookies[@remember_me_cookie]
+      refute Accounts.get_user!(user.id).confirmed_at
+      assert all_tokens() == tokens
+
+      assert conn |> get(~p"/users/log-in") |> html_response(200) =~ ~s|href="/users/register"|
+    end
+
     test "redirects to login page when magic link is invalid", %{conn: conn} do
       conn =
         post(conn, ~p"/users/log-in", %{
@@ -169,7 +195,7 @@ defmodule TipsWeb.UserSessionControllerTest do
         })
 
       assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
-               "The link is invalid or it has expired."
+               @invalid_link
 
       assert redirected_to(conn) == ~p"/users/log-in"
     end
@@ -266,7 +292,7 @@ defmodule TipsWeb.UserSessionControllerTest do
         assert redirected_to(rejected) == ~p"/users/log-in"
 
         assert Phoenix.Flash.get(rejected.assigns.flash, :error) ==
-                 "The link is invalid or it has expired."
+                 @invalid_link
 
         assert get_session(rejected, :user_token) == token
         assert all_tokens() == tokens
