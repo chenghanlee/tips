@@ -12,6 +12,7 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
   import Phoenix.LiveViewTest
   import Tips.AccountsFixtures
 
+  alias Phoenix.LiveDashboard.PageLive
   alias Tips.Accounts
   alias Tips.Accounts.{SessionRef, UserToken}
   alias Tips.Repo
@@ -20,6 +21,7 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
   defmodule PlainLive do
     use Phoenix.LiveView
 
+    def mount(_params, _session, socket), do: {:ok, socket}
     def render(assigns), do: ~H"<p id=\"plain\">plain</p>"
   end
 
@@ -198,6 +200,25 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
       refute log =~ proof, "log contains the magic-link proof"
     end
 
+    test "malformed and unrouted paths neither crash nor detach the request logger", %{
+      user: user
+    } do
+      for path <- [
+            "/users/log-in/%ZZ",
+            "/users/log-in/%00",
+            "/no/such/route",
+            "/users/log-in/a/b"
+          ] do
+        assert %Plug.Conn{status: status} = get(build_conn(), path)
+        assert status < 500
+      end
+
+      {proof, _hashed} = generate_user_magic_link_token(user)
+      log = logged(:info, fn -> get(build_conn(), ~p"/users/log-in/#{proof}") end)
+      assert log =~ "GET /users/log-in/:token"
+      refute log =~ proof, "log contains the magic-link proof"
+    end
+
     test "other paths keep the framework's request lines", %{conn: conn} do
       log = logged(:info, fn -> assert conn |> get(~p"/users/settings") |> html_response(200) end)
 
@@ -209,7 +230,7 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
 
   test "a LiveView outside the TipsWeb macro does not log its session",
        %{conn: conn, token: token} = context do
-    assert PlainLive.__live__().log == Phoenix.LiveDashboard.PageLive.__live__().log
+    assert PlainLive.__live__().log == PageLive.__live__().log
 
     log =
       logged(fn ->

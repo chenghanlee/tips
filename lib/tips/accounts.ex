@@ -70,8 +70,9 @@ defmodule Tips.Accounts do
   `TipsWeb.UserAuth.readmit/1` before every mutation and privileged read.
   Controllers keep per-request authentication. Rendering, form validation and
   public reads run no token query. Queries that bind the bearer or the
-  reference are not logged, and `TipsWeb.LiveLogger` logs LiveView callbacks
-  without the session or payloads. Work admitted before a revocation may
+  reference are not logged, `TipsWeb.LiveLogger` logs LiveView callbacks
+  without the session or payloads, and `TipsWeb.RequestLogger` logs the route
+  pattern for paths that carry a token. Work admitted before a revocation may
   finish. Admission is not eligibility: a full ban or missing confirmation
   never fails admission.
 
