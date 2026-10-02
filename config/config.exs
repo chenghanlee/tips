@@ -28,7 +28,8 @@ config :tips, Tips.Repo, timeout: 2_000
 
 config :tips, Oban,
   repo: Tips.Repo,
-  queues: [media: 1, embeddings: 1, maintenance: 1]
+  queues: [media: 1, embeddings: 1, maintenance: 1],
+  cron: [crontab: [{"* * * * *", Tips.Workers.ExpireRegistrations}]]
 
 # Admission limits (Tips.AdmissionLimiter): {limit, window_ms} per bucket.
 # MVP defaults chosen to allow ordinary use, not measured capacity. Windows are
