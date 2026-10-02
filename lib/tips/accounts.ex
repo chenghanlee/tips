@@ -52,6 +52,27 @@ defmodule Tips.Accounts do
   lost. Inside a caller's transaction these helpers join it and roll back with
   it. Lock participating accounts in ascending id order before calling them.
 
+  ### Registration deadline
+
+  An unconfirmed registration expires seven days after its original
+  `inserted_at`. Nothing moves that timestamp: resending a link and confirming
+  leave it alone. `Tips.Accounts.User.registration_expired/1` is the only
+  definition of the deadline, and three operations enforce it on the same
+  account row:
+
+    * `login_user_by_magic_link/2` rejects a link to an expired registration,
+      even when cleanup has not run.
+    * `register_user/1` reclaims expired registrations that hold the requested
+      email or handle.
+    * `expire_unconfirmed_users/1` deletes expired registrations in bounded
+      maintenance batches.
+
+  Each locks the account, then judges confirmation and the deadline in a later
+  statement against the database wall clock. Whichever commits first decides:
+  a confirmed account is never deleted, and a deleted registration's tokens go
+  with it, so they cannot authenticate the account that replaces it. Reclaim
+  and cleanup lock several accounts in ascending id order, as login does.
+
   ### Runtime admission
 
     * `get_scope_by_session_token/1` admits a bearer token. Controllers call
@@ -111,9 +132,13 @@ defmodule Tips.Accounts do
   """
 
   import Ecto.Query, warn: false
+  import Tips.Accounts.User, only: [registration_expired: 1]
+
   alias Tips.Repo
 
   alias Tips.Accounts.{Scope, SessionRef, User, UserNotifier, UserToken}
+
+  require Logger
 
   @typedoc "Standard rejection reasons for business operations, or invalid input."
   @type operation_error ::
@@ -217,6 +242,15 @@ defmodule Tips.Accounts do
   @doc """
   Registers a user.
 
+  An expired registration that holds the requested email or handle is
+  reclaimed first, in the same transaction as the insert: if the insert then
+  fails, nothing is deleted. Invalid input deletes nothing either. See
+  "Registration deadline" in the module documentation.
+
+  Returns `{:error, :registration_invariant}` when a reclaimed account still
+  has contributions. That is an operational failure, not a taken email or
+  handle: nothing is deleted and the caller keeps the submitted input.
+
   ## Examples
 
       iex> register_user(%{field: value})
@@ -226,10 +260,77 @@ defmodule Tips.Accounts do
       {:error, %Ecto.Changeset{}}
 
   """
+  @spec register_user(map()) ::
+          {:ok, User.t()} | {:error, Ecto.Changeset.t() | :registration_invariant}
   def register_user(attrs) do
-    %User{}
-    |> User.registration_changeset(attrs)
-    |> Repo.insert()
+    Repo.transact(fn ->
+      reclaim_expired_registrations(attrs)
+
+      %User{}
+      |> User.registration_changeset(attrs)
+      |> Repo.insert()
+    end)
+  rescue
+    error in Postgrex.Error ->
+      case error do
+        # Only the reclaim can violate a foreign key: `users` references nothing.
+        %{postgres: %{code: :foreign_key_violation, constraint: constraint}} ->
+          Logger.error("registration reclaim blocked by foreign key #{constraint}")
+          {:error, :registration_invariant}
+
+        _other ->
+          reraise error, __STACKTRACE__
+      end
+  end
+
+  # Only well-formed input names an identity to reclaim.
+  defp reclaim_expired_registrations(attrs) do
+    case User.registration_changeset(%User{}, attrs, validate_unique: false) do
+      %Ecto.Changeset{valid?: true, changes: %{email: email, handle: handle}} ->
+        delete_expired_registrations(
+          from(u in User,
+            where:
+              fragment("lower(?)", u.email) == ^email or
+                fragment("lower(?)", u.handle) == ^String.downcase(handle)
+          )
+        )
+
+      %Ecto.Changeset{valid?: false} ->
+        0
+    end
+  end
+
+  @doc """
+  Deletes up to `limit` expired registrations, lowest id first, and returns
+  `{:ok, count}`.
+
+  One call is one bounded batch; the maintenance schedule makes further
+  progress. See "Registration deadline" in the module documentation. An
+  account that still has contributions raises the foreign-key error and
+  deletes nothing.
+  """
+  @spec expire_unconfirmed_users(1..100) :: {:ok, non_neg_integer()}
+  def expire_unconfirmed_users(limit \\ 100) when limit in 1..100 do
+    Repo.transact(fn ->
+      {:ok,
+       delete_expired_registrations(
+         from(u in User, where: registration_expired(u), limit: ^limit)
+       )}
+    end)
+  end
+
+  # The one guarded deletion behind signup reclaim and maintenance cleanup. Call it in a
+  # transaction. It locks the candidate accounts in ascending id order, waiting for any
+  # confirmation in progress, then deletes those that are expired when the delete runs.
+  # FOR UPDATE is the lock a delete needs, so nothing is upgraded while other locks are
+  # held. The tokens go with the account through their foreign key.
+  defp delete_expired_registrations(candidates) do
+    ids = Repo.all(from(u in candidates, order_by: u.id, lock: "FOR UPDATE", select: u.id))
+
+    {count, _} =
+      Repo.delete_all(from(u in User, where: u.id in ^ids and registration_expired(u)))
+
+    count
   end
 
   @doc """
@@ -465,7 +566,8 @@ defmodule Tips.Accounts do
   end
 
   @doc """
-  Gets the user with the given magic link token.
+  Gets the user with the given magic link token, or `nil` when the link is
+  invalid or expired or belongs to an expired registration.
   """
   def get_user_by_magic_link_token(token) do
     with {:ok, query} <- UserToken.verify_magic_link_token_query(token),
@@ -493,7 +595,9 @@ defmodule Tips.Accounts do
   deleted. `revoked_family_ids` lists every session family deleted here; the
   caller disconnects them after this returns.
 
-  A rejected proof returns `{:error, :not_found}` and changes nothing.
+  A rejected proof returns `{:error, :not_found}` and changes nothing. That
+  includes a link to an expired registration: the proof is read again after
+  the account lock, so a wait that crosses the deadline is rejected too.
   """
   @spec login_user_by_magic_link(binary(), binary() | nil) ::
           {:ok, %{user: User.t(), session_token: binary(), revoked_family_ids: [Ecto.UUID.t()]}}
