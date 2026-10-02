@@ -35,8 +35,9 @@ defmodule Tips.AccountsFixtures do
         Accounts.deliver_login_instructions(user, url)
       end)
 
-    {:ok, {user, _expired_tokens}} =
-      Accounts.login_user_by_magic_link(token)
+    # Confirming logs in; drop that session so the fixture user starts signed out.
+    {:ok, %{user: user}} = Accounts.login_user_by_magic_link(token)
+    {:ok, [_family]} = Accounts.revoke_user_session_families(user)
 
     user
   end

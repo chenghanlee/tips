@@ -64,17 +64,17 @@ defmodule TipsWeb.UserAuthTest do
     end
   end
 
-  describe "log_in_user/3" do
+  describe "log_in_user/4" do
     test "stores the user token in the session", %{conn: conn, user: user} do
-      conn = UserAuth.log_in_user(conn, user)
+      conn = log_in(conn, user)
       assert token = get_session(conn, :user_token)
-      assert get_session(conn, :live_socket_id) == "users_sessions:#{Base.url_encode64(token)}"
+      assert get_session(conn, :live_socket_id) == "users_sessions:#{token_row(token).family}"
       assert redirected_to(conn) == ~p"/"
       assert Accounts.get_user_by_session_token(token)
     end
 
     test "clears everything previously stored in the session", %{conn: conn, user: user} do
-      conn = conn |> put_session(:to_be_removed, "value") |> UserAuth.log_in_user(user)
+      conn = conn |> put_session(:to_be_removed, "value") |> log_in(user)
       refute get_session(conn, :to_be_removed)
     end
 
@@ -83,44 +83,17 @@ defmodule TipsWeb.UserAuthTest do
         conn
         |> assign(:current_scope, Scope.for_user(user))
         |> put_session(:to_be_removed, "value")
-        |> UserAuth.log_in_user(user)
+        |> log_in(user)
 
       assert get_session(conn, :to_be_removed)
     end
 
-    test "re-authenticating retains the browser family and advances recency", %{
-      conn: conn,
-      user: user
-    } do
+    test "installs the committed token without minting another", %{conn: conn, user: user} do
       token = Accounts.generate_user_session_token(user)
-      %{family: family} = token_row(token)
-      override_token_authenticated_at(token, DateTime.add(DateTime.utc_now(:second), -1, :hour))
+      conn = UserAuth.log_in_user(conn, user, token)
 
-      conn =
-        conn
-        |> put_session(:user_token, token)
-        |> UserAuth.fetch_current_scope_for_user([])
-        |> UserAuth.log_in_user(user)
-
-      assert new_token = get_session(conn, :user_token)
-      refute new_token == token
-      assert %{family: ^family} = token_row(new_token)
-      assert {session_user, _} = Accounts.get_user_by_session_token(new_token)
-      assert Accounts.sudo_mode?(session_user)
-    end
-
-    test "logging in as another account starts a fresh family", %{conn: conn, user: user} do
-      other_token = Accounts.generate_user_session_token(user_fixture())
-      %{family: other_family} = token_row(other_token)
-
-      conn =
-        conn
-        |> put_session(:user_token, other_token)
-        |> UserAuth.fetch_current_scope_for_user([])
-        |> UserAuth.log_in_user(user)
-
-      assert %{family: family} = token_row(get_session(conn, :user_token))
-      refute family == other_family
+      assert get_session(conn, :user_token) == token
+      assert token_count(user) == 1
     end
 
     test "clears session when user does not match when re-authenticating", %{
@@ -133,13 +106,13 @@ defmodule TipsWeb.UserAuthTest do
         conn
         |> assign(:current_scope, Scope.for_user(other_user))
         |> put_session(:to_be_removed, "value")
-        |> UserAuth.log_in_user(user)
+        |> log_in(user)
 
       refute get_session(conn, :to_be_removed)
     end
 
     test "redirects to the configured path", %{conn: conn, user: user} do
-      conn = conn |> put_session(:user_return_to, "/hello") |> UserAuth.log_in_user(user)
+      conn = conn |> put_session(:user_return_to, "/hello") |> log_in(user)
       assert redirected_to(conn) == "/hello"
     end
 
@@ -148,14 +121,14 @@ defmodule TipsWeb.UserAuthTest do
         conn
         |> assign(:current_scope, Scope.for_user(user))
         |> put_session(:user_return_to, "/hello")
-        |> UserAuth.log_in_user(user)
+        |> log_in(user)
 
       assert redirected_to(conn) == "/hello"
       refute get_session(conn, :user_return_to)
     end
 
     test "writes a cookie if remember_me is configured", %{conn: conn, user: user} do
-      conn = conn |> fetch_cookies() |> UserAuth.log_in_user(user, %{"remember_me" => "true"})
+      conn = conn |> fetch_cookies() |> log_in(user, %{"remember_me" => "true"})
       assert get_session(conn, :user_token) == conn.cookies[@remember_me_cookie]
       assert get_session(conn, :user_remember_me) == true
 
@@ -168,13 +141,13 @@ defmodule TipsWeb.UserAuthTest do
       conn =
         conn
         |> assign(:current_scope, Scope.for_user(user))
-        |> UserAuth.log_in_user(user)
+        |> log_in(user)
 
       assert redirected_to(conn) == ~p"/users/settings"
     end
 
     test "writes a cookie if remember_me was set in previous session", %{conn: conn, user: user} do
-      conn = conn |> fetch_cookies() |> UserAuth.log_in_user(user, %{"remember_me" => "true"})
+      conn = conn |> fetch_cookies() |> log_in(user, %{"remember_me" => "true"})
       assert get_session(conn, :user_token) == conn.cookies[@remember_me_cookie]
       assert get_session(conn, :user_remember_me) == true
 
@@ -188,7 +161,7 @@ defmodule TipsWeb.UserAuthTest do
       # the conn is already logged in and has the remember_me cookie set,
       # now we log in again and even without explicitly setting remember_me,
       # the cookie should be set again
-      conn = conn |> UserAuth.log_in_user(user, %{})
+      conn = conn |> log_in(user, %{})
       assert %{value: signed_token, max_age: max_age} = conn.resp_cookies[@remember_me_cookie]
       assert signed_token != get_session(conn, :user_token)
       assert max_age == @remember_me_cookie_max_age
@@ -214,15 +187,58 @@ defmodule TipsWeb.UserAuthTest do
       refute Accounts.get_user_by_session_token(user_token)
     end
 
-    test "broadcasts to the given live_socket_id", %{conn: conn} do
-      live_socket_id = "users_sessions:abcdef-token"
-      TipsWeb.Endpoint.subscribe(live_socket_id)
+    test "logout broadcasts the family after committed revocation", %{conn: conn, user: user} do
+      token = Accounts.generate_user_session_token(user)
+      {:ok, sibling} = Accounts.renew_user_session_token(user, token)
+      other_browser = Accounts.generate_user_session_token(user)
+      %{family: family} = token_row(token)
+      TipsWeb.Endpoint.subscribe("users_sessions:#{family}")
+      TipsWeb.Endpoint.subscribe("users_sessions:#{token_row(other_browser).family}")
 
-      conn
-      |> put_session(:live_socket_id, live_socket_id)
-      |> UserAuth.log_out_user()
+      conn |> put_session(:user_token, sibling) |> UserAuth.log_out_user()
 
-      assert_receive %Phoenix.Socket.Broadcast{event: "disconnect", topic: ^live_socket_id}
+      topic = "users_sessions:#{family}"
+      assert_receive %Phoenix.Socket.Broadcast{event: "disconnect", topic: ^topic}
+      refute_receive %Phoenix.Socket.Broadcast{event: "disconnect"}, 50
+      refute Accounts.get_user_by_session_token(token)
+      refute Accounts.get_user_by_session_token(sibling)
+      assert Accounts.get_user_by_session_token(other_browser)
+    end
+
+    test "revoked family cannot authenticate when disconnect is not delivered", %{
+      conn: conn,
+      user: user
+    } do
+      token = Accounts.generate_user_session_token(user)
+      {:ok, sibling} = Accounts.renew_user_session_token(user, token)
+      %{family: family} = token_row(token)
+      # A tab that kept its session and never hears a disconnect.
+      stale_session = %{"user_token" => sibling, "live_socket_id" => "users_sessions:#{family}"}
+
+      assert {:ok, [^family]} = Accounts.revoke_user_session_family(token)
+
+      refute Accounts.get_user_by_session_token(sibling)
+
+      assert {:cont, %{assigns: %{current_scope: nil}}} =
+               UserAuth.on_mount(:mount_current_scope, %{}, stale_session, %LiveView.Socket{})
+
+      socket = %LiveView.Socket{
+        endpoint: TipsWeb.Endpoint,
+        assigns: %{__changed__: %{}, flash: %{}}
+      }
+
+      assert {:halt, %{assigns: %{current_scope: nil}}} =
+               UserAuth.on_mount(:require_authenticated, %{}, stale_session, socket)
+
+      conn =
+        conn
+        |> put_session(:user_token, sibling)
+        |> UserAuth.fetch_current_scope_for_user([])
+        |> fetch_flash()
+        |> UserAuth.require_authenticated_user([])
+
+      assert conn.assigns.current_scope == nil
+      assert conn.halted
     end
 
     test "works even if user is already logged out", %{conn: conn} do
@@ -250,7 +266,7 @@ defmodule TipsWeb.UserAuthTest do
 
     test "authenticates user from cookies", %{conn: conn, user: user} do
       logged_in_conn =
-        conn |> fetch_cookies() |> UserAuth.log_in_user(user, %{"remember_me" => "true"})
+        conn |> fetch_cookies() |> log_in(user, %{"remember_me" => "true"})
 
       user_token = logged_in_conn.cookies[@remember_me_cookie]
       %{value: signed_token} = logged_in_conn.resp_cookies[@remember_me_cookie]
@@ -269,7 +285,7 @@ defmodule TipsWeb.UserAuthTest do
       assert get_session(conn, :user_remember_me)
 
       assert get_session(conn, :live_socket_id) ==
-               "users_sessions:#{Base.url_encode64(user_token)}"
+               "users_sessions:#{token_row(user_token).family}"
     end
 
     test "does not authenticate if data is missing", %{conn: conn, user: user} do
@@ -295,7 +311,7 @@ defmodule TipsWeb.UserAuthTest do
       user: user
     } do
       logged_in_conn =
-        conn |> fetch_cookies() |> UserAuth.log_in_user(user, %{"remember_me" => "true"})
+        conn |> fetch_cookies() |> log_in(user, %{"remember_me" => "true"})
 
       token = get_session(logged_in_conn, :user_token)
       %{family: family} = token_row(token)
@@ -330,6 +346,32 @@ defmodule TipsWeb.UserAuthTest do
       assert conn.assigns.current_scope.user.id == user.id
       assert get_session(conn, :user_token) == new_token
       assert token_count(user) == 2
+    end
+
+    test "renewed siblings share one disconnect topic", %{conn: conn, user: user} do
+      logged_in_conn = conn |> fetch_cookies() |> log_in(user, %{"remember_me" => "true"})
+      token = get_session(logged_in_conn, :user_token)
+      topic = "users_sessions:#{token_row(token).family}"
+      assert get_session(logged_in_conn, :live_socket_id) == topic
+      backdate_token(token, -7, :day)
+
+      # Two responses renew the same token: one from the session, one from the cookie alone.
+      from_session =
+        conn |> put_session(:user_token, token) |> UserAuth.fetch_current_scope_for_user([])
+
+      from_cookie =
+        logged_in_conn
+        |> recycle()
+        |> Map.replace!(:secret_key_base, TipsWeb.Endpoint.config(:secret_key_base))
+        |> init_test_session(%{})
+        |> UserAuth.fetch_current_scope_for_user([])
+
+      siblings = Enum.map([from_session, from_cookie], &get_session(&1, :user_token))
+      assert [_, _, _] = Enum.uniq([token | siblings])
+
+      for renewed <- [from_session, from_cookie] do
+        assert get_session(renewed, :live_socket_id) == topic
+      end
     end
 
     test "a rejected renewal leaves the request unauthenticated without a new token", %{
@@ -514,25 +556,23 @@ defmodule TipsWeb.UserAuthTest do
   end
 
   describe "disconnect_sessions/1" do
-    test "broadcasts disconnect messages for each token" do
-      tokens = [%{token: "token1"}, %{token: "token2"}]
+    test "broadcasts a disconnect on each family topic" do
+      families = [Ecto.UUID.generate(), Ecto.UUID.generate()]
+      Enum.each(families, &TipsWeb.Endpoint.subscribe("users_sessions:#{&1}"))
 
-      for %{token: token} <- tokens do
-        TipsWeb.Endpoint.subscribe("users_sessions:#{Base.url_encode64(token)}")
+      UserAuth.disconnect_sessions(families)
+
+      for family <- families do
+        topic = "users_sessions:#{family}"
+        assert_receive %Phoenix.Socket.Broadcast{event: "disconnect", topic: ^topic}
       end
-
-      UserAuth.disconnect_sessions(tokens)
-
-      assert_receive %Phoenix.Socket.Broadcast{
-        event: "disconnect",
-        topic: "users_sessions:dG9rZW4x"
-      }
-
-      assert_receive %Phoenix.Socket.Broadcast{
-        event: "disconnect",
-        topic: "users_sessions:dG9rZW4y"
-      }
     end
+  end
+
+  # Genuine authentication as the controller does it: commit the token, then install it.
+  defp log_in(conn, user, params \\ %{}) do
+    token = Accounts.generate_user_session_token(user, get_session(conn, :user_token))
+    UserAuth.log_in_user(conn, user, token, params)
   end
 
   defp token_row(token) do

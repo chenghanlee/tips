@@ -26,16 +26,17 @@ defmodule TipsWeb.UserAuth do
   @session_reissue_age_in_days 7
 
   @doc """
-  Logs the user in.
+  Logs the user in with a session token `Tips.Accounts` already committed.
 
-  Redirects to the session's `:user_return_to` path
+  Genuine authentication issues the token in its own transaction; this only
+  installs it. Redirects to the session's `:user_return_to` path
   or falls back to the `signed_in_path/1`.
   """
-  def log_in_user(conn, user, params \\ %{}) do
+  def log_in_user(conn, user, session_token, params \\ %{}) do
     user_return_to = get_session(conn, :user_return_to)
 
     conn
-    |> create_or_extend_session(user, params)
+    |> create_or_extend_session(user, session_token, params)
     |> delete_session(:user_return_to)
     |> redirect(to: user_return_to || signed_in_path(conn))
   end
@@ -43,15 +44,12 @@ defmodule TipsWeb.UserAuth do
   @doc """
   Logs the user out.
 
+  Revokes the browser's whole session family, then disconnects its sockets.
   It clears all session data for safety. See renew_session.
   """
   def log_out_user(conn) do
-    user_token = get_session(conn, :user_token)
-    user_token && Accounts.delete_user_session_token(user_token)
-
-    if live_socket_id = get_session(conn, :live_socket_id) do
-      TipsWeb.Endpoint.broadcast(live_socket_id, "disconnect", %{})
-    end
+    {:ok, family_ids} = Accounts.revoke_user_session_family(get_session(conn, :user_token))
+    disconnect_sessions(family_ids)
 
     conn
     |> renew_session(nil)
@@ -109,15 +107,13 @@ defmodule TipsWeb.UserAuth do
     end
   end
 
-  # This function creates session tokens after genuine authentication: logging in
-  # or re-authenticating for sudo mode. The browser's current token lets the new
-  # token keep the same session family.
+  # This function installs the session token issued by genuine authentication:
+  # logging in or re-authenticating for sudo mode.
   #
   # When the session is created, rather than extended, the renew_session
   # function will clear the session to avoid fixation attacks. See the
   # renew_session function to customize this behaviour.
-  defp create_or_extend_session(conn, user, params) do
-    token = Accounts.generate_user_session_token(user, get_session(conn, :user_token))
+  defp create_or_extend_session(conn, user, token, params) do
     remember_me = get_session(conn, :user_remember_me)
 
     conn
@@ -170,22 +166,29 @@ defmodule TipsWeb.UserAuth do
     |> put_resp_cookie(@remember_me_cookie, token, @remember_me_options)
   end
 
+  # Every token of a browser's family shares one socket topic, so renewal keeps it.
   defp put_token_in_session(conn, token) do
-    conn
-    |> put_session(:user_token, token)
-    |> put_session(:live_socket_id, user_session_topic(token))
+    conn = put_session(conn, :user_token, token)
+
+    case Accounts.get_session_family_id(token) do
+      nil -> conn
+      family_id -> put_session(conn, :live_socket_id, user_session_topic(family_id))
+    end
   end
 
   @doc """
-  Disconnects existing sockets for the given tokens.
+  Disconnects the sockets of the given session families.
+
+  Call it after the revocation commits. It is immediate UI feedback only:
+  deleting the session rows is what revokes admission.
   """
-  def disconnect_sessions(tokens) do
-    Enum.each(tokens, fn %{token: token} ->
-      TipsWeb.Endpoint.broadcast(user_session_topic(token), "disconnect", %{})
+  def disconnect_sessions(family_ids) do
+    Enum.each(family_ids, fn family_id ->
+      TipsWeb.Endpoint.broadcast(user_session_topic(family_id), "disconnect", %{})
     end)
   end
 
-  defp user_session_topic(token), do: "users_sessions:#{Base.url_encode64(token)}"
+  defp user_session_topic(family_id), do: "users_sessions:#{family_id}"
 
   @doc """
   Handles mounting and authenticating the current_scope in LiveViews.

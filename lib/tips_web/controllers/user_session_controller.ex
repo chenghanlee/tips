@@ -14,15 +14,15 @@ defmodule TipsWeb.UserSessionController do
 
   # magic link login
   defp create(conn, %{"user" => %{"token" => token} = user_params}, info) when is_binary(token) do
-    case Accounts.login_user_by_magic_link(token) do
-      {:ok, {user, tokens_to_disconnect}} ->
-        UserAuth.disconnect_sessions(tokens_to_disconnect)
+    case Accounts.login_user_by_magic_link(token, get_session(conn, :user_token)) do
+      {:ok, %{user: user, session_token: session_token, revoked_family_ids: family_ids}} ->
+        UserAuth.disconnect_sessions(family_ids)
 
         conn
         |> put_flash(:info, info)
-        |> UserAuth.log_in_user(user, user_params)
+        |> UserAuth.log_in_user(user, session_token, user_params)
 
-      _ ->
+      {:error, :not_found} ->
         invalid_link(conn)
     end
   end

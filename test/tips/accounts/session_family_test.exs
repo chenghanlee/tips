@@ -88,7 +88,7 @@ defmodule Tips.Accounts.SessionFamilyTest do
       expired = Accounts.generate_user_session_token(user)
       backdate(expired, -60, :day)
       deleted = Accounts.generate_user_session_token(user)
-      :ok = Accounts.delete_user_session_token(deleted)
+      {:ok, [_family]} = Accounts.revoke_user_session_family(deleted)
       login = email_token_row(user, "login")
       change = email_token_row(user, "change:#{user.email}")
 
@@ -112,6 +112,212 @@ defmodule Tips.Accounts.SessionFamilyTest do
 
       assert {:error, :unauthenticated} = Accounts.renew_user_session_token(user, predecessor)
       assert token_count() == count
+    end
+  end
+
+  describe "revoke_user_session_family/1" do
+    test "family revocation preserves another browser and non-session tokens" do
+      user = user_fixture()
+      initial = Accounts.generate_user_session_token(user)
+      {:ok, successor} = Accounts.renew_user_session_token(user, initial)
+      other_browser = Accounts.generate_user_session_token(user)
+      other_account = Accounts.generate_user_session_token(user_fixture())
+      login = email_token_row(user, "login")
+      change = email_token_row(user, "change:#{user.email}")
+      family = row(initial).session_family_id
+
+      assert {:ok, [^family]} = Accounts.revoke_user_session_family(successor)
+
+      refute Accounts.get_user_by_session_token(initial)
+      refute Accounts.get_user_by_session_token(successor)
+      assert Repo.all_by(UserToken, session_family_id: family) == []
+      assert {%User{}, _} = Accounts.get_user_by_session_token(other_browser)
+      assert {%User{}, _} = Accounts.get_user_by_session_token(other_account)
+      assert Repo.get(UserToken, login.id)
+      assert Repo.get(UserToken, change.id)
+    end
+
+    test "absent, already revoked and non-session tokens revoke nothing" do
+      user = user_fixture()
+      revoked = Accounts.generate_user_session_token(user)
+      assert {:ok, [_family]} = Accounts.revoke_user_session_family(revoked)
+      login = email_token_row(user, "login")
+      count = token_count()
+
+      for token <- [revoked, "missing", login.token] do
+        assert {:ok, []} = Accounts.revoke_user_session_family(token)
+        assert token_count() == count
+      end
+    end
+
+    test "an expired row identifies its family for logout but never authenticates" do
+      user = user_fixture()
+      expired = Accounts.generate_user_session_token(user)
+      {:ok, successor} = Accounts.renew_user_session_token(user, expired)
+      backdate(expired, -60, :day)
+      family = row(expired).session_family_id
+
+      refute Accounts.get_user_by_session_token(expired)
+      assert {:error, :unauthenticated} = Accounts.renew_user_session_token(user, expired)
+      assert {:ok, [^family]} = Accounts.revoke_user_session_family(expired)
+      refute Accounts.get_user_by_session_token(successor)
+    end
+
+    test "a deleted account's family can still be revoked" do
+      user = user_fixture()
+      token = Accounts.generate_user_session_token(user)
+      family = row(token).session_family_id
+      delete_account(user)
+
+      assert {:ok, [^family]} = Accounts.revoke_user_session_family(token)
+      assert Repo.all_by(UserToken, session_family_id: family) == []
+    end
+  end
+
+  describe "revoke_user_session_families/1" do
+    test "all-family revocation composes with rollback" do
+      user = user_fixture()
+      first = Accounts.generate_user_session_token(user)
+      {:ok, successor} = Accounts.renew_user_session_token(user, first)
+      second = Accounts.generate_user_session_token(user)
+      other_account = Accounts.generate_user_session_token(user_fixture())
+      login = email_token_row(user, "login")
+      families = Enum.sort([row(first).session_family_id, row(second).session_family_id])
+
+      assert {:error, :rolled_back} =
+               Repo.transact(fn ->
+                 assert {:ok, ids} = Accounts.revoke_user_session_families(user)
+                 assert Enum.sort(ids) == families
+                 refute Accounts.get_user_by_session_token(first)
+                 {:error, :rolled_back}
+               end)
+
+      for token <- [first, successor, second] do
+        assert {%User{}, _} = Accounts.get_user_by_session_token(token)
+      end
+
+      assert {:ok, ids} = Accounts.revoke_user_session_families(user)
+      assert Enum.sort(ids) == families
+
+      for token <- [first, successor, second] do
+        refute Accounts.get_user_by_session_token(token)
+      end
+
+      assert Repo.get(UserToken, login.id)
+      assert {%User{}, _} = Accounts.get_user_by_session_token(other_account)
+      assert {:ok, []} = Accounts.revoke_user_session_families(user)
+    end
+  end
+
+  describe "login_user_by_magic_link/2" do
+    test "valid same-account reauthentication retains the family and advances recency" do
+      user = user_fixture()
+      predecessor = Accounts.generate_user_session_token(user)
+      stale = DateTime.add(DateTime.utc_now(:second), -1, :hour)
+      override_token_authenticated_at(predecessor, stale)
+      family = row(predecessor).session_family_id
+
+      assert {:ok, %{user: %User{} = returned, session_token: token, revoked_family_ids: []}} =
+               Accounts.login_user_by_magic_link(magic_link(user), predecessor)
+
+      assert returned.id == user.id
+      refute token == predecessor
+      assert %UserToken{session_family_id: ^family, authenticated_at: auth} = row(token)
+      assert DateTime.after?(auth, stale)
+      assert {session_user, _} = Accounts.get_user_by_session_token(token)
+      assert Accounts.sudo_mode?(session_user)
+
+      assert {%User{authenticated_at: ^stale}, _} =
+               Accounts.get_user_by_session_token(predecessor)
+    end
+
+    test "missing, revoked and expired predecessors start a fresh family and stay coherent" do
+      user = user_fixture()
+      revoked = Accounts.generate_user_session_token(user)
+      {:ok, [revoked_family]} = Accounts.revoke_user_session_family(revoked)
+      expired = Accounts.generate_user_session_token(user)
+      backdate(expired, -60, :day)
+      expired_family = row(expired).session_family_id
+
+      for predecessor <- [nil, "missing", revoked, expired] do
+        assert {:ok, %{session_token: token, revoked_family_ids: []}} =
+                 Accounts.login_user_by_magic_link(magic_link(user), predecessor)
+
+        refute row(token).session_family_id in [revoked_family, expired_family]
+        assert {%User{}, _} = Accounts.get_user_by_session_token(token)
+      end
+
+      refute Accounts.get_user_by_session_token(expired)
+    end
+
+    test "a valid switch revokes the other account's browser family only" do
+      old = user_fixture()
+      new = user_fixture()
+      initial = Accounts.generate_user_session_token(old)
+      {:ok, sibling} = Accounts.renew_user_session_token(old, initial)
+      other_browser = Accounts.generate_user_session_token(old)
+      new_elsewhere = Accounts.generate_user_session_token(new)
+      old_family = row(initial).session_family_id
+      new_id = new.id
+
+      assert {:ok, %{user: %User{id: ^new_id}, session_token: token, revoked_family_ids: ids}} =
+               Accounts.login_user_by_magic_link(magic_link(new), sibling)
+
+      assert ids == [old_family]
+      refute Accounts.get_user_by_session_token(initial)
+      refute Accounts.get_user_by_session_token(sibling)
+      assert {%User{id: ^new_id}, _} = Accounts.get_user_by_session_token(token)
+      refute row(token).session_family_id == old_family
+      assert {%User{}, _} = Accounts.get_user_by_session_token(other_browser)
+      assert {%User{}, _} = Accounts.get_user_by_session_token(new_elsewhere)
+    end
+
+    test "a rejected proof changes no session family" do
+      old = user_fixture()
+      new = user_fixture()
+      predecessor = Accounts.generate_user_session_token(old)
+      expired = magic_link(new)
+      backdate(hashed(expired), -15, :minute)
+      replayed = magic_link(new)
+      assert {:ok, _} = Accounts.login_user_by_magic_link(replayed)
+      deleted = user_fixture()
+      deleted_proof = magic_link(deleted)
+      delete_account(deleted)
+      tokens = all_tokens()
+
+      for proof <-
+            ["%", Base.url_encode64("unknown", padding: false), expired, replayed] ++
+              [deleted_proof] do
+        assert {:error, :not_found} = Accounts.login_user_by_magic_link(proof, predecessor)
+        assert all_tokens() == tokens
+      end
+
+      assert {%User{}, _} = Accounts.get_user_by_session_token(predecessor)
+    end
+
+    test "a switch away from a deleted account still revokes its family" do
+      old = user_fixture()
+      predecessor = Accounts.generate_user_session_token(old)
+      family = row(predecessor).session_family_id
+      delete_account(old)
+
+      assert {:ok, %{revoked_family_ids: [^family]}} =
+               Accounts.login_user_by_magic_link(magic_link(user_fixture()), predecessor)
+
+      assert Repo.all_by(UserToken, session_family_id: family) == []
+    end
+
+    test "first confirmation revokes every earlier session family of the account" do
+      user = unconfirmed_user_fixture()
+      earlier = Accounts.generate_user_session_token(user)
+      family = row(earlier).session_family_id
+
+      assert {:ok, %{user: %User{confirmed_at: %DateTime{}}, session_token: token} = result} =
+               Accounts.login_user_by_magic_link(magic_link(user), earlier)
+
+      assert result.revoked_family_ids == [family]
+      assert [%UserToken{token: ^token}] = Repo.all_by(UserToken, user_id: user.id)
+      refute row(token).session_family_id == family
     end
   end
 
@@ -172,6 +378,19 @@ defmodule Tips.Accounts.SessionFamilyTest do
   end
 
   defp token_count, do: Repo.aggregate(UserToken, :count)
+
+  defp all_tokens, do: UserToken |> Repo.all() |> Enum.sort_by(& &1.id)
+
+  defp magic_link(user), do: extract_user_token(&Accounts.deliver_login_instructions(user, &1))
+
+  defp hashed(magic_link),
+    do: :crypto.hash(:sha256, Base.url_decode64!(magic_link, padding: false))
+
+  defp delete_account(user) do
+    Repo.update_all(from(u in User, where: u.id == ^user.id),
+      set: [deleted_at: DateTime.utc_now(:second), handle: nil, email: nil]
+    )
+  end
 
   defp email_token_row(user, context, amount \\ 0, unit \\ :second, extra_seconds \\ 0) do
     {_encoded, token} = UserToken.build_email_token(user, context)
