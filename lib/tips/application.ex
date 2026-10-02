@@ -7,6 +7,9 @@ defmodule Tips.Application do
 
   @impl true
   def start(_type, _args) do
+    TipsWeb.LiveLogger.attach()
+    TipsWeb.RequestLogger.attach()
+
     children = [
       TwMerge.Cache,
       TipsWeb.Telemetry,

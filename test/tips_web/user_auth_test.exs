@@ -5,7 +5,7 @@ defmodule TipsWeb.UserAuthTest do
 
   alias Phoenix.LiveView
   alias Tips.Accounts
-  alias Tips.Accounts.Scope
+  alias Tips.Accounts.{Scope, SessionRef, User, UserToken}
   alias Tips.Repo
   alias TipsWeb.UserAuth
 
@@ -503,6 +503,212 @@ defmodule TipsWeb.UserAuthTest do
     end
   end
 
+  describe "controller and mount reject deleted/revoked/expired sessions" do
+    setup %{user: user} do
+      token = Accounts.generate_user_session_token(user)
+      %{token: token, session: %{"user_token" => token}}
+    end
+
+    for state <- [:deleted, :revoked, :expired] do
+      test "#{state}: the plug and every mount hook leave the caller unauthenticated", %{
+        conn: conn,
+        user: user,
+        token: token,
+        session: session
+      } do
+        invalidate(unquote(state), user, token)
+
+        conn =
+          conn |> put_session(:user_token, token) |> UserAuth.fetch_current_scope_for_user([])
+
+        assert conn.assigns.current_scope == nil
+
+        assert conn
+               |> fetch_flash()
+               |> UserAuth.require_authenticated_user([])
+               |> Map.fetch!(:halted)
+
+        for socket <- [live_socket(), connected_socket()] do
+          assert {:cont, %{assigns: %{current_scope: nil}} = mounted} =
+                   UserAuth.on_mount(:mount_current_scope, %{}, session, socket)
+
+          assert {:error, :unauthenticated} = UserAuth.readmit(mounted)
+
+          for hook <- [:require_authenticated, :require_sudo_mode] do
+            assert {:halt, %{assigns: %{current_scope: nil}, redirected: {:redirect, %{to: to}}}} =
+                     UserAuth.on_mount(hook, %{}, session, socket)
+
+            assert to == ~p"/users/log-in"
+          end
+        end
+      end
+
+      test "#{state}: a socket mounted earlier is refused at readmission", %{
+        user: user,
+        token: token,
+        session: session
+      } do
+        {:cont, socket} =
+          UserAuth.on_mount(:require_authenticated, %{}, session, connected_socket())
+
+        assert {:ok, _socket} = UserAuth.readmit(socket)
+
+        invalidate(unquote(state), user, token)
+
+        assert {:error, :unauthenticated} = UserAuth.readmit(socket)
+      end
+    end
+  end
+
+  describe "private session reference survives mount/renewal without bearer assigns" do
+    test "a connected mount keeps the row reference in private state only", %{user: user} do
+      token = Accounts.generate_user_session_token(user)
+      %UserToken{id: token_id} = Repo.get_by!(UserToken, token: token)
+      user_id = user.id
+
+      {:cont, socket} =
+        UserAuth.on_mount(:mount_current_scope, %{}, %{"user_token" => token}, connected_socket())
+
+      assert %Scope{user: %User{id: ^user_id}} = socket.assigns.current_scope
+      assert Map.keys(socket.assigns) -- [:__changed__, :flash] == [:current_scope]
+
+      assert private_values(socket, SessionRef) == [
+               %SessionRef{token_id: token_id, user_id: user_id}
+             ]
+
+      assert :binary.match(:erlang.term_to_binary({socket.assigns, socket.private}), token) ==
+               :nomatch
+    end
+
+    test "a disconnected render reuses the plug's scope without another token query", %{
+      user: user
+    } do
+      conn = log_in_user(build_conn(), user)
+
+      {conn, queries} = token_queries(fn -> get(conn, ~p"/users/settings") end)
+
+      assert html_response(conn, 200) =~ user.email
+      assert [_per_request_authentication] = queries
+    end
+
+    test "stacked mount hooks admit the session once", %{user: user} do
+      session = %{"user_token" => Accounts.generate_user_session_token(user)}
+
+      {{:cont, socket}, queries} =
+        token_queries(fn ->
+          {:cont, socket} =
+            UserAuth.on_mount(:require_authenticated, %{}, session, connected_socket())
+
+          UserAuth.on_mount(:require_sudo_mode, %{}, session, socket)
+        end)
+
+      assert [%SessionRef{}] = private_values(socket, SessionRef)
+      assert [_mount_admission] = queries
+    end
+
+    test "renewal moves new mounts to the successor; the earlier socket stays admitted until logout",
+         %{conn: conn, user: user} do
+      token = Accounts.generate_user_session_token(user)
+      user_id = user.id
+
+      {:cont, before_renewal} =
+        UserAuth.on_mount(
+          :require_authenticated,
+          %{},
+          %{"user_token" => token},
+          connected_socket()
+        )
+
+      backdate_token(token, -7, :day)
+      conn = conn |> put_session(:user_token, token) |> UserAuth.fetch_current_scope_for_user([])
+      successor = get_session(conn, :user_token)
+      refute successor == token
+      assert %Scope{user: %User{id: ^user_id}} = conn.assigns.current_scope
+
+      {:cont, after_renewal} =
+        UserAuth.on_mount(:require_authenticated, %{}, get_session(conn), connected_socket())
+
+      %UserToken{id: predecessor_id} = Repo.get_by!(UserToken, token: token)
+      %UserToken{id: successor_id} = Repo.get_by!(UserToken, token: successor)
+      assert [%SessionRef{token_id: ^predecessor_id}] = private_values(before_renewal, SessionRef)
+      assert [%SessionRef{token_id: ^successor_id}] = private_values(after_renewal, SessionRef)
+
+      for socket <- [before_renewal, after_renewal] do
+        assert {:ok, %{assigns: %{current_scope: %Scope{user: %User{id: ^user_id}}}}} =
+                 UserAuth.readmit(socket)
+      end
+
+      conn |> recycle_session() |> UserAuth.log_out_user()
+
+      for socket <- [before_renewal, after_renewal] do
+        assert {:error, :unauthenticated} = UserAuth.readmit(socket)
+      end
+    end
+
+    test "readmission assigns the current account state", %{user: user} do
+      token = Accounts.generate_user_session_token(user)
+
+      {:cont, socket} =
+        UserAuth.on_mount(:require_sudo_mode, %{}, %{"user_token" => token}, connected_socket())
+
+      stale = DateTime.add(DateTime.utc_now(:second), -1, :hour)
+      override_token_authenticated_at(token, stale)
+      Repo.update_all(from(u in User, where: u.id == ^user.id), set: [role: :moderator])
+
+      assert {:ok, readmitted} = UserAuth.readmit(socket)
+
+      assert %Scope{user: %User{role: :moderator, authenticated_at: ^stale}} =
+               readmitted.assigns.current_scope
+
+      assert private_values(readmitted, SessionRef) == private_values(socket, SessionRef)
+    end
+  end
+
+  describe "client identity/reference cannot replace mounted identity" do
+    test "params and client-shaped assigns never choose the admitted account", %{user: user} do
+      other = user_fixture()
+      other_token = Accounts.generate_user_session_token(other)
+      %UserToken{id: other_token_id} = Repo.get_by!(UserToken, token: other_token)
+      token = Accounts.generate_user_session_token(user)
+      user_id = user.id
+
+      forged = %{
+        "user_id" => other.id,
+        "user_token" => other_token,
+        "session_ref" => %{"token_id" => other_token_id, "user_id" => other.id}
+      }
+
+      {:cont, socket} =
+        UserAuth.on_mount(
+          :require_authenticated,
+          forged,
+          %{"user_token" => token},
+          connected_socket()
+        )
+
+      assert %Scope{user: %User{id: ^user_id}} = socket.assigns.current_scope
+
+      # A scope swapped in the assigns does not move the private binding.
+      swapped = Phoenix.Component.assign(socket, :current_scope, Scope.for_user(other))
+
+      assert {:ok, %{assigns: %{current_scope: %Scope{user: %User{id: ^user_id}}}}} =
+               UserAuth.readmit(swapped)
+    end
+
+    test "a socket without a server-built reference is refused", %{user: user} do
+      token = Accounts.generate_user_session_token(user)
+      %UserToken{id: token_id} = Repo.get_by!(UserToken, token: token)
+      scoped = Phoenix.Component.assign(connected_socket(), :current_scope, Scope.for_user(user))
+
+      assert {:error, :unauthenticated} = UserAuth.readmit(scoped)
+
+      for forged <- [%{"token_id" => token_id, "user_id" => user.id}, token, token_id] do
+        socket = Phoenix.Component.assign(scoped, :session_ref, forged)
+        assert {:error, :unauthenticated} = UserAuth.readmit(socket)
+      end
+    end
+  end
+
   describe "require_authenticated_user/2" do
     setup %{conn: conn} do
       %{conn: UserAuth.fetch_current_scope_for_user(conn, [])}
@@ -566,6 +772,58 @@ defmodule TipsWeb.UserAuthTest do
         topic = "users_sessions:#{family}"
         assert_receive %Phoenix.Socket.Broadcast{event: "disconnect", topic: ^topic}
       end
+    end
+  end
+
+  defp live_socket do
+    %LiveView.Socket{endpoint: TipsWeb.Endpoint, assigns: %{__changed__: %{}, flash: %{}}}
+  end
+
+  defp connected_socket, do: %{live_socket() | transport_pid: self()}
+
+  defp private_values(socket, struct) do
+    for {_key, %^struct{} = value} <- socket.private, do: value
+  end
+
+  defp invalidate(:deleted, user, _token), do: delete_account(user)
+  defp invalidate(:revoked, _user, token), do: Accounts.revoke_user_session_family(token)
+  defp invalidate(:expired, _user, token), do: backdate_token(token, -60, :day)
+
+  # The same browser on its next request.
+  defp recycle_session(conn) do
+    session = get_session(conn)
+
+    conn
+    |> recycle()
+    |> Map.replace!(:secret_key_base, TipsWeb.Endpoint.config(:secret_key_base))
+    |> init_test_session(session)
+  end
+
+  # Runs `fun` and returns its result with this process's queries on the token table.
+  defp token_queries(fun) do
+    test = self()
+    handler = {__MODULE__, make_ref()}
+
+    :telemetry.attach(
+      handler,
+      [:tips, :repo, :query],
+      fn _event, _measurements, metadata, _config ->
+        if self() == test and metadata.query =~ "users_tokens",
+          do: send(test, {:token_query, metadata.query})
+      end,
+      nil
+    )
+
+    result = fun.()
+    :telemetry.detach(handler)
+    {result, collect_token_queries()}
+  end
+
+  defp collect_token_queries do
+    receive do
+      {:token_query, query} -> [query | collect_token_queries()]
+    after
+      0 -> []
     end
   end
 

@@ -295,6 +295,40 @@ defmodule TipsWeb.UserSessionControllerTest do
     end
   end
 
+  describe "controller and mount reject deleted/revoked/expired sessions" do
+    for state <- [:deleted, :revoked, :expired] do
+      test "#{state}: the browser's requests are anonymous and settings redirects", %{
+        conn: conn,
+        user: user
+      } do
+        browser = log_in_with_magic_link(conn, user)
+        token = get_session(browser, :user_token)
+        assert browser |> get(~p"/users/settings") |> html_response(200) =~ user.email
+
+        case unquote(state) do
+          :deleted ->
+            Repo.update_all(from(u in Accounts.User, where: u.id == ^user.id),
+              set: [deleted_at: DateTime.utc_now(:second), handle: nil, email: nil]
+            )
+
+          :revoked ->
+            assert {:ok, [_family]} = Accounts.revoke_user_session_family(token)
+
+          :expired ->
+            backdate(token, -60, :day)
+        end
+
+        settings = get(browser, ~p"/users/settings")
+        assert redirected_to(settings) == ~p"/users/log-in"
+        assert settings.assigns.current_scope == nil
+
+        home = get(browser, ~p"/")
+        assert home.assigns.current_scope == nil
+        refute html_response(home, 200) =~ user.email
+      end
+    end
+  end
+
   describe "DELETE /users/log-out" do
     test "logs the user out", %{conn: conn, user: user} do
       conn = conn |> log_in_user(user) |> delete(~p"/users/log-out")

@@ -1,6 +1,11 @@
 defmodule TipsWeb.UserAuth do
   @moduledoc """
   Handles session authentication and LiveView authentication hooks.
+
+  Controllers authenticate every request. A LiveView authenticates at mount
+  and keeps a private reference to its session row; call `readmit/1` before
+  every mutation and privileged read on a mounted socket. See the "Admission
+  contract" section of `Tips.Accounts`.
   """
 
   use TipsWeb, :verified_routes
@@ -8,8 +13,12 @@ defmodule TipsWeb.UserAuth do
   import Plug.Conn
   import Phoenix.Controller
 
+  alias Phoenix.LiveView
   alias Tips.Accounts
-  alias Tips.Accounts.{Scope, UserToken}
+  alias Tips.Accounts.{Scope, SessionRef, UserToken}
+
+  # Socket private key of the mounted `Tips.Accounts.SessionRef`.
+  @session_ref :tips_session_ref
 
   # The remember me cookie lives as long as the session token it carries.
   @max_cookie_age_in_days UserToken.session_validity_in_days()
@@ -65,12 +74,13 @@ defmodule TipsWeb.UserAuth do
   """
   def fetch_current_scope_for_user(conn, _opts) do
     with {token, conn} <- ensure_user_token(conn),
-         {user, token_inserted_at} <- Accounts.get_user_by_session_token(token),
+         {:ok, %Scope{user: user} = scope, _session_ref, token_inserted_at} <-
+           Accounts.get_scope_by_session_token(token),
          {:ok, conn} <- maybe_renew_user_session_token(conn, user, token, token_inserted_at) do
-      assign(conn, :current_scope, Scope.for_user(user))
+      assign(conn, :current_scope, scope)
     else
-      nil -> assign(conn, :current_scope, Scope.for_user(nil))
-      {:error, :unauthenticated} -> assign(conn, :current_scope, Scope.for_user(nil))
+      nil -> assign(conn, :current_scope, nil)
+      {:error, :unauthenticated} -> assign(conn, :current_scope, nil)
     end
   end
 
@@ -227,44 +237,96 @@ defmodule TipsWeb.UserAuth do
   end
 
   def on_mount(:require_authenticated, _params, session, socket) do
-    socket = mount_current_scope(socket, session)
-
-    if socket.assigns.current_scope && socket.assigns.current_scope.user do
-      {:cont, socket}
-    else
-      socket =
-        socket
-        |> Phoenix.LiveView.put_flash(:error, "You must log in to access this page.")
-        |> Phoenix.LiveView.redirect(to: ~p"/users/log-in")
-
-      {:halt, socket}
+    case mount_current_scope(socket, session) do
+      %{assigns: %{current_scope: %Scope{}}} = socket -> {:cont, socket}
+      socket -> {:halt, require_login(socket)}
     end
   end
 
   def on_mount(:require_sudo_mode, _params, session, socket) do
-    socket = mount_current_scope(socket, session)
+    case mount_current_scope(socket, session) do
+      %{assigns: %{current_scope: %Scope{user: user}}} = socket ->
+        if Accounts.sudo_mode?(user, -10),
+          do: {:cont, socket},
+          else: {:halt, require_reauthentication(socket)}
 
-    if Accounts.sudo_mode?(socket.assigns.current_scope.user, -10) do
-      {:cont, socket}
-    else
-      socket =
-        socket
-        |> Phoenix.LiveView.put_flash(:error, "You must re-authenticate to access this page.")
-        |> Phoenix.LiveView.redirect(to: ~p"/users/log-in")
-
-      {:halt, socket}
+      socket ->
+        {:halt, require_login(socket)}
     end
   end
 
-  defp mount_current_scope(socket, session) do
-    Phoenix.Component.assign_new(socket, :current_scope, fn ->
-      {user, _} =
-        if user_token = session["user_token"] do
-          Accounts.get_user_by_session_token(user_token)
-        end || {nil, nil}
+  # A connected mount admits the session token once, however many hooks run,
+  # and keeps the row reference in private state. A disconnected render handles
+  # no events: it reuses the scope the plug built for the same request.
+  defp mount_current_scope(%{private: %{@session_ref => _}} = socket, _session), do: socket
 
-      Scope.for_user(user)
-    end)
+  defp mount_current_scope(socket, session) do
+    if LiveView.connected?(socket) do
+      {scope, session_ref} = admit_session(session)
+
+      socket
+      |> LiveView.put_private(@session_ref, session_ref)
+      |> Phoenix.Component.assign(:current_scope, scope)
+    else
+      Phoenix.Component.assign_new(socket, :current_scope, fn ->
+        {scope, _session_ref} = admit_session(session)
+        scope
+      end)
+    end
+  end
+
+  defp admit_session(session) do
+    case Accounts.get_scope_by_session_token(session["user_token"]) do
+      {:ok, scope, session_ref, _token_inserted_at} -> {scope, session_ref}
+      {:error, :unauthenticated} -> {nil, nil}
+    end
+  end
+
+  @doc """
+  Admits a mounted LiveView socket again, from its private session reference.
+
+  Call it before every mutation and privileged read, then use the returned
+  socket: its `current_scope` holds the account's current role, ban,
+  confirmation and authentication recency. It reads the reference the mount
+  hook stored, never assigns, params or event payloads, so the identity stays
+  the one that mounted.
+
+  Returns `{:error, :unauthenticated}` when the session expired or was
+  revoked, the account was deleted, or the socket has no reference. Send the
+  caller to `require_login/1`. Eligibility stays with the owning operation: a
+  full ban does not fail admission.
+
+      def handle_event("save", params, socket) do
+        case UserAuth.readmit(socket) do
+          {:ok, socket} -> save(socket, params)
+          {:error, :unauthenticated} -> {:noreply, UserAuth.require_login(socket)}
+        end
+      end
+  """
+  @spec readmit(LiveView.Socket.t()) :: {:ok, LiveView.Socket.t()} | {:error, :unauthenticated}
+  def readmit(%LiveView.Socket{private: private} = socket) do
+    with %SessionRef{} = session_ref <- private[@session_ref],
+         {:ok, scope} <- Accounts.readmit_scope(session_ref) do
+      {:ok, Phoenix.Component.assign(socket, :current_scope, scope)}
+    else
+      _ -> {:error, :unauthenticated}
+    end
+  end
+
+  @doc "Redirects a LiveView socket that failed admission to the log-in page."
+  @spec require_login(LiveView.Socket.t()) :: LiveView.Socket.t()
+  def require_login(socket) do
+    socket
+    |> LiveView.put_flash(:error, "You must log in to access this page.")
+    |> LiveView.redirect(to: ~p"/users/log-in")
+  end
+
+  @doc "Redirects a LiveView socket whose sign-in is too old to the log-in page."
+  @spec require_reauthentication(LiveView.Socket.t()) :: LiveView.Socket.t()
+  def require_reauthentication(socket) do
+    socket
+    |> LiveView.put_flash(:error, "You must re-authenticate to access this page.")
+    |> LiveView.redirect(to: ~p"/users/log-in")
   end
 
   # The root and the editor routes of the frontend design; ids are positive integers.
