@@ -187,6 +187,43 @@ defmodule Tips.Accounts.SessionFamilyConcurrencyTest do
     end)
   end
 
+  test "switch revokes the known family when pruning removes the predecessor during the lock wait",
+       data do
+    %{user: old, predecessor: predecessor} = data
+    {new, _new_session} = committed_user_with_session()
+
+    {successor, old_family, proof} =
+      unboxed(fn ->
+        {:ok, successor} = Accounts.renew_user_session_token(old, predecessor)
+        family = session_row(predecessor).session_family_id
+        expired_at = DateTime.add(DateTime.utc_now(:second), -60, :day)
+
+        Repo.update_all(from(t in UserToken, where: t.token == ^predecessor),
+          set: [inserted_at: expired_at]
+        )
+
+        {successor, family, magic_link(new)}
+      end)
+
+    holder = open(data.supervisor)
+    switcher = open(data.supervisor)
+    assert [_] = run(holder, fn -> lock_account(old.id, "") end)
+
+    # The switch has read the expired predecessor and waits on its account.
+    switch = submit(switcher, fn -> Accounts.login_user_by_magic_link(proof, predecessor) end)
+    await_blocked(switcher, holder)
+    assert unboxed(fn -> Accounts.prune_expired_user_tokens() end) == 1
+    commit(holder)
+    assert {:ok, result} = await(switcher, switch)
+    commit(switcher)
+
+    unboxed(fn ->
+      assert result.revoked_family_ids == [old_family]
+      refute Accounts.get_user_by_session_token(successor)
+      assert family_tokens(old_family) == []
+    end)
+  end
+
   defp unboxed(fun), do: Sandbox.unboxed_run(Repo, fun)
 
   defp magic_link(user), do: extract_user_token(&Accounts.deliver_login_instructions(user, &1))
