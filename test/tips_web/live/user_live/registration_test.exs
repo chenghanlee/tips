@@ -205,6 +205,32 @@ defmodule TipsWeb.UserLive.RegistrationTest do
       refute Repo.get_by(User, email: other)
     end
 
+    test "invariant failure preserves handle email and return destination", %{conn: conn} do
+      holder = unconfirmed_user_fixture()
+      set_registration_deadline(holder, -1)
+      tip = Tips.ContentFixtures.tip_fixture(holder)
+      before = side_effects(holder.email)
+      {:ok, lv, _html} = live(conn, ~p"/users/register?return_to=#{@return_to}")
+
+      {html, log} =
+        ExUnit.CaptureLog.with_log(fn ->
+          submit(lv, %{"handle" => "Newcomer_44", "email" => holder.email})
+        end)
+
+      assert html =~ "We couldn&#39;t complete your sign-up because of a problem on our end."
+      refute html =~ "has already been taken"
+      refute has_element?(lv, "#email-registered")
+      assert field_value(lv, :handle) == ["Newcomer_44"]
+      assert field_value(lv, :email) == [holder.email]
+      assert has_element?(lv, ~s|a[href="#{@log_in_with_return}"]|, "Log in")
+
+      assert log =~ "registration reclaim"
+      refute log =~ holder.email
+      assert side_effects(holder.email) == before
+      assert Repo.reload!(tip)
+      assert_no_email_sent()
+    end
+
     test "external and malformed return destinations are discarded", %{conn: conn} do
       for bad <- [
             "https://evil.example/editor/tips/new",

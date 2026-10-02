@@ -1,6 +1,7 @@
 defmodule Tips.Accounts.UserToken do
   use Ecto.Schema
   import Ecto.Query
+  import Tips.Accounts.User, only: [registration_expired: 1]
   alias Tips.Accounts.UserToken
 
   @hash_algorithm :sha256
@@ -156,6 +157,9 @@ defmodule Tips.Accounts.UserToken do
   The given token is valid if it matches its hashed counterpart in the
   database. This function also checks whether the token has expired. The context
   of a magic link token is always "login".
+
+  A link to an expired registration is rejected too, whether or not cleanup
+  has run. See `Tips.Accounts.User.registration_expired/1`.
   """
   def verify_magic_link_token_query(token) do
     case Base.url_decode64(token, padding: false) do
@@ -167,6 +171,7 @@ defmodule Tips.Accounts.UserToken do
             join: user in assoc(token, :user),
             where: token.inserted_at > ^cutoff("login"),
             where: token.sent_to == user.email,
+            where: not registration_expired(user),
             select: {user, token}
 
         {:ok, query}

@@ -20,6 +20,23 @@ defmodule Tips.Accounts.User do
   @type t :: %__MODULE__{}
 
   @doc """
+  Query expression that is true for an expired registration: an unconfirmed
+  account at or past seven days from its original `inserted_at`.
+
+  This is the only definition of the registration deadline. Confirmation,
+  signup reclaim and maintenance cleanup all use it. It reads the database
+  wall clock when its statement runs, not the transaction start time, so a
+  statement issued after a lock wait judges the deadline as of then.
+  Confirmed accounts never match, whatever their age.
+  """
+  defmacro registration_expired(user) do
+    quote do
+      is_nil(unquote(user).confirmed_at) and
+        fragment("? + interval '7 days' <= clock_timestamp()", unquote(user).inserted_at)
+    end
+  end
+
+  @doc """
   A registration changeset for the public handle and sign-in email.
 
   Supports the same options as `email_changeset/3`.

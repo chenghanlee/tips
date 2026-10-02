@@ -30,9 +30,15 @@ defmodule TipsWeb.UserSessionController do
   # Anything else, such as email and password credentials, is not a login.
   defp create(conn, _params, _info), do: invalid_link(conn)
 
+  # An expired registration is rejected like any other invalid link, and may already be
+  # deleted, so every rejection carries the restart guidance.
   defp invalid_link(conn) do
     conn
-    |> put_flash(:error, "The link is invalid or it has expired.")
+    |> put_flash(
+      :error,
+      "The link is invalid or it has expired. " <>
+        "If you signed up more than seven days ago without confirming, register again."
+    )
     |> redirect(to: ~p"/users/log-in")
   end
 

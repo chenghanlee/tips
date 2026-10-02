@@ -42,6 +42,19 @@ defmodule Tips.AccountsFixtures do
     user
   end
 
+  @doc """
+  Moves the user's seven-day registration deadline to `seconds_left` from now
+  on the database clock, by rewriting `inserted_at`. Zero or less is expired.
+  """
+  def set_registration_deadline(%Accounts.User{id: id}, seconds_left) do
+    Tips.Repo.query!(
+      "UPDATE users SET inserted_at = clock_timestamp() - interval '7 days' + make_interval(secs => $1) WHERE id = $2",
+      [seconds_left * 1.0, id]
+    )
+
+    :ok
+  end
+
   def user_scope_fixture do
     user = user_fixture()
     user_scope_fixture(user)

@@ -2,6 +2,8 @@ defmodule TipsWeb.UserLive.Login do
   use TipsWeb, :live_view
 
   alias Tips.Accounts
+  alias Tips.Accounts.User
+  alias TipsWeb.UserAuth
 
   @impl true
   def render(assigns) do
@@ -15,7 +17,7 @@ defmodule TipsWeb.UserLive.Login do
               You need to reauthenticate to perform sensitive actions on your account.
             <% else %>
               Don't have an account? <.link
-                navigate={~p"/users/register"}
+                navigate={@register_path}
                 class="font-semibold text-foreground underline"
                 phx-no-format
               >Sign up</.link> for an account now.
@@ -57,33 +59,53 @@ defmodule TipsWeb.UserLive.Login do
   end
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(params, session, socket) do
+    # The same validated destination the registration form accepts, so restarting signup
+    # from here keeps it.
+    return_to =
+      UserAuth.allowed_return_to(params["return_to"]) ||
+        UserAuth.allowed_return_to(session["user_return_to"])
+
     email =
       Phoenix.Flash.get(socket.assigns.flash, :email) ||
         get_in(socket.assigns, [:current_scope, Access.key(:user), Access.key(:email)])
 
     form = to_form(%{"email" => email}, as: "user")
 
-    {:ok, assign(socket, page_title: "Log in", form: form)}
+    {:ok,
+     assign(socket, page_title: "Log in", form: form, register_path: register_path(return_to))}
   end
 
   @impl true
   def handle_event("submit_magic", %{"user" => %{"email" => email}}, socket) do
-    if user = Accounts.get_user_by_email(email) do
-      Accounts.deliver_login_instructions(
-        user,
-        &url(~p"/users/log-in/#{&1}")
-      )
+    with %User{} = user <- Accounts.get_user_by_email(email),
+         {:error, :not_found} <-
+           Accounts.deliver_login_instructions(user, &url(~p"/users/log-in/#{&1}")) do
+      # The registration expired, or cleanup deleted it after the lookup. Stay on the form:
+      # the email, and the return destination kept in the session, carry into signup.
+      {:noreply,
+       socket
+       |> put_flash(
+         :error,
+         "This sign-up was not confirmed within seven days and has expired. " <>
+           "Register again to continue."
+       )
+       |> assign(form: to_form(%{"email" => email}, as: "user"))}
+    else
+      # No such account, mail accepted, or mail delivery failed: one answer for all.
+      _other ->
+        info =
+          "If your email is in our system, you will receive instructions for logging in shortly."
+
+        {:noreply,
+         socket
+         |> put_flash(:info, info)
+         |> push_navigate(to: ~p"/users/log-in")}
     end
-
-    info =
-      "If your email is in our system, you will receive instructions for logging in shortly."
-
-    {:noreply,
-     socket
-     |> put_flash(:info, info)
-     |> push_navigate(to: ~p"/users/log-in")}
   end
+
+  defp register_path(nil), do: ~p"/users/register"
+  defp register_path(return_to), do: ~p"/users/register?#{[return_to: return_to]}"
 
   defp local_mail_adapter? do
     Application.get_env(:tips, Tips.Mailer)[:adapter] == Swoosh.Adapters.Local

@@ -152,6 +152,9 @@ defmodule TipsWeb.UserLive.Registration do
   defp rejection_message(:no_client_ip),
     do: "We couldn't identify your connection. Reload the page and try again."
 
+  defp rejection_message(:registration_invariant),
+    do: "We couldn't complete your sign-up because of a problem on our end. Try again later."
+
   defp seconds(1), do: "1 second"
   defp seconds(n), do: "#{n} seconds"
 

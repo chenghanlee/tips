@@ -108,6 +108,24 @@ defmodule TipsWeb.UserLive.ConfirmationTest do
       assert html =~ "Magic link is invalid or it has expired"
     end
 
+    test "expired registration cannot establish a session and offers restart signup", %{
+      conn: conn,
+      unconfirmed_user: user
+    } do
+      token = extract_user_token(&Accounts.deliver_login_instructions(user, &1))
+      set_registration_deadline(user, 0)
+
+      {:ok, lv, html} =
+        live(conn, ~p"/users/log-in/#{token}")
+        |> follow_redirect(conn, ~p"/users/log-in")
+
+      assert html =~ "Magic link is invalid or it has expired"
+      assert html =~ "signed up more than seven days ago without confirming, register again"
+      refute html =~ "Confirm and stay logged in"
+      assert has_element?(lv, ~s|a[href="/users/register"]|)
+      refute Accounts.get_user!(user.id).confirmed_at
+    end
+
     test "raises error for invalid token", %{conn: conn} do
       {:ok, _lv, html} =
         live(conn, ~p"/users/log-in/invalid-token")
