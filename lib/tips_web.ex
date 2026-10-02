@@ -50,7 +50,8 @@ defmodule TipsWeb do
 
   def live_view do
     quote do
-      use Phoenix.LiveView
+      # LiveView's logger prints the mount session; TipsWeb.LiveLogger replaces it.
+      use Phoenix.LiveView, log: false
 
       unquote(html_helpers())
     end

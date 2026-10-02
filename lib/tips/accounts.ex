@@ -69,7 +69,9 @@ defmodule Tips.Accounts do
   A LiveView keeps its `SessionRef` in private state and re-admits with
   `TipsWeb.UserAuth.readmit/1` before every mutation and privileged read.
   Controllers keep per-request authentication. Rendering, form validation and
-  public reads run no token query. Work admitted before a revocation may
+  public reads run no token query. Queries that bind the bearer or the
+  reference are not logged, and `TipsWeb.LiveLogger` logs LiveView callbacks
+  without the session or payloads. Work admitted before a revocation may
   finish. Admission is not eligibility: a full ban or missing confirmation
   never fails admission.
 
@@ -127,6 +129,10 @@ defmodule Tips.Accounts do
 
   # Positive bigint ids; anything else cannot name a row.
   @row_ids 1..9_223_372_036_854_775_807
+
+  # Queries that bind a session bearer or a `SessionRef` pass this, so Ecto
+  # never logs those parameters. Their telemetry events still fire.
+  @private_params [log: false]
 
   ## Eligibility
 
@@ -355,12 +361,15 @@ defmodule Tips.Accounts do
 
   # Call with the account locked.
   defp valid_predecessor(user_id, token) do
-    Repo.one(from(t in UserToken.valid_session_token_query(token), where: t.user_id == ^user_id))
+    Repo.one(
+      from(t in UserToken.valid_session_token_query(token), where: t.user_id == ^user_id),
+      @private_params
+    )
   end
 
   defp insert_session_token!(user_id, family, authenticated_at) do
     {token, user_token} = UserToken.build_session_token(user_id, family, authenticated_at)
-    Repo.insert!(user_token)
+    Repo.insert!(user_token, @private_params)
     token
   end
 
@@ -388,7 +397,10 @@ defmodule Tips.Accounts do
   """
   @spec get_session_family_id(binary()) :: Ecto.UUID.t() | nil
   def get_session_family_id(token) do
-    Repo.one(from(t in UserToken.valid_session_token_query(token), select: t.session_family_id))
+    Repo.one(
+      from(t in UserToken.valid_session_token_query(token), select: t.session_family_id),
+      @private_params
+    )
   end
 
   @doc """
@@ -428,7 +440,7 @@ defmodule Tips.Accounts do
   def readmit_scope(_session_ref), do: {:error, :unauthenticated}
 
   defp admit(valid_session_query) do
-    case Repo.one(UserToken.admission_query(valid_session_query)) do
+    case Repo.one(UserToken.admission_query(valid_session_query), @private_params) do
       {%User{} = user, token_id, token_inserted_at} ->
         {:ok, Scope.for_user(user), token_id, token_inserted_at}
 
@@ -637,7 +649,9 @@ defmodule Tips.Accounts do
 
   # The stored session row of a token at any age, to identify its account and family.
   defp session_row(nil), do: nil
-  defp session_row(token), do: Repo.get_by(UserToken, token: token, context: "session")
+
+  defp session_row(token),
+    do: Repo.get_by(UserToken, [token: token, context: "session"], @private_params)
 
   defp family_query(%UserToken{user_id: user_id, session_family_id: family}) do
     from(t in UserToken, where: t.user_id == ^user_id and t.session_family_id == ^family)
