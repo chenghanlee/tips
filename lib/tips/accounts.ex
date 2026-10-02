@@ -346,8 +346,6 @@ defmodule Tips.Accounts do
   end
 
   # Call with the account locked.
-  defp valid_predecessor(_user_id, nil), do: nil
-
   defp valid_predecessor(user_id, token) do
     Repo.one(from(t in UserToken.valid_session_token_query(token), where: t.user_id == ^user_id))
   end
@@ -432,13 +430,14 @@ defmodule Tips.Accounts do
           {:ok, %{user: User.t(), session_token: binary(), revoked_family_ids: [Ecto.UUID.t()]}}
           | {:error, :not_found}
   def login_user_by_magic_link(token, predecessor_token \\ nil) do
-    # Proof and predecessor rows never change account, so their ids can be read unlocked.
+    # Proof and predecessor rows never change account or family, so both can be read unlocked.
     with {:ok, {%User{id: user_id}, _proof}} <- magic_link_proof(token) do
-      predecessor_ids = for %UserToken{user_id: id} <- [session_row(predecessor_token)], do: id
+      predecessor = session_row(predecessor_token)
+      predecessor_ids = for %UserToken{user_id: id} <- [predecessor], do: id
 
       Repo.transact(fn ->
         lock_accounts([user_id | predecessor_ids])
-        log_in_by_locked_magic_link(token, predecessor_token)
+        log_in_by_locked_magic_link(token, predecessor)
       end)
     end
   end
@@ -454,20 +453,15 @@ defmodule Tips.Accounts do
     end
   end
 
-  defp log_in_by_locked_magic_link(token, predecessor_token) do
+  defp log_in_by_locked_magic_link(token, predecessor) do
     with {:ok, {user, proof}} <- magic_link_proof(token) do
-      {:ok, log_in_by_magic_link(user, proof, predecessor_token)}
+      {:ok, log_in_by_magic_link(user, proof, predecessor)}
     end
   end
 
-  defp log_in_by_magic_link(user, proof, predecessor_token) do
+  defp log_in_by_magic_link(user, proof, predecessor) do
     {user, confirmed_away} = consume_proof(user, proof)
-
-    {family, switched_away} =
-      case valid_predecessor(user.id, predecessor_token) do
-        %UserToken{session_family_id: family} -> {family, []}
-        nil -> {Ecto.UUID.generate(), revoke_family_of_other_account(user.id, predecessor_token)}
-      end
+    {family, switched_away} = continue_or_switch_family(user.id, predecessor)
 
     %{
       user: user,
@@ -490,15 +484,20 @@ defmodule Tips.Accounts do
     {user, []}
   end
 
-  defp revoke_family_of_other_account(user_id, predecessor_token) do
-    case session_row(predecessor_token) do
-      %UserToken{user_id: other_id} = row when other_id != user_id ->
-        delete_session_rows(family_query(row))
+  # `predecessor` is the row read before the locks. Pruning takes no account lock and may
+  # have deleted it since, so the family to revoke comes from that row, not a second lookup.
+  # Keeping a family still needs the row to be valid now.
+  defp continue_or_switch_family(_user_id, nil), do: {Ecto.UUID.generate(), []}
 
-      # No row, or an expired row of the same account: nothing to revoke.
-      _same_account_or_absent ->
-        []
+  defp continue_or_switch_family(user_id, %UserToken{user_id: user_id, token: token}) do
+    case valid_predecessor(user_id, token) do
+      %UserToken{session_family_id: family} -> {family, []}
+      nil -> {Ecto.UUID.generate(), []}
     end
+  end
+
+  defp continue_or_switch_family(_user_id, %UserToken{} = other_account_row) do
+    {Ecto.UUID.generate(), delete_session_rows(family_query(other_account_row))}
   end
 
   @doc ~S"""
