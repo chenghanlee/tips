@@ -71,7 +71,7 @@ coding launches do not inherit its compaction setting.
 | Database suffix | `team.db_suffix_prefix`, team number, `roles.<role>.db_suffix` |
 | Test port | `team.port_base` + team number × `team.port_stride` + role `port_offset` |
 
-Generated worktree files point at the shared Dexter binary; reviewed revisions need not contain the build. The helper fetches locked dependencies and warms up Dexter even when invoked without `--start`. For staged pilots, `TIPS_DEXTER_HOME` selects the shared build directory. Configuration/tooling changes require disposable pilots verifying both the client root and the `TIPS_DEXTER` root in each actual client. Before scaling, measure simultaneous cold-start capacity; configured team limits do not verify it.
+Generated worktree files point at the shared Dexter binary; reviewed revisions need not contain the build. The helper warms up Dexter even when invoked without `--start`; it fetches locked dependencies first for a new checkout or a review head, and leaves a resumed developer worktree's dependencies alone. For staged pilots, `TIPS_DEXTER_HOME` selects the shared build directory. Configuration/tooling changes require disposable pilots verifying both the client root and the `TIPS_DEXTER` root in each actual client. Before scaling, measure simultaneous cold-start capacity; configured team limits do not verify it.
 
 Set database connection limits in [compose.yaml](../../compose.yaml), overridden by `TIPS_DB_MAX_CONNECTIONS`. Recreate the database service to apply changes, only with no teams running. Agent launch settings never restart PostgreSQL or existing clients.
 
