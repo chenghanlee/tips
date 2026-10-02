@@ -71,15 +71,19 @@ language-server plugins, including in linked worktrees.
 Provisioning then runs three steps in the worktree, with the role's environment.
 Any failure stops the launch:
 
-1. `mix deps.get --check-locked`. Dexter indexes dependency sources from disk
-   and does not watch `deps/`, so they must exist first. A fetch that would
-   rewrite `mix.lock` fails; the lock under review is never changed.
+1. `mix deps.get --check-locked`, for a new checkout and for a review head.
+   Dexter indexes dependency sources from disk and does not watch `deps/`, so
+   they must exist first. A fetch that would rewrite `mix.lock` fails;
+   provisioning never changes a lock. A resumed developer worktree skips this
+   step: it may hold an unfinished dependency change, and its agent must be
+   able to start to finish it.
 2. `dexter.sh query workspace-symbols --raw --wait <timeout> MixProject`. It
    starts the daemon and refuses a client if the index does not answer.
 3. `dexter.sh reindex`. A daemon that was already running indexed the checkout
    before the fetch; this reconciles it with the disk.
 
-The same steps run when a reviewer's checkout is advanced in place. An agent
+The same steps run when a reviewer's checkout is advanced in place, and again
+when the same review head is requested for a running reviewer. An agent
 that fetches or changes dependencies later runs `"$TIPS_DEXTER" reindex` itself.
 
 `team.py stop` runs `dexter.sh stop` per worktree before retiring it; an
@@ -124,8 +128,11 @@ to workspace`. Do not start another language server.
   is not proof of absence. Rerun after large checkouts or generated code.
 - Index scope: the worktree, its `deps/` and the configured Elixir sources. The
   root's `tmp/` directory and nested checkouts are left out, so scratch copies
-  of application modules never answer for the application. Reviewer scratch
-  tests under `tmp/` therefore appear in no answer; search them with `rg`.
+  of application modules never answer for the application. Index-based
+  discovery (`workspace-symbols`, `lookup`, `references`, call hierarchy)
+  therefore finds nothing in reviewer scratch tests under `tmp/`; search them
+  with `rg`. A query on a scratch file itself, such as `symbols`, still reads
+  it. Configured Elixir sources are indexed even when they lie under `tmp/`.
 - File-backed navigation uses saved disk text.
   Cached files follow later disk changes
   (`Edit`, `mix format`, generators, shell rewrites) by size and mtime.

@@ -8078,13 +8078,14 @@ index a5874ec..b979c24 100644
  	server.index.backgroundWork.Wait()
 diff --git a/internal/lsp/scratch_test.go b/internal/lsp/scratch_test.go
 new file mode 100644
-index 0000000..f33449c
+index 0000000..5c00238
 --- /dev/null
 +++ b/internal/lsp/scratch_test.go
-@@ -0,0 +1,52 @@
+@@ -0,0 +1,86 @@
 +package lsp
 +
 +import (
++	"path/filepath"
 +	"testing"
 +)
 +
@@ -8134,11 +8135,62 @@ index 0000000..f33449c
 +		})
 +	}
 +}
++
++// A standard library the user configured is indexed wherever it lies, the
++// scratch directory included: the cold build, the sweep that follows it and a
++// single-file update must agree.
++func TestServer_stdlibInScratchSurvivesReindex(t *testing.T) {
++	server, cleanup := setupTestServer(t)
++	defer cleanup()
++
++	server.SetStdlibRoot(filepath.Join(server.projectRoot, "tmp", "elixir"))
++	writeTestFile(t, server.projectRoot, "lib/worker.ex", scratchWorker)
++	stdlib := writeTestFile(t, server.projectRoot, "tmp/elixir/lib/enum.ex", `defmodule Scratch.Enum do
++  def count(enumerable), do: enumerable
++end`)
++
++	for _, step := range []struct {
++		name string
++		run  func()
++	}{
++		{"cold build", server.backgroundReindex},
++		{"sweep", server.backgroundReindex},
++		{"single-file update", func() { server.ReconcileFile(stdlib) }},
++	} {
++		step.run()
++		server.index.backgroundWork.Wait()
++		results, err := server.store.LookupFunction("Scratch.Enum", "count")
++		if err != nil {
++			t.Fatal(err)
++		}
++		if len(results) != 1 {
++			t.Fatalf("after the %s Scratch.Enum.count has %d definitions, want 1", step.name, len(results))
++		}
++	}
++}
 diff --git a/internal/lsp/server.go b/internal/lsp/server.go
-index 0499a21..3a32097 100644
+index 0499a21..7dbc2ac 100644
 --- a/internal/lsp/server.go
 +++ b/internal/lsp/server.go
-@@ -274,7 +274,7 @@ func ServeStream(server *Server, rwc io.ReadWriteCloser) error {
+@@ -258,6 +258,17 @@ func (s *Server) isStdlibPath(path string) bool {
+ 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator))
+ }
+ 
++// inScratch reports whether path is scratch the index leaves out. The
++// configured standard library is indexed wherever it lies.
++func (s *Server) inScratch(path string) bool {
++	return parser.InScratch(s.projectRoot, path) && !s.isStdlibPath(path)
++}
++
++// excluded reports whether the index leaves path out.
++func (s *Server) excluded(path string) bool {
++	return s.inScratch(path) || parser.InNestedCheckout(s.projectRoot, path)
++}
++
+ // ServeStream runs one preconstructed LSP session over a stream the session is
+ // allowed to close. Workspace daemons use this so an editor's `exit`
+ // notification ends that session — releasing its registration and its lease on
+@@ -274,7 +285,7 @@ func ServeStream(server *Server, rwc io.ReadWriteCloser) error {
  	server.conn = conn
  	server.clientLog = startClientLog(server.client, conn.Done())
  
@@ -8147,16 +8199,16 @@ index 0499a21..3a32097 100644
  	ctx := context.Background()
  
  	conn.Go(ctx, handler)
-@@ -413,7 +413,7 @@ func (s *Server) pruneMissingFiles(seen map[string]struct{}) {
+@@ -413,7 +424,7 @@ func (s *Server) pruneMissingFiles(seen map[string]struct{}) {
  				if !recordedRead {
  					recorded, recordedRead = parser.NestedWorktreeSet(s.projectRoot), true
  				}
 -				in = underTop(s.projectRoot, dir, recorded) || parser.InLinkedWorktree(s.projectRoot, storedPath)
-+				in = underTop(s.projectRoot, dir, recorded) || parser.Excluded(s.projectRoot, storedPath)
++				in = underTop(s.projectRoot, dir, recorded) || s.excluded(storedPath)
  				inWorktree[dir] = in
  			}
  			if !in {
-@@ -510,9 +510,10 @@ func (s *Server) indexOneFile(path string) {
+@@ -510,9 +521,10 @@ func (s *Server) indexOneFile(path string) {
  // indexOneFileLocked is indexOneFile for callers already holding indexWrites.
  // Go's RWMutex is not reentrant, so the two must stay separate.
  func (s *Server) indexOneFileLocked(path string) {
@@ -8166,21 +8218,21 @@ index 0499a21..3a32097 100644
 +	// Watchers and editors report changes in nested worktrees and in the
 +	// scratch directory too; the full walk leaves them out, so a single-file
 +	// update must as well.
-+	if parser.Excluded(s.projectRoot, path) {
++	if s.excluded(path) {
  		return
  	}
  	defs, refs, err := parser.ParseFile(path)
-@@ -599,6 +600,9 @@ func (s *Server) startBackgroundReindex() <-chan struct{} {
+@@ -599,6 +611,9 @@ func (s *Server) startBackgroundReindex() <-chan struct{} {
  		seen := make(map[string]struct{})
  		walkAndIndex := func(root string, indexRefs bool) {
  			_ = parser.WalkElixirFiles(root, func(path string, d fs.DirEntry) error {
-+				if parser.InScratch(s.projectRoot, path) {
++				if s.inScratch(path) {
 +					return nil
 +				}
  				seen[path] = struct{}{}
  
  				if !isEmpty {
-@@ -821,16 +825,12 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
+@@ -821,16 +836,12 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
  			s.projectRoot = store.FindProjectRoot(clientRoot)
  		}
  	} else if clientRoot != "" && s.workspaceEvents != nil {
@@ -8202,7 +8254,7 @@ index 0499a21..3a32097 100644
  			}
  		}
  	}
-@@ -1203,8 +1203,15 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1203,8 +1214,15 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  			}
  		}
  
@@ -8219,7 +8271,7 @@ index 0499a21..3a32097 100644
  		s.debugf("Definition: resolved bare %q -> %q", functionName, fullModule)
  		if fullModule == "" {
  			currentModule := s.store.LookupEnclosingModule(uriToPath(protocol.DocumentURI(docURI)), lineNum+1)
-@@ -1223,11 +1230,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1223,11 +1241,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  		// Current module — return buffer location directly (works before indexing).
  		// In a typespec the bare name is the type, everywhere else the function.
  		if fullModule == currentModule {
@@ -8232,7 +8284,7 @@ index 0499a21..3a32097 100644
  				return []protocol.Location{{
  					URI:   params.TextDocument.URI,
  					Range: lineRange(line - 1),
-@@ -1236,13 +1239,14 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1236,13 +1250,14 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  		}
  
  		kind := NameKindCallable
@@ -8248,7 +8300,7 @@ index 0499a21..3a32097 100644
  		})
  		if err == nil && len(results) > 0 {
  			s.debugf("Definition: found %d semantic result(s) for %s.%s", len(results), fullModule, functionName)
-@@ -1250,7 +1254,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1250,7 +1265,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  		}
  
  		// Fallback for use-chain inline defs (not stored as module definitions)
@@ -8257,7 +8309,7 @@ index 0499a21..3a32097 100644
  			s.debugf("Definition: found %d result(s) via current file use chain for %s", len(results), functionName)
  			return storeResultsToLocations(byKindForContext(tf, lineNum, results)), nil
  		}
-@@ -1275,15 +1279,18 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1275,15 +1290,18 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  	s.debugf("Definition: qualified call resolved %q -> %q", moduleRef, fullModule)
  
  	if functionName != "" {
@@ -8281,7 +8333,7 @@ index 0499a21..3a32097 100644
  		})
  		if err != nil {
  			return nil, nil
-@@ -2535,12 +2542,14 @@ func (s *Server) parseUsingFile(filePath, moduleName string) *usingCacheEntry {
+@@ -2535,12 +2553,14 @@ func (s *Server) parseUsingFile(filePath, moduleName string) *usingCacheEntry {
  
  // lookupThroughUseOf looks up functionName through the `use` declarations in
  // fullModule's source file. This handles qualified calls like M.func() where
@@ -8299,7 +8351,7 @@ index 0499a21..3a32097 100644
  	modResults, err := s.store.LookupModule(fullModule)
  	if err != nil || len(modResults) == 0 {
  		return nil
-@@ -2549,7 +2558,7 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
+@@ -2549,7 +2569,7 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
  	if !ok {
  		return nil
  	}
@@ -8308,7 +8360,7 @@ index 0499a21..3a32097 100644
  }
  
  // lookupThroughUse searches for functionName in definitions injected by `use`
-@@ -2557,15 +2566,15 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
+@@ -2557,15 +2577,15 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
  // priority over imported ones. Later `use` declarations shadow earlier ones.
  // Transitive use chains (use inside __using__ body) are followed recursively.
  func (s *Server) lookupThroughUse(text, functionName string, aliases map[string]string) []store.LookupResult {
@@ -8327,7 +8379,7 @@ index 0499a21..3a32097 100644
  			return result
  		}
  	}
-@@ -2577,7 +2586,7 @@ func (s *Server) lookupThroughUseWithFollow(text, functionName string, aliases m
+@@ -2577,7 +2597,7 @@ func (s *Server) lookupThroughUseWithFollow(text, functionName string, aliases m
  // consumerOpts are the keyword args from the `use Module, key: Val` call and
  // are used to resolve dynamic imports like `import unquote(mod)`.
  func (s *Server) lookupInUsingEntry(moduleName, functionName string, consumerOpts map[string]string, visited map[string]bool) []store.LookupResult {
@@ -8336,7 +8388,7 @@ index 0499a21..3a32097 100644
  }
  
  // bodyFor picks the injected body for a `use` call. An ordinary __using__ has a
-@@ -2607,13 +2616,12 @@ func usingVisitKey(moduleName, which string) string {
+@@ -2607,13 +2627,12 @@ func usingVisitKey(moduleName, which string) string {
  	return moduleName + "\x00" + which
  }
  
@@ -8356,7 +8408,7 @@ index 0499a21..3a32097 100644
  	visitKey := usingVisitKey(moduleName, which)
  	if visited[visitKey] {
  		return nil
-@@ -2630,23 +2638,20 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2630,23 +2649,20 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  	}
  
  	// Inline defs take priority: directly injected by the quote do block
@@ -8384,7 +8436,7 @@ index 0499a21..3a32097 100644
  		}
  		if err != nil || len(results) == 0 {
  			continue
-@@ -2665,19 +2670,23 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2665,19 +2681,23 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  		}
  		switch b.kind {
  		case "import":
@@ -8410,7 +8462,7 @@ index 0499a21..3a32097 100644
  				return result
  			}
  		}
-@@ -2686,7 +2695,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2686,7 +2706,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  	// Transitive uses: use Module inside the __using__ body (double-use chains)
  	for k := len(body.transCalls) - 1; k >= 0; k-- {
  		call := body.transCalls[k]
@@ -8419,7 +8471,7 @@ index 0499a21..3a32097 100644
  			return result
  		}
  	}
-@@ -2694,7 +2703,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2694,7 +2714,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  		if body.hasTransCall(body.transUses[k]) {
  			continue
  		}
@@ -8428,7 +8480,7 @@ index 0499a21..3a32097 100644
  			return result
  		}
  	}
-@@ -2703,15 +2712,12 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2703,15 +2723,12 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  }
  
  // resolveModuleViaUseChain returns the module name that provides functionName
@@ -8450,7 +8502,7 @@ index 0499a21..3a32097 100644
  	visitKey := usingVisitKey(moduleName, which)
  	if visited[visitKey] {
  		return ""
-@@ -2729,12 +2735,12 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2729,12 +2746,12 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  
  	// Functions defined directly in the quote do block belong to the module
  	// that injected them, not to any imported module.
@@ -8465,7 +8517,7 @@ index 0499a21..3a32097 100644
  			return body.imports[j]
  		}
  	}
-@@ -2749,11 +2755,11 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2749,11 +2766,11 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  		}
  		switch b.kind {
  		case "import":
@@ -8479,7 +8531,7 @@ index 0499a21..3a32097 100644
  				return m
  			}
  		}
-@@ -2761,7 +2767,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2761,7 +2778,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  
  	for k := len(body.transCalls) - 1; k >= 0; k-- {
  		call := body.transCalls[k]
@@ -8488,7 +8540,7 @@ index 0499a21..3a32097 100644
  			return mod
  		}
  	}
-@@ -2769,7 +2775,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2769,7 +2786,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  		if body.hasTransCall(body.transUses[k]) {
  			continue
  		}
@@ -8497,7 +8549,7 @@ index 0499a21..3a32097 100644
  			return mod
  		}
  	}
-@@ -3645,7 +3651,7 @@ func (s *Server) addCompletionsFromUsingFor(moduleName, which string, consumerOp
+@@ -3645,7 +3662,7 @@ func (s *Server) addCompletionsFromUsingFor(moduleName, which string, consumerOp
  // Mirrors the go-to-definition priority: current file modules → imports → use chains → Kernel.
  // Callers should pass pre-computed aliases to avoid redundant ExtractAliases scans.
  func (s *Server) resolveBareFunctionModule(filePath, text string, tf *TokenizedFile, lineNum int, functionName string, aliases map[string]string) string {
@@ -8506,7 +8558,7 @@ index 0499a21..3a32097 100644
  	return module
  }
  
-@@ -3654,21 +3660,30 @@ func (s *Server) resolveBareFunctionModule(filePath, text string, tf *TokenizedF
+@@ -3654,21 +3671,30 @@ func (s *Server) resolveBareFunctionModule(filePath, text string, tf *TokenizedF
  // distinguish a consumer override from a function supplied by its use chain:
  // both resolve to the consumer module, but only the latter should expand across
  // other consumers of the injector.
@@ -8545,7 +8597,7 @@ index 0499a21..3a32097 100644
  			return mod, false
  		}
  	}
-@@ -3678,20 +3693,20 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
+@@ -3678,20 +3704,20 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
  	useCalls := tf.ExtractUsesWithOpts(aliases)
  	for i := len(useCalls) - 1; i >= 0; i-- {
  		uc := useCalls[i]
@@ -8569,7 +8621,7 @@ index 0499a21..3a32097 100644
  			return mod, false
  		}
  	}
-@@ -3699,6 +3714,21 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
+@@ -3699,6 +3725,21 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
  	return "", false
  }
  
@@ -8591,7 +8643,7 @@ index 0499a21..3a32097 100644
  func resolveModule(moduleRef string, aliases map[string]string) string {
  	if resolved, ok := aliases[moduleRef]; ok {
  		return resolved
-@@ -5054,38 +5084,33 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
+@@ -5054,38 +5095,33 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
  			return nil, nil
  		}
  
@@ -8641,7 +8693,7 @@ index 0499a21..3a32097 100644
  			return s.hoverFromFile(functionName, results[0])
  		}
  
-@@ -5114,21 +5139,18 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
+@@ -5114,21 +5150,18 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
  	fullModule := s.resolveModuleWithNesting(moduleRef, aliases, uriToPath(protocol.DocumentURI(docURI)), lineNum)
  
  	if functionName != "" {
@@ -8672,7 +8724,7 @@ index 0499a21..3a32097 100644
  	}
  
  	results, err := s.store.LookupModule(fullModule)
-@@ -5167,6 +5189,12 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
+@@ -5167,6 +5200,12 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
  	if functionName == "" {
  		return nil, nil
  	}
@@ -8685,7 +8737,7 @@ index 0499a21..3a32097 100644
  
  	// Find the module enclosing the cursor via the store — this correctly handles
  	// files with defmodule lines inside heredocs/doc examples.
-@@ -5179,33 +5207,85 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
+@@ -5179,33 +5218,85 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
  
  	s.debugf("Implementation: module=%s function=%s", currentModule, functionName)
  
@@ -8790,7 +8842,7 @@ index 0499a21..3a32097 100644
  }
  func (s *Server) OnTypeFormatting(ctx context.Context, params *protocol.DocumentOnTypeFormattingParams) ([]protocol.TextEdit, error) {
  	return nil, nil
-@@ -5420,6 +5500,8 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5420,6 +5511,8 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  	// below. They carry the bare type uses (`@type t :: schema | embedded`)
  	// that the call-shaped scan cannot see.
  	var typespecOccurrences []protocol.Location
@@ -8799,7 +8851,7 @@ index 0499a21..3a32097 100644
  
  	if moduleRef == "" {
  		if functionName == "" {
-@@ -5463,7 +5545,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5463,7 +5556,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		}
  
  		// Bare function — resolve to its defining module
@@ -8808,7 +8860,7 @@ index 0499a21..3a32097 100644
  		s.debugf("References: resolved bare %q -> %q", functionName, fullModule)
  		if fullModule == "" {
  			currentModule := s.store.LookupEnclosingModule(uriToPath(protocol.DocumentURI(docURI)), lineNum+1)
-@@ -5513,7 +5595,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5513,7 +5606,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		useCalls := tf.ExtractUsesWithOpts(aliases)
  		for i := len(useCalls) - 1; i >= 0; i-- {
  			uc := useCalls[i]
@@ -8817,7 +8869,7 @@ index 0499a21..3a32097 100644
  				injectors = append(injectors, uc.Module)
  				s.debugf("References: opt-binding injector for %s: %s", functionName, uc.Module)
  				break
-@@ -5524,7 +5606,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5524,7 +5617,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  	kind := NameKindCallable
  	if functionName == "" {
  		kind = NameKindAny
@@ -8826,7 +8878,7 @@ index 0499a21..3a32097 100644
  		kind = NameKindType
  	}
  	semantic, err := s.ReferenceNames(fullModule, functionName, NameReferenceOptions{
-@@ -5534,15 +5616,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5534,15 +5627,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		ExcludeStdlib:      true,
  		InjectorModules:    injectors,
  		GeneratedProvider:  generatedProvider,
@@ -8846,7 +8898,7 @@ index 0499a21..3a32097 100644
  	}
  	seen := make(map[refKey]struct{}, len(semantic))
  	var locations []protocol.Location
-@@ -5556,19 +5642,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5556,19 +5653,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  			if line == lineNum && !params.Context.IncludeDeclaration {
  				continue
  			}
@@ -8869,7 +8921,7 @@ index 0499a21..3a32097 100644
  		})
  	}
  
-@@ -7100,270 +7186,17 @@ func (s *Server) DidDeleteFiles(ctx context.Context, params *protocol.DeleteFile
+@@ -7100,270 +7197,17 @@ func (s *Server) DidDeleteFiles(ctx context.Context, params *protocol.DeleteFile
  }
  func (s *Server) CodeLensRefresh(ctx context.Context) error { return nil }
  func (s *Server) PrepareCallHierarchy(ctx context.Context, params *protocol.CallHierarchyPrepareParams) ([]protocol.CallHierarchyItem, error) {
@@ -11697,7 +11749,7 @@ index 0000000..a27963d
 +	return false
 +}
 diff --git a/internal/parser/parser.go b/internal/parser/parser.go
-index fb2714c..57785df 100644
+index fb2714c..71ad0c0 100644
 --- a/internal/parser/parser.go
 +++ b/internal/parser/parser.go
 @@ -157,10 +157,9 @@ func IsElixirFile(path string) bool {
@@ -11791,7 +11843,7 @@ index fb2714c..57785df 100644
  	rel, err := filepath.Rel(root, filepath.Dir(path))
  	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
  		return false
-@@ -332,13 +355,33 @@ func InLinkedWorktree(root, path string) bool {
+@@ -332,13 +355,34 @@ func InLinkedWorktree(root, path string) bool {
  	dir := root
  	for _, part := range strings.Split(rel, string(filepath.Separator)) {
  		dir = filepath.Join(dir, part)
@@ -11804,8 +11856,9 @@ index fb2714c..57785df 100644
  }
  
 +// scratchDir is the directory directly below a workspace root that the index
-+// leaves out. Mix projects ignore it, and it holds disposable copies of
-+// application sources whose modules would otherwise answer for the application.
++// leaves out. This is the Tips convention, not a Mix rule: tmp holds disposable
++// copies of application sources whose modules would otherwise answer for the
++// application. Scratch tests written there are left out with them.
 +const scratchDir = "tmp"
 +
 +// InScratch reports whether path is root's scratch directory or lies inside it.
@@ -11826,7 +11879,7 @@ index fb2714c..57785df 100644
  // NestedWorktreeTops lists the linked worktrees of root's repository that are
  // checked out strictly below root. It reads git's own records: each admin
  // directory in <common dir>/worktrees/ has a gitdir file that names the
-@@ -452,7 +495,7 @@ func CollectElixirFilesParallel(root string) []string {
+@@ -452,7 +496,7 @@ func CollectElixirFilesParallel(root string) []string {
  		if err != nil {
  			return
  		}
@@ -13639,10 +13692,20 @@ index 0000000..8f09d51
 +	}
 +}
 diff --git a/internal/workspace/watch_fsnotify.go b/internal/workspace/watch_fsnotify.go
-index 8c8e29f..dc322df 100644
+index 8c8e29f..0ca7b5c 100644
 --- a/internal/workspace/watch_fsnotify.go
 +++ b/internal/workspace/watch_fsnotify.go
-@@ -132,7 +132,7 @@ func (w *fsnotifyWatcher) walkDirectories(root string, includeRoot bool) int {
+@@ -108,7 +108,8 @@ func (w *fsnotifyWatcher) watchTree(root string) int {
+ }
+ 
+ func (w *fsnotifyWatcher) walkDirectories(root string, includeRoot bool) int {
+-	if info, err := os.Lstat(root); err != nil || !info.IsDir() || skipWatchDir(info.Name()) {
++	// The index leaves the scratch directory out, so it needs no watch.
++	if info, err := os.Lstat(root); err != nil || !info.IsDir() || skipWatchDir(info.Name()) || parser.InScratch(w.root, root) {
+ 		return 0
+ 	}
+ 	watched := 0
+@@ -132,13 +133,13 @@ func (w *fsnotifyWatcher) walkDirectories(root string, includeRoot bool) int {
  			return
  		}
  		// The entries show a nested worktree without another syscall.
@@ -13651,7 +13714,15 @@ index 8c8e29f..dc322df 100644
  			w.tops.add(dir)
  			return
  		}
-@@ -176,7 +176,7 @@ func (w *fsnotifyWatcher) checkPending() {
+ 		for _, e := range entries {
+-			if e.IsDir() && !skipWatchDir(e.Name()) {
+-				walk(filepath.Join(dir, e.Name()))
++			if child := filepath.Join(dir, e.Name()); e.IsDir() && !skipWatchDir(e.Name()) && !parser.InScratch(w.root, child) {
++				walk(child)
+ 			}
+ 		}
+ 	}
+@@ -176,7 +177,7 @@ func (w *fsnotifyWatcher) checkPending() {
  		delete(w.pending, dir)
  		info, err := os.Stat(dir)
  		if err == nil && info.IsDir() {
@@ -13660,7 +13731,19 @@ index 8c8e29f..dc322df 100644
  				continue
  			}
  			if recordedWorktree(w.root, dir) {
-@@ -315,6 +315,19 @@ func (w *fsnotifyWatcher) handle(ev fsnotify.Event) {
+@@ -296,6 +297,11 @@ func (w *fsnotifyWatcher) handle(ev fsnotify.Event) {
+ 	dir := filepath.Dir(path)
+ 	gone := ev.Op.Has(fsnotify.Remove) || ev.Op.Has(fsnotify.Rename)
+ 
++	// The watched root still reports the scratch directory's own creation.
++	if parser.InScratch(w.root, path) {
++		return
++	}
++
+ 	// A nested worktree top is watched only for its .git file. Nothing was
+ 	// indexed from it, so its own removal needs no work either.
+ 	if w.tops.has(dir) {
+@@ -315,6 +321,19 @@ func (w *fsnotifyWatcher) handle(ev fsnotify.Event) {
  		return
  	}
  
@@ -13680,7 +13763,7 @@ index 8c8e29f..dc322df 100644
  	if ev.Op.Has(fsnotify.Create) {
  		if info, err := os.Stat(path); err == nil && info.IsDir() {
  			if skipWatchDir(base) {
-@@ -325,6 +338,10 @@ func (w *fsnotifyWatcher) handle(ev fsnotify.Event) {
+@@ -325,6 +344,10 @@ func (w *fsnotifyWatcher) handle(ev fsnotify.Event) {
  			}
  			w.retryFailedUnder(path)
  			if w.tops.has(path) {
@@ -13691,7 +13774,7 @@ index 8c8e29f..dc322df 100644
  				return
  			}
  			_ = parser.WalkElixirFiles(path, func(file string, _ fs.DirEntry) error {
-@@ -335,18 +352,6 @@ func (w *fsnotifyWatcher) handle(ev fsnotify.Event) {
+@@ -335,18 +358,6 @@ func (w *fsnotifyWatcher) handle(ev fsnotify.Event) {
  		}
  	}
  
@@ -13764,7 +13847,7 @@ index f07e2b8..b127cb6 100644
  			}
  			if recordedWorktree(w.root, dir) {
 diff --git a/internal/workspace/watch_test.go b/internal/workspace/watch_test.go
-index a99080d..8ea6baf 100644
+index a99080d..f609409 100644
 --- a/internal/workspace/watch_test.go
 +++ b/internal/workspace/watch_test.go
 @@ -259,8 +259,8 @@ func TestWatcherDropsEventsFromNestedWorktree(t *testing.T) {
@@ -13778,6 +13861,49 @@ index a99080d..8ea6baf 100644
  	}
  	if len(w.pending) != 0 {
  		t.Errorf("pending = %v before any .git change", w.pending)
+@@ -279,6 +279,42 @@ func TestWatcherDropsEventsFromNestedWorktree(t *testing.T) {
+ 	}
+ }
+ 
++// The index leaves the workspace-root scratch directory out, so the watcher
++// spends no watch on it and reports nothing from it. A tmp directory deeper in
++// the tree is source.
++func TestWatcherLeavesRootScratchUnwatched(t *testing.T) {
++	root := t.TempDir()
++	kept := filepath.Join(root, "lib", "tmp", "kept.ex")
++	copied := filepath.Join(root, "tmp", "copy", "lib", "worker.ex")
++	for _, path := range []string{kept, copied, filepath.Join(root, "tmp", "copy", "mix.exs")} {
++		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(path, []byte("defmodule Copy do\nend\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++	}
++
++	stub := &watchAddStub{failing: map[string]bool{}}
++	w, changed, _ := newRecordingWatcher(root, stub)
++	w.watchTree(root)
++	w.handle(fsnotify.Event{Name: filepath.Join(root, "tmp"), Op: fsnotify.Create})
++	w.handle(fsnotify.Event{Name: filepath.Join(root, "tmp", "copy"), Op: fsnotify.Create})
++	w.handle(fsnotify.Event{Name: copied, Op: fsnotify.Write})
++	w.handle(fsnotify.Event{Name: filepath.Join(root, "tmp", "copy", "mix.exs"), Op: fsnotify.Write})
++	w.handle(fsnotify.Event{Name: kept, Op: fsnotify.Write})
++
++	got := stub.paths()
++	slices.Sort(got)
++	want := []string{root, filepath.Join(root, "lib"), filepath.Join(root, "lib", "tmp")}
++	if !slices.Equal(got, want) {
++		t.Errorf("watched %v, want %v", got, want)
++	}
++	if !slices.Equal(*changed, []string{kept}) {
++		t.Errorf("reported %v, want only %s", *changed, kept)
++	}
++}
++
+ // git worktree add creates the directory before its .git file, and cp -r can
+ // copy subdirectories first. Once the .git file appears, the watches below the
+ // top go and the runtime is told about the directory, to drop what it indexed.
 diff --git a/lsp_integration_test.go b/lsp_integration_test.go
 index 56fad77..74150d1 100644
 --- a/lsp_integration_test.go

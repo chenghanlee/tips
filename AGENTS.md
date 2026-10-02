@@ -39,9 +39,9 @@ Scope searches to relevant paths and file types; broaden as needed.
   | Find calls a function makes | `outgoing-calls` | reading its body |
   | Check which `Module.function/arity` a position selects | `prepare-call-hierarchy` | |
 
-  - Positions: `lookup` gives the line; `symbols` gives the name's column. Take them again after edits or checkout advancement. Read the `cursor:` line of every answer to confirm the token; hierarchy also prints its `selected:` callable.
+  - Positions: `lookup` gives the line; `symbols` gives the name's column. Take them again after edits or checkout advancement. Read the `cursor:` line of every positional answer to confirm the token; hierarchy also prints its `selected:` callable.
   - Before changing or removing any function's name, arity or return shape, private helpers included: run `references` at its definition, and a scoped `rg` for the bare name and for any atom or tuple that dispatches to it. These find candidate uses; source and tests establish the impact. Investigate differences.
-  - Zero rows never means unused. `use Module, :atom`, MFA tuples, telemetry handlers, `apply` and generated code leave no row.
+  - Zero rows never means unused. `use Module, :atom`, MFA tuples, `apply` and generated code may have no indexed use.
   - Call hierarchy explains candidates and does not replace `references`. It covers every clause of the selected callable; at a default-argument head, only the maximum arity.
   - A client truncation warning or an explicit limit means you have only part of the output; narrow the query or save it to a file.
   - After you fetch or change dependencies yourself, run `"$TIPS_DEXTER" reindex`.

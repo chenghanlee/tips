@@ -1094,6 +1094,42 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert [e[2] for e in events[1:]] == ["query", "reindex"]
         assert self.state()["mix_env"] == {"HEX_HOME": str(self.wt / "tmp/hex"), "MIX_ENV": "test"}
 
+    def test_resumed_developer_worktree_keeps_its_own_dependency_state(self) -> None:
+        self.call(role="dev", task="29-dev", ref=False)
+        wt = self.root / ".worktrees/29-dev"
+        # A new checkout gets the locked dependencies, like a review checkout.
+        fetches = [e for e in self.state()["events"] if e[0] == "mix"]
+        assert fetches == [["mix", str(wt), "deps.get", "--check-locked"]]
+        # A resumed one may hold an unfinished dependency change that no fetch
+        # can resolve yet: the agent that will finish it must still start.
+        state = self.state()
+        state["mix_fails"] = True
+        self.save(state)
+        self.call("--start", role="dev", task="29-dev", ref=False)
+        assert [e for e in self.state()["events"] if e[0] == "mix"] == fetches
+        assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 1
+
+    def test_failed_advance_is_prepared_again_at_the_same_head(self) -> None:
+        self.call("--start")
+        self.commit("next")
+        new = self.git("rev-parse", "HEAD")
+        state = self.state()
+        state["mix_fails"] = True
+        self.save(state)
+        result = self.call(ref=new, ok=False)
+        assert "fixture mix failed" in result.stderr
+        assert self.git("-C", str(self.wt), "rev-parse", "HEAD") == new
+        state = self.state()
+        state["mix_fails"] = False
+        self.save(state)
+        before = len(state["events"])
+        result = self.call(ref=new)
+        # The checkout already moved, so only the index is left to prepare.
+        assert "Already running" in result.stdout
+        prepared = [e for e in self.state()["events"][before:] if e[0] in ("mix", "dexter")]
+        assert prepared[0] == ["mix", str(self.wt), "deps.get", "--check-locked"]
+        assert [e[2] for e in prepared[1:]] == ["query", "reindex"]
+
     def test_failed_dependency_fetch_never_asks_the_index_or_starts_an_agent(self) -> None:
         state = self.state()
         state["mix_fails"] = True

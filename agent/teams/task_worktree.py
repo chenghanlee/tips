@@ -355,17 +355,20 @@ enabled = true
         )
 
     def prepare_index(self) -> None:
-        """Fetch dependency sources, start the daemon and reconcile its index with the disk."""
+        """Fetch locked dependencies, start the daemon and reconcile its index with the disk."""
         env = {**os.environ, **self.target_env}
-        # Dexter indexes dependency sources from disk, so they are fetched before
-        # it is asked about them. --check-locked refuses to rewrite the lock under review.
-        run(
-            ["mix", "deps.get", "--check-locked"],
-            cwd=self.worktree,
-            env=env,
-            timeout=DEPS_FETCH_SECONDS,
-            input_text="",
-        )
+        # Dexter indexes dependency sources from disk, so a new checkout and a
+        # review head get them before it is asked; --check-locked never rewrites
+        # the lock. A resumed developer worktree keeps its own dependency state:
+        # it may hold an unfinished change that only its agent can resolve.
+        if self.review_sha or not self.old_head:
+            run(
+                ["mix", "deps.get", "--check-locked"],
+                cwd=self.worktree,
+                env=env,
+                timeout=DEPS_FETCH_SECONDS,
+                input_text="",
+            )
         # The bound command carries the binary, root and Elixir sources; a
         # missing or wrong source tree fails here, before any client starts.
         # The query ends itself within --wait plus its connection allowance, so a
@@ -513,6 +516,10 @@ enabled = true
             )
         if self.args.start and (not owner.get("name")):
             self.herdr("agent", "rename", self.args.pane, self.agent_name)
+        if self.review_sha:
+            # An earlier advance may have moved the checkout and then failed
+            # before its index was ready; preparing it again changes nothing else.
+            self.prepare_index()
         print(
             f"Already running: {self.agent_name} in {self.worktree} ({owner.get('agent_status')})"
         )
