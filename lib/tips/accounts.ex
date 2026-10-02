@@ -31,6 +31,26 @@ defmodule Tips.Accounts do
   Deleting the row revokes it. Controllers, LiveViews, renewal and pruning
   reuse it; do not add a second expiry constant or query.
 
+  ### Session revocation
+
+  A browser's session rows share one `session_family_id`. Logout and an
+  account switch delete the whole family, so a successor issued by an earlier
+  renewal cannot sign back in. Every revocation takes the account lock that
+  renewal takes, then deletes rows; a renewal that waited on the lock finds no
+  predecessor and issues nothing.
+
+    * `revoke_user_session_family/1` revokes the family of one browser token.
+    * `revoke_user_session_families/1` revokes every family of an account. It
+      is the helper for email change and account deletion.
+    * `login_user_by_magic_link/2` revokes the old family when the browser
+      switches accounts.
+
+  Each returns the revoked family ids. Deleting the rows is the authorization
+  boundary. The caller passes the ids to `TipsWeb.UserAuth.disconnect_sessions/1`
+  after its transaction commits; that broadcast is UI feedback only and may be
+  lost. Inside a caller's transaction these helpers join it and roll back with
+  it. Lock participating accounts in ascending id order before calling them.
+
   ### Runtime admission (#47, not implemented yet)
 
   These signatures are reserved. They do not exist yet.
@@ -322,11 +342,14 @@ defmodule Tips.Accounts do
         select: u.id
       )
 
-    if Repo.one(account) do
-      Repo.one(
-        from(t in UserToken.valid_session_token_query(token), where: t.user_id == ^user_id)
-      )
-    end
+    if Repo.one(account), do: valid_predecessor(user_id, token)
+  end
+
+  # Call with the account locked.
+  defp valid_predecessor(_user_id, nil), do: nil
+
+  defp valid_predecessor(user_id, token) do
+    Repo.one(from(t in UserToken.valid_session_token_query(token), where: t.user_id == ^user_id))
   end
 
   defp insert_session_token!(user_id, family, authenticated_at) do
@@ -355,6 +378,14 @@ defmodule Tips.Accounts do
   end
 
   @doc """
+  Returns the family id of a valid session token, or `nil`.
+  """
+  @spec get_session_family_id(binary()) :: Ecto.UUID.t() | nil
+  def get_session_family_id(token) do
+    Repo.one(from(t in UserToken.valid_session_token_query(token), select: t.session_family_id))
+  end
+
+  @doc """
   Gets the user with the given signed token.
 
   If the token is valid `{user, token_inserted_at}` is returned, otherwise `nil` is returned.
@@ -379,37 +410,95 @@ defmodule Tips.Accounts do
   end
 
   @doc """
-  Logs the user in by magic link.
+  Logs the user in by magic link and issues the session token.
 
-  There are two cases to consider:
+  `predecessor_token` is the browser's current session token, if any. One
+  transaction locks the participating accounts in ascending id order,
+  revalidates the proof, consumes it and inserts the session token:
 
-  1. The user has already confirmed their email. They are logged in
-     and the magic link is expired.
+    * A valid predecessor of the same account keeps its family; the new token
+      records the current time as `authenticated_at`.
+    * A predecessor of another account is an account switch: its whole family
+      is revoked and the new account starts a fresh family.
+    * Otherwise a fresh family starts.
 
-  2. The user has not confirmed their email. In this case, the user
-     gets confirmed, logged in, and all tokens - including session
-     ones - are expired. In theory, no other tokens exist but we
-     delete all of them for best security practices.
+  An unconfirmed user is confirmed and all of their earlier tokens are
+  deleted. `revoked_family_ids` lists every session family deleted here; the
+  caller disconnects them after this returns.
+
+  A rejected proof returns `{:error, :not_found}` and changes nothing.
   """
-  def login_user_by_magic_link(token) do
+  @spec login_user_by_magic_link(binary(), binary() | nil) ::
+          {:ok, %{user: User.t(), session_token: binary(), revoked_family_ids: [Ecto.UUID.t()]}}
+          | {:error, :not_found}
+  def login_user_by_magic_link(token, predecessor_token \\ nil) do
+    # Proof and predecessor rows never change account, so their ids can be read unlocked.
+    with {:ok, {%User{id: user_id}, _proof}} <- magic_link_proof(token) do
+      predecessor_ids = for %UserToken{user_id: id} <- [session_row(predecessor_token)], do: id
+
+      Repo.transact(fn ->
+        lock_accounts([user_id | predecessor_ids])
+        log_in_by_locked_magic_link(token, predecessor_token)
+      end)
+    end
+  end
+
+  # Builds the query at each call so expiry is judged after any lock wait.
+  defp magic_link_proof(token) do
     with {:ok, query} <- UserToken.verify_magic_link_token_query(token),
-         {user, user_token} <- Repo.one(query) do
-      log_in_by_magic_link(user, user_token)
+         {%User{}, %UserToken{}} = proof <- Repo.one(query) do
+      {:ok, proof}
     else
       # :error is an undecodable token, nil an unknown or expired one
       result when result in [:error, nil] -> {:error, :not_found}
     end
   end
 
-  defp log_in_by_magic_link(%User{confirmed_at: nil} = user, _user_token) do
-    user
-    |> User.confirm_changeset()
-    |> update_user_and_delete_all_tokens()
+  defp log_in_by_locked_magic_link(token, predecessor_token) do
+    with {:ok, {user, proof}} <- magic_link_proof(token) do
+      {:ok, log_in_by_magic_link(user, proof, predecessor_token)}
+    end
   end
 
-  defp log_in_by_magic_link(user, user_token) do
-    Repo.delete!(user_token)
-    {:ok, {user, []}}
+  defp log_in_by_magic_link(user, proof, predecessor_token) do
+    {user, confirmed_away} = consume_proof(user, proof)
+
+    {family, switched_away} =
+      case valid_predecessor(user.id, predecessor_token) do
+        %UserToken{session_family_id: family} -> {family, []}
+        nil -> {Ecto.UUID.generate(), revoke_family_of_other_account(user.id, predecessor_token)}
+      end
+
+    %{
+      user: user,
+      session_token: insert_session_token!(user.id, family, DateTime.utc_now(:second)),
+      revoked_family_ids: confirmed_away ++ switched_away
+    }
+  end
+
+  # First confirmation deletes every earlier token of the account, sessions included.
+  defp consume_proof(%User{confirmed_at: nil} = user, _proof) do
+    user = Repo.update!(User.confirm_changeset(user))
+    tokens = from(t in UserToken, where: t.user_id == ^user.id)
+    families = delete_session_rows(tokens)
+    Repo.delete_all(tokens)
+    {user, families}
+  end
+
+  defp consume_proof(user, proof) do
+    Repo.delete!(proof)
+    {user, []}
+  end
+
+  defp revoke_family_of_other_account(user_id, predecessor_token) do
+    case session_row(predecessor_token) do
+      %UserToken{user_id: other_id} = row when other_id != user_id ->
+        delete_session_rows(family_query(row))
+
+      # No row, or an expired row of the same account: nothing to revoke.
+      _same_account_or_absent ->
+        []
+    end
   end
 
   @doc ~S"""
@@ -439,25 +528,73 @@ defmodule Tips.Accounts do
     UserNotifier.deliver_login_instructions(user, magic_link_url_fun.(encoded_token))
   end
 
+  ## Session revocation
+
   @doc """
-  Deletes the signed token with the given context.
+  Revokes the session family of the given browser token.
+
+  Reads the account and family from the stored session row, never from the
+  browser. Locks the account, then deletes every session row of that family.
+  An expired row still identifies its family here; it never authenticates.
+  Returns `{:ok, [family_id]}`, or `{:ok, []}` when the token is `nil`, has no
+  session row or its family is already gone. Other families and non-session
+  tokens are untouched.
+
+  See "Session revocation" in the module documentation for disconnects.
   """
-  def delete_user_session_token(token) do
-    Repo.delete_all(from(UserToken, where: [token: ^token, context: "session"]))
-    :ok
+  @spec revoke_user_session_family(binary() | nil) :: {:ok, [Ecto.UUID.t()]}
+  def revoke_user_session_family(token) do
+    case session_row(token) do
+      %UserToken{user_id: user_id} = row ->
+        Repo.transact(fn ->
+          lock_accounts([user_id])
+          {:ok, delete_session_rows(family_query(row))}
+        end)
+
+      nil ->
+        {:ok, []}
+    end
   end
 
-  ## Token helper
+  @doc """
+  Revokes every session family of the account and returns their ids.
 
-  defp update_user_and_delete_all_tokens(changeset) do
+  Locks the account, then deletes its session rows only: login and
+  email-change tokens stay. Called inside a transaction it joins that
+  transaction and rolls back with it, so email change and account deletion can
+  compose it with their own writes. See "Session revocation" in the module
+  documentation for lock order and disconnects.
+  """
+  @spec revoke_user_session_families(User.t()) :: {:ok, [Ecto.UUID.t()]}
+  def revoke_user_session_families(%User{id: user_id}) do
     Repo.transact(fn ->
-      with {:ok, user} <- Repo.update(changeset) do
-        tokens_to_expire = Repo.all_by(UserToken, user_id: user.id)
-
-        Repo.delete_all(from(t in UserToken, where: t.id in ^Enum.map(tokens_to_expire, & &1.id)))
-
-        {:ok, {user, tokens_to_expire}}
-      end
+      lock_accounts([user_id])
+      {:ok, delete_session_rows(from(t in UserToken, where: t.user_id == ^user_id))}
     end)
+  end
+
+  # Ascending id order, the same account lock renewal takes.
+  defp lock_accounts(ids) do
+    for id <- ids |> Enum.uniq() |> Enum.sort() do
+      Repo.one(from(u in User, where: u.id == ^id, lock: "FOR NO KEY UPDATE", select: u.id))
+    end
+  end
+
+  # The stored session row of a token at any age, to identify its account and family.
+  defp session_row(nil), do: nil
+  defp session_row(token), do: Repo.get_by(UserToken, token: token, context: "session")
+
+  defp family_query(%UserToken{user_id: user_id, session_family_id: family}) do
+    from(t in UserToken, where: t.user_id == ^user_id and t.session_family_id == ^family)
+  end
+
+  # Deletes the session rows of `query` and returns their distinct families.
+  defp delete_session_rows(query) do
+    {_count, families} =
+      Repo.delete_all(
+        from(t in query, where: t.context == "session", select: t.session_family_id)
+      )
+
+    Enum.uniq(families)
   end
 end

@@ -93,7 +93,7 @@ defmodule Tips.Accounts.AdmissionContractTest do
 
     test "a revoked (deleted) session row does not authenticate" do
       token = Accounts.generate_user_session_token(user_fixture())
-      assert :ok = Accounts.delete_user_session_token(token)
+      assert {:ok, [_family]} = Accounts.revoke_user_session_family(token)
 
       assert Accounts.get_user_by_session_token(token) == nil
     end

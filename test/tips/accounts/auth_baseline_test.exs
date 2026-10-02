@@ -72,10 +72,9 @@ defmodule Tips.Accounts.AuthBaselineTest do
 
     magic_link = extract_user_token(&Accounts.deliver_login_instructions(session_user, &1))
 
-    assert {:ok, {%User{id: ^user_id} = reauthenticated_user, []}} =
-             Accounts.login_user_by_magic_link(magic_link)
+    assert {:ok, %{user: %User{id: ^user_id}, session_token: session_c, revoked_family_ids: []}} =
+             Accounts.login_user_by_magic_link(magic_link, session_b)
 
-    session_c = Accounts.generate_user_session_token(reauthenticated_user, session_b)
     assert %UserToken{authenticated_at: current_auth} = session_row(session_c)
     assert DateTime.after?(current_auth, previous_auth)
     assert {fresh_user, _inserted_at} = Accounts.get_user_by_session_token(session_c)
@@ -86,7 +85,7 @@ defmodule Tips.Accounts.AuthBaselineTest do
     family = session_row(session_a).session_family_id
     assert Enum.all?([session_b, session_c], &(session_row(&1).session_family_id == family))
 
-    # Renewal keeps predecessors until expiry; family revocation is logout work (#46).
+    # Renewal and reauthentication keep predecessors until expiry or family revocation.
     assert {%User{authenticated_at: ^previous_auth}, _} =
              Accounts.get_user_by_session_token(session_a)
 

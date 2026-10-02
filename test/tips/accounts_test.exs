@@ -246,23 +246,28 @@ defmodule Tips.AccountsTest do
     end
   end
 
-  describe "login_user_by_magic_link/1" do
-    test "confirms user and expires tokens" do
+  describe "login_user_by_magic_link/2" do
+    test "confirms user, expires earlier tokens and issues the session" do
       user = unconfirmed_user_fixture()
       refute user.confirmed_at
-      {encoded_token, hashed_token} = generate_user_magic_link_token(user)
+      {encoded_token, _hashed_token} = generate_user_magic_link_token(user)
 
-      assert {:ok, {user, [%{token: ^hashed_token}]}} =
+      assert {:ok, %{user: user, session_token: session_token, revoked_family_ids: []}} =
                Accounts.login_user_by_magic_link(encoded_token)
 
       assert user.confirmed_at
+      assert [%UserToken{token: ^session_token}] = Repo.all_by(UserToken, user_id: user.id)
     end
 
-    test "returns user and (deleted) token for confirmed user" do
+    test "returns the user and a session for a confirmed user; the link is single use" do
       user = user_fixture()
       assert user.confirmed_at
       {encoded_token, _hashed_token} = generate_user_magic_link_token(user)
-      assert {:ok, {^user, []}} = Accounts.login_user_by_magic_link(encoded_token)
+
+      assert {:ok, %{user: ^user, session_token: session_token, revoked_family_ids: []}} =
+               Accounts.login_user_by_magic_link(encoded_token)
+
+      assert {%User{}, _} = Accounts.get_user_by_session_token(session_token)
       # one time use only
       assert {:error, :not_found} = Accounts.login_user_by_magic_link(encoded_token)
     end
@@ -271,15 +276,6 @@ defmodule Tips.AccountsTest do
       for token <- ["%", "a"] do
         assert {:error, :not_found} = Accounts.login_user_by_magic_link(token)
       end
-    end
-  end
-
-  describe "delete_user_session_token/1" do
-    test "deletes the token" do
-      user = user_fixture()
-      token = Accounts.generate_user_session_token(user)
-      assert Accounts.delete_user_session_token(token) == :ok
-      refute Accounts.get_user_by_session_token(token)
     end
   end
 

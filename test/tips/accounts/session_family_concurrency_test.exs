@@ -97,7 +97,7 @@ defmodule Tips.Accounts.SessionFamilyConcurrencyTest do
     await_blocked(renewal, logout)
     commit(logout)
     assert {:error, :unauthenticated} = await(renewal, late)
-    commit(renewal)
+    roll_back(renewal)
 
     unboxed(fn ->
       assert family_tokens(family) == []
@@ -121,12 +121,14 @@ defmodule Tips.Accounts.SessionFamilyConcurrencyTest do
     first_switch =
       submit(first, fn -> Accounts.login_user_by_magic_link(to_other, data.predecessor) end)
 
+    await_blocked(first, holder)
+
     second_switch =
       submit(second, fn -> Accounts.login_user_by_magic_link(to_user, other_token) end)
 
-    # Both directions wait on the lower id and hold nothing on the higher id.
-    await_blocked(first, holder)
-    await_blocked(second, holder)
+    # The second waiter queues behind the first one's tuple lock. Both directions
+    # wait on the lower id and hold nothing on the higher id.
+    await_blocked(second, [holder, first])
     assert [_] = run(holder, fn -> lock_account(high.id, " NOWAIT") end)
     commit(holder)
 
@@ -177,7 +179,7 @@ defmodule Tips.Accounts.SessionFamilyConcurrencyTest do
     await_blocked(second, first)
     commit(first)
     assert {:error, :not_found} = await(second, replay)
-    commit(second)
+    roll_back(second)
 
     unboxed(fn ->
       assert [predecessor, token] |> Enum.sort() ==
@@ -261,23 +263,32 @@ defmodule Tips.Accounts.SessionFamilyConcurrencyTest do
     assert {:ok, :committed} = Task.await(task)
   end
 
+  # A rejected operation aborts the step's enclosing transaction, as nested Ecto
+  # transactions do; a top-level caller simply gets the error.
+  defp roll_back(%{task: task}) do
+    send(task.pid, :commit)
+    assert {:error, :rollback} = Task.await(task)
+  end
+
   # Observe the real database lock wait instead of relying on a scheduler race.
-  defp await_blocked(waiter, blocker) do
+  defp await_blocked(waiter, blockers) do
+    blockers = blockers |> List.wrap() |> Enum.map(& &1.backend)
+
     Sandbox.unboxed_run(Repo, fn ->
-      await_blocked(waiter.backend, blocker.backend, System.monotonic_time(:millisecond) + 1_000)
+      await_blocked(waiter.backend, blockers, System.monotonic_time(:millisecond) + 1_000)
     end)
   end
 
-  defp await_blocked(waiter, blocker, deadline) do
+  defp await_blocked(waiter, blockers, deadline) do
     %{rows: [[blocked?]]} =
-      Repo.query!("SELECT $1::integer = ANY(pg_blocking_pids($2::integer))", [blocker, waiter])
+      Repo.query!("SELECT $1::integer[] && pg_blocking_pids($2::integer)", [blockers, waiter])
 
     unless blocked? do
       assert System.monotonic_time(:millisecond) < deadline,
-             "expected backend #{waiter} to wait on #{blocker}"
+             "expected backend #{waiter} to wait on #{inspect(blockers)}"
 
       Process.sleep(10)
-      await_blocked(waiter, blocker, deadline)
+      await_blocked(waiter, blockers, deadline)
     end
   end
 end
