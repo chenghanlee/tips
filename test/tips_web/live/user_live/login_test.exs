@@ -78,10 +78,55 @@ defmodule TipsWeb.UserLive.LoginTest do
       assert has_element?(register, ~s|a[href="/users/log-in?return_to=%2Feditor%2Ftips%2Fnew"]|)
     end
 
-    test "the signup link drops an external return destination", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/users/log-in?return_to=https%3A%2F%2Fevil.example%2F")
+    # {query, session} => destination carried by the Sign up link after the expired answer.
+    for {label, query, session, carried} <- [
+          {"a valid query wins over the session", "/editor/tips/new", "/editor/tips/7/edit",
+           "/editor/tips/new"},
+          {"a missing query falls back to the session", nil, "/editor/tips/7/edit",
+           "/editor/tips/7/edit"},
+          {"an external query falls back to the session", "https://evil.example/editor/tips/new",
+           "/editor/tips/7/edit", "/editor/tips/7/edit"},
+          {"a disallowed local query falls back to the session", "/users/settings",
+           "/editor/tips/7/edit", "/editor/tips/7/edit"},
+          {"an external query and no session carry nothing", "//evil.example", nil, nil},
+          {"a disallowed query and a disallowed session carry nothing", "/users/settings",
+           "https://evil.example/", nil},
+          {"no query and no session carry nothing", nil, nil, nil}
+        ] do
+      @query query
+      @session session
+      @carried carried
+      test "expired sign-in restart: #{label}", %{conn: conn} do
+        user = unconfirmed_user_fixture()
+        set_registration_deadline(user, -1)
+        session = if @session, do: %{"user_return_to" => @session}, else: %{}
+        conn = Plug.Test.init_test_session(conn, session)
+        path = if @query, do: ~p"/users/log-in?#{[return_to: @query]}", else: ~p"/users/log-in"
 
-      assert has_element?(lv, ~s|a[href="/users/register"]|, "Sign up")
+        {:ok, lv, _html} = live(conn, path)
+        html = lv |> form("#login_form_magic", user: %{email: user.email}) |> render_submit()
+
+        assert html =~ "has expired. Register again"
+
+        assert has_element?(
+                 lv,
+                 ~s|#login_form_magic input[name="user[email]"][value="#{user.email}"]|
+               )
+
+        register_path =
+          if @carried, do: ~p"/users/register?#{[return_to: @carried]}", else: ~p"/users/register"
+
+        log_in_path =
+          if @carried, do: ~p"/users/log-in?#{[return_to: @carried]}", else: ~p"/users/log-in"
+
+        {:ok, register, _html} =
+          lv
+          |> element(~s|a[href="#{register_path}"]|, "Sign up")
+          |> render_click()
+          |> follow_redirect(conn)
+
+        assert has_element?(register, ~s|a[href="#{log_in_path}"]|, "Log in")
+      end
     end
 
     test "does not disclose if user is registered", %{conn: conn} do
