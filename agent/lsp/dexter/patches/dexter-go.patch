@@ -1,5 +1,5 @@
 diff --git a/cmd/main.go b/cmd/main.go
-index ce8da11..6deb734 100644
+index ce8da11..d493ee7 100644
 --- a/cmd/main.go
 +++ b/cmd/main.go
 @@ -14,6 +14,7 @@ import (
@@ -10,7 +10,49 @@ index ce8da11..6deb734 100644
  	"github.com/remoteoss/dexter/internal/stdlib"
  	"github.com/remoteoss/dexter/internal/store"
  	"github.com/remoteoss/dexter/internal/version"
-@@ -139,14 +140,17 @@ func main() {
+@@ -78,7 +79,10 @@ func main() {
+ 	lookupCmd := &cobra.Command{
+ 		Use:   "lookup <module> [func]",
+ 		Short: "Look up where a module/function is defined",
+-		Args:  cobra.RangeArgs(1, 2),
++		Long: "Prints the definition as file:line, relative to --root inside the workspace, with no column.\n" +
++			"Without --strict, a function that is not found falls back to its module and an empty result exits 0; with it, a miss exits 1.\n" +
++			"For uses of a name, run query references at the definition's position.",
++		Args: cobra.RangeArgs(1, 2),
+ 		RunE: func(cmd *cobra.Command, args []string) error {
+ 			module := args[0]
+ 			function := ""
+@@ -99,29 +103,6 @@ func main() {
+ 	lookupCmd.Flags().BoolVarP(&lookupOpts.quiet, "quiet", "q", false, "Suppress the note when the index is still building")
+ 	lookupCmd.Flags().BoolVarP(&allowNonProject, "yes", "y", false, "Query even though this directory is not an Elixir project")
+ 
+-	var referencesOpts queryOptions
+-	referencesCmd := &cobra.Command{
+-		Use:   "references <module> [func]",
+-		Short: "Find references to a module/function",
+-		Args:  cobra.RangeArgs(1, 2),
+-		RunE: func(cmd *cobra.Command, args []string) error {
+-			module := args[0]
+-			function := ""
+-			if len(args) == 2 {
+-				function = args[1]
+-			}
+-			projectRoot, err := os.Getwd()
+-			if err != nil {
+-				return err
+-			}
+-			cmdReferences(projectRoot, module, function, referencesOpts, allowNonProject)
+-			return nil
+-		},
+-	}
+-	referencesCmd.Flags().DurationVar(&referencesOpts.wait, "wait", 0, "Wait up to this long for a cold index before answering (0 answers immediately)")
+-	referencesCmd.Flags().BoolVarP(&referencesOpts.quiet, "quiet", "q", false, "Suppress the note when the index is still building")
+-	referencesCmd.Flags().BoolVarP(&allowNonProject, "yes", "y", false, "Query even though this directory is not an Elixir project")
+-
+ 	var forceStop bool
+ 	stopCmd := &cobra.Command{
+ 		Use:   "stop [path]",
+@@ -139,14 +120,17 @@ func main() {
  	stopCmd.Flags().BoolVar(&forceStop, "force", false, "Stop even while editor or CLI clients are attached")
  
  	lspCmd := &cobra.Command{
@@ -31,7 +73,7 @@ index ce8da11..6deb734 100644
  			cmdLSP(projectRoot)
  			return nil
  		},
-@@ -180,10 +184,11 @@ func main() {
+@@ -180,10 +164,11 @@ func main() {
  		Short: "Print the version",
  		Run: func(cmd *cobra.Command, args []string) {
  			fmt.Println(version.Version)
@@ -40,11 +82,11 @@ index ce8da11..6deb734 100644
  	}
  
 -	rootCmd.AddCommand(initCmd, reindexCmd, lookupCmd, referencesCmd, stopCmd, lspCmd, daemonCmd, versionCmd)
-+	rootCmd.AddCommand(initCmd, reindexCmd, lookupCmd, referencesCmd, stopCmd, lspCmd, daemonCmd, versionCmd, newQueryCommand())
++	rootCmd.AddCommand(initCmd, reindexCmd, lookupCmd, stopCmd, lspCmd, daemonCmd, versionCmd, newQueryCommand())
  
  	if err := rootCmd.Execute(); err != nil {
  		os.Exit(1)
-@@ -315,25 +320,6 @@ func requireProjectRoot(dir string, allowNonProject bool) {
+@@ -315,25 +300,6 @@ func requireProjectRoot(dir string, allowNonProject bool) {
  	fatal(fmt.Errorf("refusing to use %s as a workspace: no mix.exs, .git, or Dexter database found, so it does not look like an Elixir project\nhint: run from a project, pass --root <path>, or pass -y/--yes to index it anyway", dir))
  }
  
@@ -70,25 +112,46 @@ index ce8da11..6deb734 100644
  // sameDir reports whether two paths name the same directory. Stat is the
  // authority so a symlinked spelling (or a case-insensitive filesystem) cannot
  // sneak a home directory past the check.
-@@ -491,7 +477,7 @@ func cmdLookup(projectRoot string, module string, function string, strict bool,
+@@ -491,37 +457,7 @@ func cmdLookup(projectRoot string, module string, function string, strict bool,
  		}
  	}
  	for _, r := range result.Locations {
 -		fmt.Printf("%s:%d\n", r.FilePath, r.Line)
-+		fmt.Printf("%s:%d\n", queryDisplayPath(projectRoot, r.FilePath), r.Line)
- 	}
- }
- 
-@@ -521,7 +507,7 @@ func cmdReferences(projectRoot string, module string, function string, opts quer
- 		os.Exit(1)
- 	}
- 	for _, r := range result.Locations {
+-	}
+-}
+-
+-func cmdReferences(projectRoot string, module string, function string, opts queryOptions, allowNonProject bool) {
+-	projectRoot = findProjectRoot(projectRoot)
+-	requireProjectRoot(projectRoot, allowNonProject)
+-	client, err := daemon.Ensure(context.Background(), projectRoot)
+-	if err != nil {
+-		fatal(err)
+-	}
+-	defer func() { _ = client.Close() }()
+-	var result daemon.ReferencesResult
+-	callCtx, cancel := context.WithTimeout(context.Background(), controlCallTimeout)
+-	defer cancel()
+-	if err := client.Call(callCtx, daemon.MethodReferences, daemon.ReferencesParams{
+-		Module: module, Function: function, WaitReadyMs: opts.waitReadyMs(),
+-	}, &result); err != nil {
+-		fatal(err)
+-	}
+-	if len(result.Locations) == 0 {
+-		warnIfIndexBuilding(result.Ready, opts)
+-		fmt.Fprintf(os.Stderr, "No references found for %s", module)
+-		if function != "" {
+-			fmt.Fprintf(os.Stderr, ".%s", function)
+-		}
+-		fmt.Fprintln(os.Stderr)
+-		os.Exit(1)
+-	}
+-	for _, r := range result.Locations {
 -		fmt.Printf("%s:%d\n", r.FilePath, r.Line)
 +		fmt.Printf("%s:%d\n", queryDisplayPath(projectRoot, r.FilePath), r.Line)
  	}
  }
  
-@@ -668,8 +654,6 @@ func cmdStopIncompatible(ctx context.Context, root string, e *daemon.Incompatibl
+@@ -668,8 +604,6 @@ func cmdStopIncompatible(ctx context.Context, root string, e *daemon.Incompatibl
  // frontend. The daemon starts on demand: it belongs to the workspace, not to
  // this editor, the CLI, or any other frontend that happens to reach it first.
  func cmdLSP(projectRoot string) {
@@ -99,10 +162,10 @@ index ce8da11..6deb734 100644
  	if err := daemon.ProxyLSP(context.Background(), projectRoot, os.Stdin, os.Stdout); err != nil {
 diff --git a/cmd/query.go b/cmd/query.go
 new file mode 100644
-index 0000000..fa1ce3e
+index 0000000..e7b6161
 --- /dev/null
 +++ b/cmd/query.go
-@@ -0,0 +1,227 @@
+@@ -0,0 +1,231 @@
 +package main
 +
 +import (
@@ -130,7 +193,11 @@ index 0000000..fa1ce3e
 +		Short: "Run a read-only positional query through the workspace daemon",
 +		Long: "Operations: definition, references, hover, symbols, workspace-symbols, implementation, prepare-call-hierarchy, incoming-calls, outgoing-calls.\n" +
 +			"File paths are relative to --root. Input line and column are 1-based UTF-16.\n" +
-+			"Output is compact with 1-based locations; --raw returns native 0-based LSP JSON. symbols takes only a file; workspace-symbols takes an optional search.",
++			"Output is compact with 1-based locations; --raw returns native 0-based LSP JSON. symbols takes only a file; workspace-symbols takes an optional search.\n" +
++			"workspace-symbols returns at most 50 matches whatever the flags; at 50, narrow the search.\n" +
++			"references leaves out declarations unless --include-declaration. Call hierarchy selects one Module.function/arity across all its clauses.\n" +
++			"The index covers the root, its deps/ and the Elixir sources; it leaves out the root's tmp/ directory and nested checkouts.\n" +
++			"An empty result exits 0 and does not prove absence: dynamic dispatch, macros and generated code can hide uses.",
 +		Args: cobra.MinimumNArgs(1),
 +		RunE: func(cmd *cobra.Command, args []string) error {
 +			if err := output.validate(cmd); err != nil {
@@ -142,7 +209,7 @@ index 0000000..fa1ce3e
 +	cmd.Flags().DurationVar(&wait, "wait", 30*time.Second, "Wait up to this long for initial index readiness (timeout is an error)")
 +	cmd.Flags().BoolVar(&includeDeclaration, "include-declaration", false, "Include declarations in references")
 +	cmd.Flags().BoolVar(&output.raw, "raw", false, "Return unmodified LSP JSON with 0-based ranges instead of compact output")
-+	cmd.Flags().IntVar(&output.limit, "limit", 0, "Maximum compact rows; 0 prints all")
++	cmd.Flags().IntVar(&output.limit, "limit", 0, "Maximum compact rows; 0 prints every returned row")
 +	return cmd
 +}
 +
@@ -785,10 +852,41 @@ index 597d442..93e3212 100644
  same newline-delimited JSON framing the LSP stream already avoids by proxying
  bytes — and that implementation tracks SDK internals. Worth revisiting only if
 diff --git a/integration_test.go b/integration_test.go
-index 970680d..eb70887 100644
+index 970680d..d211281 100644
 --- a/integration_test.go
 +++ b/integration_test.go
-@@ -672,17 +672,17 @@ func TestIntegration_RootFlagRunsFromAnotherDirectory(t *testing.T) {
+@@ -583,6 +583,13 @@ end`,
+   use SharedLib.Provider
+   use SharedLib.Injector
+   tagged(:value)
++end`,
++		"lib/my_app/events.ex": `defmodule MyApp.Events do
++  def attach do
++    :telemetry.attach("events", [:my_app, :event], &__MODULE__.handle_event/4, nil)
++  end
++
++  def handle_event(_event, _measurements, _metadata, _config), do: :ok
+ end`,
+ 	}
+ 	for relative, contents := range files {
+@@ -600,10 +607,15 @@ end`,
+ 	if !strings.Contains(lookup, "provider.ex:4") {
+ 		t.Fatalf("semantic lookup did not follow use chain:\n%s", lookup)
+ 	}
+-	references := runDexter(t, binary, root, "references", "SharedLib.Macros", "tagged")
++	references := runDexter(t, binary, root, "query", "references", "lib/shared_lib/macros.ex", "2", "12")
+ 	if !strings.Contains(references, "consumer.ex:4") {
+ 		t.Fatalf("semantic references did not follow use chain:\n%s", references)
+ 	}
++	// A capture is the only written use of a telemetry handler.
++	references = runDexter(t, binary, root, "query", "references", "lib/my_app/events.ex", "6", "7")
++	if !strings.Contains(references, "events.ex:3") {
++		t.Fatalf("references missed a function capture:\n%s", references)
++	}
+ }
+ 
+ func TestIntegration_InitExistingIndexKeepsDaemonRunning(t *testing.T) {
+@@ -672,18 +684,18 @@ func TestIntegration_RootFlagRunsFromAnotherDirectory(t *testing.T) {
  	runDexter(t, binary, elsewhere, "init", "--root", root)
  
  	out := runDexter(t, binary, elsewhere, "lookup", "--root", root, "MyApp.Repo")
@@ -803,13 +901,16 @@ index 970680d..eb70887 100644
  		t.Errorf("lookup -C = %q, want it to contain %q", out, want)
  	}
  
- 	out = runDexter(t, binary, elsewhere, "references", "--root", root, "MyApp.Repo", "get")
+-	out = runDexter(t, binary, elsewhere, "references", "--root", root, "MyApp.Repo", "get")
 -	if want := filepath.Join(root, "lib/my_app/workers/direct_worker.ex") + ":3"; !strings.Contains(out, want) {
-+	if want := "lib/my_app/workers/direct_worker.ex:3"; out != want {
- 		t.Errorf("references --root = %q, want it to contain %q", out, want)
+-		t.Errorf("references --root = %q, want it to contain %q", out, want)
++	out = runDexter(t, binary, elsewhere, "query", "references", "--root", root, "lib/my_app/repo.ex", "2", "7")
++	if want := "lib/my_app/workers/direct_worker.ex:3"; !strings.Contains(out, want) {
++		t.Errorf("query references --root = %q, want it to contain %q", out, want)
  	}
  
-@@ -704,7 +704,7 @@ end
+ 	// A relative target resolves from the named root, not from the caller.
+@@ -704,7 +716,7 @@ end
  	runDexter(t, binary, elsewhere, "reindex", "--root", root, "lib/my_app/repo.ex")
  
  	out = runDexter(t, binary, elsewhere, "lookup", "--root", root, "MyApp.Repo", "all")
@@ -818,6 +919,26 @@ index 970680d..eb70887 100644
  		t.Errorf("lookup after relative reindex --root = %q, want it to contain %q", out, want)
  	}
  }
+@@ -807,7 +819,6 @@ func TestIntegration_RefusesNonProjectRoot(t *testing.T) {
+ 	for _, args := range [][]string{
+ 		{"init"},
+ 		{"lookup", "MyApp.Repo"},
+-		{"references", "MyApp.Repo"},
+ 		{"reindex"},
+ 	} {
+ 		out, err := run(args...)
+@@ -818,6 +829,11 @@ func TestIntegration_RefusesNonProjectRoot(t *testing.T) {
+ 			t.Errorf("dexter %v refusal should mention -y/--yes:\n%s", args, out)
+ 		}
+ 	}
++	// There is one reference search, the positional query. The search by name
++	// missed uses the positional one finds, so the command is not offered.
++	if out, err := run("references", "MyApp.Repo"); err == nil || !strings.Contains(out, "unknown command") {
++		t.Errorf("dexter references by name is still offered: %v\n%s", err, out)
++	}
+ 	if _, err := os.Stat(filepath.Join(scratch, ".dexter")); !os.IsNotExist(err) {
+ 		t.Fatalf("refused commands left an index behind: %v", err)
+ 	}
 diff --git a/internal/daemon/build_identity_test.go b/internal/daemon/build_identity_test.go
 new file mode 100644
 index 0000000..ccc18dd
@@ -1133,6 +1254,35 @@ index f4a1fbe..cd72428 100644
  		PID: 4242, Incompatible: true, Exiting: true,
  	})
  
+diff --git a/internal/daemon/locations_test.go b/internal/daemon/locations_test.go
+index 6476525..a0b9bfb 100644
+--- a/internal/daemon/locations_test.go
++++ b/internal/daemon/locations_test.go
+@@ -22,7 +22,6 @@ func TestLocationsRoundTripThroughFileTable(t *testing.T) {
+ 	}
+ 	for _, result := range []any{
+ 		&LookupResult{Locations: locations, Ready: true},
+-		&ReferencesResult{Locations: locations, Ready: true},
+ 	} {
+ 		encoded, err := json.Marshal(result)
+ 		if err != nil {
+@@ -42,14 +41,14 @@ func TestLocationsRoundTripThroughFileTable(t *testing.T) {
+ }
+ 
+ func TestEmptyLocationsEncodeAsEmptyLists(t *testing.T) {
+-	encoded, err := json.Marshal(ReferencesResult{Ready: true})
++	encoded, err := json.Marshal(LookupResult{Ready: true})
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	if got, want := string(encoded), `{"files":[],"locations":[],"ready":true}`; got != want {
+ 		t.Fatalf("encoded = %s, want %s", got, want)
+ 	}
+-	var decoded ReferencesResult
++	var decoded LookupResult
+ 	if err := json.Unmarshal(encoded, &decoded); err != nil {
+ 		t.Fatal(err)
+ 	}
 diff --git a/internal/daemon/pipe_test.go b/internal/daemon/pipe_test.go
 index 9b344bf..49784f4 100644
 --- a/internal/daemon/pipe_test.go
@@ -1322,7 +1472,7 @@ index 0000000..b262b39
 +	return handler(ctx, &params)
 +}
 diff --git a/internal/daemon/registry.go b/internal/daemon/registry.go
-index 178e329..755802f 100644
+index 178e329..c9e4361 100644
 --- a/internal/daemon/registry.go
 +++ b/internal/daemon/registry.go
 @@ -129,7 +129,7 @@ func lookupMethod(name string) (MethodHandler, bool) {
@@ -1330,23 +1480,67 @@ index 178e329..755802f 100644
  	switch name {
  	case MethodStatus, MethodShutdown, MethodWorkspaceStatus, MethodLookup,
 -		MethodReferences, MethodReindex, MethodWatch, MethodUnwatch:
-+		MethodReferences, MethodQuery, MethodReindex, MethodWatch, MethodUnwatch:
++		MethodQuery, MethodReindex, MethodWatch, MethodUnwatch:
  		return true
  	}
  	return false
+diff --git a/internal/daemon/registry_test.go b/internal/daemon/registry_test.go
+index 8296bb9..1a5d7e8 100644
+--- a/internal/daemon/registry_test.go
++++ b/internal/daemon/registry_test.go
+@@ -61,7 +61,7 @@ func TestRegisteredMethodIsDispatched(t *testing.T) {
+ func TestRegisterMethodRejectsBuiltins(t *testing.T) {
+ 	for _, name := range []string{
+ 		MethodStatus, MethodShutdown, MethodWorkspaceStatus, MethodLookup,
+-		MethodReferences, MethodReindex, MethodWatch, MethodUnwatch,
++		MethodReindex, MethodWatch, MethodUnwatch,
+ 	} {
+ 		assertPanics(t, "RegisterMethod("+name+")", func() {
+ 			RegisterMethod(name, func(MethodContext, json.RawMessage) (any, error) { return nil, nil })
 diff --git a/internal/daemon/server.go b/internal/daemon/server.go
-index 0a4d7ec..9d34965 100644
+index 0a4d7ec..627d13b 100644
 --- a/internal/daemon/server.go
 +++ b/internal/daemon/server.go
-@@ -60,6 +60,7 @@ const (
+@@ -59,7 +59,7 @@ const (
+ 	MethodShutdown        = "daemon/shutdown"
  	MethodWorkspaceStatus = "workspace/status"
  	MethodLookup          = "workspace/lookup"
- 	MethodReferences      = "workspace/references"
+-	MethodReferences      = "workspace/references"
 +	MethodQuery           = "workspace/query"
  	MethodReindex         = "workspace/reindex"
  	MethodWatch           = "workspace/watch"
  	MethodUnwatch         = "workspace/unwatch"
-@@ -611,7 +612,7 @@ func (s *server) serveConn(raw net.Conn) error {
+@@ -135,29 +135,6 @@ func (r *LookupResult) UnmarshalJSON(data []byte) error {
+ 	return err
+ }
+ 
+-type ReferencesParams struct {
+-	Module      string `json:"module"`
+-	Function    string `json:"function,omitempty"`
+-	WaitReadyMs int    `json:"waitReadyMs,omitempty"`
+-}
+-
+-// ReferencesResult travels in the location encoding described at
+-// locationsWire.
+-type ReferencesResult struct {
+-	Locations []lsp.NameLocation
+-	Ready     bool
+-}
+-
+-func (r ReferencesResult) MarshalJSON() ([]byte, error) {
+-	return marshalLocations(r.Locations, r.Ready)
+-}
+-
+-func (r *ReferencesResult) UnmarshalJSON(data []byte) error {
+-	var err error
+-	r.Locations, r.Ready, err = unmarshalLocations(data)
+-	return err
+-}
+-
+ // locationsWire is the wire shape of a location list: each path once in a file
+ // table, and locations that index into it in their original order. A hot
+ // reference result repeats a few thousand absolute paths across ~100k
+@@ -611,7 +588,7 @@ func (s *server) serveConn(raw net.Conn) error {
  		return err
  	}
  	reject := func(reason string) error {
@@ -1355,7 +1549,7 @@ index 0a4d7ec..9d34965 100644
  		return nil
  	}
  	// The restart contract: a frontend whose contract version is newer
-@@ -627,7 +628,7 @@ func (s *server) serveConn(raw net.Conn) error {
+@@ -627,7 +604,7 @@ func (s *server) serveConn(raw net.Conn) error {
  		if peerNewer {
  			message = fmt.Sprintf("a newer dexter build is taking over this workspace; this daemon is shutting down (%s)", reason)
  		}
@@ -1364,7 +1558,7 @@ index 0a4d7ec..9d34965 100644
  			Error: message, Contract: ContractVersion,
  			PID: os.Getpid(), Incompatible: true, Exiting: peerNewer,
  		}); err != nil {
-@@ -642,6 +643,16 @@ func (s *server) serveConn(raw net.Conn) error {
+@@ -642,6 +619,16 @@ func (s *server) serveConn(raw net.Conn) error {
  		}
  		return nil
  	}
@@ -1381,7 +1575,7 @@ index 0a4d7ec..9d34965 100644
  	if h.Contract != ContractVersion {
  		return rejectVersion(fmt.Sprintf("daemon contract %d, client contract %d", ContractVersion, h.Contract),
  			h.Contract > ContractVersion)
-@@ -650,7 +661,7 @@ func (s *server) serveConn(raw net.Conn) error {
+@@ -650,7 +637,7 @@ func (s *server) serveConn(raw net.Conn) error {
  		return reject("workspace does not match daemon")
  	}
  	if h.Root != s.root {
@@ -1390,7 +1584,7 @@ index 0a4d7ec..9d34965 100644
  			Error:    fmt.Sprintf("workspace is indexed as %s, not %s", s.root, h.Root),
  			Contract: ContractVersion,
  			PID:      os.Getpid(),
-@@ -681,14 +692,14 @@ func (s *server) serveConn(raw net.Conn) error {
+@@ -681,14 +668,14 @@ func (s *server) serveConn(raw net.Conn) error {
  	if h.Kind == kindLSP {
  		id, session, release := s.runtime.AttachLSPSession()
  		defer release()
@@ -1407,15 +1601,26 @@ index 0a4d7ec..9d34965 100644
  		return err
  	}
  	_ = raw.SetReadDeadline(time.Time{})
-@@ -876,6 +887,12 @@ func (s *server) handleRequest(c *conn, mc MethodContext, req request) (any, err
+@@ -862,20 +849,12 @@ func (s *server) handleRequest(c *conn, mc MethodContext, req request) (any, err
  			return nil, err
  		}
- 		return ReferencesResult{Locations: locations, Ready: s.runtime.IsReady()}, err
+ 		return LookupResult{Locations: locations, Ready: s.runtime.IsReady()}, err
+-	case MethodReferences:
+-		var params ReferencesParams
 +	case MethodQuery:
 +		var params QueryParams
-+		if err := json.Unmarshal(req.Params, &params); err != nil {
-+			return nil, err
-+		}
+ 		if err := json.Unmarshal(req.Params, &params); err != nil {
+ 			return nil, err
+ 		}
+-		s.waitReady(mc.Context, req.Method, params.WaitReadyMs)
+-		locations, err := mc.LSP().ReferenceNames(params.Module, params.Function, lsp.NameReferenceOptions{
+-			FollowDelegates: true,
+-			ExcludeStdlib:   true,
+-		})
+-		if err != nil {
+-			return nil, err
+-		}
+-		return ReferencesResult{Locations: locations, Ready: s.runtime.IsReady()}, err
 +		return s.query(mc, params)
  	case MethodReindex:
  		var params ReindexParams
@@ -1440,6 +1645,29 @@ index 3b67eac..e33d696 100644
  	}); err != nil {
  		t.Fatal(err)
  	}
+diff --git a/internal/indexer/indexer.go b/internal/indexer/indexer.go
+index 35c11cd..55eb488 100644
+--- a/internal/indexer/indexer.go
++++ b/internal/indexer/indexer.go
+@@ -14,6 +14,7 @@ import (
+ 	"fmt"
+ 	"os"
+ 	"runtime"
++	"slices"
+ 	"sync"
+ 	"sync/atomic"
+ 	"time"
+@@ -160,7 +161,9 @@ func FullBuild(s *store.Store, projectRoot string, opts Options) (Stats, error)
+ 	// Phase 1: collect file paths and mtimes. Both halves run on all cores:
+ 	// the traversal fans out per directory, and stat costs one syscall per
+ 	// file — ~70k on a large monorepo, which dominated this phase.
+-	filePaths := parser.CollectElixirFilesParallel(projectRoot)
++	filePaths := slices.DeleteFunc(parser.CollectElixirFilesParallel(projectRoot), func(path string) bool {
++		return parser.InScratch(projectRoot, path)
++	})
+ 	var stdlibPaths []string
+ 	if opts.StdlibRoot != "" {
+ 		stdlibPaths = dedupeAgainst(parser.CollectElixirFilesParallel(opts.StdlibRoot), filePaths)
 diff --git a/internal/lsp/arity_integration_test.go b/internal/lsp/arity_integration_test.go
 new file mode 100644
 index 0000000..24b0a2f
@@ -5399,6 +5627,88 @@ index 6e3f525..c260575 100644
  // ExtractModuleAndFunction splits a dotted expression into module reference and optional function name.
  // Uppercase-starting parts are module segments, the first lowercase part is the function.
  // Returns ("Foo.Bar", "baz") for "Foo.Bar.baz", ("Foo.Bar.Baz", "") for "Foo.Bar.Baz",
+diff --git a/internal/lsp/elixir_docs.go b/internal/lsp/elixir_docs.go
+index dd901e3..056775d 100644
+--- a/internal/lsp/elixir_docs.go
++++ b/internal/lsp/elixir_docs.go
+@@ -48,23 +48,9 @@ func (tf *TokenizedFile) ExtractDocAbove(defLineIdx int) (doc, spec string) {
+ 		endLine = len(lines)
+ 	}
+ 
+-	inDocHeredoc := false
+-	var docLines []string
+-
+ 	for i := startLine; i < endLine; i++ {
+ 		trimmed := strings.TrimSpace(lines[i])
+ 
+-		if inDocHeredoc {
+-			if trimmed == `"""` {
+-				inDocHeredoc = false
+-				currentDoc = dedentBlock(docLines)
+-				docLines = nil
+-			} else {
+-				docLines = append(docLines, lines[i])
+-			}
+-			continue
+-		}
+-
+ 		if inSpecBlock {
+ 			if trimmed == "" || strings.HasPrefix(trimmed, "@") || strings.HasPrefix(trimmed, "def") {
+ 				inSpecBlock = false
+@@ -74,20 +60,10 @@ func (tf *TokenizedFile) ExtractDocAbove(defLineIdx int) (doc, spec string) {
+ 			}
+ 		}
+ 
+-		if trimmed == `@doc """` || trimmed == `@doc ~S"""` || trimmed == `@doc ~s"""` ||
+-			trimmed == `@typedoc """` || trimmed == `@typedoc ~S"""` || trimmed == `@typedoc ~s"""` {
+-			inDocHeredoc = true
+-			docLines = nil
+-			continue
+-		}
+-
+-		if strings.HasPrefix(trimmed, `@doc "`) {
+-			currentDoc = extractQuotedString(trimmed[5:])
+-			continue
+-		}
+-
+-		if strings.HasPrefix(trimmed, `@typedoc "`) {
+-			currentDoc = extractQuotedString(trimmed[9:])
++		if literal, ok := tf.docLiteral(boundaryIdx, i+1); ok {
++			currentDoc = extractDocFromStringToken(tf.source, literal)
++			// Resume after the literal: its text is documentation, not attributes.
++			i = literal.Line - 1 + strings.Count(string(tf.source[literal.Start:literal.End]), "\n")
+ 			continue
+ 		}
+ 
+@@ -109,6 +85,28 @@ func (tf *TokenizedFile) ExtractDocAbove(defLineIdx int) (doc, spec string) {
+ 	return currentDoc, spec
+ }
+ 
++// docLiteral returns the string, heredoc or sigil that an @doc or @typedoc
++// attribute on line1 is given. Tokens before from precede the search range.
++func (tf *TokenizedFile) docLiteral(from, line1 int) (parser.Token, bool) {
++	for i := from; i < tf.n && tf.tokens[i].Line <= line1; i++ {
++		tok := tf.tokens[i]
++		if tok.Line < line1 || (tok.Kind != parser.TokAttrDoc && tok.Kind != parser.TokAttr) {
++			continue
++		}
++		if name := parser.TokenText(tf.source, tok); name != "@doc" && name != "@typedoc" {
++			continue
++		}
++		if j := parser.NextSigToken(tf.tokens, tf.n, i+1); j < tf.n {
++			switch next := tf.tokens[j]; next.Kind {
++			case parser.TokHeredoc, parser.TokString, parser.TokSigil:
++				return next, true
++			}
++		}
++		return parser.Token{}, false
++	}
++	return parser.Token{}, false
++}
++
+ // ExtractModuledoc scans forward from defLineIdx to find @moduledoc.
+ func (tf *TokenizedFile) ExtractModuledoc(defLineIdx int) string {
+ 	defLine1 := defLineIdx + 1
 diff --git a/internal/lsp/formatter_test.go b/internal/lsp/formatter_test.go
 index 830e5bc..6d12e51 100644
 --- a/internal/lsp/formatter_test.go
@@ -5556,6 +5866,123 @@ index 73f3ebc..0f2497c 100644
  	indexed, err := f.server.store.LookupReferences("SharedLib.Resource", "generated_lookup")
  	if err != nil || len(indexed) != 1 {
  		t.Fatalf("test setup expected one injector reference, got %v, %v", indexed, err)
+diff --git a/internal/lsp/hover_doc_literal_test.go b/internal/lsp/hover_doc_literal_test.go
+new file mode 100644
+index 0000000..4df5c62
+--- /dev/null
++++ b/internal/lsp/hover_doc_literal_test.go
+@@ -0,0 +1,111 @@
++package lsp
++
++import "testing"
++
++// Function docs are decoded from the literal token, as module docs are, so
++// every delimiter the tokenizer knows is read. The attachment rules stay:
++// a doc belongs to the next definition only, and @doc false hides it.
++func TestExtractDocAbove_LiteralForms(t *testing.T) {
++	tests := []struct {
++		name     string
++		src      string
++		defLine  int
++		wantDoc  string
++		wantSpec string
++	}{
++		{
++			name: "single quote sigil heredoc",
++			src: `defmodule MyApp.Component do
++  @doc ~S'''
++  Renders a card.
++
++      <.card title="Hello" />
++  '''
++  def card(assigns), do: assigns
++end`,
++			defLine: 6,
++			wantDoc: "Renders a card.\n\n    <.card title=\"Hello\" />",
++		},
++		{
++			name: "lowercase sigil heredoc with spec",
++			src: `defmodule MyApp.Users do
++  @doc ~s"""
++  Fetches a user.
++  """
++  @spec fetch(integer) :: map
++  def fetch(id), do: %{id: id}
++end`,
++			defLine:  5,
++			wantDoc:  "Fetches a user.",
++			wantSpec: "@spec fetch(integer) :: map",
++		},
++		{
++			name: "single line sigil",
++			src: `defmodule MyApp.Users do
++  @doc ~S|Deletes a user.|
++  def delete(id), do: id
++end`,
++			defLine: 2,
++			wantDoc: "Deletes a user.",
++		},
++		{
++			name: "attribute text inside the doc is not read as a spec or doc",
++			src: `defmodule MyApp.Users do
++  @doc ~S'''
++  Example:
++
++      @doc "inner"
++      @spec inner() :: :ok
++  '''
++  def outer, do: :ok
++end`,
++			defLine: 7,
++			wantDoc: "Example:\n\n    @doc \"inner\"\n    @spec inner() :: :ok",
++		},
++		{
++			name: "hidden after a sigil doc",
++			src: `defmodule MyApp.Users do
++  @doc ~S'''
++  Stale.
++  '''
++  @doc false
++  def hidden, do: :ok
++end`,
++			defLine: 5,
++		},
++		{
++			name: "previous definition's sigil doc does not leak",
++			src: `defmodule MyApp.Users do
++  @doc ~S'''
++  First.
++  '''
++  def first, do: :ok
++
++  def second, do: :ok
++end`,
++			defLine: 6,
++		},
++		{
++			name: "metadata keeps the doc",
++			src: `defmodule MyApp.Users do
++  @doc "Lists users."
++  @doc since: "1.2.0"
++  def list, do: []
++end`,
++			defLine: 3,
++			wantDoc: "Lists users.",
++		},
++	}
++
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			doc, spec := NewTokenizedFile(tt.src).ExtractDocAbove(tt.defLine)
++			if doc != tt.wantDoc {
++				t.Errorf("doc = %q, want %q", doc, tt.wantDoc)
++			}
++			if spec != tt.wantSpec {
++				t.Errorf("spec = %q, want %q", spec, tt.wantSpec)
++			}
++		})
++	}
++}
 diff --git a/internal/lsp/hover_qualified_use_test.go b/internal/lsp/hover_qualified_use_test.go
 new file mode 100644
 index 0000000..a409234
@@ -7649,8 +8076,66 @@ index a5874ec..b979c24 100644
  
  	edit := renameAt(t, server, defURI, 0, uint32(strings.Index(defContent, "ABTest")), "AbTest")
  	server.index.backgroundWork.Wait()
+diff --git a/internal/lsp/scratch_test.go b/internal/lsp/scratch_test.go
+new file mode 100644
+index 0000000..f33449c
+--- /dev/null
++++ b/internal/lsp/scratch_test.go
+@@ -0,0 +1,52 @@
++package lsp
++
++import (
++	"testing"
++)
++
++const scratchWorker = `defmodule Scratch.Worker do
++  def perform, do: :ok
++end`
++
++// The workspace-root tmp directory holds disposable copies of application
++// sources. A copy there must never answer for the application: not after a
++// cold build, not after a sweep of an index that already holds it, and not
++// through a single-file update. A tmp directory deeper in the tree is source.
++func TestServer_rootScratchStaysOutOfIndex(t *testing.T) {
++	for _, mode := range []string{"cold", "sweep", "single"} {
++		t.Run(mode, func(t *testing.T) {
++			server, cleanup := setupTestServer(t)
++			defer cleanup()
++
++			writeTestFile(t, server.projectRoot, "lib/worker.ex", scratchWorker)
++			scratch := writeTestFile(t, server.projectRoot, "tmp/copy/lib/worker.ex", scratchWorker)
++			writeTestFile(t, server.projectRoot, "lib/tmp/kept.ex", `defmodule Scratch.Kept do
++  def perform, do: :ok
++end`)
++
++			switch mode {
++			case "sweep":
++				indexFile(t, server.store, server.projectRoot, "lib/worker.ex", scratchWorker)
++				indexFile(t, server.store, server.projectRoot, "tmp/copy/lib/worker.ex", scratchWorker)
++			case "single":
++				server.ReconcileFile(scratch)
++			}
++			server.backgroundReindex()
++			server.index.backgroundWork.Wait()
++			if mode == "single" {
++				server.ReconcileFile(scratch)
++			}
++
++			results, err := server.store.LookupFunction("Scratch.Worker", "perform")
++			if err != nil {
++				t.Fatal(err)
++			}
++			if len(results) != 1 {
++				t.Fatalf("Scratch.Worker.perform has %d definitions, want the application's only: %v", len(results), results)
++			}
++			if kept, _ := server.store.LookupFunction("Scratch.Kept", "perform"); len(kept) != 1 {
++				t.Fatalf("lib/tmp/kept.ex is application source, got %d definitions", len(kept))
++			}
++		})
++	}
++}
 diff --git a/internal/lsp/server.go b/internal/lsp/server.go
-index 0499a21..9d44050 100644
+index 0499a21..3a32097 100644
 --- a/internal/lsp/server.go
 +++ b/internal/lsp/server.go
 @@ -274,7 +274,7 @@ func ServeStream(server *Server, rwc io.ReadWriteCloser) error {
@@ -7667,20 +8152,35 @@ index 0499a21..9d44050 100644
  					recorded, recordedRead = parser.NestedWorktreeSet(s.projectRoot), true
  				}
 -				in = underTop(s.projectRoot, dir, recorded) || parser.InLinkedWorktree(s.projectRoot, storedPath)
-+				in = underTop(s.projectRoot, dir, recorded) || parser.InNestedCheckout(s.projectRoot, storedPath)
++				in = underTop(s.projectRoot, dir, recorded) || parser.Excluded(s.projectRoot, storedPath)
  				inWorktree[dir] = in
  			}
  			if !in {
-@@ -512,7 +512,7 @@ func (s *Server) indexOneFile(path string) {
+@@ -510,9 +510,10 @@ func (s *Server) indexOneFile(path string) {
+ // indexOneFileLocked is indexOneFile for callers already holding indexWrites.
+ // Go's RWMutex is not reentrant, so the two must stay separate.
  func (s *Server) indexOneFileLocked(path string) {
- 	// Watchers and editors report changes in nested worktrees too; the full
- 	// walk skips them, so a single-file update must as well.
+-	// Watchers and editors report changes in nested worktrees too; the full
+-	// walk skips them, so a single-file update must as well.
 -	if parser.InLinkedWorktree(s.projectRoot, path) {
-+	if parser.InNestedCheckout(s.projectRoot, path) {
++	// Watchers and editors report changes in nested worktrees and in the
++	// scratch directory too; the full walk leaves them out, so a single-file
++	// update must as well.
++	if parser.Excluded(s.projectRoot, path) {
  		return
  	}
  	defs, refs, err := parser.ParseFile(path)
-@@ -821,16 +821,12 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
+@@ -599,6 +600,9 @@ func (s *Server) startBackgroundReindex() <-chan struct{} {
+ 		seen := make(map[string]struct{})
+ 		walkAndIndex := func(root string, indexRefs bool) {
+ 			_ = parser.WalkElixirFiles(root, func(path string, d fs.DirEntry) error {
++				if parser.InScratch(s.projectRoot, path) {
++					return nil
++				}
+ 				seen[path] = struct{}{}
+ 
+ 				if !isEmpty {
+@@ -821,16 +825,12 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
  			s.projectRoot = store.FindProjectRoot(clientRoot)
  		}
  	} else if clientRoot != "" && s.workspaceEvents != nil {
@@ -7702,7 +8202,7 @@ index 0499a21..9d44050 100644
  			}
  		}
  	}
-@@ -1203,8 +1199,15 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1203,8 +1203,15 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  			}
  		}
  
@@ -7719,7 +8219,7 @@ index 0499a21..9d44050 100644
  		s.debugf("Definition: resolved bare %q -> %q", functionName, fullModule)
  		if fullModule == "" {
  			currentModule := s.store.LookupEnclosingModule(uriToPath(protocol.DocumentURI(docURI)), lineNum+1)
-@@ -1223,11 +1226,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1223,11 +1230,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  		// Current module — return buffer location directly (works before indexing).
  		// In a typespec the bare name is the type, everywhere else the function.
  		if fullModule == currentModule {
@@ -7732,7 +8232,7 @@ index 0499a21..9d44050 100644
  				return []protocol.Location{{
  					URI:   params.TextDocument.URI,
  					Range: lineRange(line - 1),
-@@ -1236,13 +1235,14 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1236,13 +1239,14 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  		}
  
  		kind := NameKindCallable
@@ -7748,7 +8248,7 @@ index 0499a21..9d44050 100644
  		})
  		if err == nil && len(results) > 0 {
  			s.debugf("Definition: found %d semantic result(s) for %s.%s", len(results), fullModule, functionName)
-@@ -1250,7 +1250,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1250,7 +1254,7 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  		}
  
  		// Fallback for use-chain inline defs (not stored as module definitions)
@@ -7757,7 +8257,7 @@ index 0499a21..9d44050 100644
  			s.debugf("Definition: found %d result(s) via current file use chain for %s", len(results), functionName)
  			return storeResultsToLocations(byKindForContext(tf, lineNum, results)), nil
  		}
-@@ -1275,15 +1275,18 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
+@@ -1275,15 +1279,18 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
  	s.debugf("Definition: qualified call resolved %q -> %q", moduleRef, fullModule)
  
  	if functionName != "" {
@@ -7781,7 +8281,7 @@ index 0499a21..9d44050 100644
  		})
  		if err != nil {
  			return nil, nil
-@@ -2535,12 +2538,14 @@ func (s *Server) parseUsingFile(filePath, moduleName string) *usingCacheEntry {
+@@ -2535,12 +2542,14 @@ func (s *Server) parseUsingFile(filePath, moduleName string) *usingCacheEntry {
  
  // lookupThroughUseOf looks up functionName through the `use` declarations in
  // fullModule's source file. This handles qualified calls like M.func() where
@@ -7799,7 +8299,7 @@ index 0499a21..9d44050 100644
  	modResults, err := s.store.LookupModule(fullModule)
  	if err != nil || len(modResults) == 0 {
  		return nil
-@@ -2549,7 +2554,7 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
+@@ -2549,7 +2558,7 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
  	if !ok {
  		return nil
  	}
@@ -7808,7 +8308,7 @@ index 0499a21..9d44050 100644
  }
  
  // lookupThroughUse searches for functionName in definitions injected by `use`
-@@ -2557,15 +2562,15 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
+@@ -2557,15 +2566,15 @@ func (s *Server) lookupThroughUseOfWithFollow(fullModule, functionName string, f
  // priority over imported ones. Later `use` declarations shadow earlier ones.
  // Transitive use chains (use inside __using__ body) are followed recursively.
  func (s *Server) lookupThroughUse(text, functionName string, aliases map[string]string) []store.LookupResult {
@@ -7827,7 +8327,7 @@ index 0499a21..9d44050 100644
  			return result
  		}
  	}
-@@ -2577,7 +2582,7 @@ func (s *Server) lookupThroughUseWithFollow(text, functionName string, aliases m
+@@ -2577,7 +2586,7 @@ func (s *Server) lookupThroughUseWithFollow(text, functionName string, aliases m
  // consumerOpts are the keyword args from the `use Module, key: Val` call and
  // are used to resolve dynamic imports like `import unquote(mod)`.
  func (s *Server) lookupInUsingEntry(moduleName, functionName string, consumerOpts map[string]string, visited map[string]bool) []store.LookupResult {
@@ -7836,7 +8336,7 @@ index 0499a21..9d44050 100644
  }
  
  // bodyFor picks the injected body for a `use` call. An ordinary __using__ has a
-@@ -2607,13 +2612,12 @@ func usingVisitKey(moduleName, which string) string {
+@@ -2607,13 +2616,12 @@ func usingVisitKey(moduleName, which string) string {
  	return moduleName + "\x00" + which
  }
  
@@ -7856,7 +8356,7 @@ index 0499a21..9d44050 100644
  	visitKey := usingVisitKey(moduleName, which)
  	if visited[visitKey] {
  		return nil
-@@ -2630,23 +2634,20 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2630,23 +2638,20 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  	}
  
  	// Inline defs take priority: directly injected by the quote do block
@@ -7884,7 +8384,7 @@ index 0499a21..9d44050 100644
  		}
  		if err != nil || len(results) == 0 {
  			continue
-@@ -2665,19 +2666,23 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2665,19 +2670,23 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  		}
  		switch b.kind {
  		case "import":
@@ -7910,7 +8410,7 @@ index 0499a21..9d44050 100644
  				return result
  			}
  		}
-@@ -2686,7 +2691,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2686,7 +2695,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  	// Transitive uses: use Module inside the __using__ body (double-use chains)
  	for k := len(body.transCalls) - 1; k >= 0; k-- {
  		call := body.transCalls[k]
@@ -7919,7 +8419,7 @@ index 0499a21..9d44050 100644
  			return result
  		}
  	}
-@@ -2694,7 +2699,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2694,7 +2703,7 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  		if body.hasTransCall(body.transUses[k]) {
  			continue
  		}
@@ -7928,7 +8428,7 @@ index 0499a21..9d44050 100644
  			return result
  		}
  	}
-@@ -2703,15 +2708,12 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
+@@ -2703,15 +2712,12 @@ func (s *Server) lookupInUsingEntryForWithFollow(moduleName, functionName, which
  }
  
  // resolveModuleViaUseChain returns the module name that provides functionName
@@ -7950,7 +8450,7 @@ index 0499a21..9d44050 100644
  	visitKey := usingVisitKey(moduleName, which)
  	if visited[visitKey] {
  		return ""
-@@ -2729,12 +2731,12 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2729,12 +2735,12 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  
  	// Functions defined directly in the quote do block belong to the module
  	// that injected them, not to any imported module.
@@ -7965,7 +8465,7 @@ index 0499a21..9d44050 100644
  			return body.imports[j]
  		}
  	}
-@@ -2749,11 +2751,11 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2749,11 +2755,11 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  		}
  		switch b.kind {
  		case "import":
@@ -7979,7 +8479,7 @@ index 0499a21..9d44050 100644
  				return m
  			}
  		}
-@@ -2761,7 +2763,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2761,7 +2767,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  
  	for k := len(body.transCalls) - 1; k >= 0; k-- {
  		call := body.transCalls[k]
@@ -7988,7 +8488,7 @@ index 0499a21..9d44050 100644
  			return mod
  		}
  	}
-@@ -2769,7 +2771,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
+@@ -2769,7 +2775,7 @@ func (s *Server) resolveModuleViaUseChainFor(moduleName, functionName, which str
  		if body.hasTransCall(body.transUses[k]) {
  			continue
  		}
@@ -7997,7 +8497,7 @@ index 0499a21..9d44050 100644
  			return mod
  		}
  	}
-@@ -3645,7 +3647,7 @@ func (s *Server) addCompletionsFromUsingFor(moduleName, which string, consumerOp
+@@ -3645,7 +3651,7 @@ func (s *Server) addCompletionsFromUsingFor(moduleName, which string, consumerOp
  // Mirrors the go-to-definition priority: current file modules → imports → use chains → Kernel.
  // Callers should pass pre-computed aliases to avoid redundant ExtractAliases scans.
  func (s *Server) resolveBareFunctionModule(filePath, text string, tf *TokenizedFile, lineNum int, functionName string, aliases map[string]string) string {
@@ -8006,7 +8506,7 @@ index 0499a21..9d44050 100644
  	return module
  }
  
-@@ -3654,21 +3656,30 @@ func (s *Server) resolveBareFunctionModule(filePath, text string, tf *TokenizedF
+@@ -3654,21 +3660,30 @@ func (s *Server) resolveBareFunctionModule(filePath, text string, tf *TokenizedF
  // distinguish a consumer override from a function supplied by its use chain:
  // both resolve to the consumer module, but only the latter should expand across
  // other consumers of the injector.
@@ -8045,7 +8545,7 @@ index 0499a21..9d44050 100644
  			return mod, false
  		}
  	}
-@@ -3678,20 +3689,20 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
+@@ -3678,20 +3693,20 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
  	useCalls := tf.ExtractUsesWithOpts(aliases)
  	for i := len(useCalls) - 1; i >= 0; i-- {
  		uc := useCalls[i]
@@ -8069,7 +8569,7 @@ index 0499a21..9d44050 100644
  			return mod, false
  		}
  	}
-@@ -3699,6 +3710,21 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
+@@ -3699,6 +3714,21 @@ func (s *Server) resolveBareFunctionModuleWithOrigin(filePath, text string, tf *
  	return "", false
  }
  
@@ -8091,7 +8591,7 @@ index 0499a21..9d44050 100644
  func resolveModule(moduleRef string, aliases map[string]string) string {
  	if resolved, ok := aliases[moduleRef]; ok {
  		return resolved
-@@ -5054,38 +5080,33 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
+@@ -5054,38 +5084,33 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
  			return nil, nil
  		}
  
@@ -8141,7 +8641,7 @@ index 0499a21..9d44050 100644
  			return s.hoverFromFile(functionName, results[0])
  		}
  
-@@ -5114,21 +5135,18 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
+@@ -5114,21 +5139,18 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
  	fullModule := s.resolveModuleWithNesting(moduleRef, aliases, uriToPath(protocol.DocumentURI(docURI)), lineNum)
  
  	if functionName != "" {
@@ -8172,7 +8672,7 @@ index 0499a21..9d44050 100644
  	}
  
  	results, err := s.store.LookupModule(fullModule)
-@@ -5167,6 +5185,12 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
+@@ -5167,6 +5189,12 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
  	if functionName == "" {
  		return nil, nil
  	}
@@ -8185,7 +8685,7 @@ index 0499a21..9d44050 100644
  
  	// Find the module enclosing the cursor via the store — this correctly handles
  	// files with defmodule lines inside heredocs/doc examples.
-@@ -5179,33 +5203,85 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
+@@ -5179,33 +5207,85 @@ func (s *Server) Implementation(ctx context.Context, params *protocol.Implementa
  
  	s.debugf("Implementation: module=%s function=%s", currentModule, functionName)
  
@@ -8290,7 +8790,7 @@ index 0499a21..9d44050 100644
  }
  func (s *Server) OnTypeFormatting(ctx context.Context, params *protocol.DocumentOnTypeFormattingParams) ([]protocol.TextEdit, error) {
  	return nil, nil
-@@ -5420,6 +5496,8 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5420,6 +5500,8 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  	// below. They carry the bare type uses (`@type t :: schema | embedded`)
  	// that the call-shaped scan cannot see.
  	var typespecOccurrences []protocol.Location
@@ -8299,7 +8799,7 @@ index 0499a21..9d44050 100644
  
  	if moduleRef == "" {
  		if functionName == "" {
-@@ -5463,7 +5541,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5463,7 +5545,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		}
  
  		// Bare function — resolve to its defining module
@@ -8308,7 +8808,7 @@ index 0499a21..9d44050 100644
  		s.debugf("References: resolved bare %q -> %q", functionName, fullModule)
  		if fullModule == "" {
  			currentModule := s.store.LookupEnclosingModule(uriToPath(protocol.DocumentURI(docURI)), lineNum+1)
-@@ -5513,7 +5591,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5513,7 +5595,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		useCalls := tf.ExtractUsesWithOpts(aliases)
  		for i := len(useCalls) - 1; i >= 0; i-- {
  			uc := useCalls[i]
@@ -8317,7 +8817,7 @@ index 0499a21..9d44050 100644
  				injectors = append(injectors, uc.Module)
  				s.debugf("References: opt-binding injector for %s: %s", functionName, uc.Module)
  				break
-@@ -5524,7 +5602,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5524,7 +5606,7 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  	kind := NameKindCallable
  	if functionName == "" {
  		kind = NameKindAny
@@ -8326,7 +8826,7 @@ index 0499a21..9d44050 100644
  		kind = NameKindType
  	}
  	semantic, err := s.ReferenceNames(fullModule, functionName, NameReferenceOptions{
-@@ -5534,15 +5612,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5534,15 +5616,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  		ExcludeStdlib:      true,
  		InjectorModules:    injectors,
  		GeneratedProvider:  generatedProvider,
@@ -8346,7 +8846,7 @@ index 0499a21..9d44050 100644
  	}
  	seen := make(map[refKey]struct{}, len(semantic))
  	var locations []protocol.Location
-@@ -5556,19 +5638,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
+@@ -5556,19 +5642,19 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
  			if line == lineNum && !params.Context.IncludeDeclaration {
  				continue
  			}
@@ -8369,7 +8869,7 @@ index 0499a21..9d44050 100644
  		})
  	}
  
-@@ -7100,270 +7182,17 @@ func (s *Server) DidDeleteFiles(ctx context.Context, params *protocol.DeleteFile
+@@ -7100,270 +7186,17 @@ func (s *Server) DidDeleteFiles(ctx context.Context, params *protocol.DeleteFile
  }
  func (s *Server) CodeLensRefresh(ctx context.Context) error { return nil }
  func (s *Server) PrepareCallHierarchy(ctx context.Context, params *protocol.CallHierarchyPrepareParams) ([]protocol.CallHierarchyItem, error) {
@@ -11197,7 +11697,7 @@ index 0000000..a27963d
 +	return false
 +}
 diff --git a/internal/parser/parser.go b/internal/parser/parser.go
-index fb2714c..a58bd1b 100644
+index fb2714c..57785df 100644
 --- a/internal/parser/parser.go
 +++ b/internal/parser/parser.go
 @@ -157,10 +157,9 @@ func IsElixirFile(path string) bool {
@@ -11291,7 +11791,7 @@ index fb2714c..a58bd1b 100644
  	rel, err := filepath.Rel(root, filepath.Dir(path))
  	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
  		return false
-@@ -332,7 +355,7 @@ func InLinkedWorktree(root, path string) bool {
+@@ -332,13 +355,33 @@ func InLinkedWorktree(root, path string) bool {
  	dir := root
  	for _, part := range strings.Split(rel, string(filepath.Separator)) {
  		dir = filepath.Join(dir, part)
@@ -11300,7 +11800,33 @@ index fb2714c..a58bd1b 100644
  			return true
  		}
  	}
-@@ -452,7 +475,7 @@ func CollectElixirFilesParallel(root string) []string {
+ 	return false
+ }
+ 
++// scratchDir is the directory directly below a workspace root that the index
++// leaves out. Mix projects ignore it, and it holds disposable copies of
++// application sources whose modules would otherwise answer for the application.
++const scratchDir = "tmp"
++
++// InScratch reports whether path is root's scratch directory or lies inside it.
++// A directory of the same name deeper in the tree is ordinary source.
++func InScratch(root, path string) bool {
++	rel, err := filepath.Rel(root, path)
++	return err == nil && (rel == scratchDir || strings.HasPrefix(rel, scratchDir+string(filepath.Separator)))
++}
++
++// Excluded reports whether the index leaves path out: it lies in root's scratch
++// directory or in a checkout nested below root. Single-file updates from
++// watchers and editors and the sweep that prunes stored paths ask it, so they
++// agree with the walks on the file set.
++func Excluded(root, path string) bool {
++	return InScratch(root, path) || InNestedCheckout(root, path)
++}
++
+ // NestedWorktreeTops lists the linked worktrees of root's repository that are
+ // checked out strictly below root. It reads git's own records: each admin
+ // directory in <common dir>/worktrees/ has a gitdir file that names the
+@@ -452,7 +495,7 @@ func CollectElixirFilesParallel(root string) []string {
  		if err != nil {
  			return
  		}
@@ -11310,7 +11836,7 @@ index fb2714c..a58bd1b 100644
  		}
  
 diff --git a/internal/parser/parser_test.go b/internal/parser/parser_test.go
-index 6ba6441..320c8c0 100644
+index 6ba6441..0f71bc6 100644
 --- a/internal/parser/parser_test.go
 +++ b/internal/parser/parser_test.go
 @@ -2920,8 +2920,7 @@ func TestWalkAndCollectAgreeOnSymlinkedRoot(t *testing.T) {
@@ -11366,6 +11892,28 @@ index 6ba6441..320c8c0 100644
  	}
  }
  
+@@ -3793,3 +3797,21 @@ func TestHeredocLineContinuationClosesHeredoc(t *testing.T) {
+ 		})
+ 	}
+ }
++
++func TestInScratch(t *testing.T) {
++	// A checkout can itself live below a directory named tmp.
++	root := filepath.Join(string(filepath.Separator), "private", "tmp", "my_app")
++	for path, want := range map[string]bool{
++		filepath.Join(root, "tmp"):                         true,
++		filepath.Join(root, "tmp", "copy", "lib", "a.ex"):  true,
++		filepath.Join(root, "lib", "tmp", "a.ex"):          false,
++		filepath.Join(root, "tmpl", "a.ex"):                false,
++		filepath.Join(root, "lib", "a.ex"):                 false,
++		root:                                               false,
++		filepath.Join(filepath.Dir(root), "other", "a.ex"): false,
++	} {
++		if got := InScratch(root, path); got != want {
++			t.Errorf("InScratch(%q) = %v, want %v", path, got, want)
++		}
++	}
++}
 diff --git a/internal/parser/parser_tokenized.go b/internal/parser/parser_tokenized.go
 index efaffbf..f7ef394 100644
 --- a/internal/parser/parser_tokenized.go
@@ -12737,7 +13285,7 @@ index 0000000..9e7270a
 +}
 diff --git a/internal/workspace/nested_checkout_test.go b/internal/workspace/nested_checkout_test.go
 new file mode 100644
-index 0000000..6a4571b
+index 0000000..913d270
 --- /dev/null
 +++ b/internal/workspace/nested_checkout_test.go
 @@ -0,0 +1,137 @@
@@ -12763,7 +13311,7 @@ index 0000000..6a4571b
 +func newNestedCloneFixture(t *testing.T, preindex bool) nestedCloneFixture {
 +	t.Helper()
 +	rt, root := newTestRuntime(t)
-+	f := nestedCloneFixture{rt: rt, root: root, clone: filepath.Join(root, "tmp", "clone")}
++	f := nestedCloneFixture{rt: rt, root: root, clone: filepath.Join(root, "sandbox", "clone")}
 +	f.parent = writeTestModule(t, root, "lib/worker.ex", "SharedLib.Worker")
 +	f.foreign = writeTestModule(t, f.clone, "lib/worker.ex", "SharedLib.Worker")
 +	f.dep = writeTestModule(t, root, "deps/library/lib/dependency.ex", "SharedLib.Dependency")
@@ -12879,7 +13427,7 @@ index 0000000..6a4571b
 +	}
 +}
 diff --git a/internal/workspace/runtime.go b/internal/workspace/runtime.go
-index f2c8eb3..c115296 100644
+index f2c8eb3..5a593a1 100644
 --- a/internal/workspace/runtime.go
 +++ b/internal/workspace/runtime.go
 @@ -195,7 +195,7 @@ type lspSession struct {
@@ -12900,12 +13448,17 @@ index f2c8eb3..c115296 100644
  			under, err := r.store.ListFilePathsUnder(path)
  			if err != nil {
  				return err
-@@ -628,7 +628,7 @@ func (r *Runtime) reconcilePath(path string) error {
- 		// A nested worktree is a separate checkout the index leaves out, so its
+@@ -625,10 +625,11 @@ func (r *Runtime) reconcilePath(path string) error {
+ 	}
+ 	base := filepath.Base(path)
+ 	if base == "mix.lock" || base == "mix.exs" {
+-		// A nested worktree is a separate checkout the index leaves out, so its
++		// A nested worktree is a separate checkout, and the scratch directory
++		// holds copies of projects; the index leaves both out, so their
  		// manifests must not reindex this workspace. Source files need no check
  		// here: the core skips them itself.
 -		if parser.InLinkedWorktree(r.root, path) {
-+		if parser.InNestedCheckout(r.root, path) {
++		if parser.Excluded(r.root, path) {
  			return nil
  		}
  		r.core.ReindexWorkspace()
@@ -13158,7 +13711,7 @@ index 8c8e29f..dc322df 100644
  	if parser.IsElixirFile(path) || manifest || gone {
  		// Ignore events from explicitly skipped subtrees that can still be
 diff --git a/internal/workspace/watch_platform_darwin.go b/internal/workspace/watch_platform_darwin.go
-index f07e2b8..4ebab63 100644
+index f07e2b8..b127cb6 100644
 --- a/internal/workspace/watch_platform_darwin.go
 +++ b/internal/workspace/watch_platform_darwin.go
 @@ -124,7 +124,7 @@ func (w *fseventsWatcher) handle(event fsevents.Event) {
@@ -13176,7 +13729,7 @@ index f07e2b8..4ebab63 100644
  	}
 +	// FSEvents does not walk at startup, so an existing ordinary clone may not
 +	// have a known top yet. Check event ancestors without crawling the tree.
-+	if parser.InNestedCheckout(w.root, path) {
++	if parser.Excluded(w.root, path) {
 +		return
 +	}
 +
