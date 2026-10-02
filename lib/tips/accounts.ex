@@ -57,7 +57,7 @@ defmodule Tips.Accounts do
   An unconfirmed registration expires seven days after its original
   `inserted_at`. Nothing moves that timestamp: resending a link and confirming
   leave it alone. `Tips.Accounts.User.registration_expired/1` is the only
-  definition of the deadline, and three operations enforce it on the same
+  definition of the deadline, and four operations enforce it on the same
   account row:
 
     * `login_user_by_magic_link/2` rejects a link to an expired registration,
@@ -66,6 +66,8 @@ defmodule Tips.Accounts do
       email or handle.
     * `expire_unconfirmed_users/1` deletes expired registrations in bounded
       maintenance batches.
+    * `deliver_login_instructions/2` issues no link for an expired or deleted
+      registration.
 
   Each locks the account, then judges confirmation and the deadline in a later
   statement against the database wall clock. Whichever commits first decides:
@@ -692,12 +694,35 @@ defmodule Tips.Accounts do
 
   @doc """
   Delivers the magic link login instructions to the given user.
+
+  The caller read `user` without a lock, so cleanup or reclaim may have
+  deleted the account since, or its registration may have expired. Then no
+  token is issued, nothing is sent and the result is `{:error, :not_found}`.
+  The token is committed before the mail request.
   """
+  @spec deliver_login_instructions(User.t(), (String.t() -> String.t())) ::
+          {:ok, Swoosh.Email.t()} | {:error, term()}
   def deliver_login_instructions(%User{} = user, magic_link_url_fun)
       when is_function(magic_link_url_fun, 1) do
-    {encoded_token, user_token} = UserToken.build_email_token(user, "login")
-    Repo.insert!(user_token)
-    UserNotifier.deliver_login_instructions(user, magic_link_url_fun.(encoded_token))
+    with {:ok, encoded_token} <- issue_login_token(user) do
+      UserNotifier.deliver_login_instructions(user, magic_link_url_fun.(encoded_token))
+    end
+  end
+
+  # Takes the account lock that confirmation, cleanup and reclaim take, then judges the
+  # account in a later statement. A token is never inserted for a deleted account.
+  defp issue_login_token(%User{id: user_id} = user) do
+    Repo.transact(fn ->
+      lock_accounts([user_id])
+
+      if Repo.exists?(from(u in User, where: u.id == ^user_id and not registration_expired(u))) do
+        {encoded_token, user_token} = UserToken.build_email_token(user, "login")
+        Repo.insert!(user_token)
+        {:ok, encoded_token}
+      else
+        {:error, :not_found}
+      end
+    end)
   end
 
   ## Session revocation

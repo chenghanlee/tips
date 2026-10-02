@@ -49,6 +49,39 @@ defmodule TipsWeb.UserLive.LoginTest do
                "login"
     end
 
+    test "an expired registration is told to register again and keeps the email and destination",
+         %{conn: conn} do
+      user = unconfirmed_user_fixture()
+      set_registration_deadline(user, -1)
+      conn = Plug.Test.init_test_session(conn, %{"user_return_to" => "/editor/tips/new"})
+
+      {:ok, lv, _html} = live(conn, ~p"/users/log-in?return_to=%2Feditor%2Ftips%2Fnew")
+
+      html = lv |> form("#login_form_magic", user: %{email: user.email}) |> render_submit()
+
+      assert html =~ "was not confirmed within seven days and has expired. Register again"
+      refute html =~ "If your email is in our system"
+
+      assert has_element?(
+               lv,
+               ~s|#login_form_magic input[name="user[email]"][value="#{user.email}"]|
+             )
+
+      assert has_element?(lv, ~s|a[href="/users/register"]|, "Sign up")
+
+      refute Tips.Repo.get_by(Tips.Accounts.UserToken, user_id: user.id)
+      Swoosh.TestAssertions.assert_no_email_sent()
+
+      # The stored destination still reaches the registration form's links.
+      {:ok, register, _html} =
+        lv
+        |> element(~s|a[href="/users/register"]|, "Sign up")
+        |> render_click()
+        |> follow_redirect(conn)
+
+      assert has_element?(register, ~s|a[href="/users/log-in?return_to=%2Feditor%2Ftips%2Fnew"]|)
+    end
+
     test "does not disclose if user is registered", %{conn: conn} do
       {:ok, lv, _html} = live(conn, ~p"/users/log-in")
 

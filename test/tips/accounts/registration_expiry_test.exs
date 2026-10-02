@@ -2,6 +2,7 @@ defmodule Tips.Accounts.RegistrationExpiryTest do
   use Tips.DataCase, async: true
 
   import ExUnit.CaptureLog
+  import Swoosh.TestAssertions
   import Tips.AccountsFixtures
   import Tips.ContentFixtures
 
@@ -21,8 +22,9 @@ defmodule Tips.Accounts.RegistrationExpiryTest do
 
   test "rejects confirmation at and after the original seven-day deadline" do
     for seconds_left <- [0, -86_400] do
-      user = registration(seconds_left)
+      user = unconfirmed_user_fixture()
       link = magic_link(user)
+      set_registration_deadline(user, seconds_left)
 
       refute Accounts.get_user_by_magic_link_token(link)
       assert {:error, :not_found} = Accounts.login_user_by_magic_link(link)
@@ -43,10 +45,12 @@ defmodule Tips.Accounts.RegistrationExpiryTest do
     expired = registration(-1)
     %User{inserted_at: registered_at} = Repo.reload!(expired)
 
-    resent = magic_link(expired)
+    assert {:error, :not_found} =
+             Accounts.deliver_login_instructions(expired, &"/users/log-in/#{&1}")
 
-    assert %User{inserted_at: ^registered_at} = Repo.reload!(expired)
-    assert {:error, :not_found} = Accounts.login_user_by_magic_link(resent)
+    assert %User{inserted_at: ^registered_at, confirmed_at: nil} = Repo.reload!(expired)
+    assert tokens(expired) == []
+    assert_no_email_sent()
 
     pending = registration(60)
     %User{inserted_at: registered_at} = Repo.reload!(pending)
@@ -54,6 +58,17 @@ defmodule Tips.Accounts.RegistrationExpiryTest do
 
     assert {:ok, _} = Accounts.login_user_by_magic_link(magic_link(pending))
     assert %User{inserted_at: ^registered_at, confirmed_at: %DateTime{}} = Repo.reload!(pending)
+  end
+
+  test "resend for an account deleted since it was read sends nothing" do
+    stale = registration(-1)
+    assert {:ok, 1} = Accounts.expire_unconfirmed_users()
+
+    assert {:error, :not_found} =
+             Accounts.deliver_login_instructions(stale, &"/users/log-in/#{&1}")
+
+    assert tokens(stale) == []
+    assert_no_email_sent()
   end
 
   test "confirmed accounts survive expiry" do
@@ -76,9 +91,13 @@ defmodule Tips.Accounts.RegistrationExpiryTest do
   end
 
   test "reclaims expired email and handle held by different rows" do
-    email_holder = registration(-1, %{email: "wanted@example.com"})
-    handle_holder = registration(-1, %{handle: "Wanted_Handle"})
-    for user <- [email_holder, handle_holder], do: magic_link(user)
+    email_holder = unconfirmed_user_fixture(%{email: "wanted@example.com"})
+    handle_holder = unconfirmed_user_fixture(%{handle: "Wanted_Handle"})
+
+    for user <- [email_holder, handle_holder] do
+      magic_link(user)
+      set_registration_deadline(user, -1)
+    end
 
     assert {:ok, %User{id: id, handle: "wanted_handle", email: "wanted@example.com"}} =
              Accounts.register_user(%{handle: "wanted_handle", email: " WANTED@example.com "})
@@ -107,8 +126,9 @@ defmodule Tips.Accounts.RegistrationExpiryTest do
   end
 
   test "invalid or conflicting signup rolls back reclaim" do
-    expired = registration(-1)
+    expired = unconfirmed_user_fixture()
     magic_link(expired)
+    set_registration_deadline(expired, -1)
     confirmed = user_fixture()
 
     assert {:error, changeset} = Accounts.register_user(%{handle: "x", email: expired.email})
@@ -151,8 +171,9 @@ defmodule Tips.Accounts.RegistrationExpiryTest do
   end
 
   test "unexpected contribution FK failure is an invariant error and preserves rows and tokens" do
-    holder = registration(-1)
+    holder = unconfirmed_user_fixture()
     magic_link(holder)
+    set_registration_deadline(holder, -1)
     %Tip{id: tip_id} = tip_fixture(holder)
     attrs = %{handle: "Newcomer_44", email: holder.email}
 

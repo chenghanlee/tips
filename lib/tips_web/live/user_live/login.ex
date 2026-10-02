@@ -2,6 +2,7 @@ defmodule TipsWeb.UserLive.Login do
   use TipsWeb, :live_view
 
   alias Tips.Accounts
+  alias Tips.Accounts.User
 
   @impl true
   def render(assigns) do
@@ -69,20 +70,30 @@ defmodule TipsWeb.UserLive.Login do
 
   @impl true
   def handle_event("submit_magic", %{"user" => %{"email" => email}}, socket) do
-    if user = Accounts.get_user_by_email(email) do
-      Accounts.deliver_login_instructions(
-        user,
-        &url(~p"/users/log-in/#{&1}")
-      )
+    with %User{} = user <- Accounts.get_user_by_email(email),
+         {:error, :not_found} <-
+           Accounts.deliver_login_instructions(user, &url(~p"/users/log-in/#{&1}")) do
+      # The registration expired, or cleanup deleted it after the lookup. Stay on the form:
+      # the email, and the return destination kept in the session, carry into signup.
+      {:noreply,
+       socket
+       |> put_flash(
+         :error,
+         "This sign-up was not confirmed within seven days and has expired. " <>
+           "Register again to continue."
+       )
+       |> assign(form: to_form(%{"email" => email}, as: "user"))}
+    else
+      # No such account, mail accepted, or mail delivery failed: one answer for all.
+      _other ->
+        info =
+          "If your email is in our system, you will receive instructions for logging in shortly."
+
+        {:noreply,
+         socket
+         |> put_flash(:info, info)
+         |> push_navigate(to: ~p"/users/log-in")}
     end
-
-    info =
-      "If your email is in our system, you will receive instructions for logging in shortly."
-
-    {:noreply,
-     socket
-     |> put_flash(:info, info)
-     |> push_navigate(to: ~p"/users/log-in")}
   end
 
   defp local_mail_adapter? do
