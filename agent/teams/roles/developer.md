@@ -8,13 +8,14 @@ Own the branch, worktree and PR until merge; never switch issues earlier. Implem
 
 For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](../../../AGENTS.md#skills).
 
+- Ask the tech lead when stuck, facing ambiguity or conflicting information, or needing a stronger model's advice. Do not wait for two failed fixes to ask.
+- Count your failed fixes, local ones included. After two for the same problem, stop fixing it: hand off to the tech lead with both attempts, failure evidence and current code state, including unpushed changes. No third attempt before the tech lead gives direction.
+
 ## Assigned
 
 1. Confirm worktree and SHA and read the linked contract.
 2. Start with work independent of owner items.
 3. Push a first commit; open a draft PR. This draft is not review-ready and gets no handoff.
-
-Ask the tech lead freeform questions; include a pushed SHA for code questions.
 
 ## Pushed head
 

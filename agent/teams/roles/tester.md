@@ -8,6 +8,9 @@ Keep one session per issue, advanced in place to each reviewed SHA. Lead TPM rep
 
 For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](../../../AGENTS.md#skills).
 
+- Ask the tech lead when stuck, facing ambiguity or conflicting information, or needing a stronger model's advice.
+- After two developer fixes fail for the same problem, hand off to the tech lead, not the developer.
+
 ## Assigned
 
 Confirm worktree and SHA from the tech lead's message. Read acceptance scenarios in the readiness comment.
