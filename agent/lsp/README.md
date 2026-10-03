@@ -63,10 +63,10 @@ Out of this beta: an application in a subdirectory or monorepo.
 
 - `.dexter/dexter.sh`: `exec vendor/dexter --root <worktree> "$@"` with the
   selected sources exported. Its absolute path is `TIPS_DEXTER` in the session.
-- For Codex, `.codex/config.toml` with automatic compilation disabled and Credo enabled.
+- For Codex, `.codex/config.toml` with Credo enabled.
 
-Claude's launch settings disable automatic compilation and known
-language-server plugins, including in linked worktrees.
+Claude's launch settings disable known language-server plugins, including
+in linked worktrees.
 
 Provisioning then runs three steps in the worktree, with the role's environment.
 Any failure stops the launch:

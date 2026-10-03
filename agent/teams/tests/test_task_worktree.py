@@ -500,13 +500,10 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert not (self.wt / ".claude/settings.local.json").exists()
         argv = self.state()["launch_argv"]
         plugins = json.loads(argv[argv.index("--settings") + 1])["enabledPlugins"]
-        assert plugins["mix-compile@elixir-agent-tools"] is False
         assert plugins["mix-credo@elixir-agent-tools"] is True
-        # Disable automatic compilation and known alternative language servers.
+        # Disable known alternative language servers.
         assert {name for name, enabled in plugins.items() if not enabled} == {
-            "mix-compile@elixir-agent-tools",
-            "elixir-lsp@elixir-agent-tools",
-            "dexter-lsp@dexter",
+            "elixir-lsp@elixir-agent-tools"
         }
         # Claude uses the bound command like Codex: no generated plugin, no native server.
         assert not (self.wt / ".dexter/claude-plugin").exists()
@@ -1058,11 +1055,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call("--start")
         cfg = tomllib.loads((self.wt / ".codex/config.toml").read_text())
         assert "mcp_servers" not in cfg
-        assert set(cfg["plugins"]) == {
-            "mix-compile@elixir-agent-tools",
-            "mix-credo@elixir-agent-tools",
-        }
-        assert cfg["plugins"]["mix-compile@elixir-agent-tools"]["enabled"] is False
+        assert set(cfg["plugins"]) == {"mix-credo@elixir-agent-tools"}
         assert cfg["plugins"]["mix-credo@elixir-agent-tools"]["enabled"] is True
         assert "mcp_servers.elixir-lsp.enabled=false" not in self.state()["launch_argv"]
         assert "approval_policy" not in cfg

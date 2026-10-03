@@ -89,7 +89,7 @@ Read provider settings by path from main checkout's `.env`; only the user adds n
 inspect its callers with Dexter references and list them in the PR comment.
 Use definition on unfamiliar call sites and hover for unfamiliar types or specs.
 Follow [AGENTS.md](../../AGENTS.md) and the [operations table](../lsp/README.md#operations).
-Both clients disable the automatic compile hook and keep the Credo hook enabled.
+Both clients keep the Credo hook enabled.
 Dexter does not provide compiler diagnostics; run explicit Mix checks after edits.
 
 **Checks.** Trust CI only for commands actually run. For `agent/teams` Python changes, CI is the evidence: open the exact-head `checks` run, verify these four steps passed and link the run in your round.
