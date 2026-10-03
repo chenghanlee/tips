@@ -36,6 +36,8 @@ Design files are large. List headings with `rg -n '^#{2,3} ' <file>`, then read 
 - Follow the testing trophy, integration first. TDD means writing the failing ExUnit integration test for the acceptance scenario before the code.
 - Unit tests only for pure logic with wide blast radius.
 - Write new end-to-end tests, including browser journeys, for milestone gates; CI keeps rerunning existing coverage.
+- Keep the suite lean: fewer tests for the same confidence. Write and review tests using [Kent Beck's Test Desiderata](https://testdesiderata.com/): isolated, composable, deterministic, fast, writable, readable, behavioural, structure-insensitive, automated, specific, predictive, inspiring. Per Beck: "no property should be given up without receiving a property of greater value in return."
+- When reviewing new or changed tests, default to no. Require the developer to remove tests whose value does not justify their cost; explain why. Require repair or replacement instead if removal would lose required coverage.
 
 ## Review
 
