@@ -28,7 +28,7 @@ query($owner: String!, $name: String!, $number: Int!, $after: String) {
 """
 THREAD_FIELDS = (
     "id isResolved path line originalLine "
-    "comments(first: 100) { totalCount nodes { databaseId body } }"
+    "comments(first: 100) { totalCount nodes { databaseId body pullRequestReview { url } } }"
 )
 REVIEW_FIELDS = "databaseId state body url commit { oid }"
 RESOLVE = """
@@ -83,9 +83,6 @@ def connection(repo: str, number: int, name: str, fields: str) -> list[Any]:
 
 def unresolved_threads(repo: str, number: int) -> list[Any]:
     threads = connection(repo, number, "reviewThreads", THREAD_FIELDS)
-    for thread in threads:
-        if thread["comments"]["totalCount"] > len(thread["comments"]["nodes"]):
-            raise RefusalError(f"Thread {thread['id']} has more comments than one page returns.")
     return [thread for thread in threads if not thread["isResolved"]]
 
 
@@ -93,20 +90,43 @@ def place(thread: Any) -> str:
     return f"{thread['path']}:{thread['line'] or thread['originalLine']}"
 
 
+def reviewer(body: str) -> str:
+    """The role and session line of a review body: its first line, or the one after LGTM."""
+    lines = [line.strip() for line in body.splitlines() if line.strip()]
+    return next((line for line in lines if line != "LGTM"), "")
+
+
+def show_thread(thread: Any, owners: dict[str, str]) -> None:
+    first, *replies = thread["comments"]["nodes"]
+    opened: Any = first["pullRequestReview"] or {}
+    owner = owners.get(str(opened.get("url")), "unknown reviewer")
+    print(f"\nthread {thread['id']} reply-to {first['databaseId']} {place(thread)} by {owner}")
+    print(first["body"].strip())
+    for reply in replies:
+        print("> " + reply["body"].strip().replace("\n", "\n> "))
+    hidden = thread["comments"]["totalCount"] - len(thread["comments"]["nodes"])
+    if hidden > 0:
+        print(f"> ({hidden} later replies not shown)")
+
+
 def show(number: int, every_head: bool) -> None:
     repo, _, head = pull_request(number)
+    reviews = [
+        review
+        for review in connection(repo, number, "reviews", REVIEW_FIELDS)
+        if review["body"].strip() and review["state"] != "PENDING"
+    ]
+    # Body feedback has no thread to stay open, so the head before the latest is shown too.
+    commits = list(dict.fromkeys(review["commit"]["oid"] for review in reviews))
+    recent = commits if every_head else commits[-2:]
     print(f"head {head}")
-    for review in connection(repo, number, "reviews", REVIEW_FIELDS):
-        body = review["body"].strip()
-        current = every_head or review["commit"]["oid"] == head
-        if body and current and review["state"] != "PENDING":
-            print(f"\nreview {review['url']} {review['commit']['oid'][:7]}\n{body}")
+    for review in reviews:
+        if review["commit"]["oid"] in recent:
+            print(f"\nreview {review['url']} {review['commit']['oid'][:7]}")
+            print(review["body"].strip())
+    owners = {review["url"]: reviewer(review["body"]) for review in reviews}
     for thread in unresolved_threads(repo, number):
-        first, *replies = thread["comments"]["nodes"]
-        print(f"\nthread {thread['id']} reply-to {first['databaseId']} {place(thread)}")
-        print(first["body"].strip())
-        for reply in replies:
-            print("> " + reply["body"].strip().replace("\n", "\n> "))
+        show_thread(thread, owners)
 
 
 def resolve(thread_id: str) -> None:
@@ -123,9 +143,9 @@ def resolve(thread_id: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Read PR reviews and threads; resolve a thread.")
     commands = parser.add_subparsers(dest="command", required=True)
-    listing = commands.add_parser("list", help="Reviews on the head and every unresolved thread")
+    listing = commands.add_parser("list", help="Recent reviews and every unresolved thread")
     listing.add_argument("pr", type=int)
-    listing.add_argument("--all", action="store_true", help="Include reviews of earlier heads")
+    listing.add_argument("--all", action="store_true", help="Reviews of every head")
     resolving = commands.add_parser("resolve", help="Resolve a thread you opened")
     resolving.add_argument("thread")
     args = parser.parse_args()

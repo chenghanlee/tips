@@ -81,7 +81,7 @@ gh api "repos/{owner}/{repo}/pulls/$PR/reviews" --input tmp/review.json --jq .ht
 - Report what the linked CI run does not establish. Do not repeat the diff, the contract or passing checks.
 - Write in plain, simple English. No mannered prose. Succinct and concise. Write like the reader has ADHD.
 
-**Replies.** `agent/teams/pr_review.py list "$PR"` prints the reviews of the head and every unresolved thread with its IDs; `--all` adds earlier heads. Fix the code where that answers a comment. Reply only when useful, to explain a fix, ask or disagree:
+**Replies.** `agent/teams/pr_review.py list "$PR"` prints the reviews of the last two reviewed heads and every unresolved thread with its IDs and reviewer; `--all` adds earlier heads. Fix the code where that answers a comment. Reply only when useful, to explain a fix, ask or disagree:
 
 ```bash
 gh api "repos/{owner}/{repo}/pulls/$PR/comments/$REPLY_TO/replies" -f body="..."

@@ -53,7 +53,11 @@ def review(**changes: Any) -> dict[str, Any]:
 
 
 def thread(resolved: bool, path: str = "lib/a.ex", comments: int = 1) -> dict[str, Any]:
-    nodes = [{"databaseId": 40 + n, "body": f"comment {n}"} for n in range(comments)]
+    opened = {"url": RECORD}
+    nodes = [
+        {"databaseId": 40 + n, "body": f"comment {n}", "pullRequestReview": opened}
+        for n in range(comments)
+    ]
     return {
         "id": "T_" + path,
         "isResolved": resolved,
@@ -158,13 +162,12 @@ class PublishTest(unittest.TestCase):
             assert expected in result.stderr, (expected, result.stderr)
             assert posts(calls) == [], expected
 
-    def test_thread_with_more_comments_than_a_page_is_refused(self) -> None:
+    def test_long_resolved_thread_does_not_block_publication(self) -> None:
         long = thread(True)
         long["comments"]["totalCount"] = 101
         result, calls = publish(reviewThreads=[[long]])
-        assert result.returncode != 0
-        assert "more comments" in result.stderr
-        assert posts(calls) == []
+        assert result.returncode == 0, result.stderr
+        assert len(posts(calls)) == 1
 
     def test_record_from_another_pull_request_is_refused(self) -> None:
         other = "https://github.com/o/tips/pull/8#pullrequestreview-5"
@@ -195,25 +198,43 @@ class PublishTest(unittest.TestCase):
 
 
 class ThreadReadTest(unittest.TestCase):
-    def test_list_prints_head_reviews_and_unresolved_threads_only(self) -> None:
+    def test_list_prints_reviews_and_unresolved_threads_with_their_reviewer(self) -> None:
         reviews = [
-            listed(1, "COMMENTED", "old head", "b" * 40),
             listed(2, "COMMENTED", ""),
             listed(3, "PENDING", "draft"),
-            listed(5, "COMMENTED", "General: split the module."),
+            listed(5, "COMMENTED", "team-1-test, session t\nGeneral: split the module."),
+            listed(6, "COMMENTED", "LGTM\nteam-1-lead, session l"),
         ]
-        threads = [[thread(True, "lib/done.ex")], [thread(False, "lib/open.ex", comments=2)]]
+        mine = thread(False, "lib/open.ex", comments=2)
+        theirs = thread(False, "lib/lead.ex")
+        theirs["comments"]["nodes"][0]["pullRequestReview"] = {"url": PR + "#pullrequestreview-6"}
+        theirs["comments"]["totalCount"] = 3
+        threads = [[thread(True, "lib/done.ex")], [mine, theirs]]
         result, _ = run("pr_review.py", "list", "7", reviews=[reviews], reviewThreads=threads)
         assert result.returncode == 0, result.stderr
         out = result.stdout
         assert out.startswith(f"head {SHA}\n")
-        assert f"review {RECORD} aaaaaaa\nGeneral: split the module." in out
-        for absent in ("old head", "draft", "pullrequestreview-2", "lib/done.ex"):
+        assert f"review {RECORD} aaaaaaa\nteam-1-test, session t\nGeneral: split" in out
+        for absent in ("draft", "pullrequestreview-2", "lib/done.ex"):
             assert absent not in out, absent
-        assert "thread T_lib/open.ex reply-to 40 lib/open.ex:12\ncomment 0\n> comment 1" in out
+        open_thread = "thread T_lib/open.ex reply-to 40 lib/open.ex:12 by team-1-test, session t"
+        assert open_thread + "\ncomment 0\n> comment 1" in out
+        assert "lib/lead.ex:12 by team-1-lead, session l\ncomment 0\n> (2 later replies" in out
+
+    def test_body_feedback_on_the_previous_head_stays_visible_after_a_push(self) -> None:
+        reviews = [
+            listed(1, "COMMENTED", "oldest head", "c" * 40),
+            listed(4, "COMMENTED", "Required: rethink the lock order.", "b" * 40),
+        ]
+        after_push, _ = run("pr_review.py", "list", "7", reviews=[reviews])
+        assert "rethink the lock order" in after_push.stdout
+        assert "oldest head" in after_push.stdout
+        reviews.append(listed(5, "COMMENTED", "LGTM\nteam-1-test, session t"))
+        reviewed, _ = run("pr_review.py", "list", "7", reviews=[reviews])
+        assert "rethink the lock order" in reviewed.stdout
+        assert "oldest head" not in reviewed.stdout
         every, _ = run("pr_review.py", "list", "7", "--all", reviews=[reviews])
-        assert "old head" in every.stdout
-        assert "draft" not in every.stdout
+        assert "oldest head" in every.stdout
 
     def test_incomplete_answer_is_an_error_not_an_empty_list(self) -> None:
         result, _ = run("pr_review.py", "list", "7", reviews="broken")
