@@ -13,7 +13,7 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](.
 ## Assigned
 
 1. Confirm your pane, worktree and SHA inside the new client: `herdr agent get team-N-lead`, `pwd`, `git rev-parse HEAD`.
-2. Post an issue readiness comment: one outcome, exclusions, exact design sections, real entry points, acceptance scenarios mapped to named tests (`probe`: evidence required), runnable verification, available prerequisites, task slug. Amend this contract when needed. Link design sections; omit repeated design text, operating rules, setup history and evidence requests beyond the shared round shape. End with one line: `Needs from owner:` followed only by `none` or required secrets, credentials and network access. That line alone is not a blocker.
+2. Post an issue readiness comment: one outcome, exclusions, exact design sections, real entry points, acceptance scenarios mapped to named tests (`probe`: evidence required), runnable verification, available prerequisites, task slug. Amend this contract when needed. Link design sections; omit repeated design text, operating rules and setup history; link evidence instead of copying it into rounds. End with one line: `Needs from owner:` followed only by `none` or required secrets, credentials and network access. That line alone is not a blocker.
 3. If a second independent outcome exists or your context will not last until merge, propose a split to lead TPM as a scope question; it creates children. Never require file ownership lists, reservations or overlap approval. Coordinate concrete shared changes as they arise.
 4. Request developer by role; lead TPM chooses the pane. After its confirmation, verify developer pane, worktree and SHA. Brief developer with contract link, that SHA as base, action, owner and exact completion command `herdr agent prompt team-N-lead "..."`, naming fields the developer fills.
 5. Start with work independent of owner items.
@@ -64,7 +64,7 @@ Example:
     PASS. F1 fixed. Next: merge.
     Head: 0110df7fc0c4c0b1c2c41953849e6db39171601a  Scope: delta from 33d8135
     Tester: 0110df7, pass, <round link>
-    CI: pass
+    CI: <run link>: pass
 
     ### Local correctness
     F1 fixed: a decoder error returns :not_found.
