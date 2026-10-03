@@ -21,8 +21,8 @@ defmodule Tips.AdmissionLimiter do
     * `check_write/2` and `check_upload/2` take the server-built
       `Tips.Accounts.Scope` and charge its account id. A scope struct is not
       proof of authentication: the caller must build it from server state
-      (`TipsWeb.UserAuth`, and fresh admission once #47 lands). Eligibility and
-      locked business checks stay with the owning operation.
+      (`TipsWeb.UserAuth`; see "Runtime admission" in `Tips.Accounts`).
+      Eligibility and locked business checks stay with the owning operation.
 
   Missing or malformed identities return `{:error, :invalid_identity}`. There is
   no shared "unknown" bucket.
