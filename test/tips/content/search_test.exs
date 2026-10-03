@@ -188,16 +188,22 @@ defmodule Tips.Content.SearchTest do
       near = tip!(ctx, title: "Plain near", vector: plane(-1.0, -1.0))
 
       # The smallest float32 subnormal, a subnormal, ordinary, mixed and float32 max.
-      for {x, y} <- [
-            {-1.0e-45, -1.0e-45},
-            {-1.0e-40, -1.0e-40},
-            {-1, -1},
-            {-3.0e38, -2.9e38},
-            {-3.402_823_466_385_288_6e38, -3.402_823_466_385_288_6e38}
-          ] do
-        assert ids(search!(nil, "unmatched", embedding: plane(x, y))) == [near.id, far.id],
-               "query #{inspect({x, y})}"
-      end
+      queries = [
+        {-1.0e-45, -1.0e-45},
+        {-1.0e-40, -1.0e-40},
+        {-1, -1},
+        {-3.0e38, -2.9e38},
+        {-3.402_823_466_385_288_6e38, -3.402_823_466_385_288_6e38}
+      ]
+
+      # The exact plan checks the encoded direction. Approximate HNSW scans can
+      # miss rows; the filtered recall test covers them.
+      in_plan(:sequential, fn ->
+        for {x, y} <- queries do
+          assert ids(search!(nil, "unmatched", embedding: plane(x, y))) == [near.id, far.id],
+                 "query #{inspect({x, y})}"
+        end
+      end)
     end
 
     @tag :capture_log
