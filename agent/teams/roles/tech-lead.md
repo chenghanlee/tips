@@ -30,7 +30,7 @@ Developer repairs red; tester does not review red heads. Send red caused by `mai
 
 ## Verdict
 
-Tester sends findings directly to developer. Send your own actionable findings to developer. Apply shared Findings; require another tester verdict after repairs. Rejected designs require new commits and tester review. Request a fresh tester only for session loss or rejected design; lead TPM provisions it. After tester passes the last repair, proceed to Merge.
+Tester sends findings directly to developer. Send your own actionable findings to developer. Apply shared Findings; require another tester verdict after repairs. Rejected designs require new commits and tester review. Request a fresh tester only for session loss, a wrong launch environment or a rejected implementation design; lead TPM provisions it. After tester passes the last repair, proceed to Merge.
 
 Before the tester passes, keep your notes short: decision on findings, blocking findings, next action. Raise design concerns as soon as you see them. The five headings belong to the Merge round. Each head gets one round in your comment: if a head you already noted passes, extend that round.
 

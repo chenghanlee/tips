@@ -15,7 +15,7 @@ Describe the concrete behavior and affected contracts. State exclusions and rema
 - Implementer/session:
 - Reviewer/session and review comment:
 - Reviewed base/head:
-- Every introduced commit reviewed individually, including repairs and sync merges:
+- Tester: first head reviewed fully, later heads as deltas. Clean base updates need no new tester round; the tech lead reviews the base delta and records the updated head:
 - Complete PR reviewed; no unresolved P0/P1; all required acceptance satisfied:
 
 The reviewer records exact SHAs and publishes `tips/independent-review` only after review. A new head/base needs updated evidence. Do not copy an old pass.

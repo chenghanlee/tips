@@ -24,8 +24,8 @@ Actual commands, fixtures, environment and required evidence. Unavailable checks
 
 ## Ownership and dispatch
 
-TPM records owner/session, base SHA, branch/worktree, DB/port/provider namespace and reviewer before Active. Confirm checkout ownership and resolve unknown contracts before Ready.
+For team work, lead TPM sets Active and records the base SHA; tech lead posts readiness before implementation starts. Resolve unknown contracts before Ready.
 
 ## Completion
 
-Implementation and tests pass. Separate-session review covers every commit and complete PR with no unresolved P0/P1. Relevant integrated checks pass. Context overrun continues on this issue in a fresh repair session.
+Implementation and tests pass. Separate-session review covers the complete PR with no unresolved P0/P1. Relevant integrated checks pass. Context overrun continues on this issue in a fresh repair session.

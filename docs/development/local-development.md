@@ -2,11 +2,11 @@
 
 Run commands from the repository root.
 
-The Phoenix skeleton includes generated authentication, local email previews, Oban
-and a database health endpoint. Product-specific authentication and provider
-integrations are separate tasks.
+The app includes passwordless magic-link sign-in, local email previews, Oban and a
+database health endpoint. Remaining provider integration work is tracked in GitHub
+issues.
 
-Install Elixir **1.20.4**, Erlang/OTP **29.1**, Python **3.11+**, Docker with Compose, and a C build
+Install Elixir **1.20.4**, Erlang/OTP **29.1**, Python **3.12**, Docker with Compose, and a C build
 toolchain (Xcode Command Line Tools on macOS, or a C compiler and `make` on Linux)
 for native dependencies such as `lazy_html`. Python runs documentation checks and optional
 agent tooling. See the [toolchain guide](toolchain.md)
@@ -51,12 +51,11 @@ partitioning adds `MIX_TEST_PARTITION` after that suffix when set.
 
 No provider credentials are needed to boot, test or use features that do not call
 a provider. Development mail stays in the local Swoosh
-mailbox at <http://localhost:4000/dev/mailbox>. Generated authentication has been
-adapted for Tips identity fields and session-family IDs. Tips admission and the
-full session-family lifecycle remain pending. Oban runs in the same application
-and Repo with `media`, `embeddings`, and
-`maintenance` queues, each with concurrency 1. There are no workers yet. Tests
-use Oban's manual testing mode.
+mailbox at <http://localhost:4000/dev/mailbox>. Sign-in is passwordless, by
+magic link; a session family is renewed and revoked together. Oban runs in the
+same application and Repo with `media`, `embeddings`, and `maintenance` queues,
+each with concurrency 1. `Tips.Workers.ExpireRegistrations` is scheduled every
+minute on `maintenance`. Tests use Oban's manual testing mode.
 
 With the server running, check both routes from a second shell (adjust the port
 if you changed it):
@@ -186,7 +185,7 @@ label matches `RELEASE_REVISION`, as used by CI.
 ### Agent tooling
 
 Use the [agent team guide](../../agent/teams/README.md) for coordination and
-[Dexter guide](../../agent/lsp/README.md) for client setup, builds and acceptance.
+[Dexter guide](../../agent/lsp/README.md) for builds, provisioning and navigation.
 
 ### Extension-enabled database
 

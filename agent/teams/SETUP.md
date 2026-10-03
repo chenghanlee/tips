@@ -4,48 +4,34 @@ Humans: perform setup from the repository root. Agents use the [operating agreem
 
 ## One-time setup
 
-Install Python 3.12 and [configured client CLIs](config.toml). Authenticate clients and GitHub CLI (`gh`) for this repository. Merges require GNU `timeout` on `PATH`: macOS `brew install coreutils`; Linux distribution `coreutils` package.
+Install Python 3.12 and [configured client CLIs](config.toml). Authenticate clients and GitHub CLI (`gh`) for this repository. Merges require GNU `timeout` on `PATH`: macOS `brew install coreutils`; Linux distribution `coreutils` package. Coding agents also need `unbuffer` (Expect): the Elixir skill requires it on Mix commands.
 
-From the main checkout, install pinned [Elixir Agent Tools](https://github.com/georgeguimaraes/elixir-agent-tools) for required skills/Mix plugins:
+The user maintains the skills by hand as plain folders in the main checkout. Both locations are Git-ignored:
 
-```bash
-git clone https://github.com/georgeguimaraes/elixir-agent-tools.git agent/elixir-agent-tools
-git -C agent/elixir-agent-tools checkout --detach ac3a5a1661a087158b39d5eb742b3c25fe3c7b44
-mkdir -p .agents/skills
-for skill in elixir phoenix ecto otp oban; do
-  ln -s "$PWD/agent/elixir-agent-tools/plugins/elixir-dev/skills/$skill" ".agents/skills/$skill"
-done
-```
+- `.agents/skills/`: `elixir`, `phoenix`, `ecto`, `otp`, `oban` and `herdr`, for Codex.
+- `.claude/skills/`: the same five Elixir skills, for Claude.
 
-Inspect existing destinations before replacing these Git-ignored dependencies. Keep the source checkout: launchers link main checkout's `.agents/skills` into worktrees without downloading skills.
+Update matching copies together, then check that the skills appear in each client's skill list. Provisioning links the main checkout's `.agents/skills/` into each worktree and checks only that the directory exists, not the individual skills.
 
-From the main checkout, install plugins for clients you use:
+Install only the `mix-credo` plugin, for the clients you use:
 
 ```bash
 # Codex
-codex plugin marketplace add "$PWD/agent/elixir-agent-tools"
+codex plugin marketplace add georgeguimaraes/elixir-agent-tools
 codex plugin add mix-credo@elixir-agent-tools
 
-# Claude Code (user scope makes the installations available across worktrees)
-claude plugin marketplace add "$PWD/agent/elixir-agent-tools"
-claude plugin install --scope user elixir-dev@elixir-agent-tools
-claude plugin install --scope user mix-credo@elixir-agent-tools
+# Claude Code
+claude plugin marketplace add georgeguimaraes/elixir-agent-tools
+claude plugin install mix-credo@elixir-agent-tools
 ```
 
-Codex discovers linked `.agents/skills`; never also install Codex `elixir-dev`. Claude loads the same five skills through `elixir-dev`. Generated settings enable Credo for both clients. Run explicit Mix checks after edits. Follow plugin trust prompts. Claude launches use `--settings` to disable known language-server plugins, including in linked worktrees; existing local settings files are preserved. Launchers do not disable a legacy `mcp_servers.elixir-lsp` entry. Remove it before the pilot, including from the main checkout's `.codex/config.toml`, but only once the main checkout has this revision of `team.py`. An earlier `team.py` passes an override for that entry to Codex coordinators, and Codex refuses to start (`invalid transport`) when the entry is missing. Unrelated MCP servers remain available in coding sessions.
+Generated settings enable Credo for both clients. Run explicit Mix checks after edits. Follow plugin trust prompts. Claude launches use `--settings` to disable known language-server plugins, including in linked worktrees; existing local settings files are preserved. Remove any old `mcp_servers.elixir-lsp` entry from Codex configuration; launchers do not disable it. Unrelated MCP servers remain available in coding sessions.
 
 Build Dexter with the [LSP guide](../lsp/README.md#build): the pinned source plus the local patch, one binary. Put matching Elixir sources in the main checkout's `agent/lsp/vendor/elixir-<version>/` (the source tree contains `lib/elixir/lib/enum.ex`), or set `DEXTER_ELIXIR_LIB_ROOT` to their `lib/` directory. Provisioning selects the target worktree's Elixir version and binds the source path into the worktree's generated files. Keep the shared tools/sources independent of task worktrees.
 
-Merge the Dexter integration, including root `AGENTS.md` and `CLAUDE.md`, into
-`origin/main` before provisioning normal tasks. New developer branches start from
-the helper's freshly fetched `origin/main` and inherit these instructions from that
-commit; installing the binary alone does not update them. Existing task branches
-must merge the updated `origin/main`, and review refs must include the instructions,
-before starting a Dexter session. With teams stopped, update the canonical checkout
-and build its pinned Dexter before launching new teams. The helper does not copy
-instructions over a task branch's files.
+Task and review checkouts use their own instruction files; the helper does not copy instructions. Before launching on a new shared Dexter build, verify that the assigned revision has compatible instructions. Stop teams before replacing the shared build, then re-provision.
 
-Codex must be allowed to connect to Dexter's local Unix socket. The tested macOS `workspace-write` sandbox denies it with network access disabled; the reviewer verified access with network access enabled or a scoped `--allow-unix-socket /private/tmp/dexter-<uid>` sandbox allowance. Check the installed Codex sandbox options and set the narrowest suitable user-owned permission before the pilot. With approval policy `never`, a denied connection cannot escalate. The launcher does not change sandbox settings.
+Codex must be allowed to connect to Dexter's local Unix socket. The tested macOS `workspace-write` sandbox denies it with network access disabled; the reviewer verified access with network access enabled or a scoped `--allow-unix-socket /private/tmp/dexter-<uid>` sandbox allowance. Check the installed Codex sandbox options and set the narrowest suitable user-owned permission before first launch. With approval policy `never`, a denied connection cannot escalate. The launcher does not change sandbox settings.
 
 ## Starting the lead TPM
 
