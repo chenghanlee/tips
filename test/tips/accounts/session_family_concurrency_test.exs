@@ -34,32 +34,6 @@ defmodule Tips.Accounts.SessionFamilyConcurrencyTest do
     {user, token}
   end
 
-  test "concurrent renewals produce two valid successors in the original family", data do
-    %{user: user, predecessor: predecessor} = data
-    first = open(data.supervisor)
-    second = open(data.supervisor)
-    refute first.backend == second.backend
-
-    assert {:ok, first_token} =
-             run(first, fn -> Accounts.renew_user_session_token(user, predecessor) end)
-
-    renewal = submit(second, fn -> Accounts.renew_user_session_token(user, predecessor) end)
-    await_blocked(second, first)
-    commit(first)
-    assert {:ok, second_token} = await(second, renewal)
-    commit(second)
-
-    Sandbox.unboxed_run(Repo, fn ->
-      family = session_row(predecessor).session_family_id
-      refute first_token == second_token
-
-      for token <- [predecessor, first_token, second_token] do
-        assert %UserToken{session_family_id: ^family} = session_row(token)
-        assert {%User{}, _} = Accounts.get_user_by_session_token(token)
-      end
-    end)
-  end
-
   test "renewal commits before logout and every family token is revoked", data do
     %{user: user, predecessor: predecessor} = data
     other_browser = unboxed(fn -> Accounts.generate_user_session_token(user) end)

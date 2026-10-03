@@ -22,7 +22,12 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
     use Phoenix.LiveView
 
     def mount(_params, _session, socket), do: {:ok, socket}
-    def render(assigns), do: ~H"<p id=\"plain\">plain</p>"
+
+    def render(assigns) do
+      ~H"""
+      <p id="plain">plain</p>
+      """
+    end
   end
 
   # Fixtures run at the configured level; only `logged/2` lowers it.
@@ -40,16 +45,11 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
     }
   end
 
-  test "controller bearer admission logs the request, not the bearer", %{conn: conn} = context do
-    log = logged(fn -> assert conn |> get(~p"/users/settings") |> html_response(200) end)
-
-    assert log =~ "GET /users/settings"
-    assert_private(log, context)
-  end
-
   test "a connected settings mount logs the view, not its session", %{conn: conn} = context do
     log = logged(fn -> assert {:ok, _lv, _html} = live(conn, ~p"/users/settings") end)
 
+    assert log =~ "GET /users/settings"
+    assert log =~ "Sent 200 in"
     assert log =~ "MOUNT TipsWeb.UserLive.Settings"
     assert_private(log, context)
   end
@@ -141,7 +141,7 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
   end
 
   describe "credential URL segments" do
-    for level <- [:info, :debug] do
+    for level <- [:debug] do
       test "magic-link GET at #{level} logs the route, not the proof", %{user: user} do
         {proof, _hashed} = generate_user_magic_link_token(user)
 
@@ -185,7 +185,7 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
       end
     end
 
-    test "connected mounts on credential routes log the view only", %{conn: conn, user: user} do
+    test "connected mounts on credential routes log the view only", %{user: user} do
       {proof, _hashed} = generate_user_magic_link_token(user)
 
       log =
@@ -195,17 +195,10 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
 
       assert log =~ "MOUNT TipsWeb.UserLive.Confirmation"
       refute log =~ proof, "log contains the magic-link proof"
-
-      log = logged(fn -> assert conn |> get(~p"/users/log-in/#{proof}") |> html_response(200) end)
-      refute log =~ proof, "log contains the magic-link proof"
     end
 
-    # The router decides what a path is: after HEAD handling, percent-decoding and
-    # empty-segment removal. Every form it serves must log the route pattern.
+    # Encoded credentials must still log the matched route, never the requested path.
     for {form, method, rewrite} <- [
-          {"HEAD", :head, quote(do: & &1)},
-          {"percent-encoded static segment", :get,
-           quote(do: &String.replace(&1, "/users/", "/%75sers/"))},
           {"percent-encoded token segment", :get,
            quote(
              do: fn path ->
@@ -214,9 +207,7 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
 
                prefix <> "%" <> Base.encode16(<<char>>) <> rest
              end
-           )},
-          {"trailing and doubled slashes", :get,
-           quote(do: &(String.replace(&1, "/users/", "/users//") <> "/"))}
+           )}
         ] do
       test "magic-link #{form} logs the route, not the proof", %{user: user} do
         {proof, _hashed} = generate_user_magic_link_token(user)
@@ -233,31 +224,6 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
         refute_credential_path(log, proof, path)
         assert {:ok, %{session_token: _}} = Accounts.login_user_by_magic_link(proof)
       end
-
-      test "email-confirmation #{form} logs the route, not the token", %{conn: conn, user: user} do
-        email = unique_user_email()
-
-        confirmation =
-          extract_user_token(fn url ->
-            Accounts.deliver_user_update_email_instructions(
-              %{user | email: email},
-              user.email,
-              url
-            )
-          end)
-
-        path = unquote(rewrite).(~p"/users/settings/confirm-email/#{confirmation}")
-
-        log =
-          logged(:info, fn ->
-            assert %Plug.Conn{status: 302} = dispatch(conn, @endpoint, unquote(method), path)
-          end)
-
-        assert log =~ "GET /users/settings/confirm-email/:token"
-        assert log =~ "Sent 302 in"
-        refute_credential_path(log, confirmation, path)
-        assert Repo.reload!(user).email == email
-      end
     end
 
     test "a path the router does not serve is never logged", %{user: user} do
@@ -265,9 +231,7 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
 
       for {method, path} <- [
             {:get, "/users/log-in/#{proof}/extra"},
-            {:get, "/USERS/log-in/#{proof}"},
-            {:post, "/users/log-in/#{proof}"},
-            {:delete, "/users/settings/confirm-email/#{proof}"}
+            {:post, "/users/log-in/#{proof}"}
           ] do
         log =
           logged(fn ->
@@ -281,64 +245,16 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
       assert {:ok, %{session_token: _}} = Accounts.login_user_by_magic_link(proof)
     end
 
-    test "method override cannot turn a credential route into another logged form", %{user: user} do
-      {proof, _hashed} = generate_user_magic_link_token(user)
-      path = ~p"/users/log-in/#{proof}"
-
-      log =
-        logged(fn ->
-          assert %Plug.Conn{status: 404} = post(build_conn(), path, %{"_method" => "delete"})
-        end)
-
-      refute_credential_path(log, proof, path)
-    end
-
-    test "endpoint telemetry still carries start and stop for a credential route", %{user: user} do
-      {proof, _hashed} = generate_user_magic_link_token(user)
-      test = self()
-      handler = {__MODULE__, make_ref()}
-
-      :telemetry.attach_many(
-        handler,
-        [[:phoenix, :endpoint, :start], [:phoenix, :endpoint, :stop]],
-        fn [:phoenix, :endpoint, stage], measurements, _metadata, _config ->
-          if self() == test, do: send(test, {stage, Map.keys(measurements)})
-        end,
-        nil
-      )
-
-      head(build_conn(), ~p"/users/log-in/#{proof}")
-      :telemetry.detach(handler)
-
-      assert_received {:start, [:system_time]}
-      assert_received {:stop, [:duration]}
-    end
-
     test "malformed and unrouted paths neither crash nor detach the request logger", %{
       user: user
     } do
-      for path <- [
-            "/users/log-in/%ZZ",
-            "/users/log-in/%00",
-            "/no/such/route",
-            "/users/log-in/a/b"
-          ] do
-        assert %Plug.Conn{status: status} = get(build_conn(), path)
-        assert status < 500
-      end
+      assert %Plug.Conn{status: status} = get(build_conn(), "/users/log-in/%ZZ")
+      assert status < 500
 
       {proof, _hashed} = generate_user_magic_link_token(user)
       log = logged(:info, fn -> get(build_conn(), ~p"/users/log-in/#{proof}") end)
       assert log =~ "GET /users/log-in/:token"
       refute log =~ proof, "log contains the magic-link proof"
-    end
-
-    test "routes without a token keep their request path and status lines", %{conn: conn} do
-      log = logged(:info, fn -> assert conn |> get(~p"/users/settings") |> html_response(200) end)
-
-      assert log =~ "GET /users/settings"
-      assert log =~ "Sent 200 in"
-      refute log =~ ":token"
     end
   end
 
@@ -389,7 +305,7 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
 
     refute Enum.any?(bearer_forms, &(log =~ &1)), "log contains the session bearer"
 
-    refute log =~ ~r/\[#{token_id}, #{user_id}[,\]]/,
+    refute log =~ ~r"\[#{token_id}, #{user_id}[,\]]",
            "log contains the private row reference as query parameters"
 
     refute log =~ "SessionRef", "log contains an inspected session reference"

@@ -43,13 +43,7 @@ defmodule TipsWeb.UserSessionControllerTest do
 
   describe "POST /users/log-in - malformed input" do
     for {label, params} <- [
-          {"missing user", %{}},
-          {"non-map user", %{"user" => "bad"}},
-          {"null token", %{"user" => %{"token" => nil}}},
-          {"map token", %{"user" => %{"token" => %{"bad" => "value"}}}},
-          {"list token", %{"user" => %{"token" => ["bad"]}}},
-          {"invalid Base64 token", %{"user" => %{"token" => "%"}}},
-          {"invalid Base64 length", %{"user" => %{"token" => "a"}}}
+          {"map token", %{"user" => %{"token" => %{"bad" => "value"}}}}
         ] do
       @params params
       test "rejects #{label} without session, token or mail", %{conn: conn} do

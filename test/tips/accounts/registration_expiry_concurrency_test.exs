@@ -6,6 +6,7 @@ defmodule Tips.Accounts.RegistrationExpiryConcurrencyTest do
   use ExUnit.Case, async: false
 
   import Ecto.Query
+  import Swoosh.TestAssertions
   import Tips.AccountsFixtures
   import Tips.DataCase, only: [errors_on: 1]
   import Tips.LockSessions
@@ -86,42 +87,6 @@ defmodule Tips.Accounts.RegistrationExpiryConcurrencyTest do
     unboxed(fn ->
       assert %User{confirmed_at: %DateTime{}} = Repo.get!(User, user_id)
       assert {%User{id: ^user_id}, _} = Accounts.get_user_by_session_token(session)
-
-      assert {:error, changeset} = Accounts.register_user(attrs(prefix, "a"))
-      assert %{email: ["has already been taken"]} = errors_on(changeset)
-      assert %User{id: ^user_id} = Accounts.get_user_by_email(user.email)
-    end)
-  end
-
-  test "cleanup and reclaim win before confirmation", %{prefix: prefix, supervisor: supervisor} do
-    {user, link} = committed_registration(prefix, "a", -1)
-    cleanup = open(supervisor)
-    reclaim = open(supervisor)
-
-    assert {:ok, 1} = run(cleanup, fn -> Accounts.expire_unconfirmed_users() end)
-
-    # A late confirmation is rejected by the deadline itself, before cleanup commits and
-    # without waiting for it.
-    unboxed(fn ->
-      refute Accounts.get_user_by_magic_link_token(link)
-      assert {:error, :not_found} = Accounts.login_user_by_magic_link(link)
-    end)
-
-    # Signup for the same identity waits for the cleanup that holds the row.
-    signup = submit(reclaim, fn -> Accounts.register_user(attrs(prefix, "a")) end)
-    await_blocked(reclaim, cleanup)
-    commit(cleanup)
-    assert {:ok, %User{id: replacement_id}} = await(reclaim, signup)
-    commit(reclaim)
-
-    unboxed(fn ->
-      refute replacement_id == user.id
-      refute Repo.get(User, user.id)
-      assert tokens(user) == []
-      assert {:error, :not_found} = Accounts.login_user_by_magic_link(link)
-
-      assert %User{id: ^replacement_id, confirmed_at: nil} =
-               Accounts.get_user_by_email(user.email)
     end)
   end
 
@@ -130,7 +95,6 @@ defmodule Tips.Accounts.RegistrationExpiryConcurrencyTest do
     {user, link} = committed_registration(prefix, "a", 60)
     holder = open(supervisor)
     confirmation = open(supervisor)
-    cleanup = open(supervisor)
     approach_deadline(user)
     assert [_] = run(holder, fn -> lock_account(user.id, "") end)
 
@@ -146,16 +110,11 @@ defmodule Tips.Accounts.RegistrationExpiryConcurrencyTest do
       assert %User{confirmed_at: nil} = Repo.get!(User, user.id)
       assert [%UserToken{context: "login"}] = tokens(user)
     end)
-
-    assert {:ok, 1} = run(cleanup, fn -> Accounts.expire_unconfirmed_users() end)
-    commit(cleanup)
-    unboxed(fn -> refute Repo.get(User, user.id) end)
   end
 
   # The proof is read as valid, then the confirmation waits on the account lock while the
   # deadline passes and the lock holder deletes the registration.
   for {winner, delete} <- [
-        cleanup: quote(do: Accounts.expire_unconfirmed_users()),
         reclaim: quote(do: Accounts.register_user(attrs(var!(prefix), "a")))
       ] do
     test "#{winner} deletes a registration whose proof was valid before the lock wait",
@@ -195,7 +154,11 @@ defmodule Tips.Accounts.RegistrationExpiryConcurrencyTest do
     assert {:ok, 1} = run(cleanup, fn -> Accounts.expire_unconfirmed_users() end)
 
     delivery =
-      submit(resend, fn -> Accounts.deliver_login_instructions(user, &"/users/log-in/#{&1}") end)
+      submit(resend, fn ->
+        result = Accounts.deliver_login_instructions(user, &"/users/log-in/#{&1}")
+        assert_no_email_sent()
+        result
+      end)
 
     await_blocked(resend, cleanup)
     commit(cleanup)

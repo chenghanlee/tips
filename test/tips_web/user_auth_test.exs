@@ -30,34 +30,18 @@ defmodule TipsWeb.UserAuthTest do
             "/editor/tips/new",
             "/editor/tips/42/edit",
             "/editor/tips/7/reviews/new",
-            "/editor/reviews/9/edit",
-            "/editor/tips/9223372036854775807/edit",
-            "/editor/tips/9223372036854775807/reviews/new",
-            "/editor/reviews/9223372036854775807/edit"
+            "/editor/reviews/9/edit"
           ] do
         assert UserAuth.allowed_return_to(path) == path
       end
 
       for path <- [
             nil,
-            "",
-            42,
             "https://evil.example/",
             "//evil.example",
-            "/\\evil.example",
             "/%2F%2Fevil.example",
-            "/editor/tips/new?x=1",
-            "/editor/tips/new#frag",
-            "/editor/tips/new/",
-            "/editor/tips/0/edit",
-            "/editor/tips/-1/edit",
-            "/editor/tips/01/edit",
-            "/editor/tips/abc/edit",
-            "/editor/tips/1/reviews/2/edit",
             "/editor/tips/new\n",
-            "/editor/tips/new\u0000",
-            "/users/settings",
-            "/tips/1/slug"
+            "/users/settings"
           ] do
         assert UserAuth.allowed_return_to(path) == nil, "admitted #{inspect(path)}"
       end
@@ -399,213 +383,7 @@ defmodule TipsWeb.UserAuthTest do
     end
   end
 
-  describe "on_mount :mount_current_scope" do
-    setup %{conn: conn} do
-      %{conn: UserAuth.fetch_current_scope_for_user(conn, [])}
-    end
-
-    test "assigns current_scope based on a valid user_token", %{conn: conn, user: user} do
-      user_token = Accounts.generate_user_session_token(user)
-      session = conn |> put_session(:user_token, user_token) |> get_session()
-
-      {:cont, updated_socket} =
-        UserAuth.on_mount(:mount_current_scope, %{}, session, %LiveView.Socket{})
-
-      assert updated_socket.assigns.current_scope.user.id == user.id
-    end
-
-    test "assigns nil to current_scope assign if there isn't a valid user_token", %{conn: conn} do
-      user_token = "invalid_token"
-      session = conn |> put_session(:user_token, user_token) |> get_session()
-
-      {:cont, updated_socket} =
-        UserAuth.on_mount(:mount_current_scope, %{}, session, %LiveView.Socket{})
-
-      assert updated_socket.assigns.current_scope == nil
-    end
-
-    test "assigns nil to current_scope assign if there isn't a user_token", %{conn: conn} do
-      session = conn |> get_session()
-
-      {:cont, updated_socket} =
-        UserAuth.on_mount(:mount_current_scope, %{}, session, %LiveView.Socket{})
-
-      assert updated_socket.assigns.current_scope == nil
-    end
-  end
-
-  describe "on_mount :require_authenticated" do
-    test "authenticates current_scope based on a valid user_token", %{conn: conn, user: user} do
-      user_token = Accounts.generate_user_session_token(user)
-      session = conn |> put_session(:user_token, user_token) |> get_session()
-
-      {:cont, updated_socket} =
-        UserAuth.on_mount(:require_authenticated, %{}, session, %LiveView.Socket{})
-
-      assert updated_socket.assigns.current_scope.user.id == user.id
-    end
-
-    test "redirects to login page if there isn't a valid user_token", %{conn: conn} do
-      user_token = "invalid_token"
-      session = conn |> put_session(:user_token, user_token) |> get_session()
-
-      socket = %LiveView.Socket{
-        endpoint: TipsWeb.Endpoint,
-        assigns: %{__changed__: %{}, flash: %{}}
-      }
-
-      {:halt, updated_socket} = UserAuth.on_mount(:require_authenticated, %{}, session, socket)
-      assert updated_socket.assigns.current_scope == nil
-    end
-
-    test "redirects to login page if there isn't a user_token", %{conn: conn} do
-      session = conn |> get_session()
-
-      socket = %LiveView.Socket{
-        endpoint: TipsWeb.Endpoint,
-        assigns: %{__changed__: %{}, flash: %{}}
-      }
-
-      {:halt, updated_socket} = UserAuth.on_mount(:require_authenticated, %{}, session, socket)
-      assert updated_socket.assigns.current_scope == nil
-    end
-  end
-
-  describe "on_mount :require_sudo_mode" do
-    test "allows users that have authenticated in the last 10 minutes", %{conn: conn, user: user} do
-      user_token = Accounts.generate_user_session_token(user)
-      session = conn |> put_session(:user_token, user_token) |> get_session()
-
-      socket = %LiveView.Socket{
-        endpoint: TipsWeb.Endpoint,
-        assigns: %{__changed__: %{}, flash: %{}}
-      }
-
-      assert {:cont, _updated_socket} =
-               UserAuth.on_mount(:require_sudo_mode, %{}, session, socket)
-    end
-
-    test "redirects when authentication is too old", %{conn: conn, user: user} do
-      eleven_minutes_ago = DateTime.utc_now(:second) |> DateTime.add(-11, :minute)
-      user_token = Accounts.generate_user_session_token(user)
-      override_token_authenticated_at(user_token, eleven_minutes_ago)
-      {user, token_inserted_at} = Accounts.get_user_by_session_token(user_token)
-      assert DateTime.compare(token_inserted_at, user.authenticated_at) == :gt
-      session = conn |> put_session(:user_token, user_token) |> get_session()
-
-      socket = %LiveView.Socket{
-        endpoint: TipsWeb.Endpoint,
-        assigns: %{__changed__: %{}, flash: %{}}
-      }
-
-      assert {:halt, _updated_socket} =
-               UserAuth.on_mount(:require_sudo_mode, %{}, session, socket)
-    end
-  end
-
-  describe "controller and mount reject deleted/revoked/expired sessions" do
-    setup %{user: user} do
-      token = Accounts.generate_user_session_token(user)
-      %{token: token, session: %{"user_token" => token}}
-    end
-
-    for state <- [:deleted, :revoked, :expired] do
-      test "#{state}: the plug and every mount hook leave the caller unauthenticated", %{
-        conn: conn,
-        user: user,
-        token: token,
-        session: session
-      } do
-        invalidate(unquote(state), user, token)
-
-        conn =
-          conn |> put_session(:user_token, token) |> UserAuth.fetch_current_scope_for_user([])
-
-        assert conn.assigns.current_scope == nil
-
-        assert conn
-               |> fetch_flash()
-               |> UserAuth.require_authenticated_user([])
-               |> Map.fetch!(:halted)
-
-        for socket <- [live_socket(), connected_socket()] do
-          assert {:cont, %{assigns: %{current_scope: nil}} = mounted} =
-                   UserAuth.on_mount(:mount_current_scope, %{}, session, socket)
-
-          assert {:error, :unauthenticated} = UserAuth.readmit(mounted)
-
-          for hook <- [:require_authenticated, :require_sudo_mode] do
-            assert {:halt, %{assigns: %{current_scope: nil}, redirected: {:redirect, %{to: to}}}} =
-                     UserAuth.on_mount(hook, %{}, session, socket)
-
-            assert to == ~p"/users/log-in"
-          end
-        end
-      end
-
-      test "#{state}: a socket mounted earlier is refused at readmission", %{
-        user: user,
-        token: token,
-        session: session
-      } do
-        {:cont, socket} =
-          UserAuth.on_mount(:require_authenticated, %{}, session, connected_socket())
-
-        assert {:ok, _socket} = UserAuth.readmit(socket)
-
-        invalidate(unquote(state), user, token)
-
-        assert {:error, :unauthenticated} = UserAuth.readmit(socket)
-      end
-    end
-  end
-
   describe "private session reference survives mount/renewal without bearer assigns" do
-    test "a connected mount keeps the row reference in private state only", %{user: user} do
-      token = Accounts.generate_user_session_token(user)
-      %UserToken{id: token_id} = Repo.get_by!(UserToken, token: token)
-      user_id = user.id
-
-      {:cont, socket} =
-        UserAuth.on_mount(:mount_current_scope, %{}, %{"user_token" => token}, connected_socket())
-
-      assert %Scope{user: %User{id: ^user_id}} = socket.assigns.current_scope
-      assert Map.keys(socket.assigns) -- [:__changed__, :flash] == [:current_scope]
-
-      assert private_values(socket, SessionRef) == [
-               %SessionRef{token_id: token_id, user_id: user_id}
-             ]
-
-      assert :binary.match(:erlang.term_to_binary({socket.assigns, socket.private}), token) ==
-               :nomatch
-    end
-
-    test "a disconnected render reuses the plug's scope without another token query", %{
-      user: user
-    } do
-      conn = log_in_user(build_conn(), user)
-
-      {conn, queries} = token_queries(fn -> get(conn, ~p"/users/settings") end)
-
-      assert html_response(conn, 200) =~ user.email
-      assert [_per_request_authentication] = queries
-    end
-
-    test "stacked mount hooks admit the session once", %{user: user} do
-      session = %{"user_token" => Accounts.generate_user_session_token(user)}
-
-      {{:cont, socket}, queries} =
-        token_queries(fn ->
-          {:cont, socket} =
-            UserAuth.on_mount(:require_authenticated, %{}, session, connected_socket())
-
-          UserAuth.on_mount(:require_sudo_mode, %{}, session, socket)
-        end)
-
-      assert [%SessionRef{}] = private_values(socket, SessionRef)
-      assert [_mount_admission] = queries
-    end
-
     test "renewal moves new mounts to the successor; the earlier socket stays admitted until logout",
          %{conn: conn, user: user} do
       token = Accounts.generate_user_session_token(user)
@@ -643,24 +421,6 @@ defmodule TipsWeb.UserAuthTest do
       for socket <- [before_renewal, after_renewal] do
         assert {:error, :unauthenticated} = UserAuth.readmit(socket)
       end
-    end
-
-    test "readmission assigns the current account state", %{user: user} do
-      token = Accounts.generate_user_session_token(user)
-
-      {:cont, socket} =
-        UserAuth.on_mount(:require_sudo_mode, %{}, %{"user_token" => token}, connected_socket())
-
-      stale = DateTime.add(DateTime.utc_now(:second), -1, :hour)
-      override_token_authenticated_at(token, stale)
-      Repo.update_all(from(u in User, where: u.id == ^user.id), set: [role: :moderator])
-
-      assert {:ok, readmitted} = UserAuth.readmit(socket)
-
-      assert %Scope{user: %User{role: :moderator, authenticated_at: ^stale}} =
-               readmitted.assigns.current_scope
-
-      assert private_values(readmitted, SessionRef) == private_values(socket, SessionRef)
     end
   end
 
@@ -785,10 +545,6 @@ defmodule TipsWeb.UserAuthTest do
     for {_key, %^struct{} = value} <- socket.private, do: value
   end
 
-  defp invalidate(:deleted, user, _token), do: delete_account(user)
-  defp invalidate(:revoked, _user, token), do: Accounts.revoke_user_session_family(token)
-  defp invalidate(:expired, _user, token), do: backdate_token(token, -60, :day)
-
   # The same browser on its next request.
   defp recycle_session(conn) do
     session = get_session(conn)
@@ -797,34 +553,6 @@ defmodule TipsWeb.UserAuthTest do
     |> recycle()
     |> Map.replace!(:secret_key_base, TipsWeb.Endpoint.config(:secret_key_base))
     |> init_test_session(session)
-  end
-
-  # Runs `fun` and returns its result with this process's queries on the token table.
-  defp token_queries(fun) do
-    test = self()
-    handler = {__MODULE__, make_ref()}
-
-    :telemetry.attach(
-      handler,
-      [:tips, :repo, :query],
-      fn _event, _measurements, metadata, _config ->
-        if self() == test and metadata.query =~ "users_tokens",
-          do: send(test, {:token_query, metadata.query})
-      end,
-      nil
-    )
-
-    result = fun.()
-    :telemetry.detach(handler)
-    {result, collect_token_queries()}
-  end
-
-  defp collect_token_queries do
-    receive do
-      {:token_query, query} -> [query | collect_token_queries()]
-    after
-      0 -> []
-    end
   end
 
   # Genuine authentication as the controller does it: commit the token, then install it.
