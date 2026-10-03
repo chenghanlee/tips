@@ -2,6 +2,30 @@ defmodule Tips.Content do
   @moduledoc """
   The Content context: tips, reviews, votes, media and search.
 
+  ## Reading
+
+  `get_tip_page/2` and `get_review_page/2` return the tip and selected-review
+  destinations. Each takes a `t:viewer/0` and an id, and returns only
+  `Tips.Content.Projection` output.
+
+    * `nil` takes the public path: no token query and no privileged branch.
+    * A `Tips.Accounts.SessionRef` is readmitted once, at entry, with
+      `Tips.Accounts.readmit_scope/1`. Only the scope it returns reaches the
+      projections, so current role, ban and confirmation decide the output, and
+      a revoked or expired session fails even if its disconnect was lost.
+      Anything else, including a `Tips.Accounts.Scope`, is
+      `{:error, :unauthenticated}`. The reference comes from server-private
+      state, never from request params, and is never returned or logged.
+    * A malformed, out-of-range or missing id is `{:error, :not_found}`. An id
+      may be an integer or its decimal string.
+
+  A read that started before a revocation may finish.
+
+  `get_review_page/2` reads the review first and uses its stored parent as tip
+  context. It returns exactly that review or its removal notice; it takes no
+  list filters, sort or page and never substitutes another review. Ranked
+  review pages are later browse work.
+
   ## Publication and edit contract
 
   Publication exists for text: `publish_tip/4`, `publish_review/5` and
@@ -183,7 +207,19 @@ defmodule Tips.Content do
 
   alias Tips.Accounts
   alias Tips.Accounts.Scope
-  alias Tips.Content.{Intent, Projection, Publication}
+  alias Tips.Content.{Intent, Projection, Publication, Read}
+
+  @typedoc """
+  Who reads: `nil` for an anonymous viewer, or the server-held reference to
+  the session that admitted a signed-in one. See "Reading".
+  """
+  @type viewer :: Accounts.SessionRef.t() | nil
+
+  @typedoc "The tip page: tip context and the viewer's own-review header link."
+  @type tip_page :: %{tip: Projection.tip_detail(), own_review: Projection.own_review() | nil}
+
+  @typedoc "Why a destination read returned nothing."
+  @type read_error :: :unauthenticated | :not_found
 
   @typedoc "A content kind."
   @type kind :: :tip | :review
@@ -398,4 +434,21 @@ defmodule Tips.Content do
   defdelegate get_publication(scope, kind, submission_key, submitted_intent),
     to: Publication,
     as: :get
+
+  @doc """
+  Reads the tip page for `viewer`: the projected tip, deleted or removed tips
+  as placeholders, and the viewer's own undeleted review as an id and current
+  capabilities, even under an unavailable tip. See "Reading".
+  """
+  @spec get_tip_page(viewer(), term()) :: {:ok, tip_page()} | {:error, read_error()}
+  defdelegate get_tip_page(viewer, tip_id), to: Read
+
+  @doc """
+  Reads the selected-review destination (`/reviews/:id`) for `viewer`: the
+  review's own tip as context and that review, or its removal notice. See
+  "Reading".
+  """
+  @spec get_review_page(viewer(), term()) ::
+          {:ok, Projection.selected_review()} | {:error, read_error()}
+  defdelegate get_review_page(viewer, review_id), to: Read
 end
