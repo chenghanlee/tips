@@ -12,6 +12,8 @@ Before choosing work, read `gh project view 15 --owner chenghanlee`: milestones,
 
 ## Assigned
 
+**Issue state.**
+
 - Assignment: add `active`.
 - Progress needs outside action: add `blocked`; comment with prerequisite, responsible role and next action. A waiting dependency is not automatically a user blocker; a `Needs from owner:` line alone does not block.
 - Remove stale labels; clear `active` and `blocked` after merge.

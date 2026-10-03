@@ -1,6 +1,8 @@
 # Agent teams
 
-Agents building Tips: read this agreement through Client constraints, then your role card. [AGENTS.md](../../AGENTS.md) governs engineering. Keep requirements, decisions, review history and evidence in GitHub issues/PRs. Never repeat [config.toml](config.toml) defaults in commands or prose. Humans perform [SETUP.md](SETUP.md) once. Run commands from the repository root. When changing or reviewing `agent/teams` scripts, also read [Changing agent/teams scripts](development.md#changing-agentteams-scripts).
+Read this agreement, then your role card. [AGENTS.md](../../AGENTS.md) governs engineering. Read the issue and readiness comment for the task; they do not override this workflow. Ask the tech lead about conflicting requirements.
+
+Keep task requirements, decisions and evidence in GitHub issues/PRs; lasting design and API contracts belong in the repository. Run commands from the repository root. Use [config.toml](config.toml) defaults without copying them into commands or prose. Humans perform [setup](SETUP.md) once. For script changes, read [development](development.md#changing-agentteams-scripts).
 
 Team flow: lead TPM assigns and provisions → tech lead briefs → developer pushes → tester reviews → tech lead merges → lead TPM retires. Required feedback returns to developer for repair and another tester review. Role cards define gates and exceptions.
 
@@ -25,7 +27,7 @@ Team flow: lead TPM assigns and provisions → tech lead briefs → developer pu
 
 ## Events
 
-Classify messages by the reported event; Assigned covers only the first brief and provisioning requests. Each card uses this order. `n/a` means the event cannot reach that role. "Not defined" means no rule exists: post the question on the issue, then prompt the next role up: worker (developer or tester) → tech lead → lead TPM → user.
+Use the reported event to find your card section; Assigned is only the first brief or provisioning request. After context recovery, reread this agreement and your current card section. `n/a`: this event cannot reach your role. "Not defined": post the question on the issue and prompt the next role up: developer/tester → tech lead → lead TPM → user.
 
 1. **Always**: continuous duties.
 2. **Assigned**: the first issue, brief or provisioning request arrives.
@@ -41,9 +43,13 @@ Classify messages by the reported event; Assigned covers only the first brief an
 
 ## Shared rules
 
-**Environment.** When it launches a client, the helper applies the role’s configured model, effort, permissions, database suffix and test port. A running client keeps that environment and root: rerunning the helper reuses the session and changes neither, so a wrong environment is repaired only by exit and relaunch. The helper exports `PGPORT`, `TIPS_DB_SUFFIX`, `TIPS_TEST_PORT`, `MIX_ENV`, `TIPS_CHECK_TIMEOUT_SECONDS`, `TIPS_PROVIDER_ENV_FILE`, and links main checkout's `.agents/skills` into each worktree. For Codex roles it also exports `HEX_HOME` as the worktree's ignored `tmp/hex`, because the Codex sandbox cannot write the shared Hex cache. Preserve these values in tests, including Wallaby.
+**Environment.** The helper sets the role's configured model, effort, permissions, database suffix and test port at launch. Rerunning it reuses the client, root and environment; wrong values are repaired only by exit and relaunch.
 
-Read provider settings by path from main checkout's `.env`; only the user adds new credentials there. Never write secrets into worktrees. Inspect launch values with `env | grep -E '^(PGPORT|MIX_ENV|TIPS_)'`; macOS `printenv` prints only its first named variable. Provisioning fetches locked dependencies, warms up Dexter and exports `TIPS_DEXTER`, bound to the assigned worktree; Claude and Codex both run it from the shell. Startup is not proof of index freshness. See the [LSP guide](../lsp/README.md). Both clients keep the Credo hook enabled; Dexter gives no compiler diagnostics, so run explicit Mix checks after edits. Agents propose defaults and use synthetic fixtures; never fabricate firsthand production content. Real-provider tests require user-authorized invocations quoted on the issue by lead TPM, with scoped secrets; never run automatically on PR code.
+It exports `PGPORT`, `TIPS_DB_SUFFIX`, `TIPS_TEST_PORT`, `MIX_ENV`, `TIPS_CHECK_TIMEOUT_SECONDS` and `TIPS_PROVIDER_ENV_FILE`. Codex also gets `HEX_HOME` at its worktree's ignored `tmp/hex`: its sandbox cannot write the shared Hex cache. Preserve these values in tests, including Wallaby. Inspect launch values with `env | grep -E '^(PGPORT|MIX_ENV|TIPS_)'`; macOS `printenv` prints only its first named variable.
+
+Provisioning links main checkout's `.agents/skills` into each worktree, fetches locked dependencies, warms Dexter and exports worktree-bound `TIPS_DEXTER`. Both clients run Dexter from the shell. Startup does not prove index freshness; see the [LSP guide](../lsp/README.md). Both clients keep the Credo hook enabled; Dexter gives no compiler diagnostics, so run explicit Mix checks after edits.
+
+Read provider settings by path from main checkout's `.env`. Only the user adds credentials; never write secrets into worktrees. Propose defaults and use synthetic fixtures, never fabricated firsthand production content. Real-provider tests require user-authorized invocations quoted on the issue by lead TPM and scoped secrets. Never run them automatically on PR code.
 
 **Handoff.** Every handoff sender:
 
@@ -51,7 +57,7 @@ Read provider settings by path from main checkout's `.env`; only the user adds n
 2. Send one line via `herdr agent prompt`: evidence link, SHA, action, owner (next acting role). Link the existing contract instead of copying it. Prompt recipients separately.
 3. Before ending the turn, verify the Herdr command succeeded. On failure, report the error; never claim delivery.
 
-GitHub comments and final chat responses wake nobody. Use this handoff for readiness, implementation, review, merge and blockers. Every dispatch must name the exact recipient and completion/blocker command; “reply to the lead” is insufficient. Provisioning requests/replies and freeform questions among developer, tester, tech lead and lead TPM are messages, not handoffs. Code questions must include a pushed SHA for inspection in the recipient's own worktree.
+Use handoffs for readiness, implementation, review, merge and blockers; GitHub comments and final responses wake nobody. Dispatches name the exact recipient and completion/blocker command. Provisioning requests/replies and team questions are messages, not handoffs. Code questions include a pushed SHA for inspection in the recipient's own worktree.
 
 Example: substitute team number and evidence.
 
@@ -67,15 +73,15 @@ herdr agent prompt "team-$N-lead" "$EVIDENCE_URL SHA=$SHA; action=dispatch teste
 
 **Git.** Every agent:
 
-- Use short-lived `task/<issue>-<slug>` branches in worktrees under `.worktrees/`; retain slugs across title changes. Never push implementation to protected `main`.
+- Use short-lived `task/<issue>-<slug>` branches in worktrees under `.worktrees/`; retain slugs across title changes.
 - While any team is live, keep the main checkout read-only for source changes: never switch its branch, edit, commit or test there, because clients and lifecycle scripts are rooted there.
 - Leave repository administration (fetch, worktree creation) and `team.py start N` and `team.py stop N` to lead TPM in the main checkout. The helper fetches for reviewer refs and new developer branches, not for a reused developer worktree; whenever freshness matters, request a lead TPM fetch.
-- Compare against `origin/main`, never local `main`. Developers own task worktrees; testers and tech leads have separate detached, read-only review worktrees. Never edit another agent's checkout.
+- Compare against `origin/main`, never local `main`. Developers own task worktrees; testers and tech leads have separate detached, read-only review worktrees.
 - Open draft PRs early; mark ready at first handoff. Commit cohesive changes; run relevant checks before pushing. Reorganize only unpushed commits. Published commits are fixed: merge `origin/main`, never rebase or force-push.
 
 Repository rules block force pushes on `task/**`, require merge commits, strict up-to-date branches, resolved conversations and `checks`, `release`, `tips/independent-review`; merged remote heads are deleted. This gate is an interlock, not credential isolation.
 
-**Issue state.** Lead TPM owns labels; workers may add only Fallback `blocked`.
+**Issue state.** Lead TPM owns labels and Project Status under its [Assigned rules](roles/lead-tpm.md#assigned); workers may add only Fallback `blocked`.
 
 - After launch, escalate scope or role-label changes such as `ui`/`probe` as scope questions. Routine `active` and `blocked` updates remain state changes.
 - Close issues only after their required result is integrated and evidenced. Use `Refs #number` for partial work; `Closes #number` for completing PRs. New child issues count toward the goal.

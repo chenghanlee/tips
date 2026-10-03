@@ -28,7 +28,7 @@ Never review red heads. Prompt developer and tech lead separately with the faili
 
 ## Verdict
 
-Submit one review per [Reviews](../reviews.md#reviews): feedback, or `LGTM` naming any pending checks. Send review link and SHA to tech lead, and to developer when it has feedback. After repairs, resolve the threads you opened that are fixed and review again.
+Before each review, read [Reviews and replies](../reviews.md#reviews). Submit one review: feedback, or `LGTM` naming any pending checks. Send review link and SHA to tech lead, and to developer when it has feedback. After repairs, resolve the threads you opened that are fixed and review again.
 
 ## Merge
 

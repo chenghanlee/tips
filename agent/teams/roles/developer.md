@@ -19,7 +19,7 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](.
 
 ## Pushed head
 
-**PR description.** The developer owns the PR title and body, written as a [change description](https://google.github.io/eng-practices/review/developer/cl-descriptions.html): a short imperative title; a body that says what changed and why, plus check-configuration changes and anything CI does not verify. Keep it true until merge. Explain repairs in code and commit messages, not comments.
+**PR description.** Own the PR title and body. Write a [change description](https://google.github.io/eng-practices/review/developer/cl-descriptions.html): a short imperative title; a body that says what changed and why, plus check-configuration changes and anything CI does not verify. Keep it true until merge. Explain repairs in code and commit messages, not comments.
 
 You own green. From the second push onward, before each commit, read the preceding push's result with `gh pr checks "$PR"` once, without `--watch`. Continue work while checks run. Never push onto unrepaired red; pending is not red.
 
@@ -33,7 +33,7 @@ Repair your red before another push; name the tester's `RED` check in the repair
 
 ## Verdict
 
-Read feedback with `pr_review.py list`. Repair it under shared Required feedback and probe limits, then push and hand off. Follow [Replies](../reviews.md#replies); an approval needs no acknowledgment.
+Before handling feedback, read [Replies](../reviews.md#replies) and run `agent/teams/pr_review.py list "$PR"`. Repair under shared Required feedback and probe limits, then push and hand off. An approval needs no acknowledgment.
 
 ## Merge
 
