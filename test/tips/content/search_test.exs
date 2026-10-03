@@ -1,5 +1,9 @@
 defmodule Tips.Content.SearchTest do
-  use Tips.DataCase, async: true
+  # BM25 scores read pg_textsearch corpus statistics, which other sessions'
+  # writes change even while uncommitted, outside Sandbox row isolation. A
+  # concurrent write can split equal scores within one ranking statement, so
+  # this module runs alone.
+  use Tips.DataCase, async: false
 
   alias Tips.Accounts.Scope
   alias Tips.Content.{Model, Review, Search, Tip}
