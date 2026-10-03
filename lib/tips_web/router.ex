@@ -74,11 +74,6 @@ defmodule TipsWeb.Router do
       live "/users/register", UserLive.Registration, :new
       live "/users/log-in", UserLive.Login, :new
       live "/users/log-in/:token", UserLive.Confirmation, :new
-
-      # Test builds only: fixture page for TipsWeb.UI (test/support/ui_fixture_live.ex)
-      if Application.compile_env(:tips, :sql_sandbox, false) do
-        live "/_ui", UIFixtureLive
-      end
     end
 
     post "/users/log-in", UserSessionController, :create

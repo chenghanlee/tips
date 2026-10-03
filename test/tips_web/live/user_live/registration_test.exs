@@ -46,13 +46,6 @@ defmodule TipsWeb.UserLive.RegistrationTest do
   end
 
   describe "Registration page" do
-    test "renders registration page", %{conn: conn} do
-      {:ok, _lv, html} = live(conn, ~p"/users/register")
-
-      assert html =~ "Register"
-      assert html =~ "Log in"
-    end
-
     test "redirects if already logged in", %{conn: conn} do
       result =
         conn

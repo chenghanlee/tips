@@ -3,32 +3,55 @@ defmodule TipsWeb.LiveSmokeTest do
 
   @moduletag :browser
 
-  feature "validates email through a connected LiveView", %{session: session} do
-    session
-    |> resize_window(1280, 800)
-    |> visit("/users/register")
-    |> assert_has(css(".phx-connected"))
-    |> fill_in(text_field("Email"), with: "invalid")
-    |> assert_has(css("#registration_form", text: "must have the @ sign and no spaces"))
-  end
-
-  feature "shows the registration form on a mobile viewport", %{session: session} do
-    session
-    |> resize_window(390, 844)
-    |> visit("/users/register")
-    |> assert_has(css(".phx-connected"))
-    |> assert_has(text_field("Email"))
-    |> assert_has(button("Create an account"))
-  end
-
   feature "registers through the connected LiveView using the SQL sandbox", %{session: session} do
     email = Tips.AccountsFixtures.unique_user_email()
     handle = Tips.AccountsFixtures.valid_user_attributes().handle
 
     session
-    |> resize_window(1280, 800)
+    |> resize_window(390, 844)
     |> visit("/users/register")
     |> assert_has(css(".phx-connected"))
+    |> execute_script(
+      """
+      const probe = document.createElement("div");
+      probe.style.color = "var(--input)";
+      document.body.appendChild(probe);
+      // Registration focuses email on mount; check its resting border first.
+      const email = document.getElementById("user_email");
+      email.blur();
+      const input = getComputedStyle(email);
+      const result = [input.borderTopColor, getComputedStyle(probe).color];
+      probe.remove();
+      return result;
+      """,
+      [],
+      fn [border, input_token] ->
+        assert border == input_token
+      end
+    )
+    # Script focus, not a Tab from <body>: headless Chrome in CI does not move
+    # focus on a page-level Tab. The button follows a focus-visible input, so
+    # it matches :focus-visible too.
+    |> execute_script(
+      """
+      const outline = (el) => {
+        el.focus();
+        const style = getComputedStyle(document.activeElement);
+        return [style.outlineWidth, style.outlineStyle, describe(document.activeElement)];
+      };
+      const describe = (el) =>
+        `${el.tagName}#${el.id}.${el.className} focus-visible=${el.matches(":focus-visible")}`;
+      const button = [...document.querySelectorAll("button")].find(b => b.textContent.trim() === "Create an account");
+      return [outline(document.getElementById("user_email")), outline(button)];
+      """,
+      [],
+      fn [[input_width, input_style, input], [button_width, button_style, button]] ->
+        assert {input_width, input_style} == {"2px", "solid"}, input
+        assert {button_width, button_style} == {"2px", "solid"}, button
+      end
+    )
+    |> fill_in(text_field("Email"), with: "invalid")
+    |> assert_has(css("#registration_form", text: "must have the @ sign and no spaces"))
     |> fill_in(text_field("Email"), with: email)
     |> fill_in(text_field("Handle"), with: handle)
     |> click(button("Create an account"))

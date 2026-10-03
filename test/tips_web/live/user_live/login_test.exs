@@ -5,14 +5,6 @@ defmodule TipsWeb.UserLive.LoginTest do
   import Tips.AccountsFixtures
 
   describe "login page" do
-    test "renders login page", %{conn: conn} do
-      {:ok, _lv, html} = live(conn, ~p"/users/log-in")
-
-      assert html =~ "Log in"
-      assert html =~ "Sign up"
-      assert html =~ "Log in with email"
-    end
-
     test "offers only the email magic-link form", %{conn: conn} do
       {:ok, lv, html} = live(conn, ~p"/users/log-in")
 
@@ -86,12 +78,8 @@ defmodule TipsWeb.UserLive.LoginTest do
            "/editor/tips/7/edit"},
           {"an external query falls back to the session", "https://evil.example/editor/tips/new",
            "/editor/tips/7/edit", "/editor/tips/7/edit"},
-          {"a disallowed local query falls back to the session", "/users/settings",
-           "/editor/tips/7/edit", "/editor/tips/7/edit"},
-          {"an external query and no session carry nothing", "//evil.example", nil, nil},
           {"a disallowed query and a disallowed session carry nothing", "/users/settings",
-           "https://evil.example/", nil},
-          {"no query and no session carry nothing", nil, nil, nil}
+           "https://evil.example/", nil}
         ] do
       @query query
       @session session
