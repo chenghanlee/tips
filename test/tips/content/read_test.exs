@@ -31,7 +31,7 @@ defmodule Tips.Content.ReadTest do
 
       check = fn viewers ->
         for marker <- markers(), {viewer, ref} <- viewers do
-          put_marker!(tip, marker)
+          remark!(tip, marker)
           label = {marker, viewer}
 
           case expected_state(marker, viewer, [:owner, :moderator, :banned_owner]) do
@@ -114,8 +114,8 @@ defmodule Tips.Content.ReadTest do
       ]
 
       for parent_marker <- markers(), review_marker <- markers(), {viewer, ref} <- viewers do
-        put_marker!(tip, parent_marker)
-        put_marker!(selected, review_marker)
+        remark!(tip, parent_marker)
+        remark!(selected, review_marker)
         label = {parent_marker, review_marker, viewer}
 
         assert {:ok, %{tip: tip_view, review: review_view} = result} =
@@ -123,7 +123,7 @@ defmodule Tips.Content.ReadTest do
 
         case expected_state(parent_marker, viewer, [:tip_author, :moderator]) do
           :visible ->
-            assert {label, %{state: :visible, id: ^parent_id, title: "Parent title"}} =
+            assert {^label, %{state: :visible, id: ^parent_id, title: "Parent title"}} =
                      {label, tip_view}
 
           state ->
@@ -132,7 +132,7 @@ defmodule Tips.Content.ReadTest do
 
         case expected_state(review_marker, viewer, [:reviewer, :moderator]) do
           :visible ->
-            assert {label,
+            assert {^label,
                     {:visible,
                      %{
                        id: id,
@@ -295,7 +295,7 @@ defmodule Tips.Content.ReadTest do
       capabilities = %{vote: false, edit: false, delete: true, report: false}
 
       for marker <- [:hidden, :deleted, :deleted_and_hidden] do
-        put_marker!(tip, marker)
+        remark!(tip, marker)
         state = if marker == :hidden, do: :removed, else: :deleted
 
         assert {marker,
@@ -543,6 +543,9 @@ defmodule Tips.Content.ReadTest do
     assert {viewer, {:error, :unauthenticated}} ==
              {viewer, Content.get_review_page(viewer, review.id)}
   end
+
+  # `put_marker!/2` diffs against the struct it gets; reload so a marker can be re-applied.
+  defp remark!(content, marker), do: content |> Repo.reload!() |> put_marker!(marker)
 
   defp update_user!(user, changes), do: user |> Ecto.Changeset.change(changes) |> Repo.update!()
 

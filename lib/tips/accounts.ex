@@ -20,6 +20,9 @@ defmodule Tips.Accounts do
       `Tips.Accounts.SessionRef` and no sign-in. An author- or moderator-only
       branch inside the same API still requires fresh admission before it
       returns privileged data; an optional scope alone never authorizes it.
+      `Tips.Content.get_tip_page/2` and `Tips.Content.get_review_page/2`
+      therefore take `nil` or a `Tips.Accounts.SessionRef` and call
+      `readmit_scope/1` once at entry, never a caller-held scope.
     * Workers take ids in job args, reload committed state and never retain a
       browser scope or `Tips.Accounts.SessionRef`.
 
