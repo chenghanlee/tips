@@ -8,8 +8,8 @@ Install Python 3.12 and [configured client CLIs](config.toml). Authenticate clie
 
 The user maintains the skills by hand as plain folders in the main checkout. Both locations are Git-ignored:
 
-- `.agents/skills/`: `elixir`, `phoenix`, `ecto`, `otp`, `oban` and `herdr`, for Codex.
-- `.claude/skills/`: the same five Elixir skills, for Claude.
+- `.agents/skills/`: `dexter`, `elixir`, `phoenix`, `ecto`, `otp`, `oban` and `herdr`, for Codex.
+- `.claude/skills/`: `dexter` and the same five Elixir skills, for Claude.
 
 Update matching copies together, then check that the skills appear in each client's skill list. Provisioning links the main checkout's `.agents/skills/` into each worktree and checks only that the directory exists, not the individual skills.
 
