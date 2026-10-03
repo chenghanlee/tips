@@ -12,8 +12,6 @@ Before choosing work, read `gh project view 15 --owner chenghanlee`: milestones,
 
 ## Assigned
 
-On every message, read relevant issue and PR evidence.
-
 1. Pick an unblocked critical-path issue with integrated, evidenced prerequisites. Prefer the team's current package. Never assign package parents; discovery may be a task.
 2. Require one outcome and one independently merging PR per issue. Split before Ready, without a numeric cap. Set Project Status Ready; add `probe` for evidence-only work.
 3. Respect configured team limits: one issue per team, numbered from 1; reuse retired numbers. Every team's provisioning runs through you; add a team only when you can serve it. From the main checkout's Herdr terminal, run `agent/teams/team.py start N`. The command creates or reuses the workspace and three named shell panes and prints pane IDs; it starts no client. The limit is not verified cold-start capacity: watch the first launch before the next.
@@ -50,7 +48,7 @@ agent/teams/task_worktree.py "$ISSUE-review-team-$N-test" --team "$N" --role tes
 agent/teams/task_worktree.py "$ISSUE-review-team-$N-lead" --team "$N" --role lead [--ui] --pane "$LEAD_PANE" --review-ref "$SHA"
 ```
 
-Advance only a reviewer at a handoff: the helper refuses `blocked` or `unknown` sessions, not a working one. Before changing HEAD, the helper checks selected-client configuration and cleanliness, even at the same SHA (`_build/` output ignored; edits not ignored). Clean detached checkouts advance without changing LSP roots. Running tech leads always advance in place; a tester is restarted only through Lost session or environment. Report dirty-checkout refusals to tech lead; the owning reviewer cleans up.
+Advance only a reviewer at a handoff: the helper refuses `blocked` or `unknown` sessions, not a working one. Before changing HEAD, the helper checks selected-client configuration and cleanliness, even at the same SHA (`_build/` output ignored; edits not ignored). Clean detached checkouts advance without changing LSP roots. Running tech leads always advance in place. A tester is replaced only for session loss, recovery from a missing or wrong launch environment, or a rejected implementation design; follow Lost session or environment. Report dirty-checkout refusals to tech lead; the owning reviewer cleans up.
 
 ## Red check
 
@@ -91,7 +89,7 @@ A client keeps the environment and root it was launched with; the helper never c
 
 - Running client with missing or wrong launch variables: rerunning its helper command at the same SHA never relaunches the session; for a reviewer it fetches locked dependencies and reindexes again, then reports it. After it records shared Recovery state at a handoff, rerun the role command with `--restart` on the same task or SHA. The helper stops that client, verifies that it and its child processes exited, then launches a fresh one; a developer's branch and uncommitted work stay as they are. A refused stop launches nothing and preserves work and resources, not necessarily the session: the client may already have exited. Retry `--restart`, never `--start`, once the named processes have exited; it runs the same checks again. The worktree's Dexter daemon may keep running. Never kill processes; report a repeated refusal to the user. If your client denies the command, the user exits that client; never bypass.
 - Absent client: rerun the role command with `--start`. Reviewers start at the current head; a developer restarts on its existing branch and worktree, unchanged.
-- Running tester at same SHA: helper reuses, never replaces. Rejected design: use `--start` at new head to stop old client and verify descendant exit.
+- A tester at the same SHA is reused. After the tech lead rejects the implementation design, use `--start` at the new SHA to replace the tester, subject to the normal stop and descendant checks.
 
 ## Silence
 
