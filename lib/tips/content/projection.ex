@@ -242,8 +242,8 @@ defmodule Tips.Content.Projection do
   @type excerpt_source :: :body | :prompt | :result | :setup
 
   @typedoc """
-  A source-labelled match excerpt. The search consumer builds it only after
-  reloading the current row and projecting it as visible to this viewer.
+  A source-labelled match excerpt. `excerpt/4` builds it from a current review
+  row visible to this viewer; the search consumer then bounds its text.
   """
   @type excerpt :: %{source: excerpt_source(), text: String.t()}
 
@@ -427,6 +427,27 @@ defmodule Tips.Content.Projection do
   end
 
   @doc """
+  Projects the full text of one source of a matched review, for a search
+  excerpt. The search consumer bounds the text.
+
+  Returns `nil` unless the review is visible to `scope` and the source has
+  text. A `:setup` text is the review's own model and environment labels,
+  joined by " · ". Always requires `:parent`; `:setup` also requires `:labels`.
+  """
+  @spec excerpt(scope(), review_row(), excerpt_source(), hydration()) :: excerpt() | nil
+  def excerpt(scope, %Review{} = review, source, hydration)
+      when source in [:body, :prompt, :result, :setup] do
+    parent!(hydration, review)
+
+    with :visible <- Visibility.decision(scope, review),
+         text when is_binary(text) <- excerpt_text(review, source, hydration) do
+      %{source: source, text: text}
+    else
+      _unavailable -> nil
+    end
+  end
+
+  @doc """
   Projects attachments of a tip or review.
 
   Returns `[]` unless the parent is visible to `scope`. Otherwise keeps only
@@ -483,6 +504,17 @@ defmodule Tips.Content.Projection do
   end
 
   defp selected(_scope, _tip, %Review{}, _hydration), do: :unavailable
+
+  defp excerpt_text(review, :body, _hydration), do: review.body
+  defp excerpt_text(review, :prompt, _hydration), do: review.prompt
+  defp excerpt_text(review, :result, _hydration), do: review.output
+
+  defp excerpt_text(review, :setup, hydration) do
+    case Enum.reject([model(hydration, review), environment(hydration, review)], &is_nil/1) do
+      [] -> nil
+      labels -> Enum.map_join(labels, " · ", & &1.label)
+    end
+  end
 
   defp capabilities(scope, content) do
     contribute? = eligible?(scope, :contribute)
