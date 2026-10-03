@@ -164,6 +164,11 @@ defmodule Tips.Content.SearchTest do
         {"zebra", [offset: "20"], :invalid_offset},
         {"zebra", [offset: 20.0], :invalid_offset},
         {"zebra", [embedding: List.duplicate(0.0, @dimensions)], :invalid_embedding},
+        # Nonzero as a double, zero once pgvector stores it as float32.
+        {"zebra", [embedding: [1.0e-100 | List.duplicate(0.0, @dimensions - 1)]],
+         :invalid_embedding},
+        {"zebra", [embedding: [4.0e38 | List.duplicate(0.0, @dimensions - 1)]],
+         :invalid_embedding},
         {"zebra", [embedding: List.duplicate(1.0, @dimensions - 1)], :invalid_embedding},
         {"zebra", [embedding: [:nan | List.duplicate(1.0, @dimensions - 1)]], :invalid_embedding},
         {"zebra", [embedding: "[1,0]"], :invalid_embedding},
@@ -175,6 +180,17 @@ defmodule Tips.Content.SearchTest do
         assert {{:error, ^reason}, 0} = count_queries(fn -> Search.search(nil, query, opts) end),
                inspect({query, opts})
       end
+    end
+
+    test "a tiny embedding keeps its float32 direction", ctx do
+      near = tip!(ctx, title: "Plain near", vector: query_vector())
+
+      far =
+        tip!(ctx, title: "Plain far", vector: [0.0, 1.0 | List.duplicate(0.0, @dimensions - 2)])
+
+      tiny = [1.0e-40 | List.duplicate(0.0, @dimensions - 1)]
+
+      assert ids(search!(nil, "unmatched", embedding: tiny)) == [near.id, far.id]
     end
 
     @tag :capture_log

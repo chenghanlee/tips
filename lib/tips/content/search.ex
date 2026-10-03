@@ -18,7 +18,8 @@ defmodule Tips.Content.Search do
     * `:tag_id`, `:model_id`, `:environment_id` - an active curated id. Each
       filters the parent tip in every branch; a review's own setup or text
       never satisfies it.
-    * `:embedding` - the query vector: 1024 finite numbers, not all zero.
+    * `:embedding` - the query vector: 1024 numbers within float32 range, not
+      all zero once rounded to float32.
       `nil` (default) runs only the two keyword branches.
 
   Errors, all returned before retrieval except `:unavailable`:
@@ -340,18 +341,26 @@ defmodule Tips.Content.Search do
 
   defp vector(nil), do: {:ok, nil}
 
-  defp vector(values) when is_list(values) do
-    if length(values) == @dimensions and Enum.all?(values, &finite?/1) and
-         Enum.any?(values, &(&1 != 0)) do
-      {:ok, "[" <> Enum.map_join(values, ",", &to_string/1) <> "]"}
+  # pgvector stores float32, so the zero check runs on the encoded values: a
+  # value too small for float32 would leave a zero vector with no direction.
+  defp vector(values) when is_list(values) and length(values) == @dimensions do
+    with true <- Enum.all?(values, &finite?/1),
+         floats = Enum.map(values, &float32/1),
+         true <- Enum.any?(floats, &(&1 != 0)) do
+      {:ok, "[" <> Enum.map_join(floats, ",", &Float.to_string/1) <> "]"}
     else
-      {:error, :invalid_embedding}
+      false -> {:error, :invalid_embedding}
     end
   end
 
   defp vector(_values), do: {:error, :invalid_embedding}
 
   defp finite?(value), do: is_number(value) and abs(value) <= @float32_max
+
+  defp float32(value) do
+    <<float::float-32>> = <<value::float-32>>
+    float
+  end
 
   defp active_filters(filters) do
     if Enum.all?(filters, fn {key, id} -> is_binary(id) and active?(@filters[key], id) end),
