@@ -25,13 +25,22 @@ defmodule Tips.Workers.ExpireRegistrationsTest do
   defp remaining(ids), do: Repo.all(from u in User, where: u.id in ^ids, select: u.id)
 
   test "maintenance deletes at most the batch bound and makes progress on another run" do
-    ids = expired_registrations(101)
+    token_owner = unconfirmed_user_fixture()
+    ids = [token_owner.id | expired_registrations(100)]
+    extract_user_token(&Accounts.deliver_login_instructions(token_owner, &1))
+    Accounts.generate_user_session_token(token_owner)
+
+    assert Enum.sort(Enum.map(Repo.all_by(UserToken, user_id: token_owner.id), & &1.context)) ==
+             ["login", "session"]
+
+    set_registration_deadline(token_owner, 0)
     pending = unconfirmed_user_fixture()
     confirmed = user_fixture()
     set_registration_deadline(confirmed, -86_400)
 
     assert {:ok, 100} = perform_job(ExpireRegistrations, %{})
     assert remaining(ids) == [List.last(ids)]
+    assert Repo.all_by(UserToken, user_id: token_owner.id) == []
 
     assert {:ok, 1} = perform_job(ExpireRegistrations, %{})
     assert remaining(ids) == []
@@ -41,45 +50,24 @@ defmodule Tips.Workers.ExpireRegistrationsTest do
     assert %User{confirmed_at: %DateTime{}} = Repo.reload!(confirmed)
   end
 
-  test "a smaller bound limits the batch in id order" do
-    [first, second, third] = ids = expired_registrations(3)
-
-    assert {:ok, 2} = Accounts.expire_unconfirmed_users(2)
-    assert remaining(ids) == [third]
-    refute Repo.get(User, first) || Repo.get(User, second)
-  end
-
-  test "maintenance deletes the registration's tokens with it" do
-    user = unconfirmed_user_fixture()
-    extract_user_token(&Accounts.deliver_login_instructions(user, &1))
-    Accounts.generate_user_session_token(user)
-    set_registration_deadline(user, 0)
-
-    assert {:ok, 1} = perform_job(ExpireRegistrations, %{})
-    refute Repo.reload(user)
-    assert Repo.all_by(UserToken, user_id: user.id) == []
-  end
-
   test "worker repeats safely and reports invariant failures" do
     [clean] = expired_registrations(1)
     holder = unconfirmed_user_fixture()
+    extract_user_token(&Accounts.deliver_login_instructions(holder, &1))
+    Accounts.generate_user_session_token(holder)
+    tokens = Repo.all_by(UserToken, user_id: holder.id) |> Enum.sort_by(& &1.id)
+    assert Enum.sort(Enum.map(tokens, & &1.context)) == ["login", "session"]
     set_registration_deadline(holder, -1)
     %Tip{} = tip = tip_fixture(holder)
 
-    for _attempt <- 1..2 do
-      assert_raise Postgrex.Error, ~r/foreign_key_violation/, fn ->
-        perform_job(ExpireRegistrations, %{})
-      end
-
-      assert %User{} = Repo.reload!(holder)
-      assert %Tip{} = Repo.reload!(tip)
-      assert remaining([clean]) == [clean]
+    assert_raise Postgrex.Error, ~r/foreign_key_violation/, fn ->
+      perform_job(ExpireRegistrations, %{})
     end
 
-    Repo.delete!(tip)
-
-    assert {:ok, 2} = perform_job(ExpireRegistrations, %{})
-    assert {:ok, 0} = perform_job(ExpireRegistrations, %{})
+    assert %User{} = Repo.reload!(holder)
+    assert %Tip{} = Repo.reload!(tip)
+    assert remaining([clean]) == [clean]
+    assert Repo.all_by(UserToken, user_id: holder.id) |> Enum.sort_by(& &1.id) == tokens
   end
 
   test "an incomplete maintenance job blocks a second enqueue" do

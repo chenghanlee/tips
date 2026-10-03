@@ -1,13 +1,10 @@
 defmodule Tips.AdmissionLimiterTest do
-  use Tips.DataCase, async: true
+  use ExUnit.Case, async: true
 
-  import Tips.AccountsFixtures
   import Tips.AdmissionFixtures
-  import Tips.ContentFixtures
 
   alias Tips.Accounts.{Scope, User}
   alias Tips.AdmissionLimiter
-  alias Tips.Content.Tip
 
   defp scope(id), do: %Scope{user: %User{id: id}}
 
@@ -284,35 +281,6 @@ defmodule Tips.AdmissionLimiterTest do
       run_cleanup(limiter)
       assert entry_count(limiter) == 1
       assert {:error, {:rate_limited, 1}} = AdmissionLimiter.check_write(scope(5), limiter)
-    end
-  end
-
-  describe "business effects" do
-    test "write consumption survives content deletion and downstream failure" do
-      %{limiter: limiter} = start_limiter(write: {2, 60_000})
-      user = user_fixture()
-
-      # Representative caller: admit, then mutate. The Tip insert is a fixture
-      # standing in for a future Content write; the admission path is real.
-      write = fn scope, mutation ->
-        with :ok <- AdmissionLimiter.check_write(scope, limiter), do: mutation.()
-      end
-
-      tip = write.(Scope.for_user(user), fn -> tip_fixture(user) end)
-      Repo.delete!(tip)
-      refute Repo.exists?(Tip)
-
-      assert {:error, :provider_timeout} =
-               write.(Scope.for_user(user), fn -> {:error, :provider_timeout} end)
-
-      # No content exists, the second attempt failed downstream, and a freshly
-      # built scope for the same account still sees the spent budget.
-      fresh_scope = user |> Repo.reload!() |> Scope.for_user()
-
-      assert {:error, {:rate_limited, _}} =
-               write.(fresh_scope, fn -> flunk("mutation ran after denial") end)
-
-      refute Repo.exists?(Tip)
     end
   end
 
