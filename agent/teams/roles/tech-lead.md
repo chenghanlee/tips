@@ -13,7 +13,7 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](.
 ## Assigned
 
 1. Confirm your pane, worktree and SHA inside the new client: `herdr agent get team-N-lead`, `pwd`, `git rev-parse HEAD`.
-2. Post an issue readiness comment: one outcome, exclusions, exact design sections, real entry points, acceptance scenarios mapped to named tests (`probe`: evidence required), runnable verification, available prerequisites, task slug. Amend this contract when needed. Do not repeat operating rules, setup history or tooling reports in the contract; amend it instead of copying it. End with one line: `Needs from owner:` followed only by `none` or required secrets, credentials and network access. That line alone is not a blocker.
+2. Post an issue readiness comment: one outcome, exclusions, exact design sections, real entry points, acceptance scenarios mapped to named tests (`probe`: evidence required), runnable verification, available prerequisites, task slug. Amend this contract when needed. Link design sections instead of paraphrasing them. Do not repeat operating rules, setup history or tooling reports in the contract, and do not ask the developer or tester to restate the contract, its test mapping or check results in their rounds. End with one line: `Needs from owner:` followed only by `none` or required secrets, credentials and network access. That line alone is not a blocker.
 3. If a second independent outcome exists or your context will not last until merge, propose a split to lead TPM as a scope question; it creates children. Never require file ownership lists, reservations or overlap approval. Coordinate concrete shared changes as they arise.
 4. Request developer by role; lead TPM chooses the pane. After its confirmation, verify developer pane, worktree and SHA. Brief developer with contract link, that SHA as base, action, owner and exact completion command `herdr agent prompt team-N-lead "..."`, naming fields the developer fills.
 5. Start with work independent of owner items.
@@ -48,7 +48,7 @@ gh pr merge "$PR" --merge --match-head-commit "$REVIEWED_SHA"
 
 1. Request lead TPM advancement of your checkout to `REVIEWED_SHA`. Confirm `git rev-parse HEAD` matches and `TIPS_CHECK_TIMEOUT_SECONDS` is set.
 2. Review the integrated head's entire diff against `origin/main` once. Run `mix compile --warnings-as-errors`, `mix format --check-formatted`, `mix credo --strict`, `mix test` exactly once there. Documentation-only PRs need no local tests; `agent/teams` Python follows [Changing agent/teams scripts](../README.md#changing-agentteams-scripts). Clean updates get no second local run or tester round. Rerun the checks a later repair or base change materially affects, not the whole suite for every head.
-3. Append a `review` round to your comment in the shared round shape. Above the headings, record base and head SHAs, tester verdict per head, independently run checks, unresolved findings and follow-ups, each once. Use these five exact `###` headings (one line each for `probe`). Give the material conclusion and its evidence; avoid repeated narration. Close Defect pass with `No additional findings` when true.
+3. Append a `review` round to your comment in the shared round shape. Use these five exact `###` headings, one line each; add lines only for a finding. The publisher rejects a missing or empty heading. Close Defect pass with `No additional findings` when true.
 
 | Heading | Review |
 |---|---|

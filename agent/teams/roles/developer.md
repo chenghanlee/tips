@@ -20,7 +20,7 @@ Ask the tech lead freeform questions; include a pushed SHA for code questions.
 
 You own green. From the second push onward, before each commit, read the preceding push's result with `gh pr checks "$PR"` once, without `--watch`. Continue work while checks run. Never push onto unrepaired red; pending is not red.
 
-In every round, name check-configuration changes (ignore files, workflow, lint or scanner settings) for explicit tech-lead review.
+Name check-configuration changes (ignore files, workflow, lint or scanner settings) in the round that makes them, for explicit tech-lead review.
 
 When review-ready, mark the PR ready and append a `pushed` round. Hand off to the tech lead with evidence link, SHA, `action=dispatch tester`, owner. Pending preceding checks do not delay handoff; the tester's read decides.
 
