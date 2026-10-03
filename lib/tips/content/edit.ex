@@ -4,18 +4,20 @@ defmodule Tips.Content.Edit do
 
   See "Editing" and "Transaction participants" in `Tips.Content`. The form is
   one statement, so the account, fields, version and attachments come from one
-  snapshot. An edit checks complete intent and write admission first. One
-  transaction then locks the author and the direct tip or review, never a
+  snapshot. An edit validates complete intent, then passes write admission.
+  One transaction then locks the author and the direct tip or review, never a
   review's parent, and rechecks eligibility, ownership, deletion and the
-  expected version. Only an actual change writes: the content with one version
-  increment and `edited_at`, then its search text. Media changes are not
-  supported yet: the saved selection must be kept unchanged.
+  expected version. A failed guard rolls back, then a fresh statement names the
+  rejection from current state. Only an actual change writes: the content with
+  one version increment and `edited_at`, then its search text. Media changes
+  are not supported yet: the saved selection must be kept unchanged.
   """
 
   import Ecto.Changeset
   import Ecto.Query
 
   alias Ecto.Changeset
+  alias Tips.Accounts
   alias Tips.Accounts.{Scope, User}
   alias Tips.Content.{Intent, Projection, Publication, Review, Search, Tip}
   alias Tips.Content.Media.Asset
@@ -49,8 +51,8 @@ defmodule Tips.Content.Edit do
     Publication.unknown_on_database_error(fn ->
       with {:ok, user_id} <- author_id(scope),
            {:ok, id} <- row_id(id),
-           :ok <- Publication.admit(scope),
-           {:ok, params} <- validate(kind, expected_version, attrs, uploads) do
+           {:ok, params} <- validate(kind, expected_version, attrs, uploads),
+           :ok <- Publication.admit(scope) do
         write(kind, user_id, id, expected_version, params, uploads)
       end
     end)
@@ -146,22 +148,38 @@ defmodule Tips.Content.Edit do
     do: add_error(changeset, :edit_version, "is invalid")
 
   # Text edits keep the saved selection; the locked comparison checks it. Any
-  # other slot is rejected here, in selection order.
-  defp validate_uploads(changeset, uploads) when is_list(uploads) do
-    uploads
-    |> Enum.reverse()
-    |> Enum.reduce(changeset, fn
-      {:retained, id, description}, changeset
-      when is_integer(id) and id > 0 and (is_binary(description) or is_nil(description)) ->
-        changeset
+  # other slot is rejected here, in selection order. Anything but a proper list
+  # is invalid as a whole.
+  defp validate_uploads(changeset, uploads) do
+    case upload_errors(uploads, []) do
+      :invalid ->
+        add_error(changeset, :uploads, "is invalid")
 
-      upload, changeset ->
-        {message, keys} = upload_error(upload)
-        add_error(changeset, :uploads, message, keys)
-    end)
+      errors ->
+        Enum.reduce(errors, changeset, fn {message, keys}, changeset ->
+          add_error(changeset, :uploads, message, keys)
+        end)
+    end
   end
 
-  defp validate_uploads(changeset, _uploads), do: add_error(changeset, :uploads, "is invalid")
+  # Errors collect in reverse; adding them prepends, restoring selection order.
+  defp upload_errors([], errors), do: errors
+
+  defp upload_errors([upload | rest], errors) do
+    case upload_error(upload) do
+      :ok -> upload_errors(rest, errors)
+      error -> upload_errors(rest, [error | errors])
+    end
+  end
+
+  defp upload_errors(_not_a_list, _errors), do: :invalid
+
+  defp upload_error({:retained, id, nil}) when is_integer(id) and id > 0, do: :ok
+
+  defp upload_error({:retained, id, description})
+       when is_integer(id) and id > 0 and is_binary(description) do
+    if String.valid?(description), do: :ok, else: {"is invalid", media_id: id}
+  end
 
   defp upload_error({:missing_image, slot}), do: {"must be selected again", slot: slot}
   defp upload_error({:staged_video, media_id}), do: {"is not supported yet", media_id: media_id}
@@ -173,11 +191,47 @@ defmodule Tips.Content.Edit do
 
   ## Locked write
 
-  # A rejection rolls back; its reason was decided under the locks.
+  # Any rejection rolls back. A failed guard (an atom) is then named from the
+  # current state, read in a fresh statement; the expected version is kept.
   defp write(kind, user_id, id, expected_version, params, uploads) do
     case Repo.transact(fn -> save(kind, user_id, id, expected_version, params, uploads) end) do
-      {:error, %Changeset{} = changeset} -> {:error, %{changeset | action: :update}}
-      result -> result
+      {:error, %Changeset{} = changeset} ->
+        {:error, %{changeset | action: :update}}
+
+      {:error, guard} when is_atom(guard) ->
+        {:error, current_rejection(kind, user_id, id, expected_version, guard)}
+
+      {:ok, receipt} ->
+        {:ok, receipt}
+    end
+  end
+
+  # Eligibility, then the target, then the version, as under the locks. When
+  # the current state passes them all, the guard that failed at its decision
+  # point stands.
+  defp current_rejection(kind, user_id, id, expected_version, guard) do
+    query =
+      from(u in User,
+        left_join: c in ^schema(kind),
+        on: c.id == ^id,
+        where: u.id == ^user_id,
+        select: {u, c}
+      )
+
+    case Repo.one(query) do
+      nil -> :unauthenticated
+      {user, content} -> rejection(user, content, expected_version, guard)
+    end
+  end
+
+  defp rejection(user, content, expected_version, guard) do
+    user_id = user.id
+
+    case {Accounts.check_eligibility(user, :contribute), content} do
+      {{:error, ineligible}, _content} -> ineligible
+      {:ok, %{user_id: ^user_id, deleted_at: nil, edit_version: ^expected_version}} -> guard
+      {:ok, %{user_id: ^user_id, deleted_at: nil}} -> :conflict
+      {:ok, _missing_foreign_or_deleted} -> :not_found
     end
   end
 
@@ -235,9 +289,23 @@ defmodule Tips.Content.Edit do
       |> optimistic_lock(:edit_version)
 
     with :ok <- Publication.lock_active_choices(changeset, kind),
-         {:ok, row} <- Repo.update(changeset) do
+         {:ok, row} <- update_row(changeset) do
       :ok = write_search(kind, row.id)
       {:ok, receipt(:updated, kind, row)}
+    end
+  end
+
+  # The row lock makes a stale write unexpected; if it happens, it is a failed
+  # version guard like any other.
+  defp update_row(changeset) do
+    case Repo.update(changeset, stale_error_field: :edit_version) do
+      {:error, %Changeset{errors: errors} = changeset} ->
+        if Keyword.has_key?(errors, :edit_version),
+          do: {:error, :conflict},
+          else: {:error, changeset}
+
+      updated ->
+        updated
     end
   end
 

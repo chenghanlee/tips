@@ -194,11 +194,11 @@ defmodule Tips.Content.EditConcurrencyTest do
              end)
 
     # The writer commits as soon as the reader has read the content row.
-    pause_after_content_read()
+    pause_after_queries()
 
     reader =
       call(data.supervisor, fn ->
-        Process.put(:pause_after_content_read, self())
+        Process.put(:pause_after, :content_read)
         Content.get_edit_form(data.scope, :tip, tip.id)
       end)
 
@@ -216,6 +216,35 @@ defmodule Tips.Content.EditConcurrencyTest do
       assert {:ok, %{edit_version: 2, media: [%{description: "New description"}]}} =
                Content.get_edit_form(data.scope, :tip, tip.id)
     end)
+  end
+
+  describe "a failed guard is classified from state reread after rollback" do
+    for {change, error} <- [ban: :forbidden, delete: :not_found] do
+      test "a #{change} committed after the stale rollback is reported", data do
+        unboxed(fn -> mark!(data, :tip, :hide) end)
+        pause_after_queries()
+
+        # The stale version fails under the locks; the change commits before the reread.
+        editor =
+          call(data.supervisor, fn ->
+            Process.put(:pause_after, :rollback)
+            edit(data, :tip, 1, changed(:tip))
+          end)
+
+        assert_receive {:paused, pid}, 1_000
+
+        unboxed(fn ->
+          case unquote(change) do
+            :ban -> change_account!(data.author, :ban)
+            :delete -> mark!(data, :tip, :delete)
+          end
+        end)
+
+        send(pid, :resume)
+        assert {:error, unquote(error)} = finish(editor)
+        unboxed(fn -> assert %{edit_version: 2, edited_at: nil} = row(data, :tip) end)
+      end
+    end
   end
 
   for parent_state <- [:live, :hidden, :deleted] do
@@ -297,9 +326,10 @@ defmodule Tips.Content.EditConcurrencyTest do
 
   defp now, do: DateTime.utc_now(:second)
 
-  # Pauses the marked process after its first statement that reads a tip or
-  # review row, until the test sends `:resume`.
-  defp pause_after_content_read do
+  # Pauses a process that set `:pause_after` once, after its first matching
+  # statement: a tip or review read, or a transaction rollback. The test sends
+  # `:resume`.
+  defp pause_after_queries do
     test = self()
     id = {__MODULE__, make_ref()}
     :telemetry.attach(id, [:tips, :repo, :query], &__MODULE__.pause/4, test)
@@ -307,9 +337,9 @@ defmodule Tips.Content.EditConcurrencyTest do
   end
 
   @doc false
-  def pause(_event, _measurements, %{source: source}, test) when source in ["tips", "reviews"] do
-    if Process.get(:pause_after_content_read) == self() do
-      Process.delete(:pause_after_content_read)
+  def pause(_event, _measurements, metadata, test) do
+    if pause_point?(Process.get(:pause_after), metadata) do
+      Process.delete(:pause_after)
       send(test, {:paused, self()})
 
       receive do
@@ -318,7 +348,9 @@ defmodule Tips.Content.EditConcurrencyTest do
     end
   end
 
-  def pause(_event, _measurements, _metadata, _test), do: :ok
+  defp pause_point?(:content_read, %{source: source}), do: source in ["tips", "reviews"]
+  defp pause_point?(:rollback, %{query: query}), do: query == "rollback"
+  defp pause_point?(_point, _metadata), do: false
 
   defp delete_content(user_ids) do
     tip_ids = Repo.all(from(t in Tip, where: t.user_id in ^user_ids, select: t.id))

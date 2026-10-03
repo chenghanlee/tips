@@ -305,6 +305,11 @@ defmodule Tips.Content.EditTest do
       assert {:error, changeset} = edit(s, :tip, tip.id, 1, %{current | body: "a\0b"}, [])
       assert {"cannot contain a null byte", _} = changeset.errors[:body]
 
+      # Invalid UTF-8 is a field error, not an exception.
+      assert {:error, changeset} = edit(s, :tip, tip.id, 1, %{current | body: <<255>>}, [])
+      assert {"is invalid", _} = changeset.errors[:body]
+      assert changeset.params["body"] == <<255>>
+
       assert Repo.reload!(tip) == tip
 
       # An unchanged historical choice stays selectable.
@@ -333,7 +338,9 @@ defmodule Tips.Content.EditTest do
         {retained ++ [{:image_file, "slot-1", %{path: "/tmp/x", filename: "x.png"}, nil}],
          [slot: "slot-1"]},
         {retained ++ [{:missing_image, "slot-2"}], [slot: "slot-2"]},
-        {retained ++ [:malformed], nil}
+        {retained ++ [:malformed], nil},
+        {[{:retained, first.id, <<255>>}, {:retained, second.id, nil}], [media_id: first.id]},
+        {[{:retained, first.id, "First"} | {:retained, second.id, nil}], nil}
       ]
 
       for {uploads, keys} <- rejected do
@@ -402,7 +409,18 @@ defmodule Tips.Content.EditTest do
         confirm!(author)
       end
 
-      # Ownership is lost with the account; a stale admitted scope cannot edit.
+      # A stale author whose target changed owner after the form was read.
+      assert {:ok, %{base: base}} = Content.get_edit_form(scope(author), :tip, tip.id)
+      new_owner = user_fixture()
+      Repo.update_all(from(t in Tip, where: t.id == ^tip.id), set: [user_id: new_owner.id])
+
+      assert {:error, :not_found} =
+               edit(scope(author), :tip, tip.id, 1, %{base.attrs | body: "Not mine"}, [])
+
+      assert %Tip{edit_version: 1, edited_at: nil} = Repo.reload!(tip)
+      Repo.update_all(from(t in Tip, where: t.id == ^tip.id), set: [user_id: author.id])
+
+      # Account deletion removes eligibility; a stale admitted scope cannot edit.
       stale = scope(author)
       delete_account!(author)
 
@@ -419,16 +437,24 @@ defmodule Tips.Content.EditTest do
       tip = tip_fixture(author, @tip_attrs)
       s = scope(author)
 
-      for _ <- 1..limit//1, do: assert(:ok = AdmissionLimiter.check_write(s))
+      # Invalid input is rejected before admission and spends no budget.
+      for _ <- 1..limit//1,
+          do: assert({:error, %Ecto.Changeset{}} = edit(s, :tip, tip.id, 0, @tip_attrs, []))
+
+      assert {:ok, %{edit_version: 2}} =
+               edit(s, :tip, tip.id, 1, %{@tip_attrs | body: "Within the limit"}, [])
+
+      for _ <- 2..limit//1, do: assert(:ok = AdmissionLimiter.check_write(s))
+      tip = Repo.reload!(tip)
 
       assert {:error, {:rate_limited, seconds}} =
-               edit(s, :tip, tip.id, 1, %{@tip_attrs | body: "Over the limit"}, [])
+               edit(s, :tip, tip.id, 2, %{@tip_attrs | body: "Over the limit"}, [])
 
       assert seconds > 0
       assert Repo.reload!(tip) == tip
 
       # Reading the form consumes no write budget.
-      assert {:ok, %{edit_version: 1}} = Content.get_edit_form(s, :tip, tip.id)
+      assert {:ok, %{edit_version: 2}} = Content.get_edit_form(s, :tip, tip.id)
     end
   end
 

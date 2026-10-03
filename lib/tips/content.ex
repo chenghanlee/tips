@@ -165,7 +165,7 @@ defmodule Tips.Content do
 
   An edit checks complete, valid intent first, as above: every field, a
   positive integer expected version (else an `:edit_version` error) and the
-  selection. It then passes `Tips.AdmissionLimiter.check_write/2`, with the
+  selection as a proper list. Text that is not valid UTF-8 is "is invalid". It then passes `Tips.AdmissionLimiter.check_write/2`, with the
   same denials as publication. One transaction locks the author (`:contribute`
   eligibility) and the direct tip or review; a review edit takes no parent-tip
   lock, so a hidden or deleted parent does not block it. Missing, foreign or
@@ -182,6 +182,12 @@ defmodule Tips.Content do
   Publication dates, moderation state, votes, counters, rankings and
   notifications never change. Search text that comes out identical keeps its
   embedding.
+
+  A failed eligibility, target or version guard rolls back. A fresh statement
+  then reads the current account and target to name the rejection
+  (`:unauthenticated`, `:unconfirmed`, `:forbidden`, `:not_found` or
+  `:conflict`); if that read fails, the result is `:outcome_unknown`. The
+  expected version is never replaced.
 
   Until media edits exist, `uploads` must be the saved selection unchanged, as
   `:retained` slots in order with equal descriptions (`[]` when there is

@@ -43,6 +43,7 @@ defmodule Tips.Content.Tip do
   def edit_changeset(tip, attrs) do
     tip
     |> cast(attrs, @editable)
+    |> validate_utf8()
     |> validate_required([:title, :body, :tag_id])
     |> validate_length(:title, min: 3, max: 140, count: :codepoints)
     |> validate_format(:title, ~r/\S/u)
@@ -59,6 +60,20 @@ defmodule Tips.Content.Tip do
     |> foreign_key_constraint(:tag_id)
     |> foreign_key_constraint(:model_id)
     |> foreign_key_constraint(:environment_id)
+  end
+
+  # Text validations run regexes, which raise on invalid UTF-8. Such a value
+  # becomes an error and leaves the changes; params keep it.
+  defp validate_utf8(changeset) do
+    Enum.reduce(changeset.changes, changeset, fn
+      {field, value}, changeset when is_binary(value) ->
+        if String.valid?(value),
+          do: changeset,
+          else: changeset |> delete_change(field) |> add_error(field, "is invalid")
+
+      _change, changeset ->
+        changeset
+    end)
   end
 
   defp validate_no_null_bytes(changeset) do

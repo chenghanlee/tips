@@ -44,6 +44,7 @@ defmodule Tips.Content.Review do
   def edit_changeset(review, attrs) do
     review
     |> cast(attrs, @editable)
+    |> validate_utf8()
     |> validate_required([:body])
     |> validate_length(:body, min: 1, max: 20_000, count: :codepoints)
     |> validate_format(:body, ~r/\S/u)
@@ -57,6 +58,20 @@ defmodule Tips.Content.Review do
     |> validate_model_choice()
     |> foreign_key_constraint(:model_id)
     |> foreign_key_constraint(:environment_id)
+  end
+
+  # Text validations run regexes, which raise on invalid UTF-8. Such a value
+  # becomes an error and leaves the changes; params keep it.
+  defp validate_utf8(changeset) do
+    Enum.reduce(changeset.changes, changeset, fn
+      {field, value}, changeset when is_binary(value) ->
+        if String.valid?(value),
+          do: changeset,
+          else: changeset |> delete_change(field) |> add_error(field, "is invalid")
+
+      _change, changeset ->
+        changeset
+    end)
   end
 
   defp validate_no_null_bytes(changeset) do
