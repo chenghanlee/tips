@@ -8,9 +8,9 @@ defmodule Tips.Content.Publication do
   admission or eligibility. Only an absent key is admitted, validated and
   written: one transaction locks the author, then a review's live parent, then
   share-locks the selected curated choices while active, and inserts the
-  content, its search text, its self-vote and a review's notification. A key
-  constraint that rejects the insert rolls the attempt back; the key is then
-  looked up again in a fresh statement.
+  content, its search text, its self-vote and a review's notification. Any
+  rejection in the transaction rolls the attempt back; the key is then looked
+  up again in a fresh statement before the rejection is returned.
   """
 
   import Ecto.Changeset
@@ -320,32 +320,30 @@ defmodule Tips.Content.Publication do
   defp settle({:ok, row}, _scope, kind, _key, _intent),
     do: {:ok, receipt(:created, base_kind(kind), row)}
 
-  defp settle({:error, %Changeset{} = changeset}, scope, kind, key, intent) do
-    if key_conflict?(changeset),
-      do: reconcile(changeset, scope, kind, key, intent),
-      else: {:error, changeset}
+  # The attempt rolled back. It may have waited on the author lock while a
+  # same-key winner committed, so a fresh statement reads the key first.
+  defp settle({:error, reason}, scope, kind, key, intent) do
+    case find(scope, kind, key, intent) do
+      nil -> rejection(reason)
+      found -> found
+    end
   end
 
-  defp settle({:error, reason}, _scope, _kind, _key, _intent), do: {:error, reason}
+  defp rejection(%Changeset{} = changeset) do
+    cond do
+      one_review_conflict?(changeset) -> {:error, :already_reviewed}
+      key_conflict?(changeset) -> {:error, :outcome_unknown}
+      true -> {:error, changeset}
+    end
+  end
+
+  defp rejection(reason), do: {:error, reason}
 
   defp key_conflict?(changeset),
     do:
       Enum.any?(changeset.errors, fn {_field, {_message, keys}} ->
         keys[:constraint] == :unique
       end)
-
-  # The attempt rolled back; this is a fresh statement. The key decides first.
-  defp reconcile(changeset, scope, kind, key, intent) do
-    case find(scope, kind, key, intent) do
-      nil ->
-        if one_review_conflict?(changeset),
-          do: {:error, :already_reviewed},
-          else: {:error, :outcome_unknown}
-
-      result ->
-        result
-    end
-  end
 
   defp one_review_conflict?(changeset) do
     Enum.any?(changeset.errors, fn {_field, {_message, keys}} ->

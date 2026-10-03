@@ -288,6 +288,96 @@ defmodule Tips.Content.PublicationConcurrencyTest do
     end
   end
 
+  describe "a same-key loser reconciles before a retirement that wins the choice" do
+    for kind <- [:tip, :review], loser <- [:equivalent, :different, :unknown] do
+      test "#{kind}, #{loser} loser", data do
+        kind = unquote(kind)
+        {field, schema, choice} = data.choices[kind]
+        attrs = Map.put(@attrs[kind], field, choice)
+        key = Ecto.UUID.generate()
+        winner = open(data.supervisor)
+
+        assert {:ok, %{outcome: :created, id: id}} =
+                 run(winner, fn -> publish(kind, data, key, attrs) end)
+
+        {loser_attrs, outcome} =
+          case unquote(loser) do
+            :equivalent ->
+              {attrs, :existing_equivalent}
+
+            :different ->
+              {%{attrs | body: "The other tab changed the body."}, :existing_different}
+
+            :unknown ->
+              run(winner, fn -> delete!(kind, id) end)
+              {attrs, :existing_unknown}
+          end
+
+        racer = call(data.supervisor, fn -> publish(kind, data, key, loser_attrs) end)
+        await_blocked(racer, winner)
+
+        # The retirement queues behind the winner's share lock, then the racer behind it.
+        retirement = open(data.supervisor)
+        retired = submit(retirement, fn -> retire!(schema, choice) end)
+        await_blocked(retirement, winner)
+        commit(winner)
+        assert {1, _} = await(retirement, retired)
+        await_blocked(racer, retirement)
+        commit(retirement)
+
+        assert {:ok, %{outcome: ^outcome, id: ^id, submission_key: ^key}} = finish(racer)
+        unboxed(fn -> assert_one_effect_set(kind, data, key) end)
+      end
+    end
+  end
+
+  describe "a same-key loser reconciles before a locked eligibility rejection" do
+    for kind <- [:tip, :review] do
+      test "#{kind}: a ban queued ahead of the loser", data do
+        kind = unquote(kind)
+        key = Ecto.UUID.generate()
+        winner = open(data.supervisor)
+
+        assert {:ok, %{outcome: :created, id: id}} =
+                 run(winner, fn -> publish(kind, data, key, @attrs[kind]) end)
+
+        ban = open(data.supervisor)
+        banned = submit(ban, fn -> ban!(data.author) end)
+        await_blocked(ban, winner)
+        racer = call(data.supervisor, fn -> publish(kind, data, key, @attrs[kind]) end)
+        await_blocked(racer, [winner, ban])
+        commit(winner)
+        assert {1, _} = await(ban, banned)
+        await_blocked(racer, ban)
+        commit(ban)
+
+        assert {:ok, %{outcome: :existing_equivalent, id: ^id}} = finish(racer)
+        unboxed(fn -> assert_one_effect_set(kind, data, key) end)
+      end
+    end
+
+    test "review: a parent hide that wins the parent lock", data do
+      key = Ecto.UUID.generate()
+      winner = open(data.supervisor)
+
+      assert {:ok, %{outcome: :created, id: id}} =
+               run(winner, fn -> publish(:review, data, key, @attrs.review) end)
+
+      racer = call(data.supervisor, fn -> publish(:review, data, key, @attrs.review) end)
+      await_blocked(racer, winner)
+      hide = open(data.supervisor)
+      hidden = submit(hide, fn -> mark_parent!(data.parent, :dead_at) end)
+      await_blocked(hide, winner)
+      commit(winner)
+      assert {1, _} = await(hide, hidden)
+      await_blocked(racer, hide)
+      commit(hide)
+
+      assert {:ok, %{outcome: :existing_equivalent, id: ^id, state: :live}} = finish(racer)
+      unboxed(fn -> assert_one_effect_set(:review, data, key) end)
+    end
+  end
+
   defp publish(:tip, data, key, attrs), do: Content.publish_tip(data.scope, key, attrs, [])
 
   defp publish(:review, data, key, attrs),
