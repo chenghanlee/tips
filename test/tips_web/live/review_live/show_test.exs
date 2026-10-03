@@ -66,7 +66,7 @@ defmodule TipsWeb.ReviewLive.ShowTest do
 
   test "review stays readable under hidden and deleted tips, with the placeholder as context",
        %{conn: conn} do
-    for {marker, placeholder, slug} <- [
+    for {marker, {placeholder, slug}} <- [
           hidden: {"Removed tip", "removed-tip"},
           deleted: {"Deleted tip", "deleted-tip"}
         ] do
