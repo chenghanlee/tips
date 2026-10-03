@@ -86,7 +86,6 @@ ProcessRows = dict[int, tuple[int, str]]
 # Disable alternate language paths in launched clients, without editing user settings.
 NATIVE_LSP_PLUGINS = {
     "elixir-lsp@elixir-agent-tools": False,
-    "dexter-lsp@dexter": False,
 }
 main: Path
 cfg: Config

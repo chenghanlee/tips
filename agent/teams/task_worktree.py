@@ -329,9 +329,7 @@ class WorktreeTask:
             self.worktree / ".dexter/.gitignore": "*\n",
         }
         if self.kind == "codex":
-            config = """[plugins."mix-compile@elixir-agent-tools"]
-enabled = false
-[plugins."mix-credo@elixir-agent-tools"]
+            config = """[plugins."mix-credo@elixir-agent-tools"]
 enabled = true
 """
             self.desired[self.worktree / ".codex/config.toml"] = config
@@ -637,7 +635,6 @@ enabled = true
                 json.dumps(
                     {
                         "enabledPlugins": {
-                            "mix-compile@elixir-agent-tools": False,
                             "mix-credo@elixir-agent-tools": True,
                             **NATIVE_LSP_PLUGINS,
                         }
