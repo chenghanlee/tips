@@ -10,7 +10,7 @@
 | Fresh checkout, browser tests, worktree isolation | The section you need in [local development](docs/development/local-development.md) |
 | Product behaviour or copy | [Glossary](docs/design/glossary.md) |
 
-Design files are large. List headings with `rg -n '^#{2,3} ' <file>`, then read the relevant sections and the shared invariants they point to.
+Design files are large. List headings with `rg -n '^#{2,3} ' <file>`, then read the relevant sections and the shared invariants they point to. If output is truncated, read the missing range before relying on it.
 
 ## Boundaries
 

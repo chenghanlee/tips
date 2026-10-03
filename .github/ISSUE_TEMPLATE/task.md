@@ -22,10 +22,10 @@ Link integrated prerequisite issues, exact design sections and current code entr
 
 Actual commands, fixtures, environment and required evidence. Unavailable checks block completion.
 
-## Ownership and dispatch
+## Workflow
 
-For team work, lead TPM sets Active and records the base SHA; tech lead posts readiness before implementation starts. Resolve unknown contracts before Ready.
+Follow the [team agreement](https://github.com/chenghanlee/tips/blob/main/agent/teams/README.md) and role cards. Tech lead records readiness before implementation; keep task-specific requirements here.
 
 ## Completion
 
-Implementation and tests pass. Separate-session review covers the complete PR with no unresolved required feedback. Relevant integrated checks pass. Context overrun continues on this issue in a fresh repair session.
+Acceptance is met and evidenced; required feedback is resolved and integrated checks pass. Follow the team agreement for review, recovery and merge.

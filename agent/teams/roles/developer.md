@@ -4,7 +4,7 @@ Read [the shared agreement](../README.md) first.
 
 ## Always
 
-Own the branch, worktree and PR until merge; never switch issues earlier. Implement with AGENTS.md's integration-first TDD. For `agent/teams` changes, follow [Changing agent/teams scripts](../README.md#changing-agentteams-scripts).
+Own the branch, worktree and PR until merge; never switch issues earlier. Implement with AGENTS.md's integration-first TDD. Keep affected design and API contracts current; document new lasting constraints in their existing canonical source, without duplicating code contracts. For `agent/teams` changes, follow [Changing agent/teams scripts](../README.md#changing-agentteams-scripts).
 
 For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](../../../AGENTS.md#skills).
 
@@ -13,9 +13,9 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](.
 
 ## Assigned
 
-1. Confirm worktree and SHA and read the linked contract.
-2. Start with work independent of owner items.
-3. Push a first commit; open a draft PR. This draft is not review-ready and gets no handoff.
+1. Confirm the assigned worktree, SHA and launch values with `pwd`, `git rev-parse HEAD` and the shared Environment command.
+2. Read the issue and linked readiness comment, then its design sections and shared invariants. The team agreement governs workflow; ask the tech lead about conflicting requirements.
+3. Start work independent of owner items. Push the first commit and open a draft PR under shared Git and Checks rules; the draft gets no handoff.
 
 ## Pushed head
 
@@ -35,7 +35,7 @@ Read feedback with `pr_review.py list`. Repair it under shared Required feedback
 
 ## Merge
 
-After clean `gh pr update-branch`, ask the tech lead for a lead TPM fetch. Before another commit, run `git merge --ff-only "origin/task/$TASK"` (`TASK`: readiness task slug). If fast-forward fails, preserve work and report divergence to the tech lead.
+After clean `gh pr update-branch`, ask the tech lead for a lead TPM fetch. Before another commit, run `git merge --ff-only "origin/$(git branch --show-current)"`. If fast-forward fails, preserve work and report divergence to the tech lead.
 
 If the branch update conflicts, request the same fetch, then `git merge origin/main` in your worktree. Resolve, push and hand off; tester reviews conflicted hunks and base delta.
 
