@@ -10,7 +10,7 @@ defmodule Tips.Content.PublicationConcurrencyTest do
 
   alias Tips.Accounts.{Scope, User}
   alias Tips.Content
-  alias Tips.Content.{Notification, Review, Tip, Vote}
+  alias Tips.Content.{Model, Notification, Review, Tag, Tip, Vote}
   alias Tips.Repo
 
   @attrs %{
@@ -41,12 +41,33 @@ defmodule Tips.Content.PublicationConcurrencyTest do
         {user_fixture(), parent_author, tip_fixture(parent_author)}
       end)
 
-    on_exit(fn -> unboxed(fn -> delete_content([author.id, parent_author.id]) end) end)
+    # Committed active choices this test may retire; the shared seeds stay active.
+    suffix = System.unique_integer([:positive])
+
+    choices = %{
+      tip: {:tag_id, Tag, "race-tag-#{suffix}"},
+      review: {:model_id, Model, "race-model-#{suffix}"}
+    }
+
+    unboxed(fn ->
+      for {_field, schema, id} <- Map.values(choices),
+          do: Repo.insert!(struct(schema, id: id, label: id, sort_order: 99))
+    end)
+
+    on_exit(fn ->
+      unboxed(fn ->
+        delete_content([author.id, parent_author.id])
+
+        for {_field, schema, id} <- Map.values(choices),
+            do: Repo.delete_all(from(c in schema, where: c.id == ^id))
+      end)
+    end)
 
     %{
       author: author,
       scope: Scope.for_user(author),
       parent: parent,
+      choices: choices,
       supervisor: start_supervised!(Task.Supervisor)
     }
   end
@@ -219,6 +240,54 @@ defmodule Tips.Content.PublicationConcurrencyTest do
     end
   end
 
+  describe "publication serializes with curated choice retirement" do
+    for kind <- [:tip, :review] do
+      test "a #{kind} choice retired during the author lock wait is not available", data do
+        kind = unquote(kind)
+        {field, schema, id} = data.choices[kind]
+        holder = open(data.supervisor)
+        assert [_id] = run(holder, fn -> lock_user(data.author.id) end)
+
+        publication =
+          call(data.supervisor, fn ->
+            publish(kind, data, Ecto.UUID.generate(), Map.put(@attrs[kind], field, id))
+          end)
+
+        await_blocked(publication, holder)
+        assert {1, _} = unboxed(fn -> retire!(schema, id) end)
+        commit(holder)
+
+        assert {:error, changeset} = finish(publication)
+        assert [{^field, {"is not available", []}}] = changeset.errors
+        unboxed(fn -> assert_no_effects(data) end)
+      end
+
+      test "a committed #{kind} completes before its choice retires", data do
+        kind = unquote(kind)
+        {field, schema, id} = data.choices[kind]
+        key = Ecto.UUID.generate()
+        publication = open(data.supervisor)
+
+        assert {:ok, %{outcome: :created}} =
+                 run(publication, fn ->
+                   publish(kind, data, key, Map.put(@attrs[kind], field, id))
+                 end)
+
+        retirement = open(data.supervisor)
+        retired = submit(retirement, fn -> retire!(schema, id) end)
+        await_blocked(retirement, publication)
+        commit(publication)
+        assert {1, _} = await(retirement, retired)
+        commit(retirement)
+
+        unboxed(fn ->
+          assert_one_effect_set(kind, data, key)
+          assert %{active: false} = Repo.get!(schema, id)
+        end)
+      end
+    end
+  end
+
   defp publish(:tip, data, key, attrs), do: Content.publish_tip(data.scope, key, attrs, [])
 
   defp publish(:review, data, key, attrs),
@@ -235,6 +304,9 @@ defmodule Tips.Content.PublicationConcurrencyTest do
 
   defp mark_parent!(%Tip{id: id}, marker),
     do: Repo.update_all(from(t in Tip, where: t.id == ^id), set: [{marker, now()}])
+
+  defp retire!(schema, id),
+    do: Repo.update_all(from(c in schema, where: c.id == ^id), set: [active: false])
 
   defp lock_user(id),
     do: Repo.all(from(u in User, where: u.id == ^id, lock: "FOR NO KEY UPDATE", select: u.id))

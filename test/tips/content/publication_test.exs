@@ -390,6 +390,34 @@ defmodule Tips.Content.PublicationTest do
       assert_no_writes()
     end
 
+    test "null-byte curated ids are field errors, not unknown outcomes" do
+      scope = scope(user_fixture())
+      parent = tip_fixture()
+      review_attrs = %{@review_attrs | model_other: nil}
+
+      for field <- [:tag_id, :model_id, :environment_id] do
+        assert {:error, changeset} =
+                 Content.publish_tip(scope, key(), Map.put(@tip_attrs, field, "bad\0id"), [])
+
+        assert %{^field => ["cannot contain a null byte"]} = errors_on(changeset)
+      end
+
+      for field <- [:model_id, :environment_id] do
+        assert {:error, changeset} =
+                 Content.publish_review(
+                   scope,
+                   parent.id,
+                   key(),
+                   Map.put(review_attrs, field, "bad\0id"),
+                   []
+                 )
+
+        assert %{^field => ["cannot contain a null byte"]} = errors_on(changeset)
+      end
+
+      assert_no_writes()
+    end
+
     test "ineligible authors and parents are rejected" do
       assert {:error, :unauthenticated} = Content.publish_tip(nil, key(), @tip_attrs, [])
 

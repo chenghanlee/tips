@@ -6,10 +6,11 @@ defmodule Tips.Content.Publication do
   See "Publication" and "Transaction participants" in `Tips.Content`. A key
   lookup runs first and answers for an existing key without validation, write
   admission or eligibility. Only an absent key is admitted, validated and
-  written: one transaction locks the author, then a review's live parent, and
-  inserts the content, its search text, its self-vote and a review's
-  notification. A key constraint that rejects the insert rolls the attempt
-  back; the key is then looked up again in a fresh statement.
+  written: one transaction locks the author, then a review's live parent, then
+  share-locks the selected curated choices while active, and inserts the
+  content, its search text, its self-vote and a review's notification. A key
+  constraint that rejects the insert rolls the attempt back; the key is then
+  looked up again in a fresh statement.
   """
 
   import Ecto.Changeset
@@ -207,7 +208,6 @@ defmodule Tips.Content.Publication do
       |> content_changeset(user, params)
       |> validate_intent(@fields[kind], attrs)
       |> validate_uploads(uploads)
-      |> validate_active_choices(@choices[kind])
 
     if changeset.valid?, do: {:ok, changeset}, else: {:error, %{changeset | action: :insert}}
   end
@@ -250,22 +250,11 @@ defmodule Tips.Content.Publication do
 
   defp upload_error(_malformed), do: {"is invalid", []}
 
-  # Unknown ids reach the foreign keys, which the changesets map to errors.
-  defp validate_active_choices(changeset, choices) do
-    Enum.reduce(choices, changeset, fn {field, schema}, changeset ->
-      with id when is_binary(id) <- get_change(changeset, field),
-           true <- Repo.exists?(from(c in schema, where: c.id == ^id and not c.active)) do
-        add_error(changeset, field, "is not available")
-      else
-        _absent_or_active -> changeset
-      end
-    end)
-  end
-
   defp insert(kind, user, parent_id, changeset) do
     Repo.transact(fn ->
       with :ok <- lock_author(user.id),
            {:ok, parent_author_id} <- lock_parent(parent_id),
+           :ok <- lock_active_choices(changeset, @choices[base_kind(kind)]),
            {:ok, row} <- Repo.insert(changeset) do
         write_dependents(base_kind(kind), row, parent_author_id)
         {:ok, row}
@@ -295,6 +284,26 @@ defmodule Tips.Content.Publication do
       nil -> {:error, :not_found}
       author_id -> {:ok, author_id}
     end
+  end
+
+  # After the account and parent locks. A share lock holds each selected choice
+  # active until commit; a retirement that commits first fails the recheck.
+  # Unknown ids reach the foreign keys, which the changesets map to errors.
+  defp lock_active_choices(changeset, choices) do
+    changeset =
+      Enum.reduce(choices, changeset, fn {field, schema}, changeset ->
+        with id when is_binary(id) <- get_change(changeset, field),
+             false <-
+               Repo.one(
+                 from(c in schema, where: c.id == ^id, lock: "FOR SHARE", select: c.active)
+               ) do
+          add_error(changeset, field, "is not available")
+        else
+          _absent_unknown_or_active -> changeset
+        end
+      end)
+
+    if changeset.valid?, do: :ok, else: {:error, %{changeset | action: :insert}}
   end
 
   defp write_dependents(:tip, tip, nil) do

@@ -59,9 +59,13 @@ defmodule Tips.Content.Review do
   end
 
   defp validate_no_null_bytes(changeset) do
-    Enum.reduce([:body, :model_other, :prompt, :output], changeset, fn field, changeset ->
-      validate_format(changeset, field, ~r/\A[^\x00]*\z/, message: "cannot contain a null byte")
-    end)
+    Enum.reduce(
+      [:body, :model_id, :model_other, :environment_id, :prompt, :output],
+      changeset,
+      fn field, changeset ->
+        validate_format(changeset, field, ~r/\A[^\x00]*\z/, message: "cannot contain a null byte")
+      end
+    )
   end
 
   defp validate_model_choice(changeset) do

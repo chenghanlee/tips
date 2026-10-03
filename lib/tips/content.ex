@@ -110,7 +110,9 @@ defmodule Tips.Content do
   before any write, and a failed admitted write is not refunded. The
   transaction then locks the author (`:contribute` eligibility) and, for a
   review, its live parent tip; a missing, hidden or deleted parent is
-  `{:error, :not_found}`.
+  `{:error, :not_found}`. Last, it share-locks the selected curated choices
+  and rechecks that they are active, so a retirement either waits for the
+  commit or wins first and returns "is not available".
 
   A database error or lost connection during publication or lookup returns
   `{:error, :outcome_unknown}`: the author keeps the draft and checks the key.
