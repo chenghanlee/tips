@@ -3,7 +3,7 @@
 | When | Read |
 |---|---|
 | Launched into a team | The [team agreement](agent/teams/README.md) and your role card |
-| Working alone for the user | Use an isolated task worktree and a PR. Merge only within the user's authorization, after the required checks and review. An [owner waiver](agent/teams/roles/lead-tpm.md#merge) needs the user's explicit instruction |
+| Working alone for the user | Use an isolated task worktree and a PR, subject to the [no-live-team exception](agent/teams/README.md#the-user-decides). Merge only within the user's authorization, after the required checks and review. An [owner waiver](agent/teams/roles/lead-tpm.md#merge) needs the user's explicit instruction |
 | Every task | The assigned issue or contract, or the user's brief. Start with the design sections it links; follow the shared rules and boundaries they affect |
 | Product and repository context | [README](README.md): what Tips is, where requirements live, where files belong |
 | Before pushing or reporting completion | [Test changes](README.md#test-changes) and the checks for the files you touched |
