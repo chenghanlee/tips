@@ -67,20 +67,20 @@ herdr agent prompt "team-$N-lead" "$EVIDENCE_URL SHA=$SHA; action=dispatch teste
 
 **One comment per role.** Developer, tester and tech lead each edit one PR comment. Append `## <short SHA> <outcome>` per reviewed head, newest last. Outcomes: developer `pushed`; tester `pass`, `findings`, `RED`; tech lead `review`. Handoffs link this comment and SHA. Never create per-round comments.
 
-Write only what the reader cannot get from the diff, the contract or the PR's checks. Never restate the diff, the contract's test mapping or results of checks CI ran. Length follows findings: a round with none is its heading and the lines below that apply. Mark prior findings fixed or open by ID.
+Report findings, decisions, verification gaps and results the linked CI run does not establish. Link existing evidence; do not repeat the diff or contract. One fact per line, in short plain sentences ([Writing](../../AGENTS.md#writing)). Mark prior findings by ID and status.
 
 State reviewer and implementer identities once at the top of your comment; record a new reviewer or session in the round when ownership changes. Round shape; omit lines that do not apply:
 
     ## <short SHA> <outcome>
     <result and next action, one line>
     Base: <full SHA>  Head: <full SHA>  Scope: whole PR | delta from <SHA>
-    Ran: <checks CI does not run, results>
+    Ran: <checks CI did not run, or results that differ from CI>
     CI: <run link>: pass | fail | pending | not read
     Tester (tech lead only): <reviewed SHA>, <verdict>, <round link>
     Findings: F1 P1 path:line: trigger, defect, required behaviour (fixed | open | deferred)
     Open: <item>, <owner>
 
-Developers: add only decisions and limits the diff cannot show, one line each, and TDD as one line (`TDD: red 4/40, green 40/40`). Keep finding IDs and their state across rounds. Readers: start with the round a handoff names; follow its evidence, prior findings and contract as needed.
+Developers: add only decisions and limits the diff cannot show, and one TDD line: `TDD: <test> failed (<reason>) before the code; passes after.` Keep finding IDs and their state across rounds. Readers: start with the round a handoff names; follow its evidence, prior findings and contract as needed.
 
 **Git.** Every agent:
 
