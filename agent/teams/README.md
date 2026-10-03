@@ -81,7 +81,7 @@ herdr agent prompt "team-$N-lead" "$EVIDENCE_URL SHA=$SHA; action=dispatch teste
 
 Repository rules block force pushes on `task/**`, require merge commits, strict up-to-date branches, resolved conversations and `checks`, `release`, `tips/independent-review`; merged remote heads are deleted. This gate is an interlock, not credential isolation.
 
-**Issue state.** Lead TPM owns labels and Project Status under its [Assigned rules](roles/lead-tpm.md#always); workers may add only Fallback `blocked`.
+**Issue state.** Lead TPM owns labels and Project Status under its [Always rules](roles/lead-tpm.md#always); workers may add only Fallback `blocked`.
 
 - After launch, escalate scope or role-label changes such as `ui`/`probe` as scope questions. Routine `active` and `blocked` updates remain state changes.
 - Close issues only after their required result is integrated and evidenced. Use `Refs #number` for partial work; `Closes #number` for completing PRs. New child issues count toward the goal.
@@ -110,4 +110,3 @@ User decisions: material product changes, purchases, credentials, hosting, publi
 - Codex reviewers outside teams cannot post to GitHub.
 - Claude auto mode may deny tech-lead `gh pr merge`, developers killing their own LSP children, copying/writing `.env`, or pilots posting issue comments. Treat each as Permission denial.
 - `/new`, `/clear` and `cd` do not rebind `TIPS_DEXTER`; it stays bound to the launch worktree. Clients cannot stop themselves with `team.py stop`.
-
