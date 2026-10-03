@@ -64,6 +64,10 @@ On tech-lead request, fetch for the developer's branch synchronization or `origi
 
 Before retiring a merged team, confirm the issue records PR, reviewed head, merge SHA and evidence. Request missing items from tech lead. Merge executors record these four items; you record denied or waived merges you execute and merges the user executes.
 
+**Owner waiver.** With no live teams, users may waive independent review of changes they requested in the session. Only on explicit user instruction, user or lead TPM runs `publish_review.py --pr "$PR" --sha "$SHA" --owner-waiver "<reason>"` instead of `--record`. The command posts a waiver comment and status linking it. Agents never invoke waivers independently; CI remains required.
+
+For code changes, first complete the ad-hoc Codex review below, apply accepted fixes and post the agreed outcome on the PR. Then publish the waiver on the final head, including your fixes. Documentation-only changes need no Codex review. Use the tech lead's native merge command and record the four merge items above.
+
 Before merging owner-waived code:
 
 1. Create a detached review worktree at the reviewed head: `git worktree add --detach .worktrees/<issue>-review-codex <sha>`.

@@ -511,6 +511,10 @@ class WorktreeIntegrationTest(unittest.TestCase):
         brief = argv[argv.index("--append-system-prompt") + 1]
         assert str(self.wt / ".dexter/dexter.sh") in brief
         assert "native LSP" not in brief
+        # The prompt opens with the agent's name and the two files to read.
+        assert brief.startswith(
+            "You are team-6-test. Read agent/teams/README.md, then agent/teams/roles/tester.md;"
+        )
         s = self.state()
         assert s["launch_env"] == {
             "PGPORT": "5433",
@@ -548,6 +552,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.call("--start", role="dev", team="6", task="29-dev", ref=False)
         s = self.state()
         assert "configured-sol" in s["launch_argv"]
+        assert any("agent/teams/roles/developer.md" in arg for arg in s["launch_argv"])
         assert "42000" in s["launch_argv"]
         assert s["launch_env"]["TIPS_TEST_PORT"] == "5160"
         assert s["launch_env"]["PGPORT"] == "5434"
@@ -1078,6 +1083,9 @@ class WorktreeIntegrationTest(unittest.TestCase):
         # Both clients are pointed at the bound command and at its own help.
         assert f"{wrapper} query --help" in brief
         assert f"{wrapper} lookup --help" in brief
+        assert brief.startswith(
+            "You are team-3-lead. Read agent/teams/README.md, then agent/teams/roles/tech-lead.md;"
+        )
 
     def test_dependencies_are_fetched_in_the_worktree_before_the_index_is_asked(self) -> None:
         self.call()

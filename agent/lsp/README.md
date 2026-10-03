@@ -8,111 +8,50 @@ no editor client, plugin, adapter or MCP server.
 
 This is a read-only beta. Rename and other edits are not offered.
 
-## Build
-
-Requires Go 1.26.3 and Git. `build.sh` needs a Git repository that contains the
-pinned upstream commit; its checkout is not read:
-
-```sh
-git clone https://github.com/remoteoss/dexter tmp/dexter-upstream
-bash agent/lsp/dexter/build.sh tmp/dexter-upstream
-```
-
-The script exports the pin, applies `dexter/patches/dexter-go.patch` in a
-temporary copy, builds `dexter/vendor/dexter` and writes `dexter/vendor/build.json`
-with the pin, patch checksum, binary checksum and the local build id. The id is
-the SHA-256 of the pin and patch checksum and is linked into the binary:
-
-```sh
-agent/lsp/dexter/vendor/dexter version   # 0.7.2, then: local_build_id <id>
-```
-
-A daemon and a client with different ids refuse each other and nothing replaces
-the running daemon. Before rebuilding over active teams, stop each worktree's
-daemon with its bound command, build, then re-provision.
-The build refuses to replace a binary used by a running daemon and aborts if
-it cannot inspect processes. Keep agents stopped until the build finishes.
-
-`--keep <dir>` leaves the prepared source in place for `go test ./...`.
-[patches/README.md](dexter/patches/README.md) records what the patch changes and
-the Go static-analysis rule for it.
-
-## Elixir sources
-
-Dexter indexes the Elixir standard library from source. Put the release matching
-`elixir --short-version` in the main checkout's ignored `agent/lsp/vendor/elixir-<version>/`
-(from the [Elixir repository](https://github.com/elixir-lang/elixir); the tree
-holds `VERSION` and `lib/elixir/lib/enum.ex`), or point `DEXTER_ELIXIR_LIB_ROOT`
-at another checkout's `lib/`. A Homebrew installation has no sources. Provisioning
-refuses to start unless the tree's `VERSION` matches the worktree's toolchain.
-
-## Bound checkout
-
-`--root` must be the exact checkout Dexter serves: a directory holding `.git`
-or `mix.exs`, never one with only a `.dexter/` index. The command works from
-any caller directory. Each worktree gets its own daemon and index, and
-worktrees run concurrently. Nested checkouts, including scratch clones and
-linked worktrees under `.worktrees/`, are excluded from the parent's index
-and watcher. Dependency sources under `deps/` remain available. A root reached
-through a symlink is admitted only under the exact spelling it was bound with.
-Out of this beta: an application in a subdirectory or monorepo.
-
-## Team provisioning
-
-`agent/teams/task_worktree.py` writes, per worktree:
-
-- `.dexter/dexter.sh`: `exec vendor/dexter --root <worktree> "$@"` with the
-  selected sources exported. Its absolute path is `TIPS_DEXTER` in the session.
-- For Codex, `.codex/config.toml` with Credo enabled.
-
-Claude's launch settings disable known language-server plugins, including
-in linked worktrees.
-
-Provisioning then runs three steps in the worktree, with the role's environment.
-Any failure stops the launch:
-
-1. `mix deps.get --check-locked`, for a new checkout and for a review head.
-   Dexter indexes dependency sources from disk and does not watch `deps/`, so
-   they must exist first. A fetch that would rewrite `mix.lock` fails;
-   provisioning never changes a lock. A resumed developer worktree skips this
-   step: it may hold an unfinished dependency change, and its agent must be
-   able to start to finish it.
-2. `dexter.sh query workspace-symbols --raw --wait <timeout> MixProject`. It
-   starts the daemon and refuses a client if the index does not answer.
-3. `dexter.sh reindex`. A daemon that was already running indexed the checkout
-   before the fetch; this reconciles it with the disk.
-
-The same steps run when a reviewer's checkout is advanced in place, and again
-when the same review head is requested for a running reviewer. An agent
-that fetches or changes dependencies later runs `"$TIPS_DEXTER" reindex` itself.
-
-`team.py stop` runs `dexter.sh stop` per worktree before retiring it; an
-attached client keeps the daemon alive and the worktree is preserved. A daemon
-idles out after fifteen minutes without clients and restarts from its index on
-the next request. Do not run `git clean -x` in a team worktree: it removes the
-bound command and the index under `.dexter/`.
-
-The daemon belongs to the worktree, not to a client. A `query` that starts the
-daemon is its parent until that query ends, and `team.py` refuses to stop a
-client while one of its descendants survives. So a client stopped during a cold
-start, for example on the first query after the daemon idled out, is refused
-and everything is preserved. Wait for the query to end (within `--wait` plus
-30 seconds), then run the stop again: the daemon is then nobody's child and
-still serves the worktree. Do not use `dexter.sh stop` to hurry this: it
-refuses while the query is attached, and retirement runs it anyway.
-
 ## Operations
 
 `"$TIPS_DEXTER" query --help` and `"$TIPS_DEXTER" lookup --help` are the
 contract for syntax, output, caps and exit status. Every checkout shares one
-binary, so its help describes what you are running; this guide and
-[AGENTS.md](../../AGENTS.md#tool-use) give the workflow. Where they differ, the
-help is right.
+binary, so its help describes what you are running. Where this guide differs,
+the help is right. [AGENTS.md](../../AGENTS.md#tool-use) says when to use Dexter.
 
-- `query <operation> <file> <line> <column>`: the nine read-only operations.
-  AGENTS.md lists which one answers which question.
-- `lookup Module [function]`: the definition's file and line, by name.
-- `reindex [file|path]`: reconcile the index with the disk.
+Run `"$TIPS_DEXTER" query <operation> <file> <line> <column>` from your shell:
+
+| Task | Operation | Try before |
+|---|---|---|
+| Know the name, not its position | `"$TIPS_DEXTER" lookup Module [function]` | guessing positions after edits |
+| Find a module or function by name | `workspace-symbols <name>` | `rg 'defmodule Name'`, `rg 'def name'` |
+| Outline a file, with each name's position | `symbols <file>` | reading the file |
+| Go from a call to its definition | `definition` | grepping for the `def` |
+| Find uses of a function or module | `references` | `rg -F 'name('` |
+| Read docs, spec and signature | `hover` | opening the file |
+| List implementations, from the `@callback` head | `implementation` | `rg '@behaviour'`, `rg '@impl'` |
+| Find callers of a function | `incoming-calls` | grepping for callers |
+| Find calls a function makes | `outgoing-calls` | reading its body |
+| Check which `Module.function/arity` a position selects | `prepare-call-hierarchy` | |
+
+- Positions: `lookup` gives the line; `symbols` gives the name's column. Take
+  them again after edits or checkout advancement. Read the `cursor:` line of
+  every positional answer to confirm the token; hierarchy also prints its
+  `selected:` callable.
+- Before changing or removing any function's name, arity or return shape,
+  private helpers included: run `references` at its definition, and a scoped
+  `rg` for the bare name and for any atom or tuple that dispatches to it. These
+  find candidate uses; source and tests establish the impact. Investigate
+  differences.
+- Use `definition` on unfamiliar call sites and `hover` for unfamiliar types or
+  specs.
+- Zero rows never means unused. `use Module, :atom`, MFA tuples, `apply` and
+  generated code may have no indexed use.
+- Call hierarchy explains candidates and does not replace `references`. It
+  covers every clause of the selected callable; at a default-argument head,
+  only the maximum arity.
+- A client truncation warning or an explicit limit means you have only part of
+  the output; narrow the query or save it to a file.
+- `"$TIPS_DEXTER" reindex [file|path]` reconciles the index with the disk. Run
+  it after you fetch or change dependencies yourself.
+- Dexter reports no compiler errors: run Mix compile and tests.
+- If Dexter is unavailable, report it. Do not start another language server.
 
 There is no reference search by name: it missed uses that the positional search
 finds. Take the definition's line from `lookup` and the name's column from
@@ -195,3 +134,96 @@ to workspace`. Do not start another language server.
 - Rename, code actions and formatting through Dexter are not offered.
 - Correctness is bounded by the patch's recorded cases; see
   [patches/README.md](dexter/patches/README.md).
+
+## Bound checkout
+
+`--root` must be the exact checkout Dexter serves: a directory holding `.git`
+or `mix.exs`, never one with only a `.dexter/` index. The command works from
+any caller directory. Each worktree gets its own daemon and index, and
+worktrees run concurrently. Nested checkouts, including scratch clones and
+linked worktrees under `.worktrees/`, are excluded from the parent's index
+and watcher. Dependency sources under `deps/` remain available. A root reached
+through a symlink is admitted only under the exact spelling it was bound with.
+Out of this beta: an application in a subdirectory or monorepo.
+
+## Team provisioning
+
+`agent/teams/task_worktree.py` writes, per worktree:
+
+- `.dexter/dexter.sh`: `exec vendor/dexter --root <worktree> "$@"` with the
+  selected sources exported. Its absolute path is `TIPS_DEXTER` in the session.
+- For Codex, `.codex/config.toml` with Credo enabled.
+
+Claude's launch settings disable known language-server plugins, including
+in linked worktrees.
+
+Provisioning then runs three steps in the worktree, with the role's environment.
+Any failure stops the launch:
+
+1. `mix deps.get --check-locked`, for a new checkout and for a review head.
+   Dexter indexes dependency sources from disk and does not watch `deps/`, so
+   they must exist first. A fetch that would rewrite `mix.lock` fails;
+   provisioning never changes a lock. A resumed developer worktree skips this
+   step: it may hold an unfinished dependency change, and its agent must be
+   able to start to finish it.
+2. `dexter.sh query workspace-symbols --raw --wait <timeout> MixProject`. It
+   starts the daemon and refuses a client if the index does not answer.
+3. `dexter.sh reindex`. A daemon that was already running indexed the checkout
+   before the fetch; this reconciles it with the disk.
+
+The same steps run when a reviewer's checkout is advanced in place, and again
+when the same review head is requested for a running reviewer. An agent
+that fetches or changes dependencies later runs `"$TIPS_DEXTER" reindex` itself.
+
+`team.py stop` runs `dexter.sh stop` per worktree before retiring it; an
+attached client keeps the daemon alive and the worktree is preserved. A daemon
+idles out after fifteen minutes without clients and restarts from its index on
+the next request. Do not run `git clean -x` in a team worktree: it removes the
+bound command and the index under `.dexter/`.
+
+The daemon belongs to the worktree, not to a client. A `query` that starts the
+daemon is its parent until that query ends, and `team.py` refuses to stop a
+client while one of its descendants survives. So a client stopped during a cold
+start, for example on the first query after the daemon idled out, is refused
+and everything is preserved. Wait for the query to end (within `--wait` plus
+30 seconds), then run the stop again: the daemon is then nobody's child and
+still serves the worktree. Do not use `dexter.sh stop` to hurry this: it
+refuses while the query is attached, and retirement runs it anyway.
+
+## Build
+
+Requires Go 1.26.3 and Git. `build.sh` needs a Git repository that contains the
+pinned upstream commit; its checkout is not read:
+
+```sh
+git clone https://github.com/remoteoss/dexter tmp/dexter-upstream
+bash agent/lsp/dexter/build.sh tmp/dexter-upstream
+```
+
+The script exports the pin, applies `dexter/patches/dexter-go.patch` in a
+temporary copy, builds `dexter/vendor/dexter` and writes `dexter/vendor/build.json`
+with the pin, patch checksum, binary checksum and the local build id. The id is
+the SHA-256 of the pin and patch checksum and is linked into the binary:
+
+```sh
+agent/lsp/dexter/vendor/dexter version   # 0.7.2, then: local_build_id <id>
+```
+
+A daemon and a client with different ids refuse each other and nothing replaces
+the running daemon. Before rebuilding over active teams, stop each worktree's
+daemon with its bound command, build, then re-provision.
+The build refuses to replace a binary used by a running daemon and aborts if
+it cannot inspect processes. Keep agents stopped until the build finishes.
+
+`--keep <dir>` leaves the prepared source in place for `go test ./...`.
+[patches/README.md](dexter/patches/README.md) records what the patch changes and
+the Go static-analysis rule for it.
+
+## Elixir sources
+
+Dexter indexes the Elixir standard library from source. Put the release matching
+`elixir --short-version` in the main checkout's ignored `agent/lsp/vendor/elixir-<version>/`
+(from the [Elixir repository](https://github.com/elixir-lang/elixir); the tree
+holds `VERSION` and `lib/elixir/lib/enum.ex`), or point `DEXTER_ELIXIR_LIB_ROOT`
+at another checkout's `lib/`. A Homebrew installation has no sources. Provisioning
+refuses to start unless the tree's `VERSION` matches the worktree's toolchain.
