@@ -2,11 +2,36 @@ defmodule Tips.Content do
   @moduledoc """
   The Content context: tips, reviews, votes, media and search.
 
+  ## Reading
+
+  `get_tip_page/2` and `get_review_page/2` return the tip and selected-review
+  destinations. Each takes a `t:viewer/0` and an id, and returns only
+  `Tips.Content.Projection` output.
+
+    * `nil` takes the public path: no token query and no privileged branch.
+    * A `Tips.Accounts.SessionRef` is readmitted once, at entry, with
+      `Tips.Accounts.readmit_scope/1`. Only the scope it returns reaches the
+      projections, so current role, ban and confirmation decide the output, and
+      a revoked or expired session fails even if its disconnect was lost.
+      Anything else, including a `Tips.Accounts.Scope`, is
+      `{:error, :unauthenticated}`. The reference comes from server-private
+      state, never from request params, and is never returned or logged.
+    * A malformed, out-of-range or missing id is `{:error, :not_found}`. An id
+      may be an integer or its decimal string.
+
+  A read that started before a revocation may finish.
+
+  `get_review_page/2` reads the review first and uses its stored parent as tip
+  context. It returns exactly that review or its removal notice; it takes no
+  list filters, sort or page and never substitutes another review. Ranked
+  review pages are later browse work.
+
   ## Publication and edit contract
 
-  These operations are reserved. They do not exist yet: #73 implements
-  publication, #74 edits and #65 media claims. Their inputs and results are
-  the types below. The comparator exists: `compare_intents/3`.
+  Publication exists for text: `publish_tip/4`, `publish_review/5` and
+  `get_publication/4`. Edits (#74) and media claims (#65) are reserved and do
+  not exist yet. Inputs and results are the types below. The comparator is
+  `compare_intents/3`.
 
     * `publish_tip(scope, submission_key, attrs, uploads)` returns
       `{:ok, t:publication_receipt/0}` or `{:error, t:publication_error/0}`.
@@ -46,7 +71,11 @@ defmodule Tips.Content do
     * each `{:missing_image, slot}` gets an `:uploads` error with `slot: slot`
       in its metadata;
     * each `{:retained, media_id, _}` in a new publication gets an `:uploads`
-      error with `media_id: media_id` in its metadata.
+      error with `media_id: media_id` in its metadata;
+    * until #65 adds media claims, a new publication accepts only `uploads: []`:
+      each `{:staged_video, media_id}` or `{:image_file, slot, _, _}` gets an
+      `:uploads` error naming its media id or slot. Attachments are never
+      dropped silently.
 
   An image file's temporary path is valid only during the page attempt that
   owns it. Content uploads images and refreshes pending videos before its
@@ -55,8 +84,9 @@ defmodule Tips.Content do
   Publication stores exactly the submitted setup. It never fills omitted or
   cleared review fields from the parent tip. It validates the tag, model and
   environment against active curated choices and returns unknown or retired
-  ids as changeset errors, not database exceptions (#73 proves this against
-  the actual foreign keys).
+  ids as changeset errors, not database exceptions: a retired id is "is not
+  available"; an unknown id reaches the actual foreign key, which the
+  changeset maps to "does not exist".
 
   ### Complete intent and comparison
 
@@ -97,6 +127,19 @@ defmodule Tips.Content do
   names another publication and the result is `{:error, :conflict}`. A
   different key for an existing undeleted review is `{:error, :already_reviewed}`,
   decided only after the key lookup.
+
+  An existing key answers without write admission, validation or eligibility.
+  An absent key first passes `Tips.AdmissionLimiter.check_write/2`; a denial
+  returns `{:error, {:rate_limited, seconds}}` or `{:error, {:capacity, seconds}}`
+  before any write, and a failed admitted write is not refunded. The
+  transaction then locks the author (`:contribute` eligibility) and, for a
+  review, its live parent tip; a missing, hidden or deleted parent is
+  `{:error, :not_found}`. Last, it share-locks the selected curated choices
+  and rechecks that they are active, so a retirement either waits for the
+  commit or wins first and returns "is not available".
+
+  A database error or lost connection during publication or lookup returns
+  `{:error, :outcome_unknown}`: the author keeps the draft and checks the key.
 
   `{:ok, nil}` from `get_publication/4` means no row is committed now. It is
   not proof that an earlier request rolled back; the author may retry with the
@@ -163,7 +206,20 @@ defmodule Tips.Content do
   """
 
   alias Tips.Accounts
-  alias Tips.Content.{Intent, Projection}
+  alias Tips.Accounts.Scope
+  alias Tips.Content.{Intent, Projection, Publication, Read}
+
+  @typedoc """
+  Who reads: `nil` for an anonymous viewer, or the server-held reference to
+  the session that admitted a signed-in one. See "Reading".
+  """
+  @type viewer :: Accounts.SessionRef.t() | nil
+
+  @typedoc "The tip page: tip context and the viewer's own-review header link."
+  @type tip_page :: %{tip: Projection.tip_detail(), own_review: Projection.own_review() | nil}
+
+  @typedoc "Why a destination read returned nothing."
+  @type read_error :: :unauthenticated | :not_found
 
   @typedoc "A content kind."
   @type kind :: :tip | :review
@@ -261,10 +317,12 @@ defmodule Tips.Content do
   @typedoc """
   A rejected publication. Standard rejections and changesets come from
   `Tips.Accounts`; `:conflict` means the key names a review of another tip.
+  Admission denials carry the whole seconds to wait.
   """
   @type publication_error ::
           Accounts.operation_error()
           | :already_reviewed
+          | {:rate_limited | :capacity, retry_after_seconds :: pos_integer()}
           | {:upload_failed, [attachment_ref()]}
           | {:upload_pending, [media_id()]}
           | :outcome_unknown
@@ -347,4 +405,50 @@ defmodule Tips.Content do
   """
   @spec compare_intents(kind(), intent() | map() | nil, intent() | map() | nil) :: comparison()
   defdelegate compare_intents(kind, saved_or_base, submitted), to: Intent, as: :compare
+
+  @doc """
+  Publishes a new text tip for `submission_key`, or returns the publication
+  the key already identifies. See "Publication" above.
+  """
+  @spec publish_tip(Scope.t() | nil, submission_key(), attrs(), [attachment()]) ::
+          {:ok, publication_receipt()} | {:error, publication_error()}
+  def publish_tip(scope, submission_key, attrs, uploads),
+    do: Publication.publish(scope, :tip, submission_key, attrs, uploads)
+
+  @doc """
+  Publishes a new text review of `tip_id` for `submission_key`, or returns the
+  publication the key already identifies. See "Publication" above.
+  """
+  @spec publish_review(Scope.t() | nil, pos_integer(), submission_key(), attrs(), [attachment()]) ::
+          {:ok, publication_receipt()} | {:error, publication_error()}
+  def publish_review(scope, tip_id, submission_key, attrs, uploads),
+    do: Publication.publish(scope, {:review, tip_id}, submission_key, attrs, uploads)
+
+  @doc """
+  Returns the author's publication for `submission_key`, compared with
+  `submitted_intent` (`nil` for identity only), or `{:ok, nil}` when no row is
+  committed now. Consumes no write budget.
+  """
+  @spec get_publication(Scope.t() | nil, publication_kind(), submission_key(), intent() | nil) ::
+          {:ok, publication_receipt() | nil} | {:error, lookup_error()}
+  defdelegate get_publication(scope, kind, submission_key, submitted_intent),
+    to: Publication,
+    as: :get
+
+  @doc """
+  Reads the tip page for `viewer`: the projected tip, deleted or removed tips
+  as placeholders, and the viewer's own undeleted review as an id and current
+  capabilities, even under an unavailable tip. See "Reading".
+  """
+  @spec get_tip_page(viewer(), term()) :: {:ok, tip_page()} | {:error, read_error()}
+  defdelegate get_tip_page(viewer, tip_id), to: Read
+
+  @doc """
+  Reads the selected-review destination (`/reviews/:id`) for `viewer`: the
+  review's own tip as context and that review, or its removal notice. See
+  "Reading".
+  """
+  @spec get_review_page(viewer(), term()) ::
+          {:ok, Projection.selected_review()} | {:error, read_error()}
+  defdelegate get_review_page(viewer, review_id), to: Read
 end

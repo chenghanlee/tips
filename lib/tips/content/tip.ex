@@ -56,12 +56,19 @@ defmodule Tips.Content.Tip do
     |> validate_no_null_bytes()
     |> validate_model_choice()
     |> unique_constraint(:submission_key, name: :tips_submission_unique)
+    |> foreign_key_constraint(:tag_id)
+    |> foreign_key_constraint(:model_id)
+    |> foreign_key_constraint(:environment_id)
   end
 
   defp validate_no_null_bytes(changeset) do
-    Enum.reduce([:title, :body, :model_other, :prompt, :output], changeset, fn field, changeset ->
-      validate_format(changeset, field, ~r/\A[^\x00]*\z/, message: "cannot contain a null byte")
-    end)
+    Enum.reduce(
+      [:title, :body, :tag_id, :model_id, :model_other, :environment_id, :prompt, :output],
+      changeset,
+      fn field, changeset ->
+        validate_format(changeset, field, ~r/\A[^\x00]*\z/, message: "cannot contain a null byte")
+      end
+    )
   end
 
   defp validate_model_choice(changeset) do

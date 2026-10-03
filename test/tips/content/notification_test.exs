@@ -62,6 +62,65 @@ defmodule Tips.Content.NotificationTest do
     end
   end
 
+  describe "review fold helper" do
+    test "review fold sets initial timestamp and refreshes unread row" do
+      recipient = user_fixture()
+      review = review_fixture()
+      first_actor = user_fixture()
+      second_actor = user_fixture()
+
+      fold!(recipient, first_actor, review)
+
+      assert [%Notification{count: 1, read_at: nil, updated_at: %DateTime{}} = row] =
+               Repo.all(Notification)
+
+      assert %{type: :tip_reviewed, tip_id: nil} = row
+      assert row.actor_id == first_actor.id and row.review_id == review.id
+
+      earlier = DateTime.add(DateTime.utc_now(:second), -3600)
+      row |> change(updated_at: earlier) |> Repo.update!()
+      fold!(recipient, second_actor, review)
+
+      assert [%Notification{id: id, count: 2, read_at: nil} = folded] = Repo.all(Notification)
+      assert id == row.id and folded.actor_id == second_actor.id
+      assert DateTime.after?(folded.updated_at, earlier)
+    end
+
+    test "a read row stays read and the next fold starts a new unread row" do
+      recipient = user_fixture()
+      review = review_fixture()
+
+      fold!(recipient, user_fixture(), review)
+      read_at = DateTime.utc_now(:second)
+      [read] = Repo.all(Notification)
+      read |> change(read_at: read_at) |> Repo.update!()
+
+      fold!(recipient, user_fixture(), review)
+
+      assert [%Notification{count: 1, read_at: ^read_at}, %Notification{count: 1, read_at: nil}] =
+               Repo.all(from(n in Notification, order_by: n.id))
+    end
+
+    test "self actions write nothing and a rollback discards the fold" do
+      recipient = user_fixture()
+      review = review_fixture()
+
+      fold!(recipient, recipient, review)
+
+      assert {:error, :rolled_back} =
+               Repo.transaction(fn ->
+                 :ok = Notification.fold(:tip_reviewed, recipient.id, user_fixture().id, review)
+                 Repo.rollback(:rolled_back)
+               end)
+
+      assert Repo.all(Notification) == []
+
+      assert_raise ArgumentError, ~r/caller transaction/, fn ->
+        Notification.fold(:tip_reviewed, recipient.id, user_fixture().id, review)
+      end
+    end
+  end
+
   describe "database checks" do
     test "notifications_type_target accepts only the target for each type on insert and update" do
       tip = tip_fixture()
@@ -95,5 +154,10 @@ defmodule Tips.Content.NotificationTest do
 
       assert Repo.reload!(notification).type == :tip_upvoted
     end
+  end
+
+  defp fold!(recipient, actor, review) do
+    {:ok, :ok} =
+      Repo.transaction(fn -> Notification.fold(:tip_reviewed, recipient.id, actor.id, review) end)
   end
 end

@@ -100,13 +100,13 @@ The convention is supported by [HN's comment timestamp links](https://news.ycomb
 
 ### Proposed context contract
 
-Keep this flow behind `Tips.Content` initially. These signatures are design proposals, not implemented APIs:
+Keep this flow behind `Tips.Content` initially. `get_tip_page/2` and `get_review_page/2` are implemented; `search_tips/3` and the ranked review page are proposals. The two reads take a viewer, `nil | Accounts.SessionRef`, not a scope: `nil` is the public path with no token query, and a reference is readmitted once at entry so only a fresh scope reaches the projections. They return `{:error, :unauthenticated}` for failed admission and `{:error, :not_found}` for a malformed or missing id. The `Tips.Content` module documentation ("Reading") holds the contract.
 
 | Function | Responsibility | Data and frontend interaction |
 |---|---|---|
 | `search_tips(scope, query, opts)` | Validate the query and filters; coordinate hybrid retrieval and the existing keyword fallback | Rerun bounded retrieval and ranking for the requested page, including visible matching review excerpts. Return page position and `has_more`, derived from internal `total_in_window`; do not present a total result count. The web layer renders links. |
-| `get_tip_page(scope, tip_id, opts)` | Load projected tip context and a normal review page | Return thirty ranked reviews and a lightweight own-review id/capability lookup for the header link. |
-| `get_review_page(scope, review_id)` | Load one selected review for `/reviews/:id` with its tip context | Load the review first and derive its immutable parent id, then load that tip. Authorize the review directly and return `Projection.selected_review/4` output with its media/vote, without fetching a ranked page. A missing review has no parent: return not found. |
+| `get_tip_page(viewer, tip_id)` | Load projected tip context and the own-review header link | Return the projected tip and a lightweight own-review id/capability lookup, including a hidden own review under an unavailable tip. The thirty-review ranked page is a later browse proposal. |
+| `get_review_page(viewer, review_id)` | Load one selected review for `/reviews/:id` with its tip context | Load the review first and derive its immutable parent id, then load that tip. Authorize the review directly and return `Projection.selected_review/4` output with its media/vote, without fetching a ranked page. A missing review has no parent: return not found. |
 
 For readable tip context, return `has_earlier_reviews` from an existence check for currently visible, nondeleted reviews created before the tip’s `edited_at`. Use the same viewer-aware visibility policy; do not expose hidden review dates or compute public copy from an unavailable tip’s hidden edit metadata. This supports the single earlier-review note without loading more review bodies.
 
@@ -249,9 +249,10 @@ Thresholds include the maximum bounded scan runtime, queue delay and deployment/
 
 ## Markdown, embeds and secure headers
 
-Render tip/review authored Markdown through **MDEx 0.13.5 with its built-in Ammonia sanitizer** (`mdex_native`). Use one options list, without HtmlSanitizeEx or a custom Scrubber module:
+Render tip/review authored Markdown through **MDEx 0.13.5 with its built-in Ammonia sanitizer** (`mdex_native`). Use one options list, without HtmlSanitizeEx or a custom Scrubber module. The strikethrough and table extensions produce the `del` and `table` tags the allowlist names:
 
 ```elixir
+extension: [strikethrough: true, table: true],
 render: [unsafe: false],
 sanitize: [
   tags: ~w(p br hr h1 h2 h3 h4 h5 h6 blockquote ul ol li pre code em strong del a table thead tbody tr th td),
