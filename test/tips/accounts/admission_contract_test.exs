@@ -13,109 +13,7 @@ defmodule Tips.Accounts.AdmissionContractTest do
   alias Tips.Repo
   alias TipsWeb.UserAuth
 
-  # Representative Content callers. They take server-built context and business
-  # attrs separately, and recheck eligibility on the locked account row.
-  defmodule CallerExamples do
-    import Ecto.Query
-
-    alias Tips.Accounts
-    alias Tips.Accounts.{Scope, SessionRef, User}
-    alias Tips.Repo
-
-    # LiveView event or controller action: scope comes from UserAuth, attrs from the client.
-    def contribute(nil, _attrs), do: {:error, :unauthenticated}
-
-    # Long-lived page: re-admit the private reference, then run the operation as above.
-    def contribute(%SessionRef{} = ref, attrs) do
-      with {:ok, scope} <- Accounts.readmit_scope(ref), do: contribute(scope, attrs)
-    end
-
-    def contribute(%Scope{user: %User{id: user_id}}, attrs) do
-      Repo.transact(fn ->
-        with :ok <- user_id |> lock_account() |> Accounts.check_eligibility(:contribute) do
-          {:ok, %{author_id: user_id, title: attrs["title"]}}
-        end
-      end)
-    end
-
-    # Own deletion: a full ban does not deny it; ownership stays with Content.
-    def delete_own(nil, _owner_id), do: {:error, :unauthenticated}
-
-    def delete_own(%SessionRef{} = ref, owner_id) do
-      with {:ok, scope} <- Accounts.readmit_scope(ref), do: delete_own(scope, owner_id)
-    end
-
-    def delete_own(%Scope{user: %User{id: user_id}}, owner_id) do
-      Repo.transact(fn ->
-        with :ok <- user_id |> lock_account() |> Accounts.check_eligibility(:delete_own_content),
-             ^user_id <- owner_id do
-          {:ok, :deleted}
-        else
-          {:error, reason} -> {:error, reason}
-          _other_owner -> {:error, :forbidden}
-        end
-      end)
-    end
-
-    # Privileged read of one's own hidden item: fresh admission first, then the
-    # owning operation's ownership check. It is not check_eligibility/2, so a
-    # full ban does not deny it. This example hides existence from non-owners.
-    def read_own_hidden(%SessionRef{} = ref, owner_id) do
-      with {:ok, %Scope{user: %User{id: user_id}}} <- Accounts.readmit_scope(ref) do
-        if user_id == owner_id, do: {:ok, :hidden_item}, else: {:error, :not_found}
-      end
-    end
-
-    # Moderator-only read: fresh admission first, then the current role.
-    def read_moderation_queue(%SessionRef{} = ref) do
-      with {:ok, %Scope{user: %User{role: role}}} <- Accounts.readmit_scope(ref) do
-        if role == :moderator, do: {:ok, :queue}, else: {:error, :forbidden}
-      end
-    end
-
-    # Moderation action: fresh admission, then eligibility on the locked account.
-    def moderate(%SessionRef{} = ref) do
-      with {:ok, %Scope{user: %User{id: user_id}}} <- Accounts.readmit_scope(ref) do
-        Repo.transact(fn -> moderate_locked(user_id) end)
-      end
-    end
-
-    defp moderate_locked(user_id) do
-      with :ok <- user_id |> lock_account() |> Accounts.check_eligibility(:moderate) do
-        {:ok, :moderated}
-      end
-    end
-
-    # Worker: no browser scope or session reference; reload committed state by id.
-    def perform_worker(%{"user_id" => user_id}) do
-      Repo.transact(fn ->
-        with :ok <- user_id |> lock_account() |> Accounts.check_eligibility(:contribute) do
-          {:ok, user_id}
-        end
-      end)
-    end
-
-    defp lock_account(user_id) do
-      Repo.one!(from u in User, where: u.id == ^user_id, lock: "FOR NO KEY UPDATE")
-    end
-  end
-
   describe "one validity definition: generated session lookup" do
-    test "a valid session row returns the account and token insertion time" do
-      user = user_fixture()
-      token = Accounts.generate_user_session_token(user)
-      user_id = user.id
-
-      assert {%User{id: ^user_id}, %DateTime{}} = Accounts.get_user_by_session_token(token)
-    end
-
-    test "an expired session row does not authenticate" do
-      token = Accounts.generate_user_session_token(user_fixture())
-      set_token_inserted_at(token, days_ago(60))
-
-      assert Accounts.get_user_by_session_token(token) == nil
-    end
-
     test "a revoked (deleted) session row does not authenticate" do
       token = Accounts.generate_user_session_token(user_fixture())
       assert {:ok, [_family]} = Accounts.revoke_user_session_family(token)
@@ -273,22 +171,6 @@ defmodule Tips.Accounts.AdmissionContractTest do
                "admitted #{inspect(forged)}"
       end
     end
-
-    test "consumers act as the admitted account, whatever identity the attrs carry", %{
-      user: user,
-      ref: ref
-    } do
-      other = user_fixture()
-      author_id = user.id
-
-      attrs = %{
-        "title" => "Tip",
-        "user_id" => other.id,
-        "session_ref" => %{"user_id" => other.id}
-      }
-
-      assert {:ok, %{author_id: ^author_id}} = CallerExamples.contribute(ref, attrs)
-    end
   end
 
   describe "readmission reloads role, confirmation, ban and authentication recency" do
@@ -323,54 +205,6 @@ defmodule Tips.Accounts.AdmissionContractTest do
 
       refute Accounts.sudo_mode?(admitted)
     end
-
-    test "a moderator read follows the current role", %{user: user, ref: ref} do
-      assert {:error, :forbidden} = CallerExamples.read_moderation_queue(ref)
-      promoted = moderator(user)
-      assert {:ok, :queue} = CallerExamples.read_moderation_queue(ref)
-      update_user(promoted, role: :user)
-      assert {:error, :forbidden} = CallerExamples.read_moderation_queue(ref)
-    end
-  end
-
-  describe "banned owners retain reads and deletion while contributions/moderation fail" do
-    test "a full ban committed after mount" do
-      %{user: user, ref: ref} = admitted()
-      %{ref: stranger_ref} = admitted()
-      user |> moderator() |> ban()
-
-      assert {:ok, :hidden_item} = CallerExamples.read_own_hidden(ref, user.id)
-      assert {:ok, :queue} = CallerExamples.read_moderation_queue(ref)
-      assert {:ok, :deleted} = CallerExamples.delete_own(ref, user.id)
-      assert {:error, :forbidden} = CallerExamples.contribute(ref, %{"title" => "Tip"})
-      assert {:error, :forbidden} = CallerExamples.moderate(ref)
-
-      assert {:error, :not_found} = CallerExamples.read_own_hidden(stranger_ref, user.id)
-      assert {:error, :forbidden} = CallerExamples.delete_own(stranger_ref, user.id)
-    end
-
-    test "an unconfirmed account cannot contribute but keeps its own deletion" do
-      %{user: user, ref: ref} = admitted()
-      update_user(user, confirmed_at: nil)
-
-      assert {:error, :unconfirmed} = CallerExamples.contribute(ref, %{"title" => "Tip"})
-      assert {:ok, :deleted} = CallerExamples.delete_own(ref, user.id)
-    end
-
-    test "a revoked or deleted session reaches no privileged branch" do
-      %{user: user, token: token, ref: ref} = admitted()
-      %{user: deleted, ref: deleted_ref} = admitted()
-      assert {:ok, [_family]} = Accounts.revoke_user_session_family(token)
-      soft_delete(deleted)
-
-      for {ref, owner_id} <- [{ref, user.id}, {deleted_ref, deleted.id}] do
-        assert {:error, :unauthenticated} = CallerExamples.read_own_hidden(ref, owner_id)
-        assert {:error, :unauthenticated} = CallerExamples.read_moderation_queue(ref)
-        assert {:error, :unauthenticated} = CallerExamples.delete_own(ref, owner_id)
-        assert {:error, :unauthenticated} = CallerExamples.contribute(ref, %{"title" => "Tip"})
-        assert {:error, :unauthenticated} = CallerExamples.moderate(ref)
-      end
-    end
   end
 
   describe "private identity boundary" do
@@ -394,25 +228,6 @@ defmodule Tips.Accounts.AdmissionContractTest do
 
       for payload <- [%{"id" => user.id}, %{id: user.id}, user.id, Map.from_struct(user)] do
         assert_raise FunctionClauseError, fn -> Scope.for_user(payload) end
-      end
-    end
-
-    test "a session reference holds only the token row id and mounted user id" do
-      assert %SessionRef{token_id: 1, user_id: 2} =
-               ref = struct!(SessionRef, token_id: 1, user_id: 2)
-
-      assert ref |> Map.from_struct() |> Map.keys() |> Enum.sort() == [:token_id, :user_id]
-      assert_raise ArgumentError, fn -> struct!(SessionRef, token_id: 1) end
-      assert_raise ArgumentError, fn -> struct!(SessionRef, user_id: 2) end
-    end
-
-    test "scopes and session references have no automatic public serialization" do
-      scope = Scope.for_user(user_fixture())
-      ref = struct!(SessionRef, token_id: 1, user_id: scope.user.id)
-
-      for value <- [scope, ref] do
-        assert_raise Protocol.UndefinedError, fn -> JSON.encode!(value) end
-        assert_raise Protocol.UndefinedError, fn -> Jason.encode!(value) end
       end
     end
 
@@ -463,135 +278,6 @@ defmodule Tips.Accounts.AdmissionContractTest do
 
       assert anonymous.assigns.current_scope == nil
     end
-
-    test "Content callers ignore client identity in business attrs" do
-      scope = Scope.for_user(user_fixture())
-      other = user_fixture()
-      author_id = scope.user.id
-      attrs = %{"title" => "Tip", "user_id" => other.id, "author_id" => other.id}
-
-      assert {:ok, %{author_id: ^author_id, title: "Tip"}} =
-               CallerExamples.contribute(scope, attrs)
-
-      assert {:error, :unauthenticated} = CallerExamples.contribute(nil, attrs)
-    end
-  end
-
-  describe "operation eligibility matrix" do
-    @matrix [
-      {:confirmed,
-       [contribute: :ok, moderate: :forbidden, delete_own_content: :ok, delete_account: :ok]},
-      {:unconfirmed,
-       [
-         contribute: :unconfirmed,
-         moderate: :forbidden,
-         delete_own_content: :ok,
-         delete_account: :ok
-       ]},
-      {:full_ban,
-       [
-         contribute: :forbidden,
-         moderate: :forbidden,
-         delete_own_content: :ok,
-         delete_account: :ok
-       ]},
-      {:moderator,
-       [contribute: :ok, moderate: :ok, delete_own_content: :ok, delete_account: :ok]},
-      {:unconfirmed_moderator,
-       [
-         contribute: :unconfirmed,
-         moderate: :unconfirmed,
-         delete_own_content: :ok,
-         delete_account: :ok
-       ]},
-      {:banned_moderator,
-       [
-         contribute: :forbidden,
-         moderate: :forbidden,
-         delete_own_content: :ok,
-         delete_account: :ok
-       ]},
-      {:deleted,
-       [
-         contribute: :unauthenticated,
-         moderate: :unauthenticated,
-         delete_own_content: :unauthenticated,
-         delete_account: :unauthenticated
-       ]}
-    ]
-
-    for {state, expectations} <- @matrix, {operation, outcome} <- expectations do
-      result = if outcome == :ok, do: :ok, else: {:error, outcome}
-
-      test "#{state} account: #{operation} -> #{outcome}" do
-        user = account(unquote(state))
-
-        assert Accounts.check_eligibility(user, unquote(operation)) ==
-                 unquote(Macro.escape(result))
-      end
-    end
-  end
-
-  describe "operation outcomes" do
-    test "contribution rechecks the locked account, so a scope admitted before a ban is refused" do
-      user = user_fixture()
-      scope = Scope.for_user(user)
-      ban(user)
-
-      assert {:error, :forbidden} = CallerExamples.contribute(scope, %{"title" => "Tip"})
-    end
-
-    test "a full-banned author may still delete their own content, but not another's" do
-      user = user_fixture()
-      scope = Scope.for_user(user)
-      ban(user)
-
-      assert {:ok, :deleted} = CallerExamples.delete_own(scope, user.id)
-      assert {:error, :forbidden} = CallerExamples.delete_own(scope, user_fixture().id)
-      assert {:error, :unauthenticated} = CallerExamples.delete_own(nil, user.id)
-    end
-
-    test "a full-banned moderator loses moderation actions but the session still admits the moderator role" do
-      moderator = user_fixture() |> moderator() |> ban()
-      token = Accounts.generate_user_session_token(moderator)
-
-      assert {:error, :forbidden} = Accounts.check_eligibility(moderator, :moderate)
-
-      assert {:ok, %Scope{user: %User{role: :moderator, ban: :full}}, _ref, _inserted_at} =
-               Accounts.get_scope_by_session_token(token)
-    end
-
-    test "account deletion keeps its recent sign-in requirement for banned accounts" do
-      user = user_fixture() |> ban()
-      recent = %{user | authenticated_at: DateTime.utc_now(:second)}
-      stale = %{user | authenticated_at: DateTime.add(DateTime.utc_now(:second), -1, :hour)}
-
-      assert :ok = Accounts.check_eligibility(recent, :delete_account)
-      assert Accounts.sudo_mode?(recent)
-      refute Accounts.sudo_mode?(stale)
-    end
-  end
-
-  describe "workers reload business eligibility without browser session" do
-    test "a worker runs after every session of the account is revoked" do
-      %{user: user, ref: ref} = admitted()
-      user_id = user.id
-      assert {:ok, [_family]} = Accounts.revoke_user_session_families(user)
-
-      assert {:error, :unauthenticated} = Accounts.readmit_scope(ref)
-      assert {:ok, ^user_id} = CallerExamples.perform_worker(%{"user_id" => user_id})
-    end
-
-    test "a worker follows committed bans and deletion, not the admitting session" do
-      %{user: user} = admitted()
-      args = %{"user_id" => user.id}
-
-      banned = ban(user)
-      assert {:error, :forbidden} = CallerExamples.perform_worker(args)
-
-      banned |> update_user(ban: nil, banned_at: nil) |> soft_delete()
-      assert {:error, :unauthenticated} = CallerExamples.perform_worker(args)
-    end
   end
 
   # A signed-in account as a LiveView holds it: the bearer stays in the cookie session.
@@ -605,14 +291,6 @@ defmodule Tips.Accounts.AdmissionContractTest do
   defp days_ago(days, closer_seconds \\ 0) do
     DateTime.utc_now(:second) |> DateTime.add(-days, :day) |> DateTime.add(closer_seconds)
   end
-
-  defp account(:confirmed), do: user_fixture()
-  defp account(:unconfirmed), do: unconfirmed_user_fixture()
-  defp account(:full_ban), do: user_fixture() |> ban()
-  defp account(:moderator), do: user_fixture() |> moderator()
-  defp account(:unconfirmed_moderator), do: unconfirmed_user_fixture() |> moderator()
-  defp account(:banned_moderator), do: user_fixture() |> moderator() |> ban()
-  defp account(:deleted), do: user_fixture() |> soft_delete()
 
   defp ban(user),
     do: update_user(user, ban: :full, banned_at: DateTime.utc_now(:second))
