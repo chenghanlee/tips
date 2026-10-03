@@ -14,7 +14,7 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](.
 ## Assigned
 
 1. Confirm the assigned worktree, SHA and launch values with `pwd`, `git rev-parse HEAD` and the shared Environment command.
-2. Read the issue and linked readiness comment, then its design sections and shared invariants. The team agreement governs workflow; ask the tech lead about conflicting requirements.
+2. Read the issue and linked readiness comment, then its design sections and shared invariants.
 3. Start work independent of owner items. Push the first commit and open a draft PR under shared Git and Checks rules; the draft gets no handoff.
 
 ## Pushed head
@@ -33,7 +33,7 @@ Repair your red before another push; name the tester's `RED` check in the repair
 
 ## Verdict
 
-Before handling feedback, read [Replies](../reviews.md#replies) and run `agent/teams/pr_review.py list "$PR"`. Repair under shared Required feedback and probe limits, then push and hand off. An approval needs no acknowledgment.
+Before first handling feedback, read [Replies](../reviews.md#replies) and run `agent/teams/pr_review.py list "$PR"`. Repair under shared Required feedback and probe limits, then push and hand off. An approval needs no acknowledgment.
 
 ## Merge
 

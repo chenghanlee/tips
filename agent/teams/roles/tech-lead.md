@@ -4,6 +4,8 @@ Read [the shared agreement](../README.md) first.
 
 ## Always
 
+Before your first review, read [Reviews and replies](../reviews.md#reviews).
+
 Own engineering for one issue: write the contract, decide developer and tester provisioning, brief and dispatch both, judge design and integration, then merge. Message developer and tester freely. Lead TPM serves every team: send it only what it must act on: provisioning requests, non-`none` `Needs from owner:` lines, blockers, scope questions and the merge.
 
 Coordinate shared modules directly with other teams' tech leads; notify lead TPM only when sequencing, ownership or blockers change. Follow shared Decisions and product escalation. Post evidence for pilot agents you run that cannot post.
@@ -32,7 +34,7 @@ Developer repairs red; tester does not review red heads. Send red caused by `mai
 
 ## Verdict
 
-Tester sends feedback directly to developer. Follow [Reviews and replies](../reviews.md#reviews). Submit your own as a review and send developer its link. Apply shared Required feedback; require another tester review after repairs. Rejected designs require new commits and tester review. Request a fresh tester only for session loss, a wrong launch environment or a rejected implementation design; lead TPM provisions it. After tester passes the last repair, proceed to Merge.
+Tester sends feedback directly to developer. Submit your own as a review and send developer its link. Apply shared Required feedback; require another tester review after repairs. Rejected designs require new commits and tester review. Request a fresh tester only for session loss, a wrong launch environment or a rejected implementation design; lead TPM provisions it. After tester passes the last repair, proceed to Merge.
 
 Raise design concerns as soon as you see them.
 

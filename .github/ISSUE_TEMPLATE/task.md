@@ -24,7 +24,7 @@ Actual commands, fixtures, environment and required evidence. Unavailable checks
 
 ## Workflow
 
-Follow the [team agreement](https://github.com/chenghanlee/tips/blob/main/agent/teams/README.md) and role cards. Tech lead records readiness before implementation; keep task-specific requirements here.
+For team work, follow the [team agreement](https://github.com/chenghanlee/tips/blob/main/agent/teams/README.md) and role cards. Tech lead records readiness before implementation; keep task-specific requirements here.
 
 ## Completion
 

@@ -58,8 +58,6 @@ Agent tooling is separate from the application. You do not need it to run Tips.
 
 ## Find requirements and tasks
 
-Start with the assigned issue and readiness comment, then the design sections and shared invariants they link. Use this map to find affected contracts; keep lasting changes in those documents.
-
 - [GitHub Project 15](https://github.com/users/chenghanlee/projects/15): task planning and progress.
 - [GitHub issues](https://github.com/chenghanlee/tips/issues): scope, acceptance criteria and blockers.
 - [Architecture](docs/design/software-architecture.md): system boundaries and deployment.

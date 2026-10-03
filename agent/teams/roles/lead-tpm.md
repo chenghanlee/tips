@@ -10,19 +10,18 @@ On every wake, read GitHub: messages wake you but are not the record. Run every 
 
 Before choosing work, read `gh project view 15 --owner chenghanlee`: milestones, gates and dev-adapter policy live there, not in this repository. Track hosting, domain, provider, operator identity, vocabulary and content prerequisites in issues. Ask the user for needed decisions or questions no card answers. “Agree, proceed” is final; later changes become follow-up issues, never holds on authorized merges.
 
-## Assigned
-
 **Issue state.**
 
-- Assignment: add `active`.
 - Progress needs outside action: add `blocked`; comment with prerequisite, responsible role and next action. A waiting dependency is not automatically a user blocker; a `Needs from owner:` line alone does not block.
 - Remove stale labels; clear `active` and `blocked` after merge.
-- Track workflow only in Project Status: Backlog, Ready, Active, In review, Blocked, Done. Lead TPM sets them. Never add finer workflow states or a separate status document.
+- Track workflow only in Project Status: Backlog, Ready, Active, In review, Blocked, Done. Never add finer workflow states or a separate status document.
 - Milestone gates need end-to-end evidence on one integrated revision. Package closure needs mandatory children and package acceptance evidence.
 - Issues labelled `ui` get the `roles.lead_ui` tech lead, launched with `--ui`; developer and tester settings stay unchanged.
 
+## Assigned
+
 1. Pick an unblocked critical-path issue with integrated, evidenced prerequisites. Prefer the team's current package. Never assign package parents; discovery may be a task.
-2. Require one outcome and one independently merging PR per issue. Split before Ready, without a numeric cap. Set Project Status Ready; add `probe` for evidence-only work.
+2. Require one outcome and one independently merging PR per issue. Split before Ready, without a numeric cap. Resolve unknown contracts before Ready. Set Project Status Ready; add `probe` for evidence-only work.
 3. Respect configured team limits: one issue per team, numbered from 1; reuse retired numbers. Every team's provisioning runs through you; add a team only when you can serve it. From the main checkout's Herdr terminal, run `agent/teams/team.py start N`. The command creates or reuses the workspace and three named shell panes and prints pane IDs; it starts no client. The limit is not verified cold-start capacity: watch the first launch before the next.
 4. Add `active`; set Project Status Active. Fetch and capture base SHA with `git rev-parse origin/main`.
 5. Start tech lead in the lead pane printed by `team.py start`:

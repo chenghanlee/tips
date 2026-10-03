@@ -1,8 +1,8 @@
 # Agent teams
 
-Read this agreement, then your role card. [AGENTS.md](../../AGENTS.md) governs engineering. Read the issue and readiness comment for the task; they do not override this workflow. Ask the tech lead about conflicting requirements.
+Read this agreement, then your role card. [AGENTS.md](../../AGENTS.md) governs engineering. Read the issue and readiness comment for the task; they do not override this workflow. Take conflicting requirements to the next role up (see Events).
 
-Keep task requirements, decisions and evidence in GitHub issues/PRs; lasting design and API contracts belong in the repository. Run commands from the repository root. Use [config.toml](config.toml) defaults without copying them into commands or prose. Humans perform [setup](SETUP.md) once. For script changes, read [development](development.md#changing-agentteams-scripts).
+Keep task requirements, decisions and evidence in GitHub issues/PRs. Run commands from the repository root. Use [config.toml](config.toml) defaults without copying them into commands or prose. Humans perform [setup](SETUP.md) once. For script changes, read [development](development.md#changing-agentteams-scripts).
 
 Team flow: lead TPM assigns and provisions → tech lead briefs → developer pushes → tester reviews → tech lead merges → lead TPM retires. Required feedback returns to developer for repair and another tester review. Role cards define gates and exceptions.
 
@@ -27,7 +27,7 @@ Team flow: lead TPM assigns and provisions → tech lead briefs → developer pu
 
 ## Events
 
-Use the reported event to find your card section; Assigned is only the first brief or provisioning request. After context recovery, reread this agreement and your current card section. `n/a`: this event cannot reach your role. "Not defined": post the question on the issue and prompt the next role up: developer/tester → tech lead → lead TPM → user.
+Use the reported event to find your card section; Assigned is only the first brief or provisioning request. After context recovery, reread this agreement, Always and your current card section. Reload required references missing from context before acting. `n/a`: this event cannot reach your role. "Not defined": post the question on the issue and prompt the next role up: developer/tester → tech lead → lead TPM → user.
 
 1. **Always**: continuous duties.
 2. **Assigned**: the first issue, brief or provisioning request arrives.
@@ -81,7 +81,7 @@ herdr agent prompt "team-$N-lead" "$EVIDENCE_URL SHA=$SHA; action=dispatch teste
 
 Repository rules block force pushes on `task/**`, require merge commits, strict up-to-date branches, resolved conversations and `checks`, `release`, `tips/independent-review`; merged remote heads are deleted. This gate is an interlock, not credential isolation.
 
-**Issue state.** Lead TPM owns labels and Project Status under its [Assigned rules](roles/lead-tpm.md#assigned); workers may add only Fallback `blocked`.
+**Issue state.** Lead TPM owns labels and Project Status under its [Assigned rules](roles/lead-tpm.md#always); workers may add only Fallback `blocked`.
 
 - After launch, escalate scope or role-label changes such as `ui`/`probe` as scope questions. Routine `active` and `blocked` updates remain state changes.
 - Close issues only after their required result is integrated and evidenced. Use `Refs #number` for partial work; `Closes #number` for completing PRs. New child issues count toward the goal.
