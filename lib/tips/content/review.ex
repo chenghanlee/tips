@@ -53,6 +53,9 @@ defmodule Tips.Content.Review do
     |> validate_model_choice()
     |> unique_constraint(:submission_key, name: :reviews_submission_unique)
     |> unique_constraint(:tip_id, name: :reviews_one_per_user)
+    |> foreign_key_constraint(:tip_id)
+    |> foreign_key_constraint(:model_id)
+    |> foreign_key_constraint(:environment_id)
   end
 
   defp validate_no_null_bytes(changeset) do

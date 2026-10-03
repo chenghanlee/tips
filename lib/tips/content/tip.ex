@@ -56,6 +56,9 @@ defmodule Tips.Content.Tip do
     |> validate_no_null_bytes()
     |> validate_model_choice()
     |> unique_constraint(:submission_key, name: :tips_submission_unique)
+    |> foreign_key_constraint(:tag_id)
+    |> foreign_key_constraint(:model_id)
+    |> foreign_key_constraint(:environment_id)
   end
 
   defp validate_no_null_bytes(changeset) do
