@@ -22,14 +22,14 @@ claude_permission_mode = "auto"
 
 [roles.dev]
 kind = "claude"
-model = "opus"
+model = "claude-opus-5-5"
 effort = "high"
 db_suffix = "_dev"
 port_offset = 0
 
 [roles.test]
-kind = "claude"
-model = "opus"
+kind = "codex"
+model = "gpt-6.1-sol"
 effort = "high"
 db_suffix = "_test"
 port_offset = 1
