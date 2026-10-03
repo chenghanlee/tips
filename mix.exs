@@ -61,6 +61,7 @@ defmodule Tips.MixProject do
        compile: false,
        depth: 1},
       {:salad_ui, "~> 1.0.0"},
+      {:mdex, "0.13.5"},
       {:oban, "~> 2.24.1"},
       {:swoosh, "~> 1.16"},
       {:req, "~> 0.5"},
