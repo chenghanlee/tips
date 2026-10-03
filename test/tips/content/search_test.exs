@@ -177,6 +177,7 @@ defmodule Tips.Content.SearchTest do
       end
     end
 
+    @tag :capture_log
     test "a database failure is an error, not an empty page", ctx do
       tip!(ctx, title: "Zebra")
       # The search relations become unresolvable for the rest of this test.
@@ -188,7 +189,7 @@ defmodule Tips.Content.SearchTest do
 
   describe "ranking bounds" do
     test "review collapse and fusion retain fixed candidate bounds", ctx do
-      tips = for k <- 1..60, do: tip!(ctx, title: "Zebra #{filler(k)}")
+      tips = for k <- 1..60, do: tip!(ctx, title: "Zebra", body: "Notes #{filler(k)}")
 
       assert {:ok, %{candidates: candidates, total: 50}} = Search.rank("zebra", offset: 40)
       assert Enum.map(candidates, & &1.tip_id) == tips |> Enum.slice(40, 10) |> Enum.map(& &1.id)
@@ -225,11 +226,11 @@ defmodule Tips.Content.SearchTest do
     end
 
     test "reciprocal rank fusion sums branch contributions with tip id ties", ctx do
-      both = tip!(ctx, title: "Zebra #{filler(3)}", vector: near(1, 1))
-      lexical = tip!(ctx, title: "Zebra")
+      both = tip!(ctx, title: "Zebra", body: "Notes #{filler(3)}", vector: near(1))
+      lexical = tip!(ctx, title: "Zebra", body: "Notes")
       review_only = tip!(ctx, title: "Review-only parent")
-      review!(review_only, body: "Plain words", vector: near(1, 2))
-      far_review = review!(review_only, body: "Other words", vector: near(30, 3))
+      review!(review_only, body: "Plain words", vector: near(1))
+      far_review = review!(review_only, body: "Other words", vector: near(30))
 
       assert {:ok, %{candidates: candidates, total: 3}} =
                Search.rank("zebra", embedding: query_vector())
@@ -281,7 +282,7 @@ defmodule Tips.Content.SearchTest do
     end
 
     test "the last keyword page is short and an empty page has no next", ctx do
-      for k <- 1..30, do: tip!(ctx, title: "Zebra #{filler(k)}")
+      for k <- 1..30, do: tip!(ctx, title: "Zebra", body: "Notes #{filler(k)}")
 
       assert {:ok, %{entries: first, has_more: true}} = Search.search(nil, "zebra", [])
       assert length(first) == 20
@@ -296,7 +297,7 @@ defmodule Tips.Content.SearchTest do
       first = tip!(ctx, title: "Zebra zebra zebra")
       hidden = tip!(ctx, title: "Zebra zebra SECRET title")
       deleted = tip!(ctx, title: "Zebra SECRET deleted")
-      with_review = tip!(ctx, title: "Zebra #{filler(4)}")
+      with_review = tip!(ctx, title: "Zebra", body: "Notes #{filler(4)}")
 
       review =
         review!(with_review,
@@ -306,7 +307,7 @@ defmodule Tips.Content.SearchTest do
           model_other: "SECRET model"
         )
 
-      last = tip!(ctx, title: "Zebra #{filler(8)}")
+      last = tip!(ctx, title: "Zebra", body: "Notes #{filler(8)}")
 
       assert {:ok, %{candidates: candidates}} = Search.rank("zebra", [])
       ranked = Enum.map(candidates, & &1.tip_id)
@@ -429,7 +430,7 @@ defmodule Tips.Content.SearchTest do
     end
 
     test "hydration reads are batched", ctx do
-      tips = for k <- 1..6, do: tip!(ctx, title: "Zebra #{filler(k)}")
+      tips = for k <- 1..6, do: tip!(ctx, title: "Zebra", body: "Notes #{filler(k)}")
       for tip <- tips, do: review!(tip, body: "Zebra review")
       scope = Scope.for_user(user_fixture())
 
@@ -454,8 +455,8 @@ defmodule Tips.Content.SearchTest do
       corpus =
         for step <- 1..120 do
           tag = if step > 100, do: "persona", else: "phrase"
-          tip = tip!(ctx, title: "Vector tip", tag_id: tag, vector: near(step, step))
-          review!(tip, body: "Vector review", vector: near(step, step + 200))
+          tip = tip!(ctx, title: "Vector tip", tag_id: tag, vector: near(step))
+          review!(tip, body: "Vector review", vector: near(step))
           {tag, tip.id}
         end
 
@@ -568,11 +569,11 @@ defmodule Tips.Content.SearchTest do
   # where a review matches, the reviewer's own differing setup.
   defp branch_tips(ctx, parent, reviewer) do
     tips_bm25 = tip!(ctx, [title: "Zebra crossing"] ++ parent)
-    tips_vec = tip!(ctx, [title: "Vector parent", vector: near(1, 1)] ++ parent)
+    tips_vec = tip!(ctx, [title: "Vector parent", vector: near(1)] ++ parent)
     reviews_bm25 = tip!(ctx, [title: "Lexical review parent"] ++ parent)
     review!(reviews_bm25, [body: "Zebra seen by the reviewer"] ++ reviewer)
     reviews_vec = tip!(ctx, [title: "Vector review parent"] ++ parent)
-    review!(reviews_vec, [body: "Plain review", vector: near(2, 2)] ++ reviewer)
+    review!(reviews_vec, [body: "Plain review", vector: near(2)] ++ reviewer)
 
     %{
       tips_bm25: tips_bm25.id,
@@ -587,9 +588,9 @@ defmodule Tips.Content.SearchTest do
     reviewer = user_fixture()
 
     %{
-      tips_bm25: for(k <- 1..per_branch, do: tip!(ctx, title: "Zebra #{filler(k)}").id),
-      tips_vec:
-        for(k <- 1..per_branch, do: tip!(ctx, title: "Vector tip", vector: near(k, k)).id),
+      tips_bm25:
+        for(k <- 1..per_branch, do: tip!(ctx, title: "Zebra", body: "Notes #{filler(k)}").id),
+      tips_vec: for(k <- 1..per_branch, do: tip!(ctx, title: "Vector tip", vector: near(k)).id),
       reviews_bm25:
         for k <- 1..per_branch do
           tip = tip!(ctx, title: "Lexical review parent")
@@ -599,7 +600,7 @@ defmodule Tips.Content.SearchTest do
       reviews_vec:
         for k <- 1..per_branch do
           tip = tip!(ctx, title: "Vector review parent")
-          review!(tip, body: "Plain review", user_id: reviewer.id, vector: near(k, k + 100))
+          review!(tip, body: "Plain review", user_id: reviewer.id, vector: near(k))
           tip.id
         end
     }
@@ -607,16 +608,16 @@ defmodule Tips.Content.SearchTest do
 
   defp filler(count), do: Enum.map_join(1..count, " ", &"filler#{&1}")
 
-  ## Vectors: a unit query on axis 0 and unit documents at increasing angles.
+  ## Vectors: a unit query on axis 0 and unit documents at increasing angles
+  # on one great circle. Each document's nearest neighbours are the adjacent
+  # steps, so the HNSW graph stays connected; vectors on separate orthogonal
+  # axes form a hub-and-spoke graph that HNSW cannot fully traverse.
 
   defp query_vector, do: [1.0 | List.duplicate(0.0, @dimensions - 1)]
 
-  defp near(step, axis) do
+  defp near(step) do
     angle = step * 0.01
-
-    List.duplicate(0.0, @dimensions)
-    |> List.replace_at(0, :math.cos(angle))
-    |> List.replace_at(axis, :math.sin(angle))
+    [:math.cos(angle), :math.sin(angle) | List.duplicate(0.0, @dimensions - 2)]
   end
 
   defp vector_text(vector),
@@ -682,7 +683,7 @@ defmodule Tips.Content.SearchTest do
   defp in_plan(plan, fun) do
     settings =
       case plan do
-        :index -> ["SET LOCAL enable_seqscan = off"]
+        :index -> ["SET LOCAL enable_seqscan = off", "SET LOCAL enable_sort = off"]
         :sequential -> ["SET LOCAL enable_indexscan = off", "SET LOCAL enable_bitmapscan = off"]
       end
 
