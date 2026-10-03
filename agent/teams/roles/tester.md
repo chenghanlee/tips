@@ -17,23 +17,23 @@ Confirm worktree and SHA from the tech lead's message. Read acceptance scenarios
 After lead TPM provisioning or advancement and the tech lead's SHA message:
 
 1. Read `gh pr checks "$PR"` once. Failed required checks trigger Red check; record pending checks as pending.
-2. Review the first head fully; map acceptance scenarios to named tests. Later reviews cover deltas since the last reviewed head, including heads refused as red.
+2. Review the first head fully. Verify the tests exercise each acceptance scenario, are correct and fail when the code breaks. Later reviews cover deltas since the last reviewed head, including heads refused as red.
 
 ## Red check
 
-Never review red heads. Prompt developer and tech lead separately with the failing check. Append a two-line `RED` round to your comment.
+Never review red heads. Prompt developer and tech lead separately with the failing check.
 
 ## Verdict
 
-Append a `pass` or `findings` round with evidence and pending checks. Send comment link and reviewed SHA to tech lead; findings to developer. Issue another verdict after repairs. Apply shared Findings; tech lead decides which P2/P3 block.
+Submit one review per shared Reviews: feedback, or `LGTM` naming any pending checks. Send review link and SHA to tech lead, and to developer when it has feedback. After repairs, resolve the threads you opened that are fixed and review again.
 
 ## Merge
 
-For conflicting branch updates, review conflicted hunks and base delta. Clean updates get no round.
+For conflicting branch updates, review conflicted hunks and base delta. Clean updates get no review.
 
 ## Blocked outside the team
 
-Record missing verification credentials, network or installs in the round. Review everything else; report exact needs to tech lead.
+Record missing verification credentials, network or installs in the review. Review everything else; report exact needs to tech lead.
 
 ## Permission denial
 

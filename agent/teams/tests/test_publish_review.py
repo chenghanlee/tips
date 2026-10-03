@@ -1,4 +1,4 @@
-"""Review-record validation and the refusal path that never reaches GitHub."""
+"""Approval validation, thread reads and the refusal paths that never post a status."""
 
 import json
 import os
@@ -7,170 +7,221 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
-from publish_review import SECTIONS, RefusalError, comment_api_path, missing_sections, review_round
+from pr_review import RefusalError
+from publish_review import approval_problem, review_api_path
 from team import execute
 
-SCRIPT = Path(__file__).resolve().parents[1] / "publish_review.py"
+TEAMS = Path(__file__).resolve().parents[1]
+PR = "https://github.com/o/tips/pull/7"
+RECORD = PR + "#pullrequestreview-5"
+SHA = "a" * 40
 FAKE_GH = r"""#!/usr/bin/env python3
 import json, os, sys
 from pathlib import Path
-log = Path(os.environ["FAKE_GH_LOG"])
-with log.open("a") as stream:
-    stream.write(json.dumps(sys.argv[1:]) + "\n")
 a = sys.argv[1:]
-if a[:1] == ["api"] and "--method" not in a:
-    print(json.dumps({"body": os.environ["FAKE_GH_BODY"]}))
-elif a[:2] == ["pr", "view"]:
-    print(json.dumps({"headRefOid": os.environ["FAKE_GH_HEAD"], "url": "https://github.com/o/tips/pull/7"}))
+with Path(os.environ["FAKE_GH_LOG"]).open("a") as stream:
+    stream.write(json.dumps(a) + "\n")
+fake = json.loads(os.environ["FAKE_GH"])
+query = next((arg for arg in a if arg.startswith("query=")), "")
+if a[:2] == ["pr", "view"]:
+    print(json.dumps({"headRefOid": fake["head"], "url": "https://github.com/o/tips/pull/7"}))
 elif a[:2] == ["pr", "comment"]:
     print("https://github.com/o/tips/pull/7#issuecomment-99")
+elif "resolveReviewThread" in query:
+    print(json.dumps({"data": {"resolveReviewThread": {"thread": {"isResolved": True}}}}))
+elif query:
+    name = "reviewThreads" if "reviewThreads" in query else "reviews"
+    page = next((int(arg[len("after="):]) for arg in a if arg.startswith("after=")), 0)
+    pages = fake[name]
+    if pages == "broken":
+        print(json.dumps({"data": {"repository": None}}))
+        sys.exit(0)
+    info = {"hasNextPage": page + 1 < len(pages), "endCursor": str(page + 1)}
+    nodes = pages[page] if pages else []
+    connection = {"pageInfo": info, "nodes": nodes}
+    print(json.dumps({"data": {"repository": {"pullRequest": {name: connection}}}}))
+elif a[:1] == ["api"] and "--method" not in a:
+    print(json.dumps(fake["review"]))
 """
 
 
-def record(*present: str, sha: str = "a" * 40, outcome: str = "PASS") -> str:
-    """One `## <sha> <outcome>` round of a rolling review comment with the given `###` sections."""
-    body = "\n".join(f"### {name}\n\nchecked.\n" for name in present)
-    return f"## {sha[:7]} {outcome}\n\n{body}"
+def review(**changes: Any) -> dict[str, Any]:
+    base = {"state": "COMMENTED", "commit_id": SHA, "body": "LGTM\nteam-1-lead, session abc"}
+    return {**base, **changes}
 
 
-class RecordValidationTest(unittest.TestCase):
-    def test_all_sections_with_text_pass(self) -> None:
-        assert missing_sections(record(*SECTIONS)) == []
+def thread(resolved: bool, path: str = "lib/a.ex", comments: int = 1) -> dict[str, Any]:
+    nodes = [{"databaseId": 40 + n, "body": f"comment {n}"} for n in range(comments)]
+    return {
+        "id": "T_" + path,
+        "isResolved": resolved,
+        "path": path,
+        "line": 12,
+        "originalLine": 12,
+        "comments": {"totalCount": comments, "nodes": nodes},
+    }
 
-    def test_missing_and_empty_sections_are_named(self) -> None:
-        body = record(*SECTIONS[:3]) + "\n## Design challenge\n\n## Defect pass\n\nran mix test.\n"
-        assert missing_sections(body) == ["Design challenge"]
 
-    def test_round_for_head_is_selected_by_sha_prefix(self) -> None:
-        body = record(*SECTIONS, sha="a" * 40) + "\n" + record(*SECTIONS[:4], sha="b" * 40)
-        assert missing_sections(review_round(body, "a" * 40)) == []
-        assert missing_sections(review_round(body, "b" * 40)) == ["Defect pass"]
-        for text, sha in ((body, "c" * 40), (body + "\n" + record(*SECTIONS), "a" * 40)):
+Result = tuple[subprocess.CompletedProcess[str], list[Any]]
+
+
+def listed(number: int, state: str, body: str, oid: str = SHA) -> dict[str, Any]:
+    url = f"{PR}#pullrequestreview-{number}"
+    return {"databaseId": number, "state": state, "body": body, "url": url, "commit": {"oid": oid}}
+
+
+def run(script: str, *args: str, **fake: Any) -> Result:
+    """Run one script against a fake gh; return its result and the gh calls it made."""
+    defaults: dict[str, Any] = {"head": SHA, "review": review(), "reviewThreads": [], "reviews": []}
+    state = {**defaults, **fake}
+    with tempfile.TemporaryDirectory() as tmp:
+        gh = Path(tmp) / "gh"
+        gh.write_text(FAKE_GH)
+        gh.chmod(0o755)
+        log = Path(tmp) / "log"
+        env = dict(
+            os.environ,
+            PATH=tmp + os.pathsep + os.environ["PATH"],
+            FAKE_GH_LOG=str(log),
+            FAKE_GH=json.dumps(state),
+        )
+        result = execute([sys.executable, str(TEAMS / script), *args], env=env)
+        calls = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+        return result, calls
+
+
+def publish(*source: str, **fake: Any) -> Result:
+    record = source or ("--record", RECORD)
+    return run("publish_review.py", "--pr", "7", "--sha", SHA, *record, **fake)
+
+
+def posts(calls: list[Any]) -> list[Any]:
+    return [call for call in calls if "--method" in call]
+
+
+class ApprovalTest(unittest.TestCase):
+    def test_lgtm_on_the_head_with_a_reviewer_line_is_an_approval(self) -> None:
+        assert approval_problem(review(), SHA) is None
+        scoped = review(state="APPROVED", body="LGTM\nlead\nScope: docs")
+        assert approval_problem(scoped, SHA) is None
+
+    def test_each_defect_is_named(self) -> None:
+        cases = {
+            "state": review(state="PENDING"),
+            "not the reviewed": review(commit_id="b" * 40),
+            "only LGTM": review(body="LGTM, nice work\nteam-1-lead"),
+            "role and session": review(body="LGTM"),
+        }
+        for expected, candidate in cases.items():
+            problem = approval_problem(candidate, SHA)
+            assert problem is not None, expected
+            assert expected in problem, (expected, problem)
+        assert approval_problem(review(state="CHANGES_REQUESTED"), SHA) is not None
+        assert approval_problem(review(body=None), SHA) is not None
+
+    def test_review_links_map_to_rest_paths(self) -> None:
+        assert review_api_path(RECORD) == "repos/o/tips/pulls/7/reviews/5"
+        elsewhere = "https://example.com/o/tips/pull/7#pullrequestreview-5"
+        for link in (PR, PR + "#issuecomment-1", elsewhere):
             try:
-                review_round(text, sha)
+                review_api_path(link)
             except RefusalError:
                 continue
-            self.fail(f"missing or duplicated round accepted for {sha[:7]}")
-
-    def test_headings_are_case_insensitive_and_allow_h3(self) -> None:
-        body = "\n".join(f"### {name.upper()}\n\ntext\n" for name in SECTIONS)
-        assert missing_sections(body) == []
-
-    def test_comment_links_map_to_rest_paths(self) -> None:
-        issue = "https://github.com/o/tips/pull/7#issuecomment-123"
-        review = "https://github.com/o/tips/pull/7#discussion_r456"
-        assert comment_api_path(issue) == "repos/o/tips/issues/comments/123"
-        assert comment_api_path(review) == "repos/o/tips/pulls/comments/456"
-        try:
-            comment_api_path("https://github.com/o/tips/pull/7")
-        except RefusalError:
-            return
-        raise AssertionError("bare PR link accepted")
+            self.fail(f"accepted {link}")
 
 
-class PublishRefusalTest(unittest.TestCase):
-    def run_script(
-        self, body: str, head: str, sha: str, *source: str
-    ) -> tuple[subprocess.CompletedProcess[str], list[list[str]]]:
-        with tempfile.TemporaryDirectory() as tmp:
-            fake = Path(tmp) / "gh"
-            fake.write_text(FAKE_GH)
-            fake.chmod(0o755)
-            log = Path(tmp) / "log"
-            env = dict(
-                os.environ,
-                PATH=tmp + os.pathsep + os.environ["PATH"],
-                FAKE_GH_LOG=str(log),
-                FAKE_GH_BODY=body,
-                FAKE_GH_HEAD=head,
-            )
-            result = execute(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--pr",
-                    "7",
-                    "--sha",
-                    sha,
-                    *(source or ("--record", "https://github.com/o/tips/pull/7#issuecomment-1")),
-                ],
-                env=env,
-            )
-            calls = (
-                [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
-            )
-            return result, calls
-
-    def test_incomplete_record_never_posts_a_status(self) -> None:
-        sha = "a" * 40
-        result, calls = self.run_script(record(*SECTIONS[:4]), sha, sha)
-        assert result.returncode != 0
-        assert "Defect pass" in result.stderr
-        assert not any("--method" in call for call in calls)
-
-    def test_older_complete_round_cannot_supply_a_missing_current_heading(self) -> None:
-        body = record(*SECTIONS, sha="a" * 40) + "\n" + record(*SECTIONS[:4], sha="b" * 40)
-        result, calls = self.run_script(body, "b" * 40, "b" * 40)
-        assert result.returncode != 0
-        assert "Defect pass" in result.stderr
-        assert not any("--method" in call for call in calls)
-
-    def test_record_without_a_round_for_the_head_never_posts_a_status(self) -> None:
-        result, calls = self.run_script(record(*SECTIONS, sha="a" * 40), "b" * 40, "b" * 40)
-        assert result.returncode != 0
-        assert "round" in result.stderr
-        assert not any("--method" in call for call in calls)
-
-    def test_changed_head_never_posts_a_status(self) -> None:
-        result, calls = self.run_script(record(*SECTIONS), "b" * 40, "a" * 40)
-        assert result.returncode != 0
-        assert "PR head" in result.stderr
-        assert not any("--method" in call for call in calls)
-
-    def test_complete_record_on_reviewed_head_posts_once(self) -> None:
-        sha = "a" * 40
-        result, calls = self.run_script(record(*SECTIONS), sha, sha)
+class PublishTest(unittest.TestCase):
+    def test_approval_with_resolved_threads_posts_once(self) -> None:
+        result, calls = publish(reviewThreads=[[thread(True)], [thread(True, "lib/b.ex")]])
         assert result.returncode == 0, result.stderr
-        posts = [call for call in calls if "--method" in call]
-        assert len(posts) == 1
-        assert f"repos/o/tips/statuses/{sha}" in posts[0]
-        assert "context=tips/independent-review" in posts[0]
+        assert len(posts(calls)) == 1
+        assert f"repos/o/tips/statuses/{SHA}" in posts(calls)[0]
+        assert "context=tips/independent-review" in posts(calls)[0]
+        assert f"target_url={RECORD}" in posts(calls)[0]
+
+    def test_refusals_never_post_a_status(self) -> None:
+        second_page_open = [[thread(True)], [thread(False, "lib/b.ex")]]
+        cases: dict[str, dict[str, Any]] = {
+            "PR head": {"head": "b" * 40},
+            "only LGTM": {"review": review(body="Looks fine")},
+            "state": {"review": review(state="PENDING")},
+            "not the reviewed": {"review": review(commit_id="b" * 40)},
+            "1 unresolved review threads: lib/a.ex:12": {"reviewThreads": [[thread(False)]]},
+            "unresolved review threads: lib/b.ex:12": {"reviewThreads": second_page_open},
+            "incomplete reviewThreads": {"reviewThreads": "broken"},
+        }
+        for expected, fake in cases.items():
+            result, calls = publish(**fake)
+            assert result.returncode != 0, expected
+            assert expected in result.stderr, (expected, result.stderr)
+            assert posts(calls) == [], expected
+
+    def test_thread_with_more_comments_than_a_page_is_refused(self) -> None:
+        long = thread(True)
+        long["comments"]["totalCount"] = 101
+        result, calls = publish(reviewThreads=[[long]])
+        assert result.returncode != 0
+        assert "more comments" in result.stderr
+        assert posts(calls) == []
+
+    def test_record_from_another_pull_request_is_refused(self) -> None:
+        other = "https://github.com/o/tips/pull/8#pullrequestreview-5"
+        result, calls = publish("--record", other)
+        assert result.returncode != 0
+        assert "does not belong" in result.stderr
+        assert posts(calls) == []
 
     def test_owner_waiver_posts_comment_then_status_without_a_record(self) -> None:
-        sha = "a" * 40
-        result, calls = self.run_script("", sha, sha, "--owner-waiver", "docs-only process change")
+        result, calls = publish("--owner-waiver", "docs-only process change")
         assert result.returncode == 0, result.stderr
         assert calls[0][:2] == ["pr", "view"]
         assert calls[1][:2] == ["pr", "comment"]
         assert "Owner waiver" in calls[1][4]
-        posts = [call for call in calls if "--method" in call]
-        assert len(posts) == 1
-        assert "target_url=https://github.com/o/tips/pull/7#issuecomment-99" in posts[0]
-        assert "description=Owner waiver: independent review skipped" in posts[0]
+        assert len(posts(calls)) == 1
+        assert f"target_url={PR}#issuecomment-99" in posts(calls)[0]
+        assert "description=Owner waiver: independent review skipped" in posts(calls)[0]
 
     def test_owner_waiver_needs_a_reason_and_matching_head(self) -> None:
-        sha = "a" * 40
-        result, calls = self.run_script("", sha, sha, "--owner-waiver", "short")
+        result, calls = publish("--owner-waiver", "short")
         assert result.returncode != 0
         assert "reason" in result.stderr
         assert calls == []
-        result, calls = self.run_script(
-            "", "b" * 40, sha, "--owner-waiver", "docs-only process change"
-        )
+        result, calls = publish("--owner-waiver", "docs-only process change", head="b" * 40)
         assert result.returncode != 0
         assert "PR head" in result.stderr
         assert not any(call[:2] == ["pr", "comment"] for call in calls)
 
-    def test_record_from_another_pull_request_is_refused(self) -> None:
-        sha = "a" * 40
-        result, calls = self.run_script(
-            record(*SECTIONS),
-            sha,
-            sha,
-            "--record",
-            "https://github.com/o/tips/pull/8#issuecomment-1",
-        )
+
+class ThreadReadTest(unittest.TestCase):
+    def test_list_prints_head_reviews_and_unresolved_threads_only(self) -> None:
+        reviews = [
+            listed(1, "COMMENTED", "old head", "b" * 40),
+            listed(2, "COMMENTED", ""),
+            listed(3, "PENDING", "draft"),
+            listed(5, "COMMENTED", "General: split the module."),
+        ]
+        threads = [[thread(True, "lib/done.ex")], [thread(False, "lib/open.ex", comments=2)]]
+        result, _ = run("pr_review.py", "list", "7", reviews=[reviews], reviewThreads=threads)
+        assert result.returncode == 0, result.stderr
+        out = result.stdout
+        assert out.startswith(f"head {SHA}\n")
+        assert f"review {RECORD} aaaaaaa\nGeneral: split the module." in out
+        for absent in ("old head", "draft", "pullrequestreview-2", "lib/done.ex"):
+            assert absent not in out, absent
+        assert "thread T_lib/open.ex reply-to 40 lib/open.ex:12\ncomment 0\n> comment 1" in out
+        every, _ = run("pr_review.py", "list", "7", "--all", reviews=[reviews])
+        assert "old head" in every.stdout
+        assert "draft" not in every.stdout
+
+    def test_incomplete_answer_is_an_error_not_an_empty_list(self) -> None:
+        result, _ = run("pr_review.py", "list", "7", reviews="broken")
         assert result.returncode != 0
-        assert "does not belong" in result.stderr
-        assert not any("--method" in call for call in calls)
+        assert "incomplete reviews" in result.stderr
+
+    def test_resolve_sends_the_thread_id(self) -> None:
+        result, calls = run("pr_review.py", "resolve", "T_1")
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.strip() == "resolved T_1"
+        assert "id=T_1" in calls[0]

@@ -2,7 +2,7 @@
 
 Agents building Tips: read this agreement through Client constraints, then your role card. [AGENTS.md](../../AGENTS.md) governs engineering. Keep requirements, decisions, review history and evidence in GitHub issues/PRs. Never repeat [config.toml](config.toml) defaults in commands or prose. Humans perform [SETUP.md](SETUP.md) once. Run commands from the repository root. When changing or reviewing `agent/teams` scripts, also read [the last section](#changing-agentteams-scripts).
 
-Team flow: lead TPM assigns and provisions → tech lead briefs → developer pushes → tester reviews → tech lead merges → lead TPM retires. Blocking findings return to developer for repair and another tester verdict. Role cards define gates and exceptions.
+Team flow: lead TPM assigns and provisions → tech lead briefs → developer pushes → tester reviews → tech lead merges → lead TPM retires. Required feedback returns to developer for repair and another tester review. Role cards define gates and exceptions.
 
 | Role card | Agent name | Helper flag |
 |---|---|---|
@@ -31,7 +31,7 @@ Classify messages by the reported event; Assigned covers only the first brief an
 2. **Assigned**: the first issue, brief or provisioning request arrives.
 3. **Pushed head**: review-ready PR SHA; the tester reads the first head fully, later heads as deltas.
 4. **Red check**: required check failed; pending is not red.
-5. **Verdict**: tester or tech lead round completed.
+5. **Verdict**: tester or tech lead review submitted.
 6. **Merge**: PR ready to integrate, or merged.
 7. **Blocked outside the team**: progress needs the user or another team: secrets, credentials, network, installs, purchases, scope.
 8. **Permission denial**: tool or client refused an action.
@@ -61,24 +61,33 @@ herdr agent prompt "team-$N-lead" "$EVIDENCE_URL SHA=$SHA; action=dispatch teste
 
 **Waiting.** After sending via Herdr, finish independent work and end the turn. Replies arrive as new prompts. Never use `sleep`, polling loops, monitors, cron, hooks, `herdr agent prompt --wait` or `herdr agent wait`; only the tech lead's timed pre-merge CI wait is exempt. No status-file PRs, merge queue, polling daemon or own-list approval.
 
-**Decisions.** Before proceeding, tech leads record engineering decisions; lead TPM records project-state decisions. Use an issue or PR: only GitHub records are durable. Askers link the decision in their next handoff. The approving review round closes the record; include chat decisions absent from PR threads in its body. No separate closing note.
+**Decisions.** Before proceeding, tech leads record engineering decisions; lead TPM records project-state decisions. Use an issue or PR: only GitHub records are durable. Askers link the decision in their next handoff. The approving review closes the record; include chat decisions absent from PR threads in its body. No separate closing note.
 
 **Commands.** Run lifecycle and messaging commands directly; retain stdout, stderr and exit status. Never pipe through `tail` or ad hoc JSON formatters. Parse Herdr's JSON output only when a later step needs a field under `result`. After formatter failure, inspect once with `herdr agent get <name>` before resending: failed formatting does not prove failed delivery. Successful sends confirm submission, not completion. Verify checkouts with `pwd` and `git rev-parse HEAD`.
 
-**One comment per role.** Developer, tester and tech lead each edit one PR comment. Append `## <short SHA> <outcome>` per reviewed head, newest last, with `###` headings. Outcomes: developer `pushed`; tester `pass`, `findings`, `RED`; tech lead `review`, short until the Merge round. Each round lists changes, checks run or read and open items; mark prior findings fixed or open. Handoffs link this comment and SHA. Never create per-round comments.
+**PR description.** The developer owns the PR title and body, written as a [change description](https://google.github.io/eng-practices/review/developer/cl-descriptions.html): a short imperative title; a body that says what changed and why, plus check-configuration changes and anything CI does not verify. Keep it true until merge. Explain repairs in code and commit messages, not comments.
 
-State reviewer and implementer identities once at the top of your comment; record a new reviewer or session in the round when ownership changes. Round shape; omit lines that do not apply:
+**Reviews.** Tester and tech lead follow Google's [review comments](https://google.github.io/eng-practices/review/reviewer/comments.html) guide. Submit one review per pass, in one call, on the exact head:
 
-    ## <short SHA> <outcome>
-    <result and next action, one line>
-    Base: <full SHA>  Head: <full SHA>  Scope: whole PR | delta from <SHA>
-    Ran: <checks you ran, results>
-    CI: <run link>: pass | fail | pending | not read
-    Tester (tech lead only): <reviewed SHA>, <verdict>, <round link>
-    Findings: F1 P1 path:line: trigger, defect, required behaviour (fixed | open | deferred)
-    Open: <item>, <owner>
+```bash
+gh api "repos/{owner}/{repo}/pulls/$PR/reviews" --input tmp/review.json --jq .html_url
+```
 
-Developers: say the outcome and what the diff cannot show (TDD evidence, check-configuration changes); do not narrate the diff. Keep finding IDs and their state across rounds. Readers: start with the round a handoff names; follow its evidence, prior findings and contract as needed.
+`tmp/review.json`: `{"commit_id": "<head SHA>", "event": "COMMENT", "body": "...", "comments": [{"path": "...", "line": 12, "body": "..."}]}`.
+
+- Inline comments for local issues. The body for general issues and for lines outside the diff, as `path:line`.
+- Make required changes clear and give the reason. Mark optional advice `Nit:`, `Optional:` or `FYI:`.
+- Approval: line one is `LGTM` alone; line two is your role and session. Add scope or limits only when needed. Any other review starts with your role and session.
+- Report what the linked CI run does not establish. Do not repeat the diff, the contract or passing checks.
+- Write in plain, simple English. No mannered prose. Succinct and concise. Write like the reader has ADHD.
+
+**Replies.** `agent/teams/pr_review.py list "$PR"` prints the reviews of the head and every unresolved thread with its IDs; `--all` adds earlier heads. Fix the code where that answers a comment. Reply only when useful, to explain a fix, ask or disagree:
+
+```bash
+gh api "repos/{owner}/{repo}/pulls/$PR/comments/$REPLY_TO/replies" -f body="..."
+```
+
+The reviewer who opened a thread resolves it after checking, with `agent/teams/pr_review.py resolve "$THREAD"`. Optional advice may be declined. Feedback in a review body has no thread: its reviewer confirms it in the next review. Handoffs link the review and SHA.
 
 **Git.** Every agent:
 
@@ -100,15 +109,15 @@ Repository rules block force pushes on `task/**`, require merge commits, strict 
 - Close issues only after their required result is integrated and evidenced. Use `Refs #number` for partial work; `Closes #number` for completing PRs. New child issues count toward the goal.
 - Milestone gates need end-to-end evidence on one integrated revision. Package closure needs mandatory children and package acceptance evidence.
 - Issues labelled `ui` get the `roles.lead_ui` tech lead, launched with `--ui`; developer and tester settings stay unchanged.
-- `probe`: deliver evidence, not a code path. Tester passes once; tech lead keeps five review headings, one line each. Probe code is disposable; repair only as evidence requires.
+- `probe`: deliver evidence, not a code path. Tester reviews once. Probe code is disposable; repair only as evidence requires.
 
-**Findings.** P0: critical exposure, irreversible loss or inability to operate. P1: broken required behaviour, authorization/consistency defects or missing evidence for safe integration. P2/P3: lower-impact defects or improvements. Developers repair P0/P1 immediately, P2/P3 unless deferred by the tech lead. Tech leads decide which findings block and file follow-up issues for deferrals. All findings deferred means the `findings` round passes; never downgrade findings to pass. Acceptance failures block regardless of severity. After repeated failed repairs, investigate the root cause.
+**Required feedback.** Required: critical exposure, irreversible loss, broken required behaviour, authorization or consistency defects, acceptance failures and missing evidence for safe integration. Developers repair required feedback at once and optional advice unless they decline it with a reason. Tech leads settle disputes over what is required and file follow-up issues for deferrals. After repeated failed repairs, investigate the root cause.
 
 **Checks.** Trust CI only for commands actually run. If checks are pending, report them as pending without waiting; the tech lead's timed pre-merge wait checks completion. Markdown-only changes run `python3 scripts/check_docs.py`; no Mix run solely for prose. Agent instructions and templates still follow the review policy. CI remains required; waivers require explicit user instruction.
 
-**Recovery.** On permission denial, preserve work. Record operation, exact error and local state in your PR comment (issue if no PR); report to the tech lead, or lead TPM if you are the tech lead. Continue unaffected work. Never bypass denial through another application or remote-only commit.
+**Recovery.** On permission denial, preserve work. Record operation, exact error and local state in a PR comment (issue if no PR); report to the tech lead, or lead TPM if you are the tech lead. Continue unaffected work. Never bypass denial through another application or remote-only commit.
 
-For context recovery, keep issue and branch open. Record base and head SHAs, PR comment URL, working-tree cleanliness, committed and uncommitted work, unresolved findings, failed or unrun checks and next action. Reviewers keep scratch output under their worktree's `tmp/` so the checkout stays clean. Explicitly transfer ownership before another writer starts. Never reset or stash another's work. Before reassigning unresponsive clients, inspect Git and pane evidence: working, dialog-blocked (Permission denial), or lost (Lost session or environment).
+For context recovery, keep issue and branch open. Record base and head SHAs, latest review URL, working-tree cleanliness, committed and uncommitted work, unresolved feedback, failed or unrun checks and next action. Reviewers keep scratch output under their worktree's `tmp/` so the checkout stays clean. Explicitly transfer ownership before another writer starts. Never reset or stash another's work. Before reassigning unresponsive clients, inspect Git and pane evidence: working, dialog-blocked (Permission denial), or lost (Lost session or environment).
 
 **Fallback.** Developers and testers: if a tech-lead prompt fails to send, send the same message to lead TPM. If sent but an unanswered question blocks work, add `blocked`, comment with tech lead and question, prompt lead TPM with that comment link, then end the turn.
 
@@ -128,7 +137,7 @@ User decisions: material product changes, purchases, credentials, hosting, publi
 
 ## Changing agent/teams scripts
 
-For `agent/teams` Python changes, CI is the evidence: open the exact-head `checks` run, verify these four steps passed and link the run in your round.
+For `agent/teams` Python changes, CI is the evidence: open the exact-head `checks` run, verify these four steps passed and link the run in your review.
 
 ```sh
 ruff check agent/teams

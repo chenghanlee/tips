@@ -20,17 +20,17 @@ Ask the tech lead freeform questions; include a pushed SHA for code questions.
 
 You own green. From the second push onward, before each commit, read the preceding push's result with `gh pr checks "$PR"` once, without `--watch`. Continue work while checks run. Never push onto unrepaired red; pending is not red.
 
-In every round, name check-configuration changes (ignore files, workflow, lint or scanner settings) for explicit tech-lead review.
+Name check-configuration changes (ignore files, workflow, lint or scanner settings) in the PR description for explicit tech-lead review.
 
-When review-ready, mark the PR ready and append a `pushed` round. Hand off to the tech lead with evidence link, SHA, `action=dispatch tester`, owner. Pending preceding checks do not delay handoff; the tester's read decides.
+When review-ready, bring the PR description up to date and mark the PR ready. Hand off to the tech lead with PR link, SHA, `action=dispatch tester`, owner. Pending preceding checks do not delay handoff; the tester's read decides.
 
 ## Red check
 
-Repair your red before another push; use the tester's `RED` check name and describe the repair in your round. Attribute red to `main` only with evidence of the same failure on the task's `origin/main` base. Send that evidence to the tech lead; repair red caused by `main` only when assigned its repair task. Send real-secret gitleaks hits to the tech lead for the user's rotation decision.
+Repair your red before another push; name the tester's `RED` check in the repair commit. Attribute red to `main` only with evidence of the same failure on the task's `origin/main` base. Send that evidence to the tech lead; repair red caused by `main` only when assigned its repair task. Send real-secret gitleaks hits to the tech lead for the user's rotation decision.
 
 ## Verdict
 
-Apply shared Findings priorities and probe repair limits. Push repairs and add a round. Answer tester questions; passing verdicts need no acknowledgment.
+Read feedback with `pr_review.py list`. Repair it under shared Required feedback and probe limits, then push and hand off. Follow shared Replies; an approval needs no acknowledgment.
 
 ## Merge
 
