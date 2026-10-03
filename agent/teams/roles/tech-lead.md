@@ -13,14 +13,14 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](.
 ## Assigned
 
 1. Confirm your pane, worktree and SHA inside the new client: `herdr agent get team-N-lead`, `pwd`, `git rev-parse HEAD`.
-2. Post an issue readiness comment: one outcome, exclusions, exact design sections, real entry points, acceptance scenarios mapped to named tests (`probe`: evidence required), runnable verification, available prerequisites, task slug. Amend this contract when needed. Do not repeat operating rules, setup history or tooling reports in the contract; amend it instead of copying it. End with one line: `Needs from owner:` followed only by `none` or required secrets, credentials and network access. That line alone is not a blocker.
+2. Post an issue readiness comment: one outcome, exclusions, exact design sections, real entry points, acceptance scenarios mapped to named tests (`probe`: evidence required), runnable verification, available prerequisites, task slug. Amend this contract when needed. Link design sections; omit repeated design text, operating rules and setup history; link evidence instead of copying it into the PR. End with one line: `Needs from owner:` followed only by `none` or required secrets, credentials and network access. That line alone is not a blocker.
 3. If a second independent outcome exists or your context will not last until merge, propose a split to lead TPM as a scope question; it creates children. Never require file ownership lists, reservations or overlap approval. Coordinate concrete shared changes as they arise.
 4. Request developer by role; lead TPM chooses the pane. After its confirmation, verify developer pane, worktree and SHA. Brief developer with contract link, that SHA as base, action, owner and exact completion command `herdr agent prompt team-N-lead "..."`, naming fields the developer fills.
 5. Start with work independent of owner items.
 
 ## Pushed head
 
-At first developer handoff, request tester `--start` at that SHA. For later heads, request the tester's checkout advance once its last round is posted. After lead TPM confirmation, verify the provisioned or advanced client’s pane, worktree and SHA. Send tester the contract link, tester worktree, exact SHA, changes since last verdict and completion command.
+At first developer handoff, request tester `--start` at that SHA. For later heads, request the tester's checkout advance once its last review is submitted. After lead TPM confirmation, verify the provisioned or advanced client’s pane, worktree and SHA. Send tester the contract link, tester worktree, exact SHA, changes since last verdict and completion command.
 
 Your own checkout advances at Merge. Request an earlier advance only to inspect a head for a concrete design or triage question.
 
@@ -30,13 +30,13 @@ Developer repairs red; tester does not review red heads. Send red caused by `mai
 
 ## Verdict
 
-Tester sends findings directly to developer. Send your own actionable findings to developer. Apply shared Findings; require another tester verdict after repairs. Rejected designs require new commits and tester review. Request a fresh tester only for session loss, a wrong launch environment or a rejected implementation design; lead TPM provisions it. After tester passes the last repair, proceed to Merge.
+Tester sends feedback directly to developer. Submit your own as a review and send developer its link. Apply shared Required feedback; require another tester review after repairs. Rejected designs require new commits and tester review. Request a fresh tester only for session loss, a wrong launch environment or a rejected implementation design; lead TPM provisions it. After tester passes the last repair, proceed to Merge.
 
-Before the tester passes, keep your notes short: decision on findings, blocking findings, next action. Raise design concerns as soon as you see them. The five headings belong to the Merge round. Each head gets one round in your comment: if a head you already noted passes, extend that round.
+Raise design concerns as soon as you see them.
 
 ## Merge
 
-Execute this template in order. At the comment, complete the review steps below before waiting or merging:
+Execute this template in order. At the comment, complete the steps below before waiting or merging:
 
 ```bash
 gh pr update-branch "$PR"   # "already up to date" is not an error
@@ -48,56 +48,21 @@ gh pr merge "$PR" --merge --match-head-commit "$REVIEWED_SHA"
 
 1. Request lead TPM advancement of your checkout to `REVIEWED_SHA`. Confirm `git rev-parse HEAD` matches and `TIPS_CHECK_TIMEOUT_SECONDS` is set.
 2. Review the integrated head's entire diff against `origin/main` once. Run `mix compile --warnings-as-errors`, `mix format --check-formatted`, `mix credo --strict`, `mix test` exactly once there. Documentation-only PRs need no local tests; `agent/teams` Python follows [Changing agent/teams scripts](../README.md#changing-agentteams-scripts). Clean updates get no second local run or tester round. Rerun the checks a later repair or base change materially affects, not the whole suite for every head.
-3. Append a `review` round to your comment in the shared round shape. Above the headings, record base and head SHAs, tester verdict per head, independently run checks, unresolved findings and follow-ups, each once. Use these five exact `###` headings (one line each for `probe`). Give the material conclusion and its evidence; avoid repeated narration. Close Defect pass with `No additional findings` when true.
+3. Judge the change by Google's [standard](https://google.github.io/eng-practices/review/reviewer/standard.html): approve once it definitely improves overall code health, even if it is not perfect. Cover its [review dimensions](https://google.github.io/eng-practices/review/reviewer/looking-for.html) and AGENTS.md Review; no fixed order or output headings. Include a design challenge: it questions the chosen implementation, design choices, tradeoffs, and assumptions. It is not just a stricter pass over implementation defects.
 
-| Heading | Review |
-|---|---|
-| `Local correctness` | Changed functions and modules |
-| `Downstream effects` | Callers, related modules, features, tests |
-| `Whole-project fit` | Design, architecture, end-to-end behaviour |
-| `Design challenge` | Concrete alternatives, tradeoffs, assumptions |
-| `Defect pass` | Stricter hunt on integrated diff |
-
-Example, adapted from #264:
-
-    ## 0110df7 review
-    PASS. F1 fixed; no open findings.
-    Base: 5fe1cda1bb16bea97df77c078ca0789ae641f909
-    Head: 0110df7fc0c4c0b1c2c41953849e6db39171601a
-    Scope: repair since 33d8135 and its effect on the reviewed PR.
-    Tester: 0110df7, pass, <round link>.
-    Ran: compile with warnings as errors, format, strict Credo, docs: exit 0. mix test: 554 passed, 9 excluded.
-    CI: <run link>: pass. Browser tests ran in CI, not locally.
-    Follow-up: #265 dependency advisories, outside this repair.
-
-    ### Local correctness
-    F1: a decoder error or no match returns :not_found; "%" and "a" now reject without session, token or mail.
-
-    ### Downstream effects
-    Confirmation and single-token deletion keep their success paths and return shapes; auth suite 215 passed.
-
-    ### Whole-project fit
-    The repair stays in Accounts' existing login boundary.
-
-    ### Design challenge
-    Narrow rejection preserves database failures; a broad rescue would hide them.
-
-    ### Defect pass
-    Checked invalid and expired proof and both success paths. No additional findings.
-
-If blocking findings remain, follow Verdict; restart Merge after repairs pass.
+Submit required feedback as a review and follow Verdict; restart Merge after repairs pass. Otherwise submit your approval per shared Reviews, with the tester's approving review link on line three.
 
 4. Publish status on that exact head:
 
 ```bash
-agent/teams/publish_review.py --pr "$PR" --sha "$REVIEWED_SHA" --record "$RECORD_COMMENT_URL"
+agent/teams/publish_review.py --pr "$PR" --sha "$REVIEWED_SHA" --record "$REVIEW_URL"
 ```
 
-The publisher reads only the round whose heading starts with that SHA; it rejects missing or duplicate rounds, missing or empty headings or moved heads.
+The publisher refuses a moved head, a review of another commit, a first line other than `LGTM` or any unresolved review thread. Feedback in review bodies is yours to confirm first.
 
 The timed CI watch is the only foreground wait. On timeout, retry once; report a second timeout to lead TPM as a blocker. Failed required checks return to Red check. On rate limit, stop the merge and report the error to lead TPM. None counts as success.
 
-If branch update conflicts, relay developer's fetch request to lead TPM. Developer resolves; tester reviews resolution; restart this sequence. If `main` moves before merge, the strict gate rejects: update, review base delta and republish status. The round for a clean update keeps the five headings, one line each: cite the reviewed head's round and state what the base delta changes.
+If branch update conflicts, relay developer's fetch request to lead TPM. Developer resolves; tester reviews resolution; restart this sequence. If `main` moves before merge, the strict gate rejects: update, review base delta and republish status from a new approval on that head that says what the base delta changes.
 
 If you execute the merge, record PR, reviewed head, merge SHA and evidence on the issue; notify lead TPM. Otherwise the executor records, except lead TPM records user-executed merges. Never synchronously watch `main` or automatically revert its changes.
 

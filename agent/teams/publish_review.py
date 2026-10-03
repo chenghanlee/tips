@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Publish the tips/independent-review status only for a complete tech-lead review record.
+"""Publish the tips/independent-review status for an approving review of the exact PR head.
 
-The record is the tech lead's rolling PR comment; the round headed `## <sha prefix> ...` for the
-reviewed head must carry all five `###` sections with text.
+The record is a submitted GitHub review of the head commit whose first line is `LGTM` and whose
+second line names the reviewer. Every review thread on the PR must be resolved.
 """
 
 import argparse
@@ -10,67 +10,37 @@ import json
 import re
 import subprocess
 import sys
+from typing import Any
 from urllib.parse import urlparse
 
-from team import execute
+from pr_review import RefusalError, gh, place, pull_request, unresolved_threads
 
 CONTEXT = "tips/independent-review"
-SECTIONS = (
-    "Local correctness",
-    "Downstream effects",
-    "Whole-project fit",
-    "Design challenge",
-    "Defect pass",
-)
 
 
-class RefusalError(Exception):
-    pass
-
-
-def missing_sections(record: str) -> list[str]:
-    """Name every required heading that is absent or has no text before the next heading."""
-    missing: list[str] = []
-    parts = re.split(r"^#{2,3}\s+(.+?)\s*$", record, flags=re.MULTILINE)
-    bodies = {parts[i].strip().lower(): parts[i + 1].strip() for i in range(1, len(parts) - 1, 2)}
-    for section in SECTIONS:
-        if not bodies.get(section.lower()):
-            missing.append(section)
-    return missing
-
-
-def review_round(record: str, sha: str) -> str:
-    """The body of the one `## <sha prefix> ...` round in a rolling comment that names this head."""
-    parts = re.split(r"^##[ \t]+(.+?)[ \t]*$", record, flags=re.MULTILINE)
-    rounds = [(parts[i].split()[0].lower(), parts[i + 1]) for i in range(1, len(parts) - 1, 2)]
-    matches = [
-        body
-        for prefix, body in rounds
-        if re.fullmatch(r"[0-9a-f]{7,40}", prefix) and sha.startswith(prefix)
-    ]
-    if len(matches) != 1:
-        raise RefusalError(f"Record needs exactly one '## {sha[:7]}…' round for the reviewed head.")
-    return matches[0]
-
-
-def comment_api_path(url: str) -> str:
-    """Map a PR review-comment or issue-comment link to its REST resource."""
+def review_api_path(url: str) -> str:
+    """Map a PR review link to its REST resource."""
     parsed = urlparse(url)
-    match = re.fullmatch(r"/([^/]+)/([^/]+)/pull/\d+", parsed.path)
-    kind = re.fullmatch(r"issuecomment-(\d+)|discussion_r(\d+)", parsed.fragment)
-    if parsed.hostname != "github.com" or not match or not kind:
-        raise RefusalError("Record must be a github.com PR comment link with its #issuecomment-id.")
-    owner, repo = match.group(1), match.group(2)
-    if kind.group(1):
-        return f"repos/{owner}/{repo}/issues/comments/{kind.group(1)}"
-    return f"repos/{owner}/{repo}/pulls/comments/{kind.group(2)}"
+    match = re.fullmatch(r"/([^/]+)/([^/]+)/pull/(\d+)", parsed.path)
+    review = re.fullmatch(r"pullrequestreview-(\d+)", parsed.fragment)
+    if parsed.hostname != "github.com" or not match or not review:
+        raise RefusalError("Record must be a github.com PR review link (#pullrequestreview-id).")
+    owner, repo, number = match.groups()
+    return f"repos/{owner}/{repo}/pulls/{number}/reviews/{review.group(1)}"
 
 
-def gh(*args: str) -> str:
-    result = execute(["gh", *args])
-    if result.returncode:
-        raise RefusalError(result.stderr.strip() or result.stdout.strip() or "gh failed")
-    return result.stdout.strip()
+def approval_problem(review: Any, sha: str) -> str | None:
+    """Why this review cannot stand as the approval of `sha`, or None."""
+    lines = [line.strip() for line in (review.get("body") or "").splitlines()]
+    if review.get("state") not in ("COMMENTED", "APPROVED"):
+        return f"Review state is {review.get('state')}, not a submitted comment or approval."
+    if review.get("commit_id") != sha:
+        return f"Review is on {review.get('commit_id')}, not the reviewed {sha}."
+    if not lines or lines[0] != "LGTM":
+        return "Review must start with a line containing only LGTM."
+    if len(lines) < 2 or not lines[1]:
+        return "The second line must name the reviewer's role and session."
+    return None
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -78,7 +48,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--pr", required=True, type=int)
     parser.add_argument("--sha", required=True, help="Exact reviewed head commit")
     source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--record", help="Link to the tech lead's review record comment")
+    source.add_argument("--record", help="Link to the approving review (#pullrequestreview-id)")
     source.add_argument(
         "--owner-waiver",
         metavar="REASON",
@@ -91,13 +61,10 @@ def verified_pr(number: int, sha: str) -> tuple[str, str]:
     """Return (owner/repo, PR url) after checking the PR head is the given SHA."""
     if not re.fullmatch(r"[0-9a-f]{40}", sha):
         raise RefusalError("--sha must be a full 40-character commit id.")
-    pr = json.loads(gh("pr", "view", str(number), "--json", "headRefOid,url"))
-    if pr["headRefOid"] != sha:
-        raise RefusalError(f"PR head is {pr['headRefOid']}, not the reviewed {sha}.")
-    repo = re.fullmatch(r"https://github\.com/([^/]+/[^/]+)/pull/\d+", pr["url"])
-    if not repo:
-        raise RefusalError(f"Unexpected PR URL: {pr['url']}")
-    return repo.group(1), pr["url"]
+    repo, url, head = pull_request(number)
+    if head != sha:
+        raise RefusalError(f"PR head is {head}, not the reviewed {sha}.")
+    return repo, url
 
 
 def post_status(repo: str, sha: str, target: str, description: str) -> None:
@@ -117,35 +84,46 @@ def post_status(repo: str, sha: str, target: str, description: str) -> None:
     )
 
 
-def main() -> None:
-    args = parse_arguments()
-    if args.record:
-        path = comment_api_path(args.record)
-        record = json.loads(gh("api", path))["body"]
-        missing = missing_sections(review_round(record, args.sha))
-        if missing:
-            raise RefusalError("Review record is missing sections: " + ", ".join(missing))
-        repo, url = verified_pr(args.pr, args.sha)
-        if not args.record.startswith(url + "#"):
-            raise RefusalError(f"Record {args.record} does not belong to PR {url}.")
-        post_status(repo, args.sha, args.record, "Tech lead review record complete")
-        print(f"Published {CONTEXT} on {args.sha} -> {args.record}")
-        return
-    reason = args.owner_waiver.strip()
+def publish_record(number: int, sha: str, record: str) -> None:
+    path = review_api_path(record)
+    repo, url = verified_pr(number, sha)
+    if not record.startswith(url + "#"):
+        raise RefusalError(f"Record {record} does not belong to PR {url}.")
+    problem = approval_problem(json.loads(gh("api", path)), sha)
+    if problem:
+        raise RefusalError(problem)
+    open_threads = unresolved_threads(repo, number)
+    if open_threads:
+        places = ", ".join(place(thread) for thread in open_threads)
+        raise RefusalError(f"{len(open_threads)} unresolved review threads: {places}")
+    post_status(repo, sha, record, "LGTM on this head; review threads resolved")
+    print(f"Published {CONTEXT} on {sha} -> {record}")
+
+
+def publish_waiver(number: int, sha: str, reason: str) -> None:
     if len(reason) < 12:
         raise RefusalError("--owner-waiver needs a reason of at least 12 characters.")
-    repo, _ = verified_pr(args.pr, args.sha)
+    repo, url = verified_pr(number, sha)
     waiver = gh(
         "pr",
         "comment",
-        str(args.pr),
+        str(number),
         "--body",
-        f"**Owner waiver:** independent review skipped on {args.sha}. "
+        f"**Owner waiver:** independent review skipped on {sha}. "
         f"No team live; owner-driven change. Reason: {reason}",
     )
-    comment_api_path(waiver)  # gh prints the new comment URL; refuse anything else.
-    post_status(repo, args.sha, waiver, "Owner waiver: independent review skipped")
-    print(f"Published {CONTEXT} on {args.sha} by owner waiver -> {waiver}")
+    if not re.fullmatch(re.escape(url) + r"#issuecomment-\d+", waiver):
+        raise RefusalError(f"Unexpected waiver comment link: {waiver}")
+    post_status(repo, sha, waiver, "Owner waiver: independent review skipped")
+    print(f"Published {CONTEXT} on {sha} by owner waiver -> {waiver}")
+
+
+def main() -> None:
+    args = parse_arguments()
+    if args.record:
+        publish_record(args.pr, args.sha, args.record)
+    else:
+        publish_waiver(args.pr, args.sha, args.owner_waiver.strip())
 
 
 if __name__ == "__main__":

@@ -28,4 +28,4 @@ For team work, lead TPM sets Active and records the base SHA; tech lead posts re
 
 ## Completion
 
-Implementation and tests pass. Separate-session review covers the complete PR with no unresolved P0/P1. Relevant integrated checks pass. Context overrun continues on this issue in a fresh repair session.
+Implementation and tests pass. Separate-session review covers the complete PR with no unresolved required feedback. Relevant integrated checks pass. Context overrun continues on this issue in a fresh repair session.

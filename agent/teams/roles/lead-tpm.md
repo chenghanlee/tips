@@ -74,7 +74,7 @@ Before merging owner-waived code:
 2. Create Git-ignored `tmp/review-<issue>/chavruta.md` there: scope, AGENTS.md review order, reply command `herdr agent prompt lead-tpm "chavruta round N posted: ..."`.
 3. Run `herdr pane split --current --direction right --cwd <worktree> --no-focus`, then `herdr agent start <name> --kind codex --pane <pane> -- -a never`.
 4. Append rounds with the reviewer until agreement; fix accepted findings. Send deadlocks to the user.
-5. Post one PR comment quoting every round's findings and verdicts, since `tmp/` is never committed.
+5. Submit one PR review with the agreed outcome: changes made and advice declined, since `tmp/` is never committed.
 6. After merge, remove the review worktree.
 
 ## Blocked outside the team
