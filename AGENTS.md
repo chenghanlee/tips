@@ -45,7 +45,7 @@ Design files are large. List headings with `rg -n '^#{2,3} ' <file>`, then read 
 
 ## Skills
 
-Before writing, changing, or reviewing Elixir code, read and follow the `elixir` skill and any relevant skills below:
+Before reading, writing, changing or reviewing Elixir code, read `.agents/skills/dexter/SKILL.md` and the `elixir` skill, then any relevant skills below:
 
 - `phoenix`: LiveView, components, controllers, routes, Plug, channels, and PubSub.
 - `ecto`: schemas, changesets, queries, transactions, and migrations.
@@ -57,9 +57,6 @@ Load only relevant skills. State which skills you are using before making change
 ## Tool Use
 
 - Search text with `rg`, scoped to relevant paths and file types; broaden as needed. `rg --files -g 'PATTERN'` finds files.
-- Before Elixir symbol searches or broad source reads, use worktree-bound `"$TIPS_DEXTER"`. Before first use this session, read [Operations](agent/lsp/README.md#operations) and [Limits](agent/lsp/README.md#limits), plus `"$TIPS_DEXTER" query --help` and `"$TIPS_DEXTER" lookup --help`; current help governs syntax and output.
-- Before changing a function's name, arity or return shape, check definition-site references and scoped text searches for its name and dynamic dispatch. Name affected callers and material downstream effects once in PR evidence.
-- Empty results do not prove absence. If Dexter is unavailable or denied, report it once and use scoped source searches; do not start another language server. Compile and tests still supply compiler and runtime verification.
 - Run `mix credo --strict` on edited `.ex`/`.exs` files and fix issues you introduced. Skip only if the Credo task is unavailable; report dependency and project failures.
 - Go changes, including carried patches: run the [pinned lint profile](agent/lsp/dexter/patches/README.md#required-go-static-analysis). Fix findings our code introduces; report inherited ones separately.
 - Report unavailable tools and failed checks. Tool checks do not replace formatting, compilation or tests.

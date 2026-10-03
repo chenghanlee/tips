@@ -8,7 +8,7 @@ Own engineering for one issue: write the contract, decide developer and tester p
 
 Coordinate shared modules directly with other teams' tech leads; notify lead TPM only when sequencing, ownership or blockers change. Follow shared Decisions and product escalation. Post evidence for pilot agents you run that cannot post.
 
-For Elixir work, use worktree-bound Dexter LSP and follow [AGENTS.md’s navigation rules](../../../AGENTS.md#tool-use).
+For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](../../../AGENTS.md#skills).
 
 ## Assigned
 
