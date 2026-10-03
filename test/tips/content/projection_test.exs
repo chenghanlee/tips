@@ -7,7 +7,6 @@ defmodule Tips.Content.ProjectionTest do
   import Tips.AccountsFixtures
   import Tips.ContentFixtures
   import Tips.MediaFixtures
-  import Tips.ModerationFixtures
   import Tips.VisibilityFixtures
 
   @sentinel "SENTINEL"
@@ -27,7 +26,7 @@ defmodule Tips.Content.ProjectionTest do
       })
 
     tip_media = [
-      image_fixture(tip, %{description: "#{@sentinel} image", position: 0}),
+      image_fixture(tip, %{description: "#{@sentinel} image", position: 0, is_animated: true}),
       attached_video_fixture(tip, %{position: 1})
     ]
 
@@ -91,6 +90,7 @@ defmodule Tips.Content.ProjectionTest do
         review_fixture(ctx.tip, %{user_id: ctx.author.id, body: "Author's own review"})
 
       [review_image] = ctx.review_media
+
       viewers = viewers(ctx.author)
 
       for marker <- [:hidden, :deleted] do
@@ -190,6 +190,8 @@ defmodule Tips.Content.ProjectionTest do
             assert {label, %{state: :visible, id: review.id, body: "Visible review body"}} ==
                      {label, selected_fields(result, [:state, :id, :body])}
 
+            assert {:visible, %{tip: %{title: "SENTINEL title"}}} = result.review
+
           {:hidden, false} ->
             assert {label, %{state: :visible, id: review.id, removed: true}} ==
                      {label, selected_fields(result, [:state, :id, :removed])}
@@ -218,8 +220,12 @@ defmodule Tips.Content.ProjectionTest do
       review = Repo.preload(ctx.review, [:user, :model, :environment, tip: :user])
       author = Repo.get!(User, ctx.author.id)
       reviewer = Repo.get!(User, ctx.reviewer.id)
-      tip_hydration = %{tip_hydration(author, ctx.tip_media) | own_review: nil}
-      review_hydration = review_hydration(tip, reviewer, ctx.review_media)
+      report_detail = "#{@sentinel} report explanation"
+      report = %{reason: :harmful, detail: report_detail, reporter: reviewer}
+      tip_hydration = Map.put(tip_hydration(author, ctx.tip_media), :reports, [report])
+
+      review_hydration =
+        Map.put(review_hydration(tip, reviewer, ctx.review_media), :reports, [report])
 
       summary = Projection.summary(moderator, tip, tip_hydration)
       detail = Projection.tip(moderator, tip, tip_hydration)
@@ -265,43 +271,18 @@ defmodule Tips.Content.ProjectionTest do
         assert_plain(output)
         text = inspect(output, limit: :infinity, printable_limit: :infinity)
 
-        for private <- [author.email, reviewer.email, "hashed_password", "stream-", "users"] do
+        for private <- [
+              author.email,
+              reviewer.email,
+              report_detail,
+              "harmful",
+              "reports:",
+              "hashed_password",
+              "stream-",
+              "users"
+            ] do
           refute text =~ private
         end
-      end
-    end
-
-    test "authors receive no moderation report details", ctx do
-      detail = "#{@sentinel} report explanation"
-      reporter = user_fixture()
-      flag_fixture(reporter, %{tip_id: ctx.tip.id, reason: :harmful, detail: detail})
-      flag_fixture(reporter, %{review_id: ctx.review.id, reason: :spam, detail: detail})
-
-      tip = put_marker!(ctx.tip, :hidden)
-      review = put_marker!(ctx.review, :hidden)
-      author = Scope.for_user(ctx.author)
-      reviewer = Scope.for_user(ctx.reviewer)
-      tip_hydration = tip_hydration(ctx.author, ctx.tip_media)
-      review_hydration = review_hydration(tip, ctx.reviewer, ctx.review_media)
-
-      outputs = [
-        Projection.summary(author, tip, tip_hydration),
-        Projection.tip(author, tip, tip_hydration),
-        Projection.review(reviewer, review, review_hydration),
-        Projection.selected_review(reviewer, tip, review, %{
-          tip: tip_hydration,
-          review: review_hydration
-        }),
-        Projection.own_review(reviewer, review)
-      ]
-
-      assert [%{removed: true}, %{removed: true}, %{removed: true}, _selected, %{removed: true}] =
-               outputs
-
-      text = inspect(outputs, limit: :infinity, printable_limit: :infinity)
-
-      for private <- [detail, reporter.handle, "harmful", "spam", "reason", "flag", "reports:"] do
-        refute text =~ private
       end
     end
   end
@@ -341,7 +322,8 @@ defmodule Tips.Content.ProjectionTest do
             reader: reader,
             anonymous: nil,
             moderator: moderator
-          ] do
+          ],
+          viewer == :owner or owner_state == :confirmed do
         tip = owner |> tip_fixture() |> put_marker!(marker)
 
         review =
@@ -439,6 +421,44 @@ defmodule Tips.Content.ProjectionTest do
     test "media projection checks current parent visibility and attachment membership", ctx do
       [image, video] = ctx.tip_media
       [review_image] = ctx.review_media
+
+      vote_fixture(ctx.tip, %{user_id: ctx.reviewer.id})
+      tip = Repo.reload!(ctx.tip)
+      scope = Scope.for_user(ctx.reviewer)
+
+      hydration = %{
+        tip_hydration(ctx.author, ctx.tip_media)
+        | viewer_vote: 1,
+          own_review: ctx.review,
+          latest_review_at: ctx.review.created_at
+      }
+
+      assert %{
+               title: "SENTINEL title",
+               slug: "sentinel-title",
+               tag: %{id: "other", label: "Other technique"},
+               model: %{id: nil, label: "SENTINEL model"},
+               environment: %{id: "cli", label: "CLI"},
+               author: %{handle: handle},
+               score: 1,
+               review_count: 1,
+               viewer_vote: 1,
+               capabilities: %{vote: true}
+             } = Projection.summary(scope, tip, hydration)
+
+      assert handle == ctx.author.handle
+
+      assert %{
+               capabilities: %{review: false, edit: false, delete: false},
+               media: [%{object_key: image_key}, %{kind: :video}]
+             } = Projection.tip(scope, tip, hydration)
+
+      assert image_key == image.key
+      assert %{title: "SENTINEL title", slug: "sentinel-title"} = Projection.metadata(nil, tip)
+
+      assert %{removed: false, capabilities: %{edit: true, delete: true}} =
+               Projection.own_review(scope, ctx.review)
+
       # The fixture inserts an attached row before marking cleanup, which clears
       # its position; a free slot only avoids media_tip_slot during that insert.
       cleanup = cleanup_media_fixture(ctx.tip, %{position: 3})
@@ -456,7 +476,7 @@ defmodule Tips.Content.ProjectionTest do
           id: image.id,
           position: 0,
           description: "#{@sentinel} image",
-          animated: false,
+          animated: true,
           object_key: image.key
         },
         %{

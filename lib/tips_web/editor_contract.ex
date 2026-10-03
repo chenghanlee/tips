@@ -6,8 +6,7 @@ defmodule TipsWeb.EditorContract do
   This module only declares types. The editor page and hook (#78), browser
   storage (#75) and the Content comparator (#72) implement them. Server inputs
   and results stay `Tips.Content` types; `assets/js/editor_contract.js`
-  declares the same shapes as JSON. Examples live in
-  `TipsWeb.EditorContractFixtures`. See "Saving and recovery" and
+  declares the same shapes as JSON. See "Saving and recovery" and
   "Publication-to-edit handoff" in `docs/design/frontend-design.md`.
 
   ## Identities

@@ -6,6 +6,25 @@ schema on one integrated revision, checked against the
 [backend database contract](../design/backend-design.md#database-implementation).
 This gate verifies. It does not repair; gaps go back to their P1 owner.
 
+## Current test coverage
+
+This is a historical gate report for the revision listed below, not an inventory of
+today's suite. The test-suite reduction retired the test-owned report/delete and
+bulk-liveness schedules, raw constraint/default matrices, and index-definition mirrors.
+Their recorded results remain historical evidence; they do not prove implemented
+reporting or deletion workflows.
+
+Current coverage retains real committed vote races, application changeset boundaries,
+search writer freshness/rollback, and `search_schema_test.exs`'s BM25/cosine integration
+against the installed extensions. The extension test replaces the separate
+`repo_extensions_test.exs` smoke checks; it does not assert every queue index or English
+stemming. The request-timeout integration named below remains. Oban configuration now
+checks minute expiry scheduling and seven-day retention; actual worker tests cover
+cleanup progress, rollback and unique enqueue.
+
+The removed [report/delete experiment](https://github.com/chenghanlee/tips/blob/3cb25dbb84df943cd08728919277500c8c476077/test/tips/content/report_delete_concurrency_test.exs)
+and other old test names below refer to the gate's historical source, not current files.
+
 ## Verdict
 
 **Pass on the integrated revision.** Every canonical table, check, FK, index, view,

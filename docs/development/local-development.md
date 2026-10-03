@@ -289,11 +289,12 @@ TIPS_BROWSER=1 mix test test/tips_web/features/live_smoke_test.exs --trace
 
 Both version commands must report `153.0.8010.52`. On macOS the browser
 executable is inside `Google Chrome for Testing.app/Contents/MacOS/`.
-ChromeDriver may instead be on PATH. The browser smoke checks connected
-LiveView email validation at 1280×800, the registration form at 390×844, and
-registration through the connected LiveView. Each browser test has an isolated
-SQL sandbox; inserts are rolled back and mail uses the Swoosh test adapter.
-The narrow viewport checks layout in Chrome, not a physical mobile browser.
+ChromeDriver may instead be on PATH. The browser smoke uses one connected
+registration journey at 390×844. It checks
+invalid-email correction, account creation, and compiled input border/focus styles.
+It uses an isolated SQL sandbox; inserts are rolled back and mail uses the Swoosh
+test adapter. The viewport choice does not establish responsive layout, keyboard
+traversal or physical mobile browser coverage.
 
 The required `checks` CI job runs documentation validation,
 introduced-commit secret scanning, locked dependencies, compilation with
@@ -316,8 +317,8 @@ non-root user.
 
 | Coverage | Check |
 |---|---|
-| Linux desktop, 1280×800 | Automated Chrome milestone paths, with fresh and multiple sessions |
-| Chrome, 390×844 viewport | Automated responsive smoke; this does not test a mobile browser engine |
+| Linux desktop, 1280×800 | Future milestone checks for real journeys needing this viewport |
+| Chrome, 390×844 viewport | Automated signup and compiled-style smoke; no responsive-layout or mobile-engine guarantee |
 | Safari on macOS and physical iOS; Chrome on physical Android | Manual milestone checks for keyboard/focus, draft recovery, uploads and private video playback; record OS/browser/device versions with the results |
 
 Use dispatched events or the required button path to test drag reordering.

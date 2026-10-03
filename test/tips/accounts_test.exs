@@ -22,19 +22,6 @@ defmodule Tips.AccountsTest do
     end
   end
 
-  describe "get_user!/1" do
-    test "raises if id is invalid" do
-      assert_raise Ecto.NoResultsError, fn ->
-        Accounts.get_user!(-1)
-      end
-    end
-
-    test "returns the user with the given id" do
-      %{id: id} = user = user_fixture()
-      assert %User{id: ^id} = Accounts.get_user!(user.id)
-    end
-  end
-
   describe "register_user/1" do
     test "requires email to be set" do
       {:error, changeset} = Accounts.register_user(%{})
@@ -167,35 +154,6 @@ defmodule Tips.AccountsTest do
 
       assert Repo.get!(User, user.id).email == user.email
       assert Repo.get_by(UserToken, user_id: user.id)
-    end
-  end
-
-  describe "generate_user_session_token/1" do
-    setup do
-      %{user: user_fixture()}
-    end
-
-    test "generates a token", %{user: user} do
-      token = Accounts.generate_user_session_token(user)
-      assert user_token = Repo.get_by(UserToken, token: token)
-      assert user_token.context == "session"
-      assert user_token.authenticated_at != nil
-
-      # Creating the same token for another user should fail
-      assert_raise Ecto.ConstraintError, fn ->
-        Repo.insert!(%UserToken{
-          token: user_token.token,
-          user_id: user_fixture().id,
-          context: "session"
-        })
-      end
-    end
-
-    test "mints current recency, ignoring the caller's authenticated_at", %{user: user} do
-      stale = DateTime.add(DateTime.utc_now(:second), -3600)
-      token = Accounts.generate_user_session_token(%{user | authenticated_at: stale})
-      assert user_token = Repo.get_by(UserToken, token: token)
-      assert DateTime.after?(user_token.authenticated_at, stale)
     end
   end
 

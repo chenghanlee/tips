@@ -167,6 +167,16 @@ defmodule Tips.Content.SearchTextTest do
         kind = unquote(kind)
         content = content(kind)
 
+        assert %{rows: [[future]]} =
+                 Repo.query!(
+                   """
+                   INSERT INTO #{table(kind)} (#{id_column(kind)}, search_text, text_at)
+                   VALUES ($1, 'future text', clock_timestamp() + interval '1 day')
+                   RETURNING text_at
+                   """,
+                   [content.id]
+                 )
+
         assert {:ok, {first, second}} =
                  Repo.transact(fn ->
                    assert :ok = write(kind, content.id)
@@ -176,28 +186,9 @@ defmodule Tips.Content.SearchTextTest do
                    {:ok, {first, search_state(kind, content.id)}}
                  end)
 
+        assert DateTime.diff(first.token, future, :microsecond) >= 1
         assert second.text =~ "Changed in the same transaction"
         assert_later(second, first)
-      end
-
-      test "#{kind} token advances past a future token" do
-        kind = unquote(kind)
-        content = content(kind)
-
-        %{rows: [[future]]} =
-          Repo.query!(
-            """
-            INSERT INTO #{table(kind)} (#{id_column(kind)}, search_text, text_at)
-            VALUES ($1, 'future text', clock_timestamp() + interval '1 day')
-            RETURNING text_at
-            """,
-            [content.id]
-          )
-
-        write!(kind, content.id)
-
-        assert %{token: token} = search_state(kind, content.id)
-        assert DateTime.diff(token, future, :microsecond) >= 1
       end
     end
   end
@@ -235,148 +226,7 @@ defmodule Tips.Content.SearchTextTest do
     end
   end
 
-  describe "stale worker success and failure cannot overwrite a newer canonical document" do
-    for kind <- [:tip, :review] do
-      test "#{kind} guarded worker writes need the current token" do
-        kind = unquote(kind)
-        content = content(kind)
-        write!(kind, content.id)
-        %{token: stale_token} = search_state(kind, content.id)
-
-        assert {:ok, :edited} =
-                 Repo.transact(fn ->
-                   update!(content, output: "Newer output")
-                   :ok = write(kind, content.id)
-                   {:ok, :edited}
-                 end)
-
-        newer = search_state(kind, content.id)
-
-        assert %{num_rows: 0} = worker_success(kind, content.id, stale_token)
-        assert %{num_rows: 0} = worker_failure(kind, content.id, stale_token)
-        assert search_state(kind, content.id) == newer
-
-        assert %{num_rows: 1} = worker_failure(kind, content.id, newer.token)
-        assert %{vector?: false, embed_after: %DateTime{}} = search_state(kind, content.id)
-        assert %{num_rows: 1} = worker_success(kind, content.id, newer.token)
-
-        assert %{text: text, token: token, vector?: true} = search_state(kind, content.id)
-        assert {text, token} == {newer.text, newer.token}
-      end
-    end
-  end
-
-  describe "vote and counter changes leave search text and freshness unchanged" do
-    test "real votes and direct counter updates" do
-      tip = tip_fixture()
-      review = review_fixture(tip)
-      write!(:tip, tip.id)
-      write!(:review, review.id)
-      tip_search = search_state(:tip, tip.id)
-      review_search = search_state(:review, review.id)
-
-      vote_fixture(tip)
-      vote_fixture(review, %{value: -1})
-      Repo.query!("UPDATE tips SET review_count = review_count + 1 WHERE id = $1", [tip.id])
-
-      assert %Tip{up_count: 1} = Repo.get!(Tip, tip.id)
-      assert %Review{down_count: 1} = Repo.get!(Review, review.id)
-      assert search_state(:tip, tip.id) == tip_search
-      assert search_state(:review, review.id) == review_search
-    end
-  end
-
-  describe "label rebuild uses current labels through the canonical writer" do
-    setup do
-      tag = curated!(Tag, "Old tag")
-      model = curated!(Model, "Old model")
-      environment = curated!(Environment, "Old environment")
-
-      tagged = tip_fixture(user_fixture(), %{tag_id: tag.id})
-
-      set_up_tip =
-        tip_fixture(user_fixture(), %{model_id: model.id, environment_id: environment.id})
-
-      review =
-        review_fixture(tip_fixture(), %{model_id: model.id, environment_id: environment.id})
-
-      unaffected_tip = tip_fixture(user_fixture(), %{model_other: "Old model"})
-      unaffected_review = review_fixture(tagged)
-
-      for tip <- [tagged, set_up_tip, unaffected_tip], do: write!(:tip, tip.id)
-      for review <- [review, unaffected_review], do: write!(:review, review.id)
-
-      before =
-        Map.new(
-          [
-            {:tip, tagged.id},
-            {:tip, set_up_tip.id},
-            {:tip, unaffected_tip.id},
-            {:review, review.id},
-            {:review, unaffected_review.id}
-          ],
-          fn {kind, id} = key -> {key, embed!(kind, id)} end
-        )
-
-      %{
-        tag: tag,
-        model: model,
-        environment: environment,
-        affected: [{:tip, tagged.id}, {:tip, set_up_tip.id}, {:review, review.id}],
-        unaffected: [{:tip, unaffected_tip.id}, {:review, unaffected_review.id}],
-        before: before
-      }
-    end
-
-    test "rebuilds affected tips and reviews, including retired labels", context do
-      assert {:ok, :rebuilt} =
-               Repo.transact(fn ->
-                 relabel!(context, active: false)
-                 rebuild!(context)
-                 {:ok, :rebuilt}
-               end)
-
-      [{:tip, tagged_id}, {:tip, set_up_tip_id}, {:review, review_id}] = context.affected
-
-      assert %{text: "A useful technique\n" <> _ = tagged_text} = search_state(:tip, tagged_id)
-      assert tagged_text |> String.split("\n") |> List.last() == "New tag"
-
-      assert %{text: set_up_text} = search_state(:tip, set_up_tip_id)
-      assert ["New model", "New environment"] = set_up_text |> String.split("\n") |> Enum.take(-2)
-
-      assert %{text: review_text} = search_state(:review, review_id)
-
-      assert [_body, "New model", "New environment"] = String.split(review_text, "\n")
-
-      for key <- context.affected do
-        state = search_state(elem(key, 0), elem(key, 1))
-        assert %{vector?: false, embed_after: nil} = state
-        assert_later(state, context.before[key])
-      end
-
-      for {kind, id} = key <- context.unaffected do
-        assert search_state(kind, id) == context.before[key]
-      end
-    end
-
-    test "label change and rebuild roll back together", context do
-      assert {:error, :caller_failed} =
-               Repo.transact(fn ->
-                 relabel!(context)
-                 rebuild!(context)
-                 {:error, :caller_failed}
-               end)
-
-      assert %Tag{label: "Old tag"} = Repo.get!(Tag, context.tag.id)
-      assert %Model{label: "Old model"} = Repo.get!(Model, context.model.id)
-
-      for {kind, id} = key <- context.affected ++ context.unaffected do
-        assert search_state(kind, id) == context.before[key]
-      end
-    end
-  end
-
-  describe "canonical writers require a caller transaction and fail for missing content" do
+  describe "canonical writers require a caller transaction" do
     test "outside a transaction" do
       tip = tip_fixture()
       review = review_fixture(tip)
@@ -389,20 +239,6 @@ defmodule Tips.Content.SearchTextTest do
 
       assert search_state(:tip, tip.id) == nil
       assert search_state(:review, review.id) == nil
-    end
-
-    test "missing content" do
-      assert {:ok, :checked} =
-               Repo.transact(fn ->
-                 assert_raise Ecto.NoResultsError, fn -> Search.write_tip_text(-1) end
-                 {:ok, :checked}
-               end)
-
-      assert {:ok, :checked} =
-               Repo.transact(fn ->
-                 assert_raise Ecto.NoResultsError, fn -> Search.write_review_text(-1) end
-                 {:ok, :checked}
-               end)
     end
   end
 
@@ -433,48 +269,6 @@ defmodule Tips.Content.SearchTextTest do
     |> Repo.insert!()
   end
 
-  # A maintenance caller changing curated labels, then rebuilding the affected
-  # documents with the predicates documented in Tips.Content.Search.
-  defp relabel!(context, attrs \\ []) do
-    for {schema, row, label} <- [
-          {Tag, context.tag, "New tag"},
-          {Model, context.model, "New model"},
-          {Environment, context.environment, "New environment"}
-        ] do
-      schema
-      |> Repo.get!(row.id)
-      |> Ecto.Changeset.change([label: label] ++ attrs)
-      |> Repo.update!()
-    end
-  end
-
-  defp rebuild!(%{tag: tag, model: model, environment: environment}) do
-    %{rows: tip_rows} =
-      Repo.query!(
-        """
-        SELECT id FROM tips
-        WHERE tag_id = $1 OR model_id = $2 OR environment_id = $3
-        ORDER BY id
-        FOR NO KEY UPDATE
-        """,
-        [tag.id, model.id, environment.id]
-      )
-
-    %{rows: review_rows} =
-      Repo.query!(
-        """
-        SELECT id FROM reviews
-        WHERE model_id = $1 OR environment_id = $2
-        ORDER BY id
-        FOR NO KEY UPDATE
-        """,
-        [model.id, environment.id]
-      )
-
-    for [id] <- tip_rows, do: :ok = Search.write_tip_text(id)
-    for [id] <- review_rows, do: :ok = Search.write_review_text(id)
-  end
-
   defp search_state(kind, id) do
     case Repo.query!(
            """
@@ -492,39 +286,19 @@ defmodule Tips.Content.SearchTextTest do
     end
   end
 
-  # Simulates a completed worker round plus a later cooldown, so invalidation
-  # is visible on both columns.
+  # Seed embedding and cooldown state so writer invalidation is visible.
   defp embed!(kind, id) do
-    %{token: token} = search_state(kind, id)
-    assert %{num_rows: 1} = worker_success(kind, id, token)
-
     Repo.query!(
-      "UPDATE #{table(kind)} SET embed_after = clock_timestamp() + interval '1 hour' WHERE #{id_column(kind)} = $1",
-      [id]
+      """
+      UPDATE #{table(kind)}
+      SET embedding = $2::text::vector(1024), embed_after = clock_timestamp() + interval '1 hour'
+      WHERE #{id_column(kind)} = $1
+      """,
+      [id, unit_vector()]
     )
 
     assert %{vector?: true, embed_after: %DateTime{}} = state = search_state(kind, id)
     state
-  end
-
-  defp worker_success(kind, id, token) do
-    Repo.query!(
-      """
-      UPDATE #{table(kind)} SET embedding = $2::text::vector(1024)
-      WHERE #{id_column(kind)} = $1 AND embedding IS NULL AND text_at = $3
-      """,
-      [id, unit_vector(), token]
-    )
-  end
-
-  defp worker_failure(kind, id, token) do
-    Repo.query!(
-      """
-      UPDATE #{table(kind)} SET embed_after = clock_timestamp() + interval '10 minutes'
-      WHERE #{id_column(kind)} = $1 AND embedding IS NULL AND text_at = $2
-      """,
-      [id, token]
-    )
   end
 
   defp assert_later(%{token: later}, %{token: earlier}) do

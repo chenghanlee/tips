@@ -11,28 +11,6 @@ defmodule TipsWeb.UserLive.ConfirmationTest do
   end
 
   describe "Confirm user" do
-    test "renders confirmation page for unconfirmed user", %{conn: conn, unconfirmed_user: user} do
-      token =
-        extract_user_token(fn url ->
-          Accounts.deliver_login_instructions(user, url)
-        end)
-
-      {:ok, _lv, html} = live(conn, ~p"/users/log-in/#{token}")
-      assert html =~ "Confirm and stay logged in"
-      refute String.downcase(html) =~ "password"
-    end
-
-    test "renders login page for confirmed user", %{conn: conn, confirmed_user: user} do
-      token =
-        extract_user_token(fn url ->
-          Accounts.deliver_login_instructions(user, url)
-        end)
-
-      {:ok, _lv, html} = live(conn, ~p"/users/log-in/#{token}")
-      refute html =~ "Confirm my account"
-      assert html =~ "Keep me logged in on this device"
-    end
-
     test "renders login page for already logged in user", %{conn: conn, confirmed_user: user} do
       conn = log_in_user(conn, user)
 
@@ -52,7 +30,16 @@ defmodule TipsWeb.UserLive.ConfirmationTest do
           Accounts.deliver_login_instructions(user, url)
         end)
 
-      {:ok, lv, _html} = live(conn, ~p"/users/log-in/#{token}")
+      {:ok, lv, html} = live(conn, ~p"/users/log-in/#{token}")
+
+      assert has_element?(
+               lv,
+               ~s|#confirmation_form button[name="user[remember_me]"][value="true"]|,
+               "Confirm and stay logged in"
+             )
+
+      refute has_element?(lv, "input[type=password]")
+      refute String.downcase(html) =~ "password"
 
       form = form(lv, "#confirmation_form", %{"user" => %{"token" => token}})
       render_submit(form)
@@ -86,7 +73,17 @@ defmodule TipsWeb.UserLive.ConfirmationTest do
           Accounts.deliver_login_instructions(user, url)
         end)
 
-      {:ok, lv, _html} = live(conn, ~p"/users/log-in/#{token}")
+      {:ok, lv, html} = live(conn, ~p"/users/log-in/#{token}")
+
+      assert has_element?(
+               lv,
+               ~s|#login_form button[name="user[remember_me]"][value="true"]|,
+               "Keep me logged in on this device"
+             )
+
+      refute has_element?(lv, "#confirmation_form")
+      refute has_element?(lv, "input[type=password]")
+      refute String.downcase(html) =~ "password"
 
       form = form(lv, "#login_form", %{"user" => %{"token" => token}})
       render_submit(form)

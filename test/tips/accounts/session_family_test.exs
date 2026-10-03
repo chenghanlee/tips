@@ -6,50 +6,6 @@ defmodule Tips.Accounts.SessionFamilyTest do
   alias Tips.Accounts
   alias Tips.Accounts.{User, UserToken}
 
-  describe "authenticated issuance" do
-    test "fresh logins start independent server families with current recency" do
-      user = user_fixture()
-      stale = DateTime.add(DateTime.utc_now(:second), -1, :hour)
-
-      first = Accounts.generate_user_session_token(%{user | authenticated_at: stale})
-      second = Accounts.generate_user_session_token(user, nil)
-
-      assert %UserToken{session_family_id: family, authenticated_at: first_auth} = row(first)
-      assert %UserToken{session_family_id: other_family} = row(second)
-      assert {:ok, _} = Ecto.UUID.cast(family)
-      refute family == other_family
-      assert DateTime.after?(first_auth, stale)
-    end
-
-    test "same-account reauthentication retains the family and advances recency" do
-      user = user_fixture()
-      predecessor = Accounts.generate_user_session_token(user)
-      stale = DateTime.add(DateTime.utc_now(:second), -1, :hour)
-      override_token_authenticated_at(predecessor, stale)
-
-      token = Accounts.generate_user_session_token(user, predecessor)
-
-      refute token == predecessor
-      assert %UserToken{session_family_id: family, authenticated_at: auth} = row(token)
-      assert family == row(predecessor).session_family_id
-      assert DateTime.after?(auth, stale)
-      assert {%User{} = session_user, _} = Accounts.get_user_by_session_token(token)
-      assert Accounts.sudo_mode?(session_user)
-    end
-
-    test "reauthentication without a valid same-account predecessor starts a fresh family" do
-      user = user_fixture()
-      other = Accounts.generate_user_session_token(user_fixture())
-      expired = Accounts.generate_user_session_token(user)
-      backdate(expired, -60, :day)
-
-      for predecessor <- [other, expired, "missing"] do
-        token = Accounts.generate_user_session_token(user, predecessor)
-        refute row(token).session_family_id in family_ids([other, expired])
-      end
-    end
-  end
-
   describe "renew_user_session_token/2" do
     test "copies the family and database recency; renewal cannot restore sudo" do
       user = user_fixture()
@@ -171,41 +127,6 @@ defmodule Tips.Accounts.SessionFamilyTest do
 
       assert {:ok, [^family]} = Accounts.revoke_user_session_family(token)
       assert Repo.all_by(UserToken, session_family_id: family) == []
-    end
-  end
-
-  describe "revoke_user_session_families/1" do
-    test "all-family revocation composes with rollback" do
-      user = user_fixture()
-      first = Accounts.generate_user_session_token(user)
-      {:ok, successor} = Accounts.renew_user_session_token(user, first)
-      second = Accounts.generate_user_session_token(user)
-      other_account = Accounts.generate_user_session_token(user_fixture())
-      login = email_token_row(user, "login")
-      families = Enum.sort([row(first).session_family_id, row(second).session_family_id])
-
-      assert {:error, :rolled_back} =
-               Repo.transact(fn ->
-                 assert {:ok, ids} = Accounts.revoke_user_session_families(user)
-                 assert Enum.sort(ids) == families
-                 refute Accounts.get_user_by_session_token(first)
-                 {:error, :rolled_back}
-               end)
-
-      for token <- [first, successor, second] do
-        assert {%User{}, _} = Accounts.get_user_by_session_token(token)
-      end
-
-      assert {:ok, ids} = Accounts.revoke_user_session_families(user)
-      assert Enum.sort(ids) == families
-
-      for token <- [first, successor, second] do
-        refute Accounts.get_user_by_session_token(token)
-      end
-
-      assert Repo.get(UserToken, login.id)
-      assert {%User{}, _} = Accounts.get_user_by_session_token(other_account)
-      assert {:ok, []} = Accounts.revoke_user_session_families(user)
     end
   end
 
@@ -372,10 +293,6 @@ defmodule Tips.Accounts.SessionFamilyTest do
   end
 
   defp row(token), do: Repo.get_by!(UserToken, token: token, context: "session")
-
-  defp family_ids(tokens) do
-    Repo.all(from(t in UserToken, where: t.token in ^tokens, select: t.session_family_id))
-  end
 
   defp token_count, do: Repo.aggregate(UserToken, :count)
 

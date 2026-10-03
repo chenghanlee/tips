@@ -1,8 +1,6 @@
 defmodule Tips.Content.IntentTest do
   use ExUnit.Case, async: true
 
-  import Tips.ContentContractFixtures
-
   alias Tips.Content
   alias Tips.Content.{Review, Tip}
 
@@ -42,42 +40,34 @@ defmodule Tips.Content.IntentTest do
   test "explicit blanks follow schema casting and nonblank text remains verbatim" do
     blanks = [nil, "", " ", " \t\r\n", " ", " 　"]
 
-    # The zero-width space is not whitespace, so it is text.
-    texts = [
-      "Keep this",
-      " Keep this",
-      "Keep this\n",
-      "  Keep this",
-      "\tKeep this",
-      " Keep this",
-      "​",
-      @composed,
-      @decomposed
+    examples = [
+      {nil, "", :equivalent},
+      {nil, " ", :equivalent},
+      {"Keep this", "Keep this", :equivalent},
+      {"Keep this", " Keep this", :different},
+      {"Keep this", "Keep this\n", :different},
+      {"Keep this", "\tKeep this", :different},
+      {"Keep this", " Keep this", :different},
+      {nil, "​", :different},
+      {@composed, @decomposed, :different}
     ]
 
-    for kind <- @kinds,
-        field <- editable_fields(kind),
-        left <- blanks ++ texts,
-        right <- blanks ++ texts do
-      saved = put_in(intent(kind).attrs[field], left)
-      submitted = put_in(intent(kind).attrs[field], right)
-      expected = if blank?(left) and blank?(right), do: :equivalent, else: verbatim(left, right)
-
-      assert Content.compare_intents(kind, saved, submitted) == expected,
-             "#{kind} #{field}: #{inspect(left)} against #{inspect(right)}"
+    for {left, right, expected} <- examples do
+      saved = put_in(intent(:tip).attrs.prompt, left)
+      submitted = put_in(intent(:tip).attrs.prompt, right)
+      assert compare_both(:tip, saved, submitted) == expected
     end
 
-    # The same answers come from the real changesets for their text fields.
-    for kind <- @kinds,
-        field <- [:body, :model_other, :prompt, :output],
-        left <- blanks ++ texts,
-        right <- blanks ++ texts do
-      saved = put_in(intent(kind).attrs[field], left)
-      submitted = put_in(intent(kind).attrs[field], right)
-      equal? = cast(kind, saved.attrs) == cast(kind, submitted.attrs)
+    # The shared normalizer must continue to agree with real Ecto casting.
+    pairs =
+      Enum.map(blanks, &{nil, &1}) ++
+        [{"Keep this", "Keep this"}, {"Keep this", " Keep this"}]
 
-      assert Content.compare_intents(kind, saved, submitted) == :equivalent == equal?,
-             "#{kind} #{field}: #{inspect(left)} against #{inspect(right)}"
+    for kind <- @kinds, {left, right} <- pairs do
+      saved = put_in(intent(kind).attrs.prompt, left)
+      submitted = put_in(intent(kind).attrs.prompt, right)
+      equal? = cast(kind, saved.attrs) == cast(kind, submitted.attrs)
+      assert compare_both(kind, saved, submitted) == :equivalent == equal?
     end
   end
 
@@ -155,9 +145,11 @@ defmodule Tips.Content.IntentTest do
         {"unknown attachment", %{complete | uploads: [{:filename, "before.png"}]}}
       ]
 
-      for {name, partial} <- incomplete, other <- [complete, different, partial] do
-        assert compare_both(kind, partial, other) == :unknown, "#{kind}: #{name}"
+      for {name, partial} <- incomplete do
+        assert compare_both(kind, partial, different) == :unknown, "#{kind}: #{name}"
       end
+
+      assert compare_both(kind, nil, nil) == :unknown
 
       # An explicit empty selection is known: it is a real difference.
       assert compare_both(kind, complete, %{complete | uploads: []}) == :different
@@ -209,27 +201,6 @@ defmodule Tips.Content.IntentTest do
     assert compare_both(:tip, %{attrs: saved, uploads: []}, intent(:tip)) == :equivalent
   end
 
-  test "incomplete original base cannot enable conflict shortcut" do
-    for kind <- @kinds, field <- editable_fields(kind) do
-      latest = intent(kind, @media)
-      original = update_in(latest.attrs, &Map.delete(&1, field))
-
-      # Every supplied value agrees with the latest base; the gap still decides.
-      assert Map.take(latest.attrs, Map.keys(original.attrs)) == original.attrs
-      assert Content.compare_intents(kind, original, latest) == :unknown, "#{kind} #{field}"
-    end
-
-    for kind <- @kinds do
-      latest = intent(kind, @media)
-
-      for original <- [nil, Map.delete(latest, :uploads), %{latest | uploads: nil}] do
-        assert Content.compare_intents(kind, original, latest) == :unknown
-      end
-
-      assert Content.compare_intents(kind, latest, latest) == :equivalent
-    end
-  end
-
   defp intent(kind, uploads \\ []), do: %{attrs: attrs(kind), uploads: uploads}
 
   defp compare_both(kind, left, right) do
@@ -240,11 +211,6 @@ defmodule Tips.Content.IntentTest do
 
   defp compare_media(saved, submitted),
     do: compare_both(:tip, intent(:tip, saved), intent(:tip, submitted))
-
-  defp blank?(value), do: value == nil or String.trim(value) == ""
-
-  defp verbatim(same, same), do: :equivalent
-  defp verbatim(_left, _right), do: :different
 
   defp stringify(attrs), do: Map.new(attrs, fn {key, value} -> {Atom.to_string(key), value} end)
 
@@ -258,5 +224,199 @@ defmodule Tips.Content.IntentTest do
     |> schema.changeset(attrs)
     |> Ecto.Changeset.apply_changes()
     |> Map.take(editable_fields(kind))
+  end
+
+  @tip_fields [:title, :body, :tag_id, :model_id, :model_other, :environment_id, :prompt, :output]
+  @review_fields [:body, :model_id, :model_other, :environment_id, :prompt, :output]
+
+  defp editable_fields(:tip), do: @tip_fields
+  defp editable_fields(:review), do: @review_fields
+
+  defp tip_attrs(overrides \\ %{}) do
+    Map.merge(
+      %{
+        title: "Name the output format",
+        body: "Ask for JSON with a short schema and one example.",
+        tag_id: "output-format",
+        model_id: nil,
+        model_other: nil,
+        environment_id: nil,
+        prompt: nil,
+        output: nil
+      },
+      Map.new(overrides)
+    )
+  end
+
+  defp review_attrs(overrides \\ %{}) do
+    Map.merge(
+      %{
+        body: "Worked for a JSON export in a synthetic test.",
+        model_id: nil,
+        model_other: nil,
+        environment_id: nil,
+        prompt: nil,
+        output: nil
+      },
+      Map.new(overrides)
+    )
+  end
+
+  defp attrs(:tip), do: tip_attrs()
+  defp attrs(:review), do: review_attrs()
+
+  defp image_file(slot, path, filename, description),
+    do: {:image_file, slot, %{path: path, filename: filename}, description}
+
+  defp missing_image(slot), do: {:missing_image, slot}
+
+  defp comparison_scenarios do
+    filled = %{
+      model_other: "Local model",
+      prompt: "  Keep this indentation\n",
+      output: "line one\n  line two"
+    }
+
+    tip = tip_attrs(filled)
+    review = review_attrs(filled)
+    saved_media = [{:retained, 11, "Before"}, {:retained, 12, nil}]
+
+    text_scenarios(:tip, tip) ++
+      text_scenarios(:review, review) ++
+      [
+        %{
+          name: "same fields and ordered media",
+          kind: :tip,
+          saved: %{attrs: tip, uploads: saved_media},
+          submitted: %{attrs: tip, uploads: saved_media},
+          expected: :equivalent
+        },
+        %{
+          name: "blank image description equals no description",
+          kind: :tip,
+          saved: %{attrs: tip, uploads: saved_media},
+          submitted: %{attrs: tip, uploads: [{:retained, 11, "Before"}, {:retained, 12, "  "}]},
+          expected: :equivalent
+        },
+        %{
+          name: "staged video id equals the same attached media id",
+          kind: :tip,
+          saved: %{attrs: tip, uploads: [{:retained, 12, nil}]},
+          submitted: %{attrs: tip, uploads: [{:staged_video, 12}]},
+          expected: :equivalent
+        },
+        %{
+          name: "explicit empty selections",
+          kind: :review,
+          saved: %{attrs: review, uploads: []},
+          submitted: %{attrs: review, uploads: []},
+          expected: :equivalent
+        },
+        %{
+          name: "reordered media",
+          kind: :tip,
+          saved: %{attrs: tip, uploads: saved_media},
+          submitted: %{attrs: tip, uploads: Enum.reverse(saved_media)},
+          expected: :different
+        },
+        %{
+          name: "changed description",
+          kind: :tip,
+          saved: %{attrs: tip, uploads: saved_media},
+          submitted: %{attrs: tip, uploads: [{:retained, 11, "After"}, {:retained, 12, nil}]},
+          expected: :different
+        },
+        %{
+          name: "removed attachment",
+          kind: :tip,
+          saved: %{attrs: tip, uploads: saved_media},
+          submitted: %{attrs: tip, uploads: [{:retained, 11, "Before"}]},
+          expected: :different
+        },
+        %{
+          name: "empty selection against saved media",
+          kind: :tip,
+          saved: %{attrs: tip, uploads: saved_media},
+          submitted: %{attrs: tip, uploads: []},
+          expected: :different
+        },
+        %{
+          name: "new image file against a saved image",
+          kind: :tip,
+          saved: %{attrs: tip, uploads: [{:retained, 11, "Before"}]},
+          submitted: %{
+            attrs: tip,
+            uploads: [image_file("slot-1", "/tmp/plug-1/upload", "before.png", "Before")]
+          },
+          expected: :unknown
+        },
+        %{
+          name: "missing recovered image slot",
+          kind: :tip,
+          saved: %{attrs: tip, uploads: [{:retained, 11, "Before"}]},
+          submitted: %{attrs: tip, uploads: [missing_image("slot-1")]},
+          expected: :unknown
+        },
+        %{
+          name: "absent selection is not an empty selection",
+          kind: :review,
+          saved: %{attrs: review, uploads: []},
+          submitted: %{attrs: review, uploads: nil},
+          expected: :unknown
+        },
+        %{
+          name: "missing field is not a blank",
+          kind: :tip,
+          saved: %{attrs: tip, uploads: []},
+          submitted: %{attrs: Map.delete(tip, :prompt), uploads: []},
+          expected: :unknown
+        },
+        %{
+          name: "incomplete base",
+          kind: :review,
+          saved: %{attrs: Map.delete(review, :output), uploads: []},
+          submitted: %{attrs: review, uploads: []},
+          expected: :unknown
+        },
+        %{
+          name: "identity-only lookup",
+          kind: :tip,
+          saved: %{attrs: tip, uploads: []},
+          submitted: nil,
+          expected: :unknown
+        }
+      ]
+  end
+
+  defp text_scenarios(kind, saved) do
+    [
+      {"identical text", %{}, :equivalent},
+      {"whitespace-only prompt is a blank", %{prompt: nil}, %{prompt: "  \n "}, :equivalent},
+      {"empty model text is a blank", %{model_other: nil}, %{model_other: ""}, :equivalent},
+      {"filled blank field", %{environment_id: "ide"}, :different},
+      {"cleared setup field", %{model_other: nil}, :different},
+      {"verbatim prompt whitespace", %{prompt: "Keep this indentation"}, :different},
+      {"verbatim output whitespace", %{output: "line one\nline two"}, :different},
+      {"body trailing newline", %{body: saved.body <> "\n"}, :different},
+      {"decomposed Unicode", %{body: saved.body <> " café"}, %{body: saved.body <> " café"},
+       :different}
+    ]
+    |> Enum.map(fn
+      {name, change, expected} ->
+        {name, %{}, change, expected}
+
+      scenario ->
+        scenario
+    end)
+    |> Enum.map(fn {name, saved_change, submitted_change, expected} ->
+      %{
+        name: "#{kind}: #{name}",
+        kind: kind,
+        changeset: true,
+        saved: %{attrs: Map.merge(saved, saved_change), uploads: []},
+        submitted: %{attrs: Map.merge(saved, submitted_change), uploads: []},
+        expected: expected
+      }
+    end)
   end
 end

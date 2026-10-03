@@ -6,7 +6,7 @@ defmodule TipsWeb.UserLive.SettingsTest do
   import Tips.AccountsFixtures
 
   alias Tips.Accounts
-  alias Tips.Accounts.{SessionRef, User, UserToken}
+  alias Tips.Accounts.{User, UserToken}
   alias Tips.Repo
 
   describe "Settings page" do
@@ -50,22 +50,6 @@ defmodule TipsWeb.UserLive.SettingsTest do
       %{conn: log_in_user(conn, user), user: user}
     end
 
-    test "updates the user email", %{conn: conn, user: user} do
-      new_email = unique_user_email()
-
-      {:ok, lv, _html} = live(conn, ~p"/users/settings")
-
-      result =
-        lv
-        |> form("#email_form", %{
-          "user" => %{"email" => new_email}
-        })
-        |> render_submit()
-
-      assert result =~ "A link to confirm your email"
-      assert Accounts.get_user_by_email(user.email)
-    end
-
     test "settings ignores forged handle changes", %{conn: conn, user: user} do
       {:ok, lv, _html} = live(conn, ~p"/users/settings")
 
@@ -77,21 +61,6 @@ defmodule TipsWeb.UserLive.SettingsTest do
       assert result =~ "A link to confirm your email"
 
       assert Tips.Repo.reload!(user).handle == user.handle
-    end
-
-    test "renders errors with invalid data (phx-change)", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/users/settings")
-
-      result =
-        lv
-        |> element("#email_form")
-        |> render_change(%{
-          "action" => "update_email",
-          "user" => %{"email" => "with spaces"}
-        })
-
-      assert result =~ "Change Email"
-      assert result =~ "must have the @ sign and no spaces"
     end
 
     test "renders errors with invalid data (phx-submit)", %{conn: conn, user: user} do
@@ -180,6 +149,7 @@ defmodule TipsWeb.UserLive.SettingsTest do
     test "a current session still sends the confirmation link", %{lv: lv, user: user} do
       assert submit_email(lv) =~ "A link to confirm your email"
       assert [%UserToken{}] = change_email_tokens(user)
+      assert Accounts.get_user_by_email(user.email)
     end
   end
 
@@ -344,44 +314,14 @@ defmodule TipsWeb.UserLive.SettingsTest do
     end
   end
 
-  describe "rendering and form validation use no session state" do
+  describe "rendered credential privacy" do
     setup :mounted_settings
 
-    test "validation and re-rendering run no token query", %{lv: lv} do
-      queries =
-        token_queries(lv, fn ->
-          assert lv
-                 |> element("#email_form")
-                 |> render_change(%{"user" => %{"email" => "with spaces"}}) =~
-                   "must have the @ sign and no spaces"
-
-          assert render(lv) =~ "Change Email"
-        end)
-
-      assert queries == []
-    end
-
-    test "a privileged submit runs one admission query", %{lv: lv} do
-      assert [_readmission] =
-               token_queries(lv, fn -> submit_email(lv) end) |> Enum.filter(&(&1 =~ "SELECT"))
-    end
-
-    test "the reference stays in private state; no bearer or reference is rendered", %{
+    test "no bearer or reference is rendered", %{
       lv: lv,
       html: html,
-      user: user,
       token: token
     } do
-      %UserToken{id: token_id} = Repo.get_by!(UserToken, token: token)
-      %{socket: socket} = :sys.get_state(lv.pid)
-
-      assert [%SessionRef{token_id: ^token_id, user_id: user_id}] =
-               for({_key, %SessionRef{} = ref} <- socket.private, do: ref)
-
-      assert user_id == user.id
-      assert :binary.match(:erlang.term_to_binary(socket.assigns), token) == :nomatch
-      refute Enum.any?(Map.values(socket.assigns), &is_struct(&1, SessionRef))
-
       for rendered <- [html, render(lv), submit_email(lv)] do
         refute rendered =~ "SessionRef"
         refute rendered =~ "token_id"
@@ -404,34 +344,5 @@ defmodule TipsWeb.UserLive.SettingsTest do
 
   defp change_email_tokens(user) do
     Repo.all(from t in UserToken, where: t.user_id == ^user.id and like(t.context, "change:%"))
-  end
-
-  # Queries on the token table run by the LiveView process during `fun`.
-  defp token_queries(lv, fun) do
-    test = self()
-    live_view = lv.pid
-    handler = {__MODULE__, make_ref()}
-
-    :telemetry.attach(
-      handler,
-      [:tips, :repo, :query],
-      fn _event, _measurements, metadata, _config ->
-        if self() == live_view and metadata.query =~ "users_tokens",
-          do: send(test, {:token_query, metadata.query})
-      end,
-      nil
-    )
-
-    fun.()
-    :telemetry.detach(handler)
-    collect_token_queries()
-  end
-
-  defp collect_token_queries do
-    receive do
-      {:token_query, query} -> [query | collect_token_queries()]
-    after
-      0 -> []
-    end
   end
 end

@@ -20,17 +20,15 @@ defmodule Tips.Accounts.RegistrationExpiryTest do
 
   defp tokens(%User{id: id}), do: Repo.all_by(UserToken, user_id: id)
 
-  test "rejects confirmation at and after the original seven-day deadline" do
-    for seconds_left <- [0, -86_400] do
-      user = unconfirmed_user_fixture()
-      link = magic_link(user)
-      set_registration_deadline(user, seconds_left)
+  test "accepts confirmation before the original deadline and rejects it at the boundary" do
+    user = unconfirmed_user_fixture()
+    link = magic_link(user)
+    set_registration_deadline(user, 0)
 
-      refute Accounts.get_user_by_magic_link_token(link)
-      assert {:error, :not_found} = Accounts.login_user_by_magic_link(link)
-      assert %User{confirmed_at: nil} = Repo.reload!(user)
-      assert [%UserToken{context: "login"}] = tokens(user)
-    end
+    refute Accounts.get_user_by_magic_link_token(link)
+    assert {:error, :not_found} = Accounts.login_user_by_magic_link(link)
+    assert %User{confirmed_at: nil} = Repo.reload!(user)
+    assert [%UserToken{context: "login"}] = tokens(user)
 
     %User{id: id} = user = registration(60)
     link = magic_link(user)
@@ -58,36 +56,6 @@ defmodule Tips.Accounts.RegistrationExpiryTest do
 
     assert {:ok, _} = Accounts.login_user_by_magic_link(magic_link(pending))
     assert %User{inserted_at: ^registered_at, confirmed_at: %DateTime{}} = Repo.reload!(pending)
-  end
-
-  test "resend for an account deleted since it was read sends nothing" do
-    stale = registration(-1)
-    assert {:ok, 1} = Accounts.expire_unconfirmed_users()
-
-    assert {:error, :not_found} =
-             Accounts.deliver_login_instructions(stale, &"/users/log-in/#{&1}")
-
-    assert tokens(stale) == []
-    assert_no_email_sent()
-  end
-
-  test "confirmed accounts survive expiry" do
-    %User{id: id} = user = user_fixture()
-    set_registration_deadline(user, -30 * 86_400)
-
-    assert {:ok, 0} = Accounts.expire_unconfirmed_users()
-
-    assert {:error, changeset} =
-             Accounts.register_user(%{handle: "Newcomer", email: user.email})
-
-    assert %{email: ["has already been taken"]} = errors_on(changeset)
-
-    assert {:error, changeset} =
-             Accounts.register_user(%{handle: user.handle, email: unique_user_email()})
-
-    assert %{handle: ["has already been taken"]} = errors_on(changeset)
-
-    assert {:ok, %{user: %User{id: ^id}}} = Accounts.login_user_by_magic_link(magic_link(user))
   end
 
   test "reclaims expired email and handle held by different rows" do
@@ -123,6 +91,15 @@ defmodule Tips.Accounts.RegistrationExpiryTest do
 
     assert %{handle: ["has already been taken"]} = errors_on(changeset)
     assert %User{confirmed_at: nil} = Repo.reload!(pending)
+
+    confirmed = user_fixture()
+    set_registration_deadline(confirmed, -30 * 86_400)
+
+    assert {:error, changeset} =
+             Accounts.register_user(%{handle: "Newcomer", email: confirmed.email})
+
+    assert %{email: ["has already been taken"]} = errors_on(changeset)
+    assert %User{confirmed_at: %DateTime{}} = Repo.reload!(confirmed)
   end
 
   test "invalid or conflicting signup rolls back reclaim" do

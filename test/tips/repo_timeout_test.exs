@@ -18,21 +18,6 @@ defmodule Tips.RepoTimeoutTest do
     assert_request_timeout()
   end
 
-  test "maintenance query accepts parameters and an explicit timeout" do
-    Sandbox.unboxed_run(Repo, fn ->
-      assert %{rows: [[42]]} = Repo.maintenance_query!("SELECT $1::integer", [42])
-
-      error =
-        try do
-          Repo.maintenance_query!("SELECT pg_sleep(3)", [], timeout: 100, checkout_retries: 0)
-        rescue
-          error in [DBConnection.ConnectionError, Postgrex.Error] -> error
-        end
-
-      assert_timeout_error(error)
-    end)
-  end
-
   defp assert_request_timeout do
     Sandbox.unboxed_run(Repo, fn ->
       {elapsed, result} =

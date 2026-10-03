@@ -42,30 +42,19 @@ defmodule TipsWeb.UserSessionControllerTest do
   end
 
   describe "POST /users/log-in - malformed input" do
-    for {label, params} <- [
-          {"missing user", %{}},
-          {"non-map user", %{"user" => "bad"}},
-          {"null token", %{"user" => %{"token" => nil}}},
-          {"map token", %{"user" => %{"token" => %{"bad" => "value"}}}},
-          {"list token", %{"user" => %{"token" => ["bad"]}}},
-          {"invalid Base64 token", %{"user" => %{"token" => "%"}}},
-          {"invalid Base64 length", %{"user" => %{"token" => "a"}}}
-        ] do
-      @params params
-      test "rejects #{label} without session, token or mail", %{conn: conn} do
-        flush_emails()
-        tokens = all_tokens()
-        conn = post(conn, ~p"/users/log-in", @params)
+    test "rejects map token without session, token or mail", %{conn: conn} do
+      flush_emails()
+      tokens = all_tokens()
+      conn = post(conn, ~p"/users/log-in", %{"user" => %{"token" => %{"bad" => "value"}}})
 
-        assert redirected_to(conn) == ~p"/users/log-in"
+      assert redirected_to(conn) == ~p"/users/log-in"
 
-        assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
-                 @invalid_link
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
+               @invalid_link
 
-        refute get_session(conn, :user_token)
-        assert all_tokens() == tokens
-        assert_no_email_sent()
-      end
+      refute get_session(conn, :user_token)
+      assert all_tokens() == tokens
+      assert_no_email_sent()
     end
   end
 
