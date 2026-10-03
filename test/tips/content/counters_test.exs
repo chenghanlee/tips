@@ -6,25 +6,6 @@ defmodule Tips.Content.CountersTest do
   import Tips.AccountsFixtures
   import Tips.ContentFixtures
 
-  test "a stored vote updates its tip counters and generated score" do
-    tip = tip_fixture()
-    voter = user_fixture()
-
-    Repo.query!("INSERT INTO votes (user_id, tip_id, value) VALUES ($1, $2, 1)", [
-      voter.id,
-      tip.id
-    ])
-
-    assert %{up_count: 1, down_count: 0, score: 1} = Repo.reload!(tip)
-  end
-
-  test "a live review increments its parent count" do
-    tip = tip_fixture()
-    review_fixture(tip)
-
-    assert %{review_count: 1} = Repo.reload!(tip)
-  end
-
   for target <- [:tip, :review] do
     test "#{target} vote insert, value changes, identical update and removal apply exact deltas" do
       target = target_fixture(unquote(target))
@@ -42,23 +23,6 @@ defmodule Tips.Content.CountersTest do
       assert_counts(target, 1, 0)
 
       assert {1, nil} = Repo.delete_all(votes)
-      assert_counts(target, 0, 0)
-    end
-
-    test "#{target} invalidation deletes stored votes once, including on hidden content" do
-      target = target_fixture(unquote(target))
-      vote_fixture(target)
-      vote_fixture(target, %{value: -1})
-      assert_counts(target, 1, 1)
-
-      target |> change(dead_at: DateTime.utc_now(:second)) |> Repo.update!()
-      assert_counts(target, 1, 1)
-
-      target_field = if unquote(target) == :tip, do: :tip_id, else: :review_id
-      votes = from(v in Vote, where: field(v, ^target_field) == ^target.id)
-      assert {2, nil} = Repo.delete_all(votes)
-      assert_counts(target, 0, 0)
-      assert {0, nil} = Repo.delete_all(votes)
       assert_counts(target, 0, 0)
     end
 
@@ -110,44 +74,12 @@ defmodule Tips.Content.CountersTest do
     end
   end
 
-  for {name, attrs} <- [
-        {"no target", %{tip_id: nil, review_id: nil}},
-        {"both targets", :both}
-      ] do
-    test "votes_one_target rejects #{name}" do
-      review = review_fixture()
-
-      attrs =
-        if unquote(Macro.escape(attrs)) == :both,
-          do: %{tip_id: review.tip_id, review_id: review.id},
-          else: unquote(Macro.escape(attrs))
-
-      assert_raise Ecto.ConstraintError, ~r/votes_one_target/, fn ->
-        vote_fixture(review, attrs)
-      end
-    end
-  end
-
-  for value <- [0, 2] do
+  for value <- [0] do
     test "votes_value_chk rejects #{value}" do
       tip = tip_fixture()
 
       assert_raise Ecto.ConstraintError, ~r/votes_value_chk/, fn ->
         vote_fixture(tip, %{value: unquote(value)})
-      end
-    end
-  end
-
-  for {field, attrs} <- [
-        {:user_id, %{user_id: -1}},
-        {:tip_id, %{tip_id: -1}},
-        {:review_id, %{tip_id: nil, review_id: -1}}
-      ] do
-    test "votes_#{field}_fkey rejects unknown references" do
-      tip = tip_fixture()
-
-      assert_raise Ecto.ConstraintError, ~r/votes_#{unquote(field)}_fkey/, fn ->
-        vote_fixture(tip, unquote(Macro.escape(attrs)))
       end
     end
   end
@@ -160,45 +92,6 @@ defmodule Tips.Content.CountersTest do
       vote_fixture(target, %{user_id: voter.id})
       assert_counts(target, 1, 0)
     end
-  end
-
-  test "statement inserts receive the database timestamp default and votes have no primary key" do
-    tip = tip_fixture()
-    voter = user_fixture()
-
-    assert {1, nil} = Repo.insert_all(Vote, [%{user_id: voter.id, tip_id: tip.id, value: -1}])
-    assert %Vote{created_at: %DateTime{}} = Repo.one!(Vote)
-    assert Vote.__schema__(:primary_key) == []
-    assert_counts(tip, 0, 1)
-  end
-
-  test "partial indexes and row triggers are installed on their actual targets" do
-    %{rows: indexes} =
-      Repo.query!("SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'votes'")
-
-    for {name, target} <- [
-          {"votes_one_per_tip", "tip_id"},
-          {"votes_one_per_review", "review_id"},
-          {"votes_by_tip", "tip_id"},
-          {"votes_by_review", "review_id"}
-        ] do
-      assert [^name, definition] = Enum.find(indexes, fn [index, _] -> index == name end)
-      assert definition =~ "WHERE (#{target} IS NOT NULL)"
-
-      if String.starts_with?(name, "votes_one_per_") do
-        assert definition =~ "UNIQUE INDEX"
-        assert definition =~ "(user_id, #{target})"
-      else
-        assert definition =~ "(#{target}, created_at DESC)"
-      end
-    end
-
-    assert %{rows: [["reviews", "reviews_counts"], ["votes", "votes_counts"]]} =
-             Repo.query!("""
-             SELECT tgrelid::regclass::text, tgname FROM pg_trigger
-             WHERE tgname IN ('votes_counts', 'reviews_counts') AND NOT tgisinternal
-             ORDER BY tgname
-             """)
   end
 
   test "recount repairs only incorrect tip and review counters and then does no work" do

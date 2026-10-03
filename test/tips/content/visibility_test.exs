@@ -1,73 +1,39 @@
 defmodule Tips.Content.VisibilityTest do
-  use Tips.DataCase, async: true
+  use ExUnit.Case, async: true
 
-  alias Tips.Content.Visibility
+  alias Tips.Accounts.{Scope, User}
+  alias Tips.Content.{Review, Tip, Visibility}
 
-  import Tips.AccountsFixtures
-  import Tips.ContentFixtures
-  import Tips.VisibilityFixtures
+  @now ~U[2026-10-01 12:00:00Z]
 
-  # Expected decision for hidden (moderator-hidden, not deleted) content by viewer.
-  @hidden %{
-    anonymous: :removed,
-    reader: :removed,
-    author: :visible,
-    moderator: :visible,
-    banned_author: :visible,
-    banned_moderator: :visible,
-    deleted_author: :removed,
-    deleted_moderator: :removed
-  }
+  test "deletion wins for every viewer" do
+    author = %Scope{user: %User{id: 1}}
+    moderator = %Scope{user: %User{id: 2, role: :moderator}}
 
-  setup do
-    author = user_fixture()
-    tip = tip_fixture(author)
-    review = review_fixture(tip_fixture(), %{user_id: author.id})
-
-    %{viewers: viewers(author), contents: [tip: tip, review: review]}
-  end
-
-  test "deletion wins for every viewer", %{viewers: viewers, contents: contents} do
-    for {kind, content} <- contents,
-        marker <- [:deleted, :deleted_and_hidden],
-        content = put_marker!(content, marker),
-        {viewer, scope} <- viewers do
-      assert {kind, marker, viewer, :deleted} ==
-               {kind, marker, viewer, Visibility.decision(scope, content)}
+    for content <- [%Tip{user_id: 1}, %Review{user_id: 1}],
+        scope <- [nil, author, moderator],
+        hidden_at <- [nil, @now] do
+      assert Visibility.decision(scope, %{content | deleted_at: @now, dead_at: hidden_at}) ==
+               :deleted
     end
   end
 
-  test "hidden content is readable only by its author or a moderator", %{
-    viewers: viewers,
-    contents: contents
-  } do
-    for {kind, content} <- contents,
-        live = put_marker!(content, :live),
-        hidden = put_marker!(content, :hidden),
-        {viewer, scope} <- viewers do
-      assert {kind, viewer, :visible} == {kind, viewer, Visibility.decision(scope, live)}
+  test "hidden content is readable only by its author or a moderator" do
+    viewers = [
+      {nil, :removed},
+      {%User{id: 2}, :removed},
+      {%User{id: 1}, :visible},
+      {%User{id: 2, role: :moderator}, :visible},
+      {%User{id: 1, ban: :full, banned_at: @now}, :visible},
+      {%User{id: 2, role: :moderator, ban: :full, banned_at: @now}, :visible},
+      {%User{id: 1, deleted_at: @now}, :removed},
+      {%User{id: 2, role: :moderator, deleted_at: @now}, :removed}
+    ]
 
-      assert {kind, viewer, Map.fetch!(@hidden, viewer)} ==
-               {kind, viewer, Visibility.decision(scope, hidden)}
-    end
-  end
-
-  test "full bans preserve reading while deleted accounts lose privileged access", %{
-    viewers: viewers,
-    contents: contents
-  } do
-    for {_kind, content} <- contents do
-      hidden = put_marker!(content, :hidden)
-      live = put_marker!(content, :live)
-
-      assert Visibility.decision(viewers[:banned_author], hidden) == :visible
-      assert Visibility.decision(viewers[:banned_moderator], hidden) == :visible
-      assert Visibility.decision(viewers[:deleted_author], hidden) == :removed
-      assert Visibility.decision(viewers[:deleted_moderator], hidden) == :removed
-
-      for viewer <- [:banned_author, :banned_moderator, :deleted_author, :deleted_moderator] do
-        assert Visibility.decision(viewers[viewer], live) == :visible
-      end
+    for content <- [%Tip{user_id: 1}, %Review{user_id: 1}], {user, expected} <- viewers do
+      scope = if user, do: %Scope{user: user}
+      assert Visibility.decision(scope, content) == :visible
+      assert Visibility.decision(scope, %{content | dead_at: @now}) == expected
     end
   end
 end
