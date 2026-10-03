@@ -249,9 +249,10 @@ Thresholds include the maximum bounded scan runtime, queue delay and deployment/
 
 ## Markdown, embeds and secure headers
 
-Render tip/review authored Markdown through **MDEx 0.13.5 with its built-in Ammonia sanitizer** (`mdex_native`). Use one options list, without HtmlSanitizeEx or a custom Scrubber module:
+Render tip/review authored Markdown through **MDEx 0.13.5 with its built-in Ammonia sanitizer** (`mdex_native`). Use one options list, without HtmlSanitizeEx or a custom Scrubber module. The strikethrough and table extensions produce the `del` and `table` tags the allowlist names:
 
 ```elixir
+extension: [strikethrough: true, table: true],
 render: [unsafe: false],
 sanitize: [
   tags: ~w(p br hr h1 h2 h3 h4 h5 h6 blockquote ul ol li pre code em strong del a table thead tbody tr th td),
