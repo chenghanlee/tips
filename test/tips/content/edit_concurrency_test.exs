@@ -12,8 +12,8 @@ defmodule Tips.Content.EditConcurrencyTest do
 
   alias Tips.Accounts.{Scope, User}
   alias Tips.Content
-  alias Tips.Content.{Notification, Review, Tip, Vote}
   alias Tips.Content.Media.Asset
+  alias Tips.Content.{Notification, Review, Tip, Vote}
   alias Tips.Repo
 
   @attrs %{
@@ -44,7 +44,20 @@ defmodule Tips.Content.EditConcurrencyTest do
         parent_author = user_fixture()
         tip = tip_fixture(author, @attrs.tip)
         parent = tip_fixture(parent_author)
-        review = review_fixture(parent, Map.put(@attrs.review, :user_id, author.id))
+        # Built directly: `review_fixture/2` would commit an extra default reviewer.
+        review =
+          Repo.insert!(
+            struct!(
+              Review,
+              Map.merge(@attrs.review, %{
+                tip_id: parent.id,
+                user_id: author.id,
+                submission_key: Ecto.UUID.generate(),
+                created_at: DateTime.utc_now(:second)
+              })
+            )
+          )
+
         {author, parent_author, tip, review}
       end)
 

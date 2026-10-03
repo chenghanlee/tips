@@ -27,20 +27,24 @@ defmodule Tips.Content.Review do
     timestamps(inserted_at: :created_at, updated_at: false, type: :utc_datetime)
   end
 
-  @doc "Validates author-editable content; ownership, counters and versions are managed separately."
+  @editable [:body, :model_id, :model_other, :environment_id, :prompt, :output]
+
+  @doc "Validates a new review; ownership, counters and versions are managed separately."
   def changeset(review, attrs) do
     review
-    |> cast(attrs, [
-      :submission_key,
-      :tip_id,
-      :body,
-      :model_id,
-      :model_other,
-      :environment_id,
-      :prompt,
-      :output
-    ])
-    |> validate_required([:submission_key, :tip_id, :body])
+    |> cast(attrs, [:submission_key, :tip_id])
+    |> validate_required([:submission_key, :tip_id])
+    |> edit_changeset(attrs)
+    |> unique_constraint(:submission_key, name: :reviews_submission_unique)
+    |> unique_constraint(:tip_id, name: :reviews_one_per_user)
+    |> foreign_key_constraint(:tip_id)
+  end
+
+  @doc "Validates the author-editable fields only, for a new review or an edit."
+  def edit_changeset(review, attrs) do
+    review
+    |> cast(attrs, @editable)
+    |> validate_required([:body])
     |> validate_length(:body, min: 1, max: 20_000, count: :codepoints)
     |> validate_format(:body, ~r/\S/u)
     |> validate_length(:model_other, max: 80, count: :codepoints)
@@ -51,21 +55,14 @@ defmodule Tips.Content.Review do
     |> validate_format(:output, ~r/\S/u)
     |> validate_no_null_bytes()
     |> validate_model_choice()
-    |> unique_constraint(:submission_key, name: :reviews_submission_unique)
-    |> unique_constraint(:tip_id, name: :reviews_one_per_user)
-    |> foreign_key_constraint(:tip_id)
     |> foreign_key_constraint(:model_id)
     |> foreign_key_constraint(:environment_id)
   end
 
   defp validate_no_null_bytes(changeset) do
-    Enum.reduce(
-      [:body, :model_id, :model_other, :environment_id, :prompt, :output],
-      changeset,
-      fn field, changeset ->
-        validate_format(changeset, field, ~r/\A[^\x00]*\z/, message: "cannot contain a null byte")
-      end
-    )
+    Enum.reduce(@editable, changeset, fn field, changeset ->
+      validate_format(changeset, field, ~r/\A[^\x00]*\z/, message: "cannot contain a null byte")
+    end)
   end
 
   defp validate_model_choice(changeset) do

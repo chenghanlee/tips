@@ -28,10 +28,10 @@ defmodule Tips.Content do
 
   ## Publication and edit contract
 
-  Publication exists for text: `publish_tip/4`, `publish_review/5` and
-  `get_publication/4`. Edits (#74) and media claims (#65) are reserved and do
-  not exist yet. Inputs and results are the types below. The comparator is
-  `compare_intents/3`.
+  Publication and editing exist for text: `publish_tip/4`, `publish_review/5`,
+  `get_publication/4`, `get_edit_form/3`, `edit_tip/5` and `edit_review/5`.
+  Media claims and media edits (#65) are reserved and do not exist yet. Inputs
+  and results are the types below. The comparator is `compare_intents/3`.
 
     * `publish_tip(scope, submission_key, attrs, uploads)` returns
       `{:ok, t:publication_receipt/0}` or `{:error, t:publication_error/0}`.
@@ -41,7 +41,7 @@ defmodule Tips.Content do
       `t:publication_kind/0` and a `t:intent/0` or `nil`, and returns
       `{:ok, t:publication_receipt/0 | nil}` or `{:error, t:lookup_error/0}`.
     * `get_edit_form(scope, kind, id)` returns `{:ok, t:edit_form/0}` or
-      `{:error, :unauthenticated | :not_found}`.
+      `{:error, :unauthenticated | :not_found | :outcome_unknown}`.
     * `edit_tip(scope, id, expected_version, attrs, uploads)` returns
       `{:ok, t:edit_receipt/0}` or `{:error, t:edit_error/0}`.
     * `edit_review(scope, id, expected_version, attrs, uploads)` returns the
@@ -154,27 +154,46 @@ defmodule Tips.Content do
   ### Editing
 
   `get_edit_form/3` is a freshly admitted current-author read of undeleted
-  content. It reads the complete base, current attachments, `edit_version`
-  and capability hints in one snapshot. An unconfirmed or fully banned author
-  still reads it, with `capabilities.edit == false`; the edit itself returns
-  the Accounts eligibility error. Another account's or deleted content is
-  `:not_found`. The editor
-  keeps that version as its expected version until the author explicitly
-  loads a newer one.
+  content, hidden content included. It reads the account, complete base,
+  current attachments, `edit_version` and capability hints in one statement.
+  An unconfirmed or fully banned author still reads it, with
+  `capabilities.edit == false`; the edit itself returns the Accounts
+  eligibility error. Another account's or deleted content, and a malformed id,
+  are `:not_found`; a deleted account is `:unauthenticated`. The editor keeps
+  that version as its expected version until the author explicitly loads a
+  newer one. The read consumes no write budget.
 
-  An edit compares the expected version with the locked row first. A
-  mismatch is `{:error, :conflict}` even when the editable values are equal.
-  Ecto skips an update without changes, so `optimistic_lock/2` alone does not
-  catch a stale no-op. At the current version, an unchanged whole intent is
-  `:noop`: no version, date, search, media or notification change. An actual
-  change advances `edit_version` once and returns `:updated` with the
-  committed version.
+  An edit checks complete, valid intent first, as above: every field, a
+  positive integer expected version (else an `:edit_version` error) and the
+  selection. It then passes `Tips.AdmissionLimiter.check_write/2`, with the
+  same denials as publication. One transaction locks the author (`:contribute`
+  eligibility) and the direct tip or review; a review edit takes no parent-tip
+  lock, so a hidden or deleted parent does not block it. Missing, foreign or
+  deleted content is `:not_found`.
+
+  The expected version is compared with the locked row next. A mismatch is
+  `{:error, :conflict}` even when the editable values are equal. Ecto skips an
+  update without changes, so `optimistic_lock/2` alone does not catch a stale
+  no-op. At the current version, an unchanged whole intent is `:noop`: no
+  version, date, search, media or notification change. An actual change
+  advances `edit_version` once, sets `edited_at`, rewrites the search text and
+  returns `:updated` with the committed version. A newly selected curated
+  choice must be active, as in publication; an unchanged retired choice stays.
+  Publication dates, moderation state, votes, counters, rankings and
+  notifications never change. Search text that comes out identical keeps its
+  embedding.
+
+  Until media edits exist, `uploads` must be the saved selection unchanged, as
+  `:retained` slots in order with equal descriptions (`[]` when there is
+  none). Any other slot gets its publication `:uploads` error; a removal,
+  reorder or description change gets "cannot be changed yet".
 
   After a conflict, the editor compares its original base with the latest
   base. Only `:equivalent` offers an explicit save at the current version;
   `:different` or `:unknown` (including an incomplete base) needs manual
-  reapply. An `:outcome_unknown` edit reloads saved state and keeps the input;
-  never replay it with a freshly loaded version.
+  reapply. A database error or lost connection returns `:outcome_unknown`:
+  the editor reloads saved state and keeps the input, and never replays it
+  with a freshly loaded version.
 
   ### Staged video handoff
 
@@ -195,7 +214,7 @@ defmodule Tips.Content do
   | New tip | `:content`, `:search_text`, `:self_vote`, `:media_claims` |
   | New review | the new-tip effects and `:review_notification` |
   | Same-key retry | none |
-  | Actual edit | `:content_version`, `:search_text`, `:media_changes`, `:media_cleanup_jobs` |
+  | Actual edit | `:content_version`, `:search_text`; with media edits, `:media_changes`, `:media_cleanup_jobs` |
   | No-op edit | none |
 
   `Tips.Content.Search` writers already require a caller transaction. A
@@ -207,7 +226,7 @@ defmodule Tips.Content do
 
   alias Tips.Accounts
   alias Tips.Accounts.Scope
-  alias Tips.Content.{Intent, Projection, Publication, Read}
+  alias Tips.Content.{Edit, Intent, Projection, Publication, Read}
 
   @typedoc """
   Who reads: `nil` for an anonymous viewer, or the server-held reference to
@@ -359,9 +378,13 @@ defmodule Tips.Content do
           state: :live | :hidden
         }
 
-  @typedoc "A rejected edit. `:conflict` means a stale expected version."
+  @typedoc """
+  A rejected edit. `:conflict` means a stale expected version. Admission
+  denials carry the whole seconds to wait.
+  """
   @type edit_error ::
           Accounts.operation_error()
+          | {:rate_limited | :capacity, retry_after_seconds :: pos_integer()}
           | {:upload_failed, [attachment_ref()]}
           | {:upload_pending, [media_id()]}
           | :outcome_unknown
@@ -434,6 +457,31 @@ defmodule Tips.Content do
   defdelegate get_publication(scope, kind, submission_key, submitted_intent),
     to: Publication,
     as: :get
+
+  @doc """
+  Reads the author's editable snapshot of a tip or review. See "Editing".
+  """
+  @spec get_edit_form(Scope.t() | nil, kind(), term()) ::
+          {:ok, edit_form()} | {:error, :unauthenticated | :not_found | :outcome_unknown}
+  defdelegate get_edit_form(scope, kind, id), to: Edit, as: :get_form
+
+  @doc """
+  Saves one complete text edit of the author's tip against `expected_version`.
+  See "Editing".
+  """
+  @spec edit_tip(Scope.t() | nil, pos_integer(), pos_integer(), attrs(), [attachment()]) ::
+          {:ok, edit_receipt()} | {:error, edit_error()}
+  def edit_tip(scope, id, expected_version, attrs, uploads),
+    do: Edit.edit(scope, :tip, id, expected_version, attrs, uploads)
+
+  @doc """
+  Saves one complete text edit of the author's review against
+  `expected_version`. See "Editing".
+  """
+  @spec edit_review(Scope.t() | nil, pos_integer(), pos_integer(), attrs(), [attachment()]) ::
+          {:ok, edit_receipt()} | {:error, edit_error()}
+  def edit_review(scope, id, expected_version, attrs, uploads),
+    do: Edit.edit(scope, :review, id, expected_version, attrs, uploads)
 
   @doc """
   Reads the tip page for `viewer`: the projected tip, deleted or removed tips

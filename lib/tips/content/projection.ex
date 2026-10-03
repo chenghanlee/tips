@@ -516,7 +516,12 @@ defmodule Tips.Content.Projection do
     end
   end
 
-  defp capabilities(scope, content) do
+  @doc """
+  Projects the scope's Edit/Delete/Vote/Report hints for a current tip or
+  review row. Needs no hydration.
+  """
+  @spec capabilities(scope(), tip_row() | review_row()) :: capabilities()
+  def capabilities(scope, content) do
     contribute? = eligible?(scope, :contribute)
     own? = own?(scope, content)
     undeleted? = is_nil(content.deleted_at)

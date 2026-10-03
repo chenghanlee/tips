@@ -4,8 +4,8 @@ defmodule Tips.Content.EditTest do
   alias Tips.Accounts.Scope
   alias Tips.AdmissionLimiter
   alias Tips.Content
-  alias Tips.Content.{Model, Notification, Review, Tag, Tip, Vote}
   alias Tips.Content.Media.Asset
+  alias Tips.Content.{Model, Notification, Review, Tag, Tip, Vote}
 
   import Tips.AccountsFixtures
   import Tips.ContentFixtures
@@ -214,6 +214,7 @@ defmodule Tips.Content.EditTest do
                Content.publish_review(scope(reviewer), parent.id, key(), @review_attrs, [])
 
       review = Repo.get!(Review, review_id)
+      parent = Repo.reload!(parent)
       own = %{@review_attrs | model_id: "claude", model_other: nil, environment_id: "ide"}
 
       assert {:ok, %{edit_version: 2}} = edit(scope(reviewer), :review, review.id, 1, own, [])
@@ -475,7 +476,10 @@ defmodule Tips.Content.EditTest do
   end
 
   defp unban!(user),
-    do: Repo.update_all(from(u in Tips.Accounts.User, where: u.id == ^user.id), set: [ban: nil])
+    do:
+      Repo.update_all(from(u in Tips.Accounts.User, where: u.id == ^user.id),
+        set: [ban: nil, banned_at: nil]
+      )
 
   defp unconfirm!(user) do
     Repo.update_all(from(u in Tips.Accounts.User, where: u.id == ^user.id),
@@ -505,7 +509,7 @@ defmodule Tips.Content.EditTest do
     %{
       tip: Repo.get!(Tip, tip_id) |> Map.from_struct() |> Map.drop([:__meta__]),
       review: Repo.get!(Review, review_id) |> Map.from_struct() |> Map.drop([:__meta__]),
-      votes: Repo.all(from(v in Vote, order_by: v.id)),
+      votes: Repo.all(from(v in Vote, order_by: [v.user_id, v.tip_id, v.review_id])),
       notifications: Repo.all(from(n in Notification, order_by: n.id))
     }
   end

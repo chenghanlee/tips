@@ -28,21 +28,22 @@ defmodule Tips.Content.Tip do
     timestamps(inserted_at: :created_at, updated_at: false, type: :utc_datetime)
   end
 
-  @doc "Validates author-editable content; ownership, counters and versions are managed separately."
+  @editable [:title, :body, :tag_id, :model_id, :model_other, :environment_id, :prompt, :output]
+
+  @doc "Validates a new tip; ownership, counters and versions are managed separately."
   def changeset(tip, attrs) do
     tip
-    |> cast(attrs, [
-      :submission_key,
-      :title,
-      :body,
-      :tag_id,
-      :model_id,
-      :model_other,
-      :environment_id,
-      :prompt,
-      :output
-    ])
-    |> validate_required([:submission_key, :title, :body, :tag_id])
+    |> cast(attrs, [:submission_key])
+    |> validate_required([:submission_key])
+    |> edit_changeset(attrs)
+    |> unique_constraint(:submission_key, name: :tips_submission_unique)
+  end
+
+  @doc "Validates the author-editable fields only, for a new tip or an edit."
+  def edit_changeset(tip, attrs) do
+    tip
+    |> cast(attrs, @editable)
+    |> validate_required([:title, :body, :tag_id])
     |> validate_length(:title, min: 3, max: 140, count: :codepoints)
     |> validate_format(:title, ~r/\S/u)
     |> validate_length(:body, min: 3, max: 20_000, count: :codepoints)
@@ -55,20 +56,15 @@ defmodule Tips.Content.Tip do
     |> validate_format(:output, ~r/\S/u)
     |> validate_no_null_bytes()
     |> validate_model_choice()
-    |> unique_constraint(:submission_key, name: :tips_submission_unique)
     |> foreign_key_constraint(:tag_id)
     |> foreign_key_constraint(:model_id)
     |> foreign_key_constraint(:environment_id)
   end
 
   defp validate_no_null_bytes(changeset) do
-    Enum.reduce(
-      [:title, :body, :tag_id, :model_id, :model_other, :environment_id, :prompt, :output],
-      changeset,
-      fn field, changeset ->
-        validate_format(changeset, field, ~r/\A[^\x00]*\z/, message: "cannot contain a null byte")
-      end
-    )
+    Enum.reduce(@editable, changeset, fn field, changeset ->
+      validate_format(changeset, field, ~r/\A[^\x00]*\z/, message: "cannot contain a null byte")
+    end)
   end
 
   defp validate_model_choice(changeset) do

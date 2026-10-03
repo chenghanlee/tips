@@ -79,8 +79,9 @@ defmodule Tips.Content.Search do
   `write_tip_text/1` and `write_review_text/1` are the writers for
   publication, searchable edits, retagging and label rebuilds. Each reads the
   persisted contribution with its own curated labels, builds the document and
-  stores it. A write replaces the document, advances its freshness token, and
-  invalidates any prior embedding or retry cooldown.
+  stores it. A write that changes the document replaces it, advances its
+  freshness token, and invalidates any prior embedding or retry cooldown. A
+  write of identical text changes nothing, so the embedding stays fresh.
 
   A tip document is its title, body, prompt, output, tag label, model label
   (or free-text model) and environment label. A review document is its body,
@@ -697,6 +698,7 @@ defmodule Tips.Content.Search do
       text_at = greatest(clock_timestamp(), s.text_at + interval '1 microsecond'),
       embedding = NULL,
       embed_after = NULL
+    WHERE s.search_text IS DISTINCT FROM EXCLUDED.search_text
     """
   end
 
@@ -710,6 +712,7 @@ defmodule Tips.Content.Search do
       text_at = greatest(clock_timestamp(), s.text_at + interval '1 microsecond'),
       embedding = NULL,
       embed_after = NULL
+    WHERE s.search_text IS DISTINCT FROM EXCLUDED.search_text
     """
   end
 end
