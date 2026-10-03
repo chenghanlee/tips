@@ -182,15 +182,22 @@ defmodule Tips.Content.SearchTest do
       end
     end
 
-    test "a tiny embedding keeps its float32 direction", ctx do
-      near = tip!(ctx, title: "Plain near", vector: query_vector())
+    test "embedding magnitude never changes vector ranking", ctx do
+      # The orthogonal tip is older, so collapsed distances would rank it first.
+      far = tip!(ctx, title: "Plain far", vector: plane(1.0, -1.0))
+      near = tip!(ctx, title: "Plain near", vector: plane(-1.0, -1.0))
 
-      far =
-        tip!(ctx, title: "Plain far", vector: [0.0, 1.0 | List.duplicate(0.0, @dimensions - 2)])
-
-      tiny = [1.0e-40 | List.duplicate(0.0, @dimensions - 1)]
-
-      assert ids(search!(nil, "unmatched", embedding: tiny)) == [near.id, far.id]
+      # The smallest float32 subnormal, a subnormal, ordinary, mixed and float32 max.
+      for {x, y} <- [
+            {-1.0e-45, -1.0e-45},
+            {-1.0e-40, -1.0e-40},
+            {-1, -1},
+            {-3.0e38, -2.9e38},
+            {-3.402_823_466_385_288_6e38, -3.402_823_466_385_288_6e38}
+          ] do
+        assert ids(search!(nil, "unmatched", embedding: plane(x, y))) == [near.id, far.id],
+               "query #{inspect({x, y})}"
+      end
     end
 
     @tag :capture_log
@@ -630,6 +637,8 @@ defmodule Tips.Content.SearchTest do
   # axes form a hub-and-spoke graph that HNSW cannot fully traverse.
 
   defp query_vector, do: [1.0 | List.duplicate(0.0, @dimensions - 1)]
+
+  defp plane(x, y), do: [x, y | List.duplicate(0.0, @dimensions - 2)]
 
   defp near(step) do
     angle = step * 0.01

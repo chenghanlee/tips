@@ -19,7 +19,7 @@ defmodule Tips.Content.Search do
       filters the parent tip in every branch; a review's own setup or text
       never satisfies it.
     * `:embedding` - the query vector: 1024 numbers within float32 range, not
-      all zero once rounded to float32.
+      all zero once rounded to float32. Only its direction is used.
       `nil` (default) runs only the two keyword branches.
 
   Errors, all returned before retrieval except `:unavailable`:
@@ -341,15 +341,19 @@ defmodule Tips.Content.Search do
 
   defp vector(nil), do: {:ok, nil}
 
-  # pgvector stores float32, so the zero check runs on the encoded values: a
-  # value too small for float32 would leave a zero vector with no direction.
+  # pgvector stores float32 values and sums float32 products, so cosine needs a
+  # direction that survives both. A vector that rounds to zero has none. Any
+  # other is scaled by its largest magnitude before squaring, so no square
+  # overflows or underflows, then sent as a unit vector.
   defp vector(values) when is_list(values) and length(values) == @dimensions do
     with true <- Enum.all?(values, &finite?/1),
          floats = Enum.map(values, &float32/1),
-         true <- Enum.any?(floats, &(&1 != 0)) do
-      {:ok, "[" <> Enum.map_join(floats, ",", &Float.to_string/1) <> "]"}
+         largest when largest > 0 <- floats |> Enum.map(&abs/1) |> Enum.max() do
+      scaled = Enum.map(floats, &(&1 / largest))
+      norm = :math.sqrt(Enum.reduce(scaled, 0.0, &(&1 * &1 + &2)))
+      {:ok, "[" <> Enum.map_join(scaled, ",", &Float.to_string(float32(&1 / norm))) <> "]"}
     else
-      false -> {:error, :invalid_embedding}
+      _zero_or_out_of_range -> {:error, :invalid_embedding}
     end
   end
 
