@@ -4,7 +4,7 @@ Read [the shared agreement](../README.md) first.
 
 ## Always
 
-Keep one session per issue, advanced in place to each reviewed SHA. Lead TPM replaces the session only for loss, a wrong launch environment or a rejected implementation design. Review in order: local correctness; callers, related features and tests; end-to-end behaviour. Independently run missing relevant checks in the assigned environment; for `agent/teams` Python follow [Changing agent/teams scripts](../README.md#changing-agentteams-scripts). Message developer and tech lead freely. For `probe`, pass once.
+Keep one session per issue, advanced in place to each reviewed SHA. Lead TPM replaces the session only for loss, a wrong launch environment or a rejected implementation design. Review in order: local correctness; callers, related features and tests; end-to-end behaviour. Independently run missing relevant checks in the assigned environment; for `agent/teams` Python follow [Changing agent/teams scripts](../development.md#changing-agentteams-scripts). Message developer and tech lead freely. For `probe`, pass once.
 
 For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](../../../AGENTS.md#skills).
 
@@ -28,7 +28,7 @@ Never review red heads. Prompt developer and tech lead separately with the faili
 
 ## Verdict
 
-Submit one review per shared Reviews: feedback, or `LGTM` naming any pending checks. Send review link and SHA to tech lead, and to developer when it has feedback. After repairs, resolve the threads you opened that are fixed and review again.
+Submit one review per [Reviews](../reviews.md#reviews): feedback, or `LGTM` naming any pending checks. Send review link and SHA to tech lead, and to developer when it has feedback. After repairs, resolve the threads you opened that are fixed and review again.
 
 ## Merge
 

@@ -32,7 +32,7 @@ Developer repairs red; tester does not review red heads. Send red caused by `mai
 
 ## Verdict
 
-Tester sends feedback directly to developer. Submit your own as a review and send developer its link. Apply shared Required feedback; require another tester review after repairs. Rejected designs require new commits and tester review. Request a fresh tester only for session loss, a wrong launch environment or a rejected implementation design; lead TPM provisions it. After tester passes the last repair, proceed to Merge.
+Tester sends feedback directly to developer. Follow [Reviews and replies](../reviews.md#reviews). Submit your own as a review and send developer its link. Apply shared Required feedback; require another tester review after repairs. Rejected designs require new commits and tester review. Request a fresh tester only for session loss, a wrong launch environment or a rejected implementation design; lead TPM provisions it. After tester passes the last repair, proceed to Merge.
 
 Raise design concerns as soon as you see them.
 
@@ -49,10 +49,10 @@ gh pr merge "$PR" --merge --match-head-commit "$REVIEWED_SHA"
 ```
 
 1. Request lead TPM advancement of your checkout to `REVIEWED_SHA`. Confirm `git rev-parse HEAD` matches and `TIPS_CHECK_TIMEOUT_SECONDS` is set.
-2. Review the integrated head's entire diff against `origin/main` once, including the accuracy of affected design and API contracts. Run `mix compile --warnings-as-errors`, `mix format --check-formatted`, `mix credo --strict`, `mix test` exactly once there. Documentation-only PRs need no local tests; `agent/teams` Python follows [Changing agent/teams scripts](../README.md#changing-agentteams-scripts). Clean updates get no second local run or tester round. Rerun the checks a later repair or base change materially affects, not the whole suite for every head.
+2. Review the integrated head's entire diff against `origin/main` once, including the accuracy of affected design and API contracts. Run `mix compile --warnings-as-errors`, `mix format --check-formatted`, `mix credo --strict`, `mix test` exactly once there. Documentation-only PRs need no local tests; `agent/teams` Python follows [Changing agent/teams scripts](../development.md#changing-agentteams-scripts). Clean updates get no second local run or tester round. Rerun the checks a later repair or base change materially affects, not the whole suite for every head.
 3. Judge the change by Google's [standard](https://google.github.io/eng-practices/review/reviewer/standard.html): approve once it definitely improves overall code health, even if it is not perfect. Cover its [review dimensions](https://google.github.io/eng-practices/review/reviewer/looking-for.html) and AGENTS.md Review; no fixed order or output headings. Include a design challenge: it questions the chosen implementation, design choices, tradeoffs, and assumptions. It is not just a stricter pass over implementation defects.
 
-Submit required feedback as a review and follow Verdict; restart Merge after repairs pass. Otherwise submit your approval per shared Reviews, with the tester's approving review link on line three.
+Submit required feedback as a review and follow Verdict; restart Merge after repairs pass. Otherwise submit your approval per [Reviews](../reviews.md#reviews), with the tester's approving review link on line three.
 
 4. Publish status on that exact head:
 

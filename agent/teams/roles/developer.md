@@ -4,7 +4,7 @@ Read [the shared agreement](../README.md) first.
 
 ## Always
 
-Own the branch, worktree and PR until merge; never switch issues earlier. Implement with AGENTS.md's integration-first TDD. Keep affected design and API contracts current; document new lasting constraints in their existing canonical source, without duplicating code contracts. For `agent/teams` changes, follow [Changing agent/teams scripts](../README.md#changing-agentteams-scripts).
+Own the branch, worktree and PR until merge; never switch issues earlier. Implement with AGENTS.md's integration-first TDD. Keep affected design and API contracts current; document new lasting constraints in their existing canonical source, without duplicating code contracts. For `agent/teams` changes, follow [Changing agent/teams scripts](../development.md#changing-agentteams-scripts).
 
 For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](../../../AGENTS.md#skills).
 
@@ -19,6 +19,8 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](.
 
 ## Pushed head
 
+**PR description.** The developer owns the PR title and body, written as a [change description](https://google.github.io/eng-practices/review/developer/cl-descriptions.html): a short imperative title; a body that says what changed and why, plus check-configuration changes and anything CI does not verify. Keep it true until merge. Explain repairs in code and commit messages, not comments.
+
 You own green. From the second push onward, before each commit, read the preceding push's result with `gh pr checks "$PR"` once, without `--watch`. Continue work while checks run. Never push onto unrepaired red; pending is not red.
 
 Name check-configuration changes (ignore files, workflow, lint or scanner settings) in the PR description for explicit tech-lead review.
@@ -31,7 +33,7 @@ Repair your red before another push; name the tester's `RED` check in the repair
 
 ## Verdict
 
-Read feedback with `pr_review.py list`. Repair it under shared Required feedback and probe limits, then push and hand off. Follow shared Replies; an approval needs no acknowledgment.
+Read feedback with `pr_review.py list`. Repair it under shared Required feedback and probe limits, then push and hand off. Follow [Replies](../reviews.md#replies); an approval needs no acknowledgment.
 
 ## Merge
 

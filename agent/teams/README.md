@@ -1,6 +1,6 @@
 # Agent teams
 
-Agents building Tips: read this agreement through Client constraints, then your role card. [AGENTS.md](../../AGENTS.md) governs engineering. Keep requirements, decisions, review history and evidence in GitHub issues/PRs. Never repeat [config.toml](config.toml) defaults in commands or prose. Humans perform [SETUP.md](SETUP.md) once. Run commands from the repository root. When changing or reviewing `agent/teams` scripts, also read [the last section](#changing-agentteams-scripts).
+Agents building Tips: read this agreement through Client constraints, then your role card. [AGENTS.md](../../AGENTS.md) governs engineering. Keep requirements, decisions, review history and evidence in GitHub issues/PRs. Never repeat [config.toml](config.toml) defaults in commands or prose. Humans perform [SETUP.md](SETUP.md) once. Run commands from the repository root. When changing or reviewing `agent/teams` scripts, also read [Changing agent/teams scripts](development.md#changing-agentteams-scripts).
 
 Team flow: lead TPM assigns and provisions → tech lead briefs → developer pushes → tester reviews → tech lead merges → lead TPM retires. Required feedback returns to developer for repair and another tester review. Role cards define gates and exceptions.
 
@@ -65,30 +65,6 @@ herdr agent prompt "team-$N-lead" "$EVIDENCE_URL SHA=$SHA; action=dispatch teste
 
 **Commands.** Run lifecycle and messaging commands directly; retain stdout, stderr and exit status. Never pipe through `tail` or ad hoc JSON formatters. Parse Herdr's JSON output only when a later step needs a field under `result`. After formatter failure, inspect once with `herdr agent get <name>` before resending: failed formatting does not prove failed delivery. Successful sends confirm submission, not completion. Verify checkouts with `pwd` and `git rev-parse HEAD`.
 
-**PR description.** The developer owns the PR title and body, written as a [change description](https://google.github.io/eng-practices/review/developer/cl-descriptions.html): a short imperative title; a body that says what changed and why, plus check-configuration changes and anything CI does not verify. Keep it true until merge. Explain repairs in code and commit messages, not comments.
-
-**Reviews.** Tester and tech lead follow Google's [review comments](https://google.github.io/eng-practices/review/reviewer/comments.html) guide. Submit one review per pass, in one call, on the exact head:
-
-```bash
-gh api "repos/{owner}/{repo}/pulls/$PR/reviews" --input tmp/review.json --jq .html_url
-```
-
-`tmp/review.json`: `{"commit_id": "<head SHA>", "event": "COMMENT", "body": "...", "comments": [{"path": "...", "line": 12, "body": "..."}]}`.
-
-- Inline comments for local issues. The body for general issues and for lines outside the diff, as `path:line`.
-- Make required changes clear and give the reason. Mark optional advice `Nit:`, `Optional:` or `FYI:`.
-- Approval: line one is `LGTM` alone; line two is your role and session. Add scope or limits only when needed. Any other review starts with your role and session.
-- Report what the linked CI run does not establish. Do not repeat the diff, the contract or passing checks.
-- Write in plain, simple English. No mannered prose. Succinct and concise. Write like the reader has ADHD.
-
-**Replies.** `agent/teams/pr_review.py list "$PR"` prints the reviews of the last two reviewed heads and every unresolved thread with its IDs and reviewer; `--all` adds earlier heads. Fix the code where that answers a comment. Reply only when useful, to explain a fix, ask or disagree:
-
-```bash
-gh api "repos/{owner}/{repo}/pulls/$PR/comments/$REPLY_TO/replies" -f body="..."
-```
-
-The reviewer who opened a thread resolves it after checking, with `agent/teams/pr_review.py resolve "$THREAD"`. Optional advice may be declined. Feedback in a review body has no thread: its reviewer confirms it in the next review. Handoffs link the review and SHA.
-
 **Git.** Every agent:
 
 - Use short-lived `task/<issue>-<slug>` branches in worktrees under `.worktrees/`; retain slugs across title changes. Never push implementation to protected `main`.
@@ -101,14 +77,8 @@ Repository rules block force pushes on `task/**`, require merge commits, strict 
 
 **Issue state.** Lead TPM owns labels; workers may add only Fallback `blocked`.
 
-- Assignment: add `active`.
-- Progress needs outside action: add `blocked`; comment with prerequisite, responsible role and next action. A waiting dependency is not automatically a user blocker; a `Needs from owner:` line alone does not block.
-- Remove stale labels; clear `active` and `blocked` after merge.
-- Track workflow only in Project Status: Backlog, Ready, Active, In review, Blocked, Done. Lead TPM sets them. Never add finer workflow states or a separate status document.
 - After launch, escalate scope or role-label changes such as `ui`/`probe` as scope questions. Routine `active` and `blocked` updates remain state changes.
 - Close issues only after their required result is integrated and evidenced. Use `Refs #number` for partial work; `Closes #number` for completing PRs. New child issues count toward the goal.
-- Milestone gates need end-to-end evidence on one integrated revision. Package closure needs mandatory children and package acceptance evidence.
-- Issues labelled `ui` get the `roles.lead_ui` tech lead, launched with `--ui`; developer and tester settings stay unchanged.
 - `probe`: deliver evidence, not a code path. Tester reviews once. Probe code is disposable; repair only as evidence requires.
 
 **Required feedback.** Required: critical exposure, irreversible loss, broken required behaviour, authorization or consistency defects, acceptance failures and missing evidence for safe integration. Developers repair required feedback at once and optional advice unless they decline it with a reason. Tech leads settle disputes over what is required and file follow-up issues for deferrals. A failed fix is an attempted fix that fails verification locally, in CI or in review; rerunning a check is not another fix. After two for the same problem, either worker hands off to the tech lead and no third fix is tried before its direction. Preserve work; continue unaffected work.
@@ -135,19 +105,3 @@ User decisions: material product changes, purchases, credentials, hosting, publi
 - Claude auto mode may deny tech-lead `gh pr merge`, developers killing their own LSP children, copying/writing `.env`, or pilots posting issue comments. Treat each as Permission denial.
 - `/new`, `/clear` and `cd` do not rebind `TIPS_DEXTER`; it stays bound to the launch worktree. Clients cannot stop themselves with `team.py stop`.
 
-## Changing agent/teams scripts
-
-For `agent/teams` Python changes, CI is the evidence: open the exact-head `checks` run, verify these four steps passed and link the run in your review.
-
-```sh
-ruff check agent/teams
-ruff format --check agent/teams
-pyright --project agent/teams/pyproject.toml
-python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
-```
-
-Developers run these before pushing, in their worktree, if Ruff and Pyright are already on `PATH`; otherwise use CI. Agents never install them. Scripts use only standard-library dependencies. Tests use disposable Git repositories, fake Herdr and owned child processes, never live teams. Tests need permission to run `ps` and signal their own children.
-
-Provisioning and client-stop changes also require the real-daemon tests (`-k real_daemons`) with `TIPS_TEST_REAL_DEXTER` and `DEXTER_ELIXIR_LIB_ROOT` set (see the [LSP guide](../lsp/README.md)); CI runs them in the `dexter` job against the freshly built binary. Changes to Codex launch arguments or generated Codex configuration also require the installed-Codex tests with `TIPS_TEST_REAL_CODEX=1`. CI has no Codex client: record the local result in your round.
-
-The reviewed `# noqa: S603` boundaries are `team.py:execute` and `StopAgentTest.client`: variable argument lists, no shell, resolved executable, fixed or test-owned arguments. These are per-call exceptions, not a disabled security rule. Suppress nothing else. When these calls change, tech leads review trusted executable selection and arguments; passing lint cannot prove subprocess safety. Settings: [pyproject.toml](pyproject.toml).
