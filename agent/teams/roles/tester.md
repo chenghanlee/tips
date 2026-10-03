@@ -9,7 +9,8 @@ Keep one session per issue, advanced in place to each reviewed SHA. Lead TPM rep
 For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](../../../AGENTS.md#skills).
 
 - Ask the tech lead when stuck, facing ambiguity or conflicting information, or needing a stronger model's advice.
-- After two developer fixes fail for the same problem, hand off to the tech lead, not the developer.
+- Apply shared Required feedback's two-failed-repair stop; hand off to the tech lead, not the developer.
+- Report failed local verification even when CI is green: head, command, environment and failure evidence. Ask the tech lead when the cause is unclear; an unchanged test does not establish an inherited defect.
 
 ## Assigned
 
@@ -20,7 +21,9 @@ Confirm worktree and SHA from the tech lead's message. Read acceptance scenarios
 After lead TPM provisioning or advancement and the tech lead's SHA message:
 
 1. Read `gh pr checks "$PR"` once. Failed required checks trigger Red check; record pending checks as pending.
-2. Review the first head fully. Verify the tests exercise each acceptance scenario, are correct and fail when the code breaks. Later reviews cover deltas since the last reviewed head, including heads refused as red.
+2. Review the first head fully. Verify the tests exercise each acceptance scenario, are correct and fail when the code breaks. Apply AGENTS.md's test-value review. Later reviews cover deltas since the last reviewed head, including heads refused as red.
+
+For an intermittent-failure repair, check that it addresses the supported cause. When useful, rerun the prior failing workload within an explicit runtime budget; do not retry until green.
 
 ## Red check
 
@@ -28,7 +31,7 @@ Never review red heads. Prompt developer and tech lead separately with the faili
 
 ## Verdict
 
-Before your first review, read [Reviews and replies](../reviews.md#reviews). Submit one review: feedback, or `LGTM` naming any pending checks. Send review link and SHA to tech lead, and to developer when it has feedback. After repairs, resolve the threads you opened that are fixed and review again.
+Before your first review, read [Reviews and replies](../reviews.md#reviews). Submit one review: feedback, or `LGTM` naming any pending checks. Withhold approval when required local verification fails, even if CI is green. Send review link and SHA to tech lead, and to developer when it has feedback. After repairs, resolve the threads you opened that are fixed and review again.
 
 ## Merge
 

@@ -10,7 +10,7 @@
 | Fresh checkout, browser tests, worktree isolation | The section you need in [local development](docs/development/local-development.md) |
 | Product behaviour or copy | [Glossary](docs/design/glossary.md) |
 
-Design files are large. List headings with `rg -n '^#{2,3} ' <file>`, then read the relevant sections and the shared invariants they point to. If output is truncated, read the missing range before relying on it.
+Design files are large. List headings with `rg -n '^#{2,3} ' <file>`, then read the relevant sections and the shared invariants they point to. Batch small independent reads; separate large reads to keep combined output bounded. Check that required reads succeeded; if output is truncated, read the missing range before relying on it.
 
 ## Boundaries
 
@@ -21,7 +21,7 @@ Design files are large. List headings with `rg -n '^#{2,3} ' <file>`, then read 
 
 ## Problem Solving
 
-- Ask why 5–15 times to find the root problem. Stop when two more whys do not change the answer.
+- Ask why 5–10 times to find the root problem. Stop when two more whys do not change the answer, even before five.
 - Start with first principles, then use Occam's razor and the 80/20 rule to find the simplest working solution for the root problem.
 
 ## Software Design

@@ -1,6 +1,6 @@
 # Agent teams
 
-Read this agreement, then your role card. [AGENTS.md](../../AGENTS.md) governs engineering. Read the issue and readiness comment for the task; they do not override this workflow. Take conflicting requirements to the next role up (see Events).
+Read this agreement, then your role card. [AGENTS.md](../../AGENTS.md) governs engineering. Read the current issue contract and linked decisions, including explicit authorized overrides. Old dispatches name past owners and worktrees; do not reuse their commands. Take unresolved conflicts with this workflow to the next role up (see Events).
 
 Keep task requirements, decisions and evidence in GitHub issues/PRs. Run commands from the repository root. Use [config.toml](config.toml) defaults without copying them into commands or prose. Humans perform [setup](SETUP.md) once. For script changes, read [development](development.md#changing-agentteams-scripts).
 
@@ -54,10 +54,10 @@ Read provider settings by path from main checkout's `.env`. Only the user adds c
 **Handoff.** Every handoff sender:
 
 1. Record evidence on GitHub.
-2. Send one line via `herdr agent prompt`: evidence link, SHA, action, owner (next acting role). Link the existing contract instead of copying it. Prompt recipients separately.
+2. Send one line via `herdr agent prompt`: evidence link, SHA, action, owner (next acting role), and any constraint that changes what the recipient must do now. Link the existing contract instead of copying it. Prompt recipients separately.
 3. Before ending the turn, verify the Herdr command succeeded. On failure, report the error; never claim delivery.
 
-Use handoffs for readiness, implementation, review, merge and blockers; GitHub comments and final responses wake nobody. Dispatches name the exact recipient and completion/blocker command. Provisioning requests/replies and team questions are messages, not handoffs. Code questions include a pushed SHA for inspection in the recipient's own worktree.
+Use handoffs for readiness, implementation, review, merge and blockers; GitHub comments and final responses wake nobody. Give the exact recipient and completion/blocker command in the assignment; later dispatches link it unless it changes. Recipients read the linked evidence before acting. Provisioning requests/replies and team questions are messages, not handoffs. Code questions include a pushed SHA for inspection in the recipient's own worktree.
 
 Example: substitute team number and evidence.
 
@@ -87,13 +87,15 @@ Repository rules block force pushes on `task/**`, require merge commits, strict 
 - Close issues only after their required result is integrated and evidenced. Use `Refs #number` for partial work; `Closes #number` for completing PRs. New child issues count toward the goal.
 - `probe`: deliver evidence, not a code path. Tester reviews once. Probe code is disposable; repair only as evidence requires.
 
-**Required feedback.** Required: critical exposure, irreversible loss, broken required behaviour, authorization or consistency defects, acceptance failures and missing evidence for safe integration. Developers repair required feedback at once and optional advice unless they decline it with a reason. Tech leads settle disputes over what is required and file follow-up issues for deferrals. A failed fix is an attempted fix that fails verification locally, in CI or in review; rerunning a check is not another fix. After two for the same problem, either worker hands off to the tech lead and no third fix is tried before its direction. Preserve work; continue unaffected work.
+**Required feedback.** Required: critical exposure, irreversible loss, broken required behaviour, authorization or consistency defects, acceptance failures and missing evidence for safe integration. Developers repair required feedback at once and optional advice unless they decline it with a reason. Tech leads settle disputes over what is required and file follow-up issues for deferrals.
+
+A failed repair is a code change intended to fix a failure followed by verification that still fails, locally, in CI or in review. After two consecutive repairs leave the same test failing or do not resolve the same other failure, either worker hands off both attempts, evidence and current code state, including unpushed changes, to the tech lead. A continuing failure may appear in a different test; proof of a shared cause is not required to ask for help. No third repair before lead direction. Expected initial TDD red and diagnostic reruns are not repair attempts. Preserve work; continue unaffected work.
 
 **Checks.** Trust CI only for commands actually run. If checks are pending, report them as pending without waiting; the tech lead's timed pre-merge wait checks completion. Markdown-only changes run `python3 scripts/check_docs.py`; no Mix run solely for prose. Agent instructions and templates still follow the review policy. CI remains required; waivers require explicit user instruction.
 
 **Recovery.** On permission denial, preserve work. Record operation, exact error and local state in a PR comment (issue if no PR); report to the tech lead, or lead TPM if you are the tech lead. Continue unaffected work. Never bypass denial through another application or remote-only commit.
 
-For context recovery, keep issue and branch open. Record base and head SHAs, latest review URL, working-tree cleanliness, committed and uncommitted work, unresolved feedback, failed or unrun checks and next action. Reviewers keep scratch output under their worktree's `tmp/` so the checkout stays clean. Explicitly transfer ownership before another writer starts. Never reset or stash another's work. Before reassigning unresponsive clients, inspect Git and pane evidence: working, dialog-blocked (Permission denial), or lost (Lost session or environment).
+For context recovery, keep issue and branch open. Record base and head SHAs, latest review URL, working-tree cleanliness, committed and uncommitted work, unresolved feedback, failed repair attempts, failed or unrun checks and next action. Reviewers keep scratch output under their worktree's `tmp/` so the checkout stays clean. Give important diagnostic runs distinct filenames; before cleanup, preserve evidence needed to explain a repair outside disposable worktrees and link it. Explicitly transfer ownership before another writer starts. Never reset or stash another's work. Before reassigning unresponsive clients, inspect Git and pane evidence: working, dialog-blocked (Permission denial), or lost (Lost session or environment).
 
 **Fallback.** Developers and testers: if a tech-lead prompt fails to send, send the same message to lead TPM. If sent but an unanswered question blocks work, add `blocked`, comment with tech lead and question, prompt lead TPM with that comment link, then end the turn.
 

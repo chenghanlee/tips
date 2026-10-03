@@ -8,8 +8,8 @@ Own the branch, worktree and PR until merge; never switch issues earlier. Implem
 
 For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](../../../AGENTS.md#skills).
 
-- Ask the tech lead when stuck, facing ambiguity or conflicting information, or needing a stronger model's advice. Do not wait for two failed fixes to ask.
-- Count your failed fixes, local ones included. After two for the same problem, stop fixing it: hand off to the tech lead with both attempts, failure evidence and current code state, including unpushed changes. No third attempt before the tech lead gives direction.
+- Ask the tech lead before acting on ambiguous, conflicting, underspecified or apparently incorrect requirements, or materially departing from the contract. Ask when stuck, confused or needing advice; do not wait for two failed repairs.
+- Count failed repairs, local ones included, and follow shared Required feedback's two-attempt stop.
 
 ## Assigned
 
@@ -19,11 +19,9 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](.
 
 ## Pushed head
 
-**PR description.** Own the PR title and body. Write a [change description](https://google.github.io/eng-practices/review/developer/cl-descriptions.html): a short imperative title; a body that says what changed and why, plus check-configuration changes and anything CI does not verify. Keep it true until merge. Explain repairs in code and commit messages, not comments.
+**PR description.** Own the PR title and body. Write a [change description](https://google.github.io/eng-practices/review/developer/cl-descriptions.html): a short imperative title; a body that says what changed and why, anything CI does not verify, and check-configuration changes for explicit tech-lead review. Compare the implementation with the current contract and include `Contract departures: none` or links to approved departures. Keep it true until merge. Explain repairs in code and commit messages, not comments.
 
 You own green. From the second push onward, before each commit, read the preceding push's result with `gh pr checks "$PR"` once, without `--watch`. Continue work while checks run. Never push onto unrepaired red; pending is not red.
-
-Name check-configuration changes (ignore files, workflow, lint or scanner settings) in the PR description for explicit tech-lead review.
 
 When review-ready, bring the PR description up to date and mark the PR ready. Hand off to the tech lead with PR link, SHA, `action=dispatch tester`, owner. Pending preceding checks do not delay handoff; the tester's read decides.
 

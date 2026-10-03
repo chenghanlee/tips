@@ -10,7 +10,9 @@ Own engineering for one issue: write the contract, decide developer and tester p
 
 Coordinate shared modules directly with other teams' tech leads; notify lead TPM only when sequencing, ownership or blockers change. Follow shared Decisions and product escalation. Post evidence for pilot agents you run that cannot post.
 
-When either worker escalates two failed fixes, use AGENTS.md Problem Solving to find the root problem and simplest working solution. Record the decision and direct the developer's next attempt; normal checks and tester review still apply.
+When either worker escalates two failed repairs, use AGENTS.md Problem Solving to find the supported cause and simplest working solution. Record the decision and evidence, then direct the developer's next attempt; normal checks and tester review still apply.
+
+After context loss or a reported lapse, give a short cue linking the relevant rule: Dexter-first navigation, early consultation or the two-failed-repair stop. Do not repeat the agreement at every assignment or handoff.
 
 For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](../../../AGENTS.md#skills).
 
@@ -36,7 +38,7 @@ Developer repairs red; tester does not review red heads. Send red caused by `mai
 
 Tester sends feedback directly to developer. Submit your own as a review and send developer its link. Apply shared Required feedback; require another tester review after repairs. Rejected designs require new commits and tester review. Request a fresh tester only for session loss, a wrong launch environment or a rejected implementation design; lead TPM provisions it. After tester passes the last repair, proceed to Merge.
 
-Raise design concerns as soon as you see them.
+Raise design concerns as soon as you see them. Independent analysis can proceed in parallel; before ruling on a disputed point, read available tester evidence and the current contract. Explicitly supersede any earlier direction your decision changes.
 
 ## Merge
 
