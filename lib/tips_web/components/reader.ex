@@ -41,7 +41,7 @@ defmodule TipsWeb.Reader do
   defp contribution(_tip, nil, true), do: {:none, nil}
 
   @doc """
-  Renders the tip page header: title, author, dates, setup, the tip's votes,
+  Renders the tip page header: title, author, dates, setup, the tip's vote counts,
   its actions and the contribution control. A placeholder renders only its
   title and the contribution control.
   """
@@ -66,13 +66,11 @@ defmodule TipsWeb.Reader do
         </div>
       <% end %>
       <div class="flex flex-wrap items-center gap-3">
-        <UI.vote_control
+        <.vote_counts
           :if={@tip.state == :visible}
           id="tip-vote"
-          variant="detail"
-          target={"tip-#{@tip.id}"}
-          selected={vote(@tip.viewer_vote)}
-          counts={%{helpful: @tip.up_count, not_helpful: @tip.down_count}}
+          helpful={@tip.up_count}
+          not_helpful={@tip.down_count}
         />
         <.contribution_control state={@contribution_state} href={@contribution_href} />
       </div>
@@ -198,7 +196,7 @@ defmodule TipsWeb.Reader do
 
   @doc """
   Renders one readable review: author, dates, reviewer setup, Markdown body,
-  the Prompt and Result disclosure, votes and the viewer's actions. `open`
+  the Prompt and Result disclosure, vote counts and the viewer's actions. `open`
   opens the disclosure, as on the single-review view.
   """
   attr :review, :map, required: true
@@ -245,16 +243,27 @@ defmodule TipsWeb.Reader do
           text={@review.output}
         />
       </UI.disclosure>
-      <UI.vote_control
+      <.vote_counts
         id={"#{@dom_id}-vote"}
-        variant="detail"
-        target={@dom_id}
-        describedby={"#{@dom_id}-author"}
-        selected={vote(@review.viewer_vote)}
-        counts={%{helpful: @review.up_count, not_helpful: @review.down_count}}
+        helpful={@review.up_count}
+        not_helpful={@review.down_count}
       />
       <.actions capabilities={@review.capabilities} edit_href={"/editor/reviews/#{@review.id}/edit"} />
     </article>
+    """
+  end
+
+  # Plain-text counts; the interactive `vote_control` replaces them with #110.
+  attr :id, :string, required: true
+  attr :helpful, :integer, required: true
+  attr :not_helpful, :integer, required: true
+
+  defp vote_counts(assigns) do
+    ~H"""
+    <p id={@id} class="flex flex-wrap gap-x-3 text-sm">
+      <span>Helpful {@helpful}</span>
+      <span>Not helpful {@not_helpful}</span>
+    </p>
     """
   end
 
@@ -290,10 +299,6 @@ defmodule TipsWeb.Reader do
 
   defp author(%{handle: handle}), do: handle
   defp author(:deleted_account), do: "[deleted]"
-
-  defp vote(1), do: :helpful
-  defp vote(-1), do: :not_helpful
-  defp vote(nil), do: nil
 
   # Tip metadata links open browse with that single filter.
   defp tip_setup(tip) do
