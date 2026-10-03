@@ -674,7 +674,8 @@ The inbox uses URL Previous/Next pages of twenty notifications, with one-row loo
 Write the notification in the same transaction as the vote or review. If the recipient already has an unread row for that type and target, add 1 to its count and update its timestamp so it sorts first. Skip the insert if the actor is the recipient or the action is ineligible. The count records helpful-vote events. A user who votes, removes the vote, and votes again counts twice; this is intended.
 
 ```sql
-insert into notifications (user_id, type, actor_id, tip_id, review_id) values ($1, $2, $3, $4, $5)
+-- updated_at has no default: the insert supplies it.
+insert into notifications (user_id, type, actor_id, tip_id, review_id, updated_at) values ($1, $2, $3, $4, $5, now())
 on conflict (user_id, type, tip_id, review_id) where read_at is null
 do update set count = notifications.count + 1, actor_id = excluded.actor_id, updated_at = now();
 

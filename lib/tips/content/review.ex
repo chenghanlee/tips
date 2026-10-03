@@ -53,12 +53,19 @@ defmodule Tips.Content.Review do
     |> validate_model_choice()
     |> unique_constraint(:submission_key, name: :reviews_submission_unique)
     |> unique_constraint(:tip_id, name: :reviews_one_per_user)
+    |> foreign_key_constraint(:tip_id)
+    |> foreign_key_constraint(:model_id)
+    |> foreign_key_constraint(:environment_id)
   end
 
   defp validate_no_null_bytes(changeset) do
-    Enum.reduce([:body, :model_other, :prompt, :output], changeset, fn field, changeset ->
-      validate_format(changeset, field, ~r/\A[^\x00]*\z/, message: "cannot contain a null byte")
-    end)
+    Enum.reduce(
+      [:body, :model_id, :model_other, :environment_id, :prompt, :output],
+      changeset,
+      fn field, changeset ->
+        validate_format(changeset, field, ~r/\A[^\x00]*\z/, message: "cannot contain a null byte")
+      end
+    )
   end
 
   defp validate_model_choice(changeset) do

@@ -53,6 +53,35 @@ defmodule Tips.LockSessions do
     end
   end
 
+  @doc """
+  Starts `fun` on its own backend outside any transaction, as a top-level caller
+  would run it, so its own transactions commit or roll back for real. Collect the
+  result with `finish/1`.
+  """
+  def call(supervisor, fun) do
+    parent = self()
+
+    task =
+      Task.Supervisor.async_nolink(supervisor, fn ->
+        unboxed(fn ->
+          %{rows: [[backend]]} = Repo.query!("SELECT pg_backend_pid()")
+          send(parent, {:backend, self(), backend})
+          fun.()
+        end)
+      end)
+
+    pid = task.pid
+
+    receive do
+      {:backend, ^pid, backend} -> %{task: task, backend: backend}
+    after
+      1_000 -> flunk("call did not start")
+    end
+  end
+
+  @doc "Returns the result of a `call/2`."
+  def finish(%{task: task}), do: Task.await(task, 5_000)
+
   @doc "Starts `step` in the session's transaction and returns the ref its result is sent with."
   def submit(%{task: task}, step) do
     ref = make_ref()
