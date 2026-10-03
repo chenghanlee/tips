@@ -58,6 +58,8 @@ gh pr merge "$PR" --merge --match-head-commit "$REVIEWED_SHA"
 | `Design challenge` | Concrete alternatives, tradeoffs, assumptions |
 | `Defect pass` | Stricter hunt on integrated diff |
 
+`Design challenge` questions the chosen implementation, design choices, tradeoffs, and assumptions. It is not just a stricter pass over implementation defects.
+
 Example:
 
     ## 0110df7 review
