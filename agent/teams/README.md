@@ -67,7 +67,7 @@ herdr agent prompt "team-$N-lead" "$EVIDENCE_URL SHA=$SHA; action=dispatch teste
 
 **One comment per role.** Developer, tester and tech lead each edit one PR comment. Append `## <short SHA> <outcome>` per reviewed head, newest last. Outcomes: developer `pushed`; tester `pass`, `findings`, `RED`; tech lead `review`. Handoffs link this comment and SHA. Never create per-round comments.
 
-Report findings, decisions, verification gaps and results the linked CI run does not establish. Link existing evidence; do not repeat the diff or contract. One fact per line, in short plain sentences ([Writing](../../AGENTS.md#writing)). Mark prior findings by ID and status.
+Report findings, decisions, verification gaps and results the linked CI run does not establish. Link existing evidence; do not repeat the diff or contract. Use short plain sentences ([Writing](../../AGENTS.md#writing)): one finding or decision per line, no jargon chains or repeated facts. Mark prior findings by ID and status.
 
 State reviewer and implementer identities once at the top of your comment; record a new reviewer or session in the round when ownership changes. Round shape; omit lines that do not apply:
 
