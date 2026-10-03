@@ -44,8 +44,13 @@ defmodule TipsWeb.ReviewLive.ShowTest do
       assert attr(html, "#{card} a", reviewer.handle, "href") == "#review-#{review.id}", render
       assert text(html, card) =~ "Published", render
       assert has?(html, "#{card} strong"), render
-      assert text(html, "#{card} details[open] #review-#{review.id}-prompt pre") == review.prompt
-      assert text(html, "#{card} details[open] #review-#{review.id}-result pre") == review.output
+
+      assert verbatim(html, "#{card} details[open] #review-#{review.id}-prompt pre") ==
+               review.prompt
+
+      assert verbatim(html, "#{card} details[open] #review-#{review.id}-result pre") ==
+               review.output
+
       assert text(html, card) =~ "GPT", render
       assert text(html, card) =~ "IDE", render
       refute html =~ "/?model=gpt", render
@@ -101,9 +106,9 @@ defmodule TipsWeb.ReviewLive.ShowTest do
           {render, html, title} <- renders(as(conn, viewer), "/reviews/#{review.id}") do
         label = inspect({marker, render, viewer && viewer.id})
 
-        assert text(html, "#review-#{review.id}-unavailable") =~ line, label
+        assert text(html, "#review-unavailable") =~ line, label
 
-        assert attr(html, "#review-#{review.id}-unavailable a", "Show all reviews", "href") ==
+        assert attr(html, "#review-unavailable a", "Show all reviews", "href") ==
                  tip_path,
                label
 
@@ -146,7 +151,7 @@ defmodule TipsWeb.ReviewLive.ShowTest do
     end
 
     for {render, html, _title} <- renders(as(conn, user_fixture()), "/reviews/#{review.id}") do
-      assert text(html, "#review-#{review.id}-unavailable") =~ "Review removed by moderators"
+      assert text(html, "#review-unavailable") =~ "Review removed by moderators"
       refute html =~ "Own hidden body", render
     end
 

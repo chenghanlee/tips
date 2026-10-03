@@ -41,8 +41,8 @@ defmodule TipsWeb.TipLive.ShowTest do
 
         assert has?(html, "#tip-body ol li strong"), render
         refute html =~ "<script>alert", render
-        assert text(html, "#tip-prompt pre") == tip.prompt, render
-        assert text(html, "#tip-result pre") == tip.output, render
+        assert verbatim(html, "#tip-prompt pre") == tip.prompt, render
+        assert verbatim(html, "#tip-result pre") == tip.output, render
         assert html =~ "write a &lt;b&gt;plan&lt;/b&gt;", render
         assert text(html, "#tip-prompt figcaption") == "Prompt", render
         assert text(html, "#tip-result figcaption") == "Result", render
@@ -133,7 +133,7 @@ defmodule TipsWeb.TipLive.ShowTest do
         assert notice =~ "Removed by moderation", render
         assert notice =~ "saving changes does not restore visibility", render
 
-        assert attr(html, "#tip-removed-notice a", "Edit", "href") ==
+        assert attr(html, "#tip-header a", "Edit", "href") ==
                  "/editor/tips/#{tip.id}/edit"
 
         refute html =~ "Reporter detail text", render

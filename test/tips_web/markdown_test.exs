@@ -98,6 +98,7 @@ defmodule TipsWeb.MarkdownTest do
       [js](javascript:alert(1))
       [encoded](&#106;avascript:alert(1))
       [percent](java%73cript:alert(1))
+      [case](JaVaScRiPt:alert(1))
       [vb](vbscript:msgbox(1))
       [data](data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==)
       [mail](mailto:a@example.com)
@@ -107,10 +108,17 @@ defmodule TipsWeb.MarkdownTest do
 
     refute html =~ ~r/javascript/i
     refute html =~ ~r/vbscript/i
-    refute html =~ ~r/java%73cript/i
     refute html =~ "data:"
     assert html =~ ~s(href="mailto:a@example.com")
     assert html =~ ~s(href="http://example.com")
+
+    # A browser reads a scheme only from letters, digits, `+`, `-` and `.`, so
+    # `java%73cript:` is an inert relative path; anything with a scheme must be allowed.
+    for [_, href] <- Regex.scan(~r/href="([^"]*)"/, html),
+        [_, scheme] <- [Regex.run(~r/\A([a-z][a-z0-9+.-]*):/i, href) || [nil, nil]],
+        scheme do
+      assert String.downcase(scheme) in ~w(http https mailto), href
+    end
 
     links = Regex.scan(~r/<a [^>]*>/, html) |> List.flatten()
     assert [_, _ | _] = links

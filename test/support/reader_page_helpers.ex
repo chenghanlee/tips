@@ -15,8 +15,8 @@ defmodule TipsWeb.ReaderPageHelpers do
     {:ok, lv, connected} = live(conn, path)
 
     [
-      {:disconnected, dead, text(dead, "title")},
-      {:connected, connected, page_title(lv)}
+      {"disconnected", dead, text(dead, "title")},
+      {"connected", connected, page_title(lv)}
     ]
   end
 
@@ -27,6 +27,9 @@ defmodule TipsWeb.ReaderPageHelpers do
   def find(html, selector), do: html |> LazyHTML.from_document() |> LazyHTML.query(selector)
   def has?(html, selector), do: not Enum.empty?(find(html, selector))
   def text(html, selector), do: html |> find(selector) |> LazyHTML.text() |> String.trim()
+
+  @doc "Untrimmed text, for verbatim Prompt and Result blocks."
+  def verbatim(html, selector), do: html |> find(selector) |> LazyHTML.text()
 
   @doc "The `name` attribute of the first `selector` match whose text is `label`."
   def attr(html, selector, label, name) do

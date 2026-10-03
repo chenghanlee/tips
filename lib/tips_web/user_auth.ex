@@ -255,24 +255,17 @@ defmodule TipsWeb.UserAuth do
     end
   end
 
-  # A connected mount admits the session token once, however many hooks run,
-  # and keeps the row reference in private state. A disconnected render handles
-  # no events: it reuses the scope the plug built for the same request.
+  # Each mount, disconnected or connected, admits the session token once,
+  # however many hooks run, and keeps the row reference in private state, so
+  # both renders read as the same viewer (`viewer/1`).
   defp mount_current_scope(%{private: %{@session_ref => _}} = socket, _session), do: socket
 
   defp mount_current_scope(socket, session) do
-    if LiveView.connected?(socket) do
-      {scope, session_ref} = admit_session(session)
+    {scope, session_ref} = admit_session(session)
 
-      socket
-      |> LiveView.put_private(@session_ref, session_ref)
-      |> Phoenix.Component.assign(:current_scope, scope)
-    else
-      Phoenix.Component.assign_new(socket, :current_scope, fn ->
-        {scope, _session_ref} = admit_session(session)
-        scope
-      end)
-    end
+    socket
+    |> LiveView.put_private(@session_ref, session_ref)
+    |> Phoenix.Component.assign(:current_scope, scope)
   end
 
   defp admit_session(session) do
@@ -281,6 +274,15 @@ defmodule TipsWeb.UserAuth do
       {:error, :unauthenticated} -> {nil, nil}
     end
   end
+
+  @doc """
+  Returns the viewer the mount hook admitted: its `Tips.Accounts.SessionRef`,
+  or `nil` when anonymous. Pass it to the `Tips.Content` reads that take a
+  viewer; they readmit it. It is the same on the disconnected and connected
+  mounts. Keep it out of assigns and templates.
+  """
+  @spec viewer(LiveView.Socket.t()) :: SessionRef.t() | nil
+  def viewer(%LiveView.Socket{private: private}), do: private[@session_ref]
 
   @doc """
   Admits a mounted LiveView socket again, from its private session reference.
