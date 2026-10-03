@@ -13,7 +13,7 @@ For Elixir work, use worktree-bound Dexter LSP and follow [AGENTS.md’s navigat
 ## Assigned
 
 1. Confirm your pane, worktree and SHA inside the new client: `herdr agent get team-N-lead`, `pwd`, `git rev-parse HEAD`.
-2. Post an issue readiness comment: one outcome, exclusions, exact design sections, real entry points, acceptance scenarios mapped to named tests (`probe`: evidence required), runnable verification, available prerequisites, task slug. Amend this contract when needed. End with one line: `Needs from owner:` followed only by `none` or required secrets, credentials and network access. That line alone is not a blocker.
+2. Post an issue readiness comment: one outcome, exclusions, exact design sections, real entry points, acceptance scenarios mapped to named tests (`probe`: evidence required), runnable verification, available prerequisites, task slug. Amend this contract when needed. Do not repeat operating rules, setup history or tooling reports in the contract; amend it instead of copying it. End with one line: `Needs from owner:` followed only by `none` or required secrets, credentials and network access. That line alone is not a blocker.
 3. If a second independent outcome exists or your context will not last until merge, propose a split to lead TPM as a scope question; it creates children. Never require file ownership lists, reservations or overlap approval. Coordinate concrete shared changes as they arise.
 4. Request developer by role; lead TPM chooses the pane. After its confirmation, verify developer pane, worktree and SHA. Brief developer with contract link, that SHA as base, action, owner and exact completion command `herdr agent prompt team-N-lead "..."`, naming fields the developer fills.
 5. Start with work independent of owner items.
@@ -47,8 +47,8 @@ gh pr merge "$PR" --merge --match-head-commit "$REVIEWED_SHA"
 ```
 
 1. Request lead TPM advancement of your checkout to `REVIEWED_SHA`. Confirm `git rev-parse HEAD` matches and `TIPS_CHECK_TIMEOUT_SECONDS` is set.
-2. Review the integrated head's entire diff against `origin/main` once. Run `mix compile --warnings-as-errors`, `mix format --check-formatted`, `mix credo --strict`, `mix test` exactly once there. Documentation-only PRs need no local tests; `agent/teams` Python follows shared Checks. Clean updates get no second local run or tester round. Rerun the checks a later repair or base change materially affects, not the whole suite for every head.
-3. Append a `review` round to your comment. Above the headings, record reviewer and implementer, base and head SHAs, tester verdict per head, independently run checks, unresolved findings and follow-ups. Use these five exact `###` headings, each substantive (one line each for `probe`):
+2. Review the integrated head's entire diff against `origin/main` once. Run `mix compile --warnings-as-errors`, `mix format --check-formatted`, `mix credo --strict`, `mix test` exactly once there. Documentation-only PRs need no local tests; `agent/teams` Python follows [Changing agent/teams scripts](../README.md#changing-agentteams-scripts). Clean updates get no second local run or tester round. Rerun the checks a later repair or base change materially affects, not the whole suite for every head.
+3. Append a `review` round to your comment in the shared round shape. Above the headings, record base and head SHAs, tester verdict per head, independently run checks, unresolved findings and follow-ups, each once. Use these five exact `###` headings (one line each for `probe`). Give the material conclusion and its evidence; avoid repeated narration. Close Defect pass with `No additional findings` when true.
 
 | Heading | Review |
 |---|---|
@@ -57,6 +57,33 @@ gh pr merge "$PR" --merge --match-head-commit "$REVIEWED_SHA"
 | `Whole-project fit` | Design, architecture, end-to-end behaviour |
 | `Design challenge` | Concrete alternatives, tradeoffs, assumptions |
 | `Defect pass` | Stricter hunt on integrated diff |
+
+Example, adapted from #264:
+
+    ## 0110df7 review
+    PASS. F1 fixed; no open findings.
+    Base: 5fe1cda1bb16bea97df77c078ca0789ae641f909
+    Head: 0110df7fc0c4c0b1c2c41953849e6db39171601a
+    Scope: repair since 33d8135 and its effect on the reviewed PR.
+    Tester: 0110df7, pass, <round link>.
+    Ran: compile with warnings as errors, format, strict Credo, docs: exit 0. mix test: 554 passed, 9 excluded.
+    CI: <run link>: pass. Browser tests ran in CI, not locally.
+    Follow-up: #265 dependency advisories, outside this repair.
+
+    ### Local correctness
+    F1: a decoder error or no match returns :not_found; "%" and "a" now reject without session, token or mail.
+
+    ### Downstream effects
+    Confirmation and single-token deletion keep their success paths and return shapes; auth suite 215 passed.
+
+    ### Whole-project fit
+    The repair stays in Accounts' existing login boundary.
+
+    ### Design challenge
+    Narrow rejection preserves database failures; a broad rescue would hide them.
+
+    ### Defect pass
+    Checked invalid and expired proof and both success paths. No additional findings.
 
 If blocking findings remain, follow Verdict; restart Merge after repairs pass.
 
