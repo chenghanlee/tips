@@ -81,7 +81,7 @@ defmodule TipsWeb.UITest do
   end
 
   describe "setup_meta" do
-    test "renders everything as text when not linkable" do
+    test "renders nonlinkable metadata and free-text models without links" do
       doc =
         html(&UI.setup_meta/1,
           technique: {"Planning", "/?technique=planning"},
@@ -140,7 +140,7 @@ defmodule TipsWeb.UITest do
   end
 
   describe "vote_control" do
-    test "pending sets aria-disabled on both buttons and ignores clicks" do
+    test "pending votes ignore clicks while selected votes remain clickable" do
       doc = html(&UI.vote_control/1, target: "t1", pending: true, selected: nil)
 
       assert LazyHTML.attribute(LazyHTML.query(doc, "button"), "aria-disabled") == [

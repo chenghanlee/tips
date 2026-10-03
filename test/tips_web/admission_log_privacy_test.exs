@@ -141,48 +141,46 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
   end
 
   describe "credential URL segments" do
-    for level <- [:debug] do
-      test "magic-link GET at #{level} logs the route, not the proof", %{user: user} do
-        {proof, _hashed} = generate_user_magic_link_token(user)
+    test "magic-link GET at debug logs the route, not the proof", %{user: user} do
+      {proof, _hashed} = generate_user_magic_link_token(user)
 
-        log =
-          logged(unquote(level), fn ->
-            assert build_conn() |> get(~p"/users/log-in/#{proof}") |> html_response(200)
-          end)
+      log =
+        logged(:debug, fn ->
+          assert build_conn() |> get(~p"/users/log-in/#{proof}") |> html_response(200)
+        end)
 
-        assert log =~ "GET /users/log-in/:token"
-        assert log =~ "Sent 200 in"
-        refute log =~ proof, "log contains the magic-link proof"
-        # The page only rendered; the logged request left the proof usable.
-        assert {:ok, %{session_token: _}} = Accounts.login_user_by_magic_link(proof)
-      end
+      assert log =~ "GET /users/log-in/:token"
+      assert log =~ "Sent 200 in"
+      refute log =~ proof, "log contains the magic-link proof"
+      # The page only rendered; the logged request left the proof usable.
+      assert {:ok, %{session_token: _}} = Accounts.login_user_by_magic_link(proof)
+    end
 
-      test "email-confirmation GET at #{level} logs the route, not the token",
-           %{conn: conn, user: user} = context do
-        email = unique_user_email()
+    test "email-confirmation GET at debug logs the route, not the token",
+         %{conn: conn, user: user} = context do
+      email = unique_user_email()
 
-        confirmation =
-          extract_user_token(fn url ->
-            Accounts.deliver_user_update_email_instructions(
-              %{user | email: email},
-              user.email,
-              url
-            )
-          end)
+      confirmation =
+        extract_user_token(fn url ->
+          Accounts.deliver_user_update_email_instructions(
+            %{user | email: email},
+            user.email,
+            url
+          )
+        end)
 
-        log =
-          logged(unquote(level), fn ->
-            assert conn
-                   |> get(~p"/users/settings/confirm-email/#{confirmation}")
-                   |> redirected_to() == ~p"/users/settings"
-          end)
+      log =
+        logged(:debug, fn ->
+          assert conn
+                 |> get(~p"/users/settings/confirm-email/#{confirmation}")
+                 |> redirected_to() == ~p"/users/settings"
+        end)
 
-        assert log =~ "GET /users/settings/confirm-email/:token"
-        assert log =~ "Sent 302 in"
-        refute log =~ confirmation, "log contains the email-change token"
-        assert Repo.reload!(user).email == email
-        assert_private(log, context)
-      end
+      assert log =~ "GET /users/settings/confirm-email/:token"
+      assert log =~ "Sent 302 in"
+      refute log =~ confirmation, "log contains the email-change token"
+      assert Repo.reload!(user).email == email
+      assert_private(log, context)
     end
 
     test "connected mounts on credential routes log the view only", %{user: user} do
@@ -198,32 +196,24 @@ defmodule TipsWeb.AdmissionLogPrivacyTest do
     end
 
     # Encoded credentials must still log the matched route, never the requested path.
-    for {form, method, rewrite} <- [
-          {"percent-encoded token segment", :get,
-           quote(
-             do: fn path ->
-               {prefix, <<char, rest::binary>>} =
-                 String.split_at(path, byte_size(path) - 8)
+    test "magic-link percent-encoded token segment logs the route, not the proof", %{user: user} do
+      {proof, _hashed} = generate_user_magic_link_token(user)
+      original_path = ~p"/users/log-in/#{proof}"
 
-               prefix <> "%" <> Base.encode16(<<char>>) <> rest
-             end
-           )}
-        ] do
-      test "magic-link #{form} logs the route, not the proof", %{user: user} do
-        {proof, _hashed} = generate_user_magic_link_token(user)
-        path = unquote(rewrite).(~p"/users/log-in/#{proof}")
+      {prefix, <<char, rest::binary>>} =
+        String.split_at(original_path, byte_size(original_path) - 8)
 
-        log =
-          logged(:info, fn ->
-            assert %Plug.Conn{status: 200} =
-                     dispatch(build_conn(), @endpoint, unquote(method), path)
-          end)
+      path = prefix <> "%" <> Base.encode16(<<char>>) <> rest
 
-        assert log =~ "GET /users/log-in/:token"
-        assert log =~ "Sent 200 in"
-        refute_credential_path(log, proof, path)
-        assert {:ok, %{session_token: _}} = Accounts.login_user_by_magic_link(proof)
-      end
+      log =
+        logged(:info, fn ->
+          assert %Plug.Conn{status: 200} = dispatch(build_conn(), @endpoint, :get, path)
+        end)
+
+      assert log =~ "GET /users/log-in/:token"
+      assert log =~ "Sent 200 in"
+      refute_credential_path(log, proof, path)
+      assert {:ok, %{session_token: _}} = Accounts.login_user_by_magic_link(proof)
     end
 
     test "a path the router does not serve is never logged", %{user: user} do

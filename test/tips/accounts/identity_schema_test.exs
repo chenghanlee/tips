@@ -26,14 +26,12 @@ defmodule Tips.Accounts.IdentitySchemaTest do
       end
     end
 
-    for handle <- ~w(admin) do
-      test "registration rejects reserved handle #{handle} case-insensitively" do
-        for variant <- [unquote(handle), String.upcase(unquote(handle))] do
-          changeset =
-            User.registration_changeset(%User{}, %{email: unique_user_email(), handle: variant})
+    test "registration rejects reserved handle admin case-insensitively" do
+      for variant <- ["admin", "ADMIN"] do
+        changeset =
+          User.registration_changeset(%User{}, %{email: unique_user_email(), handle: variant})
 
-          assert %{handle: ["is reserved"]} = errors_on(changeset)
-        end
+        assert %{handle: ["is reserved"]} = errors_on(changeset)
       end
     end
 
@@ -82,16 +80,14 @@ defmodule Tips.Accounts.IdentitySchemaTest do
       end
     end
 
-    for space <- ["\u00A0"] do
-      test "registration rejects embedded Unicode whitespace #{inspect(space)}" do
-        assert {:error, changeset} =
-                 Accounts.register_user(%{
-                   handle: "ValidHandle",
-                   email: "a#{unquote(space)}b@example.com"
-                 })
+    test "registration rejects embedded Unicode whitespace NBSP" do
+      assert {:error, changeset} =
+               Accounts.register_user(%{
+                 handle: "ValidHandle",
+                 email: "a\u00A0b@example.com"
+               })
 
-        assert "must have the @ sign and no spaces" in errors_on(changeset).email
-      end
+      assert "must have the @ sign and no spaces" in errors_on(changeset).email
     end
 
     test "registration accepts a 30-character handle and a Unicode email" do
@@ -103,47 +99,45 @@ defmodule Tips.Accounts.IdentitySchemaTest do
   end
 
   describe "token expiry in non-UTC database sessions" do
-    for zone <- ["America/New_York"] do
-      test "session expiry preserves UTC semantics in #{zone}" do
-        Repo.query!("SET LOCAL TIME ZONE '#{unquote(zone)}'")
-        user = insert_user()
-        fresh = Accounts.generate_user_session_token(user)
-        expired = Accounts.generate_user_session_token(user)
-        offset_user_token(expired, -(60 * 24 + 1), :hour)
+    test "session expiry preserves UTC semantics in America/New_York" do
+      Repo.query!("SET LOCAL TIME ZONE 'America/New_York'")
+      user = insert_user()
+      fresh = Accounts.generate_user_session_token(user)
+      expired = Accounts.generate_user_session_token(user)
+      offset_user_token(expired, -(60 * 24 + 1), :hour)
 
-        assert {%{id: id}, _inserted_at} = Accounts.get_user_by_session_token(fresh)
-        assert id == user.id
-        assert Accounts.get_user_by_session_token(expired) == nil
-      end
+      assert {%{id: id}, _inserted_at} = Accounts.get_user_by_session_token(fresh)
+      assert id == user.id
+      assert Accounts.get_user_by_session_token(expired) == nil
+    end
 
-      test "magic-link expiry preserves UTC semantics in #{zone}" do
-        Repo.query!("SET LOCAL TIME ZONE '#{unquote(zone)}'")
-        user = insert_user()
-        {fresh, _fresh_hash} = generate_user_magic_link_token(user)
-        {expired, expired_hash} = generate_user_magic_link_token(user)
-        offset_user_token(expired_hash, -60, :minute)
+    test "magic-link expiry preserves UTC semantics in America/New_York" do
+      Repo.query!("SET LOCAL TIME ZONE 'America/New_York'")
+      user = insert_user()
+      {fresh, _fresh_hash} = generate_user_magic_link_token(user)
+      {expired, expired_hash} = generate_user_magic_link_token(user)
+      offset_user_token(expired_hash, -60, :minute)
 
-        assert %{id: id} = Accounts.get_user_by_magic_link_token(fresh)
-        assert id == user.id
-        assert Accounts.get_user_by_magic_link_token(expired) == nil
-      end
+      assert %{id: id} = Accounts.get_user_by_magic_link_token(fresh)
+      assert id == user.id
+      assert Accounts.get_user_by_magic_link_token(expired) == nil
+    end
 
-      test "email-change expiry preserves UTC semantics in #{zone}" do
-        Repo.query!("SET LOCAL TIME ZONE '#{unquote(zone)}'")
-        user = insert_user()
-        context = "change:#{user.email}"
-        {fresh, fresh_row} = UserToken.build_email_token(user, context)
-        {expired, expired_row} = UserToken.build_email_token(user, context)
-        Repo.insert!(fresh_row)
-        Repo.insert!(expired_row)
-        offset_user_token(expired_row.token, -(7 * 24 + 1), :hour)
+    test "email-change expiry preserves UTC semantics in America/New_York" do
+      Repo.query!("SET LOCAL TIME ZONE 'America/New_York'")
+      user = insert_user()
+      context = "change:#{user.email}"
+      {fresh, fresh_row} = UserToken.build_email_token(user, context)
+      {expired, expired_row} = UserToken.build_email_token(user, context)
+      Repo.insert!(fresh_row)
+      Repo.insert!(expired_row)
+      offset_user_token(expired_row.token, -(7 * 24 + 1), :hour)
 
-        assert {:ok, fresh_query} = UserToken.verify_change_email_token_query(fresh, context)
-        assert %UserToken{user_id: id} = Repo.one(fresh_query)
-        assert id == user.id
-        assert {:ok, expired_query} = UserToken.verify_change_email_token_query(expired, context)
-        assert Repo.one(expired_query) == nil
-      end
+      assert {:ok, fresh_query} = UserToken.verify_change_email_token_query(fresh, context)
+      assert %UserToken{user_id: id} = Repo.one(fresh_query)
+      assert id == user.id
+      assert {:ok, expired_query} = UserToken.verify_change_email_token_query(expired, context)
+      assert Repo.one(expired_query) == nil
     end
   end
 

@@ -50,7 +50,7 @@ defmodule Tips.Workers.ExpireRegistrationsTest do
     assert %User{confirmed_at: %DateTime{}} = Repo.reload!(confirmed)
   end
 
-  test "worker repeats safely and reports invariant failures" do
+  test "an invariant failure rolls back the batch and keeps tokens" do
     [clean] = expired_registrations(1)
     holder = unconfirmed_user_fixture()
     extract_user_token(&Accounts.deliver_login_instructions(holder, &1))

@@ -20,17 +20,15 @@ defmodule Tips.Accounts.RegistrationExpiryTest do
 
   defp tokens(%User{id: id}), do: Repo.all_by(UserToken, user_id: id)
 
-  test "rejects confirmation at and after the original seven-day deadline" do
-    for seconds_left <- [0] do
-      user = unconfirmed_user_fixture()
-      link = magic_link(user)
-      set_registration_deadline(user, seconds_left)
+  test "accepts confirmation before the original deadline and rejects it at the boundary" do
+    user = unconfirmed_user_fixture()
+    link = magic_link(user)
+    set_registration_deadline(user, 0)
 
-      refute Accounts.get_user_by_magic_link_token(link)
-      assert {:error, :not_found} = Accounts.login_user_by_magic_link(link)
-      assert %User{confirmed_at: nil} = Repo.reload!(user)
-      assert [%UserToken{context: "login"}] = tokens(user)
-    end
+    refute Accounts.get_user_by_magic_link_token(link)
+    assert {:error, :not_found} = Accounts.login_user_by_magic_link(link)
+    assert %User{confirmed_at: nil} = Repo.reload!(user)
+    assert [%UserToken{context: "login"}] = tokens(user)
 
     %User{id: id} = user = registration(60)
     link = magic_link(user)

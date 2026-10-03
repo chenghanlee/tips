@@ -15,15 +15,13 @@ defmodule Tips.Content.SchemaTest do
       end
     end
 
-    for marker <- [:dead_at] do
-      test "reviews_one_per_user includes #{inspect(marker)} reviews" do
-        review = review_fixture()
+    test "reviews_one_per_user includes moderator-hidden reviews" do
+      review = review_fixture()
 
-        set_visibility(review, unquote(marker))
+      set_visibility(review, :dead_at)
 
-        assert_raise Ecto.ConstraintError, ~r/reviews_one_per_user/, fn ->
-          review_fixture(Repo.get!(Tip, review.tip_id), %{user_id: review.user_id})
-        end
+      assert_raise Ecto.ConstraintError, ~r/reviews_one_per_user/, fn ->
+        review_fixture(Repo.get!(Tip, review.tip_id), %{user_id: review.user_id})
       end
     end
 

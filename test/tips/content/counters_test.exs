@@ -74,13 +74,11 @@ defmodule Tips.Content.CountersTest do
     end
   end
 
-  for value <- [0] do
-    test "votes_value_chk rejects #{value}" do
-      tip = tip_fixture()
+  test "votes_value_chk rejects 0" do
+    tip = tip_fixture()
 
-      assert_raise Ecto.ConstraintError, ~r/votes_value_chk/, fn ->
-        vote_fixture(tip, %{value: unquote(value)})
-      end
+    assert_raise Ecto.ConstraintError, ~r/votes_value_chk/, fn ->
+      vote_fixture(tip, %{value: 0})
     end
   end
 
