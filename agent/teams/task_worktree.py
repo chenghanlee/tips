@@ -342,13 +342,10 @@ enabled = true
         return (
             f"You are {self.agent_name}. Read agent/teams/README.md, then "
             f"agent/teams/roles/{ROLE_CARDS[self.role_name]}.md; await assignment. "
-            f"Language tools for this session: {self.wrapper} is Dexter bound to "
-            f"{self.worktree}; run it via your shell tool, for example "
-            f"{self.wrapper} query references lib/example.ex 12 8. Its help is the contract "
-            f"for syntax and output: read {self.wrapper} query --help and "
-            f"{self.wrapper} lookup --help once, and follow them where this checkout's "
-            "guide differs. After fetching or changing dependencies yourself, run "
-            f"{self.wrapper} reindex. "
+            f"TIPS_DEXTER={self.wrapper} is bound to this worktree; run it via the shell. "
+            'Read "$TIPS_DEXTER" query --help and "$TIPS_DEXTER" lookup --help once; '
+            "their syntax and output take precedence over a lagging checkout guide. "
+            'After fetching or changing dependencies, run "$TIPS_DEXTER" reindex. '
             "Do not start another Elixir language server. Freshness is unverified; "
             "empty results are not proof of absence. Do not stop the shared daemon when "
             "this agent exits, and do not run git clean -x: it deletes the bound command "
