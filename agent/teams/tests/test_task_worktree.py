@@ -566,13 +566,15 @@ class WorktreeIntegrationTest(unittest.TestCase):
         # A rerun reuses the session; it neither restarts it nor reapplies its environment.
         launches = (["agent", "start"], ["pane", "run"])
         assert not any(e[:2] in launches for e in self.state()["events"][before:])
-        self.commit("next")
-        new = self.git("rev-parse", "HEAD")
-        self.call("--start", role="test", task=task, ref=new)
-        stops = [e for e in self.state()["events"] if e[0] == "stop_agent"]
-        assert stops == []
-        assert self.git("-C", str(wt), "rev-parse", "HEAD") == new
-        assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 1
+        for flags in ((), ("--start",)):
+            with self.subTest(flags=flags):
+                self.commit("next")
+                new = self.git("rev-parse", "HEAD")
+                p = self.call(*flags, role="test", task=task, ref=new)
+                assert "Advanced team-3-test in place" in p.stdout
+                assert not any(e[0] == "stop_agent" for e in self.state()["events"])
+                assert self.git("-C", str(wt), "rev-parse", "HEAD") == new
+                assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 1
 
     def test_restart_replaces_tester_before_advancing_to_new_sha(self) -> None:
         task, wt = "28-review-team-3-test", self.root / ".worktrees/28-review-team-3-test"
@@ -801,17 +803,6 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.save(s)
         self.call("--start", ok=False)
         assert not any(e[:2] == ["agent", "start"] for e in self.state()["events"])
-
-    def test_running_tester_advances_in_place_without_start(self) -> None:
-        task, wt = "28-review-team-3-test", self.root / ".worktrees/28-review-team-3-test"
-        self.call("--start", role="test", task=task)
-        self.commit("next")
-        new = self.git("rev-parse", "HEAD")
-        p = self.call(role="test", task=task, ref=new)
-        assert "Advanced team-3-test in place" in p.stdout
-        assert self.git("-C", str(wt), "rev-parse", "HEAD") == new
-        assert not any(e[0] == "stop_agent" for e in self.state()["events"])
-        assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 1
 
     def test_configurable_dexter_timeout(self) -> None:
         path = self.root / "agent/teams/config.toml"
