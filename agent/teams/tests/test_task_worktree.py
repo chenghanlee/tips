@@ -557,7 +557,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert s["launch_env"]["TIPS_TEST_PORT"] == "5160"
         assert s["launch_env"]["PGPORT"] == "5434"
 
-    def test_same_live_session_reused_and_new_sha_stops_tester_before_checkout(self) -> None:
+    def test_start_preserves_tester_session_at_same_and_new_sha(self) -> None:
         task, wt = "28-review-team-3-test", self.root / ".worktrees/28-review-team-3-test"
         self.call("--start", role="test", task=task)
         before = len(self.state()["events"])
@@ -569,6 +569,17 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.commit("next")
         new = self.git("rev-parse", "HEAD")
         self.call("--start", role="test", task=task, ref=new)
+        stops = [e for e in self.state()["events"] if e[0] == "stop_agent"]
+        assert stops == []
+        assert self.git("-C", str(wt), "rev-parse", "HEAD") == new
+        assert sum(e[:2] == ["agent", "start"] for e in self.state()["events"]) == 1
+
+    def test_restart_replaces_tester_before_advancing_to_new_sha(self) -> None:
+        task, wt = "28-review-team-3-test", self.root / ".worktrees/28-review-team-3-test"
+        self.call("--start", role="test", task=task)
+        self.commit("next")
+        new = self.git("rev-parse", "HEAD")
+        self.call("--restart", role="test", task=task, ref=new)
         stops = [e for e in self.state()["events"] if e[0] == "stop_agent"]
         assert stops == [["stop_agent", "wA:pB", str(wt), self.base]]
         assert self.git("-C", str(wt), "rev-parse", "HEAD") == new

@@ -105,7 +105,11 @@ def parse_arguments() -> Arguments:
         action="store_true",
         help="Launch the lead with roles.lead_ui (issues labelled ui); lead role only",
     )
-    parser.add_argument("--start", action="store_true")
+    parser.add_argument(
+        "--start",
+        action="store_true",
+        help="Launch if absent; preserve a running session. Advance reviewers only at a handoff.",
+    )
     parser.add_argument(
         "--restart",
         action="store_true",
@@ -494,10 +498,7 @@ enabled = true
             )
         if not self.review_sha or self.review_sha == self.old_head:
             return self.reuse_running(self.owner)
-        if self.role_name == "lead" or not self.args.start:
-            return self.advance_in_place()
-        # An explicit --start on a running tester replaces it with a fresh session.
-        return self.stop_owner()
+        return self.advance_in_place()
 
     def stop_owner(self) -> bool:
         """Stop the running client under team.stop's guards; a fresh one is launched next."""
