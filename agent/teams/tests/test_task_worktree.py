@@ -663,7 +663,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
         self.save(s)
         self.commit("next")
         new = self.git("rev-parse", "HEAD")
-        self.call("--start", role="test", task=task, ref=new, ok=False)
+        self.call("--restart", role="test", task=task, ref=new, ok=False)
         assert self.git("-C", str(wt), "rev-parse", "HEAD") == self.base
 
     def test_dirty_review_refused_even_same_sha(self) -> None:
@@ -921,7 +921,7 @@ class WorktreeIntegrationTest(unittest.TestCase):
         s["stop_dirties"] = True
         self.save(s)
         self.commit("next")
-        self.call("--start", role="test", task=task, ref=self.git("rev-parse", "HEAD"), ok=False)
+        self.call("--restart", role="test", task=task, ref=self.git("rev-parse", "HEAD"), ok=False)
         assert self.git("-C", str(wt), "rev-parse", "HEAD") == self.base
         assert (wt / "tracked.txt").read_text() == "saved at exit\n"
 
