@@ -4,24 +4,24 @@ Read [the shared agreement](../README.md) first.
 
 ## Always
 
-Own the branch, worktree and PR until merge; never switch issues earlier. Implement with AGENTS.md's integration-first TDD. For `agent/teams` changes, follow [Changing agent/teams scripts](../README.md#changing-agentteams-scripts).
+Own the branch, worktree and PR until merge; never switch issues earlier. Implement with AGENTS.md's integration-first TDD. Keep affected design and API contracts current; document new lasting constraints in their existing canonical source, without duplicating code contracts. For `agent/teams` changes, follow [Changing agent/teams scripts](../development.md#changing-agentteams-scripts).
 
 For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](../../../AGENTS.md#skills).
 
-- Ask the tech lead when stuck, facing ambiguity or conflicting information, or needing a stronger model's advice. Do not wait for two failed fixes to ask.
-- Count your failed fixes, local ones included. After two for the same problem, stop fixing it: hand off to the tech lead with both attempts, failure evidence and current code state, including unpushed changes. No third attempt before the tech lead gives direction.
+- Ask the tech lead before acting on ambiguous, conflicting, underspecified or apparently incorrect requirements, or materially departing from the contract. Ask when stuck, confused or needing advice; do not wait for two failed repairs.
+- Count failed repairs, local ones included, and follow shared Required feedback's two-attempt stop.
 
 ## Assigned
 
-1. Your initial brief invokes `grill-me`. Confirm worktree and SHA, then read the brief and linked contract as the first step of that session.
+1. Your initial brief invokes `grill-me`. Confirm the assigned worktree, SHA and launch values with `pwd`, `git rev-parse HEAD` and the shared Environment command. Read the brief, issue and linked readiness contract, then its design sections and shared invariants, as the first step of that session.
 2. Independently challenge the brief under [Brief consensus](../README.md#brief-consensus). Append numbered questions and recommendations to your shared Q&A file, notify the tech lead with its supplied reply command and end your turn. When it messages you, read its answers and append follow-ups or acknowledgment. Explicitly acknowledge the final contract revision as actionable with no unresolved blockers. Wait for the tech lead's release before writing the first failing test or implementation. Then start with work independent of owner items. Reopen grilling before work that changes agreed decisions.
-3. Push a first commit; open a draft PR. This draft is not review-ready and gets no handoff.
+3. Push the first commit and open a draft PR under shared Git and Checks rules; the draft is not review-ready and gets no handoff.
 
 ## Pushed head
 
-You own green. From the second push onward, before each commit, read the preceding push's result with `gh pr checks "$PR"` once, without `--watch`. Continue work while checks run. Never push onto unrepaired red; pending is not red.
+**PR description.** Own the PR title and body. Write a [change description](https://google.github.io/eng-practices/review/developer/cl-descriptions.html): a short imperative title; a body that says what changed and why, anything CI does not verify, and check-configuration changes for explicit tech-lead review. Compare the implementation with the current contract and include `Contract departures: none` or links to approved departures. Keep it true until merge. Explain repairs in code and commit messages, not comments.
 
-Name check-configuration changes (ignore files, workflow, lint or scanner settings) in the PR description for explicit tech-lead review.
+You own green. From the second push onward, before each commit, read the preceding push's result with `gh pr checks "$PR"` once, without `--watch`. Continue work while checks run. Never push onto unrepaired red; pending is not red.
 
 When review-ready, bring the PR description up to date and mark the PR ready. Hand off to the tech lead with PR link, SHA, `action=dispatch tester`, owner. Pending preceding checks do not delay handoff; the tester's read decides.
 
@@ -31,11 +31,11 @@ Repair your red before another push; name the tester's `RED` check in the repair
 
 ## Verdict
 
-Read feedback with `pr_review.py list`. Repair it under shared Required feedback and probe limits, then push and hand off. Follow shared Replies; an approval needs no acknowledgment.
+Before first handling feedback, read [Replies](../reviews.md#replies) and run `agent/teams/pr_review.py list "$PR"`. Repair under shared Required feedback and probe limits, then push and hand off. An approval needs no acknowledgment.
 
 ## Merge
 
-After clean `gh pr update-branch`, ask the tech lead for a lead TPM fetch. Before another commit, run `git merge --ff-only "origin/task/$TASK"` (`TASK`: readiness task slug). If fast-forward fails, preserve work and report divergence to the tech lead.
+After clean `gh pr update-branch`, ask the tech lead for a lead TPM fetch. Before another commit, run `git merge --ff-only "origin/$(git branch --show-current)"`. If fast-forward fails, preserve work and report divergence to the tech lead.
 
 If the branch update conflicts, request the same fetch, then `git merge origin/main` in your worktree. Resolve, push and hand off; tester reviews conflicted hunks and base delta.
 

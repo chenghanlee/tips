@@ -69,7 +69,7 @@ Set database connection limits in [compose.yaml](../../compose.yaml), overridden
 
 ## Check changes to these scripts
 
-Follow [Changing agent/teams scripts](README.md#changing-agentteams-scripts): check commands, CI evidence, test constraints and `# noqa: S603` limits. [pyproject.toml](pyproject.toml) uses the harness's Python profile: strict types, complexity limit 10, same lint rules. Only Python files under `tests/` get the test-assertion exception. For optional local developer checks, install Ruff/Pyright yourself; agents never install them.
+Follow [Changing agent/teams scripts](development.md#changing-agentteams-scripts): check commands, CI evidence, test constraints and `# noqa: S603` limits. [pyproject.toml](pyproject.toml) uses the harness's Python profile: strict types, complexity limit 10, same lint rules. Only Python files under `tests/` get the test-assertion exception. For optional local developer checks, install Ruff/Pyright yourself; agents never install them.
 
 ## Milestones
 

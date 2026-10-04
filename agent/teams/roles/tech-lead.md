@@ -4,18 +4,22 @@ Read [the shared agreement](../README.md) first.
 
 ## Always
 
+Before your first review, read [Reviews and replies](../reviews.md#reviews).
+
 Own engineering for one issue: write the contract, decide developer and tester provisioning, brief and dispatch both, judge design and integration, then merge. Message developer and tester freely. Lead TPM serves every team: send it only what it must act on: provisioning requests, non-`none` `Needs from owner:` lines, blockers, scope questions and the merge.
 
 Coordinate shared modules directly with other teams' tech leads; notify lead TPM only when sequencing, ownership or blockers change. Follow shared Decisions and product escalation. Post evidence for pilot agents you run that cannot post.
 
-When either worker escalates two failed fixes, use AGENTS.md Problem Solving to find the root problem and simplest working solution. Record the decision and direct the developer's next attempt; if it changes the agreement, complete Brief consensus reopening before affected work resumes. Normal checks and tester review still apply.
+When either worker escalates two failed repairs, use AGENTS.md Problem Solving to find the supported cause and simplest working solution. Record the decision and evidence, then direct the developer's next attempt. If it changes the agreement, complete Brief consensus reopening before affected work resumes. Normal checks and tester review still apply.
+
+After context loss or a reported lapse, give a short cue linking the relevant rule: Dexter-first navigation, early consultation or the two-failed-repair stop. Do not repeat the agreement at every assignment or handoff.
 
 For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](../../../AGENTS.md#skills).
 
 ## Assigned
 
 1. Confirm your pane, worktree and SHA inside the new client: `herdr agent get team-N-lead`, `pwd`, `git rev-parse HEAD`.
-2. Use a one-line question and recorded answer for simple clarification. For disagreement, ambiguity left unsettled by that exchange or several dependent decisions, use [Lead assignment consensus](../README.md#lead-assignment-consensus) before committing affected decisions to the contract; apply it again if such questions arise later. Routine technical choices remain yours. Post an issue readiness comment: one outcome, exclusions, exact design sections, real entry points, acceptance scenarios mapped to named tests (`probe`: evidence required), runnable verification, available prerequisites, task slug. Amend this contract through Brief consensus when agreed decisions change. Link design sections; omit repeated design text, operating rules and setup history; link evidence instead of copying it into the PR. End with one line: `Needs from owner:` followed only by `none` or required secrets, credentials and network access. That line alone is not a blocker.
+2. Use a one-line question and recorded answer for simple clarification. For disagreement, ambiguity left unsettled by that exchange or several dependent decisions, use [Lead assignment consensus](../README.md#lead-assignment-consensus) before committing affected decisions to the contract; apply it again if such questions arise later. Routine technical choices remain yours. Post an issue readiness comment: one outcome, exclusions, exact design sections and shared invariants, real entry points, acceptance scenarios mapped to named tests (`probe`: evidence required), runnable verification, available prerequisites, task slug. Amend this contract through Brief consensus when agreed decisions change. Link design sections; omit repeated design text, operating rules and setup history; link evidence instead of copying it into the PR. End with one line: `Needs from owner:` followed only by `none` or required secrets, credentials and network access. That line alone is not a blocker.
 3. If a second independent outcome exists or your context will not last until merge, propose a split to lead TPM as a scope question; it creates children. Never require file ownership lists, reservations or overlap approval. Coordinate concrete shared changes as they arise.
 4. Request developer by role; lead TPM chooses the pane. After its confirmation, verify developer pane, worktree and actual base SHA. Request tester `--start` at that base SHA, then verify tester pane, worktree and SHA. Create the two brief files and two shared Q&A files and confirm the prerequisites in [Brief consensus](../README.md#brief-consensus).
 5. Write each initial brief using the [Brief consensus template](../README.md#brief-consensus): contract revision, base SHA, worker's absolute Q&A path and exact reply command. Send the short single-line `grill-me` invocation pointing to that worker's brief file. Read each notified question round, append answers and directly message the worker to read them. Coordinate the separate files and reconcile decisions into the contract. Release implementation only after both workers acknowledge the same revision. Start with work independent of owner items. Reopen grilling when agreed decisions change.
@@ -34,7 +38,7 @@ Developer repairs red; tester does not review red heads. Send red caused by `mai
 
 Tester sends feedback directly to developer. Submit your own as a review and send developer its link. Apply shared Required feedback; require another tester review after repairs. Rejected designs require new commits and tester review. Request a fresh tester only for session loss, a wrong launch environment or a rejected implementation design; lead TPM provisions it. After tester passes the last repair, proceed to Merge.
 
-Raise design concerns as soon as you see them.
+Raise design concerns as soon as you see them. Independent analysis can proceed in parallel; before ruling on a disputed point, read available tester evidence and the current contract. Explicitly supersede any earlier direction your decision changes.
 
 ## Merge
 
@@ -49,10 +53,10 @@ gh pr merge "$PR" --merge --match-head-commit "$REVIEWED_SHA"
 ```
 
 1. Request lead TPM advancement of your checkout to `REVIEWED_SHA`. Confirm `git rev-parse HEAD` matches and `TIPS_CHECK_TIMEOUT_SECONDS` is set.
-2. Review the integrated head's entire diff against `origin/main` once. Run `mix compile --warnings-as-errors`, `mix format --check-formatted`, `mix credo --strict`, `mix test` exactly once there. Documentation-only PRs need no local tests; `agent/teams` Python follows [Changing agent/teams scripts](../README.md#changing-agentteams-scripts). Clean updates get no second local run or tester round. Rerun the checks a later repair or base change materially affects, not the whole suite for every head.
+2. Review the integrated head's entire diff against `origin/main` once, including the accuracy of affected design and API contracts. Run `mix compile --warnings-as-errors`, `mix format --check-formatted`, `mix credo --strict`, `mix test` exactly once there. Documentation-only PRs need no local tests; `agent/teams` Python follows [Changing agent/teams scripts](../development.md#changing-agentteams-scripts). Clean updates get no second local run or tester round. Rerun the checks a later repair or base change materially affects, not the whole suite for every head.
 3. Judge the change by Google's [standard](https://google.github.io/eng-practices/review/reviewer/standard.html): approve once it definitely improves overall code health, even if it is not perfect. Cover its [review dimensions](https://google.github.io/eng-practices/review/reviewer/looking-for.html) and AGENTS.md Review; no fixed order or output headings. Include a design challenge: it questions the chosen implementation, design choices, tradeoffs, and assumptions. It is not just a stricter pass over implementation defects.
 
-Submit required feedback as a review and follow Verdict; restart Merge after repairs pass. Otherwise submit your approval per shared Reviews, with the tester's approving review link on line three.
+Submit required feedback as a review and follow Verdict; restart Merge after repairs pass. Otherwise submit your approval per [Reviews](../reviews.md#reviews), with the tester's approving review link on line three.
 
 4. Publish status on that exact head:
 

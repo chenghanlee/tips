@@ -1081,8 +1081,9 @@ class WorktreeIntegrationTest(unittest.TestCase):
         assert self.state()["launch_env"]["TIPS_DEXTER"] == str(wrapper)
         brief = self.state()["launch_argv"][-1]
         # Both clients are pointed at the bound command and at its own help.
-        assert f"{wrapper} query --help" in brief
-        assert f"{wrapper} lookup --help" in brief
+        assert f"TIPS_DEXTER={wrapper}" in brief
+        assert '"$TIPS_DEXTER" query --help' in brief
+        assert '"$TIPS_DEXTER" lookup --help' in brief
         assert brief.startswith(
             "You are team-3-lead. Read agent/teams/README.md, then agent/teams/roles/tech-lead.md;"
         )
