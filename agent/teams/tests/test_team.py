@@ -59,11 +59,13 @@ elif a[:2] == ["agent", "list"]:
             {
                 "pane_id": "wT:p1",
                 "name": "fixture-client",
-                "agent": "codex",
+                "agent": s.get("listed_kind", "codex"),
                 "foreground_cwd": s["root"],
             }
         ]
     }
+    if s.get("omit_kind"):
+        del r["agents"][0]["agent"]
 elif a[:2] == ["agent", "rename"]:
     if s.get("clear_error"):
         print(json.dumps({"error": {"code": s["clear_error"]}}), file=sys.stderr)
@@ -245,15 +247,49 @@ while True: time.sleep(.05)
         calls = [json.loads(line) for line in (self.root / "calls").read_text().splitlines()]
         assert ["agent", "rename", "wT:p1", "--clear"] in calls
 
+    def test_released_kind_with_stale_name_succeeds_after_exit(self) -> None:
+        for omit_kind in (False, True):
+            with self.subTest(omit_kind=omit_kind):
+                client = self.client()
+                state = json.loads((self.root / "state.json").read_text())
+                state.update(listed_kind=None, omit_kind=omit_kind)
+                (self.root / "state.json").write_text(json.dumps(state))
+                (self.root / "calls").unlink(missing_ok=True)
+                result = self.stop()
+                assert result.returncode == 0, result.stderr
+                assert client.wait(timeout=2) == 0
+                calls = [json.loads(line) for line in (self.root / "calls").read_text().splitlines()]
+                assert ["agent", "rename", "wT:p1", "--clear"] in calls
+
     def test_replacement_client_after_exit_preserves_its_name(self) -> None:
-        p = self.client()
+        for listed_kind in ("codex", None):
+            with self.subTest(listed_kind=listed_kind):
+                client = self.client()
+                state = json.loads((self.root / "state.json").read_text())
+                state.update(replacement=True, listed_kind=listed_kind)
+                (self.root / "state.json").write_text(json.dumps(state))
+                (self.root / "calls").unlink(missing_ok=True)
+                result = self.stop()
+                assert result.returncode != 0
+                assert "owner changed during shutdown" in result.stderr
+                assert "occupied=True" in result.stderr
+                assert "leader_pid=424242" in result.stderr
+                assert "leader_name='claude'" in result.stderr
+                assert client.wait(timeout=2) == 0
+                calls = [json.loads(line) for line in (self.root / "calls").read_text().splitlines()]
+                assert ["agent", "rename", "wT:p1", "--clear"] not in calls
+
+    def test_different_kind_at_shell_preserves_its_name(self) -> None:
+        client = self.client()
         state = json.loads((self.root / "state.json").read_text())
-        state["replacement"] = True
+        state["listed_kind"] = "claude"
         (self.root / "state.json").write_text(json.dumps(state))
-        r = self.stop()
-        assert r.returncode != 0
-        assert "owner changed during shutdown" in r.stderr
-        assert p.wait(timeout=2) == 0
+        result = self.stop()
+        assert result.returncode != 0
+        assert "owner changed during shutdown" in result.stderr
+        assert "previous_kind='codex', listed_kind='claude'" in result.stderr
+        assert "occupied=False" in result.stderr
+        assert client.wait(timeout=2) == 0
         calls = [json.loads(line) for line in (self.root / "calls").read_text().splitlines()]
         assert ["agent", "rename", "wT:p1", "--clear"] not in calls
 
