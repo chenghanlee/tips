@@ -10,7 +10,7 @@ Own engineering for one issue: write the contract, decide developer and tester p
 
 Coordinate shared modules directly with other teams' tech leads; notify lead TPM only when sequencing, ownership or blockers change. Follow shared Decisions and product escalation. Post evidence for pilot agents you run that cannot post.
 
-When either worker escalates two failed repairs, use AGENTS.md Problem Solving to find the supported cause and simplest working solution. Record the decision and evidence, then direct the developer's next attempt; normal checks and tester review still apply.
+When either worker escalates two failed repairs, use AGENTS.md Problem Solving to find the supported cause and simplest working solution. Record the decision and evidence, then direct the developer's next attempt. If it changes the agreement, complete Brief consensus reopening before affected work resumes. Normal checks and tester review still apply.
 
 After context loss or a reported lapse, give a short cue linking the relevant rule: Dexter-first navigation, early consultation or the two-failed-repair stop. Do not repeat the agreement at every assignment or handoff.
 
@@ -19,14 +19,14 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](.
 ## Assigned
 
 1. Confirm your pane, worktree and SHA inside the new client: `herdr agent get team-N-lead`, `pwd`, `git rev-parse HEAD`.
-2. Post an issue readiness comment: one outcome, exclusions, exact design sections and shared invariants, real entry points, acceptance scenarios mapped to named tests (`probe`: evidence required), runnable verification, available prerequisites, task slug. Amend this contract when needed. Link design sections; omit repeated design text, operating rules and setup history; link evidence instead of copying it into the PR. End with one line: `Needs from owner:` followed only by `none` or required secrets, credentials and network access. That line alone is not a blocker.
+2. Use a one-line question and recorded answer for simple clarification. For disagreement, ambiguity left unsettled by that exchange or several dependent decisions, use [Lead assignment consensus](../README.md#lead-assignment-consensus) before committing affected decisions to the contract; apply it again if such questions arise later. Routine technical choices remain yours. Post an issue readiness comment: one outcome, exclusions, exact design sections and shared invariants, real entry points, acceptance scenarios mapped to named tests (`probe`: evidence required), runnable verification, available prerequisites, task slug. Amend this contract through Brief consensus when agreed decisions change. Link design sections; omit repeated design text, operating rules and setup history; link evidence instead of copying it into the PR. End with one line: `Needs from owner:` followed only by `none` or required secrets, credentials and network access. That line alone is not a blocker.
 3. If a second independent outcome exists or your context will not last until merge, propose a split to lead TPM as a scope question; it creates children. Never require file ownership lists, reservations or overlap approval. Coordinate concrete shared changes as they arise.
-4. Request developer by role; lead TPM chooses the pane. After its confirmation, verify developer pane, worktree and SHA. Brief developer with contract link, that SHA as base, action, owner and exact completion command `herdr agent prompt team-N-lead "..."`, naming fields the developer fills.
-5. Start with work independent of owner items.
+4. Request developer by role; lead TPM chooses the pane. After its confirmation, verify developer pane, worktree and actual base SHA. Request tester `--start` at that base SHA, then verify tester pane, worktree and SHA. Create the two brief files and two shared Q&A files and confirm the prerequisites in [Brief consensus](../README.md#brief-consensus).
+5. Write each initial brief using the [Brief consensus template](../README.md#brief-consensus): contract revision, base SHA, worker's absolute Q&A path and exact reply command. Send the short single-line `grill-me` invocation pointing to that worker's brief file. Read each notified question round, append answers and directly message the worker to read them. Coordinate the separate files and reconcile decisions into the contract. Release implementation only after both workers acknowledge the same revision. Start with work independent of owner items. Reopen grilling when agreed decisions change.
 
 ## Pushed head
 
-At first developer handoff, request tester `--start` at that SHA. For later heads, request the tester's checkout advance once its last review is submitted. After lead TPM confirmation, verify the provisioned or advanced client’s pane, worktree and SHA. Send tester the contract link, tester worktree, exact SHA, changes since last verdict and completion command.
+At first developer handoff, request advancement of the existing tester's checkout from the agreed base to that SHA. For later heads, request advancement once its last review is submitted. Do not advance during an unfinished grilling round. After lead TPM confirmation, verify the provisioned or advanced client’s pane, worktree and SHA. Send tester the contract link, tester worktree, exact SHA, changes since last verdict and completion command.
 
 Your own checkout advances at Merge. Request an earlier advance only to inspect a head for a concrete design or triage question.
 

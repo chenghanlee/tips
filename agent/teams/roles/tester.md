@@ -14,14 +14,14 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](.
 
 ## Assigned
 
-Confirm worktree and SHA from the tech lead's message. Read acceptance scenarios in the readiness comment.
+Your initial brief invokes `grill-me`. Confirm worktree and base SHA, then read the brief and acceptance scenarios in the linked contract as the first step of that session. Independently challenge the brief under [Brief consensus](../README.md#brief-consensus), especially acceptance scenarios and verification. Append numbered questions and recommendations to your shared Q&A file, notify the tech lead with its supplied reply command and end your turn. When it messages you, read its answers and append follow-ups or acknowledgment. Explicitly acknowledge the final contract revision as actionable with no unresolved blockers. Then await checkout advancement and the review-head dispatch. Reopen grilling when agreed decisions change; contract consensus does not preapprove code or tests.
 
 ## Pushed head
 
 After lead TPM provisioning or advancement and the tech lead's SHA message:
 
 1. Read `gh pr checks "$PR"` once. Failed required checks trigger Red check; record pending checks as pending.
-2. Review the first head fully. Verify the tests exercise each acceptance scenario, are correct and fail when the code breaks. Apply AGENTS.md's test-value review. Later reviews cover deltas since the last reviewed head, including heads refused as red.
+2. At the first head, re-read the acknowledged contract and independently derive expected acceptance behavior from its linked design sections. Review the first head fully. An incorrect or incomplete contract is a normal required review finding: report the gap with evidence and let the tech lead handle reopening. Never use Q&A answers as verdict evidence. Verify the tests exercise each acceptance scenario, are correct and fail when the code breaks. Apply AGENTS.md's test-value review. Later reviews cover deltas since the last reviewed head, including heads refused as red.
 
 For an intermittent-failure repair, check that it addresses the supported cause. When useful, rerun the prior failing workload within an explicit runtime budget; do not retry until green.
 
@@ -47,7 +47,7 @@ Follow shared Recovery.
 
 ## Lost session or environment
 
-Missing or wrong environment: notify tech lead and await a relaunch; the helper cannot change a running client. Lost session: lead TPM provisions with `--start`. In a new session, review current head fully again.
+Missing or wrong environment: notify tech lead and await a relaunch; the helper cannot change a running client. Lost session: lead TPM provisions with `--start`. In a new session, complete Assigned and Brief consensus at the current head first, then review that head fully again. Contract changes reopen affected questions with the developer.
 
 ## Silence
 

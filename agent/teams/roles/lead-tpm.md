@@ -32,9 +32,9 @@ agent/teams/task_worktree.py "$ISSUE-review-team-$N-lead" --team "$N" --role lea
 
 For `ui` issues, include `--ui` on every lead call, including reruns. Otherwise the helper selects the other lead configuration, rejects running clients as conflicting, or silently launches the wrong lead on first `--start`.
 
-Choose pane IDs from start output or `herdr pane list`; never guess. When `herdr agent get` shows `idle`, brief tech lead with issue URL, base SHA and exact completion command. Never wait for compilation. No reservation list or merge slot.
+Choose pane IDs from start output or `herdr pane list`; never guess. When `herdr agent get` shows `idle`, brief tech lead with issue URL, base SHA and exact completion command. Use a one-line question and recorded answer for simple clarification. For disagreement, ambiguity left unsettled by that exchange or several dependent decisions, coordinate [Lead assignment consensus](../README.md#lead-assignment-consensus); otherwise proceed without an extra gate. Apply the same rule when these questions arise later. Never wait for compilation. No reservation list or merge slot.
 
-For each tech-lead provisioning request (one line: role; exact SHA for reviewers), select the pane, run the matching command, then reply to tech lead with pane, absolute worktree and actual SHA. At first tester dispatch, set Project Status In review.
+For each tech-lead provisioning request (one line: role; exact SHA for reviewers), select the pane, run the matching command, then reply to tech lead with pane, absolute worktree and actual SHA. Provision the tester at the confirmed developer base for the initial `grill-me` sessions; keep Project Status Active. Set In review on the first tester checkout-advance request for a pushed review head.
 
 ```bash
 agent/teams/task_worktree.py "$TASK" --team "$N" --role dev --pane "$DEV_PANE" --start
@@ -100,7 +100,7 @@ After Herdr restore, run `herdr agent list`. If your pane has no name, run `herd
 A client keeps the environment and root it was launched with; the helper never changes a running client. Before acting, inspect Git and pane evidence under shared Recovery; never reset or stash anyone's work.
 
 - Running client with missing or wrong launch variables: rerunning its helper command at the same SHA never relaunches the session; for a reviewer it fetches locked dependencies and reindexes again, then reports it. After it records shared Recovery state at a handoff, rerun the role command with `--restart` on the same task or SHA. The helper stops that client, verifies that it and its child processes exited, then launches a fresh one; a developer's branch and uncommitted work stay as they are. A refused stop launches nothing and preserves work and resources, not necessarily the session: the client may already have exited. Retry `--restart`, never `--start`, once the named processes have exited; it runs the same checks again. The worktree's Dexter daemon may keep running. Never kill processes; report a repeated refusal to the user. If your client denies the command, the user exits that client; never bypass.
-- Absent client: rerun the role command with `--start`. Reviewers start at the current head; a developer restarts on its existing branch and worktree, unchanged.
+- Absent client: rerun the role command with `--start`. Reviewers start at the current head; a replacement tester completes Assigned and Brief consensus before reviewing it. A developer restarts on its existing branch and worktree, unchanged.
 - A tester at the same SHA is reused. After the tech lead rejects the implementation design, use `--start` at the new SHA to replace the tester, subject to the normal stop and descendant checks.
 
 ## Silence

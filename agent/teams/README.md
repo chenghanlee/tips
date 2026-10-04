@@ -4,7 +4,7 @@ Read this agreement, then your role card. [AGENTS.md](../../AGENTS.md) governs e
 
 Keep task requirements, decisions and evidence in GitHub issues/PRs. Run commands from the repository root. Use [config.toml](config.toml) defaults without copying them into commands or prose. Humans perform [setup](SETUP.md) once. For script changes, read [development](development.md#changing-agentteams-scripts).
 
-Team flow: lead TPM assigns and provisions → tech lead briefs → developer pushes → tester reviews → tech lead merges → lead TPM retires. Required feedback returns to developer for repair and another tester review. Role cards define gates and exceptions.
+Team flow: lead TPM assigns and provisions → tech lead briefs → developer and tester grill with `grill-me` → tech lead releases implementation → developer pushes → tester reviews → tech lead merges → lead TPM retires. Required feedback returns to developer for repair and another tester review. Role cards define gates and exceptions.
 
 | Role card | Agent name | Helper flag |
 |---|---|---|
@@ -27,10 +27,10 @@ Team flow: lead TPM assigns and provisions → tech lead briefs → developer pu
 
 ## Events
 
-Use the reported event to find your card section; Assigned is only the first brief or provisioning request. After context recovery, reread this agreement, Always and your current card section. Reload required references missing from context before acting. `n/a`: this event cannot reach your role. "Not defined": post the question on the issue and prompt the next role up: developer/tester → tech lead → lead TPM → user.
+Use the reported event to find your card section; Assigned covers the first brief, provisioning requests, Brief consensus rounds and release. Later reopening follows Brief consensus from the active event. After context recovery, reread this agreement, Always and your current card section. Reload required references missing from context before acting. `n/a`: this event cannot reach your role. "Not defined": post the question on the issue and prompt the next role up: developer/tester → tech lead → lead TPM → user.
 
 1. **Always**: continuous duties.
-2. **Assigned**: the first issue, brief or provisioning request arrives.
+2. **Assigned**: the first issue, brief or provisioning request arrives; includes Brief consensus rounds and release.
 3. **Pushed head**: review-ready PR SHA; the tester reads the first head fully, later heads as deltas.
 4. **Red check**: required check failed; pending is not red.
 5. **Verdict**: tester or tech lead review submitted.
@@ -40,6 +40,61 @@ Use the reported event to find your card section; Assigned is only the first bri
 9. **Lost session or environment**: client, worktree or launch environment missing or wrong.
 10. **Silence**: message unanswered or failed to send.
 11. **Retire**: issue merged; team resources released.
+
+## Brief consensus
+
+The tech lead writes each worker's brief to a file and sends a short, single-line explicit `grill-me` invocation through a separate `herdr agent prompt`. Reading the brief is the first step of the session; no separate read-acknowledgment handoff is needed. Choose invocation syntax from the recipient's actual client, independently of role and model. Before dispatch, read the live client's `agent` field from `herdr agent get <recipient>` and choose syntax from that value. Read role `kind` from the main checkout's `agent/teams/config.toml` (or the explicitly selected `TIPS_TEAM_CONFIG`), including `lead_ui` when selected. A config edit after launch applies only to the next launch; keep using the healthy live client. Follow Lost session or environment only when the client differs from the intended launch assignment, not merely from a later config edit. Claude Code uses `/grill-me`; Codex uses `$grill-me`. A model change within the same client does not change this syntax. Apply this rule to every skill dispatch, including any lead TPM or tech-lead session. Verify a new client through setup before using it; never infer syntax from a model name. Before dispatch, check that `grill-me` and `grilling` folders exist in the main checkout's `.agents/skills/` and `.claude/skills/`, and that `<main-checkout>/tmp/grill/` exists. Missing prerequisites go to lead TPM. These existence checks do not prove client loading or write access; the setup pilot verifies those and round 1 exercises access. If the wrapper or its underlying `grilling` skill is unavailable, report the missing prerequisite through Blocked outside the team; do not silently replace or skip it.
+
+Use one shared Q&A file per worker–tech lead pair: `developer-qa.md` and `tester-qa.md` under `<main-checkout>/tmp/grill/team-N/<issue>/`. The stable `<main-checkout>/tmp/grill/` root gets one user-configured access allowance for all three clients. The tech lead creates the issue directory and provides absolute file paths. It also writes `developer-brief.md` and `tester-brief.md` there; each worker reads its own brief, while only the lead edits brief files. This ignored discussion scratch is the only exception here to main-checkout write isolation; source ownership is unchanged. The first append exercises each participant's access; any denial follows Permission denial, never a fallback path. Each worker appends its numbered questions, recommendations and acknowledgments; the tech lead appends answers. Preserve earlier rounds and take turns writing: save before messaging the other participant. These are discussion scratch files, not workflow status documents.
+
+Send only one short line, with no embedded newline: `/grill-me Read and follow the brief at <absolute brief path>` for Claude Code, or `$grill-me Read and follow the brief at <absolute brief path>` for Codex. Preserve the literal `$` when constructing the shell argument. Do not paste the full brief after the skill command: the pilot showed Claude treating that multiline input as pasted text without invoking the skill.
+
+Fill every placeholder in the corresponding brief file below. Each worker gets its own brief, Q&A path and reply command:
+
+```text
+Confirm the grill-me skill and its underlying grilling instructions
+actually loaded before round 1. If the invocation arrived as plain text
+and loaded no skill, stop and report through Blocked outside the team;
+do not substitute ordinary prompt guidance.
+Read <contract URL and revision> and your role card.
+Confirm your worktree and base SHA <SHA>. Grill the brief with the
+tech lead until you share an actionable understanding.
+
+Use <absolute Q&A file path>. Append a numbered round of questions
+and recommendations, or acknowledge the revision if you have none.
+Notify <tech-lead agent> using <exact Herdr reply command with file
+path and round number>, then end your turn.
+The tech lead will append answers and message you to read that round.
+Read its answers, then append follow-up questions or explicitly
+acknowledge the agreed contract revision. Repeat until no blocking
+questions remain. To acknowledge: append it to the Q&A file, post an
+issue comment with your role/session and the contract revision link,
+and send the tech lead that comment link using the supplied reply command.
+Interview the tech lead, not the human user.
+Look up facts yourself; do not spawn sub-agents for these rounds.
+The tech lead's release is the skill's final confirmation for this task;
+product and scope decisions still follow the normal user escalation.
+
+Follow Brief consensus in agent/teams/README.md, including root-cause
+analysis for disagreements. Preserve earlier rounds; never poll.
+Wait for the tech lead's explicit release before implementation.
+```
+
+The tech lead reads each notified round, writes its answers, then directly messages that worker with the file path and round to read. Workers do the same for follow-ups and acknowledgment. Verify every message was submitted under shared Commands; follow shared Waiting and Fallback on unanswered or failed messages. Successful delivery is not consensus.
+
+Grill scope, acceptance scenarios, constraints, verification and agreed design decisions. Leave routine implementation choices to the developer. For disagreements about the brief, use 5–10 whys to find the root problem; stop early when two further whys add nothing. The tech lead resolves technical disputes with evidence; product or scope disputes go through lead TPM to the user. Record the reasoning, resolution and any dissent in the contract revision comment. A technical ruling or escalated user decision closes that question; acknowledgment means the worker understands and can act on the decision, not that it prefers it. A concrete remaining acceptance, safety or feasibility blocker after a tech-lead ruling goes to lead TPM, then the user if needed; do not relabel it dissent. When further rounds produce no new evidence or change, decide or escalate rather than repeat the same questions.
+
+The tech lead records resulting decisions in one GitHub contract. Batch settled decisions from both discussions into a linked contract revision comment containing the changes; later changes require a new revision comment. Share that contract revision with both workers, not the other worker's Q&A transcript or implementation explanations. Reopen only affected questions. Each worker appends its acknowledgment to its Q&A file and posts an issue comment naming its role/session and linking the same contract revision as actionable with no unresolved blocking questions. Notify the lead with that comment link. Silence is not agreement. The tech lead releases implementation through shared Handoff, linking the revision and both acknowledgment comments, and tells the tester to await the review head. Zero-question acknowledgment is valid, including for probes and documentation tasks; do not manufacture rounds. Agreement on the contract does not approve the implementation or replace independent review.
+
+Later changes to agreed scope, behavior, acceptance criteria, constraints or design decisions, including invalidated assumptions, require another `grill-me` session in both worker panes for the affected decisions. Ask workers to preserve current work and finish their active turn before sending the new skill invocation. Update each brief file with the new contract revision and affected decisions, then use the same short, single-line invocation. Do not change a brief while its worker is still reading or answering it. Scope the session to the changed decisions; do not restart the whole design tree. Pause affected work, update the same Q&A files and contract, and obtain both acknowledgments before the tech lead releases that work again. Continue unaffected work. Routine implementation and repairs within the agreement do not reopen the gate. Directions after two failed repairs and rejected designs follow this gate if they change the agreement. A replacement worker reads the current contract and completes its `grill-me` session before taking up affected work; reopen the other worker's questions if the contract changes.
+
+## Lead assignment consensus
+
+Use the existing one-line question and recorded answer as the default between lead TPM and tech lead. Start `grill-me` only for disagreement, ambiguity that this exchange did not settle, or several dependent decisions about scope, acceptance criteria, dependencies or ownership. A split proposal alone is not a trigger. Either role can raise the need at assignment or later by naming the unresolved decisions and affected work. A clear assignment proceeds without this extra session; routine technical choices remain with the tech lead. This uses Assigned rounds and release, or reopens from the active event, just like Brief consensus.
+
+Lead TPM coordinates the session: create `lead-brief.md` and `lead-qa.md` in the same issue grill directory, then, after the tech lead finishes its active turn, invoke `grill-me` in the tech lead's pane using its live client kind and the short single-line brief-file form above. The brief links the issue and current decision record, names only the unresolved decisions, gives the absolute Q&A path and exact reply command to `lead-tpm`, and names lead TPM as respondent. Lead TPM alone edits the brief; tech lead appends numbered questions and recommendations, lead TPM appends answers, and each messages the other after writing and ends its turn. Use the same skill-load check, turn-taking, root-cause analysis, zero-question acknowledgment and recovery rules. If lead TPM raised the concern, put it in the brief for the tech lead to challenge and clarify; do not start a second reciprocal interview.
+
+Resolve engineering decisions through the tech lead and project-state or cross-team coordination through lead TPM. Lead TPM answers product/scope questions only from the recorded requirements or user decisions, citing them; anything the record does not answer goes to the user, even if both leads agree. Apply the same boundary to acceptance criteria: tech lead defines verification of agreed behavior, while new or changed product expectations need the user. Decisions the user already finalized are not reopened here; requested changes follow lead TPM Always as follow-up issues, never holds on authorized merges. A dispute about who owns a decision goes to the user. Neither role treats silence as agreement. Lead TPM posts the decision revision and dissent on the issue, preserving the tech lead's wording for engineering decisions, then sends its link to the tech lead. Both roles post acknowledgments of that same revision, with role/session, once it is actionable. Lead TPM sends the release handoff linking both acknowledgments. Pause only affected work while this is unresolved; continue unaffected work and other teams. If worker sessions overlap, the tech lead names which questions await the upstream decision, answers the rest and releases nothing affected. Lead TPM prioritizes other teams' provisioning, advance and fetch requests over grilling answers. The tech lead carries the settled decisions into the next contract revision and links the upstream decision revision; workers acknowledge that contract revision. If they change an agreement with developer or tester, complete their affected-decision grilling before releasing that work. This upstream release never replaces the worker consensus or independent review gates.
 
 ## Shared rules
 
@@ -95,7 +150,7 @@ A failed repair is a code change intended to fix a failure followed by verificat
 
 **Recovery.** On permission denial, preserve work. Record operation, exact error and local state in a PR comment (issue if no PR); report to the tech lead, or lead TPM if you are the tech lead. Continue unaffected work. Never bypass denial through another application or remote-only commit.
 
-For context recovery, keep issue and branch open. Record base and head SHAs, latest review URL, working-tree cleanliness, committed and uncommitted work, unresolved feedback, failed repair attempts, failed or unrun checks and next action. Reviewers keep scratch output under their worktree's `tmp/` so the checkout stays clean. Give important diagnostic runs distinct filenames; before cleanup, preserve evidence needed to explain a repair outside disposable worktrees and link it. Explicitly transfer ownership before another writer starts. Never reset or stash another's work. Before reassigning unresponsive clients, inspect Git and pane evidence: working, dialog-blocked (Permission denial), or lost (Lost session or environment).
+For context recovery, keep issue and branch open. During Brief consensus, record the shared Q&A paths, latest numbered rounds, contract revision, acknowledgment comment links and whether release occurred; resume unresolved rounds without discarding dissent. Record base and head SHAs, latest review URL, working-tree cleanliness, committed and uncommitted work, unresolved feedback, failed repair attempts, failed or unrun checks and next action. Reviewers keep scratch output under their worktree's `tmp/` so the checkout stays clean. Give important diagnostic runs distinct filenames; before cleanup, preserve evidence needed to explain a repair outside disposable worktrees and link it. Explicitly transfer ownership before another writer starts. Never reset or stash another's work. Before reassigning unresponsive clients, inspect Git and pane evidence: working, dialog-blocked (Permission denial), or lost (Lost session or environment).
 
 **Fallback.** Developers and testers: if a tech-lead prompt fails to send, send the same message to lead TPM. If sent but an unanswered question blocks work, add `blocked`, comment with tech lead and question, prompt lead TPM with that comment link, then end the turn.
 
@@ -108,7 +163,7 @@ User decisions: material product changes, purchases, credentials, hosting, publi
 ## Client constraints
 
 - Codex sandboxes cannot write main checkout's `.git`, so lead TPM runs all Git administration there; Claude tech leads follow the same flow. The helper and `team.py stop` reject callers lacking that write access.
-- Codex writes only within its worktree, so chavruta lives in reviewer's `tmp/`. Codex `never` approval rejects tools needing approval. Codex runs Dexter through the normal shell tool; generated configuration does not bypass approval or sandbox policies. Report any socket or command denial.
+- Codex normally writes only within its worktree, so chavruta lives in reviewer's `tmp/`. Brief consensus additionally requires user-configured access to the stable `<main-checkout>/tmp/grill/` root; a prompt or file path grants no access. Codex `never` approval rejects tools needing approval. Codex runs Dexter through the normal shell tool; generated configuration does not bypass approval or sandbox policies. Report any socket or command denial.
 - Codex reviewers outside teams cannot post to GitHub.
 - Claude auto mode may deny tech-lead `gh pr merge`, developers killing their own LSP children, copying/writing `.env`, or pilots posting issue comments. Treat each as Permission denial.
 - `/new`, `/clear` and `cd` do not rebind `TIPS_DEXTER`; it stays bound to the launch worktree. Clients cannot stop themselves with `team.py stop`.
