@@ -34,7 +34,7 @@ For `ui` issues, include `--ui` on every lead call, including reruns. Otherwise 
 
 Choose pane IDs from start output or `herdr pane list`; never guess. When `herdr agent get` shows `idle`, brief tech lead with issue URL, base SHA and exact completion command. Use a one-line question and recorded answer for simple clarification. For disagreement, ambiguity left unsettled by that exchange or several dependent decisions, coordinate [Lead assignment consensus](../README.md#lead-assignment-consensus); otherwise proceed without an extra gate. Apply the same rule when these questions arise later. Never wait for compilation. No reservation list or merge slot.
 
-For each tech-lead provisioning request (one line: role; exact SHA for reviewers), select the pane, run the matching command, then reply to tech lead with pane, absolute worktree and actual SHA. Provision the tester at the confirmed developer base for the initial `grill-me` sessions; keep Project Status Active. Set In review on the first tester checkout-advance request for a pushed review head.
+For each tech-lead provisioning request (one line: role; exact SHA for reviewers), select the pane, run the matching command, then reply to tech lead with pane, absolute worktree and actual SHA. The initial request names developer then tester, with no SHA: provision the developer, read its worktree's actual HEAD, then start the tester at that SHA, never `origin/main`. Reply once for both; keep Project Status Active. If the developer step fails, start no tester and reply with the exact error. If the tester step fails, keep the developer; reply with its pane, worktree and SHA, and report partial completion with the exact error. Set In review on the first tester checkout-advance request for a pushed review head.
 
 ```bash
 agent/teams/task_worktree.py "$TASK" --team "$N" --role dev --pane "$DEV_PANE" --start
@@ -49,14 +49,14 @@ Create child issues and re-dispatch splits proposed by tech leads. Forward non-`
 
 ## Pushed head
 
-On tech-lead request, advance the tester's checkout in place to the new SHA, without `--start`. Confirm the request still matches the current release, ownership and relevant PR head; ask the lead about stale requests before acting. Advance the tech lead's checkout the same way when it asks, normally once at Merge:
+On tech-lead request, advance the tester's checkout in place to the new SHA, without `--start`. Confirm the request still matches the current release, ownership and relevant PR head; ask the lead about stale requests before acting. Advance the tech lead's checkout the same way when it asks, normally once at Merge, then reply with its actual SHA:
 
 ```bash
 agent/teams/task_worktree.py "$ISSUE-review-team-$N-test" --team "$N" --role test --pane "$TEST_PANE" --review-ref "$SHA"
 agent/teams/task_worktree.py "$ISSUE-review-team-$N-lead" --team "$N" --role lead [--ui] --pane "$LEAD_PANE" --review-ref "$SHA"
 ```
 
-A newly launched or replaced tester gets no review dispatch: report its pane, worktree and SHA to the lead for Assigned and Brief consensus first. After advancing an existing tester that has completed those steps, send the lead-authorized handoff directly to the tester under shared Handoff rules, including the confirmed worktree. Report the SHA and dispatch outcome to the lead; do not wait for acknowledgment. A failed advance sends no dispatch. If dispatch fails after advancement, report the exact error and preserve the session and SHA; retry the message only under shared Recovery and Fallback.
+A newly launched or replaced tester gets no review dispatch: report its pane, worktree and SHA to the lead for Assigned and Brief consensus first. After advancing an existing tester that has completed those steps, send the lead-authorized handoff directly to the tester under shared Handoff rules, including the confirmed worktree; do not wait for acknowledgment and send the lead no success report. A failed advance sends no dispatch; report the exact error to the lead. If dispatch fails after advancement, report the advanced SHA and the exact error, and preserve the session and SHA; retry the message only under shared Recovery and Fallback.
 
 `--start` launches an absent client and preserves a running one; it does not authorize moving an active reviewer. Advance only a reviewer at a completed handoff: the helper refuses `blocked` or `unknown` sessions, not a working one. Before changing HEAD, the helper checks selected-client configuration and cleanliness, even at the same SHA (`_build/` output ignored; edits not ignored). Clean detached checkouts advance without changing LSP roots. Running tech leads always advance in place. A tester is replaced only for session loss, recovery from a missing or wrong launch environment, or a rejected implementation design; follow Lost session or environment. Report dirty-checkout refusals to tech lead; the owning reviewer cleans up.
 
