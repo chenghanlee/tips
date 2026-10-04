@@ -51,8 +51,8 @@ defmodule Tips.Content.Edit do
   def edit(scope, kind, id, expected_version, attrs, uploads) do
     unknown_on_database_error(fn ->
       with {:ok, user} <- author(scope),
-           {:ok, id} <- write_id(id),
            :ok <- Publication.admit(scope),
+           {:ok, id} <- write_id(id),
            {:ok, attrs} <- validate(kind, expected_version, attrs, uploads) do
         kind
         |> save(user.id, id, expected_version, attrs, uploads)

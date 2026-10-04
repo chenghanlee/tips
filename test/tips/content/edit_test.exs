@@ -363,9 +363,11 @@ defmodule Tips.Content.EditTest do
     tip = tip_fixture(author)
     scope = scope(author)
 
-    for _ <- 2..limit//1, do: assert(:ok = AdmissionLimiter.check_write(scope))
+    for _ <- 3..limit//1, do: assert(:ok = AdmissionLimiter.check_write(scope))
 
-    # The last admitted attempt fails validation; its budget is not refunded.
+    # The last admitted attempts fail; their budget is not refunded.
+    assert {:error, :not_found} = Content.edit_tip(scope, 0, 1, @tip_attrs, [])
+
     assert {:error, %Ecto.Changeset{}} =
              Content.edit_tip(scope, tip.id, 1, %{@tip_attrs | title: nil}, [])
 
@@ -373,6 +375,7 @@ defmodule Tips.Content.EditTest do
              Content.edit_tip(scope, tip.id, 1, @tip_attrs, [])
 
     assert seconds > 0
+    assert {:error, {:rate_limited, _seconds}} = Content.edit_tip(scope, 0, 1, %{}, [])
     assert reload(tip) == tip
   end
 

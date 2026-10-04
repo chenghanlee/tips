@@ -163,20 +163,34 @@ defmodule Tips.Content.EditConcurrencyTest do
     end
   end
 
-  for marker <- [:dead_at, :deleted_at] do
-    test "review edit finishes while another connection holds the parent lock (#{marker})",
-         data do
-      parent_change = open(data.supervisor)
+  test "review edit finishes under a committed unavailable parent held by another connection",
+       data do
+    # Committed in the documented order: a moderator hide locks the moderator and
+    # advances the version; the parent author's deletion locks that author.
+    for {change, version} <- [hide: 1, delete: 2] do
+      unboxed(fn ->
+        {:ok, _} = Repo.transact(fn -> {:ok, parent!(change, data)} end)
+      end)
 
-      assert {1, _} =
-               run(parent_change, fn ->
-                 Repo.update_all(where(Tip, id: ^data.parent.id), set: [{unquote(marker), now()}])
-               end)
+      holder = open(data.supervisor)
+      assert [_id] = run(holder, fn -> lock_tip(data.parent.id) end)
 
-      edit = call(data.supervisor, fn -> edit(:review, data, 1, @attrs.review) end)
-      assert {:ok, %{outcome: :updated, edit_version: 2, state: :live}} = finish(edit)
-      commit(parent_change)
+      edit =
+        call(data.supervisor, fn ->
+          edit(:review, data, version, %{@attrs.review | body: "Edited under #{change}"})
+        end)
+
+      assert {:ok, %{outcome: :updated, edit_version: edited, state: :live}} = finish(edit)
+      assert edited == version + 1
+      commit(holder)
     end
+
+    unboxed(fn ->
+      assert %Tip{dead_at: %DateTime{}, deleted_at: %DateTime{}} =
+               Repo.get!(Tip, data.parent.id)
+
+      assert %{body: "Edited under delete", edit_version: 3} = current(:review, data)
+    end)
   end
 
   test "a lost connection during the edit returns outcome_unknown", data do
@@ -235,6 +249,20 @@ defmodule Tips.Content.EditConcurrencyTest do
   defp content!(:delete, data) do
     lock_user(data.author.id)
     Repo.update_all(where(Tip, id: ^data.rows.tip.id), set: [deleted_at: now()])
+  end
+
+  defp parent!(:hide, data) do
+    lock_user(data.moderator.id)
+
+    Repo.update_all(where(Tip, id: ^data.parent.id),
+      set: [dead_at: now()],
+      inc: [edit_version: 1]
+    )
+  end
+
+  defp parent!(:delete, data) do
+    lock_user(data.parent.user_id)
+    Repo.update_all(where(Tip, id: ^data.parent.id), set: [deleted_at: now()])
   end
 
   defp lock_user(id),
