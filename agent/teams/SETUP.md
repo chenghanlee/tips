@@ -57,7 +57,7 @@ Run every lifecycle command in a Herdr terminal (`HERDR_ENV=1` set by Herdr) fro
 agent/teams/team.py start lead
 ```
 
-Do not run it while another live agent owns `lead-tpm`. The lead TPM starts and retires teams from this checkout; coding panes remain shells until assigned.
+Do not run it while another live agent owns `lead-tpm`. The lead TPM starts and retires teams from this checkout; coding panes remain shells until assigned. Once ready, send a short assignment such as `Read issue #74 and launch one team for it`; keep the detailed assignment on the issue. Follow the [assignment and handoff convention](README.md#shared-rules), not a pasted copy of the full instructions.
 
 ## Configuration
 

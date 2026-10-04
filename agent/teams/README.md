@@ -88,7 +88,9 @@ Provisioning links main checkout's `.agents/skills` into each worktree, fetches 
 
 Read provider settings by path from main checkout's `.env`. Only the user adds credentials; never write secrets into worktrees. Propose defaults and use synthetic fixtures, never fabricated firsthand production content. Real-provider tests require user-authorized invocations quoted on the issue by lead TPM and scoped secrets. Never run them automatically on PR code.
 
-**Handoff.** Every handoff sender:
+**Handoff.** Keep assignments and handoffs, including the user's initial assignment to lead TPM, to a short action plus an issue or file reference. Put the detailed assignment at that reference. Clients can classify pasted instructions as quoted content; a single line alone does not prevent this, and no character cutoff is established. This convention does not change client trust rules or the direct question-and-answer rounds above.
+
+Every handoff sender:
 
 1. Record evidence on GitHub.
 2. Send one line via `herdr agent prompt`: evidence link, SHA, action, owner (next acting role), and any constraint that changes what the recipient must do now. Link the existing contract instead of copying it. Prompt recipients separately.
