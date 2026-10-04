@@ -38,14 +38,14 @@ elif a[:2] == ["pane", "process-info"]:
         return True
 
     procs = [
-        {"pid": s["pid"], "name": "codex", "cwd": s["root"]},
-        {"pid": s["child"], "name": "node", "cwd": s["root"]},
+        {"pid": s["pid"], "name": "codex", "argv0": "codex", "cwd": s["root"]},
+        {"pid": s["child"], "name": "node", "argv0": "node", "cwd": s["root"]},
     ]
     procs = [x for x in procs if alive(x["pid"])]
     if not procs and s.get("replacement"):
-        procs = [{"pid": 424242, "name": "claude", "cwd": s["root"]}]
+        procs = [{"pid": 424242, "name": "2.1.288", "argv0": "claude", "cwd": s["root"]}]
     if not procs:
-        procs = [{"pid": s["shell"], "name": "zsh", "cwd": s["root"]}]
+        procs = [{"pid": s["shell"], "name": "zsh", "argv0": "zsh", "cwd": s["root"]}]
     r = {
         "process_info": {
             "shell_pid": s["shell"],
@@ -258,7 +258,9 @@ while True: time.sleep(.05)
                 result = self.stop()
                 assert result.returncode == 0, result.stderr
                 assert client.wait(timeout=2) == 0
-                calls = [json.loads(line) for line in (self.root / "calls").read_text().splitlines()]
+                calls = [
+                    json.loads(line) for line in (self.root / "calls").read_text().splitlines()
+                ]
                 assert ["agent", "rename", "wT:p1", "--clear"] in calls
 
     def test_replacement_client_after_exit_preserves_its_name(self) -> None:
@@ -274,9 +276,11 @@ while True: time.sleep(.05)
                 assert "owner changed during shutdown" in result.stderr
                 assert "occupied=True" in result.stderr
                 assert "leader_pid=424242" in result.stderr
-                assert "leader_name='claude'" in result.stderr
+                assert "leader_argv0='claude'" in result.stderr
                 assert client.wait(timeout=2) == 0
-                calls = [json.loads(line) for line in (self.root / "calls").read_text().splitlines()]
+                calls = [
+                    json.loads(line) for line in (self.root / "calls").read_text().splitlines()
+                ]
                 assert ["agent", "rename", "wT:p1", "--clear"] not in calls
 
     def test_different_kind_at_shell_preserves_its_name(self) -> None:
