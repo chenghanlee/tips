@@ -11,6 +11,10 @@ defmodule Tips.Content.Intent do
     review: [:body, :model_id, :model_other, :environment_id, :prompt, :output]
   }
 
+  @doc "The author-editable fields of `kind`, in a stable order."
+  @spec fields(Tips.Content.kind()) :: [atom()]
+  def fields(kind), do: Map.fetch!(@fields, kind)
+
   @doc """
   Compares two intents of one kind. Either side that is not a complete, known
   intent makes the result `:unknown`, whatever else differs.

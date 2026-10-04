@@ -11,8 +11,8 @@ defmodule Tips.Content.EditTest do
   alias Tips.Accounts.Scope
   alias Tips.AdmissionLimiter
   alias Tips.Content
-  alias Tips.Content.{Model, Notification, Review, Search, Tip}
   alias Tips.Content.Media.Asset
+  alias Tips.Content.{Model, Notification, Review, Search, Tip}
 
   @tip_attrs %{
     title: "Pin the dependency first",
@@ -42,7 +42,7 @@ defmodule Tips.Content.EditTest do
       tip = author |> tip_fixture(@tip_attrs) |> put_marker!(:hidden)
       video = attached_video_fixture(tip, position: 0)
       image = image_fixture(tip, position: 1, description: "Diagram")
-      cleanup_media_fixture(tip)
+      cleanup_media_fixture(tip, position: 2)
       tip_id = tip.id
 
       assert {:ok, form} = Content.get_edit_form(scope(author), :tip, tip.id)
@@ -185,13 +185,13 @@ defmodule Tips.Content.EditTest do
     vote_fixture(tip, %{value: 1})
     vote_fixture(tip, %{value: -1})
     upvoted = notification_fixture(author, %{tip_id: tip.id, count: 2})
-    tip = tip |> put_marker!(:hidden) |> reload()
+    put_marker!(tip, :hidden)
 
     reviewer = user_fixture()
     review = review_fixture(tip, Map.put(@review_attrs, :user_id, reviewer.id))
     vote_fixture(review, %{value: -1})
     reviewed = notification_fixture(author, %{type: :tip_reviewed, review_id: review.id})
-    review = reload(review)
+    {tip, review} = {reload(tip), reload(review)}
 
     assert {:ok, %{outcome: :updated, state: :hidden}} =
              Content.edit_tip(scope(author), tip.id, 1, changed_attrs(:tip), [])
@@ -263,7 +263,7 @@ defmodule Tips.Content.EditTest do
     tip = tip_fixture(author, @tip_attrs)
     video = attached_video_fixture(tip, position: 0)
     image = image_fixture(tip, position: 1, description: "Diagram")
-    staged = staged_video_fixture(author, state: :ready)
+    staged = staged_video_fixture(author)
     other = image_fixture(tip_fixture(), position: 0)
     media = Repo.all(from a in Asset, order_by: a.id)
     retained = [{:retained, video.id, "  "}, {:retained, image.id, "Diagram"}]

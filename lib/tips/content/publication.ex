@@ -110,7 +110,9 @@ defmodule Tips.Content.Publication do
   defp uuid(key) when is_binary(key) and byte_size(key) == 36, do: Ecto.UUID.cast(key)
   defp uuid(_key), do: :error
 
-  defp admit(scope) do
+  @doc false
+  # Shared with `Tips.Content.Edit`: one write admission per attempt, never refunded.
+  def admit(scope) do
     case AdmissionLimiter.check_write(scope) do
       :ok -> :ok
       {:error, {limit, _seconds}} = denied when limit in [:rate_limited, :capacity] -> denied
@@ -254,7 +256,7 @@ defmodule Tips.Content.Publication do
     Repo.transact(fn ->
       with :ok <- lock_author(user.id),
            {:ok, parent_author_id} <- lock_parent(parent_id),
-           :ok <- lock_active_choices(changeset, @choices[base_kind(kind)]),
+           :ok <- lock_choices(changeset, base_kind(kind)),
            {:ok, row} <- Repo.insert(changeset) do
         write_dependents(base_kind(kind), row, parent_author_id)
         {:ok, row}
@@ -262,7 +264,9 @@ defmodule Tips.Content.Publication do
     end)
   end
 
-  defp lock_author(id) do
+  @doc false
+  # Shared with `Tips.Content.Edit`: locks the participating account first.
+  def lock_author(id) do
     case Repo.one(from(u in User, where: u.id == ^id, lock: "FOR NO KEY UPDATE")) do
       nil -> {:error, :unauthenticated}
       user -> Accounts.check_eligibility(user, :contribute)
@@ -286,12 +290,19 @@ defmodule Tips.Content.Publication do
     end
   end
 
-  # After the account and parent locks. A share lock holds each selected choice
-  # active until commit; a retirement that commits first fails the recheck.
+  defp lock_choices(changeset, kind) do
+    with {:error, changeset} <- lock_active_choices(changeset, kind),
+         do: {:error, %{changeset | action: :insert}}
+  end
+
+  @doc false
+  # After the account and content locks. A share lock holds each newly selected
+  # choice active until commit; a retirement that commits first fails the
+  # recheck. Only changes are checked, so an edit keeps a retired saved choice.
   # Unknown ids reach the foreign keys, which the changesets map to errors.
-  defp lock_active_choices(changeset, choices) do
+  def lock_active_choices(changeset, kind) do
     changeset =
-      Enum.reduce(choices, changeset, fn {field, schema}, changeset ->
+      Enum.reduce(@choices[kind], changeset, fn {field, schema}, changeset ->
         with id when is_binary(id) <- get_change(changeset, field),
              false <-
                Repo.one(
@@ -303,7 +314,7 @@ defmodule Tips.Content.Publication do
         end
       end)
 
-    if changeset.valid?, do: :ok, else: {:error, %{changeset | action: :insert}}
+    if changeset.valid?, do: :ok, else: {:error, changeset}
   end
 
   defp write_dependents(:tip, tip, nil) do

@@ -43,8 +43,17 @@ defmodule Tips.Content.EditConcurrencyTest do
         author = user_fixture()
         parent = tip_fixture(user_fixture())
 
-        {author, user_fixture(), parent, tip_fixture(author),
-         review_fixture(parent, %{user_id: author.id})}
+        # Inserted directly: review_fixture/2 would commit an extra default author.
+        review =
+          Repo.insert!(%Review{
+            tip_id: parent.id,
+            user_id: author.id,
+            submission_key: Ecto.UUID.generate(),
+            body: "The technique helped in this synthetic test.",
+            created_at: DateTime.utc_now(:second)
+          })
+
+        {author, user_fixture(), parent, tip_fixture(author), review}
       end)
 
     on_exit(fn ->
