@@ -516,7 +516,9 @@ defmodule Tips.Content.Projection do
     end
   end
 
-  defp capabilities(scope, content) do
+  @doc "The `scope`'s capability hints for a current tip or review row."
+  @spec capabilities(scope(), tip_row() | review_row()) :: capabilities()
+  def capabilities(scope, content) do
     contribute? = eligible?(scope, :contribute)
     own? = own?(scope, content)
     undeleted? = is_nil(content.deleted_at)
