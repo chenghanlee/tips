@@ -14,7 +14,7 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](.
 
 ## Assigned
 
-Your initial brief invokes `grill-me`. Confirm worktree and base SHA, then read the brief and acceptance scenarios in the linked contract as the first step of that session. Independently challenge the brief under [Brief consensus](../README.md#brief-consensus), especially acceptance scenarios and verification. Append numbered questions and recommendations to your shared Q&A file, notify the tech lead with its supplied reply command and end your turn. When it messages you, read its answers and append follow-ups or acknowledgment. Explicitly acknowledge the final contract revision as actionable with no unresolved blockers. Then await checkout advancement and the review-head dispatch. Reopen grilling when agreed decisions change; contract consensus does not preapprove code or tests.
+Prepare before `grill-me`: confirm worktree and base SHA, read the issue and acceptance scenarios in the contract, then notify the tech lead that you are ready. On the skill invocation, independently challenge the assignment under [Brief consensus](../README.md#brief-consensus), especially acceptance scenarios and verification. Interview the tech lead through Herdr: print questions and recommendations in your pane and send a short notice. After answers, explicitly report more questions or no more questions and shared understanding. A changed contract decision reopens affected agreement. Acknowledge the final revision on the issue, then await release, checkout advancement and review-head dispatch. Contract consensus does not preapprove code or tests.
 
 ## Pushed head
 

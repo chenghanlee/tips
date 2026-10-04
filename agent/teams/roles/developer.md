@@ -13,8 +13,8 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](.
 
 ## Assigned
 
-1. Your initial brief invokes `grill-me`. Confirm the assigned worktree, SHA and launch values with `pwd`, `git rev-parse HEAD` and the shared Environment command. Read the brief, issue and linked readiness contract, then its design sections and shared invariants, as the first step of that session.
-2. Independently challenge the brief under [Brief consensus](../README.md#brief-consensus). Append numbered questions and recommendations to your shared Q&A file, notify the tech lead with its supplied reply command and end your turn. When it messages you, read its answers and append follow-ups or acknowledgment. Explicitly acknowledge the final contract revision as actionable with no unresolved blockers. Wait for the tech lead's release before writing the first failing test or implementation. Then start with work independent of owner items. Reopen grilling before work that changes agreed decisions.
+1. Prepare before `grill-me`: confirm the assigned worktree, SHA and launch values with `pwd`, `git rev-parse HEAD` and the shared Environment command. Read the issue, readiness contract, linked design sections and shared invariants, then notify the tech lead that you are ready.
+2. On the skill invocation, independently challenge the assignment under [Brief consensus](../README.md#brief-consensus). Interview the tech lead through Herdr: print questions and recommendations in your pane and send a short notice. After answers, explicitly report more questions or no more questions and shared understanding. A changed contract decision reopens affected agreement. Acknowledge the final revision on the issue and wait for the lead's release before the first failing test or implementation. Start with work independent of owner items.
 3. Push the first commit and open a draft PR under shared Git and Checks rules; the draft is not review-ready and gets no handoff.
 
 ## Pushed head
