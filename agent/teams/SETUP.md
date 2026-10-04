@@ -20,10 +20,10 @@ Before live teams use this workflow, run a disposable pilot using the configured
 The pilot must exercise:
 
 - Preparation before the short skill-plus-prompt invocation; the named lead is the respondent.
-- A numbered round of ten questions recovered accurately from the pane, and a complete long answer round delivered through Herdr. Verify apostrophes, backticks and dollar signs arrive literally and answers are acted on.
-- An answer that opens a dependent contract question: the worker asks it and notifies the lead. Also test answers that open nothing: the worker reports shared understanding without manufactured questions.
+- A numbered round of ten questions delivered completely to the lead through Herdr, and a complete long answer round sent back to the worker. Verify apostrophes, backticks and dollar signs arrive literally and answers are acted on.
+- An answer that opens a dependent contract question: the worker sends it to the lead. Also test answers that open nothing: the worker reports shared understanding without manufactured questions.
 - Changed decisions after one worker agreed: that worker reconsiders them in its pane. Both workers then acknowledge the same final revision before release.
-- End-of-turn notifications without polling, recovery by restating missing pane content, and the same conversation between lead TPM and tech lead.
+- Direct question and answer messages without polling, recovery by resending missing message content, and the same conversation between lead TPM and tech lead.
 
 Keep questions and answers in panes, with no file or document-link handoffs during the interview. Record failures and unresolved limits; do not substitute documentation checks for this pilot or assign live implementation through an unverified flow.
 
