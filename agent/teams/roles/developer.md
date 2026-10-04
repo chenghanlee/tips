@@ -13,8 +13,8 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](.
 
 ## Assigned
 
-1. Confirm worktree and SHA and read the linked contract.
-2. Start with work independent of owner items.
+1. Confirm worktree and SHA, read the brief and linked contract, and acknowledge reading them to the tech lead using its reply command.
+2. On the tech lead's `grill-me` invocation, independently challenge the brief under [Brief consensus](../README.md#brief-consensus). Send questions and acknowledgments to the tech lead; it owns your Q&A file. Explicitly acknowledge the final contract revision as actionable with no unresolved blockers. Wait for the tech lead's release before writing the first failing test or implementation. Then start with work independent of owner items. Reopen grilling before work that changes agreed decisions.
 3. Push a first commit; open a draft PR. This draft is not review-ready and gets no handoff.
 
 ## Pushed head

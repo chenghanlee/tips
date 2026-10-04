@@ -11,6 +11,8 @@ The user maintains the skills by hand as plain folders in the main checkout. Bot
 - `.agents/skills/`: `dexter`, `elixir`, `phoenix`, `ecto`, `otp`, `oban` and `herdr`, for Codex.
 - `.claude/skills/`: `dexter` and the same five Elixir skills, for Claude.
 
+Before using the [brief consensus workflow](README.md#brief-consensus), make `grill-me` and its underlying `grilling` skill available in both developer and tester clients. The `grill-me` wrapper invokes `grilling`; verify that invocation works in each client, including clients without a native Skill tool. A listed wrapper alone is insufficient. Skill installation and client settings remain user-owned; agents report missing prerequisites instead of installing or substituting a generic Q&A prompt.
+
 Update matching copies together, then check that the skills appear in each client's skill list. Provisioning links the main checkout's `.agents/skills/` into each worktree and checks only that the directory exists, not the individual skills.
 
 Install only the `mix-credo` plugin, for the clients you use:

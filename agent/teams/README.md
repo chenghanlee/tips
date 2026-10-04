@@ -2,7 +2,7 @@
 
 Agents building Tips: read this agreement through Client constraints, then your role card. [AGENTS.md](../../AGENTS.md) governs engineering. Keep requirements, decisions, review history and evidence in GitHub issues/PRs. Never repeat [config.toml](config.toml) defaults in commands or prose. Humans perform [SETUP.md](SETUP.md) once. Run commands from the repository root. When changing or reviewing `agent/teams` scripts, also read [the last section](#changing-agentteams-scripts).
 
-Team flow: lead TPM assigns and provisions → tech lead briefs → developer pushes → tester reviews → tech lead merges → lead TPM retires. Required feedback returns to developer for repair and another tester review. Role cards define gates and exceptions.
+Team flow: lead TPM assigns and provisions → tech lead briefs → developer and tester grill with `grill-me` → tech lead releases implementation → developer pushes → tester reviews → tech lead merges → lead TPM retires. Required feedback returns to developer for repair and another tester review. Role cards define gates and exceptions.
 
 | Role card | Agent name | Helper flag |
 |---|---|---|
@@ -38,6 +38,18 @@ Classify messages by the reported event; Assigned covers only the first brief an
 9. **Lost session or environment**: client, worktree or launch environment missing or wrong.
 10. **Silence**: message unanswered or failed to send.
 11. **Retire**: issue merged; team resources released.
+
+## Brief consensus
+
+Before implementation, developer and tester read the tech lead's brief and linked contract, then confirm they have read them. The tech lead invokes the `grill-me` skill in each worker's pane through a separate `herdr agent prompt`, with the contract revision, Q&A file path and exact reply command. The workers independently grill the brief; the tech lead answers. Use the skill's question rounds and recommendations, not a generic acknowledgment prompt. If `grill-me` or its underlying `grilling` skill is unavailable in either client, report the missing prerequisite through Blocked outside the team; do not silently replace or skip it. See [setup](SETUP.md).
+
+The tech lead is the only writer of two shared Q&A files in its own ignored `tmp/`: `developer-qa.md` and `tester-qa.md`. Give each worker the absolute path to its file; workers read it and send questions, challenges and acknowledgments through Herdr. The lead records each round and its answers. These are discussion scratch files, not workflow status documents. Use asynchronous messages and shared Waiting; do not poll or wait on panes.
+
+Grill scope, acceptance scenarios, constraints, verification and agreed design decisions. Leave routine implementation choices to the developer. For disagreements, use 5–10 whys to find the root problem; stop early when two further whys add nothing. The tech lead resolves technical disputes with evidence; product or scope disputes go through lead TPM to the user. Record the reasoning and resolution, not forced unanimity of preference.
+
+The tech lead records resulting decisions in one GitHub contract. Identify each agreed revision by a linked issue comment containing the changes; a later edit requires a new revision comment. Share changes from either discussion with both workers and reopen affected questions. Each worker must explicitly acknowledge the same revision as actionable with no unresolved blocking questions. Silence is not agreement. Record both acknowledgments on GitHub, then explicitly release implementation to the developer and tell the tester to await the review head. No fixed number of rounds. Agreement on the contract does not approve the implementation or replace independent review.
+
+Later changes to agreed scope, behavior, acceptance criteria, constraints or design decisions, including invalidated assumptions, require another `grill-me` session in both worker panes for the affected decisions. Pause affected work, update the same Q&A files and contract, and obtain both acknowledgments before the tech lead releases that work again. Continue unaffected work. Routine implementation and repairs within the agreement do not reopen the gate. A replacement worker reads the current contract and completes its `grill-me` session before taking up affected work; reopen the other worker's questions if the contract changes.
 
 ## Shared rules
 

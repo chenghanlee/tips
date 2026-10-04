@@ -26,7 +26,7 @@ For `ui` issues, include `--ui` on every lead call, including reruns. Otherwise 
 
 Choose pane IDs from start output or `herdr pane list`; never guess. When `herdr agent get` shows `idle`, brief tech lead with issue URL, base SHA and exact completion command. Never wait for compilation. No reservation list or merge slot.
 
-For each tech-lead provisioning request (one line: role; exact SHA for reviewers), select the pane, run the matching command, then reply to tech lead with pane, absolute worktree and actual SHA. At first tester dispatch, set Project Status In review.
+For each tech-lead provisioning request (one line: role; exact SHA for reviewers), select the pane, run the matching command, then reply to tech lead with pane, absolute worktree and actual SHA. Provision the tester at the confirmed developer base for the initial `grill-me` sessions; keep Project Status Active. Set In review when the tech lead first dispatches the tester to review a pushed head.
 
 ```bash
 agent/teams/task_worktree.py "$TASK" --team "$N" --role dev --pane "$DEV_PANE" --start

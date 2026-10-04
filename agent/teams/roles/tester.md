@@ -13,7 +13,7 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](.
 
 ## Assigned
 
-Confirm worktree and SHA from the tech lead's message. Read acceptance scenarios in the readiness comment.
+Confirm worktree and base SHA from the tech lead's message. Read the brief and acceptance scenarios in the linked contract, then acknowledge reading them using the tech lead's reply command. On its `grill-me` invocation, independently challenge the brief under [Brief consensus](../README.md#brief-consensus), especially acceptance scenarios and verification. Send questions and acknowledgments to the tech lead; it owns your Q&A file. Explicitly acknowledge the final contract revision as actionable with no unresolved blockers. Then await checkout advancement and the review-head dispatch. Reopen grilling when agreed decisions change; contract consensus does not preapprove code or tests.
 
 ## Pushed head
 
