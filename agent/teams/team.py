@@ -51,6 +51,7 @@ class Config(TypedDict):
 class Process(TypedDict):
     pid: int
     cwd: str
+    argv0: NotRequired[str]
 
 
 class ProcessInfo(TypedDict):
@@ -212,6 +213,8 @@ def validate_process_info(value: object) -> None:
         require_type(process.get("pid"), int, "Herdr process pid")
         if "cwd" in process:
             require_type(process["cwd"], str, "Herdr process cwd")
+        if "argv0" in process:
+            require_type(process["argv0"], str, "Herdr process argv0")
 
 
 def herdr(*args: str) -> HerdrResult:
@@ -320,8 +323,27 @@ def release_name(pane: str, current: Entity) -> None:
     # never a replacement client that appeared after the verified exit.
     for agent in herdr("agent", "list")["agents"]:
         if agent.get("pane_id") == pane and agent.get("name"):
-            if agent.get("agent") != current.get("agent") or pane_occupant(pane)[1]:
-                raise RuntimeError(f"{pane}: owner changed during shutdown; preserved")
+            info = herdr("pane", "process-info", "--pane", pane)["process_info"]
+            occupied = occupant(pane, info)[1]
+            kind = agent.get("agent")
+            # Herdr can clear kind before name. Only accept that gap at the shell,
+            # after wait_for_exit verified the owned processes; snapshots are not atomic.
+            if kind not in (None, current.get("agent")) or occupied:
+                leader = info["foreground_process_group_id"]
+                argv0 = next(
+                    (
+                        p.get("argv0", "unknown")
+                        for p in info["foreground_processes"]
+                        if p["pid"] == leader
+                    ),
+                    "unknown",
+                )
+                raise RuntimeError(
+                    f"{pane}: owner changed during shutdown; preserved; "
+                    f"previous_kind={current.get('agent')!r}, listed_kind={kind!r}, "
+                    f"occupied={occupied}, leader_pid={leader}, leader_argv0={argv0!r}, "
+                    f"shell_pid={info['shell_pid']}"
+                )
             try:
                 herdr("agent", "rename", pane, "--clear")
             except RuntimeError as error:
