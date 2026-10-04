@@ -41,9 +41,31 @@ Classify messages by the reported event; Assigned covers only the first brief an
 
 ## Brief consensus
 
-Before implementation, developer and tester read the tech lead's brief and linked contract, then confirm they have read them. The tech lead invokes the `grill-me` skill in each worker's pane through a separate `herdr agent prompt`, with the contract revision, Q&A file path and exact reply command. The workers independently grill the brief; the tech lead answers. Use the skill's question rounds and recommendations, not a generic acknowledgment prompt. If `grill-me` or its underlying `grilling` skill is unavailable in either client, report the missing prerequisite through Blocked outside the team; do not silently replace or skip it. See [setup](SETUP.md).
+The tech lead sends each worker's initial brief as an explicit `grill-me` invocation through a separate `herdr agent prompt`. Reading the brief is the first step of the session; no separate read-acknowledgment handoff is needed. Use the installed client's skill invocation syntax (`/grill-me` in Claude Code, `$grill-me` in Codex), verified during [setup](SETUP.md). If the wrapper or its underlying `grilling` skill is unavailable, report the missing prerequisite through Blocked outside the team; do not silently replace or skip it.
 
-The tech lead is the only writer of two shared Q&A files in its own ignored `tmp/`: `developer-qa.md` and `tester-qa.md`. Give each worker the absolute path to its file; workers read it and send questions, challenges and acknowledgments through Herdr. The lead records each round and its answers. These are discussion scratch files, not workflow status documents. Use asynchronous messages and shared Waiting; do not poll or wait on panes.
+Use one shared Q&A file per worker–tech lead pair: `developer-qa.md` and `tester-qa.md` under the tech lead's ignored `tmp/grill/`. The tech lead creates the files and provides absolute paths. Both participants must have approved read/write access before starting; only these discussion files are shared, never source ownership. Each worker appends its numbered questions, recommendations and acknowledgments; the tech lead appends answers. Preserve earlier rounds and take turns writing: save before messaging the other participant. These are discussion scratch files, not workflow status documents.
+
+Fill every placeholder in this initial brief; use the target client's skill invocation syntax. Each worker gets its own file and reply command:
+
+```text
+/grill-me Read <contract URL and revision> and your role card.
+Confirm your worktree and base SHA <SHA>. Grill the brief with the
+tech lead until you share an actionable understanding.
+
+Use <absolute Q&A file path>. Append a numbered round of questions
+and recommendations. Notify <tech-lead agent> using <exact Herdr reply
+command with file path and round number>, then end your turn.
+The tech lead will append answers and message you to read that round.
+Read its answers, then append follow-up questions or explicitly
+acknowledge the agreed contract revision. Repeat until no blocking
+questions remain. Interview the tech lead, not the human user.
+
+Follow Brief consensus in agent/teams/README.md, including root-cause
+analysis for disagreements. Preserve earlier rounds; never poll.
+Wait for the tech lead's explicit release before implementation.
+```
+
+The tech lead reads each notified round, writes its answers, then directly messages that worker with the file path and round to read. Workers do the same for follow-ups and acknowledgment. Verify every message was submitted under shared Commands; follow shared Waiting and Fallback on unanswered or failed messages. Successful delivery is not consensus.
 
 Grill scope, acceptance scenarios, constraints, verification and agreed design decisions. Leave routine implementation choices to the developer. For disagreements, use 5–10 whys to find the root problem; stop early when two further whys add nothing. The tech lead resolves technical disputes with evidence; product or scope disputes go through lead TPM to the user. Record the reasoning and resolution, not forced unanimity of preference.
 
@@ -142,7 +164,7 @@ User decisions: material product changes, purchases, credentials, hosting, publi
 ## Client constraints
 
 - Codex sandboxes cannot write main checkout's `.git`, so lead TPM runs all Git administration there; Claude tech leads follow the same flow. The helper and `team.py stop` reject callers lacking that write access.
-- Codex writes only within its worktree, so chavruta lives in reviewer's `tmp/`. Codex `never` approval rejects tools needing approval. Codex runs Dexter through the normal shell tool; generated configuration does not bypass approval or sandbox policies. Report any socket or command denial.
+- Codex normally writes only within its worktree, so chavruta lives in reviewer's `tmp/`. Brief consensus additionally requires the narrowly scoped, user-configured shared Q&A access described in [setup](SETUP.md); a prompt or file path grants no access. Codex `never` approval rejects tools needing approval. Codex runs Dexter through the normal shell tool; generated configuration does not bypass approval or sandbox policies. Report any socket or command denial.
 - Codex reviewers outside teams cannot post to GitHub.
 - Claude auto mode may deny tech-lead `gh pr merge`, developers killing their own LSP children, copying/writing `.env`, or pilots posting issue comments. Treat each as Permission denial.
 - `/new`, `/clear` and `cd` do not rebind `TIPS_DEXTER`; it stays bound to the launch worktree. Clients cannot stop themselves with `team.py stop`.
