@@ -31,7 +31,7 @@ Use the reported event to find your card section; Assigned covers the first brie
 
 1. **Always**: continuous duties.
 2. **Assigned**: the first issue, brief or provisioning request arrives; includes Brief consensus rounds and release.
-3. **Pushed head**: review-ready PR SHA; the tester reads the first head fully, later heads as deltas.
+3. **Pushed head**: review-ready PR SHA; the first head the tester actually reviews gets a full review, later heads deltas. A review handoff completes once the tester reports a submitted review or an explicit red refusal and has ended its turn with no open question; a submitted review alone, even on the tester's current SHA, does not show this.
 4. **Red check**: required check failed; pending is not red.
 5. **Verdict**: tester or tech lead review submitted.
 6. **Merge**: PR ready to integrate, or merged.
