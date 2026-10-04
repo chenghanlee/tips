@@ -4,9 +4,9 @@ Read [the shared agreement](../README.md) first.
 
 ## Always
 
-Coordinate assigned [Project 15](https://github.com/users/chenghanlee/projects/15) work, including child issues, until the user's scope is complete or blocked on user action. Own team start and retirement, labels, Project fields, tech-lead launch and provisioning requested by tech leads. Communicate only with tech leads, the user and ad-hoc Codex reviewers you launched, except developer or tester fallback under Silence. Run without Elixir LSP; follow shared Commands for lifecycle operations.
+Coordinate assigned [Project 15](https://github.com/users/chenghanlee/projects/15) work, including child issues, until the user's scope is complete or blocked on user action. Own team start and retirement, labels, Project fields, tech-lead launch and provisioning requested by tech leads. Communicate only with tech leads, the user and ad-hoc Codex reviewers you launched, except forwarding tech-lead-authorized tester dispatches and developer or tester fallback under Silence. Run without Elixir LSP; follow shared Commands for lifecycle operations.
 
-On every wake, read GitHub: messages wake you but are not the record. Run every lifecycle and helper command yourself, from the main checkout, one at a time. You are their only caller; no lock or daemon enforces it. Post project decisions on the issue.
+On every wake, read GitHub: messages wake you but are not the record. For provisioning, advance and fetch requests, read the current task/release record and relevant PR state; no Project-wide reread is needed. Run every lifecycle and helper command yourself, from the main checkout, one at a time. You are their only caller; no lock or daemon enforces it. Post project decisions on the issue.
 
 Before choosing work, read `gh project view 15 --owner chenghanlee`: milestones, gates and dev-adapter policy live there, not in this repository. Track hosting, domain, provider, operator identity, vocabulary and content prerequisites in issues. Ask the user for needed decisions or questions no card answers. “Agree, proceed” is final; later changes become follow-up issues, never holds on authorized merges.
 
@@ -49,14 +49,16 @@ Create child issues and re-dispatch splits proposed by tech leads. Forward non-`
 
 ## Pushed head
 
-On tech-lead request, advance the tester's checkout in place to the new SHA, without `--start`. Advance the tech lead's checkout the same way when it asks, normally once at Merge:
+On tech-lead request, advance the tester's checkout in place to the new SHA, without `--start`. Confirm the request still matches the current release, ownership and relevant PR head; ask the lead about stale requests before acting. Advance the tech lead's checkout the same way when it asks, normally once at Merge:
 
 ```bash
 agent/teams/task_worktree.py "$ISSUE-review-team-$N-test" --team "$N" --role test --pane "$TEST_PANE" --review-ref "$SHA"
 agent/teams/task_worktree.py "$ISSUE-review-team-$N-lead" --team "$N" --role lead [--ui] --pane "$LEAD_PANE" --review-ref "$SHA"
 ```
 
-Advance only a reviewer at a handoff: the helper refuses `blocked` or `unknown` sessions, not a working one. Before changing HEAD, the helper checks selected-client configuration and cleanliness, even at the same SHA (`_build/` output ignored; edits not ignored). Clean detached checkouts advance without changing LSP roots. Running tech leads always advance in place. A tester is replaced only for session loss, recovery from a missing or wrong launch environment, or a rejected implementation design; follow Lost session or environment. Report dirty-checkout refusals to tech lead; the owning reviewer cleans up.
+A newly launched or replaced tester gets no review dispatch: report its pane, worktree and SHA to the lead for Assigned and Brief consensus first. After advancing an existing tester that has completed those steps, send the lead-authorized handoff directly to the tester under shared Handoff rules, including the confirmed worktree. Report the SHA and dispatch outcome to the lead; do not wait for acknowledgment. A failed advance sends no dispatch. If dispatch fails after advancement, report the exact error and preserve the session and SHA; retry the message only under shared Recovery and Fallback.
+
+`--start` launches an absent client and preserves a running one; it does not authorize moving an active reviewer. Advance only a reviewer at a completed handoff: the helper refuses `blocked` or `unknown` sessions, not a working one. Before changing HEAD, the helper checks selected-client configuration and cleanliness, even at the same SHA (`_build/` output ignored; edits not ignored). Clean detached checkouts advance without changing LSP roots. Running tech leads always advance in place. A tester is replaced only for session loss, recovery from a missing or wrong launch environment, or a rejected implementation design; follow Lost session or environment. Report dirty-checkout refusals to tech lead; the owning reviewer cleans up.
 
 ## Red check
 
@@ -101,7 +103,7 @@ A client keeps the environment and root it was launched with; the helper never c
 
 - Running client with missing or wrong launch variables: rerunning its helper command at the same SHA never relaunches the session; for a reviewer it fetches locked dependencies and reindexes again, then reports it. After it records shared Recovery state at a handoff, rerun the role command with `--restart` on the same task or SHA. The helper stops that client, verifies that it and its child processes exited, then launches a fresh one; a developer's branch and uncommitted work stay as they are. A refused stop launches nothing and preserves work and resources, not necessarily the session: the client may already have exited. Retry `--restart`, never `--start`, once the named processes have exited; it runs the same checks again. The worktree's Dexter daemon may keep running. Never kill processes; report a repeated refusal to the user. If your client denies the command, the user exits that client; never bypass.
 - Absent client: rerun the role command with `--start`. Reviewers start at the current head; a replacement tester completes Assigned and Brief consensus before reviewing it. A developer restarts on its existing branch and worktree, unchanged.
-- A tester at the same SHA is reused. After the tech lead rejects the implementation design, use `--start` at the new SHA to replace the tester, subject to the normal stop and descendant checks.
+- A tester at the same SHA is reused. After the tech lead rejects the implementation design, use `--restart --review-ref NEW_SHA` to replace the tester, subject to the normal stop and descendant checks.
 
 ## Silence
 

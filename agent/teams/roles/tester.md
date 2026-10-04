@@ -18,7 +18,7 @@ Prepare before `grill-me`: confirm worktree and base SHA, read the issue and acc
 
 ## Pushed head
 
-After lead TPM provisioning or advancement and the tech lead's SHA message:
+After lead TPM provisioning or advancement and its forwarded tech-lead-authorized handoff, confirm your pane, worktree and `git rev-parse HEAD` match the assignment before reviewing:
 
 1. Read `gh pr checks "$PR"` once. Failed required checks trigger Red check; record pending checks as pending.
 2. At the first head, re-read the acknowledged contract and independently derive expected acceptance behavior from its linked design sections. Review the first head fully. An incorrect or incomplete contract is a normal required review finding: report the gap with evidence and let the tech lead handle reopening. Never use Q&A answers as verdict evidence. Verify the tests exercise each acceptance scenario, are correct and fail when the code breaks. Apply AGENTS.md's test-value review. Later reviews cover deltas since the last reviewed head, including heads refused as red.
