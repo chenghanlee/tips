@@ -20,7 +20,7 @@ Your initial brief invokes `grill-me`. Confirm worktree and base SHA, then read 
 After lead TPM provisioning or advancement and the tech lead's SHA message:
 
 1. Read `gh pr checks "$PR"` once. Failed required checks trigger Red check; record pending checks as pending.
-2. Review the first head fully. Verify the tests exercise each acceptance scenario, are correct and fail when the code breaks. Later reviews cover deltas since the last reviewed head, including heads refused as red.
+2. At the first head, re-read the acknowledged contract and independently derive expected acceptance behavior from its linked design sections. Review the first head fully. An incorrect or incomplete contract is a normal required review finding: report the gap with evidence and let the tech lead handle reopening. Never use Q&A answers as verdict evidence. Verify the tests exercise each acceptance scenario, are correct and fail when the code breaks. Later reviews cover deltas since the last reviewed head, including heads refused as red.
 
 ## Red check
 
@@ -44,7 +44,7 @@ Follow shared Recovery.
 
 ## Lost session or environment
 
-Missing or wrong environment: notify tech lead and await a relaunch; the helper cannot change a running client. Lost session: lead TPM provisions with `--start`. In a new session, review current head fully again.
+Missing or wrong environment: notify tech lead and await a relaunch; the helper cannot change a running client. Lost session: lead TPM provisions with `--start`. In a new session, complete Assigned and Brief consensus at the current head first, then review that head fully again. Contract changes reopen affected questions with the developer.
 
 ## Silence
 
