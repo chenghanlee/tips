@@ -13,9 +13,19 @@ The user maintains the skills by hand as plain folders in the main checkout. Bot
 
 Before using the [brief consensus workflow](README.md#brief-consensus), install `grill-me/SKILL.md` and `grilling/SKILL.md` in both skill directories above. Copy the existing grilling instructions into each `grilling/SKILL.md`. Keep the wrapper's frontmatter, but replace its Skill-tool-only body with `Read and follow the grilling skill from ../grilling/SKILL.md.` This explicit relative path works without assuming a native Skill tool. These user-owned files are ignored and are not installed by this PR. Verify `/grill-me` in Claude Code and `$grill-me` in Codex load both files, rather than merely accepting the prompt.
 
-Create the stable `<main-checkout>/tmp/grill/` directory. Add that exact absolute directory to Codex's `sandbox_workspace_write.writable_roots` and Claude's `permissions.additionalDirectories` in the user-owned client configuration. Preserve existing entries; do not grant the whole checkout. Developer, tester, tech lead and lead TPM need access; lead TPM also coordinates conditional lead-assignment sessions. Restart affected clients after configuration. The launcher does not configure this allowance. Each issue uses `team-N/<issue>/` beneath that root, so new issues need no settings change. On a denied round-1 append, agents report the exact error and path through Permission denial; they never bypass it.
+Grilling uses direct Herdr messages and needs no shared discussion directory or additional filesystem allowance. Existing discussion history can stay; this workflow does not change user-owned permissions.
 
-Run a disposable pilot once during setup and again after a skill, client-setting or client-version change. Use the configured roles in helper-provisioned worktrees, not the main checkout. Record each role's actual client kind and model separately. Skill invocation follows client kind regardless of which role uses it; when a role switches client, verify its skill discovery and access rather than assuming another role's result applies. Record evidence on the setup or change issue/PR: short single-line skill invocations referencing the lead-written brief files, delivered through Herdr, load both skills for initial and reopened sessions; each worker and lead append to their shared file under their real launch policies; messages deliver a question round and answer round; both workers acknowledge one revision; a changed decision reopens grilling and both acknowledge the next revision before release. The multiline Claude invocation failed in the pilot because it arrived as pasted text; do not use it as the setup test. Confirm Claude discovers `grill-me` from its provisioned worktree and record the exact `grilling/SKILL.md` path each client reads, including whether a user-level copy shadows the project copy. Verify the tech lead is the interview respondent and workers can end turns while waiting. A documentation check does not establish these behaviors. Complete this setup verification before assigning live teams to the workflow.
+Before live teams use this workflow, run a disposable pilot using the configured clients in helper-provisioned worktrees. Repeat after skill, client-setting or client-version changes. Use the documented assignment and invocation unchanged except for actual issue, SHA and agent targets; do not add coaching absent from the workflow. Record each role's actual client kind, model and version, session, worktree and SHA on the setup or change issue/PR. Verify both Claude and Codex load `grill-me` and `grilling`; record the exact paths, including any user-level copy that shadows the project skill.
+
+The pilot must exercise:
+
+- Preparation before the short skill-plus-prompt invocation; the named lead is the respondent.
+- A numbered round of ten questions delivered completely to the lead through Herdr, and a complete long answer round sent back to the worker. Verify apostrophes, backticks and dollar signs arrive literally and answers are acted on.
+- An answer that opens a dependent contract question: the worker sends it to the lead. Also test answers that open nothing: the worker reports shared understanding without manufactured questions.
+- Changed decisions after one worker agreed: send the changes directly to that worker for reconsideration. Both workers then acknowledge the same final revision before release.
+- Direct question and answer messages without polling, recovery by resending missing message content, and the same conversation between lead TPM and tech lead.
+
+Send questions and answers directly through Herdr, with no file or document-link handoffs during the interview. Record failures and unresolved limits; do not substitute documentation checks for this pilot or assign live implementation through an unverified flow.
 
 Update matching copies together, then check that the skills appear in each client's skill list. Provisioning links the main checkout's `.agents/skills/` into each worktree and checks only that the directory exists, not the individual skills.
 
@@ -47,7 +57,7 @@ Run every lifecycle command in a Herdr terminal (`HERDR_ENV=1` set by Herdr) fro
 agent/teams/team.py start lead
 ```
 
-Do not run it while another live agent owns `lead-tpm`. The lead TPM starts and retires teams from this checkout; coding panes remain shells until assigned.
+Do not run it while another live agent owns `lead-tpm`. The lead TPM starts and retires teams from this checkout; coding panes remain shells until assigned. Once ready, send a short assignment such as `Read issue #74 and launch one team for it`; keep the detailed assignment on the issue. Follow the [assignment and handoff convention](README.md#shared-rules), not a pasted copy of the full instructions.
 
 ## Configuration
 
