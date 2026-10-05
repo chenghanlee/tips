@@ -351,6 +351,7 @@ defmodule TipsWeb.EditorDraftStoreTest do
     edit_tip_9 = storage(101, %{tag: "edit", kind: "tip", id: 9})
     edit_review_9 = storage(101, %{tag: "edit", kind: "review", id: 9})
     empty = storage(303, %{tag: "new_tip"})
+    open_store_page(session)
 
     k = %{new_tip(tip, "draft-k", "  Body kept verbatim \n\r\n\t ") | intent: rich_intent()}
     k_pair = k.draft
