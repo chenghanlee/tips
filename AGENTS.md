@@ -51,6 +51,8 @@ Before reading, writing, changing or reviewing Elixir code, read the repository 
 - `oban`: background jobs, retries, scheduling, and workflows.
 - `otp`: processes, supervision, GenServer, Task, Registry, and ETS.
 
+For Elixir navigation (outlining a file, finding a definition, uses or callers), run the matching `"$TIPS_DEXTER"` operation before `rg`, `grep`, `sed`, `cat` or a whole-file read. Text tools are for literal text, non-Elixir files and known line ranges.
+
 Load only relevant skills. The triggers in Testing, Skills and Writing apply to Codex and Claude; reload before the relevant action after context recovery if the body is absent. State which skills you are using before making changes.
 
 ## Tool Use
