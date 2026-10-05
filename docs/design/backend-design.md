@@ -547,6 +547,8 @@ Accounts owns token creation and the generated notifier flow. Persist required a
 
 Apply the existing app limiter before creating authentication tokens or requesting mail for sign-in, verification resend and email-change requests, including LiveView events. Limit by normalized destination address and trusted client IP, with clear retry feedback; signup Turnstile and HTTP route limits do not cover these events alone. An in-process ETS-backed limiter is sufficient for the single-node MVP. Keep delivery bounded and avoid automatic mail-retry loops.
 
+One configured total budget bounds each attempt from request to result, including after the requesting process exits; `Tips.Accounts.UserNotifier` documents the outcomes. Sign-in, including reauthentication, gives one neutral answer on the form for an unknown address, a sent link and unconfirmed delivery, so the page does not reveal account existence. Response time still can: unknown addresses return at once, and there is no latency equalization or dummy provider call. Registration and email change report unconfirmed delivery as uncertain with a retry.
+
 ### Changing the sign-in email
 
 Allow an account owner to change their email after recent sign-in and verification of the new address. Keep the same user id and fixed handle, so tips, reviews, votes, browser drafts, submission keys, and moderation state remain attached to the same account. Keep the current email active until the new address is confirmed.

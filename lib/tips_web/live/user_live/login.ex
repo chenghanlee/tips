@@ -3,7 +3,12 @@ defmodule TipsWeb.UserLive.Login do
 
   alias Tips.Accounts
   alias Tips.Accounts.User
-  alias TipsWeb.UserAuth
+  alias TipsWeb.{AuthMailAdmission, UserAuth}
+
+  # One answer for unknown addresses, sent links and unconfirmed delivery, so the
+  # page never reveals whether an account exists or whether its mail was sent.
+  @requested "If this email has an account, check your inbox for a sign-in link. " <>
+               "If it hasn't arrived in a few minutes, request another."
 
   @impl true
   def render(assigns) do
@@ -73,35 +78,65 @@ defmodule TipsWeb.UserLive.Login do
     form = to_form(%{"email" => email}, as: "user")
 
     {:ok,
-     assign(socket, page_title: "Log in", form: form, register_path: register_path(return_to))}
+     socket
+     |> assign(page_title: "Log in", form: form, register_path: register_path(return_to))
+     |> AuthMailAdmission.assign_identity(session)}
   end
 
   @impl true
   def handle_event("submit_magic", %{"user" => %{"email" => email}}, socket) do
+    # Charged before the lookup, for known and unknown addresses alike. Every answer stays
+    # on the form with the email and the register link's destination.
+    socket = clear_flash(socket)
+
+    socket =
+      case AuthMailAdmission.admit(socket.assigns, email) do
+        :ok -> request_link(socket, email)
+        {:error, reason} -> reject(socket, email, reason)
+      end
+
+    {:noreply, socket}
+  end
+
+  defp request_link(socket, email) do
     with %User{} = user <- Accounts.get_user_by_email(email),
          {:error, :not_found} <-
            Accounts.deliver_login_instructions(user, &url(~p"/users/log-in/#{&1}")) do
-      # The registration expired, or cleanup deleted it after the lookup. Stay on the form:
-      # the email, and the return destination kept in the session, carry into signup.
-      {:noreply,
-       socket
-       |> put_flash(
-         :error,
-         "This sign-up was not confirmed within seven days and has expired. " <>
-           "Register again to continue."
-       )
-       |> assign(form: to_form(%{"email" => email}, as: "user"))}
+      # The registration expired, or cleanup deleted it after the lookup.
+      socket
+      |> put_flash(
+        :error,
+        "This sign-up was not confirmed within seven days and has expired. " <>
+          "Register again to continue."
+      )
+      |> assign_email(email)
     else
-      # No such account, mail accepted, or mail delivery failed: one answer for all.
-      _other ->
-        info =
-          "If your email is in our system, you will receive instructions for logging in shortly."
-
-        {:noreply,
-         socket
-         |> put_flash(:info, info)
-         |> push_navigate(to: ~p"/users/log-in")}
+      nil -> requested(socket, email)
+      {:ok, _email} -> requested(socket, email)
+      {:error, {:delivery, _category}} -> requested(socket, email)
     end
+  end
+
+  defp requested(socket, email), do: socket |> put_flash(:info, @requested) |> assign_email(email)
+
+  defp reject(socket, email, :invalid_identity),
+    do: assign_email(socket, email, errors: [email: {"is invalid", []}])
+
+  defp reject(socket, email, reason) do
+    socket |> put_flash(:error, rejection_message(reason)) |> assign_email(email)
+  end
+
+  defp rejection_message({:rate_limited, seconds}),
+    do: "Too many sign-in requests. Try again in #{AuthMailAdmission.retry_in(seconds)}."
+
+  defp rejection_message({:capacity, seconds}),
+    do: "Sign-in is busy right now. Try again in #{AuthMailAdmission.retry_in(seconds)}."
+
+  defp rejection_message(:no_client_ip), do: AuthMailAdmission.no_client_ip_message()
+
+  defp assign_email(socket, email, opts \\ []) do
+    email = if is_binary(email), do: email, else: ""
+    assign(socket, form: to_form(%{"email" => email}, [as: "user"] ++ opts))
   end
 
   defp register_path(nil), do: ~p"/users/register"

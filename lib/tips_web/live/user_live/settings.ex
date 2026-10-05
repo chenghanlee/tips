@@ -4,7 +4,7 @@ defmodule TipsWeb.UserLive.Settings do
   on_mount {TipsWeb.UserAuth, :require_sudo_mode}
 
   alias Tips.Accounts
-  alias TipsWeb.UserAuth
+  alias TipsWeb.{AuthMailAdmission, UserAuth}
 
   @impl true
   def render(assigns) do
@@ -51,7 +51,7 @@ defmodule TipsWeb.UserLive.Settings do
     {:ok, push_navigate(socket, to: ~p"/users/settings")}
   end
 
-  def mount(_params, _session, socket) do
+  def mount(_params, session, socket) do
     user = socket.assigns.current_scope.user
     email_changeset = Accounts.change_user_email(user, %{}, validate_unique: false)
 
@@ -59,6 +59,7 @@ defmodule TipsWeb.UserLive.Settings do
       socket
       |> assign(:page_title, "Account settings")
       |> assign(:email_form, to_form(email_changeset))
+      |> AuthMailAdmission.assign_identity(session)
 
     {:ok, socket}
   end
@@ -87,20 +88,51 @@ defmodule TipsWeb.UserLive.Settings do
     end
   end
 
+  # Only a valid new address is charged, to its own destination bucket, before the token.
   defp request_email_change(socket, user, user_params) do
-    case Accounts.change_user_email(user, user_params) do
-      %{valid?: true} = changeset ->
-        Accounts.deliver_user_update_email_instructions(
-          Ecto.Changeset.apply_action!(changeset, :insert),
-          user.email,
-          &url(~p"/users/settings/confirm-email/#{&1}")
-        )
+    changeset = Accounts.change_user_email(user, user_params)
+    socket = clear_flash(socket)
 
-        info = "A link to confirm your email change has been sent to the new address."
-        put_flash(socket, :info, info)
+    with {:ok, %{email: new_email} = changed} <- Ecto.Changeset.apply_action(changeset, :insert),
+         :ok <- AuthMailAdmission.admit(socket.assigns, new_email),
+         {:ok, _email} <-
+           Accounts.deliver_user_update_email_instructions(
+             changed,
+             user.email,
+             &url(~p"/users/settings/confirm-email/#{&1}")
+           ) do
+      info = "A link to confirm your email change has been sent to the new address."
+      put_flash(socket, :info, info)
+    else
+      {:error, %Ecto.Changeset{} = changeset} ->
+        assign(socket, :email_form, to_form(changeset))
 
-      changeset ->
+      {:error, :invalid_identity} ->
+        changeset = Ecto.Changeset.add_error(changeset, :email, "is invalid")
         assign(socket, :email_form, to_form(changeset, action: :insert))
+
+      {:error, {:delivery, _category}} ->
+        socket
+        |> put_flash(:error, not_confirmed_message(Ecto.Changeset.get_field(changeset, :email)))
+        |> assign(:email_form, to_form(changeset, action: :insert))
+
+      {:error, reason} ->
+        socket
+        |> put_flash(:error, rejection_message(reason))
+        |> assign(:email_form, to_form(changeset, action: :insert))
     end
   end
+
+  defp not_confirmed_message(new_email) do
+    "We couldn't confirm that the confirmation link was sent to #{new_email}. " <>
+      "It may still arrive; if it doesn't, request it again. Your sign-in email has not changed."
+  end
+
+  defp rejection_message({:rate_limited, seconds}),
+    do: "Too many email change requests. Try again in #{AuthMailAdmission.retry_in(seconds)}."
+
+  defp rejection_message({:capacity, seconds}),
+    do: "Email change is busy right now. Try again in #{AuthMailAdmission.retry_in(seconds)}."
+
+  defp rejection_message(:no_client_ip), do: AuthMailAdmission.no_client_ip_message()
 end
