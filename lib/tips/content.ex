@@ -229,7 +229,7 @@ defmodule Tips.Content do
 
   alias Tips.Accounts
   alias Tips.Accounts.Scope
-  alias Tips.Content.{Edit, Intent, Projection, Publication, Read}
+  alias Tips.Content.{Deletion, Edit, Intent, Moderation, Projection, Publication, Read}
 
   @typedoc """
   Who reads: `nil` for an anonymous viewer, or the server-held reference to
@@ -392,6 +392,60 @@ defmodule Tips.Content do
           | {:upload_pending, [media_id()]}
           | :outcome_unknown
 
+  @typedoc "A confirmed deletion, hide or restore with the committed version and state."
+  @type lifecycle_receipt :: %{
+          kind: kind(),
+          id: pos_integer(),
+          tip_id: pos_integer(),
+          state: :live | :hidden | :deleted,
+          edit_version: pos_integer(),
+          outcome: :changed | :unchanged
+        }
+
+  @typedoc "A rejected author deletion. See \"Deletion and moderation\"."
+  @type delete_error ::
+          :unauthenticated
+          | :not_found
+          | :media_cleanup_required
+          | {:rate_limited | :capacity, retry_after_seconds :: pos_integer()}
+          | :outcome_unknown
+
+  @typedoc "One open report in a moderation case. Reporter identity is never included."
+  @type report :: %{
+          id: pos_integer(),
+          reason: :spam | :harmful | :fabricated | :other,
+          detail: String.t() | nil,
+          created_at: DateTime.t()
+        }
+
+  @typedoc """
+  A moderation case: identity, current state and version, the moderator's
+  projection of the content and its open reports, oldest first.
+  """
+  @type moderation_case :: %{
+          kind: kind(),
+          id: pos_integer(),
+          tip_id: pos_integer(),
+          state: :live | :hidden | :deleted,
+          edit_version: pos_integer(),
+          content: Projection.tip_detail() | Projection.review_view(),
+          reports: [report()]
+        }
+
+  @typedoc """
+  A rejected hide or restore. `{:conflict, case}` carries the current case to
+  review again. Malformed input is a changeset.
+  """
+  @type moderation_error ::
+          :unauthenticated
+          | :unconfirmed
+          | :forbidden
+          | :not_found
+          | {:conflict, moderation_case()}
+          | Ecto.Changeset.t()
+          | {:rate_limited | :capacity, retry_after_seconds :: pos_integer()}
+          | :outcome_unknown
+
   @typedoc "A database effect that commits with its operation. See the participant table."
   @type effect ::
           :content
@@ -502,4 +556,39 @@ defmodule Tips.Content do
   @spec get_review_page(viewer(), term()) ::
           {:ok, Projection.selected_review()} | {:error, read_error()}
   defdelegate get_review_page(viewer, review_id), to: Read
+
+  @doc """
+  Deletes the author's own tip or review, irreversibly. See "Deletion and
+  moderation".
+  """
+  @spec delete_content(Scope.t() | nil, kind(), pos_integer()) ::
+          {:ok, lifecycle_receipt()} | {:error, delete_error()}
+  defdelegate delete_content(scope, kind, id), to: Deletion, as: :delete
+
+  @doc """
+  Reads one moderation case for a moderator's session. See "Deletion and
+  moderation".
+  """
+  @spec get_moderation_case(Accounts.SessionRef.t(), kind(), term()) ::
+          {:ok, moderation_case()}
+          | {:error, :unauthenticated | :forbidden | :not_found | :outcome_unknown}
+  defdelegate get_moderation_case(session_ref, kind, id), to: Moderation, as: :get_case
+
+  @doc """
+  Hides a tip or review as the moderator reviewed it, resolving the reviewed
+  reports. See "Deletion and moderation".
+  """
+  @spec hide_content(Scope.t() | nil, kind(), pos_integer(), pos_integer(), [pos_integer()]) ::
+          {:ok, lifecycle_receipt()} | {:error, moderation_error()}
+  def hide_content(scope, kind, id, expected_version, reviewed_report_ids),
+    do: Moderation.moderate(:hide, scope, kind, id, expected_version, reviewed_report_ids)
+
+  @doc """
+  Restores a hidden tip or review as the moderator reviewed it. The reviewed
+  reports stay open. See "Deletion and moderation".
+  """
+  @spec restore_content(Scope.t() | nil, kind(), pos_integer(), pos_integer(), [pos_integer()]) ::
+          {:ok, lifecycle_receipt()} | {:error, moderation_error()}
+  def restore_content(scope, kind, id, expected_version, reviewed_report_ids),
+    do: Moderation.moderate(:restore, scope, kind, id, expected_version, reviewed_report_ids)
 end
