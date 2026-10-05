@@ -130,7 +130,7 @@ herdr agent prompt "team-$N-lead" "$EVIDENCE_URL SHA=$SHA; action=dispatch teste
 
 Repository rules block force pushes on `task/**`, require merge commits, strict up-to-date branches, resolved conversations and `checks`, `release`, `tips/independent-review`; merged remote heads are deleted. This gate is an interlock, not credential isolation.
 
-**Issue state.** Lead TPM owns labels and Project Status under its [Always rules](roles/lead-tpm.md#always); workers may add only Fallback `blocked`.
+**Issue state.** Lead TPM owns Project accuracy, labels, Status and Agent under its [Always rules](roles/lead-tpm.md#always); workers may add only Fallback `blocked`. Tech leads record and notify lead TPM when implementation starts or resumes, review begins or returns to repair, work blocks or unblocks, or delivery completes. Reuse the existing provisioning, review or merge handoff when it already conveys the change; send a separate update only for a transition it does not cover. Lead TPM reconciles and verifies the affected GitHub item in that turn.
 
 - After launch, escalate scope or role-label changes such as `ui`/`probe` as scope questions. Routine `active` and `blocked` updates remain state changes.
 - Close issues only after their required result is integrated and evidenced. Use `Refs #number` for partial work; `Closes #number` for completing PRs. New child issues count toward the goal.
