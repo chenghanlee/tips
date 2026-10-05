@@ -43,6 +43,8 @@ Use the reported event to find your card section; Assigned covers the first brie
 
 ## Brief consensus
 
+The contract is the issue brief plus the latest consolidated decision comment. Lead TPM keeps the brief aligned with authorized scope and acceptance decisions before final acknowledgment. The acknowledgment covers both. Meaning-changing edits to either reopen affected agreement under this section; record the change in a new decision revision.
+
 Prepare before grilling. The tech lead sends each worker a short assignment naming the issue, contract revision, base SHA and lead's Herdr target. The worker reads the assignment, linked design sections and role card, checks its worktree and launch values, then notifies the lead that it is ready. Keep this preparation separate from the interview.
 
 Before invoking the skill, check that `grill-me` and `grilling` exist in the main checkout's `.agents/skills/` and `.claude/skills/`. Read the recipient's live `agent` field with `herdr agent get <recipient>`; syntax follows the client, not the model. Compare with its intended launch assignment using the main checkout's `config.toml` (or `TIPS_TEAM_CONFIG`, including `lead_ui` when selected). A later config edit applies next launch; it does not invalidate a healthy client. Follow Lost session or environment for a wrong launch assignment. Before live use, the tech lead checks the setup or change issue/PR for passing [pilot evidence](SETUP.md#one-time-setup) covering the configured clients and current workflow. Missing evidence goes to lead TPM; do not dispatch live implementation through an unverified flow.
