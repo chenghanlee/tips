@@ -32,11 +32,15 @@ defmodule TipsWeb.Layouts do
     default: false,
     doc: "editor pages: plain-link exits and the editor width"
 
+  attr :return_to, :string,
+    default: nil,
+    doc: "public pages: the permalink the header's Log in and Register links return to"
+
   slot :inner_block, required: true
 
   def app(assigns) do
     ~H"""
-    <TipsWeb.UI.site_header current_scope={@current_scope} editor={@editor} />
+    <TipsWeb.UI.site_header current_scope={@current_scope} editor={@editor} return_to={@return_to} />
 
     <main class={[
       "mx-auto space-y-6 px-4 py-8",

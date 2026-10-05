@@ -80,6 +80,24 @@ defmodule TipsWeb.UITest do
     assert count(doc, "[maxlength]") == 0
   end
 
+  test "site_header carries a given destination on Log in and Register only" do
+    href = fn doc, label ->
+      doc
+      |> LazyHTML.query("a")
+      |> Enum.find(&(String.trim(LazyHTML.text(&1)) == label))
+      |> LazyHTML.attribute("href")
+    end
+
+    plain = html(&UI.site_header/1, %{})
+    assert href.(plain, "Log in") == ["/users/log-in"]
+    assert href.(plain, "Register") == ["/users/register"]
+
+    carried = html(&UI.site_header/1, %{return_to: "/reviews/9"})
+    assert href.(carried, "Log in") == ["/users/log-in?return_to=%2Freviews%2F9"]
+    assert href.(carried, "Register") == ["/users/register?return_to=%2Freviews%2F9"]
+    assert href.(carried, "Tips") == ["/"]
+  end
+
   describe "setup_meta" do
     test "renders nonlinkable metadata and free-text models without links" do
       doc =

@@ -65,11 +65,9 @@ defmodule TipsWeb.UserLive.Login do
 
   @impl true
   def mount(params, session, socket) do
-    # The same validated destination the registration form accepts, so restarting signup
-    # from here keeps it.
-    return_to =
-      UserAuth.allowed_return_to(params["return_to"]) ||
-        UserAuth.allowed_return_to(session["user_return_to"])
+    # The same validated destination the registration form accepts: the emailed link
+    # carries it, and restarting signup from here keeps it.
+    return_to = UserAuth.return_to(params["return_to"], session["user_return_to"])
 
     email =
       Phoenix.Flash.get(socket.assigns.flash, :email) ||
@@ -79,7 +77,12 @@ defmodule TipsWeb.UserLive.Login do
 
     {:ok,
      socket
-     |> assign(page_title: "Log in", form: form, register_path: register_path(return_to))
+     |> assign(
+       page_title: "Log in",
+       form: form,
+       return_to: return_to,
+       register_path: UserAuth.with_return_to(~p"/users/register", return_to)
+     )
      |> AuthMailAdmission.assign_identity(session)}
   end
 
@@ -105,7 +108,7 @@ defmodule TipsWeb.UserLive.Login do
   defp request_link(socket, email) do
     with %User{} = user <- Accounts.get_user_by_email(email),
          {:error, :not_found} <-
-           Accounts.deliver_login_instructions(user, &url(~p"/users/log-in/#{&1}")) do
+           Accounts.deliver_login_instructions(user, &link_url(socket, &1)) do
       # The registration expired, or cleanup deleted it after the lookup.
       socket
       |> put_flash(
@@ -146,8 +149,8 @@ defmodule TipsWeb.UserLive.Login do
     assign(socket, form: to_form(%{"email" => email}, [as: "user"] ++ opts))
   end
 
-  defp register_path(nil), do: ~p"/users/register"
-  defp register_path(return_to), do: ~p"/users/register?#{[return_to: return_to]}"
+  defp link_url(socket, token),
+    do: UserAuth.with_return_to(url(~p"/users/log-in/#{token}"), socket.assigns.return_to)
 
   defp local_mail_adapter? do
     Application.get_env(:tips, Tips.Mailer)[:adapter] == Swoosh.Adapters.Local

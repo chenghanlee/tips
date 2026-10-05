@@ -18,7 +18,7 @@ defmodule TipsWeb.UI do
 
   alias Phoenix.LiveView.JS
   alias SaladUI.Form
-  alias TipsWeb.CoreComponents
+  alias TipsWeb.{CoreComponents, UserAuth}
 
   # SaladUI's input look, native. Inputs, textareas and selects use text-base so
   # iOS does not zoom on focus; without SaladUI's outline-hidden and focus ring,
@@ -30,14 +30,22 @@ defmodule TipsWeb.UI do
   Renders the top bar: the Tips home link and the account links.
 
   With `editor`, every exit is an ordinary `<a href>` so the editor's leave
-  warning covers it.
+  warning covers it. With `return_to`, Log in and Register carry that page as
+  their `return_to` query, so sign-in comes back to it.
 
       <TipsWeb.UI.site_header current_scope={@current_scope} />
   """
   attr :current_scope, :map, default: nil
   attr :editor, :boolean, default: false
+  attr :return_to, :string, default: nil
 
   def site_header(assigns) do
+    assigns =
+      assign(assigns,
+        register_href: UserAuth.with_return_to(~p"/users/register", assigns.return_to),
+        log_in_href: UserAuth.with_return_to(~p"/users/log-in", assigns.return_to)
+      )
+
     ~H"""
     <header class="border-b">
       <nav
@@ -56,8 +64,8 @@ defmodule TipsWeb.UI do
               Log out
             </.link>
           <% else %>
-            <.exit_link editor={@editor} href={~p"/users/register"}>Register</.exit_link>
-            <.exit_link editor={@editor} href={~p"/users/log-in"}>Log in</.exit_link>
+            <.exit_link editor={@editor} href={@register_href}>Register</.exit_link>
+            <.exit_link editor={@editor} href={@log_in_href}>Log in</.exit_link>
           <% end %>
         </div>
       </nav>

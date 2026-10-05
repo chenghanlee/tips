@@ -24,9 +24,15 @@ defmodule TipsWeb.UserAuthTest do
   end
 
   describe "allowed_return_to/1" do
-    test "admits only the root and the four editor route shapes" do
+    test "admits the root, settings, public tip and review pages and the four editor shapes" do
       for path <- [
             "/",
+            "/users/settings",
+            "/tips/1/a",
+            "/tips/9223372036854775807/a-useful-technique",
+            "/tips/42/" <> String.duplicate("a", 80),
+            "/tips/7/removed-tip",
+            "/reviews/9",
             "/editor/tips/new",
             "/editor/tips/42/edit",
             "/editor/tips/7/reviews/new",
@@ -37,11 +43,29 @@ defmodule TipsWeb.UserAuthTest do
 
       for path <- [
             nil,
+            %{"path" => "/"},
+            "",
             "https://evil.example/",
             "//evil.example",
+            "/\\evil.example",
             "/%2F%2Fevil.example",
+            "/tips/1/a%2F..",
             "/editor/tips/new\n",
-            "/users/settings"
+            "/users/settings/",
+            "/users/settings?tab=email",
+            "/users/settings#email",
+            "/users/settings/confirm-email/token",
+            "/users/log-in",
+            "/tips/1",
+            "/tips/0/a",
+            "/tips/01/a",
+            "/tips/12345678901234567890/a",
+            "/tips/1/A",
+            "/tips/1/a-",
+            "/tips/1/a--b",
+            "/tips/1/" <> String.duplicate("a", 81),
+            "/reviews/9/edit",
+            "/editor/reviews/09/edit"
           ] do
         assert UserAuth.allowed_return_to(path) == nil, "admitted #{inspect(path)}"
       end
@@ -95,20 +119,37 @@ defmodule TipsWeb.UserAuthTest do
       refute get_session(conn, :to_be_removed)
     end
 
-    test "redirects to the configured path", %{conn: conn, user: user} do
-      conn = conn |> put_session(:user_return_to, "/hello") |> log_in(user)
-      assert redirected_to(conn) == "/hello"
-    end
+    # {explicit return_to param, session user_return_to, signed in?} => redirect.
+    for {label, explicit, session, signed_in?, redirect} <- [
+          {"a valid explicit destination wins", "/reviews/9", "/users/settings", false,
+           "/reviews/9"},
+          {"a missing explicit destination falls back to the session", nil, "/reviews/9", false,
+           "/reviews/9"},
+          {"an unsafe explicit destination falls back to the session", "//evil.example",
+           "/reviews/9", false, "/reviews/9"},
+          {"a malformed explicit destination falls back to the session", %{"to" => "/"},
+           "/reviews/9", false, "/reviews/9"},
+          {"an unsafe session destination falls back to the default", nil, "/hello", false, "/"},
+          {"a session destination with a query falls back to the default", nil,
+           "/users/settings?tab=email", false, "/"},
+          {"a valid explicit destination beats the signed-in default", "/tips/7/a", nil, true,
+           "/tips/7/a"},
+          {"nothing valid keeps the signed-in default", "https://evil.example/", "/hello", true,
+           "/users/settings"}
+        ] do
+      @explicit explicit
+      @session session
+      @signed_in signed_in?
+      @redirect redirect
+      test "#{label} and the session destination is cleared", %{conn: conn, user: user} do
+        conn = if @signed_in, do: assign(conn, :current_scope, Scope.for_user(user)), else: conn
+        params = if @explicit, do: %{"return_to" => @explicit}, else: %{}
 
-    test "clears the return-to path from the session after logging in", %{conn: conn, user: user} do
-      conn =
-        conn
-        |> assign(:current_scope, Scope.for_user(user))
-        |> put_session(:user_return_to, "/hello")
-        |> log_in(user)
+        conn = conn |> put_session(:user_return_to, @session) |> log_in(user, params)
 
-      assert redirected_to(conn) == "/hello"
-      refute get_session(conn, :user_return_to)
+        assert redirected_to(conn) == @redirect
+        refute get_session(conn, :user_return_to)
+      end
     end
 
     test "writes a cookie if remember_me is configured", %{conn: conn, user: user} do

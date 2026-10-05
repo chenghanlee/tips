@@ -133,16 +133,27 @@ defmodule TipsWeb.UserSessionControllerTest do
       assert redirected_to(conn) == ~p"/"
     end
 
-    test "logs the user in with return to", %{conn: conn, user: user} do
-      {token, _hashed_token} = generate_user_magic_link_token(user)
+    # The posted destination is validated again here, whatever the form carried.
+    for {label, posted, redirect} <- [
+          {"an allowed posted destination", "/reviews/9", "/reviews/9"},
+          {"an unsafe posted destination falls back to the session's", "//evil.example",
+           "/users/settings"},
+          {"a malformed posted destination falls back to the session's", %{"to" => "/"},
+           "/users/settings"}
+        ] do
+      @posted posted
+      @redirect redirect
+      test "logs the user in and redirects to #{label}", %{conn: conn, user: user} do
+        {token, _hashed_token} = generate_user_magic_link_token(user)
 
-      conn =
-        conn
-        |> init_test_session(user_return_to: "/foo/bar")
-        |> post(~p"/users/log-in", %{"user" => %{"token" => token}})
+        conn =
+          conn
+          |> init_test_session(user_return_to: "/users/settings")
+          |> post(~p"/users/log-in", %{"user" => %{"token" => token, "return_to" => @posted}})
 
-      assert redirected_to(conn) == "/foo/bar"
-      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Welcome back!"
+        assert redirected_to(conn) == @redirect
+        assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Welcome back!"
+      end
     end
 
     test "confirms unconfirmed user", %{conn: conn, unconfirmed_user: user} do
