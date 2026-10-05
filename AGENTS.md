@@ -50,7 +50,7 @@ Before reading, writing, changing or reviewing Elixir code, read the repository 
 - `oban`: background jobs, retries, scheduling, and workflows.
 - `otp`: processes, supervision, GenServer, Task, Registry, and ETS.
 
-Load only relevant skills. These triggers apply to Codex and Claude; reload before the relevant action after context recovery if the body is absent. State which skills you are using before making changes.
+Load only relevant skills. The triggers in Testing, Skills and Writing apply to Codex and Claude; reload before the relevant action after context recovery if the body is absent. State which skills you are using before making changes.
 
 ## Tool Use
 

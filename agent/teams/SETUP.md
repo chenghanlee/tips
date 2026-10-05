@@ -60,7 +60,7 @@ for folder in folders:
     assert not folder.parent.is_symlink() and not folder.is_symlink(), folder
     assert not folder.exists() or folder.is_dir(), folder
 (root / 'tmp').mkdir(exist_ok=True)
-backup = Path(tempfile.mkdtemp(prefix='skills-before-install-', dir=root / 'tmp'))
+backup = None
 for folder in folders:
     folder.mkdir(parents=True, exist_ok=True)
     for name in names:
@@ -69,11 +69,13 @@ for folder in folders:
         if entry.is_symlink() and os.readlink(entry) == target:
             continue
         if entry.exists() or entry.is_symlink():
+            if backup is None:
+                backup = Path(tempfile.mkdtemp(prefix='skills-before-install-', dir=root / 'tmp'))
+                print('Saving previous entries under', backup, flush=True)
             saved = backup / folder.parent.name / name
             saved.parent.mkdir(parents=True, exist_ok=True)
             entry.rename(saved)
         entry.symlink_to(target, target_is_directory=True)
-print('Previous entries preserved at', backup)
 PYINSTALL
 ```
 
