@@ -1,5 +1,8 @@
 defmodule Tips.Content.Search.EmbeddingsTest do
-  use Tips.DataCase, async: true
+  # Synchronous: these fixtures write over a hundred search documents, and
+  # concurrent uncommitted documents shift BM25 statistics under async
+  # ranking tests.
+  use Tips.DataCase, async: false
 
   import Tips.AccountsFixtures
   import Tips.SearchFixtures
@@ -51,6 +54,27 @@ defmodule Tips.Content.Search.EmbeddingsTest do
     assert %{selected: 1, embedded: 1} = Embeddings.scan()
     assert [input] = provider_inputs()
     assert input =~ "Rewritten so the provider accepts it."
+  end
+
+  test "never-attempted rows go first, then the oldest due retries" do
+    author = user_fixture()
+    tips = for n <- 1..60, do: indexed_tip!(author, %{title: "Tip #{n}"})
+
+    reviews =
+      for {tip, n} <- Enum.with_index(tips, 1), do: indexed_review!(tip, %{body: "Review #{n}"})
+
+    stub_provider(fn conn, _input -> Plug.Conn.send_resp(conn, 400, "") end)
+
+    scans = [1..25, 26..50, Enum.concat(51..60, 1..15), 16..40]
+
+    for {batch, scan} <- Enum.with_index(scans, 1) do
+      # Earlier cooldowns have elapsed, as when scans outlast them.
+      if scan > 1, do: age_cooldowns!(tips, reviews, "11 minutes")
+
+      assert %{selected: 50, failed: %{{:http, 400} => 50}} = Embeddings.scan()
+      expected = Enum.flat_map(batch, &["Tip #{&1}", "Review #{&1}"])
+      assert first_lines(provider_inputs()) == expected, "scan #{scan}"
+    end
   end
 
   test "only live, due, unembedded documents are admitted, rechecked before each request" do
@@ -173,6 +197,18 @@ defmodule Tips.Content.Search.EmbeddingsTest do
     inputs = provider_inputs()
     assert Enum.any?(inputs, &(&1 =~ "A newer body."))
     assert Enum.any?(inputs, &(&1 =~ "A newer output."))
+  end
+
+  defp age_cooldowns!(tips, reviews, interval) do
+    for {table, column, rows} <- [
+          {"tip_search", "tip_id", tips},
+          {"review_search", "review_id", reviews}
+        ] do
+      Repo.query!(
+        "UPDATE #{table} SET embed_after = embed_after - $2::text::interval WHERE #{column} = ANY($1)",
+        [Enum.map(rows, & &1.id), interval]
+      )
+    end
   end
 
   defp first_line(input), do: input |> String.split("\n") |> hd()

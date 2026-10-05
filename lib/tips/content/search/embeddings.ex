@@ -7,9 +7,17 @@ defmodule Tips.Content.Search.Embeddings do
 
   `scan/1` runs from `Tips.Workers.EmbedSearch`, one scan at a time. It reads
   at most 50 candidates: live documents with no vector and no pending
-  cooldown, by id within each kind, alternating tips and reviews while both
-  remain, then the rest of the other kind. A review counts as live only when
-  its tip is live too. Nothing replenishes the list during the scan.
+  cooldown. Within each kind, rows never attempted or reset by a text change
+  come first, then due retries with the oldest cooldown first, then by id.
+  Kinds alternate, tips first, while both have candidates; the other kind
+  then fills the rest. A review counts as live only when its tip is live
+  too. Nothing replenishes the list during the scan.
+
+  Due retries take turns instead of the lowest ids winning every scan. A
+  steady stream of new or edited documents still goes first and can delay
+  retries; no progress bound is promised. The order is not served by the partial `*_search_queue` indexes,
+  so the database sorts each kind's due backlog; the limit bounds the rows
+  attempted, not that work.
 
   With no candidates the scan returns at once and needs no provider
   configuration. Otherwise it resolves the provider client first; a missing
@@ -147,7 +155,7 @@ defmodule Tips.Content.Search.Embeddings do
       SELECT s.tip_id, s.text_at FROM tip_search s
       JOIN tips t ON t.id = s.tip_id AND #{@live_tip}
       WHERE #{@due}
-      ORDER BY s.tip_id
+      ORDER BY s.embed_after ASC NULLS FIRST, s.tip_id
       LIMIT #{@limit}
       """)
 
@@ -157,7 +165,7 @@ defmodule Tips.Content.Search.Embeddings do
       JOIN reviews r ON r.id = s.review_id AND #{@live_review}
       JOIN tips t ON t.id = r.tip_id AND #{@live_tip}
       WHERE #{@due}
-      ORDER BY s.review_id
+      ORDER BY s.embed_after ASC NULLS FIRST, s.review_id
       LIMIT #{@limit}
       """)
 

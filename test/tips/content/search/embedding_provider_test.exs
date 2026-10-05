@@ -115,8 +115,12 @@ defmodule Tips.Content.Search.EmbeddingProviderTest do
     assert %Req.Request{private: %{deadline: 30_000}} =
              EmbeddingProvider.client!(deadline: 60_000)
 
+    # Long enough for the request to reach the stub under full-suite load.
     assert {:error, :deadline} =
-             EmbeddingProvider.embed_document(EmbeddingProvider.client!(deadline: 50), "document")
+             EmbeddingProvider.embed_document(
+               EmbeddingProvider.client!(deadline: 500),
+               "document"
+             )
 
     assert_received {:requesting, request}
     refute Process.alive?(request)
