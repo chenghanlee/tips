@@ -89,6 +89,11 @@ config :phoenix_live_view,
 # at the `config/runtime.exs`.
 config :tips, Tips.Mailer, adapter: Swoosh.Adapters.Local
 
+# Total time for one authentication mail attempt, from request to result
+# (Tips.Accounts.UserNotifier). Past it the attempt is killed and the user is
+# told delivery could not be confirmed.
+config :tips, Tips.Accounts.UserNotifier, delivery_budget_ms: 10_000
+
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.25.4",

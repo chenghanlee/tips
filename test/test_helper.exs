@@ -1,5 +1,7 @@
 ExUnit.start()
 
+{:ok, _} = Registry.start_link(keys: :unique, name: Tips.MailerTestAdapter)
+
 browser = if System.get_env("TIPS_BROWSER") == "1", do: [], else: [:browser]
 real_provider = if Tips.ProviderConfig.mode() == :real, do: [], else: [:real_provider]
 ExUnit.configure(exclude: browser ++ real_provider)
