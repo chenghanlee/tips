@@ -1,46 +1,10 @@
 defmodule Tips.Workers.EmbedSearchTest do
-  # A real Oban instance executes scans in its own processes over committed
-  # rows, so this module switches the sandbox to auto mode and owns cleanup.
-  use ExUnit.Case, async: false
+  use Tips.EmbeddingCase, async: false
 
-  import Ecto.Query
-  import Tips.AccountsFixtures
-  import Tips.SearchFixtures
-
-  alias Ecto.Adapters.SQL.Sandbox
-  alias Tips.Accounts.User
   alias Tips.Content.Search.EmbeddingProvider
-  alias Tips.Content.Tip
-  alias Tips.Repo
-  alias Tips.Workers.EmbedSearch
 
   setup do
-    Sandbox.mode(Repo, :auto)
-    Req.Test.set_req_test_to_shared()
-    delete_jobs!()
-
-    on_exit(fn ->
-      Req.Test.set_req_test_to_private()
-      Sandbox.mode(Repo, :manual)
-    end)
-
-    author = user_fixture()
-    on_exit(fn -> delete_owned!(author) end)
-
-    name = {__MODULE__, System.unique_integer([:positive])}
-
-    start_supervised!(
-      {Oban,
-       name: name,
-       repo: Repo,
-       queues: [embeddings: 1],
-       plugins: false,
-       testing: :disabled,
-       notifier: Oban.Notifiers.Isolated,
-       peer: Oban.Peers.Isolated}
-    )
-
-    %{oban: name, author: author}
+    %{oban: start_oban!()}
   end
 
   test "ticks coalesce while a scan executes; a finished scan admits the next", context do
@@ -121,32 +85,5 @@ defmodule Tips.Workers.EmbedSearchTest do
     assert provider_inputs() == []
   end
 
-  defp insert(%{oban: oban}), do: Oban.insert(oban, EmbedSearch.new(%{}))
-
-  # Polls the committed job row until it reaches `state`, for at most five seconds.
-  defp await_state(job, state, attempts \\ 500) do
-    case Repo.get!(Oban.Job, job.id) do
-      %{state: ^state} ->
-        :ok
-
-      %{state: other} when attempts == 0 ->
-        flunk("job #{job.id} is #{other}, expected #{state}")
-
-      _not_yet ->
-        Process.sleep(10)
-        await_state(job, state, attempts - 1)
-    end
-  end
-
-  defp delete_jobs! do
-    Repo.delete_all(from(j in Oban.Job, where: j.worker == "Tips.Workers.EmbedSearch"))
-  end
-
-  defp delete_owned!(author) do
-    delete_jobs!()
-    tip_ids = Repo.all(from(t in Tip, where: t.user_id == ^author.id, select: t.id))
-    Repo.query!("DELETE FROM tip_search WHERE tip_id = ANY($1)", [tip_ids])
-    Repo.delete_all(from(t in Tip, where: t.id in ^tip_ids))
-    Repo.delete_all(from(u in User, where: u.id == ^author.id))
-  end
+  defp insert(%{oban: oban}), do: insert_scan(oban)
 end

@@ -55,8 +55,17 @@ defmodule Tips.Content.Search.Embeddings do
   Never mix vectors from two models. To change the embedding model or
   runtime, with the release run by Docker Compose:
 
-  1. Stop every instance of the old release, so no scan or query uses the old
-     model: `docker compose stop app`.
+  1. Drain, then stop, every instance of the old release, so no scan or
+     query uses the old model. Pause the queue, wait until no scan is
+     running, then stop:
+
+         docker compose exec app bin/tips rpc "Oban.pause_queue(queue: :embeddings)"
+         docker compose exec app bin/tips rpc "IO.inspect(Oban.check_queue(queue: :embeddings).running)"
+         docker compose stop app
+
+     Repeat the check until it prints `[]`; a scan can run 25 minutes.
+     Stopping during a scan leaves its job executing, which blocks later
+     ticks until Oban rescues it.
   2. Clear the vectors without starting the application or calling a provider:
 
          docker compose run --rm app bin/tips eval "Tips.Release.clear_embeddings()"
@@ -107,25 +116,29 @@ defmodule Tips.Content.Search.Embeddings do
 
   @doc """
   Clears every vector and cooldown and advances every token, in one
-  transaction. Run only with the old release stopped; see "Changing the model".
+  transaction without the request timeout. Run only with the old release
+  stopped; see "Changing the model".
   """
   @spec clear_all() :: {:ok, %{tips: non_neg_integer(), reviews: non_neg_integer()}}
   def clear_all do
-    Repo.transact(fn ->
-      cleared =
-        Map.new([tips: "tip_search", reviews: "review_search"], fn {key, table} ->
-          %{num_rows: rows} =
-            Repo.maintenance_query!("""
-            UPDATE #{table}
-            SET embedding = NULL, embed_after = NULL,
-                text_at = greatest(clock_timestamp(), text_at + interval '1 microsecond')
-            """)
+    Repo.transact(
+      fn ->
+        cleared =
+          Map.new([tips: "tip_search", reviews: "review_search"], fn {key, table} ->
+            %{num_rows: rows} =
+              Repo.maintenance_query!("""
+              UPDATE #{table}
+              SET embedding = NULL, embed_after = NULL,
+                  text_at = greatest(clock_timestamp(), text_at + interval '1 microsecond')
+              """)
 
-          {key, rows}
-        end)
+            {key, rows}
+          end)
 
-      {:ok, cleared}
-    end)
+        {:ok, cleared}
+      end,
+      timeout: :infinity
+    )
   end
 
   defp candidates do

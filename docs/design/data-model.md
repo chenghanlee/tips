@@ -723,7 +723,7 @@ Vectors are 1024 dimensions. The embedding runtime is chosen at the existing ten
 
 To change the embedding model or runtime while retaining 1024 dimensions:
 
-1. Stop every instance of the old release, so no scan or query uses the old model.
+1. Drain the embedding queue, then stop every instance of the old release, so no scan or query uses the old model.
 2. In one transaction, set every `embedding` and `embed_after` to NULL and advance every `text_at`, including hidden and deleted rows. A write from a request started before the clear then fails its guard. This protects against a missed process; it does not replace step 1.
 3. Change the model in the worker and query code.
 4. Start the new release.
