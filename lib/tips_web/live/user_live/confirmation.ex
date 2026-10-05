@@ -75,6 +75,10 @@ defmodule TipsWeb.UserLive.Confirmation do
 
   @impl true
   def mount(%{"token" => token} = params, session, socket) do
+    # Validated here and again by the controller; kept out of the form, so a submitted
+    # value cannot replace it. A rejected link takes it to the log-in page.
+    return_to = UserAuth.return_to(params["return_to"], session["user_return_to"])
+
     if user = Accounts.get_user_by_magic_link_token(token) do
       form = to_form(%{"token" => token}, as: "user")
 
@@ -83,9 +87,7 @@ defmodule TipsWeb.UserLive.Confirmation do
          page_title: "Confirm account",
          user: user,
          form: form,
-         # Validated here and again by the controller; kept out of the form, so a
-         # submitted value cannot replace it.
-         return_to: UserAuth.return_to(params["return_to"], session["user_return_to"]),
+         return_to: return_to,
          trigger_submit: false
        ), temporary_assigns: [form: nil]}
     else
@@ -96,7 +98,7 @@ defmodule TipsWeb.UserLive.Confirmation do
          "Magic link is invalid or it has expired. " <>
            "If you signed up more than seven days ago without confirming, register again."
        )
-       |> push_navigate(to: ~p"/users/log-in")}
+       |> push_navigate(to: UserAuth.with_return_to(~p"/users/log-in", return_to))}
     end
   end
 

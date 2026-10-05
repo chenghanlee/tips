@@ -184,6 +184,45 @@ defmodule TipsWeb.UserLive.ConfirmationTest do
              )
     end
 
+    # A rejected link sends the reader to request another; only a safe destination goes along.
+    for {label, query, session, log_in} <- [
+          {"keeps a safe destination", "return_to=%2Freviews%2F9", %{},
+           "/users/log-in?return_to=%2Freviews%2F9"},
+          {"keeps the session's destination behind an unsafe one", "return_to=%2F%2Fevil.example",
+           %{"user_return_to" => "/users/settings"},
+           "/users/log-in?return_to=%2Fusers%2Fsettings"},
+          {"drops an unsafe destination", "return_to=%2F%2Fevil.example", %{}, "/users/log-in"},
+          {"drops a malformed destination", "return_to[to]=%2Freviews%2F9", %{}, "/users/log-in"}
+        ] do
+      @query query
+      @session session
+      @log_in log_in
+      test "a used link #{label} on the way to log in", %{confirmed_user: user} do
+        token = extract_user_token(&Accounts.deliver_login_instructions(user, &1))
+        assert {:ok, _} = Accounts.login_user_by_magic_link(token, nil)
+        conn = init_test_session(build_conn(), @session)
+
+        assert {:error, {:live_redirect, %{to: @log_in}}} =
+                 live(conn, "/users/log-in/#{token}?#{@query}")
+      end
+    end
+
+    test "a link used elsewhere after the form rendered keeps the destination", %{
+      confirmed_user: user
+    } do
+      token = extract_user_token(&Accounts.deliver_login_instructions(user, &1))
+      {:ok, lv, _html} = live(build_conn(), ~p"/users/log-in/#{token}?return_to=/reviews/9")
+      form = form(lv, "#login_form")
+      render_submit(form)
+      assert {:ok, _} = Accounts.login_user_by_magic_link(token, nil)
+
+      conn = follow_trigger_action(form, build_conn())
+
+      assert redirected_to(conn) == "/users/log-in?return_to=%2Freviews%2F9"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "The link is invalid"
+      refute get_session(conn, :user_token)
+    end
+
     test "raises error for invalid token", %{conn: conn} do
       {:ok, _lv, html} =
         live(conn, ~p"/users/log-in/invalid-token")
