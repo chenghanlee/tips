@@ -1,6 +1,6 @@
 ---
 name: github-comments
-description: Load before drafting or editing GitHub comments, reviews or replies. Keep messages concise while preserving decisions, findings and required evidence.
+description: Load before drafting or editing GitHub comments, reviews, replies, PR descriptions or issue bodies. Keep messages concise while preserving decisions, findings and required evidence.
 ---
 
 # GitHub comments
@@ -9,12 +9,15 @@ AGENTS.md Writing applies. Paths below are from the repository root, not the
 native skill link. This skill governs writing; posting still requires task
 and team authorization.
 
-- Keep routine updates to a short paragraph or a few bullets. Give actionable
-  findings and required records enough space; do not omit evidence to meet a quota.
+- Comment only for a decision, a review finding or a blocker. The issue, PR,
+  checks and Project already record the rest; send routine coordination as a
+  message, not a comment.
+- Give findings and decisions the space they need; do not omit evidence to meet
+  a quota.
 - Distinguish pending checks from passing ones. Report verification gaps and
   limits that linked CI does not establish; omit inventories of passing checks.
 - Before posting, remove sentences that repeat linked material or add no decision,
-  evidence, required acknowledgment or next action. Do not add a separate summary
+  evidence or next action. Do not add a separate summary
   when the review or existing record already says it.
 
 ## Reviews and replies
@@ -32,8 +35,7 @@ needs no acknowledgment. The reviewer resolves their threads after checking.
 
 ## Required records
 
-Preserve the fields required by the active role card: readiness contracts,
-contract acknowledgments, decisions, blockers, permission denials and merge
-records still need their evidence. Record agreed decisions and dissent, not
+Preserve what the active role card requires: decision comments, blockers and
+reviews still need their evidence. Record agreed decisions and dissent, not
 interview transcripts. Follow Decisions in `agent/teams/README.md` and the
 approval requirements in `agent/teams/reviews.md`.
