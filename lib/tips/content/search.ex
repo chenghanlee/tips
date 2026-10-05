@@ -131,6 +131,7 @@ defmodule Tips.Content.Search do
 
   alias Tips.Accounts.{Scope, User}
   alias Tips.Content.{Environment, Model, Projection, Review, Tag, Tip, Vote}
+  alias Tips.Content.Search.Vector
   alias Tips.Repo
 
   @page_size 20
@@ -139,7 +140,6 @@ defmodule Tips.Content.Search do
   @review_cap 1000
   @rrf_k 60
   @dimensions 1024
-  @float32_max 3.402_823_466_385_288_6e38
   @excerpt_length 280
   @excerpt_lead 80
   @filters [tag_id: Tag, model_id: Model, environment_id: Environment]
@@ -342,29 +342,11 @@ defmodule Tips.Content.Search do
 
   defp vector(nil), do: {:ok, nil}
 
-  # pgvector stores float32 values and sums float32 products, so cosine needs a
-  # direction that survives both. A vector that rounds to zero has none. Any
-  # other is scaled by its largest magnitude before squaring, so no square
-  # overflows or underflows, then sent as a unit vector.
-  defp vector(values) when is_list(values) and length(values) == @dimensions do
-    with true <- Enum.all?(values, &finite?/1),
-         floats = Enum.map(values, &float32/1),
-         largest when largest > 0 <- floats |> Enum.map(&abs/1) |> Enum.max() do
-      scaled = Enum.map(floats, &(&1 / largest))
-      norm = :math.sqrt(Enum.reduce(scaled, 0.0, &(&1 * &1 + &2)))
-      {:ok, "[" <> Enum.map_join(scaled, ",", &Float.to_string(float32(&1 / norm))) <> "]"}
-    else
-      _zero_or_out_of_range -> {:error, :invalid_embedding}
+  defp vector(values) do
+    case Vector.literal(values) do
+      {:ok, literal} -> {:ok, literal}
+      :error -> {:error, :invalid_embedding}
     end
-  end
-
-  defp vector(_values), do: {:error, :invalid_embedding}
-
-  defp finite?(value), do: is_number(value) and abs(value) <= @float32_max
-
-  defp float32(value) do
-    <<float::float-32>> = <<value::float-32>>
-    float
   end
 
   defp active_filters(filters) do
