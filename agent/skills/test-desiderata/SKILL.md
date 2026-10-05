@@ -1,6 +1,6 @@
 ---
 name: test-desiderata
-description: Always load this skill before writing, adding, changing or reviewing tests, including tests within implementation, bug fixes, refactoring or code reviews. Apply Kent Beck's Test Desiderata and the repository's test-value rules even when the user does not explicitly mention testing or this skill.
+description: Always load before designing, writing, changing or reviewing tests, including tests within other tasks. Apply Test Desiderata and repository test policy.
 ---
 
 # Test desiderata
@@ -30,9 +30,10 @@ Start from the acceptance scenario or regression and inspect existing coverage.
 Choose the smallest addition that provides missing confidence; do not add a test
 just because code changed.
 
-Repository policy: use the testing trophy, integration first. For application
-TDD, write the failing ExUnit integration test before implementation and confirm
-it fails for the intended reason. Unit tests are for pure logic with wide blast
+Repository policy: use the testing trophy, integration first. Write the failing
+acceptance test before implementation and confirm it fails for the intended
+reason. Use ExUnit integration tests for Elixir; for agent tooling, follow
+`agent/teams/development.md` from the repository root. Unit tests are for pure logic with wide blast
 radius. Add new end-to-end tests, including browser journeys, for milestone gates;
 CI continues running existing coverage.
 

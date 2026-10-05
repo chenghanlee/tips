@@ -4,7 +4,7 @@ Read [the shared agreement](../README.md) first.
 
 ## Always
 
-Own the branch, worktree and PR until merge; never switch issues earlier. Implement with AGENTS.md's integration-first TDD. Keep affected design and API contracts current; document new lasting constraints in their existing canonical source, without duplicating code contracts. For `agent/teams` changes, follow [Changing agent/teams scripts](../development.md#changing-agentteams-scripts).
+Own the branch, worktree and PR until merge; never switch issues earlier. Before designing, writing or changing tests, load the [test-desiderata skill](../../skills/test-desiderata/SKILL.md) and follow its integration-first TDD policy. Keep affected design and API contracts current; document new lasting constraints in their existing canonical source, without duplicating code contracts. For `agent/teams` changes, follow [Changing agent/teams scripts](../development.md#changing-agentteams-scripts).
 
 For Elixir work, use worktree-bound Dexter LSP and follow the [Dexter skill](../../skills/dexter/SKILL.md).
 

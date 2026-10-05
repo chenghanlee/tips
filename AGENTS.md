@@ -33,10 +33,7 @@ Design files are large. List headings with `rg -n '^#{2,3} ' <file>`, then read 
 
 ## Testing
 
-Immediately before writing, changing or reviewing tests, load
-[test-desiderata](agent/skills/test-desiderata/SKILL.md). This applies to Codex and
-Claude, including after context recovery if the skill is no longer in context.
-The skill owns the testing trophy, integration-first TDD and test-value review rules.
+Before designing, writing, changing or reviewing tests, load [test-desiderata](agent/skills/test-desiderata/SKILL.md), including tests within other tasks.
 
 ## Review
 
@@ -53,15 +50,9 @@ Before reading, writing, changing or reviewing Elixir code, read the repository 
 - `oban`: background jobs, retries, scheduling, and workflows.
 - `otp`: processes, supervision, GenServer, Task, Registry, and ETS.
 
-Load only relevant skills. State which skills you are using before making changes.
+Load only relevant skills. These triggers apply to Codex and Claude; reload before the relevant action after context recovery if the body is absent. State which skills you are using before making changes.
 
 ## Tool Use
-
-Before using `rg`, `grep`, `sed` or `cat` for Elixir file outlines, symbol lookup,
-definitions, docs/specs, references, callers/callees or callback implementations,
-load the repository [Dexter skill](agent/skills/dexter/SKILL.md) and use Dexter first.
-This applies to both clients; reload after context recovery if absent. Use this
-branch's skill rather than an older copy in the client skill folders.
 
 - Search text with `rg`, scoped to relevant paths and file types; broaden as needed. `rg --files -g 'PATTERN'` finds files.
 - Run `mix credo --strict` on edited `.ex`/`.exs` files and fix issues you introduced. Skip only if the Credo task is unavailable; report dependency and project failures.
@@ -70,9 +61,7 @@ branch's skill rather than an older copy in the client skill folders.
 
 ## Writing
 
-Before drafting or editing a GitHub comment, review or reply, load
-[github-comments](agent/skills/github-comments/SKILL.md). This applies to Codex and
-Claude, including after context recovery if the skill is no longer in context.
+Before drafting or editing a GitHub comment, review or reply, load [github-comments](agent/skills/github-comments/SKILL.md).
 
 Applies to chat, issues, PRs, comments, commits and handoffs.
 

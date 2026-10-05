@@ -26,7 +26,7 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [Dexter skill](../
 
 Include these reminders directly in each developer's and tester's initial preparation prompt, after the assignment reference:
 
-- Dexter first: use the CLI (`"$TIPS_DEXTER"`) for Elixir file outlines, definitions, docs/specs, references, call hierarchy and callback implementations. Follow the `dexter` skill for when scoped `rg`, `grep` or `sed` is appropriate, including fallback.
+- Dexter first: use the CLI (`"$TIPS_DEXTER"`) for Elixir file outlines, definitions, docs/specs, references, call hierarchy and callback implementations. Follow the [Dexter skill](../../skills/dexter/SKILL.md) for when scoped `rg`, `grep` or `sed` is appropriate, including fallback.
 - Ask lead for consultation early: before acting on ambiguous, conflicting, incomplete or apparently wrong task information, or whenever stuck. Do not wait for two failed repairs.
 - After two consecutive failed repairs of the same failure, stop affected repairs and send me both attempts, results and current code state, including unpushed changes. I take over diagnosis and direct the next attempt; no third repair without my direction. Initial TDD red and diagnostic reruns do not count.
 

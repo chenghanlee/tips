@@ -6,10 +6,10 @@ Humans: perform setup from the repository root. Agents use the [operating agreem
 
 Install Python 3.12 and [configured client CLIs](config.toml). Authenticate clients and GitHub CLI (`gh`) for this repository. Merges require GNU `timeout` on `PATH`: macOS `brew install coreutils`; Linux distribution `coreutils` package. Coding agents also need `unbuffer` (Expect): the Elixir skill requires it on Mix commands.
 
-The user maintains the skills by hand as plain folders in the main checkout. Both locations are Git-ignored:
+The user maintains third-party skills in the main checkout. Both native locations are Git-ignored:
 
-- `.agents/skills/`: `dexter`, `elixir`, `phoenix`, `ecto`, `otp`, `oban`, `herdr`, `grill-me` and `grilling`, for Codex.
-- `.claude/skills/`: `dexter`, the same five Elixir skills, `grill-me` and `grilling`, for Claude.
+- `.agents/skills/`: `elixir`, `phoenix`, `ecto`, `otp`, `oban`, `herdr`, `grill-me` and `grilling`, for Codex.
+- `.claude/skills/`: the same five Elixir skills, `grill-me` and `grilling`, for Claude.
 
 Before using the [brief consensus workflow](README.md#brief-consensus), install `grill-me/SKILL.md` and `grilling/SKILL.md` in both skill directories above. Copy the existing grilling instructions into each `grilling/SKILL.md`. Keep the wrapper's frontmatter, but replace its Skill-tool-only body with `Read and follow the grilling skill from ../grilling/SKILL.md.` This explicit relative path works without assuming a native Skill tool. These user-owned files are ignored and are not installed by this PR. Verify `/grill-me` in Claude Code and `$grill-me` in Codex load both files, rather than merely accepting the prompt.
 
@@ -28,6 +28,98 @@ The pilot must exercise:
 Send questions and answers directly through Herdr, with no file or document-link handoffs during the interview. Record failures and unresolved limits; do not substitute documentation checks for this pilot or assign live implementation through an unverified flow.
 
 Update matching copies together, then check that the skills appear in each client's skill list. Provisioning links the main checkout's `.agents/skills/` into each worktree and checks only that the directory exists, not the individual skills.
+
+### Repository skills
+
+`agent/skills/` owns `github-comments`, `test-desiderata` and `dexter`. Both clients
+load main-checkout bodies through native links. Worktrees share main's skills;
+a branch editing a skill does not isolate its native version. Provisioning still
+links the whole `.agents/skills` directory; no helper change is needed.
+
+Pass the candidate pilot below before merging. With teams idle, merge and install
+in the same sitting, then start fresh sessions: live sessions retain old skill
+lists. The PR must name installation as a merge step. Until installation, native
+Dexter still points at the old copy. Only the user runs these commands in the real
+main checkout. They preserve previous entries under ignored `tmp/`, outside native
+discovery, and leave other skills alone. Do not change skills under live agents.
+
+Run from the main checkout root after the three tracked bodies exist:
+
+```bash
+python3 - <<'PYINSTALL'
+from pathlib import Path
+import os
+import tempfile
+
+root = Path.cwd()
+names = ('github-comments', 'test-desiderata', 'dexter')
+folders = (root / '.agents/skills', root / '.claude/skills')
+for name in names:
+    assert (root / 'agent/skills' / name / 'SKILL.md').is_file(), name
+for folder in folders:
+    assert not folder.parent.is_symlink() and not folder.is_symlink(), folder
+    assert not folder.exists() or folder.is_dir(), folder
+(root / 'tmp').mkdir(exist_ok=True)
+backup = Path(tempfile.mkdtemp(prefix='skills-before-install-', dir=root / 'tmp'))
+for folder in folders:
+    folder.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        entry = folder / name
+        target = '../../agent/skills/' + name
+        if entry.is_symlink() and os.readlink(entry) == target:
+            continue
+        if entry.exists() or entry.is_symlink():
+            saved = backup / folder.parent.name / name
+            saved.parent.mkdir(parents=True, exist_ok=True)
+            entry.rename(saved)
+        entry.symlink_to(target, target_is_directory=True)
+print('Previous entries preserved at', backup)
+PYINSTALL
+```
+
+Check both clients list all three names once and load the tracked bodies. To roll
+back, remove only the three links created above and move saved entries back to
+their original locations; restart sessions. Never delete a replacement folder
+that someone has since installed.
+
+### Skill pilot
+
+Use a separate clone outside the real repository tree at the candidate head.
+Install the native links there with the same commands. Link existing Elixir and
+grilling skill folders into the clone without editing their contents. Add a
+worktree under the clone's `.worktrees/` and link its `.agents/skills` to the
+clone's directory, exactly as provisioning does. Run worker tasks there. This
+tests nested links and Claude parent discovery without the real main's stale copy.
+
+Use the configured Claude and Codex models from `config.toml`; record client,
+model and version. Run three ordinary prompts per client: add a test, find a
+function's callers, and draft a review into `tmp/review.json` without posting.
+Prompts must not name skills, Dexter, testing policy or writing style. After a
+load, compact each client's session and give a second task of the same kind.
+Do not replace compaction with a new session or a hand-written summary.
+
+Define failures before running:
+
+- Tests: test design, edits or a review verdict before loading the skill body.
+- Dexter: source navigation covered by its operation table before loading the
+  body, with any tool. Literal-text search is not a navigation miss.
+- Comments: drafting a comment or review body before loading the skill.
+- Discovery: missing or duplicate names, stale bodies, broken repository paths,
+  or Codex failing to follow the nested links.
+
+Record transcript order, body paths/content and native-entry versus AGENTS.md
+path loads. The route does not establish which context triggered it. Keep all
+three native entries. Verify review format against `reviews.md`, omit repeated
+diff descriptions and passing-check inventories, and compare length with one
+recent comparable comment. No mandatory Dexter `Ran:` line: self-reports are not
+tool-use evidence, and reviewers may lack worker traces.
+
+A miss blocks promotion of that skill. Allow at most two corrections; rerun the
+failed case plus one different case each time. After two failed corrections,
+restore that skill's prior always-loaded policy and report the failed extraction.
+Mixed results are allowed. Investigate topology only when evidence implicates it;
+a trigger miss alone does not justify rewriting provisioning. Eight single runs
+show no observed miss, not reliable adherence or measured token savings.
 
 Install only the `mix-credo` plugin, for the clients you use:
 

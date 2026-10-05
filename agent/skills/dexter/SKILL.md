@@ -1,6 +1,6 @@
 ---
 name: dexter
-description: Navigate Elixir source with the Dexter LSP CLI. Load before using rg, grep, sed or cat for file outlines, symbols, definitions, docs, references, call hierarchy or callback implementations.
+description: Load before reading, searching, writing, changing or reviewing Elixir code. Use Dexter LSP first for source navigation with any tool.
 ---
 
 # Dexter
@@ -9,7 +9,8 @@ Read-only Elixir language server CLI, bound to this worktree as `"$TIPS_DEXTER"`
 
 ## Before text tools
 
-Before using `rg`, `grep`, `sed`, `cat` or a whole-file read for an Elixir
+Before using shell tools (`rg`, `grep`, `sed`, `cat`), native Read/Grep tools
+or a whole-file read for an Elixir
 navigation goal in the table below, use its matching Dexter operation first.
 This applies to Codex and Claude. Reuse an answer while the file and checkout
 are unchanged; then read only the source range you need.
@@ -58,6 +59,8 @@ If Dexter is missing, unavailable or denied, report the exact error once and use
 4. For call hierarchy, check `selected:` shows your callable and arity. A default-argument head selects only the maximum arity.
 5. Take positions again after an edit or checkout change.
 
+One line down can give `cursor: review`, a variable, instead of `cursor: changeset`, the function.
+
 ## Before changing a name, arity or return shape
 
 Private helpers included.
@@ -80,7 +83,7 @@ Private helpers included.
 - Index discovery excludes root `tmp/` and nested checkouts, except configured Elixir sources. `symbols` reads scratch files in the bound worktree. Files in another checkout are refused.
 - Dexter reads saved files and reports no compiler errors. Run Mix compile, Credo and tests.
 - For completeness of call hierarchy or `implementation`, read the
-  [LSP limits](../../lsp/README.md#limits).
+  Limits section in `agent/lsp/README.md` from the repository root.
 
 ## Reindex
 
