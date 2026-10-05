@@ -29,7 +29,12 @@ config :tips, Tips.Repo, timeout: 2_000
 config :tips, Oban,
   repo: Tips.Repo,
   queues: [media: 1, embeddings: 1, maintenance: 1],
-  cron: [crontab: [{"* * * * *", Tips.Workers.ExpireRegistrations}]],
+  cron: [
+    crontab: [
+      {"* * * * *", Tips.Workers.ExpireRegistrations},
+      {"* * * * *", Tips.Workers.EmbedSearch}
+    ]
+  ],
   # Terminal jobs stay seven days for investigation; the minute job would otherwise grow the table.
   pruner: [max_age: {7, :days}]
 
