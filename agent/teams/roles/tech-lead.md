@@ -24,7 +24,7 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [Dexter skill](../
 
 ## Pushed head
 
-At first developer handoff, request advancement of the existing tester's checkout from the agreed base to that SHA. For later heads, request advancement once the tester's last review handoff is complete. Do not advance during an unfinished grilling round or active review. Include the authorized tester handoff: evidence link, exact SHA, recipient and action. Your recorded evidence links the final contract and the prior verdict, if any, and states the review SHA, changes since that verdict and verification gaps. Give the completion command at the first dispatch; later dispatches link it unless it changes. Lead TPM advances the checkout and sends that handoff to the tester; it reports only failures. No further dispatch or acknowledgment from you is needed.
+At first developer handoff, request advancement of the existing tester's checkout from the agreed base to that SHA. For later heads, request advancement once the tester's last review handoff is complete. Do not advance during an unfinished grilling round or active review. Include the authorized tester handoff: PR link, exact SHA, recipient, action and any verification gap the PR does not show. The PR, its reviews and the contract carry the rest; write no dispatch comment. Lead TPM advances the checkout and sends that handoff to the tester; it reports only failures. No further dispatch or acknowledgment from you is needed.
 
 Your own checkout advances at Merge. Request an earlier advance only to inspect a head for a concrete design or triage question.
 
@@ -68,7 +68,7 @@ After the watch succeeds, verify the completed runs' revision and commands cover
 
 If branch update conflicts, relay developer's fetch request to lead TPM. Developer resolves; tester reviews resolution; restart this sequence. If `main` moves before merge, the strict gate rejects: update, review base delta and republish status from a new approval on that head that says what the base delta changes.
 
-If you execute the merge, record PR, reviewed head, merge SHA and evidence on the issue; notify lead TPM. Otherwise the executor records, except lead TPM records user-executed merges. Never synchronously watch `main` or automatically revert its changes.
+After the merge, send lead TPM the PR link and merge SHA; the PR already records the reviewed head, approval and checks. Never synchronously watch `main` or automatically revert its changes.
 
 ## Blocked outside the team
 

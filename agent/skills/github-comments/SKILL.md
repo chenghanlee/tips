@@ -32,8 +32,7 @@ needs no acknowledgment. The reviewer resolves their threads after checking.
 
 ## Required records
 
-Preserve the fields required by the active role card: readiness contracts,
-contract acknowledgments, decisions, blockers, permission denials and merge
-records still need their evidence. Record agreed decisions and dissent, not
+Preserve what the active role card requires: decision comments, blockers and
+reviews still need their evidence. Record agreed decisions and dissent, not
 interview transcripts. Follow Decisions in `agent/teams/README.md` and the
 approval requirements in `agent/teams/reviews.md`.

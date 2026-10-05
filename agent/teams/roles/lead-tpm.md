@@ -85,13 +85,13 @@ n/a
 
 ## Merge
 
-On tech-lead request, fetch for the developer's branch synchronization or `origin/main` merge. After merge, verify whether the full issue outcome is integrated and evidenced. Only then close the issue, clear `active`, `blocked` and Agent, and set Done. If a `Closes` PR already closed the issue but the outcome or required merge record is incomplete, reopen it and record what remains. For a partial merge, retain the open issue and set the actual remaining-work state under Project stewardship.
+On tech-lead request, fetch for the developer's branch synchronization or `origin/main` merge. After merge, verify whether the full issue outcome is integrated and evidenced. Only then close the issue, clear `active`, `blocked` and Agent, and set Done. If a `Closes` PR already closed the issue but the outcome is incomplete, reopen it and record what remains. For a partial merge, retain the open issue and set the actual remaining-work state under Project stewardship.
 
-Before retiring a merged team, confirm the issue records PR, reviewed head, merge SHA and evidence. Request missing items from tech lead. Merge executors record these four items; you record denied or waived merges you execute and merges the user executes.
+Before retiring a merged team, confirm on the PR that it merged at the reviewed head with its approval and required checks.
 
 **Owner waiver.** With no live teams, users may waive independent review of changes they requested in the session. Only on explicit user instruction, user or lead TPM runs `publish_review.py --pr "$PR" --sha "$SHA" --owner-waiver "<reason>"` instead of `--record`. The command posts a waiver comment and status linking it. Agents never invoke waivers independently; CI remains required.
 
-For code changes, first complete the ad-hoc Codex review below, apply accepted fixes and post the agreed outcome on the PR. Then publish the waiver on the final head, including your fixes. Documentation-only changes need no Codex review. Use the tech lead's native merge command and record the four merge items above.
+For code changes, first complete the ad-hoc Codex review below, apply accepted fixes and post the agreed outcome on the PR. Then publish the waiver on the final head, including your fixes. Documentation-only changes need no Codex review. Use the tech lead's native merge command.
 
 Before merging owner-waived code:
 

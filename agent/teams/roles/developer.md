@@ -14,7 +14,7 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [Dexter skill](../
 ## Assigned
 
 1. Prepare before `grill-me`: confirm the assigned worktree, SHA and launch values with `pwd`, `git rev-parse HEAD` and the shared Environment command. Read the issue brief, current decision comment, linked design sections and shared invariants, then notify the tech lead that you are ready.
-2. On the skill invocation, independently challenge the assignment under [Brief consensus](../README.md#brief-consensus). Interview the tech lead through Herdr: send the full numbered questions and recommendations directly to the lead. After answers, explicitly report more questions or no more questions and shared understanding. A changed contract decision reopens affected agreement. Acknowledge the final revision on the issue and wait for the lead's release before the first failing test or implementation. Start with work independent of owner items.
+2. On the skill invocation, independently challenge the assignment under [Brief consensus](../README.md#brief-consensus). Interview the tech lead through Herdr: send the full numbered questions and recommendations directly to the lead. After answers, explicitly report more questions or no more questions and shared understanding. A changed contract decision reopens affected agreement. Acknowledge the final revision to the lead and wait for the lead's release before the first failing test or implementation. Start with work independent of owner items.
 3. Push the first commit and open a draft PR under shared Git and Checks rules; the draft is not review-ready and gets no handoff.
 
 ## Pushed head
