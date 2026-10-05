@@ -104,7 +104,7 @@ Read provider settings by path from main checkout's `.env`. Only the user adds c
 
 Every handoff sender:
 
-1. Write a GitHub comment only for a decision, a review finding or a blocker. The issue, PR, checks and Project already record the rest; do not copy them into comments.
+1. Comment on GitHub only for a decision, a review finding or a blocker, as [github-comments](../skills/github-comments/SKILL.md) says.
 2. Send one line via `herdr agent prompt`: the relevant issue, PR or comment link, SHA, action, owner (next acting role), and any constraint that changes what the recipient must do now. Link the existing contract instead of copying it. Prompt recipients separately.
 3. Before ending the turn, verify the Herdr command succeeded. On failure, report the error; never claim delivery.
 
