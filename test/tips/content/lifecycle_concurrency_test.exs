@@ -9,11 +9,13 @@ defmodule Tips.Content.LifecycleConcurrencyTest do
   import Tips.AccountsFixtures
   import Tips.ContentFixtures
   import Tips.LockSessions
+  import Tips.ModerationFixtures
   import Tips.VisibilityFixtures
 
+  alias Tips.Accounts
   alias Tips.Accounts.Scope
   alias Tips.Content
-  alias Tips.Content.{Review, Tip}
+  alias Tips.Content.{Flag, Review, Tip}
   alias Tips.Repo
 
   for operation <- [:delete, :hide, :restore], parent <- [:live, :deleted] do
@@ -50,6 +52,45 @@ defmodule Tips.Content.LifecycleConcurrencyTest do
         assert live == live_after(operation)
       end)
     end
+  end
+
+  test "a moderation case is one snapshot when a hide commits between its reads" do
+    data = setup_rows(:hide, :live)
+
+    {ref, reported, other} =
+      unboxed(fn ->
+        token = Accounts.generate_user_session_token(data.moderator)
+        {:ok, _scope, ref, _inserted_at} = Accounts.get_scope_by_session_token(token)
+        reported = flag_fixture(data.author, review_id: data.review.id)
+        {ref, reported, flag_fixture(data.moderator, review_id: data.review.id)}
+      end)
+
+    # Holding the reports table stops the case read after it has read the review.
+    holder = open(data.supervisor)
+    run(holder, fn -> Repo.query!("LOCK TABLE flags IN ACCESS EXCLUSIVE MODE") end)
+
+    read =
+      call(data.supervisor, fn -> Content.get_moderation_case(ref, :review, data.review.id) end)
+
+    await_blocked(read, holder)
+
+    # Meanwhile a real hide commits a new version and resolves one report.
+    moderator = Scope.for_user(data.moderator)
+
+    assert {:ok, %{edit_version: 2, outcome: :changed}} =
+             run(holder, fn ->
+               Content.hide_content(moderator, :review, data.review.id, 1, [reported.id])
+             end)
+
+    commit(holder)
+
+    assert {:ok, %{edit_version: 1, state: :live, reports: reports}} = finish(read)
+    assert Enum.map(reports, & &1.id) == [reported.id, other.id]
+
+    assert {:ok, %{edit_version: 2, state: :hidden, reports: [%{id: other_id}]}} =
+             unboxed(fn -> Content.get_moderation_case(ref, :review, data.review.id) end)
+
+    assert other_id == other.id
   end
 
   defp setup_rows(operation, parent) do
@@ -135,6 +176,7 @@ defmodule Tips.Content.LifecycleConcurrencyTest do
         from(r in Review, where: r.user_id in ^user_ids or r.tip_id in ^tip_ids, select: r.id)
       )
 
+    Repo.delete_all(from(f in Flag, where: f.review_id in ^review_ids or f.tip_id in ^tip_ids))
     Repo.delete_all(from(s in "review_search", where: s.review_id in ^review_ids))
     Repo.delete_all(from(s in "tip_search", where: s.tip_id in ^tip_ids))
     Repo.delete_all(from(r in Review, where: r.id in ^review_ids))
