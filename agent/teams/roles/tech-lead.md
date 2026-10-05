@@ -14,7 +14,7 @@ When either worker escalates two failed repairs, use AGENTS.md Problem Solving t
 
 After the initial assignment, repeat only the relevant reminder below after context loss or a reported lapse.
 
-For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](../../../AGENTS.md#skills).
+For Elixir work, use worktree-bound Dexter LSP and follow the [Dexter skill](../../skills/dexter/SKILL.md).
 
 ## Assigned
 

@@ -46,7 +46,7 @@ The skill owns the testing trophy, integration-first TDD and test-value review r
 
 ## Skills
 
-Before reading, writing, changing or reviewing Elixir code, read `.agents/skills/dexter/SKILL.md` and the `elixir` skill, then any relevant skills below:
+Before reading, writing, changing or reviewing Elixir code, read the repository [Dexter skill](agent/skills/dexter/SKILL.md) and the `elixir` skill, then any relevant skills below:
 
 - `phoenix`: LiveView, components, controllers, routes, Plug, channels, and PubSub.
 - `ecto`: schemas, changesets, queries, transactions, and migrations.
@@ -56,6 +56,12 @@ Before reading, writing, changing or reviewing Elixir code, read `.agents/skills
 Load only relevant skills. State which skills you are using before making changes.
 
 ## Tool Use
+
+Before using `rg`, `grep`, `sed` or `cat` for Elixir file outlines, symbol lookup,
+definitions, docs/specs, references, callers/callees or callback implementations,
+load the repository [Dexter skill](agent/skills/dexter/SKILL.md) and use Dexter first.
+This applies to both clients; reload after context recovery if absent. Use this
+branch's skill rather than an older copy in the client skill folders.
 
 - Search text with `rg`, scoped to relevant paths and file types; broaden as needed. `rg --files -g 'PATTERN'` finds files.
 - Run `mix credo --strict` on edited `.ex`/`.exs` files and fix issues you introduced. Skip only if the Credo task is unavailable; report dependency and project failures.

@@ -6,7 +6,7 @@ Read [the shared agreement](../README.md) first.
 
 Keep one session per issue, advanced in place to each dispatched SHA. Lead TPM replaces the session only for loss, a wrong launch environment or a rejected implementation design. Review in order: local correctness; callers, related features and tests; end-to-end behaviour. Independently run missing relevant checks in the assigned environment; for `agent/teams` Python follow [Changing agent/teams scripts](../development.md#changing-agentteams-scripts). Message developer and tech lead freely. For `probe`, pass once.
 
-For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](../../../AGENTS.md#skills).
+For Elixir work, use worktree-bound Dexter LSP and follow the [Dexter skill](../../skills/dexter/SKILL.md).
 
 - Ask the tech lead when stuck, facing ambiguity or conflicting information, or needing a stronger model's advice.
 - Apply shared Required feedback's two-failed-repair stop; hand off to the tech lead, not the developer.

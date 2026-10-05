@@ -13,7 +13,7 @@ This is a read-only beta. Rename and other edits are not offered.
 `"$TIPS_DEXTER" query --help` and `"$TIPS_DEXTER" lookup --help` are the
 contract for syntax, output, caps and exit status. Every checkout shares one
 binary, so its help describes what you are running. Where this guide differs,
-the help is right. The `dexter` skill ([AGENTS.md](../../AGENTS.md#skills)) says when to use Dexter.
+the help is right. The [Dexter skill](../skills/dexter/SKILL.md) says when to use Dexter.
 
 Run `"$TIPS_DEXTER" query <operation> <file> <line> <column>` from your shell:
 
