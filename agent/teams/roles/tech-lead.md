@@ -24,7 +24,7 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [Dexter skill](../
 
 ## Pushed head
 
-At first developer handoff, request advancement of the existing tester's checkout from the agreed base to that SHA. For later heads, request advancement once the tester's last review handoff is complete. Do not advance during an unfinished grilling round or active review. Include the authorized tester handoff: PR link, exact SHA, recipient, action and any verification gap the PR does not show. The PR, its reviews and the contract carry the rest; write no dispatch comment. Lead TPM advances the checkout and sends that handoff to the tester; it reports only failures. No further dispatch or acknowledgment from you is needed.
+At first developer handoff, request advancement of the existing tester's checkout from the agreed base to that SHA. For later heads, request advancement once the tester's last review handoff is complete. Do not advance during an unfinished grilling round or active review. Include the authorized tester handoff: PR link, exact SHA, recipient and action. Keep verification gaps in the PR description or a review and link them; write no dispatch comment. Lead TPM advances the checkout and sends that handoff to the tester; it reports only failures. No further dispatch or acknowledgment from you is needed.
 
 Your own checkout advances at Merge. Request an earlier advance only to inspect a head for a concrete design or triage question.
 
