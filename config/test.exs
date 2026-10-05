@@ -84,3 +84,9 @@ config :phoenix,
   sort_verified_routes_query_params: true
 
 config :tips, Oban, testing: :manual
+
+# Embedding requests reach Req.Test stubs, never the network, even with TIPS_REAL_PROVIDERS=1.
+# An unstubbed request raises.
+config :tips, Tips.Content.Search.EmbeddingProvider,
+  api_key: "synthetic-test-key",
+  plug: {Req.Test, Tips.Content.Search.EmbeddingProvider}

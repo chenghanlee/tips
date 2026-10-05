@@ -5,7 +5,8 @@ It is an Elixir/Phoenix application with PostgreSQL.
 
 The app has a placeholder home page, passwordless magic-link sign-in, session-family
 management, admission and content/search foundations, a scheduled registration-cleanup
-job and a database health check. Publishing and editing are not implemented yet.
+job and a database health check. The Content context can publish, edit and delete
+text and let moderators hide or restore it; no web screens use these yet.
 The design documents describe target product behavior; GitHub issues and PRs track
 what has been implemented.
 
