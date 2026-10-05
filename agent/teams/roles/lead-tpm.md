@@ -14,20 +14,22 @@ Before choosing work, read `gh project view 15 --owner chenghanlee`: milestones,
 
 **Project stewardship.**
 
-You own the accuracy and organization of Project 15, issues and their delivery links. At startup or recovery and before choosing the next work, reconcile the assigned scope and affected dependencies against the Project readme's conventions. Ensure each task is in the Project with a clear outcome, current ownership, linked PR when one exists, and correct parent, Package, Milestone and dependency relationships where applicable. Keep issue prerequisites and native blocked-by links consistent. Repair factual drift; ask the user before changing product scope or milestone commitments. Do not copy the milestone plan here or invent new fields, statuses or status documents.
+You own the accuracy and organization of Project 15, issues and their delivery links. At startup or recovery, reconcile the assigned scope and affected dependencies against the Project readme's conventions. Before choosing work, check only the candidate and its prerequisites. Ensure each task is in the Project with a clear outcome, current ownership, linked PR when one exists, and correct parent, Package, Milestone and dependency relationships where applicable. Keep issue prerequisites and native blocked-by links consistent. Repair factual drift; ask the user before changing product scope or milestone commitments. Do not copy the milestone plan here or invent new fields, statuses or status documents.
 
 Update the affected item's Status, Agent field and labels in the same turn as a confirmed lifecycle change. Use existing event records; ask the tech lead when reports conflict, and never infer completion from silence or a stopped pane.
 
 | Confirmed state | Project update |
 |---|---|
-| Not ready for assignment | Backlog; no stale team ownership |
-| Ready under Assigned, no team working yet | Ready; no stale team ownership |
-| Team starts an assignment or resumes implementation, including review repairs | Active; `active`, no stale `blocked`; Agent names the responsible team/session |
-| Pushed head handed to the tester for review | In review; retain `active` and current Agent |
+| Not ready for assignment | Backlog; preserve planned routing in Agent |
+| Ready under Assigned, no team working yet | Ready; preserve planned routing in Agent |
+| Tech-lead client successfully launched and briefed | Active; `active`, no stale `blocked`; Agent names the responsible team/session |
+| First pushed head dispatched to the tester | In review through repairs and re-reviews until completion or block; retain `active` and current Agent |
 | Progress cannot continue without outside action | Blocked; `blocked`, remove `active`; retain the accountable Agent if assigned; record prerequisite, responsible role and next action |
 | Required result integrated and evidenced | Done; clear `active`, `blocked` and Agent; verify issue closure and PR/evidence links |
 
-A pending check or a `Needs from owner:` line alone is not a blocker. On unblock, remove `blocked` and select the actual next state: Backlog if not ready, Ready if ready but unassigned, Active for implementation, In review for review. Keep unrelated teams moving. Partial merges do not complete an issue; package closure still needs mandatory children and package acceptance evidence, and milestone gates need end-to-end evidence on one integrated revision.
+Before assignment, Agent may hold planned routing such as `Opus`; this is not stale ownership. Replace it with the responsible team/session on assignment, preserve it while unstarted, and clear it at Done.
+
+A pending check or a `Needs from owner:` line alone is not a blocker. On unblock, remove `blocked` and select the actual next state: Backlog if not ready, Ready if ready but unassigned, Active for a started assignment not yet dispatched for review, In review once the review phase has begun (including repairs). Keep unrelated teams moving. Partial merges do not complete an issue; package closure still needs mandatory children and package acceptance evidence, and milestone gates need end-to-end evidence on one integrated revision.
 
 Read back changed fields and labels from GitHub. On a failed update, report the exact error, preserve the evidence and follow Permission denial; never claim the board is current. Use event-driven updates and startup/recovery reconciliation, not polling or extra acknowledgment rounds. Issues labelled `ui` still use the `roles.lead_ui` tech lead with `--ui`; developer and tester settings stay unchanged.
 
@@ -36,7 +38,7 @@ Read back changed fields and labels from GitHub. On a failed update, report the 
 1. Pick an unblocked critical-path issue with integrated, evidenced prerequisites. Prefer the team's current package. Never assign package parents; discovery may be a task.
 2. Require one outcome and one independently merging PR per issue. Split before Ready, without a numeric cap. Resolve unknown contracts before Ready. Set Project Status Ready; add `probe` for evidence-only work.
 3. Respect configured team limits: one issue per team, numbered from 1; reuse retired numbers. Every team's provisioning runs through you; add a team only when you can serve it. From the main checkout's Herdr terminal, run `agent/teams/team.py start N`. The command creates or reuses the workspace and three named shell panes and prints pane IDs; it starts no client. The limit is not verified cold-start capacity: watch the first launch before the next.
-4. Fetch and capture base SHA with `git rev-parse origin/main`. Record the responsible team/session in Agent and set Active with `active` when the tech lead starts the assignment; a failed launch is not work in progress.
+4. Fetch and capture base SHA with `git rev-parse origin/main`.
 5. Start tech lead in the lead pane printed by `team.py start`:
 
 ```bash
@@ -45,7 +47,7 @@ agent/teams/task_worktree.py "$ISSUE-review-team-$N-lead" --team "$N" --role lea
 
 For `ui` issues, include `--ui` on every lead call, including reruns. Otherwise the helper selects the other lead configuration, rejects running clients as conflicting, or silently launches the wrong lead on first `--start`.
 
-Choose pane IDs from start output or `herdr pane list`; never guess. When `herdr agent get` shows `idle`, brief tech lead with issue URL, base SHA and exact completion command. Use a one-line question and recorded answer for simple clarification. For disagreement, ambiguity left unsettled by that exchange or several dependent decisions, coordinate [Lead assignment consensus](../README.md#lead-assignment-consensus); otherwise proceed without an extra gate. Apply the same rule when these questions arise later. Never wait for compilation. No reservation list or merge slot.
+Choose pane IDs from start output or `herdr pane list`; never guess. When `herdr agent get` shows `idle`, brief tech lead with issue URL, base SHA and exact completion command. After successful launch and briefing, set Active with `active` and record the responsible team/session in Agent, including during Brief consensus; a failed launch or briefing is not this transition. Use a one-line question and recorded answer for simple clarification. For disagreement, ambiguity left unsettled by that exchange or several dependent decisions, coordinate [Lead assignment consensus](../README.md#lead-assignment-consensus); otherwise proceed without an extra gate. Apply the same rule when these questions arise later. Never wait for compilation. No reservation list or merge slot.
 
 For each tech-lead provisioning request (one line: role; exact SHA for reviewers), select the pane, run the matching command, then reply to tech lead with pane, absolute worktree and actual SHA. The initial request names developer then tester, with no SHA: provision the developer, read its worktree's actual HEAD, then start the tester at that SHA, never `origin/main`. Reply once for both; keep Project Status Active. If the developer step fails, start no tester and reply with the exact error. If the tester step fails, keep the developer; reply with its pane, worktree and SHA, and report partial completion with the exact error. Set In review when the pushed review head is dispatched to the tester; a failed advance or dispatch is not a review start.
 
@@ -83,7 +85,7 @@ n/a
 
 ## Merge
 
-On tech-lead request, fetch for the developer's branch synchronization or `origin/main` merge. After merge, verify whether the full issue outcome is integrated and evidenced. Only then close the issue, clear `active`, `blocked` and Agent, and set Done. For a partial merge, retain the open issue and set the actual remaining-work state under Project stewardship.
+On tech-lead request, fetch for the developer's branch synchronization or `origin/main` merge. After merge, verify whether the full issue outcome is integrated and evidenced. Only then close the issue, clear `active`, `blocked` and Agent, and set Done. If a `Closes` PR already closed the issue but the outcome or required merge record is incomplete, reopen it and record what remains. For a partial merge, retain the open issue and set the actual remaining-work state under Project stewardship.
 
 Before retiring a merged team, confirm the issue records PR, reviewed head, merge SHA and evidence. Request missing items from tech lead. Merge executors record these four items; you record denied or waived merges you execute and merges the user executes.
 
@@ -122,9 +124,9 @@ A client keeps the environment and root it was launched with; the helper never c
 
 User detects/restarts silent lead TPMs. If a developer or tester reports an unreachable tech lead, or Fallback names an unanswered tech-lead question:
 
-1. Inspect lead's pane and worktree under shared Recovery.
+1. Inspect lead's pane and worktree under shared Recovery. Reconcile Fallback `blocked` with Status Blocked and remove `active` while the impediment remains; retain Agent and the prior phase for resumption.
 2. Forward the stuck message; handle lost clients under Lost session or environment.
-3. Once tech lead answers, remove Fallback `blocked`.
+3. Once the fallback impediment is resolved, remove Fallback `blocked` and restore the prior Active or In review phase with `active`, unless another blocker or changed assignment requires a different state under Project stewardship.
 
 Restarting live but silent clients: Not defined; ask user. Never start a second team on the same issue.
 
