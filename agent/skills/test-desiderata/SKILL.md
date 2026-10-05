@@ -1,6 +1,6 @@
 ---
 name: test-desiderata
-description: Write, change and review tests using Kent Beck's Test Desiderata and the repository's test-value rules. Load immediately before this work.
+description: Always load this skill before writing, adding, changing or reviewing tests, including tests within implementation, bug fixes, refactoring or code reviews. Apply Kent Beck's Test Desiderata and the repository's test-value rules even when the user does not explicitly mention testing or this skill.
 ---
 
 # Test desiderata
