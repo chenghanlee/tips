@@ -274,6 +274,18 @@ defmodule TipsWeb.UserLive.LoginTest do
       %{user: user, conn: log_in_user(conn, user)}
     end
 
+    test "a forged address cannot replace the account's own address", %{conn: conn, user: user} do
+      flush_emails()
+      {:ok, lv, _html} = live(conn, ~p"/users/log-in")
+      forged = %{"user" => %{"email" => "other-review@example.com"}}
+
+      for _attempt <- 1..2 do
+        assert render_submit(lv, "submit_magic", forged) =~ @requested
+        assert email_value?(lv, user.email)
+        assert_email_sent(to: user.email)
+      end
+    end
+
     test "shows login page with email filled in", %{conn: conn, user: user} do
       {:ok, _lv, html} = live(conn, ~p"/users/log-in")
 

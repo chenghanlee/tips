@@ -84,7 +84,11 @@ defmodule TipsWeb.UserLive.Login do
   end
 
   @impl true
-  def handle_event("submit_magic", %{"user" => %{"email" => email}}, socket) do
+  def handle_event("submit_magic", %{"user" => %{"email" => typed}}, socket) do
+    # Reauthentication always uses the signed-in account's own address; the event cannot
+    # replace it.
+    email = reauthentication_email(socket.assigns.current_scope) || typed
+
     # Charged before the lookup, for known and unknown addresses alike. Every answer stays
     # on the form with the email and the register link's destination.
     socket = clear_flash(socket)
@@ -116,6 +120,9 @@ defmodule TipsWeb.UserLive.Login do
       {:error, {:delivery, _category}} -> requested(socket, email)
     end
   end
+
+  defp reauthentication_email(%{user: %User{email: email}}), do: email
+  defp reauthentication_email(nil), do: nil
 
   defp requested(socket, email), do: socket |> put_flash(:info, @requested) |> assign_email(email)
 
