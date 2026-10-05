@@ -165,7 +165,7 @@ defmodule TipsWeb.TipLive.ShowTest do
 
       for {render, html, _title} <- renders(conn, path) do
         assert attr(html, "#contribution-control a", "Sign in to review", "href") ==
-                 "/users/log-in",
+                 "/users/log-in?" <> URI.encode_query(return_to: path),
                render
       end
 

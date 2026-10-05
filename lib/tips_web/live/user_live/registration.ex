@@ -79,9 +79,7 @@ defmodule TipsWeb.UserLive.Registration do
   end
 
   def mount(params, session, socket) do
-    return_to =
-      UserAuth.allowed_return_to(params["return_to"]) ||
-        UserAuth.allowed_return_to(session["user_return_to"])
+    return_to = UserAuth.return_to(params["return_to"], session["user_return_to"])
 
     changeset =
       Accounts.change_user_registration(%User{}, %{handle: Accounts.suggest_handle()},
@@ -94,7 +92,7 @@ defmodule TipsWeb.UserLive.Registration do
         page_title: "Register",
         connected: connected?(socket),
         return_to: return_to,
-        log_in_path: with_return_to(~p"/users/log-in", return_to)
+        log_in_path: UserAuth.with_return_to(~p"/users/log-in", return_to)
       )
       |> AuthMailAdmission.assign_identity(session)
       |> assign_form(changeset)
@@ -148,7 +146,7 @@ defmodule TipsWeb.UserLive.Registration do
 
   defp deliver_confirmation(socket, user) do
     return_to = socket.assigns.return_to
-    url_fun = &with_return_to(url(~p"/users/log-in/#{&1}"), return_to)
+    url_fun = &UserAuth.with_return_to(url(~p"/users/log-in/#{&1}"), return_to)
 
     case Accounts.deliver_login_instructions(user, url_fun) do
       {:ok, _email} ->
@@ -170,9 +168,6 @@ defmodule TipsWeb.UserLive.Registration do
         |> push_navigate(to: socket.assigns.log_in_path)
     end
   end
-
-  defp with_return_to(path, nil), do: path
-  defp with_return_to(path, return_to), do: path <> "?" <> URI.encode_query(return_to: return_to)
 
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do
     assign(socket,

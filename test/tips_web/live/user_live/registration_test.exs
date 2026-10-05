@@ -251,7 +251,7 @@ defmodule TipsWeb.UserLive.RegistrationTest do
             "/editor/tips/1/edit/extra",
             "/%2F%2Fevil.example",
             "/editor/tips/new\n",
-            "/users/settings",
+            "/users/settings/confirm-email/token",
             "editor/tips/new"
           ] do
         {:ok, lv, _html} = live(conn, "/users/register?" <> URI.encode_query(return_to: bad))
@@ -266,7 +266,7 @@ defmodule TipsWeb.UserLive.RegistrationTest do
       for {stored, expected} <- [
             {"/editor/reviews/12/edit",
              "/users/log-in?return_to=%2Feditor%2Freviews%2F12%2Fedit"},
-            {"/users/settings", "/users/log-in"}
+            {"/users/settings?tab=email", "/users/log-in"}
           ] do
         conn = registration_conn(build_conn(), limiter, %{"user_return_to" => stored})
         {:ok, lv, _html} = live(conn, ~p"/users/register")

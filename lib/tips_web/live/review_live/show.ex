@@ -13,7 +13,7 @@ defmodule TipsWeb.ReviewLive.Show do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
+    <Layouts.app flash={@flash} current_scope={@current_scope} return_to={@path}>
       <Reader.tip_context tip={@tip} />
       <%= case @review do %>
         <% {:visible, review} -> %>
@@ -35,7 +35,13 @@ defmodule TipsWeb.ReviewLive.Show do
   def mount(%{"id" => id}, _session, socket) do
     case Content.get_review_page(UserAuth.viewer(socket), id) do
       {:ok, %{tip: tip, review: review}} ->
-        {:ok, assign(socket, tip: tip, review: review, page_title: "Review of #{tip.title}")}
+        {:ok,
+         assign(socket,
+           tip: tip,
+           review: review,
+           path: ~p"/reviews/#{id}",
+           page_title: "Review of #{tip.title}"
+         )}
 
       {:error, :not_found} ->
         raise TipsWeb.NotFoundError

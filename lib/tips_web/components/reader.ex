@@ -33,7 +33,9 @@ defmodule TipsWeb.Reader do
     do: {:not_accepting, nil}
 
   defp contribution(%{removed: true}, nil, _signed_in?), do: {:not_accepting, nil}
-  defp contribution(_tip, nil, false), do: {:sign_in, ~p"/users/log-in"}
+
+  defp contribution(tip, nil, false),
+    do: {:sign_in, TipsWeb.UserAuth.with_return_to(~p"/users/log-in", tip_path(tip))}
 
   defp contribution(%{id: id, capabilities: %{review: true}}, nil, true),
     do: {:write, "/editor/tips/#{id}/reviews/new"}

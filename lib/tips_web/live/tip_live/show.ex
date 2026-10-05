@@ -13,7 +13,7 @@ defmodule TipsWeb.TipLive.Show do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
+    <Layouts.app flash={@flash} current_scope={@current_scope} return_to={Reader.tip_path(@tip)}>
       <Reader.removed_notice
         :if={@tip.state == :visible and @tip.removed}
         id="tip-removed-notice"
