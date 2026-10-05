@@ -1,5 +1,7 @@
 defmodule Tips.Content.SearchTest do
-  use Tips.DataCase, async: true
+  # BM25 corpus statistics include other sandbox transactions. Ranking assertions
+  # need a fixed corpus, so run after concurrent fixture writers have finished.
+  use Tips.DataCase, async: false
 
   alias Tips.Accounts.Scope
   alias Tips.Content.{Model, Review, Search, Tip}

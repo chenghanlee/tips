@@ -1,8 +1,5 @@
 defmodule Tips.Content.Search.EmbeddingsTest do
-  # Synchronous: these fixtures write over a hundred search documents, and
-  # concurrent uncommitted documents shift BM25 statistics under async
-  # ranking tests.
-  use Tips.DataCase, async: false
+  use Tips.DataCase, async: true
 
   import Tips.AccountsFixtures
   import Tips.SearchFixtures
