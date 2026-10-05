@@ -5,6 +5,8 @@ defmodule Tips.Release do
   """
   @app :tips
 
+  alias Tips.Content.Search.Embeddings
+
   def migrate do
     load_app()
 
@@ -16,6 +18,21 @@ defmodule Tips.Release do
   def rollback(repo, version) do
     load_app()
     {:ok, _, _} = Ecto.Migrator.with_repo(repo, &Ecto.Migrator.run(&1, :down, to: version))
+  end
+
+  @doc """
+  Clears every search vector for an embedding model or runtime change.
+
+  Run only after every instance of the old release has stopped. See
+  "Changing the model" in `Tips.Content.Search.Embeddings`.
+  """
+  def clear_embeddings do
+    load_app()
+
+    {:ok, {:ok, cleared}, _} =
+      Ecto.Migrator.with_repo(Tips.Repo, fn _repo -> Embeddings.clear_all() end)
+
+    cleared
   end
 
   defp repos do

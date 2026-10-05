@@ -114,15 +114,9 @@ defmodule Tips.Content.Search do
     * model: tips and reviews with `model_id` = the model;
     * environment: tips and reviews with `environment_id` = the environment.
 
-  Embedding workers must guard both outcomes with the `text_at` value they read:
-
-      update tip_search set embedding = $2
-      where tip_id = $1 and embedding is null and text_at = $3
-
-      update tip_search set embed_after = clock_timestamp() + interval '10 minutes'
-      where tip_id = $1 and embedding is null and text_at = $3
-
-  The corresponding review updates use `review_search` and `review_id`.
+  `Tips.Content.Search.Embeddings` fills missing vectors. It guards every
+  write with the `text_at` value it read, so a changed document is never
+  given a vector or cooldown computed for older text.
   """
 
   import Ecto.Query

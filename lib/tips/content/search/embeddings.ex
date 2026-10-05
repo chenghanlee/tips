@@ -53,17 +53,22 @@ defmodule Tips.Content.Search.Embeddings do
   ## Changing the model
 
   Never mix vectors from two models. To change the embedding model or
-  runtime:
+  runtime, with the release run by Docker Compose:
 
   1. Stop every instance of the old release, so no scan or query uses the old
-     model. Stopping drains the scan.
-  2. Run `bin/tips eval "Tips.Release.clear_embeddings()"`. It calls
-     `clear_all/0`: in one transaction, every tip and review vector and
-     cooldown is cleared and every token is advanced, including rows that are
-     hidden or deleted. A write from a request started before the clear then
-     fails its guard. That is extra protection; it does not replace step 1.
-  3. Deploy the release with the new model for both documents and queries.
-  4. Start it. Scans embed every live document again.
+     model: `docker compose stop app`.
+  2. Clear the vectors without starting the application or calling a provider:
+
+         docker compose run --rm app bin/tips eval "Tips.Release.clear_embeddings()"
+
+     It calls `clear_all/0`: in one transaction, every tip and review vector
+     and cooldown is cleared and every token is advanced, including rows that
+     are hidden or deleted. A write from a request started before the clear
+     then fails its guard. That is extra protection; it does not replace
+     step 1.
+  3. Build the release with the new model for both documents and queries.
+  4. Start it: `docker compose up -d app`. Scans embed every live document
+     again.
   """
 
   alias Tips.Content.Search.EmbeddingProvider
@@ -208,10 +213,9 @@ defmodule Tips.Content.Search.Embeddings do
   end
 
   defp claim(update, id, token) do
-    case Repo.query!(update <> " AND s.text_at = $2 AND #{@due} RETURNING s.search_text", [
-           id,
-           token
-         ]) do
+    sql = update <> " AND s.text_at = $2 AND #{@due} RETURNING s.search_text"
+
+    case Repo.query!(sql, [id, token]) do
       %{rows: [[text]]} -> text
       %{rows: []} -> nil
     end
