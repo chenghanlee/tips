@@ -12,7 +12,7 @@ Coordinate shared modules directly with other teams' tech leads; notify lead TPM
 
 When either worker escalates two failed repairs, use AGENTS.md Problem Solving to find the supported cause and simplest working solution. Record the decision and evidence, then direct the developer's next attempt. If it changes the agreement, complete Brief consensus reopening before affected work resumes. Normal checks and tester review still apply.
 
-After context loss or a reported lapse, give a short cue linking the relevant rule: Dexter-first navigation, early consultation or the two-failed-repair stop. Do not repeat the agreement at every assignment or handoff.
+After the initial assignment, repeat only the relevant reminder below after context loss or a reported lapse.
 
 For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](../../../AGENTS.md#skills).
 
@@ -23,6 +23,12 @@ For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](.
 3. If a second independent outcome exists or your context will not last until merge, propose a split to lead TPM as a scope question; it creates children. Never require file ownership lists, reservations or overlap approval. Coordinate concrete shared changes as they arise.
 4. Send lead TPM one request to provision the developer, then the tester at the developer worktree's actual HEAD; it chooses the panes and replies once for both. Before assigning either worker, verify both panes, worktrees and SHAs, with the tester at the developer's actual HEAD. Check the skills and the setup or change issue/PR for passing pilot evidence under [Brief consensus](../README.md#brief-consensus); missing evidence goes to lead TPM before live dispatch.
 5. Follow [Brief consensus](../README.md#brief-consensus): send each worker its assignment for preparation, then invoke `grill-me` with a short prompt when it reports ready. Read each worker's question message and send answers back through Herdr. Keep interviews open until release; state changed decisions in affected panes and obtain renewed agreement. Confirm shared understanding with both workers, record the final contract and release only after both acknowledge that revision. Start with work independent of owner items.
+
+Include these reminders directly in each developer's and tester's initial preparation prompt, after the assignment reference:
+
+- Dexter first: use the CLI (`"$TIPS_DEXTER"`) for Elixir file outlines, definitions, docs/specs, references, call hierarchy and callback implementations. Follow the `dexter` skill for when scoped `rg`, `grep` or `sed` is appropriate, including fallback.
+- Ask lead for consultation early: before acting on ambiguous, conflicting, incomplete or apparently wrong task information, or whenever stuck. Do not wait for two failed repairs.
+- After two consecutive failed repairs of the same failure, stop affected repairs and send me both attempts, results and current code state, including unpushed changes. I take over diagnosis and direct the next attempt; no third repair without my direction. Initial TDD red and diagnostic reruns do not count.
 
 ## Pushed head
 
