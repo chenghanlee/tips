@@ -2,6 +2,7 @@ defmodule TipsWeb.UserLive.Confirmation do
   use TipsWeb, :live_view
 
   alias Tips.Accounts
+  alias TipsWeb.UserAuth
 
   @impl true
   def render(assigns) do
@@ -21,6 +22,7 @@ defmodule TipsWeb.UserLive.Confirmation do
           class="space-y-2"
         >
           <input type="hidden" name={@form[:token].name} value={@form[:token].value} />
+          <input :if={@return_to} type="hidden" name="user[return_to]" value={@return_to} />
           <UI.button
             size="lg"
             class="w-full"
@@ -46,6 +48,7 @@ defmodule TipsWeb.UserLive.Confirmation do
           class="space-y-2"
         >
           <input type="hidden" name={@form[:token].name} value={@form[:token].value} />
+          <input :if={@return_to} type="hidden" name="user[return_to]" value={@return_to} />
           <%= if @current_scope do %>
             <UI.button size="lg" class="w-full" phx-disable-with="Logging in...">
               Log in
@@ -71,7 +74,11 @@ defmodule TipsWeb.UserLive.Confirmation do
   end
 
   @impl true
-  def mount(%{"token" => token}, _session, socket) do
+  def mount(%{"token" => token} = params, session, socket) do
+    # Validated here and again by the controller; kept out of the form, so a submitted
+    # value cannot replace it. A rejected link takes it to the log-in page.
+    return_to = UserAuth.return_to(params["return_to"], session["user_return_to"])
+
     if user = Accounts.get_user_by_magic_link_token(token) do
       form = to_form(%{"token" => token}, as: "user")
 
@@ -80,6 +87,7 @@ defmodule TipsWeb.UserLive.Confirmation do
          page_title: "Confirm account",
          user: user,
          form: form,
+         return_to: return_to,
          trigger_submit: false
        ), temporary_assigns: [form: nil]}
     else
@@ -90,7 +98,7 @@ defmodule TipsWeb.UserLive.Confirmation do
          "Magic link is invalid or it has expired. " <>
            "If you signed up more than seven days ago without confirming, register again."
        )
-       |> push_navigate(to: ~p"/users/log-in")}
+       |> push_navigate(to: UserAuth.with_return_to(~p"/users/log-in", return_to))}
     end
   end
 

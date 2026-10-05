@@ -38,11 +38,12 @@ defmodule TipsWeb.UserAuth do
   Logs the user in with a session token `Tips.Accounts` already committed.
 
   Genuine authentication issues the token in its own transaction; this only
-  installs it. Redirects to the session's `:user_return_to` path
-  or falls back to the `signed_in_path/1`.
+  installs it. Redirects to the allowed destination `return_to/2` picks from
+  `params["return_to"]` and the session's `:user_return_to`, or falls back to
+  `signed_in_path/1`.
   """
   def log_in_user(conn, user, session_token, params \\ %{}) do
-    user_return_to = get_session(conn, :user_return_to)
+    user_return_to = return_to(params["return_to"], get_session(conn, :user_return_to))
 
     conn
     |> create_or_extend_session(user, session_token, params)
@@ -331,16 +332,21 @@ defmodule TipsWeb.UserAuth do
     |> LiveView.redirect(to: ~p"/users/log-in")
   end
 
-  # The root and the editor routes of the frontend design; ids are positive integers.
-  @return_to ~r"\A/(editor/(tips/new|tips/[1-9]\d*/edit|tips/[1-9]\d*/reviews/new|reviews/[1-9]\d*/edit))?\z"
+  # Positive bigint ids, as the routes take them, and `Tips.Content.Projection` slugs.
+  @id "[1-9]\\d{0,18}"
+  @slug "(?=[a-z0-9-]{1,80}\\z)[a-z0-9]+(-[a-z0-9]+)*"
+
+  # The root, settings, the public tip and review pages, and the editor routes of
+  # the frontend design.
+  @return_to ~r"\A/(users/settings|tips/#{@id}/#{@slug}|reviews/#{@id}|editor/(tips/new|tips/#{@id}/edit|tips/#{@id}/reviews/new|reviews/#{@id}/edit))?\z"
 
   @doc """
   Returns `path` if it is an allowed local return destination, otherwise `nil`.
 
-  Only the root and the editor routes are allowed. The whole path must match,
-  so schemes, `//`, backslashes, percent escapes, queries and control
-  characters are rejected. Check every carrier with it when accepting and when
-  consuming a destination.
+  Only the root, settings, the public tip and review pages and the editor routes
+  are allowed. The whole path must match, so schemes, `//`, backslashes, percent
+  escapes, queries, fragments and control characters are rejected. Check every
+  carrier with it when accepting and when consuming a destination.
   """
   @spec allowed_return_to(term()) :: String.t() | nil
   def allowed_return_to(path) when is_binary(path) do
@@ -348,6 +354,25 @@ defmodule TipsWeb.UserAuth do
   end
 
   def allowed_return_to(_path), do: nil
+
+  @doc """
+  Picks the destination to carry or redirect to: `explicit` if allowed,
+  otherwise the session's `user_return_to` if allowed, otherwise `nil`.
+
+  A rejected explicit value never hides a valid session destination.
+  """
+  @spec return_to(term(), term()) :: String.t() | nil
+  def return_to(explicit, session_return_to) do
+    allowed_return_to(explicit) || allowed_return_to(session_return_to)
+  end
+
+  @doc """
+  Adds `return_to` to an authentication page `path` as its query; `nil` leaves
+  `path` as it is.
+  """
+  @spec with_return_to(String.t(), String.t() | nil) :: String.t()
+  def with_return_to(path, nil), do: path
+  def with_return_to(path, return_to), do: path <> "?" <> URI.encode_query(return_to: return_to)
 
   @doc "Returns the path to redirect to after log in."
   # the user was already logged in, redirect to settings

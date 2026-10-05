@@ -133,16 +133,27 @@ defmodule TipsWeb.UserSessionControllerTest do
       assert redirected_to(conn) == ~p"/"
     end
 
-    test "logs the user in with return to", %{conn: conn, user: user} do
-      {token, _hashed_token} = generate_user_magic_link_token(user)
+    # The posted destination is validated again here, whatever the form carried.
+    for {label, posted, redirect} <- [
+          {"an allowed posted destination", "/reviews/9", "/reviews/9"},
+          {"an unsafe posted destination falls back to the session's", "//evil.example",
+           "/users/settings"},
+          {"a malformed posted destination falls back to the session's", %{"to" => "/"},
+           "/users/settings"}
+        ] do
+      @posted posted
+      @redirect redirect
+      test "logs the user in and redirects to #{label}", %{conn: conn, user: user} do
+        {token, _hashed_token} = generate_user_magic_link_token(user)
 
-      conn =
-        conn
-        |> init_test_session(user_return_to: "/foo/bar")
-        |> post(~p"/users/log-in", %{"user" => %{"token" => token}})
+        conn =
+          conn
+          |> init_test_session(user_return_to: "/users/settings")
+          |> post(~p"/users/log-in", %{"user" => %{"token" => token, "return_to" => @posted}})
 
-      assert redirected_to(conn) == "/foo/bar"
-      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Welcome back!"
+        assert redirected_to(conn) == @redirect
+        assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Welcome back!"
+      end
     end
 
     test "confirms unconfirmed user", %{conn: conn, unconfirmed_user: user} do
@@ -191,6 +202,30 @@ defmodule TipsWeb.UserSessionControllerTest do
       assert all_tokens() == tokens
 
       assert conn |> get(~p"/users/log-in") |> html_response(200) =~ ~s|href="/users/register"|
+    end
+
+    # {posted, session} => where the rejection sends the reader to request another link.
+    for {label, posted, session, log_in} <- [
+          {"a safe posted destination", "/reviews/9", "/users/settings",
+           "/users/log-in?return_to=%2Freviews%2F9"},
+          {"the session's destination behind an unsafe posted one", "//evil.example",
+           "/users/settings", "/users/log-in?return_to=%2Fusers%2Fsettings"},
+          {"no destination for unsafe values", "//evil.example", "/hello", "/users/log-in"},
+          {"no destination for a malformed value", %{"to" => "/reviews/9"}, nil, "/users/log-in"}
+        ] do
+      @posted posted
+      @session session
+      @log_in log_in
+      test "a rejected link keeps #{label}", %{conn: conn} do
+        conn =
+          conn
+          |> init_test_session(user_return_to: @session)
+          |> post(~p"/users/log-in", %{"user" => %{"token" => "invalid", "return_to" => @posted}})
+
+        assert redirected_to(conn) == @log_in
+        assert Phoenix.Flash.get(conn.assigns.flash, :error) == @invalid_link
+        refute get_session(conn, :user_token)
+      end
     end
 
     test "redirects to login page when magic link is invalid", %{conn: conn} do

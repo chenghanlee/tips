@@ -98,6 +98,19 @@ defmodule TipsWeb.UserLive.LoginTest do
       end
     end
 
+    test "the emailed link carries the destination, also after a rejected attempt", %{conn: conn} do
+      user = user_fixture()
+      flush_emails()
+      {:ok, lv, _html} = live(conn, ~p"/users/log-in?return_to=%2Ftips%2F7%2Fa")
+
+      submit_magic(lv, "not an address")
+      assert submit_magic(lv, user.email) =~ @requested
+
+      assert_email_sent(fn sent ->
+        assert sent.text_body =~ ~r{/users/log-in/[^\s?]+\?return_to=%2Ftips%2F7%2Fa\s}
+      end)
+    end
+
     test "an expired registration is told to register again and keeps the email and destination",
          %{conn: conn} do
       user = unconfirmed_user_fixture()
@@ -135,8 +148,8 @@ defmodule TipsWeb.UserLive.LoginTest do
            "/editor/tips/7/edit"},
           {"an external query falls back to the session", "https://evil.example/editor/tips/new",
            "/editor/tips/7/edit", "/editor/tips/7/edit"},
-          {"a disallowed query and a disallowed session carry nothing", "/users/settings",
-           "https://evil.example/", nil}
+          {"a disallowed query and a disallowed session carry nothing",
+           "/users/settings?tab=email", "https://evil.example/", nil}
         ] do
       @query query
       @session session
@@ -284,6 +297,17 @@ defmodule TipsWeb.UserLive.LoginTest do
         assert email_value?(lv, user.email)
         assert_email_sent(to: user.email)
       end
+    end
+
+    test "the reauthentication link carries the destination", %{conn: conn, user: user} do
+      flush_emails()
+      {:ok, lv, _html} = live(conn, ~p"/users/log-in?return_to=%2Fusers%2Fsettings")
+
+      assert submit_magic(lv, user.email) =~ @requested
+
+      assert_email_sent(fn sent ->
+        assert sent.text_body =~ ~r{/users/log-in/[^\s?]+\?return_to=%2Fusers%2Fsettings\s}
+      end)
     end
 
     test "shows login page with email filled in", %{conn: conn, user: user} do

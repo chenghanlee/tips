@@ -23,23 +23,26 @@ defmodule TipsWeb.UserSessionController do
         |> UserAuth.log_in_user(user, session_token, user_params)
 
       {:error, :not_found} ->
-        invalid_link(conn)
+        invalid_link(conn, user_params["return_to"])
     end
   end
 
   # Anything else, such as email and password credentials, is not a login.
-  defp create(conn, _params, _info), do: invalid_link(conn)
+  defp create(conn, _params, _info), do: invalid_link(conn, nil)
 
   # An expired registration is rejected like any other invalid link, and may already be
-  # deleted, so every rejection carries the restart guidance.
-  defp invalid_link(conn) do
+  # deleted, so every rejection carries the restart guidance. Requesting another link
+  # from the log-in page keeps the allowed destination.
+  defp invalid_link(conn, return_to) do
+    return_to = UserAuth.return_to(return_to, get_session(conn, :user_return_to))
+
     conn
     |> put_flash(
       :error,
       "The link is invalid or it has expired. " <>
         "If you signed up more than seven days ago without confirming, register again."
     )
-    |> redirect(to: ~p"/users/log-in")
+    |> redirect(to: UserAuth.with_return_to(~p"/users/log-in", return_to))
   end
 
   def delete(conn, _params) do
