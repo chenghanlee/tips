@@ -106,7 +106,7 @@ Every handoff sender:
 2. Send one line via `herdr agent prompt`: evidence link, SHA, action, owner (next acting role), and any constraint that changes what the recipient must do now. Link the existing contract instead of copying it. Prompt recipients separately.
 3. Before ending the turn, verify the Herdr command succeeded. On failure, report the error; never claim delivery.
 
-Use handoffs for readiness, implementation, review, merge and blockers; GitHub comments and final responses wake nobody. Give the exact recipient and completion/blocker command in the assignment; later dispatches link it unless it changes. Recipients read the linked evidence before acting. Provisioning requests/replies and team questions are messages, not handoffs. Code questions include a pushed SHA for inspection in the recipient's own worktree.
+Use handoffs for readiness contracts, contract acknowledgments, implementation, review, merge and blockers; GitHub comments and final responses wake nobody. Give the exact recipient and completion/blocker command in the assignment; later dispatches link it unless it changes. Recipients read the linked evidence before acting. Provisioning requests/replies, team questions and a worker's prepared-for-grilling notice are messages, not handoffs. That notice says ready, or not ready with the mismatch. Code questions include a pushed SHA for inspection in the recipient's own worktree.
 
 Example: substitute team number and evidence.
 

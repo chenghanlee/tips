@@ -3,6 +3,7 @@
 | When | Read |
 |---|---|
 | Launched into a team | The [team agreement](agent/teams/README.md) and your role card |
+| After context recovery in a team | Reread the team agreement, then Always and your current event section in your role card ([Events](agent/teams/README.md#events)) |
 | Working alone for the user | Use an isolated task worktree and a PR, subject to the [no-live-team exception](agent/teams/README.md#the-user-decides). Merge only within the user's authorization, after the required checks and review. An [owner waiver](agent/teams/roles/lead-tpm.md#merge) needs the user's explicit instruction |
 | Every task | The assigned issue or contract, or the user's brief. Start with the design sections it links; follow the shared rules and boundaries they affect |
 | Product and repository context | [README](README.md): what Tips is, where requirements live, where files belong |
@@ -68,6 +69,6 @@ Applies to chat, issues, PRs, comments, commits and handoffs.
 - Simple, plain English. No mannered prose. Concise and succinct. Write like the reader has ADHD. Less is more.
 - Lead with the result and the next action, if any.
 - State each decision or result once, then link its evidence. Do not copy the contract, the diff or earlier rounds.
-- Keep what the reader needs to act or audit: revision, findings, checks you ran, relevant limits.
+- Keep what the reader needs to act or audit: revision, findings, relevant limits.
 - Omit walkthroughs of unchanged code, routine process narration and lists of things that were fine.
 - Give a finding the space it needs to be actionable.

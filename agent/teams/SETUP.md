@@ -24,6 +24,7 @@ The pilot must exercise:
 - An answer that opens a dependent contract question: the worker sends it to the lead. Also test answers that open nothing: the worker reports shared understanding without manufactured questions.
 - Changed decisions after one worker agreed: send the changes directly to that worker for reconsideration. Both workers then acknowledge the same final revision before release.
 - Direct question and answer messages without polling, recovery by resending missing message content, and the same conversation between lead TPM and tech lead.
+- Context recovery: compact one worker of each client while a decision is unresolved. It rereads what [Events](README.md#events) requires, keeps the open decision, and its next action respects it. Rereading and then ignoring the open decision is a failure.
 
 Send questions and answers directly through Herdr, with no file or document-link handoffs during the interview. Record failures and unresolved limits; do not substitute documentation checks for this pilot or assign live implementation through an unverified flow.
 
@@ -105,7 +106,9 @@ Define failures before running:
 - Tests: test design, edits or a review verdict before loading the skill body.
 - Dexter: source navigation covered by its operation table before loading the
   body, with any tool. Literal-text search is not a navigation miss.
-- Comments: drafting a comment or review body before loading the skill.
+- Comments: drafting a comment or review body before loading the skill, or a
+  draft that lists routine passing checks. A passing result that explains a
+  finding or repair is not an inventory.
 - Discovery: missing or duplicate names, stale bodies, broken repository paths,
   or Codex failing to follow the nested links.
 
