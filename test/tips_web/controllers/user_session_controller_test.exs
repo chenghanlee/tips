@@ -41,6 +41,22 @@ defmodule TipsWeb.UserSessionControllerTest do
     end
   end
 
+  describe "POST /users/log-in - email only" do
+    test "email-only POST cannot request authentication mail", %{conn: conn, user: user} do
+      flush_emails()
+      tokens = all_tokens()
+
+      for email <- [user.email, "unknown@example.com"] do
+        conn = post(conn, ~p"/users/log-in", %{"user" => %{"email" => email}})
+
+        assert redirected_to(conn) == ~p"/users/log-in"
+        assert Phoenix.Flash.get(conn.assigns.flash, :error) == @invalid_link
+        assert all_tokens() == tokens
+        assert_no_email_sent()
+      end
+    end
+  end
+
   describe "POST /users/log-in - malformed input" do
     test "rejects map token without session, token or mail", %{conn: conn} do
       flush_emails()

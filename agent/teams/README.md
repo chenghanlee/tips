@@ -106,7 +106,7 @@ Every handoff sender:
 2. Send one line via `herdr agent prompt`: evidence link, SHA, action, owner (next acting role), and any constraint that changes what the recipient must do now. Link the existing contract instead of copying it. Prompt recipients separately.
 3. Before ending the turn, verify the Herdr command succeeded. On failure, report the error; never claim delivery.
 
-Use handoffs for readiness, implementation, review, merge and blockers; GitHub comments and final responses wake nobody. Give the exact recipient and completion/blocker command in the assignment; later dispatches link it unless it changes. Recipients read the linked evidence before acting. Provisioning requests/replies and team questions are messages, not handoffs. Code questions include a pushed SHA for inspection in the recipient's own worktree.
+Use handoffs for readiness contracts, contract acknowledgments, implementation, review, merge and blockers; GitHub comments and final responses wake nobody. Give the exact recipient and completion/blocker command in the assignment; later dispatches link it unless it changes. Recipients read the linked evidence before acting. Provisioning requests/replies, team questions and a worker's prepared-for-grilling notice are messages, not handoffs. That notice says ready, or not ready with the mismatch. Code questions include a pushed SHA for inspection in the recipient's own worktree.
 
 Example: substitute team number and evidence.
 
@@ -130,7 +130,7 @@ herdr agent prompt "team-$N-lead" "$EVIDENCE_URL SHA=$SHA; action=dispatch teste
 
 Repository rules block force pushes on `task/**`, require merge commits, strict up-to-date branches, resolved conversations and `checks`, `release`, `tips/independent-review`; merged remote heads are deleted. This gate is an interlock, not credential isolation.
 
-**Issue state.** Lead TPM owns labels and Project Status under its [Always rules](roles/lead-tpm.md#always); workers may add only Fallback `blocked`.
+**Issue state.** Lead TPM owns Project accuracy, labels, Status and Agent under its [Always rules](roles/lead-tpm.md#always); workers may add only Fallback `blocked`. Lead TPM reconciles and verifies the affected GitHub item when handling existing assignment, checkout-advance, blocker and merge events; no per-review-round status handoff is needed.
 
 - After launch, escalate scope or role-label changes such as `ui`/`probe` as scope questions. Routine `active` and `blocked` updates remain state changes.
 - Close issues only after their required result is integrated and evidenced. Use `Refs #number` for partial work; `Closes #number` for completing PRs. New child issues count toward the goal.

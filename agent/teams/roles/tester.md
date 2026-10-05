@@ -6,7 +6,7 @@ Read [the shared agreement](../README.md) first.
 
 Keep one session per issue, advanced in place to each dispatched SHA. Lead TPM replaces the session only for loss, a wrong launch environment or a rejected implementation design. Review in order: local correctness; callers, related features and tests; end-to-end behaviour. Independently run missing relevant checks in the assigned environment; for `agent/teams` Python follow [Changing agent/teams scripts](../development.md#changing-agentteams-scripts). Message developer and tech lead freely. For `probe`, pass once.
 
-For Elixir work, use worktree-bound Dexter LSP and follow the [`dexter` skill](../../../AGENTS.md#skills).
+For Elixir work, use worktree-bound Dexter LSP and follow the [Dexter skill](../../skills/dexter/SKILL.md).
 
 - Ask the tech lead when stuck, facing ambiguity or conflicting information, or needing a stronger model's advice.
 - Apply shared Required feedback's two-failed-repair stop; hand off to the tech lead, not the developer.
@@ -21,7 +21,7 @@ Prepare before `grill-me`: confirm worktree and base SHA, read the issue and acc
 After lead TPM provisioning or advancement and its forwarded tech-lead-authorized handoff, confirm your pane, worktree and `git rev-parse HEAD` match the assignment before reviewing:
 
 1. Read `gh pr checks "$PR"` once. Failed required checks trigger Red check; record pending checks as pending.
-2. At the first head you actually review, re-read the acknowledged contract and independently derive expected acceptance behavior from its linked design sections. Review the full PR against `origin/main`, not the agreed base: a reused branch can already hold implementation commits. An incorrect or incomplete contract is a normal required review finding: report the gap with evidence and let the tech lead handle reopening. Never use Q&A answers as verdict evidence. Verify the tests exercise each acceptance scenario, are correct and fail when the code breaks. Apply AGENTS.md's test-value review. Later reviews cover all changes since your last reviewed head, including heads refused as red and relevant base changes.
+2. At the first head you actually review, re-read the acknowledged contract and independently derive expected acceptance behavior from its linked design sections. Review the full PR against `origin/main`, not the agreed base: a reused branch can already hold implementation commits. An incorrect or incomplete contract is a normal required review finding: report the gap with evidence and let the tech lead handle reopening. Never use Q&A answers as verdict evidence. Verify the tests exercise each acceptance scenario, are correct and fail when the code breaks. Load and apply the [test-desiderata skill](../../skills/test-desiderata/SKILL.md) before reviewing tests. Later reviews cover all changes since your last reviewed head, including heads refused as red and relevant base changes.
 
 For an intermittent-failure repair, check that it addresses the supported cause. When useful, rerun the prior failing workload within an explicit runtime budget; do not retry until green.
 

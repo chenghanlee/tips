@@ -18,6 +18,8 @@ defmodule Tips.Application do
       {DNSCluster, query: Application.get_env(:tips, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Tips.PubSub},
       {Tips.AdmissionLimiter, Application.fetch_env!(:tips, Tips.AdmissionLimiter)},
+      # Bounded authentication mail attempts (Tips.Accounts.UserNotifier).
+      {Task.Supervisor, name: Tips.Accounts.MailTaskSupervisor},
       # Start a worker by calling: Tips.Worker.start_link(arg)
       # {Tips.Worker, arg},
       # Start to serve requests, typically the last entry

@@ -3,8 +3,7 @@ defmodule TipsWeb.UserLive.Registration do
 
   alias Tips.Accounts
   alias Tips.Accounts.User
-  alias Tips.AdmissionLimiter
-  alias TipsWeb.{ClientIdentity, UserAuth}
+  alias TipsWeb.{AuthMailAdmission, UserAuth}
 
   @impl true
   def render(assigns) do
@@ -95,10 +94,9 @@ defmodule TipsWeb.UserLive.Registration do
         page_title: "Register",
         connected: connected?(socket),
         return_to: return_to,
-        log_in_path: with_return_to(~p"/users/log-in", return_to),
-        client_ip: ClientIdentity.from_socket(socket),
-        limiter: session["admission_limiter"] || AdmissionLimiter
+        log_in_path: with_return_to(~p"/users/log-in", return_to)
       )
+      |> AuthMailAdmission.assign_identity(session)
       |> assign_form(changeset)
 
     {:ok, socket, temporary_assigns: [form: nil]}
@@ -109,7 +107,7 @@ defmodule TipsWeb.UserLive.Registration do
     changeset = Accounts.change_user_registration(%User{}, user_params, validate_unique: false)
 
     with {:ok, %User{email: email}} <- Ecto.Changeset.apply_action(changeset, :insert),
-         :ok <- admit(socket.assigns, email),
+         :ok <- AuthMailAdmission.admit(socket.assigns, email),
          {:ok, user} <- Accounts.register_user(user_params) do
       {:noreply, deliver_confirmation(socket, user)}
     else
@@ -126,12 +124,6 @@ defmodule TipsWeb.UserLive.Registration do
     {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
   end
 
-  # Only the transport peer from mount identifies the client; event params never do.
-  defp admit(%{client_ip: {:ok, ip}, limiter: limiter}, email),
-    do: AdmissionLimiter.check_auth(email, ip, limiter)
-
-  defp admit(%{client_ip: {:error, :invalid_identity}}, _email), do: {:error, :no_client_ip}
-
   defp reject(socket, changeset, :invalid_identity) do
     changeset = Ecto.Changeset.add_error(changeset, :email, "is invalid")
     assign_form(socket, Map.put(changeset, :action, :insert))
@@ -144,19 +136,15 @@ defmodule TipsWeb.UserLive.Registration do
   end
 
   defp rejection_message({:rate_limited, seconds}),
-    do: "Too many sign-up attempts. Try again in #{seconds(seconds)}."
+    do: "Too many sign-up attempts. Try again in #{AuthMailAdmission.retry_in(seconds)}."
 
   defp rejection_message({:capacity, seconds}),
-    do: "Sign-up is busy right now. Try again in #{seconds(seconds)}."
+    do: "Sign-up is busy right now. Try again in #{AuthMailAdmission.retry_in(seconds)}."
 
-  defp rejection_message(:no_client_ip),
-    do: "We couldn't identify your connection. Reload the page and try again."
+  defp rejection_message(:no_client_ip), do: AuthMailAdmission.no_client_ip_message()
 
   defp rejection_message(:registration_invariant),
     do: "We couldn't complete your sign-up because of a problem on our end. Try again later."
-
-  defp seconds(1), do: "1 second"
-  defp seconds(n), do: "#{n} seconds"
 
   defp deliver_confirmation(socket, user) do
     return_to = socket.assigns.return_to

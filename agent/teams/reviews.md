@@ -2,7 +2,13 @@
 
 ## Reviews
 
-Tester and tech lead follow Google's [review comments](https://google.github.io/eng-practices/review/reviewer/comments.html) guide. Submit one review per pass, in one call, on the exact head:
+Load the [github-comments skill](../skills/github-comments/SKILL.md) before writing a review or reply. Tester and tech lead follow Google's [review comments](https://google.github.io/eng-practices/review/reviewer/comments.html) guide. Review format:
+
+- Approval: `LGTM` alone on line one; role and session on line two. A tech lead puts the tester's approving review link on line three.
+- Other reviews: role and session on line one.
+- Include relevant scope, limits and pending checks. The approving review must include chat decisions absent from PR threads; it closes the decision record without a separate closing note.
+
+Submit one review per pass, in one call, on the exact head:
 
 ```bash
 gh api "repos/{owner}/{repo}/pulls/$PR/reviews" --input tmp/review.json --jq .html_url
@@ -10,15 +16,9 @@ gh api "repos/{owner}/{repo}/pulls/$PR/reviews" --input tmp/review.json --jq .ht
 
 `tmp/review.json`: `{"commit_id": "<head SHA>", "event": "COMMENT", "body": "...", "comments": [{"path": "...", "line": 12, "body": "..."}]}`.
 
-- Inline comments for local issues. The body for general issues and for lines outside the diff, as `path:line`.
-- Make required changes clear and give the reason. Mark optional advice `Nit:`, `Optional:` or `FYI:`.
-- Approval: line one is `LGTM` alone; line two is your role and session. Add scope or limits only when needed. Any other review starts with your role and session.
-- Report what the linked CI run does not establish. Do not repeat the diff, the contract or passing checks.
-- Write in plain, simple English. No mannered prose. Succinct and concise. Write like the reader has ADHD.
-
 ## Replies
 
-`agent/teams/pr_review.py list "$PR"` prints the reviews of the last two reviewed heads and every unresolved thread with its IDs and reviewer; `--all` adds earlier heads. Fix the code where that answers a comment. Reply only when useful, to explain a fix, ask or disagree:
+`agent/teams/pr_review.py list "$PR"` prints the reviews of the last two reviewed heads and every unresolved thread with its IDs and reviewer; `--all` adds earlier heads. To reply:
 
 ```bash
 gh api "repos/{owner}/{repo}/pulls/$PR/comments/$REPLY_TO/replies" -f body="..."

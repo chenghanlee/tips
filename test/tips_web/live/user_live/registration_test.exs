@@ -151,6 +151,24 @@ defmodule TipsWeb.UserLive.RegistrationTest do
       end)
     end
 
+    test "delivery failure offers retry without claiming no message was sent", %{conn: conn} do
+      Tips.MailerTestAdapter.script(:reject)
+      {:ok, lv, _html} = live(conn, ~p"/users/register?return_to=#{@return_to}")
+      email = unique_user_email()
+
+      {:ok, login, html} =
+        lv
+        |> submit(%{"handle" => "Unconfirmed_Mail", "email" => email})
+        |> follow_redirect(conn, @log_in_with_return)
+
+      assert html =~ "we couldn&#39;t confirm that the email was sent. Request a new link below."
+      assert has_element?(login, ~s|#login_form_magic input[value="#{email}"]|)
+      assert %User{id: id, confirmed_at: nil} = Repo.get_by(User, email: email)
+      assert %UserToken{context: "login"} = Repo.get_by(UserToken, user_id: id)
+      assert_received {:mail_attempt, _attempt}
+      refute_received {:mail_attempt, _retry}
+    end
+
     test "registered email offers sign in without changing the existing identity",
          %{conn: conn} do
       existing = user_fixture(%{handle: "Original", email: "taken@example.com"})

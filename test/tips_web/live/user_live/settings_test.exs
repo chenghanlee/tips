@@ -3,11 +3,25 @@ defmodule TipsWeb.UserLive.SettingsTest do
 
   import Ecto.Query
   import Phoenix.LiveViewTest
+  import Swoosh.TestAssertions
   import Tips.AccountsFixtures
+  import Tips.AdmissionFixtures
 
   alias Tips.Accounts
   alias Tips.Accounts.{User, UserToken}
-  alias Tips.Repo
+  alias Tips.{MailerTestAdapter, Repo}
+
+  # Every test owns an isolated limiter and a fixed transport peer.
+  setup %{conn: conn} do
+    %{limiter: limiter} = start_limiter(auth_destination: {5, 60_000}, auth_ip: {20, 60_000})
+    %{conn: limited_conn(conn, limiter)}
+  end
+
+  defp limited_conn(conn, limiter) do
+    conn
+    |> Plug.Test.init_test_session(%{"admission_limiter" => limiter})
+    |> Plug.Test.put_peer_data(%{address: {198, 51, 100, 7}, port: 40_000, ssl_cert: nil})
+  end
 
   describe "Settings page" do
     test "renders settings page", %{conn: conn} do
@@ -75,6 +89,50 @@ defmodule TipsWeb.UserLive.SettingsTest do
 
       assert result =~ "Change Email"
       assert result =~ "did not change"
+    end
+
+    test "delivery failure offers retry without claiming no message was sent",
+         %{conn: conn, user: user} do
+      MailerTestAdapter.script(:reject)
+      {:ok, lv, _html} = live(conn, ~p"/users/settings")
+      new_email = unique_user_email()
+
+      html = lv |> form("#email_form", %{"user" => %{"email" => new_email}}) |> render_submit()
+
+      assert html =~
+               "We couldn&#39;t confirm that the confirmation link was sent to #{new_email}. " <>
+                 "It may still arrive; if it doesn&#39;t, request it again. " <>
+                 "Your sign-in email has not changed."
+
+      refute html =~ "has been sent"
+      assert has_element?(lv, ~s|#email_form input[name="user[email]"][value="#{new_email}"]|)
+      assert [%UserToken{}] = change_email_tokens(user)
+      assert Repo.reload!(user).email == user.email
+      assert_received {:mail_attempt, _attempt}
+      refute_received {:mail_attempt, _retry}
+    end
+
+    test "auth mail denial has no token or provider side effects; invalid changes are not charged",
+         %{user: user} do
+      %{limiter: limiter} = start_limiter(auth_ip: {1, 60_000})
+      conn = build_conn() |> limited_conn(limiter) |> log_in_user(user)
+      {:ok, lv, _html} = live(conn, ~p"/users/settings")
+      submit = &(lv |> form("#email_form", %{"user" => %{"email" => &1}}) |> render_submit())
+
+      # The fixture's confirmation mail.
+      assert_email_sent(to: user.email)
+      assert submit.(user.email) =~ "did not change"
+      admitted = unique_user_email()
+      assert submit.(admitted) =~ "A link to confirm your email"
+      assert_email_sent(to: admitted)
+      denied = unique_user_email()
+
+      html = submit.(denied)
+
+      assert html =~ ~r/Too many email change requests\. Try again in \d+ seconds?\./
+      assert has_element?(lv, ~s|#email_form input[name="user[email]"][value="#{denied}"]|)
+      assert [_admitted] = change_email_tokens(user)
+      assert_no_email_sent()
     end
   end
 

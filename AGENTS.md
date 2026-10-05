@@ -3,6 +3,7 @@
 | When | Read |
 |---|---|
 | Launched into a team | The [team agreement](agent/teams/README.md) and your role card |
+| After context recovery in a team | Reread the team agreement, then Always and your current event section in your role card ([Events](agent/teams/README.md#events)) |
 | Working alone for the user | Use an isolated task worktree and a PR, subject to the [no-live-team exception](agent/teams/README.md#the-user-decides). Merge only within the user's authorization, after the required checks and review. An [owner waiver](agent/teams/roles/lead-tpm.md#merge) needs the user's explicit instruction |
 | Every task | The assigned issue or contract, or the user's brief. Start with the design sections it links; follow the shared rules and boundaries they affect |
 | Product and repository context | [README](README.md): what Tips is, where requirements live, where files belong |
@@ -33,11 +34,7 @@ Design files are large. List headings with `rg -n '^#{2,3} ' <file>`, then read 
 
 ## Testing
 
-- Follow the testing trophy, integration first. TDD means writing the failing ExUnit integration test for the acceptance scenario before the code.
-- Unit tests only for pure logic with wide blast radius.
-- Write new end-to-end tests, including browser journeys, for milestone gates; CI keeps rerunning existing coverage.
-- Keep the suite lean: fewer tests for the same confidence. Write and review tests using [Kent Beck's Test Desiderata](https://testdesiderata.com/): isolated, composable, deterministic, fast, writable, readable, behavioural, structure-insensitive, automated, specific, predictive, inspiring. Per Beck: "no property should be given up without receiving a property of greater value in return."
-- When reviewing new or changed tests, default to no. Require the developer to remove tests whose value does not justify their cost; explain why. Require repair or replacement instead if removal would lose required coverage.
+Before designing, writing, changing or reviewing tests, load [test-desiderata](agent/skills/test-desiderata/SKILL.md), including tests within other tasks.
 
 ## Review
 
@@ -47,14 +44,14 @@ Design files are large. List headings with `rg -n '^#{2,3} ' <file>`, then read 
 
 ## Skills
 
-Before reading, writing, changing or reviewing Elixir code, read `.agents/skills/dexter/SKILL.md` and the `elixir` skill, then any relevant skills below:
+Before reading, writing, changing or reviewing Elixir code, read the repository [Dexter skill](agent/skills/dexter/SKILL.md) and the `elixir` skill, then any relevant skills below:
 
 - `phoenix`: LiveView, components, controllers, routes, Plug, channels, and PubSub.
 - `ecto`: schemas, changesets, queries, transactions, and migrations.
 - `oban`: background jobs, retries, scheduling, and workflows.
 - `otp`: processes, supervision, GenServer, Task, Registry, and ETS.
 
-Load only relevant skills. State which skills you are using before making changes.
+Load only relevant skills. The triggers in Testing, Skills and Writing apply to Codex and Claude; reload before the relevant action after context recovery if the body is absent. State which skills you are using before making changes.
 
 ## Tool Use
 
@@ -65,11 +62,13 @@ Load only relevant skills. State which skills you are using before making change
 
 ## Writing
 
+Before drafting or editing a GitHub comment, review or reply, load [github-comments](agent/skills/github-comments/SKILL.md).
+
 Applies to chat, issues, PRs, comments, commits and handoffs.
 
 - Simple, plain English. No mannered prose. Concise and succinct. Write like the reader has ADHD. Less is more.
 - Lead with the result and the next action, if any.
 - State each decision or result once, then link its evidence. Do not copy the contract, the diff or earlier rounds.
-- Keep what the reader needs to act or audit: revision, findings, checks you ran, relevant limits.
+- Keep what the reader needs to act or audit: revision, findings, relevant limits.
 - Omit walkthroughs of unchanged code, routine process narration and lists of things that were fine.
 - Give a finding the space it needs to be actionable.

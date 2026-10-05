@@ -681,12 +681,18 @@ defmodule Tips.Accounts do
   @doc ~S"""
   Delivers the update email instructions to the given user.
 
+  The token is committed before the bounded mail attempt; a delivery error
+  leaves it and the current email in place. See `Tips.Accounts.UserNotifier`
+  for the results.
+
   ## Examples
 
       iex> deliver_user_update_email_instructions(user, current_email, &url(~p"/users/settings/confirm-email/#{&1}"))
       {:ok, %{to: ..., body: ...}}
 
   """
+  @spec deliver_user_update_email_instructions(User.t(), String.t(), (String.t() -> String.t())) ::
+          UserNotifier.result()
   def deliver_user_update_email_instructions(%User{} = user, current_email, update_email_url_fun)
       when is_function(update_email_url_fun, 1) do
     {encoded_token, user_token} = UserToken.build_email_token(user, "change:#{current_email}")
@@ -701,10 +707,11 @@ defmodule Tips.Accounts do
   The caller read `user` without a lock, so cleanup or reclaim may have
   deleted the account since, or its registration may have expired. Then no
   token is issued, nothing is sent and the result is `{:error, :not_found}`.
-  The token is committed before the mail request.
+  The token is committed before the bounded mail attempt, whose delivery
+  errors are described in `Tips.Accounts.UserNotifier`.
   """
   @spec deliver_login_instructions(User.t(), (String.t() -> String.t())) ::
-          {:ok, Swoosh.Email.t()} | {:error, term()}
+          UserNotifier.result() | {:error, :not_found}
   def deliver_login_instructions(%User{} = user, magic_link_url_fun)
       when is_function(magic_link_url_fun, 1) do
     with {:ok, encoded_token} <- issue_login_token(user) do

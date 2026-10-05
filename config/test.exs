@@ -63,8 +63,9 @@ if path = System.get_env("TIPS_CHROMEDRIVER") do
   config :wallaby, chromedriver: [path: path]
 end
 
-# In test we don't send emails
-config :tips, Tips.Mailer, adapter: Swoosh.Adapters.Test
+# In test we don't send emails. Tips.MailerTestAdapter delegates to Swoosh.Adapters.Test
+# unless a test scripts its own delivery outcome.
+config :tips, Tips.Mailer, adapter: Tips.MailerTestAdapter
 
 # Disable swoosh api client as it is only required for production adapters
 config :swoosh, :api_client, false
