@@ -43,7 +43,7 @@ Use the reported event to find your card section; Assigned covers the first brie
 
 ## Brief consensus
 
-The contract is the issue brief plus the latest consolidated decision comment. Lead TPM keeps the brief aligned with authorized scope and acceptance decisions before final acknowledgment. The acknowledgment covers both. Meaning-changing edits to either reopen affected agreement under this section; record the change in a new decision revision.
+The contract is the issue brief plus the latest consolidated decision comment. The tech lead keeps the brief's acceptance criteria current before final acknowledgment. The acknowledgment covers both. Meaning-changing edits to either reopen affected agreement under this section; record the change in a new decision revision.
 
 Prepare before grilling. The tech lead sends each worker a short assignment naming the issue, contract revision, base SHA and lead's Herdr target. The worker reads the assignment, linked design sections and role card, checks its worktree and launch values, then notifies the lead that it is ready. Keep this preparation separate from the interview.
 
