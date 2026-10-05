@@ -1,6 +1,6 @@
 ---
 name: github-comments
-description: Load before drafting or editing GitHub comments, reviews or replies. Keep messages concise while preserving decisions, findings and required evidence.
+description: Load before drafting or editing GitHub comments, reviews, replies, PR descriptions or issue bodies. Keep messages concise while preserving decisions, findings and required evidence.
 ---
 
 # GitHub comments

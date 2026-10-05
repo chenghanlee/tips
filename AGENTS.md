@@ -62,7 +62,7 @@ Load only relevant skills. The triggers in Testing, Skills and Writing apply to 
 
 ## Writing
 
-Before drafting or editing a GitHub comment, review or reply, load [github-comments](agent/skills/github-comments/SKILL.md).
+Before drafting or editing a GitHub comment, review, reply, PR description or issue body, load [github-comments](agent/skills/github-comments/SKILL.md).
 
 Applies to chat, issues, PRs, comments, commits and handoffs.
 
