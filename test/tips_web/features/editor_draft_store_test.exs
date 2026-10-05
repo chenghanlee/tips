@@ -180,6 +180,52 @@ defmodule TipsWeb.EditorDraftStoreTest do
     quota: () => abortAfterPut(true),
   }
 
+  // Temporary negative control (#75 c2, removed in c3): reads in one
+  // transaction and blindly puts in another, reporting ok only after the put's
+  // transaction completes. Its only defect is the split read/compare/write.
+  function splitKey({account_id, slot}) {
+    if (slot.tag === "new_tip") return [account_id, "new_tip"]
+    if (slot.tag === "new_review") return [account_id, "new_review", slot.tip_id]
+    return [account_id, "edit", slot.kind, slot.id]
+  }
+
+  function splitStep(db, mode, step) {
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE, mode)
+      let result
+      step(transaction.objectStore(STORE)).onsuccess = (event) => {
+        result = event.target.result
+      }
+      transaction.oncomplete = () => resolve(result)
+      transaction.onabort = () => reject(transaction.error)
+    })
+  }
+
+  const split = {
+    async create(record) {
+      const db = await openDatabase()
+      const key = splitKey(record.storage)
+      if ((await splitStep(db, "readonly", (store) => store.get(key))) !== undefined) {
+        return {status: "conflict"}
+      }
+      await splitStep(db, "readwrite", (store) => store.put(record, key))
+      return {status: "ok", record}
+    },
+
+    async save(storage, expected, record) {
+      const db = await openDatabase()
+      const key = splitKey(storage)
+      const stored = await splitStep(db, "readonly", (store) => store.get(key))
+      const {draft_id, revision} = stored?.draft ?? {}
+      if (draft_id !== expected.draft_id || revision !== expected.revision) return {status: "conflict"}
+      const next = {...record, draft: {draft_id, revision: revision + 1}}
+      await splitStep(db, "readwrite", (store) => store.put(next, key))
+      return {status: "ok", record: next}
+    },
+  }
+
+  const racer = () => (window.draftHarness.racerImpl === "split" ? split : importStore())
+
   const webStorage = () =>
     JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)])
 
@@ -192,13 +238,13 @@ defmodule TipsWeb.EditorDraftStoreTest do
 
     // Starts a create without waiting for it; the result lands in pending.
     async startCreate(record) {
-      const store = await importStore()
+      const store = await racer()
       observe()
       this.pending = settle(store.create(record))
     },
 
     async saveRace(storage, expected, first, second) {
-      const racers = [await importStore(), await importStore()]
+      const racers = [await racer(), await racer()]
       const outcome = await race(() => [
         racers[0].save(storage, expected, first),
         racers[1].save(storage, expected, second),
@@ -529,6 +575,37 @@ defmodule TipsWeb.EditorDraftStoreTest do
     assert after_quota == %{"status" => "ok", "record" => wire(draft)}
   end
 
+  # Temporary negative controls (c2 only): the same race helpers and CAS
+  # assertions must reject a split read-then-write store.
+  feature "negative control: split creation fails the first-writer assertion", %{
+    session: session
+  } do
+    storage = storage(101, %{tag: "new_tip"})
+    first = new_tip(storage, "draft-first", "Typed in the first tab")
+    second = new_tip(storage, "draft-second", "Typed in the second tab")
+
+    error =
+      assert_raise ExUnit.AssertionError, fn ->
+        race_first_creation(session, first, second, "split")
+      end
+
+    IO.puts("negative control (two-tab create): " <> error.message)
+    assert error.message == "expected exactly one ok and one conflict, got two ok"
+  end
+
+  feature "negative control: split saving fails the stale-writer assertion", %{session: session} do
+    storage = storage(101, %{tag: "new_tip"})
+    open_store_page(session)
+
+    error =
+      assert_raise ExUnit.AssertionError, fn ->
+        save_race(session, new_tip(storage, "draft-raced", "Seed"), storage, "split")
+      end
+
+    IO.puts("negative control (same-page save): " <> error.message)
+    assert error.message == "expected exactly one ok and one conflict, got two ok"
+  end
+
   defp open_store_page(session) do
     session
     |> visit("/")
@@ -564,7 +641,7 @@ defmodule TipsWeb.EditorDraftStoreTest do
   end
 
   # Two tabs of one profile each create the same slot behind the blocker.
-  defp race_first_creation(session, first, second) do
+  defp race_first_creation(session, first, second, impl \\ "store") do
     first_tab = session |> open_store_page() |> window_handle()
 
     assert run(session, "return (await h.importStore()).load(args[0])", [first.storage]) ==
@@ -572,14 +649,14 @@ defmodule TipsWeb.EditorDraftStoreTest do
 
     run(
       session,
-      "await h.checkDatabase(); h.blocker = await h.block(); await h.startCreate(args[0])",
-      [first]
+      "h.racerImpl = args[1]; await h.checkDatabase(); h.blocker = await h.block(); await h.startCreate(args[0])",
+      [first, impl]
     )
 
     execute_script(session, "window.open('about:blank', '_blank')")
     [second_tab] = window_handles(session) -- [first_tab]
     session |> focus_window(second_tab) |> open_store_page()
-    run(session, "await h.startCreate(args[0])", [second])
+    run(session, "h.racerImpl = args[1]; await h.startCreate(args[0])", [second, impl])
     second_result = run(session, "return h.pending")
 
     focus_window(session, first_tab)
@@ -591,7 +668,7 @@ defmodule TipsWeb.EditorDraftStoreTest do
     assert_one_winner([first_result, second_result])
   end
 
-  defp save_race(session, seed, storage) do
+  defp save_race(session, seed, storage, impl \\ "store") do
     expected = seed.draft
     first = edited(seed, expected, "First racer")
     second = edited(seed, expected, "Second racer")
@@ -600,7 +677,13 @@ defmodule TipsWeb.EditorDraftStoreTest do
              %{"status" => "ok", "record" => wire(seed)}
 
     %{"schedule" => schedule, "results" => results, "stored" => stored} =
-      run(session, "return h.saveRace(...args)", [storage, expected, first, second])
+      run(session, "h.racerImpl = args[4]; return h.saveRace(...args)", [
+        storage,
+        expected,
+        first,
+        second,
+        impl
+      ])
 
     assert_schedule(schedule)
     winner = assert_one_winner(results)
