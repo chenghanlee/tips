@@ -36,9 +36,14 @@ defmodule Tips.DataCase do
 
   @doc """
   Sets up the sandbox based on the test tags.
+
+  An `:isolation` tag, such as `"REPEATABLE READ"`, sets the test transaction's
+  isolation before any query, so code under test can declare the same level.
   """
   def setup_sandbox(tags) do
-    pid = Sandbox.start_owner!(Tips.Repo, shared: not tags[:async])
+    pid =
+      Sandbox.start_owner!(Tips.Repo, shared: not tags[:async], isolation: tags[:isolation])
+
     on_exit(fn -> Sandbox.stop_owner(pid) end)
   end
 

@@ -56,6 +56,17 @@ defmodule Tips.Content.Read do
     end
   end
 
+  @doc false
+  # Projects one loaded row for a moderation case, with the same hydration and
+  # deletion-first masking as the pages. A review sees its parent as a link.
+  def project(scope, %Tip{} = tip),
+    do: Projection.tip(scope, tip, tip_hydration(scope, tip, own_review(scope, tip)))
+
+  def project(scope, %Review{} = review) do
+    hydration = review_hydration(scope, review)
+    Projection.review(scope, review, Map.put(hydration, :parent, Repo.get!(Tip, review.tip_id)))
+  end
+
   # Anonymous viewers take the public path without a token query; anything else
   # must be a session reference that readmits now.
   defp admit(nil), do: {:ok, nil}
