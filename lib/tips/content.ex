@@ -208,6 +208,57 @@ defmodule Tips.Content do
   rewrites the `Tips.Content.Media.Target`, rebinds media or edits a deleted
   original.
 
+  ### Deletion and moderation
+
+  `delete_content(scope, kind, id)` irreversibly deletes the author's own tip
+  or review. `get_moderation_case(session_ref, kind, id)` reads one case;
+  `hide_content/5` and `restore_content/5` change only moderator visibility
+  (`dead_at`) against what the moderator reviewed. Successes return
+  `t:lifecycle_receipt/0`; raw rows never leave Content.
+
+  Each mutation checks the scope, spends one `Tips.AdmissionLimiter.check_write/2`
+  (rejected, conflicting and unchanged attempts included, never refunded),
+  validates its input, then takes locks in the shared order: the acting
+  account, the tip, then the review. A review always locks its parent tip
+  first, even a hidden or deleted one, because the review-count trigger
+  writes it. Eligibility is rechecked on the locked account.
+
+  Deletion uses `:delete_own_content`, so unconfirmed and fully banned authors
+  may delete. Another author's or a missing row is `:not_found`; an owned,
+  already-deleted row is `:unchanged` with no further effects. A row with its
+  own attached media (not yet marked for cleanup) is
+  `{:error, :media_cleanup_required}` with no writes: media cleanup is not
+  transactional yet. Media of a tip's reviews do not block the tip. A real
+  deletion sets `deleted_at` and advances `edit_version` once, keeping
+  `dead_at` and author dates; resolves the target's open reports with no
+  resolver; and removes, read or unread, a review's notifications, or a tip's
+  `tip_upvoted` notifications and the `tip_reviewed` notifications of its
+  reviews. Reviews, their media and review-upvote notifications stay.
+  Errors: `t:delete_error/0`.
+
+  The case read readmits the session and requires the moderator role only: a
+  full ban or missing confirmation still reads. It is one repeatable-read
+  snapshot of the projected content (deletion-first, as for every viewer), its
+  version and state, and the open reports without reporter identity. Errors:
+  `:unauthenticated`, `:forbidden`, `:not_found`, `:outcome_unknown`. An id may
+  be an integer or its decimal string; mutations take an integer.
+
+  Hide and restore require `:moderate` eligibility. `expected_version` must be
+  a positive integer and `reviewed_report_ids` a list of unique positive ids
+  (`[]` allowed); otherwise a changeset. Deleted content, a different version,
+  or any reviewed id that is missing, another target's or already resolved is
+  `{:error, {:conflict, case}}` with a fresh case read after rollback; reports
+  filed later are not compared. Only after all guards does an already-hidden
+  hide or already-live restore return `:unchanged`, resolving nothing. A real
+  change sets or clears `dead_at` and advances `edit_version` once; hide
+  resolves exactly the reviewed reports with the moderator as resolver, and
+  restore leaves them open. Author dates, text, votes, search data, media and
+  notifications are kept; nothing is replayed. Errors:
+  `t:moderation_error/0`.
+
+  A database error or lost connection returns `{:error, :outcome_unknown}`;
+  reload before deciding to repeat.
+
   ### Transaction participants
 
   Each row commits its effects together, in one transaction, or none of them.
@@ -219,6 +270,10 @@ defmodule Tips.Content do
   | Same-key retry | none |
   | Actual edit | `:content_version`, `:search_text`, `:media_changes`, `:media_cleanup_jobs` |
   | No-op edit | none |
+  | Author deletion | `:content_version`, `:report_resolution`, `:notification_removal` |
+  | Hide | `:content_version`, `:report_resolution` |
+  | Restore | `:content_version` |
+  | Unchanged deletion, hide or restore | none |
 
   `Tips.Content.Search` writers already require a caller transaction. A
   search or required notification failure rolls back the publication. The
@@ -229,7 +284,7 @@ defmodule Tips.Content do
 
   alias Tips.Accounts
   alias Tips.Accounts.Scope
-  alias Tips.Content.{Edit, Intent, Projection, Publication, Read}
+  alias Tips.Content.{Deletion, Edit, Intent, Moderation, Projection, Publication, Read}
 
   @typedoc """
   Who reads: `nil` for an anonymous viewer, or the server-held reference to
@@ -392,6 +447,60 @@ defmodule Tips.Content do
           | {:upload_pending, [media_id()]}
           | :outcome_unknown
 
+  @typedoc "A confirmed deletion, hide or restore with the committed version and state."
+  @type lifecycle_receipt :: %{
+          kind: kind(),
+          id: pos_integer(),
+          tip_id: pos_integer(),
+          state: :live | :hidden | :deleted,
+          edit_version: pos_integer(),
+          outcome: :changed | :unchanged
+        }
+
+  @typedoc "A rejected author deletion. See \"Deletion and moderation\"."
+  @type delete_error ::
+          :unauthenticated
+          | :not_found
+          | :media_cleanup_required
+          | {:rate_limited | :capacity, retry_after_seconds :: pos_integer()}
+          | :outcome_unknown
+
+  @typedoc "One open report in a moderation case. Reporter identity is never included."
+  @type report :: %{
+          id: pos_integer(),
+          reason: :spam | :harmful | :fabricated | :other,
+          detail: String.t() | nil,
+          created_at: DateTime.t()
+        }
+
+  @typedoc """
+  A moderation case: identity, current state and version, the moderator's
+  projection of the content and its open reports, oldest first.
+  """
+  @type moderation_case :: %{
+          kind: kind(),
+          id: pos_integer(),
+          tip_id: pos_integer(),
+          state: :live | :hidden | :deleted,
+          edit_version: pos_integer(),
+          content: Projection.tip_detail() | Projection.review_view(),
+          reports: [report()]
+        }
+
+  @typedoc """
+  A rejected hide or restore. `{:conflict, case}` carries the current case to
+  review again. Malformed input is a changeset.
+  """
+  @type moderation_error ::
+          :unauthenticated
+          | :unconfirmed
+          | :forbidden
+          | :not_found
+          | {:conflict, moderation_case()}
+          | Ecto.Changeset.t()
+          | {:rate_limited | :capacity, retry_after_seconds :: pos_integer()}
+          | :outcome_unknown
+
   @typedoc "A database effect that commits with its operation. See the participant table."
   @type effect ::
           :content
@@ -402,6 +511,8 @@ defmodule Tips.Content do
           | :media_changes
           | :media_cleanup_jobs
           | :review_notification
+          | :report_resolution
+          | :notification_removal
 
   @doc """
   Compares two editable intents of one `kind`: a saved intent or edit base
@@ -502,4 +613,39 @@ defmodule Tips.Content do
   @spec get_review_page(viewer(), term()) ::
           {:ok, Projection.selected_review()} | {:error, read_error()}
   defdelegate get_review_page(viewer, review_id), to: Read
+
+  @doc """
+  Deletes the author's own tip or review, irreversibly. See "Deletion and
+  moderation".
+  """
+  @spec delete_content(Scope.t() | nil, kind(), pos_integer()) ::
+          {:ok, lifecycle_receipt()} | {:error, delete_error()}
+  defdelegate delete_content(scope, kind, id), to: Deletion, as: :delete
+
+  @doc """
+  Reads one moderation case for a moderator's session. See "Deletion and
+  moderation".
+  """
+  @spec get_moderation_case(Accounts.SessionRef.t(), kind(), term()) ::
+          {:ok, moderation_case()}
+          | {:error, :unauthenticated | :forbidden | :not_found | :outcome_unknown}
+  defdelegate get_moderation_case(session_ref, kind, id), to: Moderation, as: :get_case
+
+  @doc """
+  Hides a tip or review as the moderator reviewed it, resolving the reviewed
+  reports. See "Deletion and moderation".
+  """
+  @spec hide_content(Scope.t() | nil, kind(), pos_integer(), pos_integer(), [pos_integer()]) ::
+          {:ok, lifecycle_receipt()} | {:error, moderation_error()}
+  def hide_content(scope, kind, id, expected_version, reviewed_report_ids),
+    do: Moderation.moderate(:hide, scope, kind, id, expected_version, reviewed_report_ids)
+
+  @doc """
+  Restores a hidden tip or review as the moderator reviewed it. The reviewed
+  reports stay open. See "Deletion and moderation".
+  """
+  @spec restore_content(Scope.t() | nil, kind(), pos_integer(), pos_integer(), [pos_integer()]) ::
+          {:ok, lifecycle_receipt()} | {:error, moderation_error()}
+  def restore_content(scope, kind, id, expected_version, reviewed_report_ids),
+    do: Moderation.moderate(:restore, scope, kind, id, expected_version, reviewed_report_ids)
 end
