@@ -65,6 +65,10 @@ Load only relevant skills. State which skills you are using before making change
 
 ## Writing
 
+Before drafting or editing a GitHub comment, review or reply, load
+[github-comments](agent/skills/github-comments/SKILL.md). This applies to Codex and
+Claude, including after context recovery if the skill is no longer in context.
+
 Applies to chat, issues, PRs, comments, commits and handoffs.
 
 - Simple, plain English. No mannered prose. Concise and succinct. Write like the reader has ADHD. Less is more.
