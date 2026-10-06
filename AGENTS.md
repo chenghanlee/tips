@@ -28,14 +28,18 @@
 
 - No mannered prose. The user has ADHD.
 - Plain and simple English, in chat, issues, PRs, comments and commits. Lead with the result and the next action.
+- Omit greetings, praise, rhetorical questions, stock transitions and repeated conclusions.
 - State each decision or result once and link its evidence instead of repeating it.
 
 ## Tests
 
-- Follow Kent Beck's [Test Desiderata](https://testdesiderata.com/) when writing tests.
-- Focus on behaviour and integration tests. Write very few unit and end-to-end tests.
-- When behaviour changes and existing coverage does not establish it, write the failing acceptance or regression test first and confirm it fails for the right reason.
-- Keep the suite lean: add a test only for confidence that is missing; remove redundant tests and simplify costly ones without losing required coverage.
+- Weigh each test's value against its cost with Kent Beck's [Test Desiderata](https://testdesiderata.com/); its properties are trade-offs, not a checklist.
+- Test behaviour with integration tests. Add a unit test only for pure-logic boundary cases they do not reach, and an end-to-end test only for a user interaction that lower-level tests cannot exercise.
+- The default is no new test. First read the existing tests for the behaviour. Add a test only if breaking the behaviour would leave every existing test passing; otherwise change an existing test. One test per behaviour, not per function or branch.
+- Do not test the framework, a library, a private function or the code's structure.
+- When behaviour changes and no existing test establishes it, write the failing acceptance or regression test first and confirm it fails for the right reason.
+- In the same PR, delete the tests your change makes redundant. Keep the only test of an acceptance scenario or regression.
+- Reviewing: for each new test, name the defect that only it would catch. If there is none, its removal is a P1 finding.
 
 ## GitHub
 
