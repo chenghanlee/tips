@@ -3,10 +3,12 @@ defmodule TipsWeb.SearchLive.Index do
   The search page, `/search?q=…&technique=…&model=…&environment=…&page=…`.
 
   The URL is the only search state. `handle_params/3` normalizes it into a
-  request and runs `Tips.Content.search_tips/3` synchronously, on the
-  disconnected and the first connected render alike; an unchanged request
-  does no new search. Later parameter changes still search synchronously
-  until #59 moves them to named async work.
+  request and runs `Tips.Content.search_tips/3` synchronously on the
+  disconnected and the first connected render; an unchanged request does no
+  new search. Later parameter changes and Retry go through `begin_results/1`:
+  it cancels the previous `:results` task, shows loading under the new
+  heading and starts a new one. LiveView drops the result or exit of a task
+  that a newer `start_async/3` replaced, so stale pages never render.
 
   Normalization:
 
@@ -59,7 +61,13 @@ defmodule TipsWeb.SearchLive.Index do
           value={@request.filters[filter]}
         />
       </UI.filter_bar>
-      <section :if={@request.q} id="results" class="grid gap-4" aria-labelledby="results-heading">
+      <section
+        :if={@request.q}
+        id="results"
+        class="grid gap-4"
+        aria-labelledby="results-heading"
+        phx-hook=".RestoreScroll"
+      >
         <h1 id="results-heading" class="text-xl font-semibold">
           Results for “{@request.q}”
           <span class="text-sm font-normal text-muted-foreground">
@@ -68,12 +76,37 @@ defmodule TipsWeb.SearchLive.Index do
         </h1>
         <.results result={@result} request={@request} />
       </section>
+      <script :type={Phoenix.LiveView.ColocatedHook} name=".RestoreScroll">
+        // LiveView restores a history entry's scroll position when a Back patch
+        // replies, while only the loading notice shows. Apply it again once the
+        // rows arrive. A link or filter patch shows loading before it pushes its
+        // new URL, so a changed URL means there is no position to restore.
+        export default {
+          updated() {
+            const loading = this.el.querySelector("#results-loading") !== null
+            if (loading && !this.loading) {
+              this.from = {href: location.href, scroll: history.state?.scroll}
+            }
+            const {href, scroll} = this.from || {}
+            if (!loading && this.loading && href === location.href && typeof scroll === "number") {
+              requestAnimationFrame(() => window.scrollTo(0, scroll))
+            }
+            this.loading = loading
+          }
+        }
+      </script>
     </Layouts.app>
     """
   end
 
   attr :result, :any, required: true
   attr :request, :map, required: true
+
+  defp results(%{result: :loading} = assigns) do
+    ~H"""
+    <UI.notice id="results-loading" role="status">Loading results…</UI.notice>
+    """
+  end
 
   defp results(%{result: {:ok, %{entries: []}}} = assigns) do
     ~H"""
@@ -158,9 +191,36 @@ defmodule TipsWeb.SearchLive.Index do
   @impl true
   def handle_params(params, _uri, socket) do
     case request(params, socket.assigns.options) do
-      request when request == socket.assigns.request -> {:noreply, socket}
-      request -> {:noreply, socket |> clear_error(request) |> assign(request: request) |> run()}
+      request when request == socket.assigns.request ->
+        {:noreply, socket}
+
+      request ->
+        {:noreply,
+         socket
+         |> clear_error(request)
+         |> assign(request: request, page_title: page_title(request))
+         |> load_results(socket.assigns.request)}
     end
+  end
+
+  # The first request of this LiveView process searches synchronously, so the
+  # disconnected render and the first connected render, also after a
+  # reconnect, have their rows. Later requests load asynchronously.
+  defp load_results(socket, nil = _previous) do
+    assign(socket, result: search(socket.assigns.current_scope, socket.assigns.request))
+  end
+
+  defp load_results(socket, _previous), do: begin_results(socket)
+
+  # Cancelling the previous task stops its work; replacing it alone would only
+  # drop its result. The task captures plain values, never the socket.
+  defp begin_results(socket) do
+    %{current_scope: scope, request: request} = socket.assigns
+
+    socket
+    |> cancel_async(:results)
+    |> assign(result: :loading)
+    |> start_async(:results, fn -> search(scope, request) end)
   end
 
   # Only a new submitted query clears the blank-search message. Clearing it on
@@ -189,13 +249,20 @@ defmodule TipsWeb.SearchLive.Index do
     end
   end
 
-  def handle_event("retry", _params, socket), do: {:noreply, run(socket)}
+  def handle_event("retry", _params, socket), do: {:noreply, begin_results(socket)}
 
-  defp run(%{assigns: %{request: request}} = socket) do
-    socket
-    |> assign(result: search(socket.assigns.current_scope, request))
-    |> assign(page_title: if(request.q, do: "#{request.q} · Search", else: "Search"))
-  end
+  @impl true
+  def handle_async(:results, {:ok, result}, socket),
+    do: {:noreply, assign(socket, result: result)}
+
+  # A cancelled task is not a failure.
+  def handle_async(:results, {:exit, {:shutdown, :cancel}}, socket), do: {:noreply, socket}
+
+  def handle_async(:results, {:exit, _reason}, socket),
+    do: {:noreply, assign(socket, result: {:error, :unavailable})}
+
+  defp page_title(%{q: nil}), do: "Search"
+  defp page_title(%{q: q}), do: "#{q} · Search"
 
   defp search(_scope, %{q: nil}), do: nil
   defp search(_scope, %{page: page}) when page > @last_page, do: :out_of_range

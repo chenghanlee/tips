@@ -1,7 +1,8 @@
 defmodule TipsWeb.SearchLive.IndexTest do
   @moduledoc """
   Acceptance evidence for #58: `/search` renders one URL-driven result page,
-  the same on the disconnected and first connected render.
+  the same on the disconnected and first connected render. For #59, later
+  requests load asynchronously and cancel stale work.
 
   The embedding provider answers 503, so each search uses keyword ranking.
   """
@@ -138,6 +139,7 @@ defmodule TipsWeb.SearchLive.IndexTest do
 
     lv |> form("form[role=search]", %{q: "flake fix"}) |> render_submit()
     assert_patch(lv, "/search?q=flake+fix&technique=workflow")
+    render_async(lv)
     assert_received {:provider_input, input}
     assert input =~ ~r/Query:flake fix$/
 
@@ -146,6 +148,7 @@ defmodule TipsWeb.SearchLive.IndexTest do
 
     lv |> form("#filters", %{technique: "", environment: "cli"}) |> render_change()
     assert_patch(lv, "/search?environment=cli&q=flake+fix")
+    render_async(lv)
   end
 
   test "invalid and out-of-window pages normalize the same way on both renders", %{
@@ -184,7 +187,9 @@ defmodule TipsWeb.SearchLive.IndexTest do
 
     # The search relations become unresolvable until the path is restored.
     Tips.Repo.query!("SET LOCAL search_path = pg_catalog")
-    html = lv |> form("#filters", %{environment: "cli"}) |> render_change()
+    lv |> form("#filters", %{environment: "cli"}) |> render_change()
+    assert_patch(lv, "/search?environment=cli&q=flake")
+    html = render_async(lv)
     Tips.Repo.query!("SET LOCAL search_path TO DEFAULT")
 
     assert text(html, "#results-error") =~ "Couldn't load this page of results."
@@ -192,8 +197,68 @@ defmodule TipsWeb.SearchLive.IndexTest do
     refute has?(html, "#result-rows")
     assert squished(html, "#results-heading") == "Results for “flake” · Environment: CLI"
 
+    # Retry reruns the same URL without a patch, so it adds no history entry.
     html = lv |> element("#retry") |> render_click()
-    assert text(html, "#results-empty") == "No tips match these filters"
+    assert has?(html, "#results-loading")
+    refute has?(html, "#results-error")
+    assert text(render_async(lv), "#results-empty") == "No tips match these filters"
+    refute_patched(lv)
+  end
+
+  test "a later request cancels the earlier search; neither its exit nor a late result shows",
+       %{conn: conn, author: author} do
+    indexed_tip!(author, %{title: "Slow build"})
+    flake = indexed_tip!(author, %{title: "Flake fix"})
+    test = self()
+
+    # These queries wait for the test's :release; the first page's does not.
+    stub_provider(fn conn, input ->
+      if input =~ ~r/Query:(slow|build|flake fix)$/ do
+        send(test, {:held, self()})
+        receive do: (:release -> :ok)
+      end
+
+      Plug.Conn.send_resp(conn, 503, "")
+    end)
+
+    {:ok, lv, _html} = live(conn, "/search?q=flake")
+
+    submit(lv, "slow")
+    assert_receive {:held, slow}
+    slow_ref = Process.monitor(slow)
+
+    # Cancelling stops the earlier search's work, and its exit shows no error.
+    submit(lv, "build")
+    assert_receive {:DOWN, ^slow_ref, :process, ^slow, {:shutdown, :cancel}}
+    assert_receive {:held, build}
+
+    html = render(lv)
+    assert squished(html, "#results-heading") == "Results for “build”"
+    assert has?(html, "#results-loading")
+    refute has?(html, "#results-error")
+    refute has?(html, "#result-rows")
+
+    # The build search finishes after the next URL change, a patch as Back
+    # sends, reached the LiveView and before the LiveView handles it, so its
+    # result is already queued when the patch replaces it.
+    :sys.suspend(lv.pid)
+    patching = Task.async(fn -> render_patch(lv, "/search?q=flake+fix") end)
+    await_queued(lv.pid, 1)
+    send(build, :release)
+    await_queued(lv.pid, 2)
+    :sys.resume(lv.pid)
+    Task.await(patching)
+    assert_receive {:held, flake_fix}
+
+    html = render(lv)
+    assert squished(html, "#results-heading") == "Results for “flake fix”"
+    assert has?(html, "#results-loading")
+    refute has?(html, "#result-rows")
+
+    send(flake_fix, :release)
+    html = render_async(lv)
+    assert [_row] = html |> find("#result-rows li") |> Enum.to_list()
+    assert has?(html, "#tip-#{flake.id}")
   end
 
   test "without a query the page searches nothing", %{conn: conn} do
@@ -204,6 +269,17 @@ defmodule TipsWeb.SearchLive.IndexTest do
     end
 
     refute_received {:provider_input, _input}
+  end
+
+  defp submit(lv, q), do: lv |> form("form[role=search]", %{q: q}) |> render_submit()
+
+  defp await_queued(pid, count) do
+    {:message_queue_len, queued} = Process.info(pid, :message_queue_len)
+
+    if queued < count do
+      Process.sleep(5)
+      await_queued(pid, count)
+    end
   end
 
   defp squished(html, selector), do: html |> text(selector) |> String.split() |> Enum.join(" ")
