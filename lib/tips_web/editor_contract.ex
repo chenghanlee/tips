@@ -56,7 +56,10 @@ defmodule TipsWeb.EditorContract do
   preserves the proposal. The request is an instruction: the hook clears only
   a stored record with the same storage and that draft pair, and newer work
   stays. It replies `editor:cleared` with a `t:clear_status/0`; only
-  `:conflict` keeps the editor open.
+  `:conflict` keeps the editor open. The page replies `%{left: boolean()}`;
+  unless the page is leaving, as after a remount, the hook opens the
+  request's `to` itself, and it does the same when a reconnect follows its
+  clear.
 
   ## Page and hook
 
@@ -76,14 +79,14 @@ defmodule TipsWeb.EditorContract do
   | `editor:reconcile` | hook or Check again to LiveView | `%{}`: look up an unsettled submission |
   | `editor:handoff` | LiveView to hook | `t:handoff/0` |
   | `editor:clear` | LiveView to hook | `t:clear_request/0` |
-  | `editor:cleared` | hook to LiveView | `%{status: t:clear_status/0}` |
+  | `editor:cleared` | hook to LiveView | `%{status: t:clear_status/0}`, replied with `%{left: boolean()}` |
   | `editor:settled` | LiveView to hook | `%{unresolved: boolean()}` after a submit, restore or lookup |
   | `editor:refused` | LiveView to hook | `%{}`: a submit failed validation |
 
   The hook sends `editor:restore` only on a fresh mount, never on reconnect.
-  `:restored` settles recovery, not publication; `:published` means the
-  record's publication is confirmed, so the hook clears it and the page keeps
-  its fresh form; `:rejected` means the recovered identity is not this
+  `:restored` settles recovery, not publication; `:published` (with `to`, the
+  item's path) means the record's publication is confirmed, so the page
+  restores it and the hook clears it; `:rejected` means the recovered identity is not this
   form's. With no record or a storage error the author composes without a
   restore reply. Reconnect uses `editor:recover` and reads no storage; if a
   submission was unsettled, the hook then sends `editor:reconcile`, as the
@@ -147,16 +150,20 @@ defmodule TipsWeb.EditorContract do
 
   @typedoc "The reply to `editor:restore`, naming the record it settles."
   @type restore_reply :: %{
-          status: restore_status(),
-          storage: storage_identity(),
-          draft: draft_pair()
+          required(:status) => restore_status(),
+          required(:storage) => storage_identity(),
+          required(:draft) => draft_pair(),
+          optional(:to) => String.t()
         }
 
   @typedoc "`editor:handoff`: K's storage and current pair, and its edit-mode record."
   @type handoff :: %{storage: storage_identity(), expected: draft_pair(), record: draft_record()}
 
-  @typedoc "`editor:clear`: the slot and draft whose submitted revision to clear."
-  @type clear_request :: %{storage: storage_identity(), draft_id: Ecto.UUID.t()}
+  @typedoc """
+  `editor:clear`: the slot and draft whose submitted revision to clear, and
+  the confirmed item's path.
+  """
+  @type clear_request :: %{storage: storage_identity(), draft_id: Ecto.UUID.t(), to: String.t()}
 
   @typedoc """
   The hook's clear: `:ok`, `:none` (no revision of this page held the

@@ -287,12 +287,14 @@ defmodule TipsWeb.EditorTest do
     assert_reply(b, %{status: "restored"})
 
     a |> form(form_id, tip: values) |> render_submit()
-    assert_push_event(a, "editor:clear", %{draft_id: ^key})
     assert %Tip{id: id} = Repo.get_by!(Tip, submission_key: key)
+    to = "/tips/#{id}/plan-first"
+    assert_push_event(a, "editor:clear", %{draft_id: ^key, to: ^to})
 
-    # Newer work from another tab kept the draft: no navigation.
+    # Other work kept the draft: no navigation.
     html = render_hook(a, "editor:cleared", %{"status" => "conflict"})
-    assert text(html, "#{form_id}-outcome") =~ "A newer draft from another tab was kept"
+    assert_reply(a, %{left: false})
+    assert text(html, "#{form_id}-outcome") =~ "A different draft saved in this browser was kept"
 
     # Tab B's different values are not the publication.
     html = b |> form(form_id, tip: %{values | body: "Plan, then prompt."}) |> render_submit()
@@ -312,10 +314,18 @@ defmodule TipsWeb.EditorTest do
       "record" => published
     })
 
-    assert_reply(c, %{status: "published"})
-    assert record(render(c), form_id)["submission_key"] != key
+    assert_reply(c, %{status: "published", to: ^to})
+    c_html = render(c)
+    assert record(c_html, form_id)["submission_key"] == key
+
+    # A reconnect before the clear settles still finds the publication.
+    {:ok, c2, c2_html} = live(conn, "/editor/tips/new")
+    recover(c2, c2_html, form_id, c_html, json(values))
+    render_hook(c2, "editor:reconcile", %{})
+    assert_push_event(c2, "editor:clear", %{draft_id: ^key, to: ^to})
+
     render_hook(c, "editor:cleared", %{"status" => "ok"})
-    assert_redirect(c, "/tips/#{id}/plan-first")
+    assert_redirect(c, to)
 
     {:ok, d, d_html} = live(conn, "/editor/tips/new")
     unknown = put_in(published, ["intent", "uploads"], nil)

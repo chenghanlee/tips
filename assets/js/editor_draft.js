@@ -27,11 +27,12 @@
 // A submit saves exactly the submitted values first. When the page confirms
 // them (editor:clear), the hook clears the revision that holds them, only
 // while the slot still holds it, and reports the result (editor:cleared);
-// the page then leaves, or stays when newer work kept the draft. A restore
-// the page answers "published" clears the restored revision the same way.
-// editor:settled says whether the submission is still unresolved; after a
-// reconnect, an unsettled submission is looked up again (editor:reconcile),
-// as its reply may have been lost.
+// the page then leaves, or stays when other work kept the draft. If that
+// report is lost, or the page reconnects after the clear, the hook leaves for
+// the confirmed item itself. A restore the page answers "published" clears
+// the restored revision the same way. editor:settled says whether the
+// submission is still unresolved; after a reconnect, an unsettled submission
+// is looked up again (editor:reconcile), as its reply may have been lost.
 
 import {EDITOR_EVENTS} from "./editor_contract.js"
 import {clear, create, load, save} from "./editor_draft_store.js"
@@ -75,8 +76,13 @@ export const EditorDraft = {
     this.timer = null
     // Draft writes run one at a time, in order.
     this.queue = Promise.resolve(null)
-    // Resolves to the pair that holds the last submitted values, or null.
+    // Resolves to {status, pair}: whether the last submitted values were saved,
+    // and the pair that holds them.
     this.submission = null
+    // Autosave paused because the slot holds other work.
+    this.kept = false
+    // Where a confirmed item is; the hook leaves for it after its clear.
+    this.destination = null
     // A submission whose outcome the page has not settled.
     this.unsettled = false
     this.typed = !sameAttrs(readAttrs(this.el, this.kind), this.record.intent.attrs, this.kind)
@@ -117,7 +123,9 @@ export const EditorDraft = {
 
   reconnected() {
     this.connected = true
-    if (this.unsettled) this.pushEvent(EDITOR_EVENTS.reconcile, {}, () => {})
+    // The remounted page no longer holds the confirmed receipt.
+    if (this.phase === "cleared") this.leave()
+    else if (this.unsettled) this.pushEvent(EDITOR_EVENTS.reconcile, {}, () => {})
   },
 
   destroyed() {
@@ -159,7 +167,7 @@ export const EditorDraft = {
     if (this.reading !== token) return
     this.reading = null
     if (result.status !== "ok") {
-      this.pause(STATUS.unread, true)
+      this.pause(STATUS.unread, true, false)
     } else if (result.record === null) {
       // Nothing saved any more: keep the input and save it as a new draft.
       this.expected = null
@@ -186,9 +194,12 @@ export const EditorDraft = {
       if (this.pending !== token) return
       this.pending = null
       if (reply.status === "published") {
-        // The draft's publication is confirmed: clear it; the page keeps a fresh form.
+        // The draft's publication is confirmed: the page restored it; clear it.
+        this.record = record
+        this.expected = record.draft
+        this.destination = reply.to
         this.phase = "clearing"
-        clear(record.storage, record.draft).then(({status}) => this.settleClear(status, false))
+        clear(record.storage, record.draft).then(({status}) => this.settleClear(status))
         return
       }
       this.js().removeAttribute(fields, "disabled")
@@ -212,10 +223,12 @@ export const EditorDraft = {
     if (this.typed) this.schedule()
   },
 
-  pause(message, reloadable = false) {
+  // `kept`: the slot holds other work than this page's input.
+  pause(message, reloadable = false, kept = true) {
     clearTimeout(this.timer)
     this.timer = null
     this.phase = "paused"
+    this.kept = kept
     this.showReload(reloadable)
     this.status(message)
   },
@@ -270,50 +283,62 @@ export const EditorDraft = {
 
   // The form is submitting the values on screen; LiveView keeps the inputs
   // read-only until the reply. Saves exactly these values, so that a
-  // confirmed receipt clears the revision that holds them. A paused or
-  // unrestored editor holds no such revision.
+  // confirmed receipt clears the revision that holds them. A save conflict,
+  // or autosave paused over other work, means the slot keeps other work.
+  // An unrestored or unreadable editor holds no revision.
   submitted() {
     this.unsettled = true
     if (this.phase !== "composing") {
-      this.submission = Promise.resolve(null)
+      const status = this.phase === "paused" && this.kept ? "conflict" : "none"
+      this.submission = Promise.resolve({status, pair: null})
       return
     }
     clearTimeout(this.timer)
     this.timer = null
     const attrs = readAttrs(this.el, this.kind)
-    this.submission = this.enqueue(() => attrs).then((result) =>
-      result?.status === "ok" ? result.record.draft : null,
-    )
+    this.submission = this.enqueue(() => attrs).then((result) => ({
+      status: result?.status ?? "none",
+      pair: result?.status === "ok" ? result.record.draft : null,
+    }))
   },
 
   // editor:clear: the page confirmed the submitted content. Clears the
   // revision that holds it, only if the slot still holds that revision.
-  async clearSubmitted({storage, draft_id}) {
-    if (this.phase === "cleared") return this.settleClear("ok", true)
+  async clearSubmitted({storage, draft_id, to}) {
+    this.destination = to
+    if (this.phase === "cleared") return this.settleClear("ok")
     this.phase = "clearing"
     clearTimeout(this.timer)
     this.timer = null
     this.js().setAttribute(this.fields(), "disabled", "")
-    const pair = await (this.submission ?? null)
-    const ours = pair !== null && pair.draft_id === draft_id && sameStorage(storage, this.record.storage)
-    const {status} = ours ? await clear(this.record.storage, pair) : {status: "none"}
-    this.settleClear(status, true)
+    const submitted = await (this.submission ?? {status: "none", pair: null})
+    const ours =
+      submitted.pair !== null && submitted.pair.draft_id === draft_id && sameStorage(storage, this.record.storage)
+    const {status} = ours ? await clear(this.record.storage, submitted.pair) : submitted
+    this.settleClear(ours || status === "conflict" ? status : "none")
   },
 
   // Reports the clear: "ok", "none" (no revision of ours held the values) or
-  // "error" let the page leave; "conflict" keeps newer work and the editor.
-  // A report lost to a disconnect is looked up again after the reconnect.
-  settleClear(status, lookupOnReconnect) {
+  // "error" let the page leave; "conflict" keeps the other work and the
+  // editor. If the page does not leave, as when the report is lost, the hook
+  // leaves by itself.
+  settleClear(status) {
     if (this.phase === "destroyed") return
     if (status === "conflict") {
       this.js().removeAttribute(this.fields(), "disabled")
       this.pause(STATUS.conflict, true)
-    } else {
-      this.phase = "cleared"
+      this.pushEvent(EDITOR_EVENTS.cleared, {status}, () => {})
+      return
     }
-    this.pushEvent(EDITOR_EVENTS.cleared, {status}).catch(() => {
-      if (lookupOnReconnect) this.unsettled = true
-    })
+    this.phase = "cleared"
+    this.pushEvent(EDITOR_EVENTS.cleared, {status}).then(
+      ({left}) => left || this.leave(),
+      () => this.leave(),
+    )
+  },
+
+  leave() {
+    if (this.phase === "cleared" && this.destination) window.location.assign(this.destination)
   },
 
   // The page has patched in the errors before this runs. LiveView then

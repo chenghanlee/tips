@@ -18,8 +18,8 @@ defmodule TipsWeb.Editor do
     * `:pending` is set while a submission's outcome is unresolved: `:absent`
       (no publication now; Retry sends the same key), `:unchecked` (the
       lookup failed; Check again) or `:signed_out`. Its values stay fixed.
-    * `:receipt` is a confirmed publication or save whose draft the hook is
-      clearing. `:saved` is the current saved edit after an unknown outcome.
+    * `:receipt` is a confirmed publication or save, with its destination
+      `:to`, whose draft the hook is clearing. `:saved` is the current saved edit after an unknown outcome.
     * `:refusal` explains a refused or unconfirmed save and `:outcome` a save
       whose browser draft was kept.
 
@@ -27,8 +27,9 @@ defmodule TipsWeb.Editor do
   readmits the session, then publishes or saves. A `:created`,
   `:existing_equivalent`, `:updated` or `:noop` receipt pushes `editor:clear`;
   once the hook has cleared the submitted draft, the page leaves for the
-  published item. If newer browser work kept the draft, the page stays. Any
-  other receipt keeps the draft. An unknown outcome runs one lookup:
+  published item; the hook leaves by itself if that reply is lost. If other
+  browser work kept the draft, the page stays. Any other receipt keeps the
+  draft. An unknown outcome runs one lookup:
   `Tips.Content.get_publication/4` for a publication, `get_edit_form/3` for an
   edit, which shows the saved version beside the proposal and keeps the
   expected version. A restored new draft is looked up before it is applied.
@@ -178,7 +179,10 @@ defmodule TipsWeb.Editor do
      |> settle()}
   end
 
-  def handle_event("editor:cleared", params, socket), do: {:noreply, cleared(socket, params)}
+  def handle_event("editor:cleared", params, socket) do
+    {left?, socket} = cleared(socket, params)
+    {:reply, %{left: left?}, socket}
+  end
 
   defp change(socket, params) do
     kind = kind(socket.assigns.identity.target)
@@ -263,10 +267,13 @@ defmodule TipsWeb.Editor do
   defp acknowledge(socket, %{outcome: outcome} = receipt)
        when outcome in [:created, :existing_equivalent, :updated, :noop] do
     %{storage: storage, draft: %{draft_id: draft_id}} = socket.assigns.record
+    socket = confirm(socket, receipt)
 
-    socket
-    |> assign(pending: nil, receipt: receipt)
-    |> LiveView.push_event("editor:clear", %{storage: storage_json(storage), draft_id: draft_id})
+    LiveView.push_event(socket, "editor:clear", %{
+      storage: storage_json(storage),
+      draft_id: draft_id,
+      to: socket.assigns.receipt.to
+    })
   end
 
   defp acknowledge(socket, receipt) do
@@ -274,6 +281,10 @@ defmodule TipsWeb.Editor do
     |> assign(:pending, nil)
     |> refuse(:published_earlier, receipt.state != :deleted && destination(socket, receipt))
   end
+
+  # Holds the confirmed receipt and its destination until the hook's clear.
+  defp confirm(socket, receipt),
+    do: assign(socket, pending: nil, receipt: Map.put(receipt, :to, destination(socket, receipt)))
 
   # One lookup of what an unknown outcome left saved. A publication is looked
   # up by its key and the submitted values; an edit reads the saved version
@@ -318,29 +329,30 @@ defmodule TipsWeb.Editor do
       LiveView.push_event(socket, "editor:settled", %{unresolved: socket.assigns.pending != nil})
 
   # The hook's result for the confirmed draft: cleared, not stored or not
-  # clearable leave the editor; newer browser work keeps it open.
-  defp cleared(%{assigns: %{receipt: nil}} = socket, _params), do: socket
+  # clearable leave the editor; other browser work keeps it open. Returns
+  # whether the page is leaving; without a receipt (a remounted page) the
+  # hook leaves by itself.
+  defp cleared(%{assigns: %{receipt: nil}} = socket, _params), do: {false, socket}
 
-  defp cleared(%{assigns: %{receipt: receipt}} = socket, %{"status" => "conflict"}) do
-    assign(socket, receipt: nil, outcome: kept(receipt))
-  end
+  defp cleared(%{assigns: %{receipt: receipt}} = socket, %{"status" => "conflict"}),
+    do: {false, assign(socket, receipt: nil, outcome: kept(receipt))}
 
   defp cleared(%{assigns: %{receipt: receipt}} = socket, _params) do
-    socket
-    |> assign(:receipt, nil)
-    |> LiveView.put_flash(:info, done(receipt))
-    |> LiveView.push_navigate(to: destination(socket, receipt))
+    {true,
+     socket
+     |> assign(:receipt, nil)
+     |> LiveView.put_flash(:info, done(receipt))
+     |> LiveView.push_navigate(to: receipt.to)}
   end
 
   defp done(%{outcome: outcome}) when outcome in [:updated, :noop], do: "Changes saved."
   defp done(_receipt), do: "Published."
 
   defp kept(%{outcome: outcome}) when outcome in [:updated, :noop],
-    do:
-      "Changes saved. Newer changes from another tab were kept in this browser; they aren't saved."
+    do: "Changes saved. A different draft saved in this browser was kept; it isn't saved."
 
   defp kept(_receipt),
-    do: "Published. A newer draft from another tab was kept in this browser; it isn't published."
+    do: "Published. A different draft saved in this browser was kept; it isn't published."
 
   # The item's page, from its current projection.
   defp destination(_socket, %{kind: :review, id: id}), do: ~p"/reviews/#{id}"
@@ -440,8 +452,9 @@ defmodule TipsWeb.Editor do
   defp restore(socket, params), do: {reply("rejected", params["record"]), socket}
 
   # A new draft may have been published from another page: its key is looked
-  # up first. An equivalent publication keeps the fresh form while the hook
-  # clears the draft; a missing one restores the ordinary draft.
+  # up first. An equivalent publication restores the draft while the hook
+  # clears it, so recovery keeps its key until the clear settles; a missing
+  # one restores the ordinary draft.
   defp reopen(socket, %{mode: :new} = record, json) do
     restored = assign_record(socket, record)
 
@@ -450,7 +463,8 @@ defmodule TipsWeb.Editor do
         {reply("restored", json), restored}
 
       {:ok, %{outcome: :existing_equivalent} = receipt} ->
-        {reply("published", json), assign(socket, :receipt, receipt)}
+        restored = confirm(restored, receipt)
+        {Map.put(reply("published", json), :to, restored.assigns.receipt.to), restored}
 
       result ->
         {reply("restored", json), reconciled(restored, result)}

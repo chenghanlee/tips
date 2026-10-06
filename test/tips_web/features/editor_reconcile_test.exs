@@ -23,7 +23,7 @@ defmodule TipsWeb.EditorReconcileTest do
     %{user: user, form: "#editor-#{user.id}-tip"}
   end
 
-  feature "a tab whose draft has newer work in another tab publishes and leaves; the newer draft stays",
+  feature "a tab whose draft has newer work in another tab publishes and stays; the newer draft stays",
           %{session: session, form: form} do
     tab_a = window_handle(session)
     session |> open_editor("/editor/tips/new") |> compose("Plan before you prompt.", form)
@@ -40,8 +40,11 @@ defmodule TipsWeb.EditorReconcileTest do
     session
     |> focus_window(tab_a)
     |> click(button("Publish"))
-    |> assert_has(css("h1", text: "Plan first"))
-    |> assert_has(css("[role=alert]", text: "Published."))
+    |> assert_has(
+      css("#{form}-outcome", text: "A different draft saved in this browser was kept")
+    )
+
+    assert current_path(session) == "/editor/tips/new"
 
     assert %{"intent" => %{"attrs" => %{"body" => "Plan before you prompt, then test."}}} =
              stored(session, storage)
@@ -55,7 +58,7 @@ defmodule TipsWeb.EditorReconcileTest do
     assert [%Tip{body: "Plan before you prompt."}] = Repo.all(Tip)
   end
 
-  feature "a publish whose reply was lost is looked up after the reconnect, then cleared",
+  feature "a publish whose replies were lost is looked up after the reconnect, cleared and left",
           %{session: session, form: form} do
     session |> open_editor("/editor/tips/new") |> compose("Plan before you prompt.", form)
     %{"storage" => storage, "submission_key" => key} = hidden_record(session)
@@ -63,13 +66,20 @@ defmodule TipsWeb.EditorReconcileTest do
     drop_replies(session)
     click(session, button("Publish"))
     await(fn -> Repo.get_by(Tip, submission_key: key) end)
+
+    # The lookup confirms it and the hook clears the draft, but its report
+    # never reaches the page.
+    drop_push(session, "editor:cleared")
     reconnect(session)
+    await_cleared(session, storage)
 
-    session
-    |> assert_has(css("h1", text: "Plan first"))
-    |> assert_has(css("[role=alert]", text: "Published."))
+    # The page may leave as soon as the connection drops.
+    execute_script(
+      session,
+      "window.liveSocket.disconnect(); setTimeout(() => window.liveSocket.connect(), 100)"
+    )
 
-    assert stored(session, storage) == nil
+    assert_has(session, css("h1", text: "Plan first"))
   end
 
   feature "a save whose reply was lost shows the saved version beside the proposal",
@@ -130,6 +140,21 @@ defmodule TipsWeb.EditorReconcileTest do
     """)
   end
 
+  # Never sends the page's `event` pushes.
+  defp drop_push(session, event) do
+    run(
+      session,
+      """
+      const socket = window.liveSocket.getSocket()
+      const push = socket.push.bind(socket)
+      socket.push = (data) => {
+        if (data.payload?.event !== args[0]) push(data)
+      }
+      """,
+      [event]
+    )
+  end
+
   defp reconnect(session) do
     run(session, """
     const main = document.querySelector("[data-phx-main]")
@@ -153,6 +178,21 @@ defmodule TipsWeb.EditorReconcileTest do
       found ->
         found
     end
+  end
+
+  defp await_cleared(session, storage) do
+    run(
+      session,
+      """
+      const store = await importStore()
+      const deadline = Date.now() + 5000
+      while ((await store.load(args[0])).record !== null) {
+        if (Date.now() > deadline) throw new Error("the draft was not cleared")
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+      """,
+      [storage]
+    )
   end
 
   defp stored(session, storage) do

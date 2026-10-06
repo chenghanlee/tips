@@ -133,12 +133,13 @@ export const EDITOR_DOM = Object.freeze({
  */
 
 /**
- * published: the record's publication is confirmed, so the hook clears it
- * and the page keeps its fresh form.
+ * published: the record's publication is confirmed, so the page restored it
+ * and the hook clears it; `to` is the item's path.
  * @typedef {Object} EditorRestoreReply
  * @property {"restored"|"published"|"rejected"} status
  * @property {EditorStorageIdentity} storage
  * @property {EditorDraftPair} draft
+ * @property {string} [to]
  */
 
 /**
@@ -150,15 +151,18 @@ export const EDITOR_DOM = Object.freeze({
 
 /**
  * An instruction to clear the revision that holds the submitted values, not
- * a result. The hook owns the revision; the page names the slot and draft.
+ * a result. The hook owns the revision; the page names the slot and draft,
+ * and `to`, the confirmed item's path.
  * @typedef {Object} EditorClearRequest
  * @property {EditorStorageIdentity} storage
  * @property {string} draft_id
+ * @property {string} to
  */
 
 /**
  * ok: cleared. none: no revision of this page held the values. error: storage
- * failed. conflict: the slot holds newer work, which stays.
+ * failed. conflict: the slot holds other work, which stays. The page replies
+ * {left: boolean}; unless it is leaving, the hook leaves for `to` itself.
  * @typedef {Object} EditorClearResult
  * @property {"ok"|"none"|"error"|"conflict"} status
  */
