@@ -20,7 +20,7 @@ defmodule Tips.SearchGateTest do
                "data" => %{
                  "endpoints" => [
                    %{
-                     "tag" => "deepinfra",
+                     "tag" => "deepinfra/us",
                      "provider_name" => "DeepInfra",
                      "status" => 0,
                      "context_length" => 32_768,
@@ -40,7 +40,7 @@ defmodule Tips.SearchGateTest do
 
   test "runs every protocol step through the application and sends only eligible documents",
        %{fixtures: fixtures} do
-    stub_provider(fn _input, _documents_sent -> 200 end)
+    stub_provider(fn _input, _documents_sent -> {200, "DeepInfra"} end)
 
     assert {_passed_or_failed, report} =
              SearchGate.run(fixtures,
@@ -71,26 +71,34 @@ defmodule Tips.SearchGateTest do
     assert JSON.encode!(report)
   end
 
-  test "stops the scan at the first failed document request and calls no query", %{
-    fixtures: fixtures
-  } do
-    stub_provider(fn _input, documents_sent -> if documents_sent == 3, do: 500, else: 200 end)
+  for {failure, response} <- [
+        {"an HTTP error", {500, "DeepInfra"}},
+        {"another upstream", {200, "Nebius"}}
+      ] do
+    test "stops the scan at the first document request that gets #{failure} and calls no query",
+         %{fixtures: fixtures} do
+      failed = unquote(Macro.escape(response))
 
-    assert {:stopped, report} =
-             SearchGate.run(fixtures,
-               preflight_plug: {Req.Test, SearchGate},
-               require_empty: false
-             )
+      stub_provider(fn _input, documents_sent ->
+        if documents_sent == 3, do: failed, else: {200, "DeepInfra"}
+      end)
 
-    assert %{stopped: ":provider_error", usage: %{requests: 5, failed_requests: 1}} = report
-    assert %{requests: 3, embedded: 2} = report.scan
-    assert length(provider_inputs()) == 3
-    assert JSON.encode!(report)
+      assert {:stopped, report} =
+               SearchGate.run(fixtures,
+                 preflight_plug: {Req.Test, SearchGate},
+                 require_empty: false
+               )
+
+      assert %{stopped: ":provider_error", usage: %{requests: 5, failed_requests: 1}} = report
+      assert %{requests: 3, embedded: 2} = report.scan
+      assert length(provider_inputs()) == 3
+      assert JSON.encode!(report)
+    end
   end
 
   # Responds as the selected runtime with bag-of-words vectors, so ranking has
   # signal, and reports each request to the gate as Finch telemetry would.
-  defp stub_provider(status_for) do
+  defp stub_provider(response_for) do
     test = self()
     counter = :counters.new(1, [])
 
@@ -99,13 +107,13 @@ defmodule Tips.SearchGateTest do
       %{"input" => [input]} = JSON.decode!(body)
       send(test, {:provider_input, input})
       :counters.add(counter, 1, 1)
-      status = status_for.(input, :counters.get(counter, 1))
+      {status, upstream} = response_for.(input, :counters.get(counter, 1))
 
       response =
         JSON.encode!(%{
           "data" => [%{"index" => 0, "embedding" => bag_of_words(input)}],
           "model" => "Qwen/Qwen3-Embedding-8B",
-          "provider" => "DeepInfra",
+          "provider" => upstream,
           "usage" => %{"prompt_tokens" => byte_size(input), "cost" => 1.0e-8}
         })
 

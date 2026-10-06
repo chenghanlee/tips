@@ -230,7 +230,11 @@ defmodule Tips.SearchGate do
   defp plan(%{fixtures: %{gate: gate, queries: queries}} = state) do
     documents = eligible_documents(state.corpus_ids)
     planned = gate["protocol"]["planned_requests"]
-    reserved = gate["protocol"]["reserved_after_run"]["browser_journey_searches"]
+
+    reserved =
+      gate["protocol"]["reserved_after_run"]["browser_journey_searches"] +
+        gate["protocol"]["requests_before_this_run"]
+
     budget = gate["budget"]
     sizes = Map.new(documents, fn {id, text} -> {id, byte_size(text)} end)
     query_tokens = Enum.map(queries, &tokens(@query_instruction <> &1["text"]))
@@ -313,7 +317,12 @@ defmodule Tips.SearchGate do
         state =
           update_in(
             state.report.preflight,
-            &Map.merge(&1, %{endpoint: endpoint, key: key, estimated_max_cost_usd: estimate})
+            &Map.merge(&1, %{
+              endpoint: endpoint,
+              key: key,
+              estimated_max_cost_usd: estimate,
+              tag_since_234: "#234 ran against tag deepinfra; this run's tag is #{endpoint.tag}"
+            })
           )
 
         cond do
@@ -762,10 +771,12 @@ defmodule Tips.SearchGate do
         _other -> %{}
       end
 
+    path = path |> String.split("/") |> List.last()
+
     %{
-      path: path |> String.split("/") |> List.last(),
+      path: path,
       input: input,
-      outcome: outcome(status),
+      outcome: outcome(status, path, response["provider"]),
       duration_ms: duration_ms,
       model: response["model"],
       provider: response["provider"],
@@ -775,9 +786,16 @@ defmodule Tips.SearchGate do
     }
   end
 
-  defp outcome(200), do: "ok"
-  defp outcome(nil), do: "transport"
-  defp outcome(status), do: "http #{status}"
+  # An embedding served by another upstream is a runtime failure, so it stops the run.
+  defp outcome(200, "embeddings", provider) do
+    if is_binary(provider) and String.downcase(provider) == @endpoint,
+      do: "ok",
+      else: "provider #{inspect(provider)}"
+  end
+
+  defp outcome(200, _path, _provider), do: "ok"
+  defp outcome(nil, _path, _provider), do: "transport"
+  defp outcome(status, _path, _provider), do: "http #{status}"
 
   @doc """
   Sends `record` to the running gate. During the document scan a failed

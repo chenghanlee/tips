@@ -22,9 +22,12 @@
     "eligible_documents": 40
   },
   "protocol": {
-    "runs": 1,
+    "runs": 2,
+    "authorizations": ["https://github.com/chenghanlee/tips/issues/60#issuecomment-6021235880", "https://github.com/chenghanlee/tips/issues/60#issuecomment-6021707162"],
+    "requests_before_this_run": 1,
+    "run_history": "Run 1 (evidence/60-integrated-run-1.json) stopped at preflight with no endpoint tagged deepinfra; the listing now tags DeepInfra deepinfra/us. Run 2 is the last authorized run.",
     "validate_command": "unbuffer mix run --no-start scripts/search_gate.exs --validate",
-    "real_command": "MIX_ENV=dev unbuffer mix ecto.reset && TIPS_REAL_PROVIDERS=1 MIX_ENV=dev unbuffer mix run --no-start scripts/search_gate.exs --real --output test/fixtures/search_probe/evidence/60-integrated-run-1.json",
+    "real_command": "MIX_ENV=dev unbuffer mix ecto.reset && TIPS_REAL_PROVIDERS=1 MIX_ENV=dev unbuffer mix run --no-start scripts/search_gate.exs --real --output test/fixtures/search_probe/evidence/60-integrated-run-2.json",
     "application": "Started with Oban queues and plugins off, so only the steps below call the provider.",
     "steps": [
       "1 preflight: OpenRouter endpoint listing and key check. The report lists every endpoint. Exactly one DeepInfra endpoint (tag deepinfra or deepinfra/<variant>) must be listed with its price and context; otherwise stop. Stop if the estimated cost exceeds the budget.",
@@ -39,10 +42,10 @@
     "reserved_after_run": {"browser_journey_searches": 3, "note": "The browser journey runs against the same database after the run; its searches count toward the 100-request ceiling."},
     "stop_rules": [
       "Refuse to start if the fixture hashes differ, the database has tips, an eligible document exceeds 30,000 bytes, the eligible count is not 40, or the planned requests, token bound or estimated cost exceed the budget.",
-      "Stop at the first non-200 status or transport error from the provider. During the document scan the request process is killed at once, so the scan makes no further request.",
+      "Stop at the first non-200 status, transport error or embedding served by an upstream other than DeepInfra. During the document scan the request process is killed at once, so the scan makes no further request.",
       "Stop after the scan unless it embedded all 40 eligible documents with no failure, skip or stale result.",
       "Stop at the first query pass request that is not a hybrid result: a keyword fallback means the provider was not exercised.",
-      "Never retry. Keep every attempt in the report. A second run needs new authorization."
+      "Never retry. Keep every attempt in the report. A third run needs new authorization."
     ]
   },
   "relevance": {
