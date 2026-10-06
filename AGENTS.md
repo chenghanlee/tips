@@ -21,6 +21,7 @@
 
 ## Software design
 
+- Prefer industry standards, established conventions and proven libraries, frameworks and tools over custom solutions.
 - Use Elixir and Phoenix idioms and conventions, and proven design patterns from widely used similar software.
 - Prefer Ecto's query, changeset and migration DSLs. Use raw SQL only for a database feature those DSLs cannot express; bind runtime values as parameters.
 - Build the simplest working MVP: no enterprise complexity or backwards compatibility. Accept complexity only to simplify the user's experience.
