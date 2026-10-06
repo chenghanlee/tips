@@ -107,6 +107,7 @@ defmodule Tips.SearchGateTest do
         {"an HTTP error", {:status, 500}},
         {"another upstream", {:upstream, "Nebius"}},
         {"an all-zero vector", :zero_vector},
+        {"a vector at index 1", :index_one},
         {"no response before its deadline", :no_response}
       ] do
     test "stops the scan at the first document request that gets #{failure} and calls no query",
@@ -155,9 +156,11 @@ defmodule Tips.SearchGateTest do
       embedding =
         if failure == :zero_vector, do: List.duplicate(0.0, 1024), else: bag_of_words(input)
 
+      index = if failure == :index_one, do: 1, else: 0
+
       response =
         JSON.encode!(%{
-          "data" => [%{"index" => 0, "embedding" => embedding}],
+          "data" => [%{"index" => index, "embedding" => embedding}],
           "model" => "Qwen/Qwen3-Embedding-8B",
           "provider" => upstream,
           "usage" => %{"prompt_tokens" => byte_size(input), "cost" => 1.0e-8}

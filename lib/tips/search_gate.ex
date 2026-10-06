@@ -25,7 +25,7 @@ defmodule Tips.SearchGate do
   alias Tips.Accounts
   alias Tips.Content
   alias Tips.Content.{Review, Search, Tip}
-  alias Tips.Content.Search.{EmbeddingProvider, ProviderCapacity, Vector}
+  alias Tips.Content.Search.{EmbeddingProvider, ProviderCapacity}
   alias Tips.Repo
   alias Tips.Workers.EmbedSearch
 
@@ -44,7 +44,6 @@ defmodule Tips.SearchGate do
   @saturated_requests 3
   @saturation_allowance_ms 250
   @observer {__MODULE__, :observer}
-  @model "qwen/qwen3-embedding-8b"
   # Request counters of the current phase.
   @started 1
   @ended 2
@@ -833,7 +832,7 @@ defmodule Tips.SearchGate do
     %{
       path: path,
       input: input,
-      outcome: outcome(status, path, response, embedding),
+      outcome: outcome(status, path, body, response),
       duration_ms: duration_ms,
       model: response["model"],
       provider: response["provider"],
@@ -843,22 +842,24 @@ defmodule Tips.SearchGate do
     }
   end
 
-  # An embedding the application would reject, or one served by another
+  # An embedding the application rejects, including one served by another
   # upstream, is a runtime failure, so it stops the run.
-  defp outcome(200, "embeddings", response, embedding) do
-    cond do
-      not same?(response["provider"], @endpoint) -> "provider #{inspect(response["provider"])}"
-      not same?(response["model"], @model) -> "model #{inspect(response["model"])}"
-      Vector.literal(embedding) == :error -> "malformed"
-      true -> "ok"
+  defp outcome(200, "embeddings", body, response) do
+    case EmbeddingProvider.decode(body) do
+      {:ok, _vector} ->
+        "ok"
+
+      {:error, :contract} ->
+        "contract: model #{inspect(response["model"])}, provider #{inspect(response["provider"])}"
+
+      {:error, :malformed} ->
+        "malformed"
     end
   end
 
-  defp outcome(200, _path, _response, _embedding), do: "ok"
-  defp outcome(nil, _path, _response, _embedding), do: "transport"
-  defp outcome(status, _path, _response, _embedding), do: "http #{status}"
-
-  defp same?(value, expected), do: is_binary(value) and String.downcase(value) == expected
+  defp outcome(200, _path, _body, _response), do: "ok"
+  defp outcome(nil, _path, _body, _response), do: "transport"
+  defp outcome(status, _path, _body, _response), do: "http #{status}"
 
   @doc """
   Sends `record` to the running gate. During the document scan a failed

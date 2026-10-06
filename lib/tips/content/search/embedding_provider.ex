@@ -142,12 +142,17 @@ defmodule Tips.Content.Search.EmbeddingProvider do
     end
   end
 
-  defp response({:ok, %Req.Response{status: 200, body: body}}), do: parse(body)
+  defp response({:ok, %Req.Response{status: 200, body: body}}), do: decode(body)
   defp response({:ok, %Req.Response{status: status}}), do: {:error, {:http, status}}
   defp response({:error, %Req.TransportError{reason: :timeout}}), do: {:error, :deadline}
   defp response({:error, _exception}), do: {:error, :transport}
 
-  defp parse(body) do
+  @doc """
+  Decodes a 200 response body as `embed_document/2` and `embed_query/2` do:
+  the vector, `{:error, :contract}` or `{:error, :malformed}`.
+  """
+  @spec decode(String.t()) :: {:ok, Vector.t()} | {:error, :contract | :malformed}
+  def decode(body) do
     case JSON.decode(body) do
       {:ok,
        %{
