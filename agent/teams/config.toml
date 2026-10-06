@@ -33,22 +33,3 @@ model = "gpt-6.1-sol"
 effort = "high"
 db_suffix = "_test"
 port_offset = 1
-
-[roles.lead]
-kind = "codex"
-model = "gpt-6-astra"
-effort = "high"
-db_suffix = "_dev-lead"
-port_offset = 2
-
-# Lead client for issues labelled `ui`; launched with --ui. Port and database are roles.lead's.
-[roles.lead_ui]
-kind = "claude"
-model = "fable"
-effort = "high"
-
-[roles.lead_tpm]
-kind = "claude"
-model = "fable"
-effort = "high"
-compaction_percent = 35

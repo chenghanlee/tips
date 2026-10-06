@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local Herdr team lifecycle; shared stop_agent is safe to import."""
+"""Pair lifecycle in Herdr: start, hand over and stop one developer-tester pair per issue."""
 
 import json
 import os
@@ -19,15 +19,9 @@ from typing import NotRequired, TypedDict, cast
 
 
 class Role(TypedDict):
-    """Role settings; resource fields are used only by coding roles."""
-
     kind: str
     model: str
     effort: str
-    compaction_percent: NotRequired[int]
-
-
-class CodingRole(Role):
     port_offset: int
     db_suffix: str
 
@@ -84,6 +78,15 @@ class HerdrResult(TypedDict):
 
 
 ProcessRows = dict[int, tuple[int, str]]
+ROLES = ("dev", "test")
+ROLE_TITLES = {"dev": "developer", "test": "tester"}
+# Dexter's query gives up this long after --wait: its allowance to reach the daemon.
+DEXTER_CONNECT_SECONDS = 30
+# A cold Hex cache downloads every package; anything slower is a hung fetch.
+DEPS_FETCH_SECONDS = 300
+CODEX_CONFIG = """[plugins."mix-credo@elixir-agent-tools"]
+enabled = true
+"""
 # Disable alternate language paths in launched clients, without editing user settings.
 NATIVE_LSP_PLUGINS = {
     "elixir-lsp@elixir-agent-tools": False,
@@ -137,9 +140,13 @@ def execute(
 
 
 def run(
-    *args: str | Path | int, cwd: str | Path | None = None, timeout: float | None = None
+    *args: str | Path | int,
+    cwd: str | Path | None = None,
+    timeout: float | None = None,
+    env: dict[str, str] | None = None,
+    input_text: str | None = None,
 ) -> str:
-    p = execute(args, cwd=cwd, timeout=timeout)
+    p = execute(args, cwd=cwd, timeout=timeout, env=env, input_text=input_text)
     if p.returncode:
         raise RuntimeError(p.stderr.strip() or p.stdout.strip() or f"Command failed: {args}")
     return p.stdout.strip()
@@ -156,7 +163,7 @@ def require_git_admin(common: Path) -> None:
     except OSError as error:
         raise RuntimeError(
             f"Cannot write {common} ({error.strerror}); "
-            "ask lead-tpm to run it from the main checkout."
+            "ask the dispatcher to run it from the main checkout."
         ) from error
 
 
@@ -276,7 +283,7 @@ def stop(pane: str, root: str | Path) -> None:
         raise RuntimeError(f"{pane}: client root does not match {root}; preserved")
     owned = descendants(rows, shell)
     if os.getpid() in owned:
-        raise RuntimeError(f"{pane}: cannot stop the calling agent; ask lead-tpm to stop it")
+        raise RuntimeError(f"{pane}: cannot stop the calling agent; ask the dispatcher to stop it")
     identity = {pid: rows[pid][1] for pid in owned if pid in rows}
     signal_client(pane, current, clients, owned)
     wait_for_exit(pane, shell, identity)
@@ -361,14 +368,13 @@ def load_config() -> tuple[Path, Config]:
     common = Path(
         run("git", "-C", script.parent, "rev-parse", "--path-format=absolute", "--git-common-dir")
     )
-    canonical = common.parent
+    canonical = common.parent.resolve()
     path = Path(os.environ.get("TIPS_TEAM_CONFIG", canonical / "agent/teams/config.toml"))
     with path.open("rb") as f:
         value = cast(Config, tomllib.load(f))
     validate_config_fields(path, value)
     validate_settings(path, value)
     validate_allocations(path, value)
-    validate_compaction(path, value)
     return canonical, value
 
 
@@ -384,21 +390,11 @@ def validate_config_fields(path: Path, value: Config) -> None:
     for key in ("codex_approval", "claude_permission_mode"):
         require_type(policies.get(key), str, f"{path}: launch.{key}")
     roles = object_fields(fields.get("roles"), f"{path}: roles")
-    for name in ("dev", "test", "lead", "lead_tpm"):
-        validate_role_fields(roles.get(name), f"{path}: roles.{name}", name)
-    if "lead_ui" in roles:
-        validate_role_fields(roles["lead_ui"], f"{path}: roles.lead_ui", "lead_ui")
-
-
-def validate_role_fields(value: object, label: str, name: str) -> None:
-    role = object_fields(value, label)
-    for key in ("kind", "model", "effort"):
-        require_type(role.get(key), str, f"{label}.{key}")
-    if name in ("dev", "test", "lead"):
-        require_type(role.get("port_offset"), int, f"{label}.port_offset")
-        require_type(role.get("db_suffix"), str, f"{label}.db_suffix")
-    if name == "lead_tpm" or "compaction_percent" in role:
-        require_type(role.get("compaction_percent"), int, f"{label}.compaction_percent")
+    for name in ROLES:
+        role = object_fields(roles.get(name), f"{path}: roles.{name}")
+        for key in ("kind", "model", "effort", "db_suffix"):
+            require_type(role.get(key), str, f"{path}: roles.{name}.{key}")
+        require_type(role.get("port_offset"), int, f"{path}: roles.{name}.port_offset")
 
 
 def validate_settings(path: Path, value: Config) -> None:
@@ -413,9 +409,8 @@ def validate_settings(path: Path, value: Config) -> None:
             raise RuntimeError(f"{path}: timeouts.{key} must be a positive integer")
     if value["team"]["max_teams"] < 1:
         raise RuntimeError(f"{path}: team.max_teams must be positive")
-    for name in ("dev", "test", "lead", "lead_tpm", "lead_ui"):
-        role = value["roles"].get(name)
-        if role is not None and role["kind"] not in ("codex", "claude"):
+    for name in ROLES:
+        if value["roles"][name]["kind"] not in ("codex", "claude"):
             raise RuntimeError(f"{path}: invalid role {name}")
 
 
@@ -423,8 +418,8 @@ def validate_allocations(path: Path, value: Config) -> None:
     ports: set[int] = set()
     stems: list[str] = []
     for n in range(1, value["team"]["max_teams"] + 1):
-        for role in ("dev", "test", "lead"):
-            spec = cast(CodingRole, value["roles"][role])
+        for role in ROLES:
+            spec = value["roles"][role]
             port = (
                 value["team"]["port_base"] + n * value["team"]["port_stride"] + spec["port_offset"]
             )
@@ -440,19 +435,6 @@ def validate_allocations(path: Path, value: Config) -> None:
             stems.append(stem)
 
 
-def validate_compaction(path: Path, value: Config) -> None:
-    percent = value["roles"]["lead_tpm"].get("compaction_percent")
-    if type(percent) is not int or not 1 <= percent <= 100:
-        raise RuntimeError(f"{path}: invalid coordinator compaction percentage")
-
-
-def matching_workspace(label: str) -> Entity | None:
-    matches = [w for w in herdr("workspace", "list")["workspaces"] if w.get("label") == label]
-    if len(matches) > 1:
-        raise RuntimeError(f"Ambiguous workspace label: {label}")
-    return matches[0] if matches else None
-
-
 def pane_roles(workspace: Entity, names: list[str]) -> dict[str, Entity]:
     result: dict[str, Entity] = {}
     for pane in herdr("pane", "list", "--workspace", workspace["workspace_id"])["panes"]:
@@ -463,159 +445,403 @@ def pane_roles(workspace: Entity, names: list[str]) -> dict[str, Entity]:
     return result
 
 
-def coordinator(pane: Entity) -> None:
-    name, spec = "lead-tpm", cfg["roles"]["lead_tpm"]
-    if pane.get("agent"):
-        agent = herdr("agent", "get", pane["pane_id"])["agent"]
-        if (
-            agent.get("name") != name
-            or agent.get("agent") != spec["kind"]
-            or pane_occupant(pane["pane_id"]) != (main, True)
-        ):
-            raise RuntimeError(f"{pane['pane_id']}: conflicting coordinator; preserved")
-        if agent.get("agent_status") in ("blocked", "unknown"):
-            raise RuntimeError(f"{pane['pane_id']}: coordinator is not ready; inspect its pane")
-        return
-    if pane_occupant(pane["pane_id"])[1]:
-        raise RuntimeError(f"{pane['pane_id']}: not an available shell")
-    token = "team-setup-" + uuid.uuid4().hex
-    env = {
-        "TIPS_CHECK_TIMEOUT_SECONDS": str(cfg["timeouts"]["checks_minutes"] * 60),
-        "TIPS_TEAM_CONFIG": str(
-            Path(os.environ.get("TIPS_TEAM_CONFIG", main / "agent/teams/config.toml")).resolve()
-        ),
-    }
-    if spec["kind"] == "claude":
-        env["CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"] = str(spec.get("compaction_percent"))
-    command = (
-        "cd -- "
-        + shlex.quote(str(main))
-        + " && unset CLAUDE_AUTOCOMPACT_PCT_OVERRIDE && export "
-        + shlex.join([f"{k}={v}" for k, v in env.items()])
+def git(*args: str | Path, root: Path | None = None) -> str:
+    return run("git", "-C", root or main, *args)
+
+
+def pair_workspaces() -> dict[int, tuple[str, Entity]]:
+    """Live pair workspaces by slot; each label names its slot and issue."""
+    pattern = re.escape(cfg["team"]["workspace_prefix"]) + r"-([0-9]+)-([0-9]+)"
+    pairs: dict[int, tuple[str, Entity]] = {}
+    for workspace in herdr("workspace", "list")["workspaces"]:
+        match = re.fullmatch(pattern, workspace.get("label") or "")
+        if not match:
+            continue
+        slot = int(match.group(1))
+        if slot in pairs:
+            raise RuntimeError(f"Ambiguous workspaces for slot {slot}; preserved")
+        pairs[slot] = (match.group(2), workspace)
+    return pairs
+
+
+def find_slot(issue: str) -> tuple[int, Entity | None]:
+    """The slot already holding this issue, else the first free one."""
+    pairs = pair_workspaces()
+    for slot, (owner, workspace) in pairs.items():
+        if owner == issue:
+            return slot, workspace
+    for slot in range(1, cfg["team"]["max_teams"] + 1):
+        if slot not in pairs:
+            return slot, None
+    raise RuntimeError(f"No free slot: team.max_teams is {cfg['team']['max_teams']}")
+
+
+def bound_command(binary: Path, root: Path, sources: Path | str) -> str:
+    """The worktree's Dexter command: the one place naming binary, root and sources."""
+    return (
+        "#!/bin/sh\n"
+        f"export DEXTER_ELIXIR_LIB_ROOT={shlex.quote(str(sources))}\n"
+        f"exec {shlex.quote(str(binary))} --root {shlex.quote(str(root))}"
+        ' "$@"\n'
     )
-    # printf's format splits the echoed token with non-space text, so neither input echo
-    # nor unwrapping, which can drop spaces at a wrap point, acknowledges setup.
-    command += " && printf 'team-setup-%s\\n' " + token.removeprefix("team-setup-")
-    herdr("pane", "run", pane["pane_id"], command)
+
+
+def warm_up_query(startup_seconds: int) -> list[str]:
+    """Bound-command arguments that start the daemon and wait for its index."""
+    return ["query", "workspace-symbols", "--raw", "--wait", f"{startup_seconds}s", "MixProject"]
+
+
+def dexter_binary() -> Path:
+    home = Path(os.environ.get("TIPS_DEXTER_HOME", str(main / "agent/lsp/dexter"))).resolve()
+    binary = home / "vendor/dexter"
+    if not os.access(binary, os.X_OK):
+        raise RuntimeError(f"Missing executable: {binary}; run agent/lsp/dexter/build.sh.")
+    return binary
+
+
+def elixir_sources(cwd: Path) -> Path:
+    """The Elixir standard-library sources Dexter indexes for this worktree."""
+    version = run(
+        "elixir", "--short-version", cwd=cwd, timeout=cfg["timeouts"]["dexter_startup_seconds"]
+    )
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?", version):
+        raise RuntimeError(f"Unexpected Elixir version: {version!r}")
+    explicit = os.environ.get("DEXTER_ELIXIR_LIB_ROOT")
+    sources = (
+        Path(explicit) if explicit else main / "agent/lsp/vendor" / f"elixir-{version}" / "lib"
+    )
+    recorded = sources.parent / "VERSION"
+    if (
+        not (sources / "elixir/lib/enum.ex").is_file()
+        or not recorded.is_file()
+        or recorded.read_text().strip() != version
+    ):
+        raise RuntimeError(
+            f"Elixir {version} sources are missing at {sources}; see agent/lsp/README.md."
+        )
+    return sources.resolve()
+
+
+def role_env(role: str, slot: int, worktree: Path) -> dict[str, str]:
+    """One client's environment: its own database and port, the pair's worktree tools."""
+    spec, team = cfg["roles"][role], cfg["team"]
+    config = Path(os.environ.get("TIPS_TEAM_CONFIG", main / "agent/teams/config.toml")).resolve()
+    env = {
+        "PGPORT": str(team["postgres_port"]),
+        "TIPS_DB_SUFFIX": team["db_suffix_prefix"] + str(slot) + spec["db_suffix"],
+        "TIPS_TEST_PORT": str(
+            team["port_base"] + team["port_stride"] * slot + spec["port_offset"]
+        ),
+        "MIX_ENV": "test",
+        "TIPS_CHECK_TIMEOUT_SECONDS": str(cfg["timeouts"]["checks_minutes"] * 60),
+        "TIPS_TEAM_CONFIG": str(config),
+        # Provider settings are read by path from the main checkout; nothing is copied.
+        "TIPS_PROVIDER_ENV_FILE": str(main / ".env"),
+        "TIPS_DEXTER": str(worktree / ".dexter/dexter.sh"),
+    }
+    if spec["kind"] == "codex":
+        # Codex's sandbox cannot write the shared Hex cache in the home directory.
+        env["HEX_HOME"] = str(worktree / "tmp/hex")
+    return env
+
+
+def checkout(issue: str, worktree: Path) -> bool:
+    """Add the task worktree from fetched origin/main; return whether it is new."""
+    branch = "task/" + issue
+    if worktree.exists():
+        if (
+            Path(git("rev-parse", "--show-toplevel", root=worktree)) != worktree
+            or git("branch", "--show-current", root=worktree) != branch
+        ):
+            raise RuntimeError(f"Not a worktree on {branch}: {worktree}")
+        return False
+    git("fetch", "origin")
+    if git("branch", "--list", branch):
+        git("worktree", "add", worktree, branch)
+    else:
+        git("worktree", "add", "--no-track", "-b", branch, worktree, "origin/main")
+    return True
+
+
+def link_skills(link: Path, shared: Path) -> None:
+    if link.is_symlink() and os.readlink(link) == str(shared):
+        return
+    if link.exists() and not link.is_symlink():
+        raise RuntimeError(f"Refusing to replace existing skills: {link}")
+    link.parent.mkdir(parents=True, exist_ok=True)
+    link.unlink(missing_ok=True)
+    link.symlink_to(shared)
+
+
+def prepare_index(worktree: Path, wrapper: Path, slot: int, fetch: bool) -> None:
+    """Fetch a new checkout's locked dependencies, start Dexter and reconcile its index."""
+    # A Codex role's environment wins: its sandbox needs the Hex cache inside the worktree.
+    role = next((r for r in ROLES if cfg["roles"][r]["kind"] == "codex"), ROLES[0])
+    env = {**os.environ, **role_env(role, slot, worktree)}
+    if fetch:
+        # --check-locked never rewrites the lock. A reused worktree keeps its own dependency
+        # state: it may hold an unfinished change that only its agent can resolve.
+        run(
+            "mix",
+            "deps.get",
+            "--check-locked",
+            cwd=worktree,
+            env=env,
+            timeout=DEPS_FETCH_SECONDS,
+            input_text="",
+        )
+    # The query ends itself within --wait plus its connection allowance, so a valid slow
+    # start is never cut short; the margin only catches a hung query.
+    seconds = cfg["timeouts"]["dexter_startup_seconds"]
+    budget = seconds + DEXTER_CONNECT_SECONDS + 5
+    output = run(
+        "/bin/sh", wrapper, *warm_up_query(seconds), env=env, timeout=budget, input_text=""
+    )
+    if not json.loads(output):
+        raise RuntimeError("Dexter indexed no MixProject module; inspect the daemon log.")
+    # A daemon that was already running does not watch deps/: reconcile it with the disk.
+    run("/bin/sh", wrapper, "reindex", env=env, timeout=budget, input_text="")
+    print(f"Dexter index ready for {worktree}")
+
+
+def prepare_worktree(issue: str, worktree: Path, slot: int) -> None:
+    """Create or reuse the pair's worktree and prepare it once for both clients."""
+    # Preflight before any change: a refusal here leaves no worktree behind.
+    binary, skills = dexter_binary(), main / ".agents/skills"
+    if not skills.is_dir():
+        raise RuntimeError("Shared skills directory is missing.")
+    sources = elixir_sources(worktree if worktree.is_dir() else main)
+    new = checkout(issue, worktree)
+    wrapper = worktree / ".dexter/dexter.sh"
+    files = {
+        wrapper: bound_command(binary, worktree, sources),
+        worktree / ".dexter/.gitignore": "*\n",
+    }
+    if any(cfg["roles"][role]["kind"] == "codex" for role in ROLES):
+        files[worktree / ".codex/config.toml"] = CODEX_CONFIG
+    for path, content in files.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.is_file() or path.read_text() != content:
+            path.write_text(content)
+    wrapper.chmod(0o755)
+    link_skills(worktree / ".agents/skills", skills)
+    # A fetch that failed last time left no dependencies: fetch again.
+    prepare_index(worktree, wrapper, slot, fetch=new or not (worktree / "deps").is_dir())
+
+
+def refuse_foreign_owner(worktree: Path, names: list[str]) -> None:
+    """Only the assigned pair may work in the task worktree."""
+    for agent in herdr("agent", "list")["agents"]:
+        if agent.get("name") not in names and pane_occupant(agent["pane_id"])[0] == worktree:
+            owner = agent.get("name") or agent["pane_id"]
+            raise RuntimeError(f"Conflicting live agent in {worktree}: {owner}")
+
+
+def open_panes(label: str, workspace: Entity | None, names: list[str]) -> dict[str, Entity]:
+    """Reuse the pair's workspace or create it, with one labelled shell pane per role."""
+    if workspace:
+        panes = pane_roles(workspace, names)
+    else:
+        created = herdr("workspace", "create", "--cwd", str(main), "--label", label, "--no-focus")
+        first = created["root_pane"]
+        herdr("pane", "rename", first["pane_id"], names[0])
+        panes = {names[0]: first}
+    for name in names:
+        if name not in panes:
+            beside = next(iter(panes.values()))["pane_id"]
+            pane = herdr(
+                "pane", "split", beside, "--direction", "right", "--cwd", str(main), "--no-focus"
+            )["pane"]
+            herdr("pane", "rename", pane["pane_id"], name)
+            panes[name] = pane
+    return panes
+
+
+def enter(pane: str, worktree: Path, env: dict[str, str]) -> None:
+    """Move the pane's shell into the worktree with the client's environment."""
+    token = uuid.uuid4().hex
+    setup = (
+        "cd -- "
+        + shlex.quote(str(worktree))
+        + " && export "
+        + " ".join(shlex.quote(key + "=" + value) for key, value in env.items())
+        # The format splits the marker, so neither the typed command's echo nor unwrapping,
+        # which can drop spaces at a wrap point, acknowledges setup.
+        + " && printf '\\nTIPS_PAIR_READY_%s\\n' "
+        + token
+    )
+    herdr("pane", "run", pane, setup)
     herdr(
         "pane",
         "wait-output",
-        pane["pane_id"],
+        pane,
         "--match",
-        token,
+        "TIPS_PAIR_READY_" + token,
         "--source",
         "recent-unwrapped",
         "--timeout",
         str(cfg["timeouts"]["shell_seconds"] * 1000),
     )
-    if spec["kind"] == "claude":
-        args = [
-            "--permission-mode",
-            cfg["launch"]["claude_permission_mode"],
-            "--effort",
-            spec["effort"],
-            "--settings",
-            json.dumps({"enabledPlugins": NATIVE_LSP_PLUGINS}),
-            "--strict-mcp-config",
-            "--mcp-config",
-            '{"mcpServers":{}}',
-        ]
-        if spec["model"]:
-            args += ["--model", spec["model"]]
-    else:
-        args = [
-            "-a",
-            cfg["launch"]["codex_approval"],
-            "-C",
-            str(main),
-            "-c",
-            "model_reasoning_effort=" + json.dumps(spec["effort"]),
-        ]
+
+
+def brief(role: str, name: str, issue: str, wrapper: Path) -> str:
+    first = (
+        "Implement it, then hand over with agent/teams/team.py turn."
+        if role == "dev"
+        else "Then wait for the developer's ring before you review."
+    )
+    # The binary is shared by every checkout and the guide is not, so the binary's own
+    # help is the contract a lagging checkout can still trust.
+    return (
+        f"You are {name}, the {ROLE_TITLES[role]} for issue #{issue}. "
+        f"Read agent/teams/README.md, then the issue with gh issue view {issue}. {first} "
+        f"TIPS_DEXTER={wrapper} is bound to this worktree; run it via the shell. "
+        'Read "$TIPS_DEXTER" query --help and "$TIPS_DEXTER" lookup --help once; '
+        "their syntax and output take precedence over a lagging checkout guide. "
+        'After fetching or changing dependencies, run "$TIPS_DEXTER" reindex. '
+        "Do not start another Elixir language server. Freshness is unverified; "
+        "empty results are not proof of absence. Do not stop the shared daemon when "
+        "this agent exits, and do not run git clean -x: it deletes the bound command "
+        "and the index while the daemon may still run."
+    )
+
+
+def client_args(role: str, prompt: str, worktree: Path) -> list[str]:
+    spec, policies = cfg["roles"][role], cfg["launch"]
+    if spec["kind"] == "codex":
+        args = ["-a", policies["codex_approval"], "-C", str(worktree)]
         if spec["model"]:
             args += ["-m", spec["model"]]
+        return [*args, "-c", "model_reasoning_effort=" + json.dumps(spec["effort"]), prompt]
+    args = [
+        "--permission-mode",
+        policies["claude_permission_mode"],
+        "--effort",
+        spec["effort"],
+        # CLI settings also apply in linked worktrees and preserve user files.
+        "--settings",
+        json.dumps(
+            {"enabledPlugins": {"mix-credo@elixir-agent-tools": True, **NATIVE_LSP_PLUGINS}}
+        ),
+        "--append-system-prompt",
+        prompt,
+    ]
+    if spec["model"]:
+        args += ["--model", spec["model"]]
+    return args
+
+
+def launch(role: str, name: str, pane: str, issue: str, worktree: Path, slot: int) -> None:
+    """Start one client in its pane, or keep the one already running there."""
+    kind = cfg["roles"][role]["kind"]
+    root, live = pane_occupant(pane)
+    if live:
+        agent = herdr("agent", "get", pane)["agent"]
+        if agent.get("name") != name or agent.get("agent") != kind or root != worktree:
+            raise RuntimeError(f"{pane}: conflicting client; preserved")
+        print(f"Already running: {name} ({agent.get('agent_status')})")
+        return
+    enter(pane, worktree, role_env(role, slot, worktree))
+    prompt = brief(role, name, issue, worktree / ".dexter/dexter.sh")
     herdr(
         "agent",
         "start",
         name,
         "--kind",
-        spec["kind"],
+        kind,
         "--pane",
-        pane["pane_id"],
+        pane,
         "--timeout",
         str(cfg["timeouts"]["launch_seconds"] * 1000),
         "--",
-        *args,
+        *client_args(role, prompt, worktree),
     )
-    started = herdr("agent", "get", pane["pane_id"])["agent"]
+    started = herdr("agent", "get", pane)["agent"]
     if (
-        started.get("name") != name
-        or started.get("agent") != spec["kind"]
-        or pane_occupant(pane["pane_id"]) != (main, True)
+        pane_occupant(pane) != (worktree, True)
+        or started.get("agent") != kind
+        or started.get("name") != name
         or started.get("agent_status") in ("blocked", "unknown")
     ):
+        raise RuntimeError(f"{name} started in an unexpected state or root; inspect {pane}")
+    if kind == "claude":
+        # Claude holds the brief as its system prompt and waits; Codex receives it as input.
+        herdr("agent", "prompt", name, "Begin.")
+    print(f"Launched {name}: {kind} in {worktree}")
+
+
+def start(issue: str) -> None:
+    """Launch a developer and a tester for one issue in one prepared worktree."""
+    if Path.cwd() != main:
+        raise RuntimeError(f"Run from the main checkout: {main}")
+    require_git_admin(main / ".git")
+    slot, workspace = find_slot(issue)
+    names = [f"team-{slot}-{role}" for role in ROLES]
+    worktree = main / ".worktrees" / issue
+    refuse_foreign_owner(worktree, names)
+    prepare_worktree(issue, worktree, slot)
+    label = f"{cfg['team']['workspace_prefix']}-{slot}-{issue}"
+    panes = open_panes(label, workspace, names)
+    for role, name in zip(ROLES, names, strict=True):
+        launch(role, name, panes[name]["pane_id"], issue, worktree, slot)
+    print(f"Issue {issue}: pair in slot {slot}, {worktree}")
+
+
+def checkout_problem(head: str) -> str | None:
+    """Why this checkout is not the pushed PR head, or None."""
+    here = Path.cwd()
+    if git("status", "--porcelain", "--untracked-files=all", root=here):
+        return "The worktree has uncommitted or untracked files."
+    local = git("rev-parse", "HEAD", root=here)
+    if local != head:
+        return f"HEAD is {local}, not the PR head {head}."
+    return None
+
+
+def turn(pr: str, recipient: str) -> None:
+    """Hand the shared worktree to the partner and ring it."""
+    pane = os.environ.get("HERDR_PANE_ID")
+    if not pane:
+        raise RuntimeError("HERDR_PANE_ID is not set; run turn from your own pair pane")
+    me = herdr("agent", "get", pane)["agent"].get("name") or ""
+    match = re.fullmatch(r"team-([0-9]+)-(dev|test)", me)
+    if not match or match.group(2) == recipient:
         raise RuntimeError(
-            "Coordinator launch returned an unexpected client/root/state; inspect its pane"
+            f"turn hands over to the other pair agent; this pane is {me or 'unnamed'}"
         )
-    herdr(
-        "agent",
-        "prompt",
-        name,
-        f"You are {name}. Read agent/teams/README.md, then your card "
-        "agent/teams/roles/lead-tpm.md. Coordinate from this read-only main "
-        "checkout. Report readiness to the user; await assignment.",
-    )
-
-
-def start(target: str) -> None:
-    is_lead = target == "lead"
-    names = (
-        ["lead-tpm"] if is_lead else [f"team-{target}-{role}" for role in ("dev", "test", "lead")]
-    )
-    label = cfg["team"]["workspace_prefix"] + "-" + target
-    workspace = matching_workspace(label)
-    if workspace:
-        panes = pane_roles(workspace, names)
+    view = json.loads(run("gh", "pr", "view", pr, "--json", "headRefOid,url"))
+    head, url = str(view["headRefOid"]), str(view["url"])
+    problem = checkout_problem(head)
+    if recipient == "test":
+        if problem:
+            raise RuntimeError(f"{problem} Commit and push, then hand over.")
+        message = (
+            f"Your turn: review {url} at {head}. "
+            "The developer has stopped using the tree, build and database."
+        )
     else:
-        created = herdr("workspace", "create", "--cwd", str(main), "--label", label, "--no-focus")
-        workspace = created["workspace"]
-        first = created["root_pane"]
-        herdr("pane", "rename", first["pane_id"], names[0])
-        first["label"] = names[0]
-        panes = {names[0]: first}
-    for index, name in enumerate(names):
-        if name not in panes:
-            pane = herdr(
-                "pane",
-                "split",
-                panes[names[0]]["pane_id"],
-                "--direction",
-                "right" if index == 1 else "down",
-                "--cwd",
-                str(main),
-                "--no-focus",
-            )["pane"]
-            herdr("pane", "rename", pane["pane_id"], name)
-            panes[name] = pane
-    if is_lead:
-        coordinator(panes[names[0]])
-    for name, pane in panes.items():
-        print(f"{name}: {pane['pane_id']}")
-    print("Lead TPM launched." if is_lead else "Coding panes await assignment.")
+        message = f"Your turn on {url}: read the review with agent/teams/pr_review.py list {pr}."
+        if problem:
+            # Handing back never refuses: only the developer can repair the checkout.
+            message += f" Fix the checkout first: {problem}"
+            print(f"Reported to the developer: {problem}")
+    partner = f"team-{match.group(1)}-{recipient}"
+    herdr("agent", "prompt", partner, message)
+    print(f"Rang {partner}")
 
 
-def git(*args: str | Path, root: Path | None = None) -> str:
-    return run("git", "-C", root or main, *args)
-
-
-def stop_team(target: str) -> None:
-    label = cfg["team"]["workspace_prefix"] + "-" + target
-    workspace = matching_workspace(label)
-    if not workspace:
-        print(f"{label}: no workspace; nothing removed")
+def stop_pair(issue: str) -> None:
+    """Retire a pair whose work is clean and merged; preserve everything otherwise."""
+    found = [(slot, ws) for slot, (owner, ws) in pair_workspaces().items() if owner == issue]
+    if not found:
+        print(f"Issue {issue}: no pair workspace; nothing removed")
         return
-    names = [f"team-{target}-{r}" for r in ("dev", "test", "lead")]
-    panes = pane_roles(workspace, names)
+    slot, workspace = found[0]
+    panes = pane_roles(workspace, [f"team-{slot}-{role}" for role in ROLES])
     roots = owned_worktrees(panes)
+    worktree = main / ".worktrees" / issue
+    if worktree.is_dir():
+        roots.add(worktree)
     check_shared_owners(roots, panes)
     if roots:
         require_git_admin(main / ".git")
@@ -625,6 +851,14 @@ def stop_team(target: str) -> None:
         stop(pane["pane_id"], pane_occupant(pane["pane_id"])[0])
     check_worktrees(roots)
     check_shared_owners(roots, panes)
+    retire(roots, slot)
+    herdr("workspace", "close", workspace["workspace_id"])
+    print(f"Issue {issue}: pair retired; main checkout status follows")
+    print(git("status", "--short") or "Main checkout clean")
+
+
+def retire(roots: set[Path], slot: int) -> None:
+    """Stop each worktree's daemon, drop the pair's databases, remove worktrees and branches."""
     for root in sorted(roots):
         wrapper = root / ".dexter/dexter.sh"
         if wrapper.is_file():
@@ -635,17 +869,18 @@ def stop_team(target: str) -> None:
             )
             if result.returncode:
                 raise RuntimeError(result.stderr or result.stdout)
-    if roots or panes:
-        drop_databases(target)
+    drop_databases(slot)
     for root in sorted(roots):
+        branch = git("branch", "--show-current", root=root)
         git("worktree", "remove", root)
-    herdr("workspace", "close", workspace["workspace_id"])
-    print(f"{label}: closed; main checkout status follows")
-    print(git("status", "--short") or "Main checkout clean")
+        # check_worktrees proved the branch merged into fetched origin/main; -d would
+        # compare against the main checkout's own, possibly stale, branch.
+        if branch.startswith("task/"):
+            git("branch", "-D", branch)
 
 
 def check_shared_owners(roots: set[Path], panes: dict[str, Entity]) -> None:
-    """Do not retire a worktree still used by an agent outside this team."""
+    """Do not retire a worktree still used by an agent outside this pair."""
     owned_panes = {pane["pane_id"] for pane in panes.values()}
     for agent in herdr("agent", "list")["agents"]:
         pane = agent["pane_id"]
@@ -689,12 +924,9 @@ def check_worktrees(roots: set[Path]) -> None:
             ) from error
 
 
-def drop_databases(target: str) -> None:
-    prefix = cfg["team"]["db_suffix_prefix"] + target
-    stems = [
-        "tips_test" + prefix + cast(CodingRole, cfg["roles"][r])["db_suffix"]
-        for r in ("dev", "test", "lead")
-    ]
+def drop_databases(slot: int) -> None:
+    prefix = cfg["team"]["db_suffix_prefix"] + str(slot)
+    stems = ["tips_test" + prefix + cfg["roles"][role]["db_suffix"] for role in ROLES]
     psql = [
         "docker",
         "compose",
@@ -732,19 +964,17 @@ def stop_agent(pane: str, root: str | Path) -> None:
 def cli() -> None:
     configure()
     args = sys.argv[1:]
-    if len(args) != 2 or args[0] not in ("start", "stop"):
-        raise RuntimeError("Usage: agent/teams/team.py start|stop N; start lead")
-    target = args[1]
-    if target == "lead":
-        if args[0] != "start":
-            raise RuntimeError("Only start lead is supported; exit that client normally")
-    elif (
-        not target.isdecimal()
-        or not 1 <= int(target) <= cfg["team"]["max_teams"]
-        or str(int(target)) != target
-    ):
-        raise RuntimeError("Team must be within config team.max_teams")
-    (start if args[0] == "start" else stop_team)(target)
+    usage = "Usage: agent/teams/team.py start <issue> | turn <pr> dev|test | stop <issue>"
+    if len(args) < 2 or not args[1].isdecimal():
+        raise RuntimeError(usage)
+    if args[0] == "start" and len(args) == 2:
+        start(args[1])
+    elif args[0] == "stop" and len(args) == 2:
+        stop_pair(args[1])
+    elif args[0] == "turn" and len(args) == 3 and args[2] in ROLES:
+        turn(args[1], args[2])
+    else:
+        raise RuntimeError(usage)
 
 
 if __name__ == "__main__":
