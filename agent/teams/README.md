@@ -56,7 +56,6 @@ No label marks the turn. After a restart, read the PR: a head newer than the las
 ## Rules
 
 - **Severity.** P0: a feature does not work, or authorization or data integrity is broken. P1: significantly hurts the user's experience, or a required acceptance test or local check is missing or failing. P2: minor; fix if trivial, decline with a reason, or file one batched follow-up issue.
-- Every finding has a severity and a concrete failure.
 - **Stuck.** A dispute unresolved after one round of evidence, or two failed repairs of one finding with no agreed next check: ring the dispatcher `blocked` with the question. Product and scope questions go the same way, at any time, PR or not.
 - **Dispatcher on `blocked`.** One diagnostic pass if the question is technical; otherwise a clear question to the user. Set Status Blocked.
 - **Red `main`.** Revert the merge that broke it, then fix forward. A developer whose CI is red for reasons outside its change checks `main` and rings the dispatcher.

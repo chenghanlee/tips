@@ -36,8 +36,13 @@
 
 ## GitHub
 
-- Comment only for a decision, a review finding or a blocker. No progress comments.
-- Omit routine CI inventories; report material local evidence and failed, pending or unrun checks.
+- Comment only for a decision, a review finding or a blocker. No progress, status or acknowledgment comments.
+- Review: submit one review per pass, on the exact head. Put each finding inline on the line it concerns, one finding per comment. Use the review body only for a finding with no line in the diff, and name its `path:line`.
+- Finding: line one is the severity (`P0`, `P1` or `P2`, [defined here](agent/teams/README.md#rules)) and the required change. Then the failure: steps or input, actual result, expected result. Add a `suggestion` block when the fix is a few lines.
+- Reply to a finding only with the commit that fixes it or the reason you decline it. The reviewer who opened a thread resolves it.
+- Blocker: what is blocked, the exact error or question, and who must act. Decision: what was decided and why, in one or two sentences.
+- Link evidence instead of pasting it: a commit-SHA permalink for code, the run URL for CI. Quote only the failing lines.
+- Do not list passing checks. Report failed, pending and unrun checks, and local evidence that CI does not cover.
 
 ## Elixir navigation
 
