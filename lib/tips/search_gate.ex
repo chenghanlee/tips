@@ -83,8 +83,13 @@ defmodule Tips.SearchGate do
   Runs the protocol and returns `{status, report}` with status `:passed`,
   `:failed` (a gate rule failed) or `:stopped` (a stop rule ended the run).
 
+  The run calls the provider only when opted in: with `real: true`, or with a
+  `:preflight_plug` from a test. Otherwise it stops before seeding.
+
   Options:
 
+    * `:real` - call OpenRouter. `scripts/search_gate.exs` sets it only for
+      `--real` with `TIPS_REAL_PROVIDERS=1`;
     * `:preflight_plug` - a `Req` plug for the preflight requests, for tests;
     * `:require_empty` - refuse a database that already has tips. Default `true`.
   """
@@ -105,6 +110,7 @@ defmodule Tips.SearchGate do
     }
 
     steps = [
+      &opt_in/1,
       &seed/1,
       &plan/1,
       &preflight/1,
@@ -137,17 +143,29 @@ defmodule Tips.SearchGate do
 
   ## Step 1: seed and plan
 
-  defp seed(%{fixtures: %{corpus: corpus}, setup: setup, opts: opts} = state) do
+  defp opt_in(%{opts: opts} = state) do
+    if opts[:real] == true or opts[:preflight_plug],
+      do: {:ok, state},
+      else: {:stop, :not_opted_in, state}
+  end
+
+  defp seed(%{fixtures: %{corpus: corpus}, opts: opts} = state) do
     if Keyword.get(opts, :require_empty, true) and Repo.exists?(Tip) do
       {:stop, :database_not_empty, state}
     else
-      {:ok, ids} = Repo.transact(fn -> {:ok, insert_corpus(corpus, setup)} end)
+      {:ok, ids} = Repo.transact(fn -> {:ok, seed_corpus(corpus)} end)
       corpus_ids = Map.new(ids, fn {id, row} -> {row, id} end)
       {:ok, Map.merge(state, %{ids: ids, corpus_ids: corpus_ids})}
     end
   end
 
-  defp insert_corpus(corpus, setup) do
+  @doc """
+  Persists the corpus as `corpus_setup` in `gate-60.json` describes and writes
+  every search document. Returns each persisted corpus id with its row,
+  `{:tip, id}` or `{:review, id}`. Call it inside a transaction.
+  """
+  def seed_corpus(corpus) do
+    setup = setup(corpus)
     author = user!("gate-author")
 
     tips =

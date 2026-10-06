@@ -3,7 +3,7 @@
 #     mix run --no-start scripts/search_gate.exs --validate
 #     MIX_ENV=dev mix ecto.reset && TIPS_REAL_PROVIDERS=1 MIX_ENV=dev mix run --no-start scripts/search_gate.exs --real --output PATH
 #
-# --real calls OpenRouter. It needs a clean checkout, an empty development database and
+# --real calls OpenRouter. It needs TIPS_REAL_PROVIDERS=1, a clean checkout, an empty development database and
 # authorization for one run on the issue. It refuses an existing output file.
 defmodule SearchGateScript do
   def main(argv) do
@@ -32,6 +32,7 @@ defmodule SearchGateScript do
 
     cond do
       Mix.env() != :dev -> refuse("run with MIX_ENV=dev")
+      System.get_env("TIPS_REAL_PROVIDERS") != "1" -> refuse("set TIPS_REAL_PROVIDERS=1")
       File.exists?(output) -> refuse("#{output} exists")
       dirty != "" -> refuse("the checkout has uncommitted changes")
       true -> run(output, String.trim(sha))
@@ -55,7 +56,7 @@ defmodule SearchGateScript do
     )
 
     {:ok, fixtures} = Tips.SearchGate.load()
-    {status, report} = Tips.SearchGate.run(fixtures)
+    {status, report} = Tips.SearchGate.run(fixtures, real: true)
 
     report =
       Map.merge(report, %{
