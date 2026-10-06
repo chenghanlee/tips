@@ -16,9 +16,7 @@ class DispatchTest(unittest.TestCase):
             root = Path(directory)
             scripts = root / "agent/teams"
             scripts.mkdir(parents=True)
-            shutil.copy2(
-                Path(__file__).resolve().parents[1] / "dispatch", scripts / "dispatch"
-            )
+            shutil.copy2(Path(__file__).resolve().parents[1] / "dispatch", scripts / "dispatch")
             config = root / "custom config.toml"
             config.write_text(
                 '[dispatcher]\nmodel="test-model"\neffort="high"\ncompact_percent=42\n'
@@ -55,7 +53,8 @@ elif args[:2] == ["pane", "split"]:
             calls = [json.loads(line) for line in log.read_text().splitlines()]
             assert all(name == "herdr" for name, _ in calls), result.stdout
             split = next(args for _, args in calls if args[:2] == ["pane", "split"])
-            assert "--current" in split and "--no-focus" in split
+            assert "--current" in split
+            assert "--no-focus" in split
             assert split[split.index("--cwd") + 1] == str(root)
             run = next(args for _, args in calls if args[:2] == ["pane", "run"])
             assert run[2] == "new-pane"
