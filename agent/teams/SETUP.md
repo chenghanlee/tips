@@ -58,9 +58,7 @@ Codex launches with approval policy `never`, so a denied action cannot escalate,
 In a Herdr pane (`HERDR_ENV=1`) at the main checkout:
 
 ```bash
-CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=35 claude --permission-mode auto \
-  --append-system-prompt 'You are the dispatcher in agent/teams/README.md. At startup, on every done or blocked ring and when the user says the board changed, apply its Common path and Rules; reread them if they are no longer in context.' \
-  'Run herdr agent rename "$HERDR_PANE_ID" dispatcher, then begin.'
+agent/teams/dispatch
 ```
 
 Start only one. Pairs ring it by the name `dispatcher`. Nothing watches GitHub: after you mark tasks Ready, type `board changed` in its pane. It asks you product and scope questions in that pane; answer there. Every ring starts a turn over its whole context, so it compacts at 35%; GitHub holds the state it needs. It starts and stops pairs with `team.py` from this checkout; each pair gets its own Herdr workspace. Handle each client's repository trust prompt the first time. An unexpected approval prompt stops a launch; inspect it and follow the active approval policy.
