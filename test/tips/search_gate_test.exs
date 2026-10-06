@@ -90,19 +90,19 @@ defmodule Tips.SearchGateTest do
     {:ok, ids} = Repo.transact(fn -> {:ok, SearchGate.seed_corpus(fixtures.corpus)} end)
     fixture = SearchGateVectors.load!(ids)
 
-    stored =
-      for %{"id" => id} <- fixture["documents"] do
-        query =
-          case ids[id] do
-            {:tip, row} -> from(s in "tip_search", where: s.tip_id == ^row)
-            {:review, row} -> from(s in "review_search", where: s.review_id == ^row)
-          end
+    assert length(fixture["documents"]) == 40
 
-        Repo.one!(select(query, [s], fragment("?::text", s.embedding)))
-      end
+    for %{"id" => id, "embedding" => embedding} <- fixture["documents"] do
+      query =
+        case ids[id] do
+          {:tip, row} -> from(s in "tip_search", where: s.tip_id == ^row)
+          {:review, row} -> from(s in "review_search", where: s.review_id == ^row)
+        end
 
-    assert length(stored) == 40
-    assert stored == Enum.map(fixture["documents"], & &1["embedding"])
+      # Compared as vectors: pgvector prints float32 values in fewer digits.
+      stored = select(query, [s], fragment("? = ?::text::vector", s.embedding, ^embedding))
+      assert Repo.one!(stored), "#{id} was not stored"
+    end
   end
 
   test "hybrid search over the frozen vectors meets the gate's relevance rules" do
