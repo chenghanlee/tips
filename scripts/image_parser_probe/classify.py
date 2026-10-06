@@ -7,15 +7,18 @@ enforce the time and memory ceilings. This script enforces the byte, dimension,
 frame and pixel ceilings before decoding, then decodes every frame so truncated or
 corrupt data fails instead of passing on a valid header.
 
-Pillow's decoders do not check PNG chunk CRCs, require IEND, compare the APNG frame
-count with the frames present, or require the GIF trailer. check_structure does
-these four checks on the bytes before Pillow decodes them.
+Pillow's decoders do not check PNG chunk CRCs, require IEND, enforce the APNG
+control-chunk rules, or require the GIF trailer. Where an APNG breaks a rule
+Pillow checks, it falls back to the static default image with a warning.
+check_structure checks these on the bytes before Pillow decodes them, and the
+warning is raised as an error.
 """
 
 import json
 import os
 import resource
 import sys
+import warnings
 import zlib
 
 from PIL import Image, ImageFile, UnidentifiedImageError
@@ -32,6 +35,8 @@ FORMATS = {"PNG": "png", "JPEG": "jpeg", "WEBP": "webp", "GIF": "gif"}
 ImageFile.LOAD_TRUNCATED_IMAGES = False
 # The bounds below replace Pillow's decompression-bomb warning threshold.
 Image.MAX_IMAGE_PIXELS = None
+# Pillow's static fallback for an invalid APNG would silently drop motion.
+warnings.filterwarnings("error", message="Invalid APNG")
 
 
 class Reject(Exception):
@@ -46,10 +51,12 @@ def check_structure(data, image_format):
 
 
 # Walk every chunk after the signature: each must fit the file and match its CRC,
-# and IEND must be present. An APNG must hold exactly the fcTL count its acTL
-# declares; Pillow trusts acTL, so a lower count would hide frames.
+# and IEND must be present. APNG rules: at most one acTL, before the first IDAT,
+# declaring at least one frame; fcTL and fdAT only after acTL, with sequence
+# numbers 0, 1, 2, ...; exactly as many fcTL as acTL declares. Pillow trusts acTL,
+# so a lower count would hide frames.
 def check_png_chunks(data):
-    pos, declared, controls, seen_idat = 8, None, 0, False
+    pos, declared, controls, sequence, seen_idat = 8, None, 0, 0, False
     while True:
         if pos + 12 > len(data):
             raise Reject("malformed")
@@ -63,10 +70,19 @@ def check_png_chunks(data):
         kind = body[:4]
         if kind == b"IDAT":
             seen_idat = True
-        elif kind == b"acTL" and not seen_idat:
+        elif kind == b"acTL":
+            if declared is not None or seen_idat or length < 8:
+                raise Reject("malformed")
             declared = int.from_bytes(body[4:8], "big")
-        elif kind == b"fcTL":
-            controls += 1
+            if declared < 1:
+                raise Reject("malformed")
+        elif kind in (b"fcTL", b"fdAT"):
+            if declared is None or length < 4:
+                raise Reject("malformed")
+            if int.from_bytes(body[4:8], "big") != sequence:
+                raise Reject("malformed")
+            sequence += 1
+            controls += kind == b"fcTL"
         elif kind == b"IEND":
             break
         pos = end
@@ -125,7 +141,7 @@ def main(path):
         result = {"verdict": "reject", "reason": str(reject)}
     except MemoryError:
         result = {"verdict": "reject", "reason": "memory_limit"}
-    except (OSError, EOFError, SyntaxError, ValueError) as error:
+    except (OSError, EOFError, SyntaxError, ValueError, UserWarning) as error:
         result = {
             "verdict": "reject",
             "reason": "malformed",

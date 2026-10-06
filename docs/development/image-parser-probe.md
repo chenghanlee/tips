@@ -1,8 +1,8 @@
 # Image parser probe
 
 Result for [#244](https://github.com/chenghanlee/tips/issues/244): **Pillow 12.3.0
-is selected,** with four structure checks of our own. Run in its own OS process
-under `timeout` and `prlimit`, it passes all 43 fixtures and all three enforcement experiments on linux/arm64 and
+is selected,** with structure checks of our own. Run in its own OS process
+under `timeout` and `prlimit`, it passes all 45 fixtures and all three enforcement experiments on linux/arm64 and
 linux/amd64. [#62](https://github.com/chenghanlee/tips/issues/62) builds on the
 [contract below](#contract-for-62).
 
@@ -40,7 +40,7 @@ Both runs are at `048a41e` with no tracked changes:
   [fixtures](image-parser-probe/amd64-20261006T175047Z-fixtures.json).
 
 Fixture bytes are stable across runs on one architecture: repeated arm64 runs gave
-identical hashes for all 43 fixtures. Across architectures, the lossy encodes
+identical hashes for all 45 fixtures. Across architectures, the lossy encodes
 differ (`static.jpg`, `spoofed-jpeg-as.png`, `truncated.jpg` and the three
 lossy at-limit WebPs). Every other fixture is byte-identical. All verdicts match.
 
@@ -102,24 +102,34 @@ them.
 
 ## Structure checks
 
-Pillow alone accepts five malformed files that decode cleanly:
+Pillow alone accepts seven malformed files that decode cleanly:
 
 - `png-crc-mismatch.png`: Pillow does not check chunk CRCs.
 - `png-iend-missing.png`: Pillow does not require IEND.
 - `apng-actl-undercount.png`: Pillow trusts the `acTL` frame count, so a file that
   declares 1 frame but holds 5 reads as static.
+- `apng-actl-duplicate.png` and `apng-actl-after-idat.png`: Pillow falls back to
+  the static default image with an "Invalid APNG" warning.
 - `gif-trailer-missing.gif`: Pillow does not require the GIF trailer.
 - `gif-frame-outside-canvas.gif`: Pillow grows a 64×48 canvas to 9064×9043 for a
   frame placed far outside it. Decoding that frame peaked at 723 MiB.
 
-`classify.py` adds four checks that reject them:
+`classify.py` adds these checks to reject them:
 
 1. For PNG, it walks every chunk on the raw bytes: length, CRC and a final IEND.
-2. For APNG, the `fcTL` count must equal the `acTL` frame count.
-3. For GIF, the file must end with the trailer byte.
-4. After each `seek`, the canvas size must be unchanged. Pillow grows the canvas
+2. For APNG, it checks the chunk rules:
+   - at most one `acTL`, before the first IDAT, declaring at least one frame;
+   - `fcTL` and `fdAT` only after `acTL`, numbered 0, 1, 2 and so on;
+   - exactly as many `fcTL` as `acTL` declares.
+3. Pillow's "Invalid APNG" warning is raised as an error, in case a rule the walk
+   misses triggers the static fallback.
+4. For GIF, the file must end with the trailer byte.
+5. After each `seek`, the canvas size must be unchanged. Pillow grows the canvas
    on `seek` but allocates it on `load`, so this check runs before the memory is
    used.
+
+`corrupt-idat.png` has a valid CRC, so it tests the decoder rather than the chunk
+walk: zlib rejects its damaged data (`OSError`).
 
 Design assessment: these checks only validate structure. They never decode pixels
 or decide motion; Pillow still decodes every frame, and its frame count still

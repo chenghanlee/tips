@@ -133,6 +133,10 @@ defmodule ParserProbe.Fixtures do
        reject("malformed")},
       {"apng-actl-undercount.png", &set_actl_frames(p.("animated.apng"), &1, :one),
        reject("malformed")},
+      {"apng-actl-duplicate.png", &misplace_actl(p.("animated.apng"), &1, :duplicate),
+       reject("malformed")},
+      {"apng-actl-after-idat.png", &misplace_actl(p.("animated.apng"), &1, :after_idat),
+       reject("malformed")},
       {"apng-frame-outside-canvas.png", &shift_second_fctl(p.("animated.apng"), &1),
        reject("malformed")},
       {"webp-anim-flag-unset.webp", &clear_webp_anim_flag(p.("animated.webp"), &1),
@@ -238,13 +242,43 @@ defmodule ParserProbe.Fixtures do
   end
 
   # Invert one byte inside the first IDAT payload; its CRC no longer matches.
+  # Invert byte 10 of the first IDAT payload and recompute its CRC, so only the
+  # decoder can find the damage.
   defp corrupt_idat(from, out) do
-    data = File.read!(from)
-    {pos, _} = :binary.match(data, "IDAT")
-    at = pos + 4 + 10
-    <<pre::binary-size(^at), b, post::binary>> = data
-    File.write!(out, <<pre::binary, Bitwise.bxor(b, 0xFF), post::binary>>)
-    "#{Path.basename(from)} with byte #{at} inverted inside IDAT"
+    {chunks, _} =
+      from
+      |> File.read!()
+      |> Png.chunks()
+      |> Enum.map_reduce(false, fn
+        {"IDAT", <<pre::binary-size(10), b, post::binary>>}, false ->
+          {{"IDAT", <<pre::binary, Bitwise.bxor(b, 0xFF), post::binary>>}, true}
+
+        c, done ->
+          {c, done}
+      end)
+
+    File.write!(out, Png.assemble(chunks))
+    "#{Path.basename(from)} with byte 10 of the first IDAT payload inverted, CRC recomputed"
+  end
+
+  # Move acTL to just after the first IDAT, or repeat it right after itself.
+  defp misplace_actl(from, out, how) do
+    chunks = from |> File.read!() |> Png.chunks()
+    actl = List.keyfind!(chunks, "acTL", 0)
+    File.write!(out, Png.assemble(misplace(chunks, actl, how)))
+    "#{Path.basename(from)} with acTL #{how}, CRCs recomputed"
+  end
+
+  defp misplace(chunks, actl, :after_idat) do
+    {before, [idat | rest]} =
+      chunks |> List.delete(actl) |> Enum.split_while(&(elem(&1, 0) != "IDAT"))
+
+    before ++ [idat, actl | rest]
+  end
+
+  defp misplace(chunks, actl, :duplicate) do
+    {before, [^actl | rest]} = Enum.split_while(chunks, &(&1 != actl))
+    before ++ [actl, actl | rest]
   end
 
   # Rewrite acTL num_frames with a valid CRC.
