@@ -49,7 +49,7 @@ defmodule TipsWeb.EditorDraftTest do
     assert draft_id == seeded["draft"]["draft_id"] and revision > 0
   end
 
-  feature "typing before the hook mounts stays, and the saved draft is not applied",
+  feature "typing before the hook mounts stays until the author reloads the saved draft",
           %{session: session, status: status} do
     seeded = session |> open_editor("/editor/tips/new") |> seed("Saved title", "Saved body")
 
@@ -70,9 +70,18 @@ defmodule TipsWeb.EditorDraftTest do
     run(session, "window.liveSocket.disableLatencySim()")
     assert_value(session, "#tip_body", "Typed before the page connected")
     assert stored(session, seeded["storage"]) == seeded
+
+    session
+    |> click(button("Reload saved draft"))
+    |> assert_has(css(status, text: "Recovered your draft from this browser."))
+    |> assert_value("#tip_title", "Saved title")
+    |> assert_value("#tip_body", "Saved body")
+    |> refute_has(button("Reload saved draft"))
+
+    assert hidden_record(session)["submission_key"] == seeded["submission_key"]
   end
 
-  feature "typing during a slow storage read stays, and a read that lands offline restores nothing",
+  feature "typing during a slow storage read stays, and a read pending across a reconnect restores nothing",
           %{session: session, status: status} do
     seeded = session |> open_editor("/editor/tips/new") |> seed("Saved title", "Saved body")
     editor_tab = window_handle(session)
@@ -90,21 +99,30 @@ defmodule TipsWeb.EditorDraftTest do
     |> assert_has(css(status, text: @paused))
     |> assert_value("#tip_body", "Typed during the read")
 
-    # The read lands while the page is disconnected.
+    # The read is still pending when the page has reconnected and recovered its form.
     hold_store(session, blocker_tab)
     focus_window(session, editor_tab)
     open_editor(session, "/editor/tips/new")
-    run(session, "window.liveSocket.disconnect()")
+    recovered = hidden_record(session)
+
+    run(session, """
+    const main = document.querySelector("[data-phx-main]")
+    const until = async (test) => { while (!test()) await new Promise((r) => setTimeout(r, 50)) }
+    window.liveSocket.disconnect()
+    await until(() => !main.classList.contains("phx-connected"))
+    window.liveSocket.connect()
+    await until(() => main.classList.contains("phx-connected"))
+    """)
+
     release_store(session, blocker_tab)
     focus_window(session, editor_tab)
-    assert_has(session, css(status, text: @paused))
-    run(session, "window.liveSocket.connect()")
 
     session
-    |> assert_has(css(".phx-connected"))
+    |> assert_has(css(status, text: @paused))
     |> assert_value("#tip_title", "")
     |> assert_value("#tip_body", "")
 
+    assert hidden_record(session)["submission_key"] == recovered["submission_key"]
     assert stored(session, seeded["storage"]) == seeded
   end
 

@@ -284,8 +284,9 @@ defmodule TipsWeb.Editor do
   end
 
   @doc """
-  Renders the draft status line, which the hook writes, and the submit button.
-  Submitting is #79 and #80, so the button stays disabled until then.
+  Renders the draft status line, which the hook writes, the "Reload saved
+  draft" button the hook shows while autosave is paused, and the submit
+  button. Submitting is #79 and #80, so that button stays disabled until then.
   """
   attr :identity, :map, required: true
   attr :submit, :string, required: true
@@ -300,6 +301,11 @@ defmodule TipsWeb.Editor do
         class="min-h-5 text-sm text-muted-foreground"
       >
       </p>
+      <div>
+        <TipsWeb.UI.button id={"#{form_id(@identity)}-reload"} type="button" variant="outline" hidden>
+          Reload saved draft
+        </TipsWeb.UI.button>
+      </div>
       <div>
         <TipsWeb.UI.button type="submit" size="lg" disabled>{@submit}</TipsWeb.UI.button>
       </div>

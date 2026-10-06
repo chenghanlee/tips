@@ -7,13 +7,16 @@
 // the form still shows what the page rendered and nothing was typed, so
 // typing before the hook started or during a slow read stays. Otherwise, and
 // when the page rejects the draft, autosave pauses so it cannot overwrite the
-// saved draft. The hook sends editor:restore only to apply a draft; the page
-// replies "restored" or "rejected" ("preserved" keeps input like "rejected").
+// saved draft. A paused editor offers "Reload saved draft", which replaces
+// the input with the saved draft and resumes autosave. The hook sends
+// editor:restore only to apply a draft; the page replies "restored" or
+// "rejected" ("preserved" keeps input like "rejected").
 //
 // A reconnect reads no storage: LiveView recovers the form through
-// editor:recover, and this hook keeps its draft pair. Results that arrive
-// after the hook is destroyed, or after a restore fell back on disconnect,
-// are ignored. Autosave starts once recovery settles.
+// editor:recover, and this hook keeps its draft pair. A read still pending at
+// a disconnect never restores. Results that arrive after the hook is
+// destroyed, or after a restore fell back on disconnect, are ignored.
+// Autosave starts once recovery settles.
 
 import {EDITOR_EVENTS} from "./editor_contract.js"
 import {create, load, save} from "./editor_draft_store.js"
@@ -28,8 +31,12 @@ const FIELDS = {
 const STATUS = {
   restored: "Recovered your draft from this browser.",
   unsaved: "Draft couldn't be saved; keep this page open.",
-  paused: "Autosave is paused so it doesn't replace a draft saved earlier in this browser. Keep this page open.",
-  conflict: "This draft was changed in another tab. Autosave is paused; keep this page open.",
+  paused:
+    "Autosave is paused so it doesn't replace a draft saved earlier in this browser. Reloading the saved draft replaces what is on this page.",
+  conflict:
+    "This draft was changed in another tab. Autosave is paused. Reloading the saved draft replaces what is on this page.",
+  rejected: "Autosave is paused so it doesn't replace a draft saved earlier in this browser. Keep this page open.",
+  unread: "The saved draft couldn't be read. Autosave is paused; keep this page open.",
 }
 
 export const EditorDraft = {
@@ -39,9 +46,13 @@ export const EditorDraft = {
     this.kind = kindOf(this.identity.target)
     // The pair of the stored draft this page may replace; null until it holds one.
     this.expected = null
-    // reading -> restoring -> composing or paused; destroyed at the end.
+    // reading -> restoring -> composing or paused; paused -> reloading ->
+    // restoring; destroyed at the end.
     this.phase = "reading"
     this.connected = true
+    // The page disconnected during the first read, so it recovered the form
+    // from the DOM: that read never restores.
+    this.interrupted = false
     this.pending = null
     this.timer = null
     this.writing = false
@@ -52,16 +63,21 @@ export const EditorDraft = {
       this.schedule()
     }
     this.el.addEventListener("input", this.onInput)
+    this.onReload = () => this.reload()
+    this.reloadButton().addEventListener("click", this.onReload)
     load(this.record.storage).then((result) => this.settleRead(result))
   },
 
   disconnected() {
     this.connected = false
+    if (this.phase === "reading") this.interrupted = true
+    // Its result is ignored; the author can reload again once connected.
+    if (this.phase === "reloading") this.pause(STATUS.paused, true)
     // The reply cannot arrive now. Fall back to the unrestored form.
     if (this.phase === "restoring") {
       this.pending = null
       this.js().removeAttribute(this.fields(), "disabled")
-      this.pause(STATUS.paused)
+      this.pause(STATUS.paused, true)
     }
   },
 
@@ -76,6 +92,7 @@ export const EditorDraft = {
     this.phase = "destroyed"
     this.pending = null
     this.el.removeEventListener("input", this.onInput)
+    this.reloadButton().removeEventListener("click", this.onReload)
     // Best effort: the write may still finish after the page is gone.
     if (unsaved) this.write()
   },
@@ -85,8 +102,28 @@ export const EditorDraft = {
     if (result.status !== "ok" || result.record === null) {
       // No draft, or storage failed: compose. A failed store reports itself on save.
       this.compose()
-    } else if (this.typed || !this.connected) {
-      this.pause(STATUS.paused)
+    } else if (this.typed || this.interrupted) {
+      this.pause(STATUS.paused, true)
+    } else {
+      this.restore(result.record)
+    }
+  },
+
+  // The author chose the saved draft over the input on the page.
+  async reload() {
+    if (this.phase !== "paused" || !this.connected) return
+    this.phase = "reloading"
+    const result = await load(this.record.storage)
+    if (this.phase !== "reloading") return
+    if (result.status !== "ok") {
+      this.pause(STATUS.unread, true)
+    } else if (result.record === null) {
+      // Nothing saved any more: keep the input and save it as a new draft.
+      this.expected = null
+      this.typed = true
+      this.showReload(false)
+      this.status("")
+      this.compose()
     } else {
       this.restore(result.record)
     }
@@ -105,7 +142,7 @@ export const EditorDraft = {
       this.pending = null
       this.js().removeAttribute(fields, "disabled")
       if (reply.status !== "restored") {
-        this.pause(STATUS.paused)
+        this.pause(STATUS.rejected)
         return
       }
       this.record = record
@@ -114,6 +151,7 @@ export const EditorDraft = {
       if (prompt || output) this.el.querySelector("details").open = true
       if (focused instanceof HTMLElement && this.el.contains(focused)) focused.focus()
       this.phase = "composing"
+      this.showReload(false)
       this.status(STATUS.restored)
     })
   },
@@ -123,11 +161,17 @@ export const EditorDraft = {
     if (this.typed) this.schedule()
   },
 
-  pause(message) {
+  pause(message, reloadable = false) {
     clearTimeout(this.timer)
     this.timer = null
     this.phase = "paused"
+    this.showReload(reloadable)
     this.status(message)
+  },
+
+  showReload(shown) {
+    if (shown) this.js().removeAttribute(this.reloadButton(), "hidden")
+    else this.js().setAttribute(this.reloadButton(), "hidden", "")
   },
 
   schedule() {
@@ -164,7 +208,7 @@ export const EditorDraft = {
       this.expected = result.record.draft
       if (this.phase === "composing") this.status(`Draft saved in this browser at ${clock()}`)
     } else if (result.status === "conflict") {
-      this.pause(STATUS.conflict)
+      this.pause(STATUS.conflict, true)
     } else {
       this.status(STATUS.unsaved)
     }
@@ -172,6 +216,10 @@ export const EditorDraft = {
 
   fields() {
     return this.el.querySelector(`#${CSS.escape(this.el.id)}-fields`)
+  },
+
+  reloadButton() {
+    return this.el.querySelector(`#${CSS.escape(this.el.id)}-reload`)
   },
 
   status(message) {
