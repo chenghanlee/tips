@@ -26,6 +26,7 @@ defmodule Tips.SearchGate do
   alias Tips.Content
   alias Tips.Content.{Review, Search, Tip}
   alias Tips.Content.Search.{EmbeddingProvider, ProviderCapacity}
+  alias Tips.Content.Search.EmbeddingProvider.OpenRouter
   alias Tips.Repo
   alias Tips.Workers.EmbedSearch
 
@@ -34,11 +35,9 @@ defmodule Tips.SearchGate do
   @models ~w(claude gpt gemini)
   @environments ~w(chat ide cli)
   @base_url "https://openrouter.ai/api/v1"
-  @endpoint "deepinfra"
   @max_document_bytes 30_000
   @max_body_codepoints 20_000
   @tokens_per_input 8
-  @query_instruction "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:"
   @passes 3
   @deep_offset 180
   @saturated_requests 3
@@ -264,7 +263,8 @@ defmodule Tips.SearchGate do
 
     budget = gate["budget"]
     sizes = Map.new(documents, fn {id, text} -> {id, byte_size(text)} end)
-    query_tokens = Enum.map(queries, &tokens(@query_instruction <> &1["text"]))
+    instruction = OpenRouter.runtime().query_instruction
+    query_tokens = Enum.map(queries, &tokens(instruction <> &1["text"]))
 
     token_bound =
       Enum.sum(Enum.map(documents, fn {_id, text} -> tokens(text) end)) +
@@ -348,7 +348,8 @@ defmodule Tips.SearchGate do
               endpoint: endpoint,
               key: key,
               estimated_max_cost_usd: estimate,
-              tag_since_234: "#234 ran against tag deepinfra; this run's tag is #{endpoint.tag}"
+              host_before:
+                "#234 and gate runs 1 to 4 used DeepInfra; this run's tag is #{endpoint.tag}"
             })
           )
 
@@ -371,16 +372,18 @@ defmodule Tips.SearchGate do
     end
   end
 
-  # Returns the one listed DeepInfra endpoint, tagged `deepinfra` or
-  # `deepinfra/<variant>`, and every listed endpoint for the report. Routing by
-  # provider cannot choose between two DeepInfra endpoints, so two stop the run.
+  # Returns the one listed endpoint of the configured host, tagged `<host>` or
+  # `<host>/<variant>`, and every listed endpoint for the report. Routing by
+  # provider cannot choose between two endpoints of one host, so two stop the run.
   defp endpoint(client) do
-    case Req.get(client, url: "/models/qwen/qwen3-embedding-8b/endpoints") do
+    %{model: model, host: host} = OpenRouter.runtime()
+
+    case Req.get(client, url: "/models/#{model}/endpoints") do
       {:ok, %{status: 200, body: %{"data" => %{"endpoints" => endpoints}}}}
       when is_list(endpoints) ->
         listed = Enum.map(endpoints, &listing/1)
 
-        case Enum.filter(listed, &deepinfra?/1) do
+        case Enum.filter(listed, &host?(&1, host)) do
           [%{context_tokens: context, prompt_price_usd_per_token: price} = endpoint]
           when is_integer(context) and is_float(price) ->
             {{:ok, endpoint}, listed}
@@ -421,16 +424,16 @@ defmodule Tips.SearchGate do
 
   defp listing(other), do: %{unexpected: inspect(other)}
 
-  defp deepinfra?(%{tag: tag}) when is_binary(tag),
-    do: tag == @endpoint or String.starts_with?(tag, @endpoint <> "/")
+  defp host?(%{tag: tag}, host) when is_binary(tag),
+    do: tag == host or String.starts_with?(tag, host <> "/")
 
-  defp deepinfra?(_listing), do: false
+  defp host?(_listing, _host), do: false
 
   # Records the key's limits, never its label or usage.
   defp key(client) do
     # The key the embedding requests will use.
     api_key =
-      Application.get_env(:tips, EmbeddingProvider, [])[:api_key] ||
+      Application.get_env(:tips, OpenRouter, [])[:api_key] ||
         Tips.ProviderConfig.fetch!("OPENROUTER_API_KEY")
 
     auth = {:bearer, api_key}
@@ -845,7 +848,7 @@ defmodule Tips.SearchGate do
   # An embedding the application rejects, including one served by another
   # upstream, is a runtime failure, so it stops the run.
   defp outcome(200, "embeddings", body, response) do
-    case EmbeddingProvider.decode(body) do
+    case OpenRouter.decode(body) do
       {:ok, _vector} ->
         "ok"
 

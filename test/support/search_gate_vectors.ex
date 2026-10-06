@@ -1,8 +1,8 @@
 defmodule Tips.SearchGateVectors do
   @moduledoc """
-  The frozen vectors of #348, `test/fixtures/search_probe/vectors-60.json`:
-  the 40 document vectors of #60 gate run 3 and the query vectors that
-  `scripts/search_gate_vectors.exs` recorded, so tests can replay the gate's
+  The frozen vectors of #365, `test/fixtures/search_probe/vectors-60.json`:
+  the 40 document and ten query vectors that `scripts/search_gate_vectors.exs`
+  recorded from the configured runtime, so tests can replay the gate's
   retrieval without the provider.
 
   `load!/2` writes the document vectors into the search tables of a corpus

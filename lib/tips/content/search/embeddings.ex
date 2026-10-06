@@ -63,8 +63,8 @@ defmodule Tips.Content.Search.Embeddings do
 
   ## Changing the model
 
-  Never mix vectors from two models. To change the embedding model or
-  runtime, with the release run by Docker Compose:
+  Never mix vectors from two models or hosts. To change the embedding
+  implementation, model or host, with the release run by Docker Compose:
 
   1. Drain, then stop, every instance of the old release, so no scan or
      query uses the old model. Pause the queue, wait until no scan is
@@ -86,7 +86,9 @@ defmodule Tips.Content.Search.Embeddings do
      are hidden or deleted. A write from a request started before the clear
      then fails its guard. That is extra protection; it does not replace
      step 1.
-  3. Build the release with the new model for both documents and queries.
+  3. Build the release with the new configuration in `config/config.exs`,
+     used for both documents and queries. A change of dimensions also needs a
+     migration of the `embedding` columns.
   4. Start it: `docker compose up -d app`. Scans embed every live document
      again.
   """
