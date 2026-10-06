@@ -244,6 +244,15 @@ defmodule TipsWeb.EditorTest do
     html = render(lv)
     assert textarea(html, "review[body]") == "Saved body"
     assert record(html, form_id)["draft"] == record(fresh, form_id)["draft"]
+
+    # Save validates against the same rules, then saves at the loaded version.
+    html = lv |> form(form_id, review: %{body: " "}) |> render_submit()
+    assert_push_event(lv, "editor:refused", %{})
+    assert summary_links(html, form_id) == ["#review_body"]
+
+    html = lv |> form(form_id, review: %{body: "Edited"}) |> render_submit()
+    assert text(html, "#{form_id}-outcome") == "Changes saved"
+    assert %Review{body: "Edited", edit_version: 2} = Repo.get!(Review, review.id)
   end
 
   # What LiveView sends after a reconnect: the old page's hidden inputs with
