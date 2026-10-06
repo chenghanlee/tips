@@ -402,8 +402,16 @@ defmodule Tips.Content.SearchTest do
       assert_in_delta reviewed_score, 1 / 62 + 1 / 63, 1.0e-12
       assert_in_delta review_score, 1 / 62, 1.0e-12
 
-      assert {:ok, %{entries: [_top, _reviewed, %{matched_review_id: ^near_review_id}]}} =
-               Search.search(nil, "zebra", embedding: query_vector())
+      stub_provider(&respond_vector(&1, &2, query_vector()))
+
+      assert {:ok,
+              %{
+                entries: [
+                  %{tip: %{id: ^top_id}, matched_review_id: nil},
+                  %{tip: %{id: ^reviewed_id}, matched_review_id: ^review_id},
+                  %{tip: %{id: ^review_tip_id}, matched_review_id: ^near_review_id}
+                ]
+              }} = Content.search_tips(nil, "zebra")
     end
 
     test "pagination slices one fixed bounded ranking", ctx do
