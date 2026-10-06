@@ -635,8 +635,7 @@ class PairLifecycleTest(unittest.TestCase):
             ),
             # A stop-time write lands between the two cleanliness checks: ps runs only in stop().
             "ps": (
-                '#!/bin/sh\n[ -n "$RACE_DIRTY_FILE" ] && echo raced > "$RACE_DIRTY_FILE"\n'
-                "exit 0\n"
+                '#!/bin/sh\n[ -n "$RACE_DIRTY_FILE" ] && echo raced > "$RACE_DIRTY_FILE"\nexit 0\n'
             ),
         }
         for name, body in fakes.items():
@@ -899,9 +898,7 @@ class PairLifecycleTest(unittest.TestCase):
     def test_repository_configuration_validates(self) -> None:
         env = dict(self.env, TIPS_TEAM_CONFIG=str(SCRIPT.parent / "config.toml"))
         code = "import sys; sys.path.insert(0,sys.argv[1]); from team import load_config; "
-        result = execute(
-            ["python3", "-c", code + "load_config()", str(SCRIPT.parent)], env=env
-        )
+        result = execute(["python3", "-c", code + "load_config()", str(SCRIPT.parent)], env=env)
         assert result.returncode == 0, result.stderr
 
     @unittest.skipIf(os.geteuid() == 0, "root bypasses directory permissions")

@@ -529,9 +529,7 @@ def role_env(role: str, slot: int, worktree: Path) -> dict[str, str]:
     env = {
         "PGPORT": str(team["postgres_port"]),
         "TIPS_DB_SUFFIX": team["db_suffix_prefix"] + str(slot) + spec["db_suffix"],
-        "TIPS_TEST_PORT": str(
-            team["port_base"] + team["port_stride"] * slot + spec["port_offset"]
-        ),
+        "TIPS_TEST_PORT": str(team["port_base"] + team["port_stride"] * slot + spec["port_offset"]),
         "MIX_ENV": "test",
         "TIPS_CHECK_TIMEOUT_SECONDS": str(cfg["timeouts"]["checks_minutes"] * 60),
         "TIPS_TEAM_CONFIG": str(config),
