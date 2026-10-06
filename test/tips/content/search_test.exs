@@ -39,9 +39,12 @@ defmodule Tips.Content.SearchTest do
           assert {:ok, %{candidates: candidates, total: 3}} = Search.rank("quokka", [])
           # Tip and review scores come from separate BM25 indexes, so only the
           # tips' own order is fixed.
-          assert [{strong_id, nil} | rest] = Enum.map(candidates, &{&1.tip_id, &1.review_id})
-          assert strong_id == strong.id
-          assert Enum.sort(rest) == Enum.sort([{reviewed.id, review.id}, {weak.id, nil}])
+          ranked = Enum.map(candidates, &{&1.tip_id, &1.review_id})
+
+          assert Enum.sort(ranked) ==
+                   Enum.sort([{strong.id, nil}, {reviewed.id, review.id}, {weak.id, nil}])
+
+          assert [strong.id, weak.id] == for({tip_id, nil} <- ranked, do: tip_id)
 
           scans = scans(explain("quokka", []))
 
