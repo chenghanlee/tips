@@ -59,14 +59,14 @@ Before reading, editing or reviewing Elixir code, load `elixir` and each skill t
 
 ## Tests
 
-- Test the acceptance scenarios in the issue or user brief, and reported regressions. Changed functions, branches or input variants alone do not justify more tests.
-- Read existing tests first. If they already check the required behaviour, leave them unchanged. If a requirement changed, update their assertions. If a scenario or regression is not covered, extend a test whose setup and action can exercise it; add one only when none can. Make the smallest set of changes that covers the scenarios and regressions.
-- When adding coverage for new behaviour or a regression, write the test before implementing the change and confirm it fails for the intended reason.
-- Use integration tests that exercise cooperating components through public entry points. Add a unit test only for a pure-logic boundary case not covered by integration tests. Add a browser test only for a user interaction that lower-level tests cannot exercise.
+- Test the acceptance scenarios in the issue or user brief, and reported regressions. Do not add tests just because functions, branches or inputs changed.
+- Read existing tests first. If they already check the required behaviour, leave them unchanged. If a requirement changed, update their assertions. If a scenario or regression has no test, extend an existing test that can check it with the same setup and action. Add a test only if none can. Make the smallest set of changes that covers the scenarios and regressions.
+- To test new behaviour or a regression, write or update the test before changing the code. Check that it fails for the reason you expect.
+- Use integration tests to check that components work together through their public entry points. Add a unit test only for a boundary case in pure logic that integration tests do not cover. Add a browser test only for a user interaction that lower-level tests cannot check.
 - Do not test frameworks, libraries, private functions or code structure.
-- Before adding or changing tests, weigh the relevant [Test Desiderata](https://testdesiderata.com/) factors within these rules: isolated, composable, deterministic, fast, writable, readable, behavioral, structure-insensitive, automated, specific, predictive and inspiring.
-- In the same PR, delete obsolete tests and tests your change makes redundant. Keep coverage of every acceptance scenario and regression that still applies.
-- Reviewers: assess test changes together with the existing tests for the same scenarios and regressions. Passing tests and a reason for each test do not show that all are needed. When asking to remove or merge tests, name the existing test or smaller replacement that keeps the coverage.
+- Before adding or changing tests, weigh the trade-offs using the relevant [Test Desiderata](https://testdesiderata.com/) factors: isolated, composable, deterministic, fast, writable, readable, behavioral, structure-insensitive, automated, specific, predictive and inspiring. Follow the rules above when choosing.
+- In the same PR, delete tests for requirements that no longer apply and tests your change makes unnecessary. Keep tests for every acceptance scenario and regression that still applies.
+- Reviewers: read changed and existing tests for the same scenarios and regressions together. Check whether all are needed, even if each test passes and has a reason to exist. When asking to remove or combine tests, name the existing test or smaller replacement that still checks the same behaviour.
 
 ## Checks
 
@@ -86,9 +86,9 @@ Fix the findings your change introduces; report the others.
 
 ## GitHub
 
-- Issue and PR comments: only decisions, findings, blockers and the review replies allowed below. No standalone progress, status or acknowledgment comments.
-- Reviews: follow the [PR review record](agent/teams/README.md#pr-review-record). Put one finding per inline comment, on the line it concerns. Limit the body to the verdict, the record's required metadata, verification evidence and limits (see Evidence), and findings outside the diff. Give each finding outside the diff its `path:line`.
-- Findings: start with [P0, P1 or P2](agent/teams/README.md#severity) and the change you ask for, then the consequence. For wrong behaviour, give the steps or input, the actual result and the expected result; otherwise say what it breaks or costs. A `suggestion` block must replace the commented lines exactly.
-- Review replies: only ask or answer a question the finding leaves open, link the fixing commit, or say why you decline it. The reviewer who opened the thread resolves it.
-- Blockers: state what is blocked, the exact error or question, and who must act. In a pair, follow the [blocker procedure](agent/teams/README.md#report-and-resolve-blockers). Decisions: state what and why in one or two sentences.
-- Evidence: link code at its commit SHA and CI at its run URL. When quoting check output, quote only the failing lines. In PR descriptions and reviews, report failed, pending and unrun checks and local evidence that CI does not cover. Do not list passing checks.
+- Issue and PR comments: post only decisions, findings, blockers and the review replies allowed below. Do not post separate progress updates, status updates or acknowledgments.
+- Reviews: follow the [PR review record](agent/teams/README.md#pr-review-record). Put one finding per inline comment, on the line it concerns. In the body, include only the review decision, details required by the review record, check results and what you did not check (see Evidence), and findings outside the diff. Give each finding outside the diff its `path:line`.
+- Findings: start with [P0, P1 or P2](agent/teams/README.md#severity) and the change you ask for, then explain why it matters. For wrong behaviour, give the steps or input, the actual result and the expected result; otherwise say what it breaks or costs. A `suggestion` block must replace the commented lines exactly.
+- Review replies: only ask or answer a question the finding leaves open, link the commit that fixes it, or explain why you will not make the requested change. The reviewer who opened the thread resolves it.
+- Blockers: state what is blocked, the exact error or question, and who must act. In a pair, follow the [blocker procedure](agent/teams/README.md#report-and-resolve-blockers). Decisions: say what you decided and why in one or two sentences.
+- Evidence: link code at its commit SHA and CI at its run URL. When quoting check output, quote only the failing lines. In PR descriptions and reviews, report checks that failed, are pending or were not run. Also report results from local checks that CI does not cover. Do not list passing checks.
