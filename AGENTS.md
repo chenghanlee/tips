@@ -60,7 +60,7 @@ Before reading, editing or reviewing Elixir code, load `elixir` and each skill t
 
 ## Tests
 
-- Before adding or changing tests, compare them with existing coverage and simpler options using relevant [Test Desiderata](https://testdesiderata.com/) factors: isolated, composable, deterministic, fast, writable, readable, behavioral, structure-insensitive, automated, specific, predictive and inspiring. Justify the trade-offs in the PR with measurements or concrete examples.
+- Before adding or changing tests, weigh the trade-offs using relevant [Test Desiderata](https://testdesiderata.com/) factors: isolated, composable, deterministic, fast, writable, readable, behavioral, structure-insensitive, automated, specific, predictive and inspiring.
 - Test behaviour with integration tests. Add a unit test only for pure-logic boundary cases they do not reach, and an end-to-end test only for a user interaction that lower-level tests cannot exercise.
 - Default to no test changes. Read the existing tests for the issue's acceptance scenarios or the reported regression. If they detect the failure, leave them unchanged. Otherwise make the smallest set of changes that detects it: extend a test whose setup and action can exercise the scenario; add one only when none can. Changed functions, branches or input variants do not justify new cases.
 - Do not test frameworks, libraries, private functions or code structure.
