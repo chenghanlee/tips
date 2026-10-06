@@ -63,6 +63,11 @@ defmodule TipsWeb.Router do
       on_mount: @sandbox_hooks ++ [{TipsWeb.UserAuth, :require_authenticated}] do
       live "/users/settings", UserLive.Settings, :edit
       live "/users/settings/confirm-email/:token", UserLive.Settings, :confirm_email
+
+      live "/editor/tips/new", TipLive.Editor, :new
+      live "/editor/tips/:id/edit", TipLive.Editor, :edit
+      live "/editor/tips/:tip_id/reviews/new", ReviewLive.Editor, :new
+      live "/editor/reviews/:id/edit", ReviewLive.Editor, :edit
     end
   end
 

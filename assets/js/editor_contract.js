@@ -1,7 +1,6 @@
 // Browser wire contract for the tip and review editors and their EditorDraft
-// hook. Declarations only: nothing imports this file yet. The Elixir side and
-// the rules live in TipsWeb.EditorContract (lib/tips_web/editor_contract.ex);
-// examples live in test/support/fixtures/editor_contract_fixtures.ex.
+// hook. Declarations only. The Elixir side and the rules live in
+// TipsWeb.EditorContract (lib/tips_web/editor_contract.ex).
 //
 // JSON uses string keys, tagged objects for targets and media, and explicit
 // nulls. Text travels exactly as typed; Content owns normalization.
