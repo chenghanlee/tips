@@ -6,8 +6,8 @@ GitHub holds all workflow state: the issue, the PR with its reviews and checks, 
 |---|---|---|
 | User | n/a | Orders the board, marks tasks Ready, answers product, scope, purchase and credential questions, starts the dispatcher once |
 | Dispatcher | `dispatcher` | Keeps the board true, picks tasks, starts and stops pairs, handles `blocked`. Writes no code and reviews nothing |
-| Developer | `team-N-dev` | Implements and verifies the issue, opens the PR, repairs P0 and P1 findings, confirms the merge |
-| Tester | `team-N-test` | Reviews the pushed head, runs the tests or the app, approves and publishes |
+| Developer | `team-N-dev` | Implements and verifies the issue, opens the PR, repairs findings and failed checks |
+| Tester | `team-N-test` | Reviews the pushed head, runs the tests or the app, approves, publishes and confirms the merge |
 
 ## Common path
 
@@ -17,9 +17,9 @@ GitHub holds all workflow state: the issue, the PR with its reviews and checks, 
 4. **Developer: hand over.** `team.py turn <pr> test`, then stop using the tree, build and database until rung.
 5. **Tester: review that SHA.** Run the tests; for UI tasks boot the app and check the acceptance scenarios in a browser. Report every P0 and P1 you find in the first review. Before submitting, confirm the tree is clean and HEAD is still that SHA. If you have any finding, submit the review and run `team.py turn <pr> dev`; otherwise go to step 7.
 6. **Both: repair loop.** The developer fixes every P0 and P1, fixes or declines each P2, pushes and hands back. The tester reviews the delta and resolves each thread that is fixed or declined with a reason.
-7. **Tester: approve** when no P0 or P1 remains and every thread is resolved: the [PR review record](#pr-review-record), then `team.py turn <pr> dev`.
+7. **Tester: approve** when no P0 or P1 remains and every thread is resolved: submit and publish the [PR review record](#pr-review-record) without waiting for CI, keep the turn and go to step 9.
 8. **GitHub: merge.** Auto-merge needs `checks`, `release`, `tips/independent-review` and resolved threads. The merge closes the issue, the Project sets Done and the remote branch is deleted.
-9. **Developer: confirm.** Run `timeout "$TIPS_CHECK_TIMEOUT_SECONDS" gh pr checks <pr> --watch --required` once, then `gh pr view <pr> --json state,mergedAt`. Ring `done` only when the PR is merged. Otherwise repair a failed check, or ring `blocked` with the pending check or merge blocker.
+9. **Tester: confirm.** Run `timeout "$TIPS_CHECK_TIMEOUT_SECONDS" gh pr checks <pr> --watch --required` once. Whether it passes, fails or times out, then run `gh pr view <pr> --json state,mergedAt`. Merged: ring the dispatcher `done`. Not merged and a required check failed: `team.py turn <pr> dev`. Otherwise ring the dispatcher `blocked` with the pending check or merge blocker. Do not repeat the watch.
 10. **Dispatcher: clean up.** `team.py stop <issue>`, then refill the slot. Tell the user which Backlog items are one edit from Ready.
 
 ## Commands
@@ -39,14 +39,14 @@ herdr agent prompt dispatcher "<issue or PR URL> done"
 herdr agent prompt dispatcher "<issue or PR URL> blocked: <question>"
 ```
 
-`start` and `stop` take the issue number; `turn` and the review tools take the PR number. Rerunning `start` keeps a running client and relaunches a missing one. After a handoff is sent, end your turn; the partner's ring arrives as a new prompt. If the send fails, report the exact error: the turn is still yours. The only wait is the developer's in step 9.
+`start` and `stop` take the issue number; `turn` and the review tools take the PR number. Rerunning `start` keeps a running client and relaunches a missing one. After a handoff is sent, end your turn; the partner's ring arrives as a new prompt. If the send fails, report the exact error: the turn is still yours. The only wait is the tester's in step 9.
 
-No label marks the turn. After a restart it is the developer's turn if no PR exists or the latest review's `commit_id` equals the PR head; otherwise it is the tester's.
+No label marks the turn. After a restart, read the PR, the reviews of its head and its required checks. It is the developer's turn if no PR exists, if a required check has failed, or if the head has a review with findings. Otherwise it is the tester's: review an unreviewed head, or finish steps 7 and 9 on an approved one.
 
 ## Rules
 
 - **Severity.** Use the first that matches. P0: a feature cannot complete, an unauthorized action succeeds, or stored data is lost or corrupted. P1: an acceptance scenario fails, a required test or check is missing or failing, or the change significantly hurts the user's experience. P2: everything else. The developer fixes it, declines it with a reason, or files one follow-up issue for all deferred P2s.
-- **Messages.** Every message makes its recipient reread its whole context. Send only these: `team.py turn`, `done`, `blocked`, and the dispatcher's answer to `blocked`. Never send an acknowledgment, a progress or status update, thanks or a reply to a ring. Put everything the recipient needs in that one message or behind its link.
+- **Messages between agents.** Every message starts a turn over the recipient's whole context. Send only these: `team.py turn`, `done`, `blocked`, and the dispatcher's answer to `blocked`. Never send an acknowledgment, a progress or status update, thanks or a reply that only confirms receipt. Put everything the recipient needs in that one message or behind its link.
 - **Stuck.** Whoever holds the turn rings the dispatcher `blocked` with the question and the evidence when both of you have answered a finding with evidence and still disagree, or when two fixes leave the same finding failing and you do not agree on the next check. A rerun without a fix is not a fix. Product and scope questions go the same way at once, PR or not.
 - **Dispatcher on `blocked`.** Set Status Blocked. Answer a technical question from the reported error and the cited code; send a product or scope question, or one you cannot answer, to the user. Then record the answer on the issue, set Status Active and ring the agent that asked.
 - **Red `main`.** A developer whose failing check also fails on the latest `main` run rings the dispatcher `blocked` with both run links. The dispatcher finds the merge that broke `main`, opens its revert with `gh pr revert <pr>`, enables auto-merge with `gh pr merge <revert pr> --auto --merge` and asks the user for an owner waiver on the revert PR. Fix forward after the revert merges.

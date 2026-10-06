@@ -9,9 +9,9 @@ USER         order the board · mark Ready · start the dispatcher once
 DISPATCHER   tidy → pick → team.py start <issue> → set Active
 DEVELOPER    code → push → PR with "Closes #<issue>" + auto-merge → team.py turn <pr> test
 TESTER       review → findings → team.py turn <pr> dev      (loop until no P0 or P1)
-TESTER       LGTM → publish_review.py → team.py turn <pr> dev
+TESTER       LGTM → publish_review.py
 GITHUB       checks + status + resolved threads → merge → issue closes → Done
-DEVELOPER    confirm the merge → ring the dispatcher "done"
+TESTER       confirm the merge → ring the dispatcher "done"
 DISPATCHER   team.py stop <issue> → next
 ```
 
@@ -63,7 +63,7 @@ CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=35 claude --permission-mode auto \
   'Run herdr agent rename "$HERDR_PANE_ID" dispatcher, then begin.'
 ```
 
-Start only one. Pairs ring it by the name `dispatcher`. Every ring makes it reread its whole context, so it compacts at 35%: GitHub holds the state it needs. It starts and stops pairs with `team.py` from this checkout; each pair gets its own Herdr workspace. Handle each client's repository trust prompt the first time. An unexpected approval prompt stops a launch; inspect it and follow the active approval policy.
+Start only one. Pairs ring it by the name `dispatcher`. Every ring starts a turn over its whole context, so it compacts at 35%; GitHub holds the state it needs. It starts and stops pairs with `team.py` from this checkout; each pair gets its own Herdr workspace. Handle each client's repository trust prompt the first time. An unexpected approval prompt stops a launch; inspect it and follow the active approval policy.
 
 ## Configuration
 
