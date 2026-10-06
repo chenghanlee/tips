@@ -150,13 +150,12 @@ defmodule TipsWeb.EditorReconcileTest do
     )
   end
 
-  # Returns once `connect()` is called; the page may then leave.
+  # Returns once `connect()` is called; the page may then leave. Connects only
+  # after the disconnect's teardown: an earlier teardown still running closes
+  # the next connection.
   defp reconnect(session) do
     run(session, """
-    const main = document.querySelector("[data-phx-main]")
-    const until = async (test) => { while (!test()) await new Promise((r) => setTimeout(r, 50)) }
-    window.liveSocket.disconnect()
-    await until(() => !main.classList.contains("phx-connected"))
+    await new Promise((resolve) => window.liveSocket.disconnect(resolve))
     window.dropReplies = false
     window.liveSocket.connect()
     """)
