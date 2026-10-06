@@ -20,17 +20,20 @@
 
 ## Software design
 
-- Use Elixir and Phoenix idioms and proven designs from widely used similar software.
+- Use Elixir and Phoenix idioms, conventions and proven design patterns from widely used similar software.
+- Use Ecto instead of raw SQL.
 - Build the simplest working MVP: no enterprise complexity, no backwards compatibility. Accept complexity only when it makes the user's experience simpler.
 
 ## Writing
 
-- Plain, short English, in chat, issues, PRs, comments and commits. Lead with the result and the next action.
+- No mannered prose. The user has ADHD.
+- Plain and simple English, in chat, issues, PRs, comments and commits. Lead with the result and the next action.
 - State each decision or result once and link its evidence instead of repeating it.
 
 ## Tests
 
-- Integration first. Unit tests are for pure logic with wide blast radius.
+- Follow Kent Beck's [Test Desiderata](https://testdesiderata.com/) when writing tests.
+- Focus on behaviour and integration tests. Write very few unit and end-to-end tests.
 - When behaviour changes and existing coverage does not establish it, write the failing acceptance or regression test first and confirm it fails for the right reason.
 - Keep the suite lean: add a test only for confidence that is missing; remove redundant tests and simplify costly ones without losing required coverage.
 
