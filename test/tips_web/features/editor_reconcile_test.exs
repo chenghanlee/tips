@@ -72,12 +72,7 @@ defmodule TipsWeb.EditorReconcileTest do
     drop_push(session, "editor:cleared")
     reconnect(session)
     await_cleared(session, storage)
-
-    # The page may leave as soon as the connection drops.
-    execute_script(
-      session,
-      "window.liveSocket.disconnect(); setTimeout(() => window.liveSocket.connect(), 100)"
-    )
+    reconnect(session)
 
     assert_has(session, css("h1", text: "Plan first"))
   end
@@ -155,6 +150,7 @@ defmodule TipsWeb.EditorReconcileTest do
     )
   end
 
+  # Returns once `connect()` is called; the page may then leave.
   defp reconnect(session) do
     run(session, """
     const main = document.querySelector("[data-phx-main]")
