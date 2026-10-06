@@ -21,7 +21,7 @@
 ## Software design
 
 - Use Elixir and Phoenix idioms, conventions and proven design patterns from widely used similar software.
-- Use Ecto instead of raw SQL.
+- Prefer Ecto. Use raw SQL only where Ecto cannot express it, and parameterize it.
 - Build the simplest working MVP: no enterprise complexity, no backwards compatibility. Accept complexity only when it makes the user's experience simpler.
 
 ## Writing
