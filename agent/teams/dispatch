@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # Start the dispatcher in this Herdr pane. Its settings are [dispatcher] in config.toml.
+if [[ $# -gt 1 || ( $# -eq 1 && $1 != --new-pane ) ]]; then
+  echo 'Usage: agent/teams/dispatch [--new-pane]' >&2
+  exit 2
+fi
 cd "$(dirname "$0")/../.." || exit
 settings=$(python3 -c '
 import sys, tomllib
@@ -7,6 +11,25 @@ d = tomllib.load(open(sys.argv[1], "rb"))["dispatcher"]
 print(d["model"], d["effort"], d["compact_percent"])
 ' "${TIPS_TEAM_CONFIG:-agent/teams/config.toml}") || exit
 read -r model effort compact_percent <<<"$settings"
+if [[ ${1:-} == --new-pane ]]; then
+  if [[ ${HERDR_ENV:-} != 1 || -z ${HERDR_PANE_ID:-} ]]; then
+    echo '--new-pane requires a session running inside Herdr.' >&2
+    exit 1
+  fi
+  layout=$(herdr pane layout --current) || exit
+  direction=$(python3 -c '
+import json, sys
+panes = json.load(sys.stdin)["result"]["layout"]["panes"]
+rect = next(p["rect"] for p in panes if p["pane_id"] == sys.argv[1])
+print("right" if rect["width"] >= 120 else "down")
+' "$HERDR_PANE_ID" <<<"$layout") || exit
+  pane=$(herdr pane split --current --direction "$direction" --cwd "$PWD" --no-focus) || exit
+  pane_id=$(python3 -c 'import json, sys; print(json.load(sys.stdin)["result"]["pane"]["pane_id"])' <<<"$pane") || exit
+  printf -v command 'TIPS_TEAM_CONFIG=%q %q' "${TIPS_TEAM_CONFIG:-$PWD/agent/teams/config.toml}" "$PWD/agent/teams/dispatch"
+  herdr pane run "$pane_id" "$command" || exit
+  echo "Dispatcher launch submitted to Herdr pane $pane_id. Check that pane for startup or approval prompts."
+  exit 0
+fi
 # Every ring starts a turn over the whole context, so compact early; GitHub holds the state.
 CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=$compact_percent exec claude --permission-mode auto \
   --model "$model" --effort "$effort" \
