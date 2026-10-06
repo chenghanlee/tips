@@ -59,13 +59,14 @@ Before reading, editing or reviewing Elixir code, load `elixir` and each skill t
 
 ## Tests
 
-- Before adding or changing tests, weigh the trade-offs using relevant [Test Desiderata](https://testdesiderata.com/) factors: isolated, composable, deterministic, fast, writable, readable, behavioral, structure-insensitive, automated, specific, predictive and inspiring.
-- Test behaviour with integration tests. Add a unit test only for pure-logic boundary cases they do not reach, and an end-to-end test only for a user interaction that lower-level tests cannot exercise.
-- Default to no test changes. Read the existing tests for the issue's acceptance scenarios or the reported regression. If they detect the failure, leave them unchanged. Otherwise make the smallest set of changes that detects it: extend a test whose setup and action can exercise the scenario; add one only when none can. Changed functions, branches or input variants do not justify new cases.
+- Test the acceptance scenarios in the issue or user brief, and reported regressions. Changed functions, branches or input variants alone do not justify more tests.
+- Read existing tests first. If they already check the required behaviour, leave them unchanged. If a requirement changed, update their assertions. If a scenario or regression is not covered, extend a test whose setup and action can exercise it; add one only when none can. Make the smallest set of changes that covers the scenarios and regressions.
+- When adding coverage for new behaviour or a regression, write the test before implementing the change and confirm it fails for the intended reason.
+- Use integration tests that exercise cooperating components through public entry points. Add a unit test only for a pure-logic boundary case not covered by integration tests. Add a browser test only for a user interaction that lower-level tests cannot exercise.
 - Do not test frameworks, libraries, private functions or code structure.
-- If no existing test covers the changed behaviour, write the acceptance or regression test first and confirm it fails for the intended reason.
-- In the same PR, delete the tests your change makes redundant. Keep the only test of an acceptance scenario or regression.
-- Review test changes as a set against the existing tests for the same acceptance scenarios and regressions. When asking for removal or consolidation, name the existing test or the smaller replacement that keeps the coverage. Passing tests and a reason for each test do not show that the set is needed.
+- Before adding or changing tests, weigh the relevant [Test Desiderata](https://testdesiderata.com/) factors within these rules: isolated, composable, deterministic, fast, writable, readable, behavioral, structure-insensitive, automated, specific, predictive and inspiring.
+- In the same PR, delete obsolete tests and tests your change makes redundant. Keep coverage of every acceptance scenario and regression that still applies.
+- Reviewers: assess test changes together with the existing tests for the same scenarios and regressions. Passing tests and a reason for each test do not show that all are needed. When asking to remove or merge tests, name the existing test or smaller replacement that keeps the coverage.
 
 ## Checks
 
@@ -85,10 +86,9 @@ Fix the findings your change introduces; report the others.
 
 ## GitHub
 
-- Comment only for a decision, a finding or a blocker; no progress, status or acknowledgment comments.
-- Reviews: one finding per inline comment, on the line it concerns. Use the body only for the verdict, verification limits and findings outside the diff, each with its `path:line`.
-- Findings: start with [P0, P1 or P2](agent/teams/README.md#rules) and the change you ask for, then the consequence. For wrong behaviour give the steps or input, the actual result and the expected result; otherwise what it breaks or costs. A `suggestion` block is optional and must replace the commented lines exactly.
-- Replies: only to ask or answer a question the finding leaves open, link the commit that fixes it, or give the reason you decline it. The reviewer who opened a thread resolves it.
-- Blockers: what is blocked, the exact error or question, and who must act. Decisions: what and why, in one or two sentences.
-- Link code at its commit SHA and CI at its run URL. Quote only the failing lines.
-- Do not list passing checks. Report failed, pending and unrun checks, and local evidence that CI does not cover.
+- Issue and PR comments: only decisions, findings, blockers and the review replies allowed below. No standalone progress, status or acknowledgment comments.
+- Reviews: follow the [PR review record](agent/teams/README.md#pr-review-record). Put one finding per inline comment, on the line it concerns. Limit the body to the verdict, the record's required metadata, verification evidence and limits (see Evidence), and findings outside the diff. Give each finding outside the diff its `path:line`.
+- Findings: start with [P0, P1 or P2](agent/teams/README.md#severity) and the change you ask for, then the consequence. For wrong behaviour, give the steps or input, the actual result and the expected result; otherwise say what it breaks or costs. A `suggestion` block must replace the commented lines exactly.
+- Review replies: only ask or answer a question the finding leaves open, link the fixing commit, or say why you decline it. The reviewer who opened the thread resolves it.
+- Blockers: state what is blocked, the exact error or question, and who must act. In a pair, follow the [blocker procedure](agent/teams/README.md#report-and-resolve-blockers). Decisions: state what and why in one or two sentences.
+- Evidence: link code at its commit SHA and CI at its run URL. When quoting check output, quote only the failing lines. In PR descriptions and reviews, report failed, pending and unrun checks and local evidence that CI does not cover. Do not list passing checks.
