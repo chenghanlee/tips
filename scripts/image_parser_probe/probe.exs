@@ -95,8 +95,7 @@ defmodule ParserProbe.Fixtures do
        accept("png", false)},
       {"animated.apng", &ff.(&1, ["-f", "lavfi", "-i", src, "-plays", "0", "-f", "apng"]),
        accept("png", true)},
-      {"single-frame.apng", &ff.(&1, ["-f", "lavfi", "-i", src, "-frames:v", "1", "-f", "apng"]),
-       accept("png", false)},
+      {"single-frame.apng", &first_apng_frame(p.("animated.apng"), &1), accept("png", false)},
       {"static.jpg", &ff.(&1, ["-f", "lavfi", "-i", src, "-frames:v", "1"]),
        accept("jpeg", false)},
       {"static.gif", &ff.(&1, ["-f", "lavfi", "-i", src, "-frames:v", "1"]),
@@ -126,19 +125,22 @@ defmodule ParserProbe.Fixtures do
       {"truncated.webp", &truncate(p.("animated.webp"), &1), reject("malformed")},
       {"truncated.apng", &truncate(p.("animated.apng"), &1), reject("malformed")},
       {"corrupt-idat.png", &corrupt_idat(p.("static.png"), &1), reject("malformed")},
-      # Spoofed motion metadata. A static classification must match what a browser
-      # shows, or the browser would animate an image the product treats as still.
+      {"png-crc-mismatch.png", &flip_idat_crc(p.("static.png"), &1), reject("malformed")},
+      {"png-iend-missing.png", &drop_iend(p.("static.png"), &1), reject("malformed")},
+      {"gif-trailer-missing.gif", &drop_gif_trailer(p.("animated.gif"), &1), reject("malformed")},
+      # Spoofed motion metadata.
       {"apng-actl-overcount.png", &set_actl_frames(p.("animated.apng"), &1, +1),
        reject("malformed")},
-      # Chrome 154's ImageDecoder reports this file as one static frame.
       {"apng-actl-undercount.png", &set_actl_frames(p.("animated.apng"), &1, :one),
-       [reject("malformed"), accept("png", false)]},
+       reject("malformed")},
       {"apng-frame-outside-canvas.png", &shift_second_fctl(p.("animated.apng"), &1),
        reject("malformed")},
       {"webp-anim-flag-unset.webp", &clear_webp_anim_flag(p.("animated.webp"), &1),
-       [reject("malformed"), accept("webp", true)]},
-      {"gif-trailer-missing.gif", &drop_gif_trailer(p.("animated.gif"), &1),
-       [reject("malformed"), accept("gif", true)]},
+       reject("malformed")},
+      # A later frame far outside a small canvas: Pillow would grow the canvas to
+      # 9064x9043 and allocate it on decode.
+      {"gif-frame-outside-canvas.gif", &move_last_gif_frame(p.("animated.gif"), &1),
+       reject("malformed")},
       # Resource bounds.
       {"huge-dimensions.png", &black_png(&1, 20_000, 20_000, {0, 8}),
        reject("dimensions_over_limit")},
@@ -294,6 +296,79 @@ defmodule ParserProbe.Fixtures do
     File.write!(out, <<pre::binary, Bitwise.band(flags, Bitwise.bnot(0x02)), post::binary>>)
     "#{Path.basename(from)} with the VP8X animation flag cleared"
   end
+
+  # Flip one byte of the first IDAT chunk's CRC; the data is unchanged.
+  defp flip_idat_crc(from, out) do
+    data = File.read!(from)
+    {pos, _} = :binary.match(data, "IDAT")
+    <<len::32>> = binary_part(data, pos - 4, 4)
+    at = pos + 4 + len
+    <<pre::binary-size(^at), b, post::binary>> = data
+    File.write!(out, <<pre::binary, Bitwise.bxor(b, 0xFF), post::binary>>)
+    "#{Path.basename(from)} with IDAT CRC byte #{at} inverted"
+  end
+
+  defp drop_iend(from, out) do
+    data = File.read!(from)
+    size = byte_size(data) - 12
+    <<body::binary-size(^size), 0::32, "IEND", _crc::32>> = data
+    File.write!(out, body)
+    "#{Path.basename(from)} without its final 12-byte IEND chunk"
+  end
+
+  # A genuine one-frame APNG: acTL num_frames 1, the first fcTL and the IDAT default
+  # image; later fcTL and fdAT chunks are dropped.
+  defp first_apng_frame(from, out) do
+    {chunks, _} =
+      from
+      |> File.read!()
+      |> Png.chunks()
+      |> Enum.flat_map_reduce(0, fn
+        {"acTL", <<_n::32, plays::32>>}, n -> {[{"acTL", <<1::32, plays::32>>}], n}
+        {"fcTL", _} = c, 0 -> {[c], 1}
+        {"fcTL", _}, n -> {[], n + 1}
+        {"fdAT", _}, n -> {[], n}
+        c, n -> {[c], n}
+      end)
+
+    File.write!(out, Png.assemble(chunks))
+    "#{Path.basename(from)} reduced to acTL num_frames 1, its first fcTL and IDAT"
+  end
+
+  # Set the last image descriptor's left and top offsets to 9000.
+  defp move_last_gif_frame(from, out) do
+    data = File.read!(from)
+    <<_header::binary-size(10), flags, _::binary>> = data
+    at = last_gif_descriptor(data, 13 + color_table_size(flags), nil) + 1
+    <<pre::binary-size(^at), _left::16, _top::16, post::binary>> = data
+    File.write!(out, <<pre::binary, 9000::little-16, 9000::little-16, post::binary>>)
+    "#{Path.basename(from)} with the last image descriptor's offsets set to 9000,9000"
+  end
+
+  defp last_gif_descriptor(data, pos, last) do
+    case binary_part(data, pos, 1) do
+      ";" ->
+        last
+
+      "!" ->
+        last_gif_descriptor(data, skip_sub_blocks(data, pos + 2), last)
+
+      "," ->
+        flags = :binary.at(data, pos + 9)
+        data_start = pos + 10 + color_table_size(flags) + 1
+        last_gif_descriptor(data, skip_sub_blocks(data, data_start), pos)
+    end
+  end
+
+  defp skip_sub_blocks(data, pos) do
+    case :binary.at(data, pos) do
+      0 -> pos + 1
+      len -> skip_sub_blocks(data, pos + 1 + len)
+    end
+  end
+
+  defp color_table_size(flags) when Bitwise.band(flags, 0x80) == 0, do: 0
+  defp color_table_size(flags), do: 3 * Bitwise.bsl(2, Bitwise.band(flags, 7))
 
   defp drop_gif_trailer(from, out) do
     data = File.read!(from)

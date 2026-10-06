@@ -1,8 +1,8 @@
 # Image parser probe
 
 Result for [#244](https://github.com/chenghanlee/tips/issues/244): **Pillow 12.3.0
-is selected.** Run in its own OS process under `timeout` and `prlimit`, it passes
-all 40 fixtures and all three enforcement experiments on linux/arm64 and
+is selected,** with four structure checks of our own. Run in its own OS process
+under `timeout` and `prlimit`, it passes all 43 fixtures and all three enforcement experiments on linux/arm64 and
 linux/amd64. [#62](https://github.com/chenghanlee/tips/issues/62) builds on the
 [contract below](#contract-for-62).
 
@@ -40,7 +40,7 @@ Both runs are at `f6c221f` with no tracked changes:
   [fixtures](image-parser-probe/amd64-20261006T173820Z-fixtures.json).
 
 Fixture bytes are stable across runs on one architecture: repeated arm64 runs gave
-identical hashes for all 40 fixtures. Across architectures, the lossy encodes
+identical hashes for all 43 fixtures. Across architectures, the lossy encodes
 differ (`static.jpg`, `spoofed-jpeg-as.png`, `truncated.jpg` and the three
 lossy at-limit WebPs). Every other fixture is byte-identical. All verdicts match.
 
@@ -95,17 +95,36 @@ Peak RSS is the parser process's `ru_maxrss`.
 #61 failed these with Vix 0.41.0/libvips 8.18.3: `animated.apng` (read as static),
 `truncated.gif` and `truncated.apng` (accepted). ffprobe 8.1 also failed
 `animated.webp`, `truncated.jpg` and `huge-dimensions.png`. Pillow passes all of
-them. No handwritten APNG or GIF parsing is needed.
+them.
 
-Three fixtures have two acceptable outcomes. The rule: a static result must match
-what a browser shows.
+## Structure checks
 
-- `apng-actl-undercount.png`: `acTL` declares 1 frame but the file holds 5.
-  Pillow reads it as static. Chrome 154's `ImageDecoder` also reports one static
-  frame. Firefox and Safari were not tested.
-- `gif-trailer-missing.gif`: a complete 5-frame GIF without its final `;` byte.
-  Pillow and Chrome both read 5 frames.
-- `webp-anim-flag-unset.webp`: Pillow rejects it. Chrome cannot read it either.
+Pillow alone accepts five malformed files that decode cleanly:
+
+- `png-crc-mismatch.png`: Pillow does not check chunk CRCs.
+- `png-iend-missing.png`: Pillow does not require IEND.
+- `apng-actl-undercount.png`: Pillow trusts the `acTL` frame count, so a file that
+  declares 1 frame but holds 5 reads as static.
+- `gif-trailer-missing.gif`: Pillow does not require the GIF trailer.
+- `gif-frame-outside-canvas.gif`: Pillow grows a 64×48 canvas to 9064×9043 for a
+  frame placed far outside it. Decoding that frame peaked at 723 MiB.
+
+`classify.py` adds four checks that reject them:
+
+1. For PNG, it walks every chunk on the raw bytes: length, CRC and a final IEND.
+2. For APNG, the `fcTL` count must equal the `acTL` frame count.
+3. For GIF, the file must end with the trailer byte.
+4. After each `seek`, the canvas size must be unchanged. Pillow grows the canvas
+   on `seek` but allocates it on `load`, so this check runs before the memory is
+   used.
+
+Design assessment: these checks only validate structure. They never decode pixels
+or decide motion; Pillow still decodes every frame, and its frame count still
+decides `animated`. The PNG walk reads a file that is at most 10 MB, using lengths
+it checks against the file size, under the same deadline and memory ceiling. JPEG
+and WebP need no extra check: Pillow, libjpeg-turbo and libwebp reject every
+malformed JPEG and WebP fixture. JPEG is not required to end with its EOI marker,
+because some phones append data after it.
 
 ## Enforcement experiments
 
@@ -131,7 +150,8 @@ or libwebp returns an error that Pillow raises as `OSError`. Both are rejections
 timeout --signal=KILL 5 prlimit --as=1073741824 -- <venv>/bin/python -I classify.py <path>
 ```
 
-It prints one JSON line. An accepted file prints `verdict`, `format`
+`classify.py` applies the size ceilings and the [structure checks](#structure-checks),
+then decodes every frame. It prints one JSON line. An accepted file prints `verdict`, `format`
 (`png`/`jpeg`/`webp`/`gif`), `animated`, `width`, `height` and `frames`. A rejected
 file prints `verdict` and `reason`. Exit 137 is SIGKILL, normally from the deadline. Any
 other nonzero exit, or output that is not one JSON line, is a parser failure.
