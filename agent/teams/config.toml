@@ -20,6 +20,13 @@ checks_minutes = 30
 codex_approval = "never"
 claude_permission_mode = "auto"
 
+# Started by agent/teams/dispatch; always Claude. It compacts when its context is
+# compact_percent full, because every ring starts a turn over the whole context.
+[dispatcher]
+model = "claude-opus-5-5"
+effort = "medium"
+compact_percent = 35
+
 [roles.dev]
 kind = "claude"
 model = "claude-opus-5-5"

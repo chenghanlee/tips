@@ -61,11 +61,11 @@ In a Herdr pane (`HERDR_ENV=1`) at the main checkout:
 agent/teams/dispatch
 ```
 
-Start only one. Pairs ring it by the name `dispatcher`. Nothing watches GitHub: after you mark tasks Ready, type `board changed` in its pane. It asks you product and scope questions in that pane; answer there. Every ring starts a turn over its whole context, so it compacts at 35%; GitHub holds the state it needs. It starts and stops pairs with `team.py` from this checkout; each pair gets its own Herdr workspace. Handle each client's repository trust prompt the first time. An unexpected approval prompt stops a launch; inspect it and follow the active approval policy.
+Start only one. Pairs ring it by the name `dispatcher`. Nothing watches GitHub: after you mark tasks Ready, type `board changed` in its pane. It asks you product and scope questions in that pane; answer there. Every ring starts a turn over its whole context, so it compacts early (`dispatcher.compact_percent`); GitHub holds the state it needs. It starts and stops pairs with `team.py` from this checkout; each pair gets its own Herdr workspace. Handle each client's repository trust prompt the first time. An unexpected approval prompt stops a launch; inspect it and follow the active approval policy.
 
 ## Configuration
 
-Edit [config.toml](config.toml): the number of pairs, client, model and effort per role, port and database allocation, permissions and time budgets. Scripts read the main checkout's file; `TIPS_TEAM_CONFIG=/absolute/path` selects a staged one. Settings apply at the next launch.
+Edit [config.toml](config.toml): the number of pairs, client, model and effort per role, the dispatcher's model, effort and compaction point, port and database allocation, permissions and time budgets. Scripts read the main checkout's file; `TIPS_TEAM_CONFIG=/absolute/path` selects a staged one. Settings apply at the next launch.
 
 | Allocation | Components |
 |---|---|
