@@ -13,6 +13,8 @@
 # The output has the format Tips.SearchGateVectors reads. Its meta records each request's time,
 # answering host and cost. On success it replaces test/fixtures/search_probe/vectors-60.json.
 defmodule SearchGateVectorsScript do
+  import Ecto.Query
+
   alias Tips.Content.Search.EmbeddingProvider
   alias Tips.Content.Search.EmbeddingProvider.OpenRouter
   alias Tips.{Repo, SearchGate}
@@ -131,10 +133,12 @@ defmodule SearchGateVectorsScript do
   end
 
   defp search_text(kind, id) do
-    %{rows: [[text]]} =
-      Repo.query!("SELECT search_text FROM #{kind}_search WHERE #{kind}_id = $1", [id])
-
-    text
+    Repo.one!(
+      from(s in "#{kind}_search",
+        where: field(s, ^:"#{kind}_id") == ^id,
+        select: s.search_text
+      )
+    )
   end
 
   defp run(plan, output, sha) do
