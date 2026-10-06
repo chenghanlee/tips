@@ -21,7 +21,9 @@
 
 ## Software design
 
+- Follow industry standards, conventions and rules for the language, framework and problem you are working on. Explain any exceptions in the PR.
 - Use Elixir and Phoenix idioms and conventions, and proven design patterns from widely used similar software.
+- Check built-in features and proven libraries, frameworks and tools before writing your own. Reuse them when they meet the requirements. Build your own only when they do not; list the options checked and explain why they do not fit in the PR.
 - Prefer Ecto's query, changeset and migration DSLs. Use raw SQL only for a database feature those DSLs cannot express; bind runtime values as parameters.
 - Build the simplest working MVP: no enterprise complexity or backwards compatibility. Accept complexity only to simplify the user's experience.
 - In the same PR, update the docs that describe what you changed and delete the code, files and docs your change leaves unused.
@@ -58,7 +60,7 @@ Before reading, editing or reviewing Elixir code, load `elixir` and each skill t
 
 ## Tests
 
-- Weigh a test's value against its cost with Kent Beck's [Test Desiderata](https://testdesiderata.com/): trade-offs, not a checklist.
+- Before adding or changing tests, weigh the trade-offs using relevant [Test Desiderata](https://testdesiderata.com/) factors: isolated, composable, deterministic, fast, writable, readable, behavioral, structure-insensitive, automated, specific, predictive and inspiring.
 - Test behaviour with integration tests. Add a unit test only for pure-logic boundary cases they do not reach, and an end-to-end test only for a user interaction that lower-level tests cannot exercise.
 - Default to no test changes. Read the existing tests for the issue's acceptance scenarios or the reported regression. If they detect the failure, leave them unchanged. Otherwise make the smallest set of changes that detects it: extend a test whose setup and action can exercise the scenario; add one only when none can. Changed functions, branches or input variants do not justify new cases.
 - Do not test frameworks, libraries, private functions or code structure.
