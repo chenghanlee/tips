@@ -1,0 +1,77 @@
+{
+  "version": "60-integrated-v1",
+  "frozen_at": "2026-10-07",
+  "issue": "https://github.com/chenghanlee/tips/issues/60",
+  "baseline": {
+    "gate": "gate-v2.json",
+    "evidence": "evidence/v2-run-1.json",
+    "change": "The corpus, queries, judgments, runtime and numeric thresholds are those of gate-v2. The documents are the application's persisted search_text, and retrieval is the application's hybrid search, so results are tips, not documents."
+  },
+  "fixture_hashes": {
+    "corpus.json": "a56ae777fde93fa07b9f75bf1b902b328bfeb0ab10a7717873d4075a5150cafd",
+    "queries.json": "059c61a4782cb37c758ba49fc249fbf9436858805988e9d390a00257be94317e",
+    "gate-v2.json": "dab46a2539709645e62fe8ca6ed8262ab1458b5e26486b31fcb33f2f4f00248b"
+  },
+  "runtime": "Tips.Content.Search.EmbeddingProvider unchanged: qwen/qwen3-embedding-8b through OpenRouter, DeepInfra only, fallbacks disabled, 1024 dimensions, gate-v2 query instruction, documents of at most 30,000 UTF-8 bytes sent whole.",
+  "corpus_setup": {
+    "database": "An empty development database (mix ecto.reset). The run refuses a database that already has tips.",
+    "tips": "Every corpus tip is inserted with its title and body, tag other. A body over the application's 20,000-codepoint limit (long-01, long-03, long-04, long-05) is split at its last whitespace within 20,000 codepoints: the text before stays the body and the text after becomes the output (Result), which the document places right after the body, so the document keeps the corpus text in order. Its model and environment come from its position among corpus tips (0-based, corpus order): model [claude, gpt, gemini][i rem 3], environment [chat, ide, cli][div(i, 3) rem 3].",
+    "reviews": "Every corpus review is inserted under its parent tip with its body only, by its own reviewer.",
+    "search_text": "Tips.Content.Search.write_tip_text/1 and write_review_text/1 build every document, as publication does.",
+    "states": "published rows stay live. hidden-01 gets dead_at and deleted-01 gets deleted_at after their documents are written; review-h1 stays live under hidden hidden-01. private-01 and draft-01 are never persisted: drafts never reach the server and the application has no private state.",
+    "eligible_documents": 40
+  },
+  "protocol": {
+    "runs": 3,
+    "authorizations": ["https://github.com/chenghanlee/tips/issues/60#issuecomment-6021235880", "https://github.com/chenghanlee/tips/issues/60#issuecomment-6021707162", "https://github.com/chenghanlee/tips/issues/60#issuecomment-6021825770"],
+    "requests_before_this_run": 0,
+    "run_history": "Run 1 (evidence/60-integrated-run-1.json) stopped at preflight with no endpoint tagged deepinfra; the listing now tags DeepInfra deepinfra/us. Run 2 (evidence/60-integrated-run-2.json) stopped at pass 1 q02 on a keyword fallback after the query embedding passed the 4,500 ms budget. Run 3 has fresh ceilings of its own and is the last authorized run: a latency stop or keyword fallback ends the gate blocked on a runtime repair.",
+    "validate_command": "unbuffer mix run --no-start scripts/search_gate.exs --validate",
+    "real_command": "MIX_ENV=dev unbuffer mix ecto.reset && TIPS_REAL_PROVIDERS=1 MIX_ENV=dev unbuffer mix run --no-start scripts/search_gate.exs --real --output test/fixtures/search_probe/evidence/60-integrated-run-3.json",
+    "application": "Started with Oban queues and plugins off, so only the steps below call the provider.",
+    "steps": [
+      "1 preflight: OpenRouter endpoint listing and key check. The report lists every endpoint. Exactly one DeepInfra endpoint (tag deepinfra or deepinfra/<variant>) must be listed with its price and context; otherwise stop. Stop if the estimated cost exceeds the budget.",
+      "2 documents: one Tips.Workers.EmbedSearch.perform/1 call, the production scan of up to 50 rows.",
+      "3 query passes: three ordered passes over the ten queries through Tips.Content.search_tips/3 with no scope and no filters, concurrency one, no discarded warm-up. The first query of pass 1 is the cold request.",
+      "4 query vectors: one EmbeddingProvider.embed_query/2 per query. Each vector is reused, with no further requests, for model-filtered retrieval and the deepest offset (180) through Tips.Content.Search.search/3. Keyword-only retrieval (no vector) is also recorded.",
+      "5 saturation: hold every ProviderCapacity slot, then run three concurrent search_tips requests. No provider request is made.",
+      "6 burst: eight concurrent search_tips requests, the configured capacity size."
+    ],
+    "http_retries": false,
+    "planned_requests": {"preflight": 2, "documents": 40, "query_passes": 30, "query_vectors": 10, "burst": 8, "total": 90},
+    "reserved_after_run": {"browser_journey_searches": 3, "note": "The browser journey runs against the same database after the run; its searches count toward the 100-request ceiling."},
+    "stop_rules": [
+      "Refuse to start if the fixture hashes differ, the database has tips, an eligible document exceeds 30,000 bytes, the eligible count is not 40, or the planned requests, token bound or estimated cost exceed the budget.",
+      "Stop at the first non-200 status, transport error or embedding served by an upstream other than DeepInfra. During the document scan the request process is killed at once, so the scan makes no further request.",
+      "Stop after the scan unless it embedded all 40 eligible documents with no failure, skip or stale result.",
+      "Stop at the first query pass request that is not a hybrid result: a keyword fallback means the provider was not exercised.",
+      "Never retry. Keep every attempt in the report. There is no fourth run."
+    ]
+  },
+  "relevance": {
+    "k": 5,
+    "unit": "Results are tips with their best matching review. A relevant tip document is retrieved when its tip is in the top five. A relevant review document is retrieved when its parent tip is in the top five with that review as matched_review_id.",
+    "query_recall": "retrieved relevant documents / relevant documents, per query and pass",
+    "long_input": "Integrated documents are never truncated, so each long-input reference equals its stored input and long-input recall loss is 0 by construction. The run checks that each cohort document was sent whole and that every long-input query keeps a top-five hit.",
+    "filtered": "For each relevant tip of a query, filter by that tip's model. Every returned tip must have that model, and filtered recall over the relevant documents under that model must not be lower than their unfiltered recall with the same vector. This check is new in this gate and is not a gate-v2 threshold."
+  },
+  "gate": {
+    "every_query_needs_top_k_hit": true,
+    "min_macro_recall": 0.8,
+    "long_input_queries": ["q06", "q07", "q08"],
+    "long_input_cohort": ["long-01", "long-02", "long-03", "long-04", "long-05"],
+    "long_input_max_recall_loss": 0.1,
+    "query_p95_ms": 5000,
+    "query_deadline_ms": 10000,
+    "document_deadline_ms": 30000,
+    "max_incremental_rss_mib": 256,
+    "latency_measures": "Query thresholds apply to the complete search_tips request (embedding, ranking and hydration) and, separately, to the provider request alone. Document deadlines apply to each provider request in the scan.",
+    "saturation": "Each saturated request returns a page within the 8,000 ms total search budget plus 250 ms of scheduling allowance, through keyword retrieval after {:embedding, :busy}."
+  },
+  "budget": {
+    "max_requests": 100,
+    "max_input_tokens": 500000,
+    "max_cost_usd": 0.1,
+    "token_bound": "One token per UTF-8 byte plus 8 per input."
+  }
+}
