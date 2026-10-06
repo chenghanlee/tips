@@ -745,6 +745,7 @@ class PairLifecycleTest(unittest.TestCase):
         assert test_brief.startswith("You are team-1-test, the tester for issue #29.")
         for text in (dev_brief, test_brief):
             assert f"TIPS_DEXTER={wt / '.dexter/dexter.sh'}" in text
+            assert "README restart rule" in text
             assert "roles/" not in text
         # Claude holds its brief as a system prompt, so it alone needs a first message.
         assert self.events("agent", "prompt") == [["agent", "prompt", "team-1-test", "Begin."]]

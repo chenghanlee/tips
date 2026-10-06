@@ -683,16 +683,16 @@ def enter(pane: str, worktree: Path, env: dict[str, str]) -> None:
 
 
 def brief(role: str, name: str, issue: str, wrapper: Path) -> str:
-    first = (
-        "Implement it, then hand over with agent/teams/team.py turn."
-        if role == "dev"
-        else "Then wait for the developer's ring before you review."
-    )
+    # A relaunched client gets this brief too, so it finds the turn instead of assuming it.
     # The binary is shared by every checkout and the guide is not, so the binary's own
     # help is the contract a lagging checkout can still trust.
     return (
         f"You are {name}, the {ROLE_TITLES[role]} for issue #{issue}. "
-        f"Read agent/teams/README.md, then the issue with gh issue view {issue}. {first} "
+        f"Read agent/teams/README.md, then the issue with gh issue view {issue}. "
+        "Find whose turn it is with the README restart rule. If it is yours, do your next "
+        "common-path step; otherwise end your turn and wait for your partner's ring. "
+        "Before reading Elixir code, load the skills AGENTS.md requires. "
+        "For Elixir navigation, use Dexter before text tools. "
         f"TIPS_DEXTER={wrapper} is bound to this worktree; run it via the shell. "
         'Read "$TIPS_DEXTER" query --help and "$TIPS_DEXTER" lookup --help once; '
         "their syntax and output take precedence over a lagging checkout guide. "
@@ -814,18 +814,24 @@ def turn(pr: str, recipient: str) -> None:
         if problem:
             raise RuntimeError(f"{problem} Commit and push, then hand over.")
         message = (
-            f"Your turn: review {url} at {head}. "
-            "The developer has stopped using the tree, build and database."
+            f"Your turn: review {url} at {head}. Apply AGENTS.md Tests and GitHub and the "
+            "README PR review record; judge the test changes as a set. Submit your findings "
+            f"or publish the approval, then run agent/teams/team.py turn {pr} dev. "
+            "Do not wait for CI."
         )
     else:
-        message = f"Your turn on {url}: read the review with agent/teams/pr_review.py list {pr}."
+        message = (
+            f"Your turn on {url}: run agent/teams/pr_review.py list {pr}. If this head is "
+            "approved, do README step 9: confirm the merge, then ring the dispatcher done. "
+            "Otherwise answer the findings and hand back; if stuck, apply README Stuck."
+        )
         if problem:
             # Handing back never refuses: only the developer can repair the checkout.
             message += f" Fix the checkout first: {problem}"
             print(f"Reported to the developer: {problem}")
     partner = f"team-{match.group(1)}-{recipient}"
     herdr("agent", "prompt", partner, message)
-    print(f"Rang {partner}")
+    print(f"Rang {partner}. Stop using this worktree, build and database; end your turn now.")
 
 
 def stop_pair(issue: str) -> None:

@@ -52,7 +52,7 @@ def parse_arguments() -> argparse.Namespace:
     source.add_argument(
         "--owner-waiver",
         metavar="REASON",
-        help="Owner-driven change with no team live: skip independent review for this reason",
+        help="Skip independent review, only on the user's explicit instruction; give the reason",
     )
     return parser.parse_args()
 
@@ -110,7 +110,7 @@ def publish_waiver(number: int, sha: str, reason: str) -> None:
         str(number),
         "--body",
         f"**Owner waiver:** independent review skipped on {sha}. "
-        f"No team live; owner-driven change. Reason: {reason}",
+        f"Owner-authorized exception. Reason: {reason}",
     )
     if not re.fullmatch(re.escape(url) + r"#issuecomment-\d+", waiver):
         raise RefusalError(f"Unexpected waiver comment link: {waiver}")

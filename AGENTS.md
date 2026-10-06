@@ -7,6 +7,7 @@
 | Product and repository context | [README](README.md): what Tips is, where requirements live, where files belong |
 | Before pushing or reporting completion | [Test changes](README.md#test-changes) and the checks for the files you touched |
 | Any PR | The [PR review record](agent/teams/README.md#pr-review-record) |
+| After context compaction | In a pair or dispatching: reread the pair workflow. Before the next action that needs a skill, reload it |
 | Working alone for the user | Use an isolated worktree and a PR. The required checks and review apply. Merge only within the user's authorization |
 | Fresh checkout, browser tests, worktree isolation | The section you need in [local development](docs/development/local-development.md) |
 | Product behaviour or copy | [Glossary](docs/design/glossary.md) |
@@ -35,11 +36,11 @@
 
 - Weigh each test's value against its cost with Kent Beck's [Test Desiderata](https://testdesiderata.com/); its properties are trade-offs, not a checklist.
 - Test behaviour with integration tests. Add a unit test only for pure-logic boundary cases they do not reach, and an end-to-end test only for a user interaction that lower-level tests cannot exercise.
-- The default is no new test. First read the existing tests for the behaviour. Add a test only if breaking the behaviour would leave every existing test passing; otherwise change an existing test. One test per behaviour, not per function or branch.
+- Default to no test changes. First read the existing tests for the issue's acceptance scenarios or the reported regression. If they already detect the failure, change nothing. Otherwise make the smallest set of test changes that detects it: extend an existing test when its setup and action can exercise the scenario; add a test when they cannot. Do not add test cases because functions, branches or input variants changed.
 - Do not test the framework, a library, a private function or the code's structure.
 - When behaviour changes and no existing test establishes it, write the failing acceptance or regression test first and confirm it fails for the right reason.
 - In the same PR, delete the tests your change makes redundant. Keep the only test of an acceptance scenario or regression.
-- Reviewing: for each new test, name the defect that only it would catch. If there is none, its removal is a P1 finding.
+- Reviewing: judge the added and changed tests as a set against the existing tests for the same acceptance scenarios and regressions. Ask for removal or consolidation by naming the existing test, or the smaller replacement, that keeps the coverage. Passing tests, and a reason for each test, do not show the set is needed.
 
 ## GitHub
 
@@ -63,4 +64,4 @@ Before reading, editing or reviewing Elixir code, load the `elixir` skill. Also 
 ## Checks
 
 - Before pushing a change to `.ex` or `.exs` files, run `mix credo --strict`. Fix the findings your change introduced; report the others.
-- Go changes, including carried patches: run the [pinned lint profile](agent/lsp/dexter/patches/README.md#required-go-static-analysis). Fix findings our code introduces; report inherited ones separately.
+- Before pushing a Go change, including a carried patch, run the [pinned lint profile](agent/lsp/dexter/patches/README.md#required-go-static-analysis). Fix the findings our code introduces; report the others.

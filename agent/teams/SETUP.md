@@ -58,7 +58,9 @@ Codex must be allowed to connect to Dexter's local Unix socket. The tested macOS
 In a Herdr pane (`HERDR_ENV=1`) at the main checkout:
 
 ```bash
-claude --permission-mode auto 'Run herdr agent rename "$HERDR_PANE_ID" dispatcher. Then read agent/teams/README.md and act as the dispatcher.'
+claude --permission-mode auto \
+  --append-system-prompt 'You are the dispatcher in agent/teams/README.md. At startup and on every done or blocked ring, apply its Common path and Rules; reread them if they are no longer in context.' \
+  'Run herdr agent rename "$HERDR_PANE_ID" dispatcher, then begin.'
 ```
 
 Start only one. Pairs ring it by the name `dispatcher`. It starts and stops pairs with `team.py` from this checkout; each pair gets its own Herdr workspace. Handle each client's repository trust prompt the first time. An unexpected approval prompt stops a launch; inspect it and follow the active approval policy.
