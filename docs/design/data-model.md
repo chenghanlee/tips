@@ -232,8 +232,7 @@ create table media (
   target            text,                              -- server-encoded typed video target: stable content identity, no version
   position          smallint,                          -- live attachment slot, 0..9
   created_at        timestamptz not null,              -- authorization time for staged videos
-  completed_at      timestamptz,                       -- trusted upload completion, not readiness
-  expires_at        timestamptz,                       -- only unattached video recovery
+  expires_at        timestamptz,                       -- unattached video only: upload deadline, then recovery deadline
   reconcile_after   timestamptz,                       -- uncertain expiry retry cooldown; not user expiry
   cleanup_at        timestamptz,                       -- terminal removal; keep identifiers
   constraint media_one_parent check (num_nonnulls(tip_id, review_id) <= 1),
@@ -244,7 +243,7 @@ create table media (
   constraint media_state_vals check (state is null or state in ('uploading', 'processing', 'ready', 'failed')),
   constraint media_storage_chk check (
     (kind = 'image' and is_animated is not null and key is not null and stream_uid is null and state is null
-      and target is null and duration_s is null and completed_at is null
+      and target is null and duration_s is null
       and expires_at is null and reconcile_after is null
       and num_nonnulls(tip_id, review_id) = 1)
     or
@@ -252,8 +251,10 @@ create table media (
       and (state not in ('processing', 'ready') or stream_uid is not null))
   ),
   constraint media_ready_chk check (state is distinct from 'ready'
-    or (duration_s is not null and duration_s > 0 and duration_s <= 180
-        and completed_at is not null and stream_uid is not null)),
+    or (duration_s is not null and duration_s > 0 and duration_s <= 180 and stream_uid is not null)),
+  -- A known-uid row that left 'uploading' has completed its transfer and holds the recovery deadline.
+  constraint media_deadline_chk check (expires_at is null or expires_at = created_at +
+    case when stream_uid is not null and state <> 'uploading' then interval '49 hours' else interval '1 hour' end),
   constraint media_lifecycle_chk check (
     (cleanup_at is not null and position is null)
     or (cleanup_at is null and (
@@ -813,7 +814,20 @@ Create the owned row before requesting the Stream tus URL; initially `stream_uid
 
 Editors refresh pending video state through `get_video_uploads` ([Managed video](backend-design.md#managed-video)). Timeouts preserve committed facts and do not mean encoding failure. Ready rows require no provider refresh on Publish; reconcile the submission key first. No global readiness worker, scan-rotation column or webhook exists.
 
-Store trusted completion once. Stream's `uploaded` is the reservation time, not completion; the completion source is undecided ([#243](https://github.com/chenghanlee/tips/issues/243)). Completion within the original authorization deadline changes unattached expiry to `completed_at + interval '48 hours'`, including processing time. Readiness and observation time are not completion. Completion outside the one-hour deadline cannot receive a recovery window. A separate bounded periodic expiry worker selects at most fifty due unattached rows through `media_expiry`, checking `expires_at <= clock_timestamp()` and `(reconcile_after IS NULL OR reconcile_after <= clock_timestamp())` at runtime. Never put a time-dependent expression in the partial-index predicate. Before retiring an apparently unfinished known-uid row, reconcile trusted provider completion; on uncertainty set `reconcile_after` to wall time after the attempt plus ten minutes initially, guarded against attachment, cleanup or state changes. This lets later rows progress without changing user expiry. Clear the cooldown on definitive progress, attachment or cleanup; it survives restarts. No per-row expiry jobs or global readiness scanner are needed. Completed rows expire at their stored completion-based deadline, regardless of processing state. NULL-uid rows retire locally. Editor and expiry results use the same guarded transition, never reset completion, regress terminal state, revive cleanup or restore expiry after attachment. Provider calls run outside row locks; recheck current eligibility and current wall-clock deadlines in a statement after acquiring the lock when applying results. The deadline decision, not a promised future commit time, is the linearization point.
+Stream records no completion time: `uploaded` is the reservation time, `modified` the last change and `readyToStreamAt` processing readiness. It does give a trusted completion fact: the video leaves `pendingupload` only after the last byte. Stream refuses a `PATCH` started after the reservation `expiry`, which equals the upload deadline `created_at + interval '1 hour'`. Whether it can complete a `PATCH` still sending at that instant is unproven; three such requests were refused (400, code 10017) when their bodies finished ([probe](../development/stream-completion-probe.md)). So the recovery deadline is fixed from the upload deadline, not from completion: an upload that completed is recoverable until `created_at + interval '49 hours'`. That is at least 48 hours after its last byte, or at least 47 hours 50 minutes if Stream completes an upload inside the 10-minute margin below. No completion time is stored, and observation or readiness time never sets a deadline.
+
+The first trusted provider state other than `pendingupload` moves a known-uid row out of `uploading` (to `processing`, `ready` or `failed`) and sets `expires_at = created_at + interval '49 hours'` in the same guarded statement, `where state = 'uploading' and stream_uid is not null and cleanup_at is null and tip_id is null and review_id is null`. That statement needs no wall-clock check: any completion Stream reports counts, including one inside the margin. A cleanup-marked row is never revived. `media_deadline_chk` keeps `expires_at` equal to one of the two deadlines. A `failed` row with a uid completed its transfer and failed processing, for example on duration; it keeps the recovery deadline so the author sees why.
+
+A separate bounded periodic expiry worker selects at most fifty due unattached rows through `media_expiry`, checking `expires_at <= clock_timestamp()` and `(reconcile_after IS NULL OR reconcile_after <= clock_timestamp())` at runtime. Never put a time-dependent expression in the partial-index predicate. The worker handles each due row by kind of upload:
+
+| Upload | Due at | Worker action |
+|---|---|---|
+| Unfinished, NULL uid | upload deadline | Retire locally; no provider call or job. |
+| Unfinished, known uid | upload deadline | Read Stream. Any state other than `pendingupload` is a completion: apply the transition above, which moves the row to the recovery deadline. `pendingupload` is definitive only for a read that starts at least 10 minutes after the upload deadline: then retire and enqueue deletion. An earlier `pendingupload` read sets `reconcile_after = expires_at + interval '10 minutes'`. |
+| Uncertain: the read times out, is rate limited or fails | upload deadline | Set `reconcile_after` to wall time after the attempt plus ten minutes initially, guarded against attachment, cleanup or state changes. The user-facing deadline does not change. |
+| Completed: `processing`, `ready` or `failed` with a uid | recovery deadline | Retire and enqueue deletion, whatever the processing state. |
+
+The 10-minute margin covers a `PATCH` still sending at the deadline, whose outcome is unproven. An upload that completes after a definitive `pendingupload` read is not recovered: its row is already in cleanup and is never revived. The cooldown lets later rows progress without changing user expiry. Clear it on definitive progress, attachment or cleanup; it survives restarts. No per-row expiry jobs or global readiness scanner are needed. Editor and expiry results use the same guarded transition, never regress terminal state, revive cleanup or restore expiry after attachment. Provider calls run outside row locks; recheck current eligibility and current wall-clock deadlines in a statement after acquiring the lock when applying results. The deadline decision, not a promised future commit time, is the linearization point.
 
 Processing state is `uploading | processing | ready | failed`; Ready means trusted playable media within the duration limit. Provider-result writes mutate only known rows with `cleanup_at IS NULL` through guarded Media operations; readiness never publishes. Publication/edit locks the row, verifies author/target/readiness/deadline and unique selection, attaches it once, assigns its position and clears `expires_at` and `reconcile_after`. After an edit conflict, explicit reapplication reuses the same owned staged assets because their target is the content id, not a version; the edit transaction still checks the editor's original expected version. Never silently advance the saved version.
 
@@ -947,7 +961,7 @@ where r.id = x.id and (r.up_count, r.down_count) is distinct from (coalesce(v.up
 - Run revised migrations in pinned extension-enabled development/CI databases. Verify normal/full account states, two-marker content visibility and counter triggers. Reproduce publication versus ban/deletion and ordered bulk invalidation; no generic deadlock retry wrapper.
 - Verify vote insertion/value changes/deletion and invalidation update counters once. Unban never recreates a vote; a later explicit vote follows normal notification rules. Retain both helpfulness directions.
 - Verify one-open-report uniqueness per reporter/target, receipt honesty, fresh reports after resolution on unchanged content and the accepted delayed-retry duplicate. Retain moderator content-version and reviewed-report-set guards while new reports arrive.
-- Verify stable media identity and optional descriptions through draft recovery/reorder/edit, trusted GIF/WebP/APNG motion classification, deferrable slot constraints, upload ownership and claims racing expiry/discard. Test NULL-uid local expiry, conditional uid persistence, completion-based recovery and durable cleanup after job pruning.
+- Verify stable media identity and optional descriptions through draft recovery/reorder/edit, trusted GIF/WebP/APNG motion classification, deferrable slot constraints, upload ownership and claims racing expiry/discard. Test NULL-uid local expiry, conditional uid persistence, the fixed recovery deadline set once on leaving `uploading`, and durable cleanup after job pruning.
 - Exercise asynchronous bounded editor refresh, timeout/429 backoff, nonoverlapping cycles, no false failure or ready-state regression, and recovery of off-screen completion. Ready uploads can publish during a status-provider outage; prior publication keys reconcile before media work.
 - Verify fresh signed inline-player and thumbnail redirects, current visibility, owner-only staged access, authorized hidden-content access, cleanup rejection, fixed destinations and private/no-store responses. Tokens necessarily reach the browser network stack but never draft storage. Test long-open-page playback and real provider URLs.
 - Test revoked-session admission even if disconnect delivery is lost, seven-day confirmation versus cleanup/reclaim, old tokens against replacement accounts, one-form signup errors and fixed handles.

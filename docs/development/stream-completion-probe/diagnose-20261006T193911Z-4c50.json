@@ -1,0 +1,234 @@
+{
+  "mode": "diagnose",
+  "started_at": "2026-10-06T19:39:11.299267Z",
+  "bounds": {
+    "max_calls": 120,
+    "provider_calls": 14,
+    "api_receive_timeout_ms": 5000,
+    "api_connect_timeout_ms": 5000,
+    "patch_receive_timeout_ms": 180000,
+    "retries": 0
+  },
+  "versions": {
+    "otp": "29",
+    "elixir": "1.20.4",
+    "tus": "1.0.0"
+  },
+  "cases": [
+    {
+      "case": "unthrottled",
+      "uid": "a7144c11b3fb5bcdd6dbf789b4d5b4db",
+      "first_chunk": {
+        "label": "patch:unthrottled@0+5242880",
+        "status": 204,
+        "body": "",
+        "headers": {
+          "cf-ray": "a4672186ea65fee8-MNL",
+          "date": "Tue, 06 Oct 2026 19:39:16 GMT",
+          "stream-media-id": "a7144c11b3fb5bcdd6dbf789b4d5b4db",
+          "tus-resumable": "1.0.0",
+          "upload-offset": "5242880"
+        },
+        "response_at": "2026-10-06T19:39:16.500998Z",
+        "sent_at": "2026-10-06T19:39:14.162464Z",
+        "body_done_at": "2026-10-06T19:39:14.245Z",
+        "method": "patch",
+        "ms": 2339
+      },
+      "observations": [
+        {
+          "error": "",
+          "size": 15339962,
+          "state": "pendingupload",
+          "modified": "2026-10-06T19:39:13.292955Z",
+          "observed_at": "2026-10-06T19:39:19.903377Z",
+          "uploaded": "2026-10-06T19:39:13.280612Z",
+          "created": "2026-10-06T19:39:13.292955Z",
+          "ready_to_stream_at": null,
+          "upload_expiry": "2026-10-06T19:54:12Z",
+          "duration": -1
+        },
+        {
+          "error": "",
+          "size": 15339962,
+          "state": "pendingupload",
+          "modified": "2026-10-06T19:39:13.292955Z",
+          "observed_at": "2026-10-06T19:39:25.215182Z",
+          "uploaded": "2026-10-06T19:39:13.280612Z",
+          "created": "2026-10-06T19:39:13.292955Z",
+          "ready_to_stream_at": null,
+          "upload_expiry": "2026-10-06T19:54:12Z",
+          "duration": -1
+        },
+        {
+          "error": "",
+          "size": 15339962,
+          "state": "pendingupload",
+          "modified": "2026-10-06T19:39:13.292955Z",
+          "observed_at": "2026-10-06T19:39:30.464309Z",
+          "uploaded": "2026-10-06T19:39:13.280612Z",
+          "created": "2026-10-06T19:39:13.292955Z",
+          "ready_to_stream_at": null,
+          "upload_expiry": "2026-10-06T19:54:12Z",
+          "duration": -1
+        }
+      ],
+      "spanning_patch": {
+        "label": "patch:unthrottled@5242880+10097082",
+        "status": 500,
+        "body": "{\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10000,\n      \"message\": \"Internal Server Error: An unexpected server error occured. Wait a few minutes and try the request again.\"\n    }\n  ],\n  \"messages\": null\n}\n",
+        "headers": {
+          "cf-ray": "a46721950bb9fee8-MNL",
+          "date": "Tue, 06 Oct 2026 19:39:19 GMT"
+        },
+        "response_at": "2026-10-06T19:39:19.008878Z",
+        "sent_at": "2026-10-06T19:39:16.503405Z",
+        "body_done_at": "2026-10-06T19:39:16.523Z",
+        "method": "patch",
+        "ms": 2505
+      },
+      "after_spanning_patch": {
+        "video": {
+          "error": "",
+          "size": 15339962,
+          "state": "pendingupload",
+          "modified": "2026-10-06T19:39:13.292955Z",
+          "observed_at": "2026-10-06T19:39:19.636814Z",
+          "uploaded": "2026-10-06T19:39:13.280612Z",
+          "created": "2026-10-06T19:39:13.292955Z",
+          "ready_to_stream_at": null,
+          "upload_expiry": "2026-10-06T19:54:12Z",
+          "duration": -1
+        },
+        "head_offset": 15339962,
+        "observed_at": "2026-10-06T19:39:19.636808Z",
+        "head_status": 200
+      },
+      "final_video": {
+        "allowedOrigins": [],
+        "clippedFrom": null,
+        "created": "2026-10-06T19:39:13.292955Z",
+        "creator": null,
+        "duration": -1,
+        "input": {
+          "height": -1,
+          "width": -1
+        },
+        "maxDurationSeconds": 180,
+        "maxSizeBytes": null,
+        "meta": {
+          "name": "tips-probe-243-20261006T193911Z-4c50-unthrottled"
+        },
+        "modified": "2026-10-06T19:39:13.292955Z",
+        "playback": {
+          "dash": "https://customer-<redacted>.cloudflarestream.com/a7144c11b3fb5bcdd6dbf789b4d5b4db/manifest/video.mpd",
+          "hls": "https://customer-<redacted>.cloudflarestream.com/a7144c11b3fb5bcdd6dbf789b4d5b4db/manifest/video.m3u8"
+        },
+        "preview": "https://customer-<redacted>.cloudflarestream.com/a7144c11b3fb5bcdd6dbf789b4d5b4db/watch",
+        "publicDetails": {
+          "channel_link": "",
+          "logo": "",
+          "share_link": "",
+          "title": ""
+        },
+        "readyToStream": false,
+        "readyToStreamAt": null,
+        "requireSignedURLs": true,
+        "scheduledDeletion": null,
+        "size": 15339962,
+        "status": {
+          "errorReasonCode": "",
+          "errorReasonText": "",
+          "state": "pendingupload"
+        },
+        "thumbnail": "https://customer-<redacted>.cloudflarestream.com/a7144c11b3fb5bcdd6dbf789b4d5b4db/thumbnails/thumbnail.jpg",
+        "thumbnailTimestampPct": 0,
+        "uid": "a7144c11b3fb5bcdd6dbf789b4d5b4db",
+        "uploadExpiry": "2026-10-06T19:54:12Z",
+        "uploaded": "2026-10-06T19:39:13.280612Z",
+        "watermark": null
+      }
+    },
+    {
+      "case": "throttled-20s",
+      "skipped": "unthrottled upload did not complete"
+    }
+  ],
+  "fixture": {
+    "bytes": 15339962,
+    "sha256": "b831aae93d8aaff2d247269346dfdb4f09d1bec0e71c5a086bcbf53fdf2cbca3",
+    "recipe": "ffmpeg -f lavfi -i testsrc2=size=1280x720:rate=30:duration=10 -f lavfi -i sine=frequency=440:duration=10 -vf noise=alls=40:allf=t+u -c:v libx264 -pix_fmt yuv420p -preset veryfast -b:v 12M -minrate 12M -maxrate 12M -bufsize 12M -x264-params nal-hrd=cbr -c:a aac -shortest -movflags +faststart"
+  },
+  "deleted": [
+    {
+      "delete": 200,
+      "uid": "a7144c11b3fb5bcdd6dbf789b4d5b4db",
+      "get_after": 404
+    },
+    {
+      "delete": 200,
+      "uid": "488f9b360e7a688b77275a4892a2d576",
+      "get_after": 404
+    }
+  ],
+  "assertions": [
+    {
+      "name": "unthrottled_completes",
+      "status": "fail",
+      "required": true,
+      "evidence": {
+        "final_state": "pendingupload",
+        "head_offset_after": 15339962,
+        "skipped": null,
+        "first_chunk_status": 204,
+        "rest_status": 500,
+        "rest_sent_at": "2026-10-06T19:39:16.503405Z",
+        "rest_body_done_at": "2026-10-06T19:39:16.523Z",
+        "rest_response_at": "2026-10-06T19:39:19.008878Z",
+        "rest_body": "{\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10000,\n      \"message\": \"Internal Server Error: An unexpected server error occured. Wait a few minutes and try the request again.\"\n    }\n  ],\n  \"messages\": null\n}\n"
+      }
+    },
+    {
+      "name": "throttled_completes",
+      "status": "fail",
+      "required": true,
+      "evidence": {
+        "final_state": null,
+        "head_offset_after": null,
+        "skipped": "unthrottled upload did not complete",
+        "first_chunk_status": null,
+        "rest_status": null,
+        "rest_sent_at": null,
+        "rest_body_done_at": null,
+        "rest_response_at": null,
+        "rest_body": null
+      }
+    },
+    {
+      "name": "every_reservation_deleted",
+      "status": "pass",
+      "required": true,
+      "evidence": {
+        "deleted": [
+          {
+            "delete": 200,
+            "uid": "a7144c11b3fb5bcdd6dbf789b4d5b4db",
+            "get_after": 404
+          },
+          {
+            "delete": 200,
+            "uid": "488f9b360e7a688b77275a4892a2d576",
+            "get_after": 404
+          }
+        ]
+      }
+    }
+  ],
+  "requested_expiry": "2026-10-06T19:54:12Z",
+  "verdict": "fail",
+  "run_id": "20261006T193911Z-4c50",
+  "issue": 243,
+  "git_sha": "11587c92a4ccabfc48ea3680bb9dbb28fabe5a81",
+  "git_tracked_changes": 0,
+  "finished_at": "2026-10-06T19:39:31.910970Z"
+}
