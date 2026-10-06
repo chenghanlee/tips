@@ -6,7 +6,13 @@
 # --check matches the documents and prints the estimate without calling the provider.
 # Documents are never embedded again. Each query makes one OpenRouter request through
 # Tips.Content.Search.EmbeddingProvider; the script stops at the first provider error and
-# never retries. Tests load the result with Tips.SearchGateVectors.
+# never retries.
+#
+#     TIPS_REAL_PROVIDERS=1 MIX_ENV=dev mix run --no-start scripts/search_gate_vectors.exs --add-missing PATH
+#
+# --add-missing embeds the queries PATH lacks, under the second authorization: one retry per
+# query after an error, and a stop when a query fails twice. Tests load the result with
+# Tips.SearchGateVectors.
 defmodule SearchGateVectorsScript do
   import Ecto.Query
 
@@ -15,13 +21,20 @@ defmodule SearchGateVectorsScript do
 
   @authorization "https://github.com/chenghanlee/tips/issues/60#issuecomment-6022030147"
   @run "test/fixtures/search_probe/evidence/60-integrated-run-3.json"
+  @second_authorization "https://github.com/chenghanlee/tips/issues/348#issuecomment-6022334989"
   @max_requests 12
+  @max_added_requests 10
   @max_cost_usd 0.01
   @tokens_per_input 8
   @query_instruction "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:"
 
   def main(argv) do
-    case OptionParser.parse(argv, strict: [output: :string, check: :boolean]) do
+    case OptionParser.parse(argv,
+           strict: [output: :string, check: :boolean, add_missing: :string]
+         ) do
+      {[add_missing: path], [], []} ->
+        add_missing(path)
+
       {[output: output], [], []} ->
         check(output, :embed)
 
@@ -32,7 +45,7 @@ defmodule SearchGateVectorsScript do
         check(output, :check)
 
       _invalid ->
-        refuse("usage: --output PATH [--check]")
+        refuse("usage: --output PATH [--check] | --add-missing PATH")
     end
   end
 
@@ -45,14 +58,17 @@ defmodule SearchGateVectorsScript do
     end
   end
 
-  defp run(output, action) do
+  defp start do
     # Only the query requests below may call the provider: no cron scan, no queues.
     oban = Application.fetch_env!(:tips, Oban)
     Application.put_env(:tips, Oban, Keyword.merge(oban, queues: false, plugins: false))
     Logger.configure(level: :info)
     {:ok, _apps} = Application.ensure_all_started(:tips)
     :real = Tips.ProviderConfig.mode()
+  end
 
+  defp run(output, action) do
+    start()
     {:ok, fixtures} = SearchGate.load()
     documents = documents(fixtures.corpus)
     run = @run |> File.read!() |> JSON.decode!()
@@ -146,17 +162,7 @@ defmodule SearchGateVectorsScript do
       self()
     )
 
-    client = EmbeddingProvider.client!()
-
-    {queries, stopped} =
-      Enum.reduce_while(fixtures.queries, {[], nil}, fn %{"id" => id, "text" => text},
-                                                        {acc, nil} ->
-        case EmbeddingProvider.embed_query(client, text) do
-          {:ok, literal} -> {:cont, {[%{id: id, embedding: literal} | acc], nil}}
-          {:error, reason} -> {:halt, {acc, %{query: id, reason: inspect(reason)}}}
-        end
-      end)
-
+    {queries, _attempts, stopped} = embed_queries(fixtures.queries, 0)
     requests = requests([])
 
     meta = %{
@@ -180,26 +186,11 @@ defmodule SearchGateVectorsScript do
         estimate: estimate,
         stopped: stopped,
         requests: requests,
-        usage: %{
-          requests: length(requests),
-          prompt_tokens:
-            requests |> Enum.map(& &1.prompt_tokens) |> Enum.filter(&is_integer/1) |> Enum.sum(),
-          cost_usd: requests |> Enum.map(& &1.cost_usd) |> Enum.filter(&is_number/1) |> Enum.sum()
-        }
+        usage: usage(requests)
       }
     }
 
-    lines = &Enum.map_join(&1, ",\n", fn entry -> JSON.encode!(entry) end)
-
-    File.write!(output, [
-      ~s({"meta":),
-      JSON.encode!(meta),
-      ~s(,\n"documents":[\n),
-      lines.(documents),
-      ~s(\n],\n"queries":[\n),
-      lines.(Enum.reverse(queries)),
-      "\n]}\n"
-    ])
+    write(output, meta, documents, queries)
 
     failed = Enum.count(requests, &(&1.outcome != "ok"))
 
@@ -210,6 +201,151 @@ defmodule SearchGateVectorsScript do
     if stopped == nil and failed == 0 and length(queries) == length(fixtures.queries),
       do: 0,
       else: 1
+  end
+
+  # The second authorization: embed only the queries `path` lacks, retrying each
+  # once after an error, and stop when one fails twice.
+  defp add_missing(path) do
+    cond do
+      Mix.env() != :dev -> refuse("run with MIX_ENV=dev")
+      System.get_env("TIPS_REAL_PROVIDERS") != "1" -> refuse("set TIPS_REAL_PROVIDERS=1")
+      not File.exists?(path) -> refuse("#{path} does not exist")
+      true -> add_missing(path, path |> File.read!() |> JSON.decode!())
+    end
+  end
+
+  defp add_missing(path, %{"meta" => meta, "documents" => documents, "queries" => queries}) do
+    start()
+    {:ok, fixtures} = SearchGate.load()
+    true = meta["fixture_hashes"] == Map.take(fixtures.hashes, ["corpus.json", "queries.json"])
+    have = MapSet.new(queries, & &1["id"])
+    missing = Enum.reject(fixtures.queries, &(&1["id"] in have))
+
+    price =
+      (@run
+       |> File.read!()
+       |> JSON.decode!())["preflight"]["endpoint"]["prompt_price_usd_per_token"]
+
+    requests = 2 * length(missing)
+
+    tokens =
+      2 * Enum.sum_by(missing, &(byte_size(@query_instruction <> &1["text"]) + @tokens_per_input))
+
+    estimate = tokens * price
+
+    IO.puts(
+      "#{length(missing)} queries, at most #{requests} requests and #{tokens} tokens, US$#{estimate}"
+    )
+
+    if requests > @max_added_requests or estimate > @max_cost_usd do
+      refuse("over the authorized budget")
+    else
+      :telemetry.attach(
+        :search_gate_vectors,
+        [:finch, :request, :stop],
+        &__MODULE__.handle_finch/4,
+        self()
+      )
+
+      {added, attempts, stopped} = embed_queries(missing, 1)
+      recorded = requests([])
+      order = fixtures.queries |> Enum.with_index() |> Map.new(fn {q, i} -> {q["id"], i} end)
+      queries = Enum.sort_by(queries ++ JSON.decode!(JSON.encode!(added)), &order[&1["id"]])
+
+      meta =
+        meta
+        |> put_in(["queries", "unrecorded_requests"], %{
+          count: 1,
+          note: "q06's request was killed at the 30-second deadline before Finch recorded it"
+        })
+        |> Map.put("queries_added", %{
+          authorization: @second_authorization,
+          retries_per_query: 1,
+          estimate: %{
+            price_usd_per_token: price,
+            max_requests: requests,
+            max_input_tokens: tokens,
+            estimated_max_cost_usd: estimate
+          },
+          attempts: attempts,
+          stopped: stopped,
+          requests: recorded,
+          usage: usage(recorded)
+        })
+        |> Map.put(
+          "missing_queries",
+          for(q <- fixtures.queries, q["id"] not in Enum.map(queries, & &1["id"]), do: q["id"])
+        )
+
+      write(path, meta, documents, queries)
+
+      IO.puts(
+        "#{length(added)} added, #{length(attempts)} attempts, missing #{inspect(meta["missing_queries"])}: #{path}"
+      )
+
+      if stopped == nil, do: 0, else: 1
+    end
+  end
+
+  # Embeds each query, retrying it up to `retries` times after an error. Stops at
+  # a query that fails every attempt. Every attempt counts as one request.
+  defp embed_queries(queries, retries) do
+    client = EmbeddingProvider.client!()
+
+    {vectors, attempts, stopped} =
+      Enum.reduce_while(queries, {[], [], nil}, fn query, {vectors, attempts, nil} ->
+        case attempt(client, query, retries, attempts) do
+          {{:ok, literal}, attempts} ->
+            {:cont, {[%{id: query["id"], embedding: literal} | vectors], attempts, nil}}
+
+          {{:error, reason}, attempts} ->
+            {:halt, {vectors, attempts, %{query: query["id"], reason: inspect(reason)}}}
+        end
+      end)
+
+    {Enum.reverse(vectors), Enum.reverse(attempts), stopped}
+  end
+
+  defp attempt(client, %{"id" => id, "text" => text} = query, retries, attempts) do
+    started = System.monotonic_time(:millisecond)
+    result = EmbeddingProvider.embed_query(client, text)
+
+    attempts = [
+      %{
+        query: id,
+        result: if(match?({:ok, _vector}, result), do: "ok", else: inspect(elem(result, 1))),
+        ms: System.monotonic_time(:millisecond) - started
+      }
+      | attempts
+    ]
+
+    case result do
+      {:error, _reason} when retries > 0 -> attempt(client, query, retries - 1, attempts)
+      result -> {result, attempts}
+    end
+  end
+
+  defp usage(requests) do
+    %{
+      requests: length(requests),
+      prompt_tokens:
+        requests |> Enum.map(& &1.prompt_tokens) |> Enum.filter(&is_integer/1) |> Enum.sum(),
+      cost_usd: requests |> Enum.map(& &1.cost_usd) |> Enum.filter(&is_number/1) |> Enum.sum()
+    }
+  end
+
+  defp write(path, meta, documents, queries) do
+    lines = &Enum.map_join(&1, ",\n", fn entry -> JSON.encode!(entry) end)
+
+    File.write!(path, [
+      ~s({"meta":),
+      JSON.encode!(meta),
+      ~s(,\n"documents":[\n),
+      lines.(documents),
+      ~s(\n],\n"queries":[\n),
+      lines.(queries),
+      "\n]}\n"
+    ])
   end
 
   @doc false
