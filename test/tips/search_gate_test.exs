@@ -2,8 +2,11 @@ defmodule Tips.SearchGateTest do
   # The gate holds every shared provider-capacity slot during its saturation step.
   use Tips.DataCase, async: false
 
+  import Ecto.Query
+
   alias Tips.Content.Search.EmbeddingProvider
-  alias Tips.SearchGate
+  alias Tips.Content.Tip
+  alias Tips.{SearchGate, SearchGateVectors}
 
   setup do
     {:ok, fixtures} = SearchGate.load()
@@ -69,6 +72,33 @@ defmodule Tips.SearchGateTest do
         do: assert(gate in passed, "#{gate} failed: #{inspect(report.gates)}")
 
     assert JSON.encode!(report)
+  end
+
+  test "refuses without opt-in before it seeds or calls the provider", %{fixtures: fixtures} do
+    assert {:stopped, %{stopped: ":not_opted_in", usage: %{requests: 0}}} =
+             SearchGate.run(fixtures)
+
+    refute Repo.exists?(Tip)
+  end
+
+  test "loads the frozen vectors into the seeded corpus's search tables" do
+    {:ok, fixtures} = SearchGate.load()
+    {:ok, ids} = Repo.transact(fn -> {:ok, SearchGate.seed_corpus(fixtures.corpus)} end)
+    fixture = SearchGateVectors.load!(ids)
+
+    stored =
+      for %{"id" => id} <- fixture["documents"] do
+        query =
+          case ids[id] do
+            {:tip, row} -> from(s in "tip_search", where: s.tip_id == ^row)
+            {:review, row} -> from(s in "review_search", where: s.review_id == ^row)
+          end
+
+        Repo.one!(select(query, [s], fragment("?::text", s.embedding)))
+      end
+
+    assert length(stored) == 40
+    assert stored == Enum.map(fixture["documents"], & &1["embedding"])
   end
 
   for {failure, response} <- [
