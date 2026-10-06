@@ -24,6 +24,7 @@
 - Use Elixir and Phoenix idioms and conventions, and proven design patterns from widely used similar software.
 - Prefer Ecto's query, changeset and migration DSLs. Use raw SQL only for a database feature those DSLs cannot express; bind runtime values as parameters.
 - Build the simplest working MVP: no enterprise complexity or backwards compatibility. Accept complexity only to simplify the user's experience.
+- In the same PR, update the docs that describe what you changed and delete the code, files and docs your change leaves unused.
 
 ## Skills
 
