@@ -3,10 +3,11 @@
 Tips helps developers find and share practical AI techniques and firsthand results.
 It is an Elixir/Phoenix application with PostgreSQL.
 
-The app has a placeholder home page, passwordless magic-link sign-in, session-family
-management, admission and content/search foundations, a scheduled registration-cleanup
-job and a database health check. The Content context can publish, edit and delete
-text and let moderators hide or restore it; no web screens use these yet.
+The app has a placeholder home page, read-only tip and review pages, passwordless
+magic-link sign-in, session-family management, admission and content/search foundations,
+scheduled registration-cleanup and search-embedding jobs and a database health check.
+The Content context can publish, edit and delete text and let moderators hide or
+restore it; no web screens use these yet.
 The design documents describe target product behavior; GitHub issues and PRs track
 what has been implemented.
 
@@ -24,9 +25,7 @@ worktrees, follow the [worktree setup](docs/development/local-development.md#iso
 to give each checkout its own database and port.
 
 The [toolchain guide](docs/development/toolchain.md) identifies version sources,
-dependency choices and upgrade rules. Two evidence records are kept for reference:
-[historical schema/lock gate evidence](docs/development/schema-lock-gate.md) and
-[media provider probe evidence and limits](docs/development/media-provider-probe.md).
+dependency choices and upgrade rules.
 
 ## Test changes
 
