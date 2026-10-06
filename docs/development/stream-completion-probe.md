@@ -85,8 +85,9 @@ reservations and `diagnose` two; each deletes them and confirms each with `GET` 
 `diagnose` uploads twice, 15 minutes from expiry: once unthrottled, then, only if that
 completes, with the final chunk throttled over 20 s like the `before` control.
 `run` stops before the next reservation when the control does not complete, a chunk is
-not acknowledged, a request fails or crashes, or a boundary request gets anything but
-204 or 400 with code 10017. It still writes the partial report and deletes every
+not acknowledged, the case crashes, a boundary request gets anything but 204 or 400
+with code 10017, or any request gets no response, a server error or, for a video read,
+anything but 200. Any such response also fails both `run` and `diagnose`. It still writes the partial report and deletes every
 reservation it made. A slow `PATCH` records `body_done_at` only when its whole body was
 sent.
 

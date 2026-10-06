@@ -63,7 +63,12 @@ defmodule StreamCompletionProbe do
     deleted = Enum.map(reserved_uids(ctx), &delete_confirmed(ctx, &1))
 
     assertions =
-      [assertion("run_not_stopped", true, stopped == nil, %{stopped: stopped})] ++
+      [
+        assertion("run_not_stopped", true, stopped == nil, %{stopped: stopped}),
+        assertion("no_unexplained_responses", true, unexplained(ctx) == [], %{
+          responses: unexplained(ctx)
+        })
+      ] ++
         assertions(results, deleted)
 
     %{
@@ -78,9 +83,10 @@ defmodule StreamCompletionProbe do
   defp run_cases(_ctx, [], _data, done), do: {Enum.reverse(done), nil}
 
   defp run_cases(ctx, [c | rest], data, done) do
+    seen = length(unexplained(ctx))
     result = guarded(c.label, fn -> run_case(ctx, c, data) end)
 
-    case unexpected(result) do
+    case unexpected(result) || unexplained_since(ctx, seen) do
       nil -> run_cases(ctx, rest, data, [result | done])
       reason -> {Enum.reverse([result | done]), %{case: c.label, reason: reason}}
     end
@@ -114,6 +120,13 @@ defmodule StreamCompletionProbe do
     do: "chunk not acknowledged: " <> describe(List.last(lead))
 
   defp unexpected(%{reservation: record}), do: "reservation failed: " <> describe(record)
+
+  defp unexplained_since(ctx, seen) do
+    case Enum.drop(unexplained(ctx), seen) do
+      [] -> nil
+      responses -> "unexplained responses: " <> Enum.join(responses, "; ")
+    end
+  end
 
   defp expected_boundary?(%{status: 204}), do: true
 
@@ -383,16 +396,22 @@ defmodule StreamCompletionProbe do
     first = guarded("unthrottled", fn -> diagnose_case(ctx, "unthrottled", data, expiry, 0) end)
 
     second =
-      if completed?(first),
+      if completed?(first) and unexplained(ctx) == [],
         do:
           guarded("throttled-20s", fn ->
             diagnose_case(ctx, "throttled-20s", data, expiry, 20_000)
           end),
-        else: %{case: "throttled-20s", skipped: "unthrottled upload did not complete"}
+        else: %{
+          case: "throttled-20s",
+          skipped: "unthrottled upload failed or a request was unexplained"
+        }
 
     deleted = Enum.map(reserved_uids(ctx), &delete_confirmed(ctx, &1))
 
     assertions = [
+      assertion("no_unexplained_responses", true, unexplained(ctx) == [], %{
+        responses: unexplained(ctx)
+      }),
       assertion("unthrottled_completes", true, completed?(first), diagnose_evidence(first)),
       assertion("throttled_completes", true, completed?(second), diagnose_evidence(second)),
       assertion(
@@ -668,8 +687,21 @@ defmodule StreamCompletionProbe do
       |> Map.put(:ms, System.monotonic_time(:millisecond) - started)
 
     File.write!(ctx.calls_log, redact(Jason.encode!(record)) <> "\n", [:append])
+
+    if unexplained?(label, record),
+      do: :ets.insert(ctx.unexplained, {System.unique_integer([:monotonic]), describe(record)})
+
     {result, record}
   end
+
+  # No response, a server error, or a failed video read. PATCH and HEAD 4xx responses are
+  # judged by the case, because Stream refuses expired uploads with 400.
+  defp unexplained?(_label, %{status: nil}), do: true
+  defp unexplained?(_label, %{status: status}) when status >= 500, do: true
+  defp unexplained?("video", %{status: status}), do: status != 200
+  defp unexplained?(_label, _record), do: false
+
+  defp unexplained(ctx), do: ctx.unexplained |> :ets.tab2list() |> Enum.map(&elem(&1, 1))
 
   defp response_record({:ok, resp}) do
     body = resp.body
@@ -743,6 +775,7 @@ defmodule StreamCompletionProbe do
     ctx = %{
       run_id: run_id,
       calls: :counters.new(1, []),
+      unexplained: :ets.new(:unexplained, [:ordered_set, :public]),
       inventory: Path.join([@out, "inventory", "#{mode}-#{run_id}.jsonl"]),
       calls_log: Path.join([@out, "private", "#{mode}-#{run_id}-calls.jsonl"])
     }
