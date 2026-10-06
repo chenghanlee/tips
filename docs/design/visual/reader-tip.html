@@ -69,7 +69,9 @@
     .site-header { border-bottom: 1px solid var(--border); }
     .site-header nav { max-width: var(--page-width, var(--container-reading)); margin: 0 auto; padding: var(--space-2) var(--space-4); display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); }
     .site-header a { display: inline-flex; align-items: center; min-height: var(--control-sm); }
-    .logo { font-weight: 600; text-decoration: none; }
+    .site-header .account { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; column-gap: var(--space-4); font-size: var(--text-sm); }
+    .site-header .account span { color: var(--muted-foreground); }
+    .logo { font-weight: 600; text-decoration: none; flex: none; }
 
     /* button */
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-height: var(--control-sm); padding: 0 var(--space-3); border: 1px solid var(--input); border-radius: var(--radius); background: var(--background); color: var(--foreground); font: inherit; font-size: var(--text-sm); font-weight: 500; line-height: 1.25; text-align: center; text-decoration: none; cursor: pointer; }
@@ -164,7 +166,7 @@
   <header class="site-header" data-component="site_header">
     <nav aria-label="Site">
       <a class="logo" href="#">Tips</a>
-      <a href="#">grace_h</a>
+      <div class="account"><span>grace@example.com</span><a href="/users/settings">Settings</a><a href="#">Log out</a></div>
     </nav>
   </header>
 

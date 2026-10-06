@@ -65,6 +65,7 @@ Agent tooling is separate from the application. You do not need it to run Tips.
 - [Frontend design](docs/design/frontend-design.md): pages, forms and browser behavior.
 - [Data model](docs/design/data-model.md): schema and database rules.
 - [Glossary](docs/design/glossary.md): product terms.
+- [Product validation](docs/design/product-validation.md): hypothesis, first audience and success signals for the developer trials.
 
 ## Where files belong
 

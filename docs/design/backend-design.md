@@ -12,23 +12,11 @@ Follow the [software architecture](software-architecture.md), including its [MVP
 
 Tips serves two connected needs: discovering relevant AI techniques and judging whether they are worth trying. Design the backend around discovery and trust.
 
-Prioritize developers using AI for coding, debugging, and software workflows for the first user interviews, seed content, and end-to-end search tests. The site remains open to other audiences; this is the initial validation focus, not an access restriction. Use developer tasks and firsthand results to evaluate discovery quality rather than generic sample queries alone.
-
 Design task-first discovery as the first complete reader journey: a reader has something they want to do with AI and searches for techniques that could help. Existing browse, sorting, and filtering features remain in scope.
 
-The initial product hypothesis addresses three gaps together: useful advice is scattered, advice becomes outdated as tools change, and advice often lacks concrete steps that a developer can adapt. Prioritize finding relevant techniques, recent firsthand reports of what still works, and actionable explanations with optional prompts and results. Trust supports these needs; uncertainty about whether advice generalizes was not selected as the primary gap. Validate these hypotheses with the initial developer audience.
+Prioritize finding relevant techniques, recent firsthand reports of what still works, and actionable explanations with optional prompts and results. Trust supports these needs.
 
-The first end-to-end scenario is a developer trying to make a coding agent implement a correct, scoped change without unrelated edits. The reader searches for that problem, finds a relevant technique, inspects the author's firsthand account and other users' reviews, tries it in their own workflow, and can return to describe what they tried and what happened. Use this scenario for seed-content selection and search evaluation; it does not narrow the site's supported topics or require a new task-category field. Correctness and scope are outcomes to assess in user testing, not claims established by a Helpful vote. Do not present illustrative seed examples as real firsthand experience.
-
-Prioritize success signals for the first developer trials in this order:
-
-1. Developers find and try a technique, then describe an improvement in their coding workflow.
-2. Developers find an actionable technique they intend to try.
-3. Developers return to Tips for subsequent coding problems.
-
-All three are useful, but discovery intent and return visits do not establish that the technique improved a workflow. Start validation through observed trials, interviews, and existing firsthand reviews; the ranking alone does not require a new analytics system.
-
-Seed the first developer trials with the founder’s firsthand techniques and contributions from a small invited group of developers. The founder recruits contributors and organizes trials as well as contributing. Authors publish their own experiences through the normal forms; no special import or publishing-on-behalf workflow is required. Signup remains open to anyone who verifies their email, including during the first developer trials. Invitations are personal outreach only; no invitation codes, allowlist, or account-approval queue is required.
+Authors publish their own experiences through the normal forms; there is no import or publishing-on-behalf workflow. Signup is open to anyone who verifies their email; there are no invitation codes, allowlist or account-approval queue. No task-category field or analytics system is needed for the [validation plan](product-validation.md).
 
 A tip should come from the author's firsthand use of the technique. Prompts, result text, and media are optional supporting examples. The required body remains one Markdown textbox with short guidance to describe when to use the technique, the steps, and what happened when the author tried it. Do not require headings or split these into separately required fields. Content validates the body as text; it does not parse headings to decide whether the account meets the firsthand-use rule.
 
