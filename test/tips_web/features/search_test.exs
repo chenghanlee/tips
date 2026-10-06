@@ -99,7 +99,8 @@ defmodule TipsWeb.SearchFeatureTest do
     |> click(button("Retry"))
     |> assert_has(css("#results-empty", text: "No tips match these filters"))
     |> then(&assert(current_url(&1) =~ "/search?environment=cli&q=flake"))
-    |> then(&assert(script_value(&1, "return history.length") == history))
+
+    assert script_value(session, "return history.length") == history
   end
 
   defp scroll_to_bottom(session) do
