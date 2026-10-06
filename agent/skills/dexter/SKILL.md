@@ -46,14 +46,6 @@ If Dexter is missing, unavailable or denied, report the exact error once and use
 4. For call hierarchy, check `selected:` shows your callable and arity. A default-argument head selects only the maximum arity.
 5. Take positions again after an edit or checkout change.
 
-## Before changing a name, arity or return shape
-
-Private helpers included.
-
-1. `references` at the definition.
-2. Scoped `rg` for the bare name and any atom or tuple that dispatches to it.
-3. Investigate each difference. Source and tests establish the impact.
-
 ## Limits
 
 - Zero rows does not mean unused. An empty result exits 0.

@@ -54,8 +54,23 @@
 
 ## Elixir navigation
 
-- Use `"$TIPS_DEXTER"` before `rg`, `grep`, `sed`, `cat` or a whole-file read to outline a file or find a definition, uses or callers. See the [Dexter reference](agent/skills/dexter/SKILL.md).
-- After Dexter navigation, read the source ranges you need; use scoped text searches for literal text, dynamic dispatch and files outside its index. On tool failure, report once and fall back.
+`"$TIPS_DEXTER"` is the Elixir language server CLI for this worktree, its `deps/` and the Elixir sources. Commands are in the [Dexter reference](agent/skills/dexter/SKILL.md).
+
+| Need | Use |
+|---|---|
+| Outline a `.ex` or `.exs` file before reading it | Dexter `symbols`, then read only the line range you need |
+| Where a module or function is defined | Dexter `lookup`; `workspace-symbols` for a partial name; `definition` from a call site |
+| Docs, spec or signature | Dexter `hover` |
+| Uses of a function, its callers, the calls it makes | Dexter `references`, `incoming-calls`, `outgoing-calls`; `prepare-call-hierarchy` confirms which function a position selects |
+| Implementations of a callback | Dexter `implementation` |
+| Literal text: strings, messages, config keys, comments, atoms | `rg` or `grep` |
+| Non-Elixir files, file names, files under `tmp/` | `rg` or `grep`; `rg --files` for names |
+| A known line range | `sed -n` or the client's read tool |
+
+- Before changing a function's name, arity, return shape or behaviour, list its uses two ways: Dexter `references` at the definition, and `rg` for the bare name and any atom or tuple that dispatches to it. Check every use that only one of them found.
+- An empty Dexter result does not prove absence: dynamic dispatch, macros and generated code hide uses. Confirm with `rg` before you conclude that nothing uses a function.
+- After `mix deps.get` or a dependency change, run `"$TIPS_DEXTER" reindex`.
+- If `$TIPS_DEXTER` is unset or fails, report the error once and use `rg`.
 
 ## Skills
 
