@@ -425,14 +425,16 @@ defmodule TipsWeb.UI do
 
   `tip` has `id` (DOM id prefix), `title`, `href`, `net_score`,
   `review_count`, `age`, `datetime`, `author` (`handle`, `href`) and `setup`
-  (`setup_meta/1` attrs). `vote` holds the `vote_control/1` attrs.
+  (`setup_meta/1` attrs). A nil author `href` renders the handle as plain
+  text. `vote` holds the `vote_control/1` attrs; without it the row has no
+  vote control.
 
       <TipsWeb.UI.tip_row tip={tip} vote={%{target: tip.id, selected: nil}}>
         <:excerpt source="Review" href={tip.href}>{excerpt}</:excerpt>
       </TipsWeb.UI.tip_row>
   """
   attr :tip, :map, required: true
-  attr :vote, :map, required: true
+  attr :vote, :map, default: nil
 
   slot :excerpt, doc: "a matching excerpt of about 200 characters" do
     attr :source, :string, required: true, doc: "Review, Prompt, Result or Reviewer setup"
@@ -453,7 +455,14 @@ defmodule TipsWeb.UI do
         <.setup_meta {@tip.setup} />
         <span>
           by
-          <.link navigate={@tip.author.href} class="inline-flex min-h-6 items-center">{@tip.author.handle}</.link>
+          <.link
+            :if={@tip.author.href}
+            navigate={@tip.author.href}
+            class="inline-flex min-h-6 items-center"
+          >
+            {@tip.author.handle}
+          </.link>
+          <span :if={!@tip.author.href}>{@tip.author.handle}</span>
         </span>
         <time datetime={@tip.datetime}>{@tip.age}</time>
         <span>Net {net_score(@tip.net_score)}</span>
@@ -466,7 +475,7 @@ defmodule TipsWeb.UI do
       >
         <span class="font-semibold">{excerpt.source}:</span> {render_slot(excerpt)}
       </.link>
-      <.vote_control id={"#{@tip.id}-vote"} describedby={"#{@tip.id}-title"} {@vote} />
+      <.vote_control :if={@vote} id={"#{@tip.id}-vote"} describedby={"#{@tip.id}-title"} {@vote} />
     </li>
     """
   end

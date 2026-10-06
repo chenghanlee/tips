@@ -75,6 +75,7 @@ defmodule TipsWeb.Router do
       live "/users/log-in", UserLive.Login, :new
       live "/users/log-in/:token", UserLive.Confirmation, :new
 
+      live "/search", SearchLive.Index, :index
       live "/tips/:id/:slug", TipLive.Show, :show
       live "/reviews/:id", ReviewLive.Show, :show
     end
