@@ -22,26 +22,26 @@ If Dexter is missing, unavailable or denied, report the exact error once and use
 
 ## Operations
 
-`Q` = `"$TIPS_DEXTER" query`. `<pos>` = `<file> <line> <column>`, 1-based UTF-16, path relative to the bound worktree.
+`<pos>` = `<file> <line> <column>`, 1-based UTF-16, path relative to the bound worktree.
 
 | Goal | Run |
 |---|---|
-| Outline a file: names, lines, columns | `Q symbols <file>` |
+| Outline a file: names, lines, columns | `"$TIPS_DEXTER" query symbols <file>` |
 | Find a function by name | `"$TIPS_DEXTER" lookup Module function --strict` |
 | Find a module by name | `"$TIPS_DEXTER" lookup Module` |
-| Find by partial name | `Q workspace-symbols <search>` |
-| Go from a call to its definition | `Q definition <pos>` |
-| Read docs, spec, signature | `Q hover <pos>` |
-| Find uses (add `--include-declaration` for the definition too) | `Q references <pos>` at the definition |
-| Find callers | `Q incoming-calls <pos>` |
-| List the calls a function makes | `Q outgoing-calls <pos>` |
-| Confirm the `Module.function/arity` at a position | `Q prepare-call-hierarchy <pos>` |
-| Find implementations of a callback | `Q implementation <pos>` at the `@callback` head |
+| Find by partial name | `"$TIPS_DEXTER" query workspace-symbols <search>` |
+| Go from a call to its definition | `"$TIPS_DEXTER" query definition <pos>` |
+| Read docs, spec, signature | `"$TIPS_DEXTER" query hover <pos>` |
+| Find uses (add `--include-declaration` for the definition too) | `"$TIPS_DEXTER" query references <pos>` at the definition |
+| Find callers | `"$TIPS_DEXTER" query incoming-calls <pos>` |
+| List the calls a function makes | `"$TIPS_DEXTER" query outgoing-calls <pos>` |
+| Confirm the `Module.function/arity` at a position | `"$TIPS_DEXTER" query prepare-call-hierarchy <pos>` |
+| Find implementations of a callback | `"$TIPS_DEXTER" query implementation <pos>` at the `@callback` head |
 
 ## Positions
 
-1. `lookup Module function --strict`. Without `--strict`, a missing function returns the module's line and exits 0.
-2. `Q symbols <file>`: take line and column from the row with the name and arity you want.
+1. `"$TIPS_DEXTER" lookup Module function --strict`. Without `--strict`, a missing function returns the module's line and exits 0.
+2. `"$TIPS_DEXTER" query symbols <file>`: take line and column from the row with the name and arity you want.
 3. Run the positional query. Read `cursor:` first; it names the selected token. If it is not your name, fix the position and rerun.
 4. For call hierarchy, check `selected:` shows your callable and arity. A default-argument head selects only the maximum arity.
 5. Take positions again after an edit or checkout change.
