@@ -39,6 +39,15 @@ defmodule Tips.Content.Search.EmbeddingProviderTest do
              "dimensions" => 1024,
              "provider" => %{"only" => ["deepinfra"], "allow_fallbacks" => false}
            }
+
+    # Queries follow the gate's instruction directly, with no separator.
+    assert {:ok, ^vector} =
+             EmbeddingProvider.embed_query(EmbeddingProvider.client!(), "fix flaky tests")
+
+    assert_received {:request, _conn, %{"input" => [query]}}
+
+    assert query ==
+             "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:fix flaky tests"
   end
 
   test "rejects invalid and oversized input without a request" do

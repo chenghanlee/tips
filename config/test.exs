@@ -91,3 +91,6 @@ config :tips, Oban, testing: :manual
 config :tips, Tips.Content.Search.EmbeddingProvider,
   api_key: "synthetic-test-key",
   plug: {Req.Test, Tips.Content.Search.EmbeddingProvider}
+
+# Saturation tests wait for capacity; keep each wait short.
+config :tips, Tips.Content.Search.ProviderCapacity, size: 8, queue_wait: 200

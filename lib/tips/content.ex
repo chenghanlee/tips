@@ -284,7 +284,7 @@ defmodule Tips.Content do
 
   alias Tips.Accounts
   alias Tips.Accounts.Scope
-  alias Tips.Content.{Deletion, Edit, Intent, Moderation, Projection, Publication, Read}
+  alias Tips.Content.{Deletion, Edit, Intent, Moderation, Projection, Publication, Read, Search}
 
   @typedoc """
   Who reads: `nil` for an anonymous viewer, or the server-held reference to
@@ -613,6 +613,15 @@ defmodule Tips.Content do
   @spec get_review_page(viewer(), term()) ::
           {:ok, Projection.selected_review()} | {:error, read_error()}
   defdelegate get_review_page(viewer, review_id), to: Read
+
+  @doc """
+  Searches live tips for `query` within one time budget, falling back to
+  keyword ranking when meaning-based ranking is unavailable. A failure is an
+  error, never an empty page. See `Tips.Content.Search` ("Search requests").
+  """
+  @spec search_tips(Scope.t() | nil, String.t(), keyword()) ::
+          {:ok, Search.page()} | {:error, Search.error()}
+  defdelegate search_tips(scope, query, opts \\ []), to: Search
 
   @doc """
   Deletes the author's own tip or review, irreversibly. See "Deletion and

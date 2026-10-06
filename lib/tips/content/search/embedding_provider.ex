@@ -5,23 +5,28 @@ defmodule Tips.Content.Search.EmbeddingProvider do
 
   The ten-query gate fixed this runtime (`test/fixtures/search_probe/gate-v2.json`,
   evidence retained on #234): 1024 requested dimensions, and plain-text
-  documents of at most 30,000 UTF-8 bytes, never truncated. A query caller
-  belongs here too, sharing this policy. It prefixes the query with
-  `"Instruct: Given a web search query, retrieve relevant passages that answer the query\\nQuery: "`
-  and accepts at most 1024 query bytes.
+  documents of at most 30,000 UTF-8 bytes, never truncated. Queries are at
+  most 1024 bytes and are sent after the gate's retrieval instruction,
+  `"Instruct: Given a web search query, retrieve relevant passages that answer the query\\nQuery:"`,
+  with nothing between the instruction and the query.
 
-  `client!/1` resolves configuration once; `embed_document/2` makes at most one
-  request with it. There are no retries or redirects, so text is sent once.
-  One deadline of at most 30 seconds covers pool wait, connect, send, receive
-  and decoding. On expiry the request process is killed. A request the
-  provider already received cannot be recalled. The request process is linked:
-  if it crashes, so does the caller, and a caller that exits takes it along.
+  `client!/1` resolves configuration once; `embed_document/2` and
+  `embed_query/2` make at most one request with it. There are no retries or
+  redirects, so text is sent once. One deadline of at most 30 seconds covers
+  the wait for shared capacity (`Tips.Content.Search.ProviderCapacity`),
+  connection pool wait, connect, send, receive and decoding. On expiry the
+  request process is killed. A request the provider already received cannot
+  be recalled. The request process is linked: if it crashes, so does the
+  caller, and a caller that exits takes it along.
 
   Errors are classifications only. They never carry credentials, input text,
   response bodies or headers:
 
     * `:invalid_input` - not valid UTF-8, or blank; no request is made;
-    * `:too_large` - over 30,000 bytes; no request is made;
+    * `:too_large` - a document over 30,000 bytes or a query over 1024;
+      no request is made;
+    * `:busy` - no shared capacity freed within the queue wait; no request
+      is made;
     * `{:http, status}` - any status other than 200;
     * `:transport` - the connection failed;
     * `:deadline` - the deadline expired;
@@ -33,7 +38,7 @@ defmodule Tips.Content.Search.EmbeddingProvider do
   A returned vector is the L2-normalized response as a pgvector literal.
   """
 
-  alias Tips.Content.Search.Vector
+  alias Tips.Content.Search.{ProviderCapacity, Vector}
   alias Tips.ProviderConfig
 
   @base_url "https://openrouter.ai/api/v1"
@@ -42,11 +47,14 @@ defmodule Tips.Content.Search.EmbeddingProvider do
   @routing %{only: ["deepinfra"], allow_fallbacks: false}
   @dimensions 1024
   @max_document_bytes 30_000
+  @max_query_bytes 1024
+  @query_instruction "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:"
   @deadline 30_000
 
   @type error ::
           :invalid_input
           | :too_large
+          | :busy
           | {:http, pos_integer()}
           | :transport
           | :deadline
@@ -89,28 +97,45 @@ defmodule Tips.Content.Search.EmbeddingProvider do
     |> Req.Request.put_private(:deadline, deadline)
   end
 
+  @doc "The largest query, in UTF-8 bytes, that `embed_query/2` accepts."
+  @spec max_query_bytes() :: pos_integer()
+  def max_query_bytes, do: @max_query_bytes
+
   @doc "Embeds one document. See the module documentation for errors."
   @spec embed_document(Req.Request.t(), String.t()) :: {:ok, Vector.t()} | {:error, error()}
   def embed_document(%Req.Request{} = client, text) do
-    with :ok <- document(text) do
-      request(client, %{model: @model, input: [text], dimensions: @dimensions, provider: @routing})
-    end
+    with :ok <- input(text, @max_document_bytes), do: request(client, text)
   end
 
-  defp document(text) when is_binary(text) and byte_size(text) > @max_document_bytes,
+  @doc """
+  Embeds one reader query after the retrieval instruction. See the module
+  documentation for errors.
+  """
+  @spec embed_query(Req.Request.t(), String.t()) :: {:ok, Vector.t()} | {:error, error()}
+  def embed_query(%Req.Request{} = client, query) do
+    with :ok <- input(query, @max_query_bytes), do: request(client, @query_instruction <> query)
+  end
+
+  defp input(text, max_bytes) when is_binary(text) and byte_size(text) > max_bytes,
     do: {:error, :too_large}
 
-  defp document(text) when is_binary(text) do
+  defp input(text, _max_bytes) when is_binary(text) do
     if String.valid?(text) and String.trim(text) != "", do: :ok, else: {:error, :invalid_input}
   end
 
-  defp document(_text), do: {:error, :invalid_input}
+  defp input(_text, _max_bytes), do: {:error, :invalid_input}
 
-  defp request(client, body) do
-    deadline = Req.Request.get_private(client, :deadline)
+  defp request(client, text) do
+    body = %{model: @model, input: [text], dimensions: @dimensions, provider: @routing}
+    deadline = System.monotonic_time(:millisecond) + Req.Request.get_private(client, :deadline)
+    ProviderCapacity.run(deadline, fn -> send_request(client, body, deadline) end)
+  end
+
+  defp send_request(client, body, deadline) do
     task = Task.async(fn -> client |> Req.request(json: body) |> response() end)
+    time_left = max(deadline - System.monotonic_time(:millisecond), 0)
 
-    case Task.yield(task, deadline) || Task.shutdown(task, :brutal_kill) do
+    case Task.yield(task, time_left) || Task.shutdown(task, :brutal_kill) do
       {:ok, result} -> result
       nil -> {:error, :deadline}
       {:exit, reason} -> exit(reason)

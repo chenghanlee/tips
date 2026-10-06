@@ -14,6 +14,8 @@ defmodule Tips.Application do
       TwMerge.Cache,
       TipsWeb.Telemetry,
       Tips.Repo,
+      # Shared by search queries and the embedding scan, so it starts before Oban.
+      Tips.Content.Search.ProviderCapacity,
       {Oban, Application.fetch_env!(:tips, Oban)},
       {DNSCluster, query: Application.get_env(:tips, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Tips.PubSub},

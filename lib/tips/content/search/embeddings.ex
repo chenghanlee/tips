@@ -44,8 +44,11 @@ defmodule Tips.Content.Search.Embeddings do
   Reviews use `review_search` and `review_id`. A text change during the
   request advances the token and clears the cooldown, so neither update
   applies, and a later scan embeds the new text. Every classified failure
-  restarts the cooldown and the scan continues with the next row. Each
-  admitted row is attempted once per scan. Unexpected errors fail the scan.
+  restarts the cooldown and the scan continues with the next row, except
+  `:busy`: reader queries hold all of
+  `Tips.Content.Search.ProviderCapacity`, so the scan stops and leaves the
+  rest for the next tick. Each admitted row is attempted once
+  per scan. Unexpected errors fail the scan.
 
   At 30 seconds per request, one scan can take 25 minutes plus database time.
   Each scan returns its counts:
@@ -118,7 +121,8 @@ defmodule Tips.Content.Search.Embeddings do
 
       candidates ->
         client = EmbeddingProvider.client!(opts)
-        Enum.reduce(candidates, summary(length(candidates)), &attempt(&1, client, &2))
+
+        Enum.reduce_while(candidates, summary(length(candidates)), &step(&1, client, &2))
     end
   end
 
@@ -180,6 +184,12 @@ defmodule Tips.Content.Search.Embeddings do
   defp alternate([tip | tips], [review | reviews]), do: [tip, review | alternate(tips, reviews)]
   defp alternate(tips, []), do: tips
   defp alternate([], reviews), do: reviews
+
+  # Busy capacity is not the row's fault, and the next rows would only wait too.
+  defp step(candidate, client, summary) do
+    summary = attempt(candidate, client, summary)
+    if Map.has_key?(summary.failed, :busy), do: {:halt, summary}, else: {:cont, summary}
+  end
 
   defp attempt({kind, id, token}, client, summary) do
     case admit(kind, id, token) do

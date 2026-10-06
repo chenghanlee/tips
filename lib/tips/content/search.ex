@@ -2,11 +2,43 @@ defmodule Tips.Content.Search do
   @moduledoc """
   Owns search documents and bounded hybrid retrieval.
 
+  ## Search requests
+
+  `search_tips/4`, public as `Tips.Content.search_tips/3`, runs one complete
+  search request within one budget (`config/config.exs`). It takes the
+  options of `search/3` except `:embedding`, and returns the same results and
+  errors.
+
+  1. It validates the query and options before any provider or retrieval
+     work. A query longer than `EmbeddingProvider.max_query_bytes/0` once
+     normalized is `:query_too_long`.
+  2. It embeds the query. The call shares `ProviderCapacity` with the
+     embedding scan; its capacity wait and request take at most the query
+     embedding deadline and never pass the total deadline.
+  3. With a vector it runs the hybrid ranking. If the query embedding or the
+     hybrid ranking fails, it reruns the same request with keyword branches
+     only: the same query, filters, offset and visibility rules.
+  4. If keyword retrieval also fails, the result is `{:error, :unavailable}`.
+
+  One total deadline covers every step, including database work. The work
+  runs in a linked task; at the deadline the task, its provider request and
+  its capacity slot are dropped and the result is `{:error, :unavailable}`.
+  Database statements keep the two-second `Tips.Repo` timeout. A failure is
+  never an empty page, and nothing is cached: each request chooses hybrid or
+  keyword ranking on its own.
+
+  The result does not say which ranking ran. Each request that reaches
+  retrieval emits `[:tips, :search, :request]` telemetry with `%{duration:}`
+  in native units and `%{result: :hybrid | :keyword | :error, reason:}`.
+  `reason` is `nil` for hybrid results. A keyword result gives
+  `{:embedding, EmbeddingProvider.error()}` or `:hybrid_ranking`; an error
+  gives `:keyword_ranking` or `:deadline`. Fallbacks and failures are also
+  logged, without the query.
+
   ## Retrieval
 
-  `search/3` is the internal retrieval step behind the future public
-  `Tips.Content.search_tips/3`, which owns query embedding, deadlines and
-  keyword fallback. It ranks with `rank/2`, then projects with `hydrate/3`:
+  `search/3` is the retrieval step behind `search_tips/4`. It ranks with
+  `rank/2`, then projects with `hydrate/3`:
 
       {:ok, %{entries: [entry()], offset: offset, has_more: boolean()}}
       {:error, reason}
@@ -25,6 +57,7 @@ defmodule Tips.Content.Search do
   Errors, all returned before retrieval except `:unavailable`:
 
     * `:blank_query` - nothing but whitespace or NUL;
+    * `:query_too_long` - over 1024 bytes once normalized;
     * `:invalid_query` - not a valid UTF-8 string;
     * `:invalid_option` - not a keyword list, an unknown key or a repeated key;
     * `:invalid_offset`, `:invalid_filter`, `:invalid_embedding`;
@@ -125,7 +158,7 @@ defmodule Tips.Content.Search do
 
   alias Tips.Accounts.{Scope, User}
   alias Tips.Content.{Environment, Model, Projection, Review, Tag, Tip, Vote}
-  alias Tips.Content.Search.Vector
+  alias Tips.Content.Search.{EmbeddingProvider, Vector}
   alias Tips.Repo
 
   @page_size 20
@@ -138,6 +171,7 @@ defmodule Tips.Content.Search do
   @excerpt_lead 80
   @filters [tag_id: Tag, model_id: Model, environment_id: Environment]
   @options [:offset, :embedding | Keyword.keys(@filters)]
+  @request_options List.delete(@options, :embedding)
   @sources [:body, :prompt, :result, :setup]
 
   @typedoc "One search result. See \"Hydration\"."
@@ -152,6 +186,7 @@ defmodule Tips.Content.Search do
 
   @type error ::
           :blank_query
+          | :query_too_long
           | :invalid_query
           | :invalid_option
           | :invalid_offset
@@ -222,14 +257,82 @@ defmodule Tips.Content.Search do
     write_text(:review, review_id, search_text)
   end
 
+  @typedoc "One page of search results."
+  @type page :: %{entries: [entry()], offset: non_neg_integer(), has_more: boolean()}
+
+  @typedoc "Milliseconds for the whole request and for the query embedding call."
+  @type budget :: [total: pos_integer(), query_embedding: pos_integer()]
+
+  @doc """
+  Runs one complete search request within `budget`. See "Search requests".
+  """
+  @spec search_tips(Scope.t() | nil, String.t(), keyword(), budget()) ::
+          {:ok, page()} | {:error, error()}
+  def search_tips(scope, query, opts, budget \\ Application.fetch_env!(:tips, __MODULE__)) do
+    started = System.monotonic_time()
+    deadline = System.monotonic_time(:millisecond) + Keyword.fetch!(budget, :total)
+    call_ms = Keyword.fetch!(budget, :query_embedding)
+    task = Task.async(fn -> request(scope, query, opts, deadline, call_ms, started) end)
+
+    case Task.yield(task, time_left(deadline)) || Task.shutdown(task, :brutal_kill) do
+      {:ok, result} -> result
+      nil -> observe(started, {:error, :unavailable}, :error, :deadline)
+      {:exit, reason} -> exit(reason)
+    end
+  end
+
+  defp request(scope, query, opts, deadline, call_ms, started) do
+    with {:ok, query, options} <- validate(query, opts, @request_options) do
+      client = EmbeddingProvider.client!(deadline: min(call_ms, time_left(deadline)))
+
+      case EmbeddingProvider.embed_query(client, query) do
+        {:ok, vector} -> hybrid(scope, query, %{options | vector: vector}, started)
+        {:error, reason} -> keyword(scope, query, options, started, {:embedding, reason})
+      end
+    end
+  end
+
+  defp hybrid(scope, query, options, started) do
+    case page(scope, query, options) do
+      {:ok, page} -> observe(started, {:ok, page}, :hybrid, nil)
+      {:error, :unavailable} -> keyword(scope, query, options, started, :hybrid_ranking)
+    end
+  end
+
+  defp keyword(scope, query, options, started, reason) do
+    Logger.warning("search used keyword ranking: #{inspect(reason)}")
+
+    case page(scope, query, %{options | vector: nil}) do
+      {:ok, page} -> observe(started, {:ok, page}, :keyword, reason)
+      error -> observe(started, error, :error, :keyword_ranking)
+    end
+  end
+
+  defp observe(started, result, outcome, reason) do
+    if outcome == :error, do: Logger.error("search failed: #{inspect(reason)}")
+    measurements = %{duration: System.monotonic_time() - started}
+
+    :telemetry.execute([:tips, :search, :request], measurements, %{
+      result: outcome,
+      reason: reason
+    })
+
+    result
+  end
+
+  defp time_left(deadline), do: max(deadline - System.monotonic_time(:millisecond), 0)
+
   @doc """
   Ranks and hydrates one page of search results. See "Retrieval".
   """
-  @spec search(Scope.t() | nil, String.t(), keyword()) ::
-          {:ok, %{entries: [entry()], offset: non_neg_integer(), has_more: boolean()}}
-          | {:error, error()}
+  @spec search(Scope.t() | nil, String.t(), keyword()) :: {:ok, page()} | {:error, error()}
   def search(scope, query, opts \\ []) do
-    with {:ok, %{candidates: candidates, offset: offset, total: total}} <- rank(query, opts) do
+    with {:ok, query, options} <- validate(query, opts, @options), do: page(scope, query, options)
+  end
+
+  defp page(scope, query, options) do
+    with {:ok, %{candidates: candidates, offset: offset, total: total}} <-
+           retrieve(statement(query, options)) do
       entries = hydrate(scope, query, candidates)
       has_more = entries != [] and offset + @page_size < total
       {:ok, %{entries: entries, offset: offset, has_more: has_more}}
@@ -255,11 +358,8 @@ defmodule Tips.Content.Search do
   # The validated ranking SQL, its parameters and the transaction-local
   # settings it runs with. Tests EXPLAIN this exact statement.
   def ranking_statement(query, opts) do
-    with {:ok, query} <- normalize_query(query),
-         {:ok, options} <- options(opts),
-         :ok <- active_filters(options.filters) do
-      {:ok, statement(query, options)}
-    end
+    with {:ok, query, options} <- validate(query, opts, @options),
+         do: {:ok, statement(query, options)}
   end
 
   @doc """
@@ -300,12 +400,19 @@ defmodule Tips.Content.Search do
 
   ## Validation
 
+  defp validate(query, opts, allowed) do
+    with {:ok, query} <- normalize_query(query),
+         {:ok, options} <- options(opts, allowed),
+         :ok <- active_filters(options.filters) do
+      {:ok, query, options}
+    end
+  rescue
+    error in [DBConnection.ConnectionError, Postgrex.Error] -> unavailable(error)
+  end
+
   defp normalize_query(query) when is_binary(query) do
     if String.valid?(query) do
-      case query |> String.replace("\0", " ") |> normalize() do
-        "" -> {:error, :blank_query}
-        query -> {:ok, query}
-      end
+      query |> String.replace("\0", " ") |> normalize() |> query_size()
     else
       {:error, :invalid_query}
     end
@@ -313,10 +420,18 @@ defmodule Tips.Content.Search do
 
   defp normalize_query(_query), do: {:error, :invalid_query}
 
-  defp options(opts) do
+  defp query_size(""), do: {:error, :blank_query}
+
+  defp query_size(query) do
+    if byte_size(query) > EmbeddingProvider.max_query_bytes(),
+      do: {:error, :query_too_long},
+      else: {:ok, query}
+  end
+
+  defp options(opts, allowed) do
     with true <- Keyword.keyword?(opts),
          keys = Keyword.keys(opts),
-         [] <- keys -- @options,
+         [] <- keys -- allowed,
          true <- keys == Enum.uniq(keys),
          {:ok, offset} <- offset(Keyword.get(opts, :offset, 0)),
          {:ok, vector} <- vector(Keyword.get(opts, :embedding)) do

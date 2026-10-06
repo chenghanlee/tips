@@ -26,6 +26,20 @@ config :tips,
 
 config :tips, Tips.Repo, timeout: 2_000
 
+# Search request budget (Tips.Content.Search.search_tips/4), in milliseconds.
+# The #234 embedding gate measured hosted query embeddings at p95 987 ms and
+# max 3,394 ms. The query call deadline covers the capacity wait below
+# (at most 1,000 ms) plus 3,500 ms for the request, above that maximum. The
+# total adds the 2 s statement timeout above for the hybrid ranking and keeps
+# at least 1,500 ms for keyword fallback.
+config :tips, Tips.Content.Search, total: 8_000, query_embedding: 4_500
+
+# Concurrent embedding-provider requests, shared by reader queries and the
+# embedding scan, which holds at most one. Eight slots at the measured p95
+# serve about eight queries a second. A reader waits at most `queue_wait` ms
+# for a slot, then uses keyword search. Sizes are not load-tested.
+config :tips, Tips.Content.Search.ProviderCapacity, size: 8, queue_wait: 1_000
+
 config :tips, Oban,
   repo: Tips.Repo,
   queues: [media: 1, embeddings: 1, maintenance: 1],
