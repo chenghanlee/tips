@@ -217,7 +217,9 @@ defmodule TipsWeb.EditorDraftTest do
     session
     |> visit("/users/log-in/#{token}")
     |> click(button("Log me in only this time"))
-    |> assert_has(css("header", text: user.email))
+    # The browser matches the email itself, so no text is read from the log-in page's
+    # header while the navigation replaces it.
+    |> assert_has(xpath(~s|//header[contains(., "#{user.email}")]|))
   end
 
   defp open_editor(session, path) do
