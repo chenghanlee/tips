@@ -26,10 +26,10 @@ defmodule Tips.SearchGateTest do
                "data" => %{
                  "endpoints" => [
                    %{
-                     "tag" => "nebius",
-                     "provider_name" => "Nebius",
+                     "tag" => "deepinfra/us",
+                     "provider_name" => "DeepInfra",
                      "status" => 0,
-                     "context_length" => 32_000,
+                     "context_length" => 32_768,
                      "pricing" => %{"prompt" => "0.00000001"}
                    }
                  ]
@@ -173,7 +173,7 @@ defmodule Tips.SearchGateTest do
 
   for {failure, third} <- [
         {"an HTTP error", {:status, 500}},
-        {"another upstream", {:upstream, "DeepInfra"}},
+        {"another upstream", {:upstream, "Nebius"}},
         {"an all-zero vector", :zero_vector},
         {"a vector at index 1", :index_one},
         {"no response before its deadline", :no_response}
@@ -216,9 +216,9 @@ defmodule Tips.SearchGateTest do
 
       {status, upstream} =
         case failure do
-          {:status, status} -> {status, "Nebius"}
+          {:status, status} -> {status, "DeepInfra"}
           {:upstream, upstream} -> {200, upstream}
-          _ok_or_vector -> {200, "Nebius"}
+          _ok_or_vector -> {200, "DeepInfra"}
         end
 
       embedding =
@@ -253,7 +253,7 @@ defmodule Tips.SearchGateTest do
       Req.Test.json(conn, %{
         "data" => [%{"index" => 0, "embedding" => vector.(input)}],
         "model" => "Qwen/Qwen3-Embedding-8B",
-        "provider" => "Nebius"
+        "provider" => "DeepInfra"
       })
     end)
   end

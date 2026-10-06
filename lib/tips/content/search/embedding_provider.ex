@@ -1,16 +1,14 @@
 defmodule Tips.Content.Search.EmbeddingProvider do
   @moduledoc """
   The selected embedding runtime: `qwen/qwen3-embedding-8b` through OpenRouter,
-  served only by Nebius, with fallbacks disabled so vectors never mix.
+  served only by DeepInfra, with fallbacks disabled so vectors never mix.
 
   The ten-query gate fixed this runtime (`test/fixtures/search_probe/gate-v2.json`,
   evidence retained on #234): 1024 requested dimensions, and plain-text
   documents of at most 30,000 UTF-8 bytes, never truncated. Queries are at
   most 1024 bytes and are sent after the gate's retrieval instruction,
   `"Instruct: Given a web search query, retrieve relevant passages that answer the query\\nQuery:"`,
-  with nothing between the instruction and the query. #363 moved the host from
-  DeepInfra to Nebius after DeepInfra missed the 30-second document deadline;
-  `test/fixtures/search_probe/evidence/363-nebius.json` has the measurement.
+  with nothing between the instruction and the query.
 
   `client!/1` resolves configuration once; `embed_document/2` and
   `embed_query/2` make at most one request with it. There are no retries or
@@ -45,8 +43,8 @@ defmodule Tips.Content.Search.EmbeddingProvider do
 
   @base_url "https://openrouter.ai/api/v1"
   @model "qwen/qwen3-embedding-8b"
-  @upstream "Nebius"
-  @routing %{only: ["nebius"], allow_fallbacks: false}
+  @upstream "DeepInfra"
+  @routing %{only: ["deepinfra"], allow_fallbacks: false}
   @dimensions 1024
   @max_document_bytes 30_000
   @max_query_bytes 1024

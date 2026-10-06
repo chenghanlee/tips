@@ -12,7 +12,7 @@ defmodule Tips.Content.Search.EmbeddingProviderTest do
     Req.Test.stub(EmbeddingProvider, fn conn ->
       {:ok, body, conn} = Plug.Conn.read_body(conn)
       send(test, {:request, conn, JSON.decode!(body)})
-      respond_vector(conn, nil, [3, 4 | List.duplicate(0, 1022)], %{"provider" => "nebius"})
+      respond_vector(conn, nil, [3, 4 | List.duplicate(0, 1022)], %{"provider" => "deepinfra"})
     end)
 
     assert {:ok, vector} =
@@ -37,7 +37,7 @@ defmodule Tips.Content.Search.EmbeddingProviderTest do
              "model" => "qwen/qwen3-embedding-8b",
              "input" => [document],
              "dimensions" => 1024,
-             "provider" => %{"only" => ["nebius"], "allow_fallbacks" => false}
+             "provider" => %{"only" => ["deepinfra"], "allow_fallbacks" => false}
            }
 
     # Queries follow the gate's instruction directly, with no separator.
@@ -69,7 +69,7 @@ defmodule Tips.Content.Search.EmbeddingProviderTest do
       {&respond_vector(&1, nil, [1 | List.duplicate(0, 1022)]), :contract},
       {&respond_vector(&1, nil, provider_vector() ++ List.duplicate(0.0, 3072)), :contract},
       {&respond_vector(&1, nil, provider_vector(), %{"model" => "other/model"}), :contract},
-      {&respond_vector(&1, nil, provider_vector(), %{"provider" => "DeepInfra"}), :contract},
+      {&respond_vector(&1, nil, provider_vector(), %{"provider" => "Nebius"}), :contract},
       {&respond_vector(&1, nil, provider_vector(), %{"provider" => nil}), :malformed},
       {&respond_vector(&1, nil, zero), :malformed},
       {&respond_vector(&1, nil, provider_vector(1.0e39)), :malformed},

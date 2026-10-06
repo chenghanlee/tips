@@ -34,7 +34,7 @@ defmodule Tips.SearchGate do
   @models ~w(claude gpt gemini)
   @environments ~w(chat ide cli)
   @base_url "https://openrouter.ai/api/v1"
-  @endpoint "nebius"
+  @endpoint "deepinfra"
   @max_document_bytes 30_000
   @max_body_codepoints 20_000
   @tokens_per_input 8
@@ -348,8 +348,7 @@ defmodule Tips.SearchGate do
               endpoint: endpoint,
               key: key,
               estimated_max_cost_usd: estimate,
-              host_since_363:
-                "#234 and gate runs 1 to 4 used DeepInfra; #363 moved the host to Nebius. This run's tag is #{endpoint.tag}"
+              tag_since_234: "#234 ran against tag deepinfra; this run's tag is #{endpoint.tag}"
             })
           )
 
@@ -372,16 +371,16 @@ defmodule Tips.SearchGate do
     end
   end
 
-  # Returns the one listed Nebius endpoint, tagged `nebius` or
-  # `nebius/<variant>`, and every listed endpoint for the report. Routing by
-  # provider cannot choose between two Nebius endpoints, so two stop the run.
+  # Returns the one listed DeepInfra endpoint, tagged `deepinfra` or
+  # `deepinfra/<variant>`, and every listed endpoint for the report. Routing by
+  # provider cannot choose between two DeepInfra endpoints, so two stop the run.
   defp endpoint(client) do
     case Req.get(client, url: "/models/qwen/qwen3-embedding-8b/endpoints") do
       {:ok, %{status: 200, body: %{"data" => %{"endpoints" => endpoints}}}}
       when is_list(endpoints) ->
         listed = Enum.map(endpoints, &listing/1)
 
-        case Enum.filter(listed, &selected_host?/1) do
+        case Enum.filter(listed, &deepinfra?/1) do
           [%{context_tokens: context, prompt_price_usd_per_token: price} = endpoint]
           when is_integer(context) and is_float(price) ->
             {{:ok, endpoint}, listed}
@@ -422,10 +421,10 @@ defmodule Tips.SearchGate do
 
   defp listing(other), do: %{unexpected: inspect(other)}
 
-  defp selected_host?(%{tag: tag}) when is_binary(tag),
+  defp deepinfra?(%{tag: tag}) when is_binary(tag),
     do: tag == @endpoint or String.starts_with?(tag, @endpoint <> "/")
 
-  defp selected_host?(_listing), do: false
+  defp deepinfra?(_listing), do: false
 
   # Records the key's limits, never its label or usage.
   defp key(client) do
