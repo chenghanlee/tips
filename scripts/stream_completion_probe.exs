@@ -53,13 +53,18 @@ defmodule StreamCompletionProbe do
 
   ## Run
 
-  # Cases run one after another, each with its own reservation and expiry.
+  # Cases run one after another, each with its own reservation and expiry. Any unexpected
+  # result stops the run before the next reservation; the partial report is kept and every
+  # reservation this run made is deleted.
   defp run(ctx) do
     fixture = fixture()
     data = File.read!(fixture.path)
-    results = Enum.map(@cases, &run_case(ctx, &1, data))
-    deleted = for %{uid: uid} <- results, do: delete_confirmed(ctx, uid)
-    assertions = assertions(results, deleted)
+    {results, stopped} = run_cases(ctx, @cases, data, [])
+    deleted = Enum.map(reserved_uids(ctx), &delete_confirmed(ctx, &1))
+
+    assertions =
+      [assertion("run_not_stopped", true, stopped == nil, %{stopped: stopped})] ++
+        assertions(results, deleted)
 
     %{
       fixture: Map.delete(fixture, :path),
@@ -68,6 +73,63 @@ defmodule StreamCompletionProbe do
       assertions: assertions,
       verdict: verdict(assertions)
     }
+  end
+
+  defp run_cases(_ctx, [], _data, done), do: {Enum.reverse(done), nil}
+
+  defp run_cases(ctx, [c | rest], data, done) do
+    result = guarded(c.label, fn -> run_case(ctx, c, data) end)
+
+    case unexpected(result) do
+      nil -> run_cases(ctx, rest, data, [result | done])
+      reason -> {Enum.reverse([result | done]), %{case: c.label, reason: reason}}
+    end
+  end
+
+  # A crash still returns a result, so the report and the deletions survive it.
+  defp guarded(label, fun) do
+    fun.()
+  rescue
+    e -> %{case: label, crashed: Exception.message(e)}
+  end
+
+  # The control must complete. Boundary requests may succeed or be refused for expiry
+  # (400, code 10017); anything else is an unexplained provider error.
+  defp unexpected(%{crashed: message}), do: "crashed: " <> message
+
+  defp unexpected(%{case: "before", lead_acknowledged: true} = result) do
+    if result.spanning_patch.status == 204 and completed?(result),
+      do: nil,
+      else: "control did not complete: " <> describe(result.spanning_patch)
+  end
+
+  defp unexpected(%{lead_acknowledged: true} = result) do
+    case Enum.reject([result.spanning_patch | result.tail_patches || []], &expected_boundary?/1) do
+      [] -> nil
+      [record | _rest] -> "unexpected response: " <> describe(record)
+    end
+  end
+
+  defp unexpected(%{lead_acknowledged: false, lead_chunks: lead}),
+    do: "chunk not acknowledged: " <> describe(List.last(lead))
+
+  defp unexpected(%{reservation: record}), do: "reservation failed: " <> describe(record)
+
+  defp expected_boundary?(%{status: 204}), do: true
+
+  defp expected_boundary?(%{status: 400, body: body}) when is_binary(body),
+    do: match?({:ok, %{"errors" => [%{"code" => 10_017} | _]}}, Jason.decode(body))
+
+  defp expected_boundary?(_record), do: false
+
+  defp describe(record), do: inspect(Map.take(record, [:label, :status, :error, :body]))
+
+  defp reserved_uids(ctx) do
+    ctx.inventory
+    |> File.stream!()
+    |> Enum.map(&Jason.decode!/1)
+    |> Enum.filter(&(&1["phase"] == "reserved"))
+    |> Enum.map(& &1["uid"])
   end
 
   defp run_case(ctx, c, data) do
@@ -225,7 +287,10 @@ defmodule StreamCompletionProbe do
         )
       )
     ] ++
-      Enum.flat_map(["span-10", "span-60", "nonfinal-span-10"], &span_assertions(by[&1])) ++
+      Enum.flat_map(
+        ["span-10", "span-60", "nonfinal-span-10"],
+        &span_assertions(by[&1] || %{case: &1})
+      ) ++
       [
         assertion(
           "every_reservation_deleted",
@@ -315,14 +380,17 @@ defmodule StreamCompletionProbe do
     fixture = fixture()
     data = File.read!(fixture.path)
     expiry = DateTime.utc_now() |> DateTime.add(@diagnose_expiry_s) |> DateTime.truncate(:second)
-    first = diagnose_case(ctx, "unthrottled", data, expiry, 0)
+    first = guarded("unthrottled", fn -> diagnose_case(ctx, "unthrottled", data, expiry, 0) end)
 
     second =
       if completed?(first),
-        do: diagnose_case(ctx, "throttled-20s", data, expiry, 20_000),
+        do:
+          guarded("throttled-20s", fn ->
+            diagnose_case(ctx, "throttled-20s", data, expiry, 20_000)
+          end),
         else: %{case: "throttled-20s", skipped: "unthrottled upload did not complete"}
 
-    deleted = for %{uid: uid} <- [first, second], do: delete_confirmed(ctx, uid)
+    deleted = Enum.map(reserved_uids(ctx), &delete_confirmed(ctx, &1))
 
     assertions = [
       assertion("unthrottled_completes", true, completed?(first), diagnose_evidence(first)),
@@ -381,7 +449,8 @@ defmodule StreamCompletionProbe do
       final_body: get_in(result, [:spanning_patch, :body]),
       head_offset_after: get_in(result, [:after_spanning_patch, :head_offset]),
       final_state: get_in(result, [:final_video, "status", "state"]),
-      skipped: result[:skipped]
+      skipped: result[:skipped],
+      crashed: result[:crashed]
     }
   end
 
@@ -494,8 +563,9 @@ defmodule StreamCompletionProbe do
   end
 
   # An unthrottled body goes as one binary, as in the #61 client. A throttled body is a
-  # stream of 50 pieces with an explicit Content-Length; the stream's after-callback runs
-  # once the last piece has been handed to the socket.
+  # stream of 50 pieces with an explicit Content-Length. Its last-callback runs only when
+  # the client asks for more after the last piece, so `body_done_at` stays unset when a
+  # transport error halts the body early.
   defp patch(ctx, r, offset, data, duration_ms) do
     done = :atomics.new(1, [])
 
@@ -533,7 +603,11 @@ defmodule StreamCompletionProbe do
         if i > 0, do: Process.sleep(div(duration_ms, @pieces))
         {[bytes], acc}
       end,
-      fn _acc -> :atomics.put(done, 1, System.system_time(:millisecond)) end
+      fn acc ->
+        :atomics.put(done, 1, System.system_time(:millisecond))
+        {[], acc}
+      end,
+      fn _acc -> :ok end
     )
   end
 

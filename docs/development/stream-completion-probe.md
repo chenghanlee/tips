@@ -84,6 +84,11 @@ a checkout with no tracked changes and `ffmpeg` on `PATH`. `run` makes four
 reservations and `diagnose` two; each deletes them and confirms each with `GET` 404.
 `diagnose` uploads twice, 15 minutes from expiry: once unthrottled, then, only if that
 completes, with the final chunk throttled over 20 s like the `before` control.
+`run` stops before the next reservation when the control does not complete, a chunk is
+not acknowledged, a request fails or crashes, or a boundary request gets anything but
+204 or 400 with code 10017. It still writes the partial report and deletes every
+reservation it made. A slow `PATCH` records `body_done_at` only when its whole body was
+sent.
 
 ```sh
 TIPS_REAL_PROVIDERS=1 unbuffer mix run --no-start scripts/stream_completion_probe.exs run
