@@ -4,10 +4,10 @@ defmodule TipsWeb.ReviewLive.Editor do
   `/editor/reviews/:id/edit`.
 
   Mounts the draft form, its `EditorDraft` hook, browser draft restore,
-  reconnect recovery, submit-time validation and publishing or saving
-  (`TipsWeb.Editor`). A fresh review form starts with the tip's model and
-  environment; a restored, recovered or saved review keeps its own values,
-  blanks included.
+  reconnect recovery, submit-time validation, publishing or saving, outcome
+  reconciliation and draft clearing (`TipsWeb.Editor`). A fresh review form
+  starts with the tip's model and environment; a restored, recovered or saved
+  review keeps its own values, blanks included.
   """
   use TipsWeb, :live_view
 
@@ -26,26 +26,30 @@ defmodule TipsWeb.ReviewLive.Editor do
       <.form :if={!@load_failed} for={@form} class="grid gap-6" {Editor.form_attrs(assigns)}>
         <Editor.hidden_inputs identity={@identity} record={@record} />
         <Editor.error_summary form={@form} identity={@identity} />
-        <fieldset id={"#{Editor.form_id(@identity)}-fields"} class="grid gap-6">
-          <TipsWeb.UI.field
-            field={@form[:body]}
-            type="textarea"
-            rows={8}
-            label="Review"
-            helper="Describe what happened when you tried this tip yourself: what you did, what worked and what didn't. Markdown is supported."
-          />
-          <Editor.evidence_fields form={@form} id={"#{Editor.form_id(@identity)}-evidence"} />
-          <Editor.setup_fields
-            form={@form}
-            choices={@choices}
-            helper="Check that they match your own attempt."
-          />
+        <fieldset disabled={@pending != nil} class="contents">
+          <fieldset id={"#{Editor.form_id(@identity)}-fields"} class="grid gap-6">
+            <TipsWeb.UI.field
+              field={@form[:body]}
+              type="textarea"
+              rows={8}
+              label="Review"
+              helper="Describe what happened when you tried this tip yourself: what you did, what worked and what didn't. Markdown is supported."
+            />
+            <Editor.evidence_fields form={@form} id={"#{Editor.form_id(@identity)}-evidence"} />
+            <Editor.setup_fields
+              form={@form}
+              choices={@choices}
+              helper="Check that they match your own attempt."
+            />
+          </fieldset>
         </fieldset>
+        <Editor.saved_version identity={@identity} saved={@saved} choices={@choices} />
         <Editor.editor_bar
           identity={@identity}
           submit={if @live_action == :new, do: "Publish", else: "Save changes"}
           refusal={@refusal}
           outcome={@outcome}
+          pending={@pending}
         />
       </.form>
     </Layouts.app>
@@ -110,15 +114,5 @@ defmodule TipsWeb.ReviewLive.Editor do
   defp environment_id(%{id: id}), do: id
 
   @impl true
-  def handle_event("change", params, socket), do: {:noreply, Editor.change(socket, params)}
-
-  def handle_event("submit", params, socket), do: {:noreply, Editor.submit(socket, params)}
-
-  def handle_event("editor:recover", params, socket),
-    do: {:noreply, Editor.recover(socket, params)}
-
-  def handle_event("editor:restore", params, socket) do
-    {reply, socket} = Editor.restore(socket, params)
-    {:reply, reply, socket}
-  end
+  def handle_event(event, params, socket), do: Editor.handle_event(event, params, socket)
 end

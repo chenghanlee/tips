@@ -10,15 +10,20 @@ export const EDITOR_HOOK = "EditorDraft"
 
 /**
  * Page events. restore: hook to LiveView, replied with EditorRestoreReply.
- * recover: form to LiveView through phx-auto-recover. handoff, clear and
- * refused: LiveView to hook; refused has an empty payload and means a submit
- * failed validation.
+ * recover: form to LiveView through phx-auto-recover. reconcile: hook to
+ * LiveView after a reconnect when a submission is unsettled, or the Check
+ * again button. cleared: hook to LiveView with EditorClearResult. handoff,
+ * clear, settled and refused: LiveView to hook; refused has an empty payload
+ * and means a submit failed validation.
  */
 export const EDITOR_EVENTS = Object.freeze({
   restore: "editor:restore",
   recover: "editor:recover",
+  reconcile: "editor:reconcile",
   handoff: "editor:handoff",
   clear: "editor:clear",
+  cleared: "editor:cleared",
+  settled: "editor:settled",
   refused: "editor:refused",
 })
 
@@ -128,8 +133,10 @@ export const EDITOR_DOM = Object.freeze({
  */
 
 /**
+ * published: the record's publication is confirmed, so the hook clears it
+ * and the page keeps its fresh form.
  * @typedef {Object} EditorRestoreReply
- * @property {"restored"|"preserved"|"rejected"} status
+ * @property {"restored"|"published"|"rejected"} status
  * @property {EditorStorageIdentity} storage
  * @property {EditorDraftPair} draft
  */
@@ -142,35 +149,21 @@ export const EDITOR_DOM = Object.freeze({
  */
 
 /**
- * @typedef {Object} EditorSubmittedDraft
- * @property {EditorStorageIdentity} storage
- * @property {EditorDraftPair} draft
- * @property {EditorTarget} target
- */
-
-/**
- * @typedef {Object} EditorPublicationReceipt
- * @property {"created"|"existing_equivalent"} outcome
- * @property {"tip"|"review"} kind
- * @property {number} id
- * @property {number} tip_id
- * @property {string} submission_key
- * @property {"live"|"hidden"|"deleted"} state
- */
-
-/**
- * @typedef {Object} EditorEditReceipt
- * @property {"updated"|"noop"} outcome
- * @property {"tip"|"review"} kind
- * @property {number} id
- * @property {number} tip_id
- * @property {number} edit_version
- * @property {"live"|"hidden"} state
- */
-
-/**
- * An instruction to clear exactly the submitted draft pair, not a result.
+ * An instruction to clear the revision that holds the submitted values, not
+ * a result. The hook owns the revision; the page names the slot and draft.
  * @typedef {Object} EditorClearRequest
- * @property {EditorSubmittedDraft} submitted
- * @property {EditorPublicationReceipt|EditorEditReceipt} receipt
+ * @property {EditorStorageIdentity} storage
+ * @property {string} draft_id
+ */
+
+/**
+ * ok: cleared. none: no revision of this page held the values. error: storage
+ * failed. conflict: the slot holds newer work, which stays.
+ * @typedef {Object} EditorClearResult
+ * @property {"ok"|"none"|"error"|"conflict"} status
+ */
+
+/**
+ * @typedef {Object} EditorSettled
+ * @property {boolean} unresolved
  */

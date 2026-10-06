@@ -3,8 +3,8 @@ defmodule TipsWeb.TipLive.Editor do
   The tip editor: `/editor/tips/new` and `/editor/tips/:id/edit`.
 
   Mounts the draft form, its `EditorDraft` hook, browser draft restore,
-  reconnect recovery, submit-time validation and publishing or saving
-  (`TipsWeb.Editor`).
+  reconnect recovery, submit-time validation, publishing or saving, outcome
+  reconciliation and draft clearing (`TipsWeb.Editor`).
   """
   use TipsWeb, :live_view
 
@@ -22,31 +22,35 @@ defmodule TipsWeb.TipLive.Editor do
       <.form :if={!@load_failed} for={@form} class="grid gap-6" {Editor.form_attrs(assigns)}>
         <Editor.hidden_inputs identity={@identity} record={@record} />
         <Editor.error_summary form={@form} identity={@identity} />
-        <fieldset id={"#{Editor.form_id(@identity)}-fields"} class="grid gap-6">
-          <TipsWeb.UI.field field={@form[:title]} label="Title" />
-          <TipsWeb.UI.field
-            field={@form[:body]}
-            type="textarea"
-            rows={8}
-            label="Tip"
-            helper="Explain when to use this, the steps, and what happened when you tried it. Markdown is supported."
-          />
-          <TipsWeb.UI.field
-            field={@form[:tag_id]}
-            type="select"
-            label="Technique"
-            options={[
-              {"Choose a technique", ""} | Editor.options(@choices.tags, @form[:tag_id].value)
-            ]}
-          />
-          <Editor.setup_fields form={@form} choices={@choices} />
-          <Editor.evidence_fields form={@form} id={"#{Editor.form_id(@identity)}-evidence"} />
+        <fieldset disabled={@pending != nil} class="contents">
+          <fieldset id={"#{Editor.form_id(@identity)}-fields"} class="grid gap-6">
+            <TipsWeb.UI.field field={@form[:title]} label="Title" />
+            <TipsWeb.UI.field
+              field={@form[:body]}
+              type="textarea"
+              rows={8}
+              label="Tip"
+              helper="Explain when to use this, the steps, and what happened when you tried it. Markdown is supported."
+            />
+            <TipsWeb.UI.field
+              field={@form[:tag_id]}
+              type="select"
+              label="Technique"
+              options={[
+                {"Choose a technique", ""} | Editor.options(@choices.tags, @form[:tag_id].value)
+              ]}
+            />
+            <Editor.setup_fields form={@form} choices={@choices} />
+            <Editor.evidence_fields form={@form} id={"#{Editor.form_id(@identity)}-evidence"} />
+          </fieldset>
         </fieldset>
+        <Editor.saved_version identity={@identity} saved={@saved} choices={@choices} />
         <Editor.editor_bar
           identity={@identity}
           submit={if @live_action == :new, do: "Publish", else: "Save changes"}
           refusal={@refusal}
           outcome={@outcome}
+          pending={@pending}
         />
       </.form>
     </Layouts.app>
@@ -83,15 +87,5 @@ defmodule TipsWeb.TipLive.Editor do
   end
 
   @impl true
-  def handle_event("change", params, socket), do: {:noreply, Editor.change(socket, params)}
-
-  def handle_event("submit", params, socket), do: {:noreply, Editor.submit(socket, params)}
-
-  def handle_event("editor:recover", params, socket),
-    do: {:noreply, Editor.recover(socket, params)}
-
-  def handle_event("editor:restore", params, socket) do
-    {reply, socket} = Editor.restore(socket, params)
-    {:reply, reply, socket}
-  end
+  def handle_event(event, params, socket), do: Editor.handle_event(event, params, socket)
 end
