@@ -28,10 +28,26 @@ defmodule TipsWeb.SearchFeatureTest do
     |> assert_has(css("#q-error", text: "Enter a task or keywords to search."))
     |> assert_has(css("#result-rows li a", text: "Reproduce the flake first"))
     |> assert_focus("q")
-    |> click(css("#technique option[value=persona]"))
+    |> choose_focused("technique", "persona")
     |> assert_has(css("#results-empty", text: "No tips match these filters"))
     |> assert_focus("technique")
     |> then(&assert(current_url(&1) =~ "/search?q=flake&technique=persona"))
+  end
+
+  # Selects with the control focused, as a reader does. WebDriver's option
+  # click does not reliably focus the select in headless Chrome.
+  defp choose_focused(session, id, value) do
+    execute_script(
+      session,
+      """
+      const select = document.getElementById(arguments[0]);
+      select.focus();
+      select.value = arguments[1];
+      select.dispatchEvent(new Event("input", {bubbles: true}));
+      select.dispatchEvent(new Event("change", {bubbles: true}));
+      """,
+      [id, value]
+    )
   end
 
   defp assert_focus(session, id) do
