@@ -11,7 +11,8 @@
 defmodule StreamCompletionProbe do
   @out "tmp/stream-completion-probe"
   @prefix "tips-probe-243-"
-  @chunk 262_144
+  # Stream's minimum non-final tus chunk; non-final chunks must also be 256 KiB multiples.
+  @chunk 5_242_880
   @max_calls 120
   # The production envelope for server-side Stream API calls: create, status read, delete.
   @api_timeouts [receive_timeout: 5_000, connect_options: [timeout: 5_000]]
@@ -19,8 +20,8 @@ defmodule StreamCompletionProbe do
   @patch_receive_timeout 180_000
   @expiry_s 130
 
-  # Final PATCH start and end, in seconds relative to uploadExpiry. `nonfinal` sends a
-  # 4 x 256 KiB chunk across expiry, then the rest at once.
+  # Slow PATCH start and end, in seconds relative to uploadExpiry. `final` sends the rest
+  # of the file; `nonfinal` sends one more 5 MiB chunk across expiry, then the rest at once.
   @cases [
     %{label: "before", start: -40, finish: -20, kind: :final},
     %{label: "span-10", start: -10, finish: 10, kind: :final},
@@ -63,7 +64,7 @@ defmodule StreamCompletionProbe do
       |> Task.await_many(:timer.minutes(10))
 
     deleted = Enum.map(owned(reservations), &delete_confirmed(ctx, &1))
-    assertions = assertions(results, deleted)
+    assertions = assertions(results, deleted, expiry)
 
     %{
       fixture: Map.delete(fixture, :path),
@@ -78,15 +79,28 @@ defmodule StreamCompletionProbe do
   defp run_case(_ctx, c, {:error, record}, _data, _expiry),
     do: %{case: c.label, reservation: record}
 
+  # A rejected first chunk means no unfinished transfer exists, so the case stops there.
   defp run_case(ctx, c, {:ok, r}, data, expiry) do
     first = patch(ctx, r, 0, binary_part(data, 0, @chunk), 0)
     {:ok, reserved} = video(ctx, r.uid)
+
+    if acknowledged?(first, @chunk),
+      do: span_case(ctx, c, r, data, expiry, first, reserved),
+      else: %{
+        case: c.label,
+        uid: r.uid,
+        first_chunk: first,
+        reserved_video: observation(reserved)
+      }
+  end
+
+  defp span_case(ctx, c, r, data, expiry, first, reserved) do
     sleep_until(expiry, c.start)
 
     {body_size, rest} =
       case c.kind do
         :final -> {byte_size(data) - @chunk, nil}
-        :nonfinal -> {4 * @chunk, 5 * @chunk}
+        :nonfinal -> {@chunk, 2 * @chunk}
       end
 
     spanning =
@@ -171,11 +185,24 @@ defmodule StreamCompletionProbe do
     }
   end
 
-  defp assertions(results, deleted) do
+  defp assertions(results, deleted, expiry) do
     by = Map.new(results, &{&1.case, &1})
     before = by["before"]
 
     [
+      assertion(
+        "first_chunks_acknowledged",
+        true,
+        Enum.all?(results, &acknowledged?(&1[:first_chunk], @chunk)),
+        Map.new(
+          results,
+          &{&1.case, Map.take(&1[:first_chunk] || %{}, [:status, :headers, :body])}
+        )
+      ),
+      assertion("before_finished_before_expiry", true, before?(before, :response_at, expiry), %{
+        response_at: get_in(before, [:spanning_patch, :response_at]),
+        expiry: DateTime.to_iso8601(expiry)
+      }),
       assertion("before_expiry_completes", true, completed?(before), %{
         patch_status: get_in(before, [:spanning_patch, :status]),
         final_state: get_in(before, [:final_video, "status", "state"])
@@ -194,7 +221,7 @@ defmodule StreamCompletionProbe do
         )
       )
     ] ++
-      Enum.map(["span-10", "span-60", "nonfinal-span-10"], &span_assertion(by[&1])) ++
+      Enum.flat_map(["span-10", "span-60", "nonfinal-span-10"], &span_assertions(by[&1], expiry)) ++
       [
         assertion(
           "every_reservation_deleted",
@@ -207,7 +234,24 @@ defmodule StreamCompletionProbe do
       ]
   end
 
-  defp span_assertion(result) do
+  # A case measures the boundary only if its PATCH started before expiry and was still
+  # handing body bytes to the socket after it.
+  defp span_assertions(result, expiry) do
+    spans? =
+      before?(result, :sent_at, expiry) and not before?(result, :body_done_at, expiry) and
+        get_in(result, [:spanning_patch, :body_done_at]) != nil
+
+    [
+      assertion("#{result.case}_spans_expiry", true, spans?, %{
+        sent_at: get_in(result, [:spanning_patch, :sent_at]),
+        body_done_at: get_in(result, [:spanning_patch, :body_done_at]),
+        expiry: DateTime.to_iso8601(expiry)
+      }),
+      span_outcome(result)
+    ]
+  end
+
+  defp span_outcome(result) do
     assertion("#{result.case}_outcome", false, :info, %{
       patch_sent_at: get_in(result, [:spanning_patch, :sent_at]),
       body_done_at: get_in(result, [:spanning_patch, :body_done_at]),
@@ -219,6 +263,18 @@ defmodule StreamCompletionProbe do
       final_state: get_in(result, [:final_video, "status", "state"]),
       completed: completed?(result)
     })
+  end
+
+  defp acknowledged?(%{status: 204, headers: %{"upload-offset" => offset}}, expected),
+    do: offset == Integer.to_string(expected)
+
+  defp acknowledged?(_record, _expected), do: false
+
+  defp before?(result, key, expiry) do
+    case get_in(result, [:spanning_patch, key]) do
+      nil -> false
+      at -> before_iso?(at, DateTime.to_iso8601(expiry))
+    end
   end
 
   defp completed?(%{final_video: %{"status" => %{"state" => state}}}),
@@ -560,19 +616,23 @@ defmodule StreamCompletionProbe do
     System.halt(if report.verdict == "pass" and leaked == 0, do: 0, else: 1)
   end
 
-  # A 10 s 640x480 clip of about 2.5 MB, so the slow PATCH carries many pieces.
+  # A 10 s 720p clip of about 15 MB: noise keeps the constant bitrate full, so the file
+  # holds two 5 MiB non-final chunks and a final one.
   defp fixture do
     dir = Path.join(@out, "fixtures")
     File.mkdir_p!(dir)
     path = Path.join(dir, "clip-10s.mp4")
 
     args =
-      ~w(-f lavfi -i testsrc2=size=640x480:rate=25:duration=10 -f lavfi -i sine=frequency=440:duration=10
-         -c:v libx264 -pix_fmt yuv420p -preset veryfast -b:v 2M -maxrate 2M -bufsize 4M -c:a aac -shortest
-         -movflags +faststart)
+      ~w(-f lavfi -i testsrc2=size=1280x720:rate=30:duration=10 -f lavfi -i sine=frequency=440:duration=10
+         -vf noise=alls=40:allf=t+u -c:v libx264 -pix_fmt yuv420p -preset veryfast -b:v 12M -minrate 12M
+         -maxrate 12M -bufsize 12M -x264-params nal-hrd=cbr -c:a aac -shortest -movflags +faststart)
 
     {_out, 0} = System.cmd("ffmpeg", ~w(-hide_banner -loglevel error -y) ++ args ++ [path])
     bin = File.read!(path)
+
+    if byte_size(bin) <= 2 * @chunk,
+      do: raise("fixture has #{byte_size(bin)} bytes; need over #{2 * @chunk}")
 
     %{
       path: path,

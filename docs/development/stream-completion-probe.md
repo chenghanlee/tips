@@ -8,7 +8,16 @@ on it.
 
 ## Result
 
-**Pending.** No run is recorded yet.
+**Pending.** No complete run is recorded yet.
+
+The first run, at `f440270` with no tracked changes, measured nothing: Stream rejected
+every 256 KiB first chunk with 400, code 10015, "Minimum allowed ChunkSize for a
+non-final chunk is 5242880 bytes". The tester stopped it before expiry and deleted all
+four reservations, each confirmed by `GET` 404
+([run](stream-completion-probe/tester-aborted-20261006T191501Z-0938.json),
+[cleanup](stream-completion-probe/cleanup-20261006T191603Z-3126.json)). The probe now
+sends 5 MiB non-final chunks from a 15 MB clip and stops a case whose first chunk is
+not acknowledged with 204 and the expected `Upload-Offset`.
 
 Already known from the [#61 probe](https://github.com/chenghanlee/tips/blob/bb876b87e7e5f920faef8b6d722d2d46b6dda768/docs/development/media-provider-probe.md#stream_deadline):
 
@@ -19,16 +28,17 @@ Already known from the [#61 probe](https://github.com/chenghanlee/tips/blob/bb87
 
 ## Cases
 
-One reservation each, with the same 10 s, 640×480 clip and a 130 s expiry (Stream
-refuses less than two minutes). Each sends the first 256 KiB at once, then one slow
-`PATCH`. Times are relative to `uploadExpiry`.
+One reservation each, with the same 10 s, 720p clip of about 15 MB and a 130 s expiry
+(Stream refuses less than two minutes). Each sends the first 5 MiB at once, then one
+slow `PATCH`. Times are relative to `uploadExpiry`. A boundary case counts only if its
+`PATCH` started before expiry and was still sending after it.
 
 | Case | Slow `PATCH` | Question |
 |---|---|---|
 | `before` | rest of the file, −40 s to −20 s | Control: does the upload complete, and which timestamps does the finished video carry? |
 | `span-10` | rest of the file, −10 s to +10 s | Is a final `PATCH` still sending at expiry accepted, and does the video complete? |
 | `span-60` | rest of the file, −10 s to +60 s | The same with a longer overrun. |
-| `nonfinal-span-10` | 1 MiB, −10 s to +10 s, then the rest at once if accepted | Does Stream store a non-final chunk that spans expiry? |
+| `nonfinal-span-10` | 5 MiB, −10 s to +10 s, then the rest at once if accepted | Does Stream store a non-final chunk that spans expiry? |
 
 Server-side API calls use the production timeouts (5 s connect, 5 s receive, no
 retry). The slow `PATCH` stands in for the browser and has a 180 s receive timeout.

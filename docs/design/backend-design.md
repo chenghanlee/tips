@@ -336,6 +336,7 @@ Observed Stream behaviour ([provider probe](https://github.com/chenghanlee/tips/
 - A `PATCH` cannot raise the declared length. A `PATCH` with more bytes than declared: 400, nothing stored.
 - Bytes sent after the upload is complete: 204, but `Upload-Offset` stays the same and the bytes are not stored. Read `Upload-Offset`; the status does not signal refusal.
 - A non-final `PATCH` that is not a multiple of 256 KiB: 400, code 10031.
+- A non-final `PATCH` under 5,242,880 bytes: 400, code 10015 ([#243 run](../development/stream-completion-probe.md#result)). Non-final tus chunks must be at least 5 MiB and a multiple of 256 KiB.
 - An expiry less than two minutes ahead: 400, code 10005.
 - `uploadExpiry` is fixed at reservation. Pause and resume do not extend it.
 - A `PATCH` started after `uploadExpiry`: 400, code 10017; the video stays `pendingupload`. A `PATCH` in progress at expiry: see the [completion probe](../development/stream-completion-probe.md).
