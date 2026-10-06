@@ -548,9 +548,7 @@ Allow an account owner to change their email after recent sign-in and verificati
 
 Use the generated authentication flow as the foundation, including its recent-authentication check (Phoenix's "sudo mode"). If that check has expired, require another magic-link sign-in through the current address before requesting the change. This is an account-setting operation owned by Accounts, not a Content operation. [Phoenix's authentication design](https://github.com/phoenixframework/phoenix/issues/6041) uses recent authentication for email changes; [Mastodon](https://docs.joinmastodon.org/user/contacts/) also exposes email changes in account settings.
 
-The shipped code still uses the generated email-change functions, which neither revoke session families nor start a fresh one; [#102](https://github.com/chenghanlee/tips/issues/102) implements this contract.
-
-Accounts operations, adapting the generated functions rather than building a second authentication system:
+Accounts operations ([#102](https://github.com/chenghanlee/tips/issues/102)), adapting the generated functions rather than building a second authentication system:
 
 | Function | Contract |
 |---|---|
