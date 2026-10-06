@@ -116,6 +116,9 @@ Do not repeat the watch.
 
 ### 6. Dispatcher: remove the pair and assign the next task
 
+Confirm the PR merged. If not, handle the message as blocked. Do not disable or
+re-arm auto-merge.
+
 Run `agent/teams/team.py stop <issue>`, then select another task for the free slot.
 Apply the selection process above, including Backlog and resolved blockers.
 
