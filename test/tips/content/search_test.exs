@@ -37,15 +37,11 @@ defmodule Tips.Content.SearchTest do
       for plan <- [:index, :sequential] do
         in_plan(plan, fn ->
           assert {:ok, %{candidates: candidates, total: 3}} = Search.rank("quokka", [])
-
-          assert [
-                   %{tip_id: strong_id, review_id: nil},
-                   %{tip_id: reviewed_id, review_id: review_id},
-                   %{tip_id: weak_id, review_id: nil}
-                 ] = candidates
-
-          assert {strong_id, reviewed_id, weak_id, review_id} ==
-                   {strong.id, reviewed.id, weak.id, review.id}
+          # Tip and review scores come from separate BM25 indexes, so only the
+          # tips' own order is fixed.
+          assert [{strong_id, nil} | rest] = Enum.map(candidates, &{&1.tip_id, &1.review_id})
+          assert strong_id == strong.id
+          assert Enum.sort(rest) == Enum.sort([{reviewed.id, review.id}, {weak.id, nil}])
 
           scans = scans(explain("quokka", []))
 
@@ -383,27 +379,39 @@ defmodule Tips.Content.SearchTest do
                Repo.one!(from r in Review, where: r.tip_id == ^crowded.id, select: min(r.id))
     end
 
-    test "reciprocal rank fusion sums branch contributions with tip id ties", ctx do
-      both = tip!(ctx, title: "Zebra", body: "Notes #{filler(3)}", vector: near(1))
-      lexical = tip!(ctx, title: "Zebra", body: "Notes")
+    test "each list ranks a tip once, by the better of the tip and its best review", ctx do
+      top = tip!(ctx, title: "Zebra", body: "Notes", vector: near(1))
+      reviewed = tip!(ctx, title: "Zebra", body: "Notes #{filler(3)}", vector: near(3))
+      review = review!(reviewed, body: "Plain notes", vector: near(4))
       review_only = tip!(ctx, title: "Review-only parent")
-      review!(review_only, body: "Plain words", vector: near(1))
-      far_review = review!(review_only, body: "Other words", vector: near(30))
+      near_review = review!(review_only, body: "Plain words", vector: near(2))
+      review!(review_only, body: "Other words", vector: near(30))
 
       assert {:ok, %{candidates: candidates, total: 3}} =
                Search.rank("zebra", embedding: query_vector())
 
       assert [
-               %{tip_id: both_id, review_id: nil, score: both_score},
-               %{tip_id: lexical_id, review_id: nil, score: lexical_score},
-               %{tip_id: review_tip_id, review_id: review_id, score: review_score}
+               %{tip_id: top_id, review_id: nil, score: top_score},
+               %{tip_id: reviewed_id, review_id: review_id, score: reviewed_score},
+               %{tip_id: review_tip_id, review_id: near_review_id, score: review_score}
              ] = candidates
 
-      assert {both_id, lexical_id, review_tip_id} == {both.id, lexical.id, review_only.id}
-      assert review_id != far_review.id
-      assert_in_delta both_score, 1 / 62 + 1 / 61, 1.0e-12
-      assert_in_delta lexical_score, 1 / 61, 1.0e-12
-      assert_in_delta review_score, 1 / 61, 1.0e-12
+      assert {top_id, reviewed_id, review_tip_id} == {top.id, reviewed.id, review_only.id}
+      assert {review_id, near_review_id} == {review.id, near_review.id}
+      assert_in_delta top_score, 1 / 61 + 1 / 61, 1.0e-12
+      assert_in_delta reviewed_score, 1 / 62 + 1 / 63, 1.0e-12
+      assert_in_delta review_score, 1 / 62, 1.0e-12
+
+      stub_provider(&respond_vector(&1, &2, query_vector()))
+
+      assert {:ok,
+              %{
+                entries: [
+                  %{tip: %{id: ^top_id}, matched_review_id: nil},
+                  %{tip: %{id: ^reviewed_id}, matched_review_id: ^review_id},
+                  %{tip: %{id: ^review_tip_id}, matched_review_id: ^near_review_id}
+                ]
+              }} = Content.search_tips(nil, "zebra")
     end
 
     test "pagination slices one fixed bounded ranking", ctx do

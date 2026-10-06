@@ -77,11 +77,17 @@ defmodule Tips.Content.Search do
   nonnegative BM25 scores, which are nonmatches, after their bounded
   candidate scan. Vector branches set `hnsw.iterative_scan = relaxed_order`
   for the transaction and re-sort the materialized candidates by distance.
-  Reciprocal rank fusion (`1 / (60 + rank)`) sums each tip's branch scores
-  into a window of at most 200 tips, ordered by score, then tip id. The best
-  contributing review is the tip's matched review. The offset applies only to
-  that window; candidate limits never grow with it. Search is public and
-  live-only for every viewer, authors and moderators included.
+
+  The keyword list ranks each tip once by the better BM25 score of the tip
+  and its best review; the vector list does the same with distance. Having
+  reviews adds no score by itself. The two BM25 indexes keep their own
+  corpus statistics, so a tip and a review with the same text can score
+  differently. Reciprocal rank fusion (`1 / (60 + rank)`) sums each tip's
+  two list scores into a window of at most 200 tips, ordered by score, then
+  tip id. The tip's matched review is its best ranked review in either review
+  branch. The offset applies only to that window; candidate limits never grow
+  with it. Search is public and live-only for every viewer, authors and
+  moderators included.
 
   ### Hydration
 
@@ -477,15 +483,15 @@ defmodule Tips.Content.Search do
       |> Enum.with_index(first_filter)
       |> Enum.map_join(fn {{column, _id}, index} -> " AND t.#{column} = $#{index}" end)
 
-    branches = [{"tips_bm25", false}, {"reviews_bm25", true}]
-    vector_branches = if vector, do: [{"tips_vec", false}, {"reviews_vec", true}], else: []
+    lists = [{"keyword", "tips_bm25", "reviews_bm25"}]
+    vector_lists = if vector, do: [{"vector", "tips_vec", "reviews_vec"}], else: []
 
     ctes =
       [lexical_ctes(predicates) | if(vector, do: [vector_ctes(predicates)], else: [])]
       |> Enum.join(",\n")
 
     %{
-      sql: ranking_sql(ctes, branches ++ vector_branches),
+      sql: ranking_sql(ctes, lists ++ vector_lists),
       params: [query, offset | vector_params] ++ Keyword.values(filters),
       settings: if(vector, do: ["SET LOCAL hnsw.iterative_scan = relaxed_order"], else: []),
       offset: offset
@@ -496,11 +502,11 @@ defmodule Tips.Content.Search do
   @live_review "r.deleted_at IS NULL AND r.dead_at IS NULL"
 
   # Keyword scans keep their bounded ORDER BY ... LIMIT candidate subquery
-  # and drop nonmatches (scores >= 0) outside it, before rank and collapse.
+  # and drop nonmatches (scores >= 0) outside it, before collapse and merge.
   defp lexical_ctes(predicates) do
     """
     tips_bm25 AS (
-      SELECT tip_id, row_number() OVER (ORDER BY d, tip_id) AS rank
+      SELECT tip_id, d
       FROM (
         SELECT s.tip_id, s.search_text <@> to_bm25query($1, 'tips_bm25') AS d
         FROM tip_search s
@@ -511,7 +517,7 @@ defmodule Tips.Content.Search do
       WHERE d < 0
     ),
     reviews_bm25 AS (
-      SELECT tip_id, review_id, row_number() OVER (ORDER BY d, tip_id) AS rank
+      SELECT tip_id, review_id, d, row_number() OVER (ORDER BY d, tip_id) AS rank
       FROM (
         SELECT DISTINCT ON (tip_id) tip_id, review_id, d
         FROM (
@@ -532,19 +538,17 @@ defmodule Tips.Content.Search do
   end
 
   # Relaxed iterative HNSW scans can return candidates slightly out of order,
-  # so each scan is materialized and sorted again; `d + 0` forces that sort.
+  # so each scan is materialized and sorted again before ranking; `d + 0`
+  # forces a sort where the planner could reuse the scan order.
   defp vector_ctes(predicates) do
     """
-    tips_vec_c AS MATERIALIZED (
+    tips_vec AS MATERIALIZED (
       SELECT s.tip_id, s.embedding <=> $3::text::vector(#{@dimensions}) AS d
       FROM tip_search s
       JOIN tips t ON t.id = s.tip_id AND #{@live_tip}#{predicates}
       WHERE s.embedding IS NOT NULL
       ORDER BY d
       LIMIT #{@branch_limit}
-    ),
-    tips_vec AS (
-      SELECT tip_id, row_number() OVER (ORDER BY d + 0, tip_id) AS rank FROM tips_vec_c
     ),
     reviews_vec_c AS MATERIALIZED (
       SELECT s.review_id, r.tip_id, s.embedding <=> $3::text::vector(#{@dimensions}) AS d
@@ -556,7 +560,7 @@ defmodule Tips.Content.Search do
       LIMIT #{@review_cap}
     ),
     reviews_vec AS (
-      SELECT tip_id, review_id, row_number() OVER (ORDER BY d + 0, tip_id) AS rank
+      SELECT tip_id, review_id, d, row_number() OVER (ORDER BY d + 0, tip_id) AS rank
       FROM (
         SELECT DISTINCT ON (tip_id) tip_id, review_id, d
         FROM reviews_vec_c
@@ -568,27 +572,50 @@ defmodule Tips.Content.Search do
     """
   end
 
-  defp ranking_sql(ctes, branches) do
-    fused =
-      Enum.map_join(branches, "\n  UNION ALL\n", fn {name, review?} ->
-        review_id = if review?, do: "review_id", else: "NULL::bigint"
-        "  SELECT tip_id, #{review_id} AS review_id, 1.0 / (#{@rrf_k} + rank) AS s FROM #{name}"
+  # Each list ranks every tip once by the better score of the tip and its
+  # best review. The matched review is the best ranked review in either
+  # review branch, whether or not it beat the tip.
+  defp ranking_sql(ctes, lists) do
+    merged =
+      Enum.map_join(lists, ",\n", fn {name, tips, reviews} ->
+        """
+        #{name} AS (
+          SELECT tip_id, row_number() OVER (ORDER BY d, tip_id) AS rank
+          FROM (
+            SELECT tip_id, min(d) AS d
+            FROM (SELECT tip_id, d FROM #{tips} UNION ALL SELECT tip_id, d FROM #{reviews}) c
+            GROUP BY tip_id
+          ) best
+        )\
+        """
+      end)
+
+    ranks =
+      Enum.map_join(lists, " UNION ALL ", fn {name, _tips, _reviews} ->
+        "SELECT tip_id, rank FROM #{name}"
+      end)
+
+    reviews =
+      Enum.map_join(lists, " UNION ALL ", fn {_name, _tips, reviews} ->
+        "SELECT tip_id, review_id, rank FROM #{reviews}"
       end)
 
     """
     WITH #{ctes},
-    fused AS (
-    #{fused}
-    ),
+    #{merged},
     ranked AS (
-      SELECT tip_id, sum(s) AS score,
-             (array_agg(review_id ORDER BY s DESC, review_id)
-                FILTER (WHERE review_id IS NOT NULL))[1] AS review_id
-      FROM fused
+      SELECT tip_id, sum(1.0 / (#{@rrf_k} + rank)) AS score
+      FROM (#{ranks}) fused
       GROUP BY tip_id
+    ),
+    matched AS (
+      SELECT DISTINCT ON (tip_id) tip_id, review_id
+      FROM (#{reviews}) r
+      ORDER BY tip_id, rank, review_id
     )
-    SELECT tip_id, review_id, score::float8, count(*) OVER () AS total
+    SELECT tip_id, m.review_id, score::float8, count(*) OVER () AS total
     FROM ranked
+    LEFT JOIN matched m USING (tip_id)
     ORDER BY score DESC, tip_id
     LIMIT #{@page_size} OFFSET $2
     """
