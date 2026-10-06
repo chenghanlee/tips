@@ -24,19 +24,19 @@ If Dexter is missing, unavailable or denied, report the exact error once and use
 
 `Q` = `"$TIPS_DEXTER" query`. `<pos>` = `<file> <line> <column>`, 1-based UTF-16, path relative to the bound worktree.
 
-| Goal | Run | Use before |
-|---|---|---|
-| Outline a file: names, lines, columns | `Q symbols <file>` | `cat`, `sed`, whole-file read |
-| Find a function by name | `"$TIPS_DEXTER" lookup Module function --strict` | `rg 'def name'` |
-| Find a module by name | `"$TIPS_DEXTER" lookup Module` | `rg 'defmodule'` |
-| Find by partial name | `Q workspace-symbols <search>` | `rg` for the name |
-| Go from a call to its definition | `Q definition <pos>` | grepping for the `def` |
-| Read docs, spec, signature | `Q hover <pos>` | opening the file |
-| Find uses (add `--include-declaration` for the definition too) | `Q references <pos>` at the definition | `rg -F 'name('` |
-| Find callers | `Q incoming-calls <pos>` | grepping for callers |
-| List the calls a function makes | `Q outgoing-calls <pos>` | scanning its body |
-| Confirm the `Module.function/arity` at a position | `Q prepare-call-hierarchy <pos>` | guessing the arity |
-| Find implementations of a callback | `Q implementation <pos>` at the `@callback` head | `rg '@behaviour'`, `rg '@impl'` |
+| Goal | Run |
+|---|---|
+| Outline a file: names, lines, columns | `Q symbols <file>` |
+| Find a function by name | `"$TIPS_DEXTER" lookup Module function --strict` |
+| Find a module by name | `"$TIPS_DEXTER" lookup Module` |
+| Find by partial name | `Q workspace-symbols <search>` |
+| Go from a call to its definition | `Q definition <pos>` |
+| Read docs, spec, signature | `Q hover <pos>` |
+| Find uses (add `--include-declaration` for the definition too) | `Q references <pos>` at the definition |
+| Find callers | `Q incoming-calls <pos>` |
+| List the calls a function makes | `Q outgoing-calls <pos>` |
+| Confirm the `Module.function/arity` at a position | `Q prepare-call-hierarchy <pos>` |
+| Find implementations of a callback | `Q implementation <pos>` at the `@callback` head |
 
 ## Positions
 
@@ -46,8 +46,6 @@ If Dexter is missing, unavailable or denied, report the exact error once and use
 4. For call hierarchy, check `selected:` shows your callable and arity. A default-argument head selects only the maximum arity.
 5. Take positions again after an edit or checkout change.
 
-One line down can give `cursor: review`, a variable, instead of `cursor: changeset`, the function.
-
 ## Before changing a name, arity or return shape
 
 Private helpers included.
@@ -56,11 +54,6 @@ Private helpers included.
 2. Scoped `rg` for the bare name and any atom or tuple that dispatches to it.
 3. Investigate each difference. Source and tests establish the impact.
 
-## After Dexter
-
-- Read the smallest source range you need. Dexter returns no function bodies.
-- Use `rg` for literal text, dynamic dispatch, non-Elixir files and files outside the index.
-
 ## Limits
 
 - Zero rows does not mean unused. An empty result exits 0.
@@ -68,7 +61,7 @@ Private helpers included.
 - Call hierarchy silently omits calls it cannot resolve. It does not replace `references`.
 - `--limit 0` lifts the row limit, except `workspace-symbols` stops at 50: narrow the search. If the tool client cuts output, narrow the query or save it to a file.
 - Index discovery excludes root `tmp/` and nested checkouts, except configured Elixir sources. `symbols` reads scratch files in the bound worktree. Files in another checkout are refused.
-- Dexter reads saved files and reports no compiler errors. Run Mix compile, Credo and tests.
+- Dexter reads saved files, returns no function bodies and reports no compiler errors. Run Mix compile, Credo and tests.
 - For completeness of call hierarchy or `implementation`, read the
   Limits section in `agent/lsp/README.md` from the repository root.
 

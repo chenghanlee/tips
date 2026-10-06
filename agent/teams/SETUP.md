@@ -2,9 +2,24 @@
 
 For humans, from the repository root. Agents read the [pair workflow](README.md) instead.
 
+## How it runs
+
+```
+USER         order the board · mark Ready · start the dispatcher once
+DISPATCHER   tidy → pick → team.py start <issue> → set Active
+DEVELOPER    code → push → PR with "Closes #<issue>" + auto-merge → team.py turn <pr> test
+TESTER       review → findings → team.py turn <pr> dev      (loop until no P0 or P1)
+TESTER       LGTM → publish_review.py → team.py turn <pr> dev
+GITHUB       checks + status + resolved threads → merge → issue closes → Done
+DEVELOPER    confirm the merge → ring the dispatcher "done"
+DISPATCHER   team.py stop <issue> → next
+```
+
 ## One-time setup
 
-Install Python 3.12 and the [configured client CLIs](config.toml). Authenticate the clients and the GitHub CLI (`gh`) for this repository. Coding agents also need `unbuffer` (Expect): the Elixir skill requires it on Mix commands.
+In GitHub: enable "Allow auto-merge" on the repository; in the ruleset "Reviewed main" turn off the strict up-to-date requirement and keep `checks`, `release`, `tips/independent-review` and resolved conversations; in Project 15 enable the workflow "Item closed" so a closed issue gets Status Done.
+
+Install Python 3.12 and the [configured client CLIs](config.toml). Authenticate the clients and the GitHub CLI (`gh`) for this repository. Agents also need GNU `timeout` (macOS: `brew install coreutils`) and `unbuffer` (Expect): the Elixir skill requires it on Mix commands.
 
 The user maintains third-party skills in the main checkout. Both locations are Git-ignored:
 

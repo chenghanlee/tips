@@ -157,21 +157,17 @@ Out of this beta: an application in a subdirectory or monorepo.
 Claude's launch settings disable known language-server plugins, including
 in linked worktrees.
 
-Provisioning then runs three steps in the worktree. Any failure stops the launch:
+Provisioning then runs three steps in the shared worktree. Any failure stops the launch:
 
-1. `mix deps.get --check-locked`, for a new worktree or one without `deps/`.
-   Dexter indexes dependency sources from disk and does not watch `deps/`, so
-   they must exist first. A fetch that would rewrite `mix.lock` fails;
-   provisioning never changes a lock. A resumed worktree skips this step: it
-   may hold an unfinished dependency change, and its agent must be able to
-   start to finish it.
-2. `dexter.sh query workspace-symbols --raw --wait <timeout> MixProject`. It
-   starts the daemon and refuses a client if the index does not answer.
-3. `dexter.sh reindex`. A daemon that was already running indexed the checkout
-   before the fetch; this reconciles it with the disk.
+1. `mix deps.get --check-locked`, for a new worktree or one without `deps/`;
+   otherwise the existing dependencies are kept. A fetch that would change
+   `mix.lock` fails.
+2. `dexter.sh query workspace-symbols --raw --wait <timeout> MixProject` starts
+   the daemon and checks that its index answers.
+3. `dexter.sh reindex` reconciles the index with the disk.
 
-The developer and the tester share the worktree, its daemon and its index. An
-agent that fetches or changes dependencies later runs `"$TIPS_DEXTER" reindex` itself.
+The developer and the tester share this daemon and index. After a later
+dependency change, follow [Reindex](../skills/dexter/SKILL.md#reindex).
 
 `team.py stop` runs `dexter.sh stop` per worktree before retiring it; an
 attached client keeps the daemon alive and the worktree is preserved. A daemon

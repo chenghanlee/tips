@@ -21,7 +21,7 @@
 ## Software design
 
 - Use Elixir and Phoenix idioms, conventions and proven design patterns from widely used similar software.
-- Prefer Ecto. Use raw SQL only where Ecto cannot express it, and parameterize it.
+- Prefer Ecto's query, changeset and migration DSLs. Use raw SQL only for a database feature they do not support, and bind runtime values as parameters.
 - Build the simplest working MVP: no enterprise complexity, no backwards compatibility. Accept complexity only when it makes the user's experience simpler.
 
 ## Writing
@@ -40,8 +40,8 @@
 ## GitHub
 
 - Comment only for a decision, a review finding or a blocker. No progress, status or acknowledgment comments.
-- Review: follow the [PR review record](agent/teams/README.md#pr-review-record). Put each finding inline on the line it concerns, one finding per comment. The review body holds only the verdict, the verification limits and findings with no line in the diff, each with its `path:line`.
-- Finding: line one is the severity (`P0`, `P1` or `P2`, [defined here](agent/teams/README.md#rules)) and the change you ask for. Then the consequence. For wrong behaviour: the steps or input, the actual result and the expected result. Otherwise: what it breaks or costs. A `suggestion` block is optional, for a fix of a few lines.
+- Review: put each finding inline on the line it concerns, one finding per comment. The review body holds only the verdict, the verification limits and findings outside the diff; give each of those findings its `path:line`.
+- Finding: line one is the severity (`P0`, `P1` or `P2`, [defined here](agent/teams/README.md#rules)) and the change you ask for. Then the consequence. For wrong behaviour: the steps or input, the actual result and the expected result. Otherwise: what it breaks or costs. A `suggestion` block is optional; it must replace the commented lines exactly.
 - Reply to a finding only to ask or answer a question it leaves open, to link the commit that fixes it, or to give the reason you decline it. The reviewer who opened a thread resolves it.
 - Blocker: what is blocked, the exact error or question, and who must act. Decision: what was decided and why, in one or two sentences.
 - Link evidence instead of pasting it: a commit-SHA permalink for code, the run URL for CI. Quote only the failing lines.
@@ -54,9 +54,9 @@
 
 ## Skills
 
-Before Elixir work, load the `elixir` skill, then those that apply: `phoenix` (LiveView, components, controllers, routes, Plug, channels, PubSub), `ecto` (schemas, changesets, queries, transactions, migrations), `oban` (background jobs), `otp` (processes, supervision, ETS).
+Before reading, editing or reviewing Elixir code, load the `elixir` skill. Also load `phoenix` for LiveView, components, controllers, routes, Plug, channels or PubSub; `ecto` for schemas, changesets, queries, transactions or migrations; `oban` for background jobs; `otp` for processes, supervision or ETS.
 
 ## Checks
 
-- Run `mix credo --strict` on edited `.ex`/`.exs` files and fix issues you introduced.
+- Before pushing a change to `.ex` or `.exs` files, run `mix credo --strict`. Fix the findings your change introduced; report the others.
 - Go changes, including carried patches: run the [pinned lint profile](agent/lsp/dexter/patches/README.md#required-go-static-analysis). Fix findings our code introduces; report inherited ones separately.
