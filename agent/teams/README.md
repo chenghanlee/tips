@@ -41,7 +41,7 @@ herdr agent prompt dispatcher "<issue or PR URL> blocked: <question>"
 
 `start` and `stop` take the issue number; `turn` and the review tools take the PR number. Rerunning `start` keeps a running client and relaunches a missing one. After a handoff is sent, end your turn; the partner's ring arrives as a new prompt. If the send fails, report the exact error: the turn is still yours. The only wait is the tester's in step 9.
 
-No label marks the turn. After a restart, read the PR, the reviews of its head and its required checks. It is the developer's turn if no PR exists, if a required check has failed, or if the head has a review with findings. Otherwise it is the tester's: review an unreviewed head, or finish steps 7 and 9 on an approved one.
+No label marks the turn. After a restart, read the PR, the reviews of its head and its required checks. It is the developer's turn if no PR exists, if a required check has failed, or if this head has reviews and the latest is not an LGTM. Otherwise it is the tester's: review an unreviewed head, or finish steps 7 and 9 on an approved one.
 
 ## Rules
 
