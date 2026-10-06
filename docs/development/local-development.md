@@ -184,7 +184,7 @@ label matches `RELEASE_REVISION`, as used by CI.
 
 ### Agent tooling
 
-Use the [agent team guide](../../agent/teams/README.md) for coordination and
+Use the [pair workflow](../../agent/teams/README.md) for coordination and
 [Dexter guide](../../agent/lsp/README.md) for builds, provisioning and navigation.
 
 ### Extension-enabled database
@@ -225,8 +225,8 @@ unique `TIPS_DB_SUFFIX`, development HTTP `PORT`, and `TIPS_TEST_PORT`;
 use `PGPORT=5433` for the shared server. Tests start their own endpoint on
 `TIPS_TEST_PORT` (default 4002), including when browser tests are excluded.
 Each checkout already has its own `deps/` and `_build/`, so install dependencies
-in each worktree. Do not share or symlink those directories. For team-launched
-worktrees, the launcher exports `TIPS_PROVIDER_ENV_FILE` pointing at the main
+in each worktree. Do not share or symlink those directories. For pair
+worktrees, `team.py start` exports `TIPS_PROVIDER_ENV_FILE` pointing at the main
 checkout's `.env`, so no worktree holds a copy; a manual worktree reads its own
 `.env` unless you export that variable. Export the worktree's
 database and port values in its shell.

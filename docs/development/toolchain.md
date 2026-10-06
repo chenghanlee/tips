@@ -17,7 +17,7 @@ when changing the toolchain.
 | Tailwind and esbuild binaries | [Asset configuration](../../config/config.exs) |
 | PostgreSQL, extensions and archive checksums | [Database Dockerfile](../../db/Dockerfile) |
 | Chrome for Testing and matching ChromeDriver | [CI browser setup](../../.github/workflows/checks.yml) |
-| Agent clients, models and launch settings | [Team configuration](../../agent/teams/config.toml) |
+| Agent clients, models and launch settings | [Pair configuration](../../agent/teams/config.toml) |
 | Agent language-server builds | [LSP setup](../../agent/lsp/README.md) |
 
 ## Dependency updates

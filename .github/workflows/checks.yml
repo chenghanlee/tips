@@ -30,13 +30,25 @@ jobs:
         with:
           python-version: '3.12'
       - run: python scripts/check_docs.py
+      - name: Detect agent harness changes
+        # The harness checks run on main and when a PR touches the harness or this workflow.
+        id: harness
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != pull_request ] ||
+            ! git diff --quiet "origin/$GITHUB_BASE_REF...HEAD" -- agent/teams .github/workflows/checks.yml; then
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
       - name: Install Python check tools
+        if: steps.harness.outputs.changed == 'true'
         run: python -m pip install ruff==0.16.8 pyright==1.1.413
       - name: Lint agent harness
+        if: steps.harness.outputs.changed == 'true'
         run: ruff check agent/teams
       - name: Check agent harness formatting
+        if: steps.harness.outputs.changed == 'true'
         run: ruff format --check agent/teams
       - name: Type-check agent harness
+        if: steps.harness.outputs.changed == 'true'
         run: pyright --project agent/teams/pyproject.toml
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
         with:
@@ -44,6 +56,7 @@ jobs:
           otp-version: '29.1'
           version-type: strict
       - name: Check agent harness
+        if: steps.harness.outputs.changed == 'true'
         run: |
           python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4

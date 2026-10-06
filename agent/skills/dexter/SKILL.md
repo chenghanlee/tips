@@ -1,26 +1,13 @@
 ---
 name: dexter
-description: Load before reading, searching, writing, changing or reviewing Elixir code. Use Dexter LSP first for source navigation with any tool.
+description: Command reference for the Dexter Elixir language server CLI. Operations, positions, limits and reindexing for source navigation.
 ---
 
 # Dexter
 
 Read-only Elixir language server CLI, bound to this worktree as `"$TIPS_DEXTER"`.
 
-## Before text tools
-
-Before using shell tools (`rg`, `grep`, `sed`, `cat`), native Read/Grep tools
-or a whole-file read for an Elixir
-navigation goal in the table below, use its matching Dexter operation first.
-This applies to Codex and Claude. Reuse an answer while the file and checkout
-are unchanged; then read only the source range you need.
-
-- Adding a function to an existing module counts: outline that module first.
-- Literal text, non-Elixir files, filename discovery and dynamic-dispatch
-  cross-checks can use scoped text tools directly.
-- Index-based searches outside Dexter's index use scoped text tools; `symbols`
-  can still outline a scratch file in the bound worktree.
-- Reading `--help` is setup, not navigation.
+AGENTS.md says when to use it; this is the command reference.
 
 ## Setup, once per session
 
