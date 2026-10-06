@@ -60,7 +60,7 @@ Before reading, editing or reviewing Elixir code, load `elixir` and each skill t
 
 ## Tests
 
-- Before adding or changing tests, use your judgement to choose the relevant [Test Desiderata](https://testdesiderata.com/) factors. Use them to compare the proposed tests with existing coverage and simpler options. In the PR, explain the main gains, costs and why the trade-offs are worth it. Support claims with measurements or concrete examples.
+- Before adding or changing tests, compare them with existing coverage and simpler options using relevant [Test Desiderata](https://testdesiderata.com/) factors. Justify the trade-offs in the PR with measurements or concrete examples.
 - Test behaviour with integration tests. Add a unit test only for pure-logic boundary cases they do not reach, and an end-to-end test only for a user interaction that lower-level tests cannot exercise.
 - Default to no test changes. Read the existing tests for the issue's acceptance scenarios or the reported regression. If they detect the failure, leave them unchanged. Otherwise make the smallest set of changes that detects it: extend a test whose setup and action can exercise the scenario; add one only when none can. Changed functions, branches or input variants do not justify new cases.
 - Do not test frameworks, libraries, private functions or code structure.
