@@ -736,23 +736,21 @@ To change the embedding model or runtime while retaining 1024 dimensions:
 -- ORDER BY alone is not a match predicate.
 with q as (select to_bm25query($1, 'tips_bm25') as qt, to_bm25query($1, 'reviews_bm25') as qr, $2::vector(1024) as vec),
 tips_bm25 as (
-  select tip_id, row_number() over (order by d, tip_id) as rank from (
+  select tip_id, d from (
     select s.tip_id, s.search_text <@> (select qt from q) as d
     from tip_search s join live_tips t on t.id = s.tip_id
     order by d, s.tip_id limit 50) x where d < 0),
 -- vector branches: with hnsw.iterative_scan = relaxed_order the index can return candidates slightly out of order,
 -- so the candidates are materialized and sorted again before ranking, as the pgvector docs show.
-tips_vec_c as materialized (
+tips_vec as materialized (
     select s.tip_id, s.embedding <=> (select vec from q) as d
     from tip_search s join live_tips t on t.id = s.tip_id
     where s.embedding is not null
     order by d limit 50),
-tips_vec as (
-  select tip_id, row_number() over (order by d + 0, tip_id) as rank from tips_vec_c),   -- d + 0 forces a sort after the relaxed scan
 -- review branches: 1000 candidates from the index with live parents, then the best review per tip, then re-rank.
 -- The cap counts reviews. If many matches belong to one tip, fewer distinct tips are returned.
 reviews_bm25 as (
-  select tip_id, review_id, row_number() over (order by d, tip_id) as rank from (
+  select tip_id, review_id, d, row_number() over (order by d, tip_id) as rank from (
     select distinct on (r.tip_id) r.tip_id, r.review_id, r.d from (
       select s.review_id, r.tip_id, s.search_text <@> (select qr from q) as d
       from review_search s
@@ -770,22 +768,36 @@ reviews_vec_c as materialized (
       where s.embedding is not null
       order by d limit 1000),
 reviews_vec as (
-  select tip_id, review_id, row_number() over (order by d, tip_id) as rank from (
+  select tip_id, review_id, d, row_number() over (order by d + 0, tip_id) as rank from (
     select distinct on (tip_id) tip_id, review_id, d from reviews_vec_c order by tip_id, d + 0, review_id) x
   order by d + 0, tip_id limit 50),
-fused as (
-  select tip_id, null::bigint as review_id, 1.0 / (60 + rank) as s from tips_bm25
-  union all select tip_id, null, 1.0 / (60 + rank) from tips_vec
-  union all select tip_id, review_id, 1.0 / (60 + rank) from reviews_bm25
-  union all select tip_id, review_id, 1.0 / (60 + rank) from reviews_vec)
-select tip_id, sum(s) as score, count(*) over () as total_in_window, (array_agg(review_id order by s desc, review_id) filter (where review_id is not null))[1] as matched_review
-from fused group by tip_id order by score desc, tip_id limit 20 offset $3;
+-- one list per modality: each tip once, by the better score of the tip and its best review.
+keyword as (
+  select tip_id, row_number() over (order by d, tip_id) as rank from (
+    select tip_id, min(d) as d from (select tip_id, d from tips_bm25 union all select tip_id, d from reviews_bm25) c
+    group by tip_id) x),
+vector as (
+  select tip_id, row_number() over (order by d, tip_id) as rank from (
+    select tip_id, min(d) as d from (select tip_id, d from tips_vec union all select tip_id, d from reviews_vec) c
+    group by tip_id) x),
+ranked as (
+  select tip_id, sum(1.0 / (60 + rank)) as score
+  from (select tip_id, rank from keyword union all select tip_id, rank from vector) fused
+  group by tip_id),
+matched as (
+  select distinct on (tip_id) tip_id, review_id
+  from (select tip_id, review_id, rank from reviews_bm25 union all select tip_id, review_id, rank from reviews_vec) r
+  order by tip_id, rank, review_id)
+select tip_id, m.review_id as matched_review, score, count(*) over () as total_in_window
+from ranked left join matched m using (tip_id) order by score desc, tip_id limit 20 offset $3;
 -- $3 is a validated multiple of 20, from 0 through 180, into the final <=200-tip window.
 ```
 
-The keyword branches exclude zero/nonnegative scores outside their bounded candidate subqueries and before ranking/grouping/fusion. Standalone scoring may return zero for nonmatching documents; those are not lexical hits. Vector branches remain independent.
+The keyword branches exclude zero/nonnegative scores outside their bounded candidate subqueries and before ranking/grouping/fusion. Standalone scoring may return zero for nonmatching documents; those are not lexical hits. Vector branches have no cutoff.
 
-Search returns one result per tip, as Hacker News does. If a review matches, `matched_review` identifies the best matching review, and the result shows its snippet under the tip. Return a matching review excerpt's source as Review (body), Prompt, Result, or Reviewer setup. Hydrate tip ids, viewer votes/capabilities and matching excerpts with current visibility checks, then apply the shared projection; an old hit id does not authorize hidden text. Preserve returned ranking order. `total_in_window` determines whether the current bounded ranking has another page; an empty page has none. Candidate limits do not grow with offset. Cross-page repeats/omissions are accepted, and each request may independently fall back to keywords.
+A tip ranks by how well the tip or its best review matches. Each modality merges the tip and review branches into one list that ranks each tip once by the better of the two scores, so having reviews adds no score by itself. Summing four branch ranks did: a reviewed tip collected review-vector score for any query, and the [#60 gate run 3](https://github.com/chenghanlee/tips/blob/d3026ac1a973f0e62512453a53dfa1dedfdbcbb9/test/fixtures/search_probe/evidence/60-integrated-run-3.json) missed q03 and q06 ([#349](https://github.com/chenghanlee/tips/issues/349)). Cosine distances share one embedding space. BM25 scores come from two indexes with their own corpus statistics, as in Elasticsearch `best_fields` across fields, so the keyword comparison is approximate. Each list holds up to 100 tips, so the window stays at most 200.
+
+Search returns one result per tip, as Hacker News does. If a review matches, `matched_review` identifies the best matching review: the best ranked review in either review branch, whether or not it beat the tip in its list, and the result shows its snippet under the tip. Return a matching review excerpt's source as Review (body), Prompt, Result, or Reviewer setup. Hydrate tip ids, viewer votes/capabilities and matching excerpts with current visibility checks, then apply the shared projection; an old hit id does not authorize hidden text. Preserve returned ranking order. `total_in_window` determines whether the current bounded ranking has another page; an empty page has none. Candidate limits do not grow with offset. Cross-page repeats/omissions are accepted, and each request may independently fall back to keywords.
 
 If query embedding fails or the hybrid statement times out, retry without the vector branches only within the remaining total operation budget. The [backend search contract](backend-design.md#task-first-discovery) bounds provider request concurrency, queue wait and the complete operation; retain the two-second request query timeout. Failure of the keyword path or overall budget returns a search error, not no matches. Put tag, model, and environment filters inside all four branches. Model filters always use the parent tip's `t.model_id`, including review branches; do not substitute or OR in `r.model_id`. `search_text` includes the tag label and each contribution’s own model/environment labels or free text so words such as "persona" and "opus" can match. Strict quoted-phrase search is deferred: the app treats input as ordinary text and must escape or normalize engine syntax consistently rather than pass through raw query operators. Include Result text (`output`) in both tip and review search documents. Uploaded image/video contents are not transcribed or indexed. Publication, searchable edits and retagging use the shared search-text writer and freshness guard above.
 
@@ -919,7 +931,7 @@ where r.id = x.id and (r.up_count, r.down_count) is distinct from (coalesce(v.up
 | Exponential embedding retry | When retries every ten minutes cause excessive load during an outage. This requires an attempt-count column. |
 | Search fusion in the app | After testing the extensions on the Docker image, if combining results in the app requires less code. |
 | Image transformation pipeline | Required bounded format/motion parsing is included; resizing, transcoding and exhaustive image processing remain deferred. |
-| Weighted RRF, title branch | When query evaluation on the Docker image shows poor ranking with equal weights across the four branches. |
+| Weighted RRF, title branch | When query evaluation on the Docker image shows poor ranking with equal weights across the keyword and vector lists. |
 | pgvectorscale DiskANN | Above a million vectors. |
 | Promote a common `model_other` into the list | When a moderator sees the same text often. Add a model entry and update matching content rows. |
 

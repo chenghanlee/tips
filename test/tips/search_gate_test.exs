@@ -4,6 +4,7 @@ defmodule Tips.SearchGateTest do
 
   import Ecto.Query
 
+  alias Tips.Content
   alias Tips.Content.Search.EmbeddingProvider
   alias Tips.Content.Tip
   alias Tips.{SearchGate, SearchGateVectors}
@@ -103,6 +104,73 @@ defmodule Tips.SearchGateTest do
     assert stored == Enum.map(fixture["documents"], & &1["embedding"])
   end
 
+  test "hybrid search over the frozen vectors meets the gate's relevance rules" do
+    {:ok, %{corpus: corpus, queries: queries, gate: gate}} = SearchGate.load()
+    {:ok, ids} = Repo.transact(fn -> {:ok, SearchGate.seed_corpus(corpus)} end)
+    vectors = ids |> SearchGateVectors.load!() |> SearchGateVectors.queries()
+    corpus_ids = Map.new(ids, fn {id, row} -> {row, id} end)
+    models = SearchGate.setup(corpus)
+
+    parents =
+      for %{"kind" => "review"} = doc <- corpus, into: %{}, do: {doc["id"], doc["parent_id"]}
+
+    respond_vector(fn input ->
+      %{"id" => id} = Enum.find(queries, &String.ends_with?(input, &1["text"]))
+      vectors[id]
+    end)
+
+    top = fn text, opts ->
+      assert {:ok, %{entries: entries}} = Content.search_tips(nil, text, opts)
+
+      for entry <- Enum.take(entries, 5) do
+        %{
+          tip: corpus_ids[{:tip, entry.tip.id}],
+          review: corpus_ids[{:review, entry.matched_review_id}]
+        }
+      end
+    end
+
+    handler = {__MODULE__, self()}
+    test = self()
+
+    :telemetry.attach(
+      handler,
+      [:tips, :search, :request],
+      fn _event, _measure, meta, _ ->
+        send(test, {:search, meta.result})
+      end,
+      nil
+    )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    results =
+      for %{"id" => id, "text" => text, "relevant" => relevant} <- queries do
+        hybrid = top.(text, [])
+
+        # Gate rule "filtered": per relevant model, only that model, recall kept.
+        filters_hold =
+          relevant
+          |> Enum.group_by(&models[Map.get(parents, &1, &1)].model)
+          |> Enum.all?(fn {model, docs} ->
+            filtered = top.(text, model_id: model)
+
+            Enum.all?(filtered, &(models[&1.tip].model == model)) and
+              SearchGate.recall(docs, filtered, ids).recall >=
+                SearchGate.recall(docs, hybrid, ids).recall
+          end)
+
+        {id, SearchGate.recall(relevant, hybrid, ids), filters_hold}
+      end
+
+    assert for({id, %{hit: false}, _filters} <- results, do: id) == []
+    assert for({id, _recall, false} <- results, do: id) == []
+    macro = Enum.sum(for {_id, %{recall: recall}, _filters} <- results, do: recall) / 10
+    assert macro >= gate["gate"]["min_macro_recall"]
+    refute_received {:search, :keyword}
+    refute_received {:search, :error}
+  end
+
   for {failure, third} <- [
         {"an HTTP error", {:status, 500}},
         {"another upstream", {:upstream, "Nebius"}},
@@ -173,6 +241,20 @@ defmodule Tips.SearchGateTest do
       conn
       |> Plug.Conn.put_resp_content_type("application/json")
       |> Plug.Conn.send_resp(status, response)
+    end)
+  end
+
+  # Responds to each query embedding request with `vector.(input)`.
+  defp respond_vector(vector) do
+    Req.Test.stub(EmbeddingProvider, fn conn ->
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      %{"input" => [input]} = JSON.decode!(body)
+
+      Req.Test.json(conn, %{
+        "data" => [%{"index" => 0, "embedding" => vector.(input)}],
+        "model" => "Qwen/Qwen3-Embedding-8B",
+        "provider" => "DeepInfra"
+      })
     end)
   end
 
