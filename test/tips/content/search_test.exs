@@ -4,10 +4,16 @@ defmodule Tips.Content.SearchTest do
   use Tips.DataCase, async: false
 
   alias Tips.Accounts.Scope
+  alias Tips.Content
   alias Tips.Content.{Model, Review, Search, Tip}
+  alias Tips.Content.Search.{Embeddings, ProviderCapacity}
 
   import Tips.AccountsFixtures
   import Tips.ContentFixtures
+
+  import Tips.SearchFixtures,
+    only: [provider_inputs: 0, respond_vector: 3, search_row: 1, stub_provider: 1]
+
   import Tips.VisibilityFixtures
 
   @dimensions 1024
@@ -182,6 +188,20 @@ defmodule Tips.Content.SearchTest do
         assert {{:error, ^reason}, 0} = count_queries(fn -> Search.search(nil, query, opts) end),
                inspect({query, opts})
       end
+
+      stub_provider(&respond_vector(&1, &2, query_vector()))
+
+      for {query, opts, reason} <- [
+            {" \t\n ", [], :blank_query},
+            {String.duplicate("é", 513), [], :query_too_long},
+            {"zebra", [embedding: query_vector()], :invalid_option}
+          ] do
+        assert {{:error, ^reason}, 0} =
+                 count_queries(fn -> Content.search_tips(nil, query, opts) end),
+               inspect({query, opts})
+      end
+
+      assert provider_inputs() == []
     end
 
     test "embedding magnitude never changes vector ranking", ctx do
@@ -207,14 +227,121 @@ defmodule Tips.Content.SearchTest do
         end
       end)
     end
+  end
+
+  describe "search requests" do
+    setup do
+      test = self()
+      handler = "search-request-#{System.unique_integer([:positive])}"
+
+      :telemetry.attach(
+        handler,
+        [:tips, :search, :request],
+        fn _event, _measure, meta, _config -> send(test, {:search, meta}) end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler) end)
+    end
 
     @tag :capture_log
-    test "a database failure is an error, not an empty page", ctx do
+    test "each request ranks hybrid when it can, else by keywords, without saying so", ctx do
+      keyword = tip!(ctx, title: "Zebra crossing")
+      meaning = tip!(ctx, title: "Striped horses", vector: query_vector())
+      budget = [total: 3_000, query_embedding: 300]
+
+      stub_provider(&respond_vector(&1, &2, query_vector()))
+      assert {:ok, hybrid} = Content.search_tips(nil, "zebra")
+      assert sorted_ids(hybrid) == Enum.sort([keyword.id, meaning.id])
+      assert_received {:search, %{result: :hybrid, reason: nil}}
+
+      # Without the vector column only the keyword branches can run.
+      Repo.query!("ALTER TABLE review_search RENAME COLUMN embedding TO embedding_gone")
+
+      assert {:ok, %{entries: [_], offset: 0, has_more: false} = page} =
+               Content.search_tips(nil, "zebra")
+
+      assert ids(page) == [keyword.id]
+      assert_received {:search, %{result: :keyword, reason: :hybrid_ranking}}
+      Repo.query!("ALTER TABLE review_search RENAME COLUMN embedding_gone TO embedding")
+
+      for {respond, reason} <- [
+            {fn conn, _input -> Plug.Conn.send_resp(conn, 503, "") end, {:http, 503}},
+            {fn _conn, _input -> Process.sleep(:infinity) end, :deadline}
+          ] do
+        stub_provider(respond)
+        assert {:ok, ^page} = Search.search_tips(nil, "zebra", [], budget)
+        assert_received {:search, %{result: :keyword, reason: {:embedding, ^reason}}}
+      end
+    end
+
+    @tag :capture_log
+    test "an expired budget or failed keyword ranking is an error, not an empty page", ctx do
       tip!(ctx, title: "Zebra")
+      test = self()
+
+      stub_provider(fn _conn, _input ->
+        send(test, {:requesting, self()})
+        Process.sleep(:infinity)
+      end)
+
+      budget = [total: 300, query_embedding: 1_000]
+      assert Search.search_tips(nil, "zebra", [], budget) == {:error, :unavailable}
+      assert_received {:search, %{result: :error, reason: :deadline}}
+      assert_received {:requesting, request}
+      refute Process.alive?(request)
+
+      stub_provider(&respond_vector(&1, &2, query_vector()))
       # The search relations become unresolvable for the rest of this test.
       Repo.query!("SET LOCAL search_path = pg_catalog")
 
-      assert Search.search(nil, "zebra", embedding: query_vector()) == {:error, :unavailable}
+      assert Content.search_tips(nil, "zebra") == {:error, :unavailable}
+      assert_received {:search, %{result: :error, reason: :keyword_ranking}}
+    end
+
+    @tag :capture_log
+    test "queries and the embedding scan share capacity, and dead holders release it", ctx do
+      zebra = tip!(ctx, title: "Zebra")
+      later = tip!(ctx, title: "Yak")
+      test = self()
+
+      holders =
+        for _slot <- 1..8 do
+          spawn(fn ->
+            ProviderCapacity.run(System.monotonic_time(:millisecond) + 60_000, fn ->
+              send(test, :holding)
+              Process.sleep(:infinity)
+            end)
+          end)
+        end
+
+      on_exit(fn -> Enum.each(holders, &Process.exit(&1, :kill)) end)
+      for _holder <- holders, do: assert_receive(:holding)
+
+      stub_provider(&respond_vector(&1, &2, query_vector()))
+      assert {:ok, page} = Content.search_tips(nil, "zebra")
+      assert ids(page) == [zebra.id]
+      assert_received {:search, %{result: :keyword, reason: {:embedding, :busy}}}
+      # The scan stops at the first busy row and leaves the rest due.
+      assert %{selected: 2, embedded: 0, failed: %{busy: 1}} = Embeddings.scan()
+      assert provider_inputs() == []
+      assert %{embed_after: nil} = search_row({:tip, later.id})
+
+      # A cancelled search frees its slot, like any dead holder.
+      Process.exit(hd(holders), :kill)
+
+      stub_provider(fn _conn, _input ->
+        send(test, :requesting)
+        Process.sleep(:infinity)
+      end)
+
+      {:ok, searcher} = Task.start(fn -> Content.search_tips(nil, "zebra") end)
+      assert_receive :requesting
+      Process.exit(searcher, :kill)
+
+      stub_provider(&respond_vector(&1, &2, query_vector()))
+      assert {:ok, _page} = Content.search_tips(nil, "zebra")
+      assert_received {:search, %{result: :hybrid}}
     end
   end
 
@@ -759,7 +886,7 @@ defmodule Tips.Content.SearchTest do
         handler,
         [:tips, :repo, :query],
         fn _event, _measure, _meta, _config ->
-          if self() == test, do: send(test, :query)
+          if test in [self() | Process.get(:"$callers", [])], do: send(test, :query)
         end,
         nil
       )
