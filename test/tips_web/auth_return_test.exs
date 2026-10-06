@@ -50,7 +50,10 @@ defmodule TipsWeb.AuthReturnTest do
   end
 
   describe "returning through the emailed link in another browser" do
-    for form <- [:login, :registration], destination <- [:tip, :review, :settings] do
+    # Only an existing account can own the review its edit route opens.
+    for form <- [:login, :registration],
+        destination <- [:tip, :review, :settings, :new_review, :edit_review],
+        form == :login or destination != :edit_review do
       @form form
       @destination destination
       test "#{form} started from #{destination} returns there and writes no product state",
@@ -63,6 +66,7 @@ defmodule TipsWeb.AuthReturnTest do
         vote_fixture(tip, %{user_id: voter.id})
         flag_fixture(voter, %{review_id: review.id})
         notification_fixture(voter, %{tip_id: tip.id})
+        context = Map.put(context, :own_review, user && review_fixture(tip, %{user_id: user.id}))
         before = product_state()
 
         {destination, entry, conn} = enter(conn, @destination, @form, context)
@@ -126,10 +130,19 @@ defmodule TipsWeb.AuthReturnTest do
     {path, link_href(conn, path, if(form == :login, do: "Log in", else: "Register")), conn}
   end
 
-  # Settings is protected: the GET stores the destination in this browser's session,
-  # and the log-in page, or its Sign up link, carries it on.
-  defp enter(conn, :settings, form, _context) do
-    conn = get(conn, ~p"/users/settings")
+  # Settings and the editors are protected: the GET stores the destination in this
+  # browser's session, and the log-in page, or its Sign up link, carries it on.
+  defp enter(conn, :settings, form, _context),
+    do: enter_protected(conn, ~p"/users/settings", form)
+
+  defp enter(conn, :new_review, form, %{tip: tip}),
+    do: enter_protected(conn, ~p"/editor/tips/#{tip}/reviews/new", form)
+
+  defp enter(conn, :edit_review, form, %{own_review: review}),
+    do: enter_protected(conn, ~p"/editor/reviews/#{review}/edit", form)
+
+  defp enter_protected(conn, path, form) do
+    conn = get(conn, path)
     assert redirected_to(conn) == ~p"/users/log-in"
 
     entry =
@@ -137,7 +150,7 @@ defmodule TipsWeb.AuthReturnTest do
         do: ~p"/users/log-in",
         else: link_href(conn, ~p"/users/log-in", "Sign up")
 
-    {~p"/users/settings", entry, conn}
+    {path, entry, conn}
   end
 
   defp link_href(conn, path, label) do
