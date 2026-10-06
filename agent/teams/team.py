@@ -692,7 +692,7 @@ def brief(role: str, name: str, issue: str, wrapper: Path) -> str:
         "Find whose turn it is with the README restart rule. If it is yours, do your next "
         "common-path step; otherwise end your turn and wait for your partner's ring. "
         "Before reading Elixir code, load the skills AGENTS.md requires. "
-        "For Elixir navigation, use Dexter before text tools. "
+        "For Elixir navigation, follow the AGENTS.md Need/Use table and its use check. "
         f"TIPS_DEXTER={wrapper} is bound to this worktree; run it via the shell. "
         'Read "$TIPS_DEXTER" query --help and "$TIPS_DEXTER" lookup --help once; '
         "their syntax and output take precedence over a lagging checkout guide. "

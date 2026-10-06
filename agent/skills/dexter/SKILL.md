@@ -40,8 +40,8 @@ If Dexter is missing, unavailable or denied, report the exact error once and use
 
 ## Positions
 
-1. `"$TIPS_DEXTER" lookup Module function --strict`. Without `--strict`, a missing function returns the module's line and exits 0.
-2. `"$TIPS_DEXTER" query symbols <file>`: take line and column from the row with the name and arity you want.
+1. If the definition's file or line is unknown: `"$TIPS_DEXTER" lookup Module function --strict`. Without `--strict`, a missing function returns the module's line and exits 0.
+2. If its column in the saved file is unknown: `"$TIPS_DEXTER" query symbols <file>`, then take the line and column from the row with the name and arity you want. If you already have the current position, go to step 3.
 3. Run the positional query. Read `cursor:` first; it names the selected token. If it is not your name, fix the position and rerun.
 4. For call hierarchy, check `selected:` shows your callable and arity. A default-argument head selects only the maximum arity.
 5. Take positions again after an edit or checkout change.
