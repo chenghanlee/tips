@@ -8,9 +8,13 @@ cd "$(dirname "$0")/../.." || exit
 settings=$(python3 -c '
 import sys, tomllib
 d = tomllib.load(open(sys.argv[1], "rb"))["dispatcher"]
-print(d["model"], d["effort"], d["compact_percent"])
+print(d["model"], d["effort"], d["compact_percent"], sep="\n")
 ' "${TIPS_TEAM_CONFIG:-agent/teams/config.toml}") || exit
-read -r model effort compact_percent <<<"$settings"
+{
+  IFS= read -r model
+  IFS= read -r effort
+  IFS= read -r compact_percent
+} <<<"$settings"
 if [[ ${1:-} == --new-pane ]]; then
   if [[ ${HERDR_ENV:-} != 1 || -z ${HERDR_PANE_ID:-} ]]; then
     echo '--new-pane requires a session running inside Herdr.' >&2
@@ -30,8 +34,17 @@ print("right" if rect["width"] >= 120 else "down")
   echo "Dispatcher launch submitted to Herdr pane $pane_id. Check that pane for startup or approval prompts."
   exit 0
 fi
+model_args=()
+if [[ -n $model ]]; then
+  model_args=(--model "$model")
+fi
+advisor_args=()
+case "$model" in
+  ""|*fable*) ;;
+  *) advisor_args=(--advisor fable) ;;
+esac
 # Every ring starts a turn over the whole context, so compact early; GitHub holds the state.
 CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=$compact_percent exec claude --permission-mode auto \
-  --model "$model" --effort "$effort" \
+  "${model_args[@]}" --effort "$effort" "${advisor_args[@]}" \
   --append-system-prompt 'You are the Tips technical program manager and dispatcher. Read AGENTS.md and agent/teams/README.md. Use the Project 15 milestone plan, issue dependencies and product value to choose and prepare the next eligible task yourself; do not wait for the user to mark tasks Ready. At startup, on every done or blocked message and when the user says the board changed, apply its Common path and Rules; reread them if they are no longer in context.' \
   'Run herdr agent rename "$HERDR_PANE_ID" dispatcher, then begin.'

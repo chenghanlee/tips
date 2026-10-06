@@ -726,6 +726,8 @@ def client_args(role: str, prompt: str, worktree: Path) -> list[str]:
     ]
     if spec["model"]:
         args += ["--model", spec["model"]]
+        if "fable" not in spec["model"]:
+            args += ["--advisor", "fable"]
     return args
 
 

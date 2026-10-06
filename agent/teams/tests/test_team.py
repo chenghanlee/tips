@@ -751,6 +751,8 @@ class PairLifecycleTest(unittest.TestCase):
         assert self.events("agent", "prompt") == [["agent", "prompt", "team-1-test", "Begin."]]
         assert {"fixture-dev", "never"} <= set(dev["launch_argv"])
         assert "fixture-test" in argv
+        assert argv[argv.index("--advisor") + 1] == "fable"
+        assert "--advisor" not in dev["launch_argv"]
         plugins = json.loads(argv[argv.index("--settings") + 1])["enabledPlugins"]
         assert plugins == {
             "mix-credo@elixir-agent-tools": True,
@@ -778,20 +780,23 @@ class PairLifecycleTest(unittest.TestCase):
         self.team("start", "29")
         wt = self.worktree("29")
         (wt / "tracked.txt").write_text("unfinished work\n")
-        state = self.state()
-        tester = next(pane for pane in state["panes"] if pane["label"] == "team-1-test")
-        for key in ("agent", "name", "agent_status"):
-            del tester[key]
-        self.save(state)
-        self.team("start", "29")
-        assert [e[2] for e in self.events("agent", "start")] == [
-            "team-1-dev",
-            "team-1-test",
-            "team-1-test",
-        ]
-        assert (wt / "tracked.txt").read_text() == "unfinished work\n"
-        # A reused worktree keeps its own dependency state.
-        assert len(self.events("mix")) == 1
+        for model in ("claude-fable-5-1", ""):
+            with self.subTest(model=model):
+                config = self.repo / "agent/teams/config.toml"
+                config.write_text(CONFIG.replace('model = "fixture-test"', f'model = "{model}"'))
+                state = self.state()
+                tester = next(pane for pane in state["panes"] if pane["label"] == "team-1-test")
+                for key in ("agent", "name", "agent_status"):
+                    del tester[key]
+                self.save(state)
+                before = len(self.events("agent", "start"))
+                self.team("start", "29")
+                assert self.events("agent", "start")[before:][0][2] == "team-1-test"
+                assert len(self.events("agent", "start")) == before + 1
+                assert "--advisor" not in self.pane("team-1-test")["launch_argv"]
+                assert (wt / "tracked.txt").read_text() == "unfinished work\n"
+                # A reused worktree keeps its own dependency state.
+                assert len(self.events("mix")) == 1
 
     def test_each_issue_takes_its_own_slot_until_none_is_free(self) -> None:
         path = self.repo / "agent/teams/config.toml"
