@@ -43,6 +43,7 @@ python3 scripts/check_docs.py
 `mix test` excludes browser tests. Follow the
 [browser test instructions](docs/development/local-development.md#browser-tests-and-ci)
 when a change needs browser coverage. CI runs the full suite, including browser tests.
+A PR that changes only Markdown skips CI's application and release steps.
 
 Follow [AGENTS.md](AGENTS.md) for engineering rules. Put the task scope, acceptance
 criteria and review evidence in the relevant GitHub issue and PR.

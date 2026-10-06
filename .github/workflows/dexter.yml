@@ -7,12 +7,14 @@ on:
       - 'agent/lsp/**'
       - 'agent/teams/**'
       - '.github/workflows/**'
+      - '!**.md'
   push:
     branches: [main]
     paths:
       - 'agent/lsp/**'
       - 'agent/teams/**'
       - '.github/workflows/**'
+      - '!**.md'
 permissions:
   contents: read
 jobs:
