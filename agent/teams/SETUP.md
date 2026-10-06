@@ -76,9 +76,16 @@ agent-browser open about:blank --session preflight
 agent-browser close --session preflight
 ```
 
-If opening fails, retain the full error and run `agent-browser doctor` in that
-same tester. The quick/offline doctor is not a launch check. Resolve the failure
-before assigning manual browser review; do not disable Chrome's sandbox or
+If opening fails with `Chrome exited early` or `without writing DevToolsActivePort`,
+first follow the [close-and-reopen recovery](README.md#recover-a-failed-browser-launch).
+A daemon started inside the sandbox can survive a failed launch, so retrying
+`open` alone can still fail even with the allow rule installed.
+
+If recovery fails or opening reports another error, retain the full error and
+run `agent-browser doctor` in that same tester. Doctor's launch test starts a
+separate browser and can fail inside the Codex sandbox even when the approved
+`open` command works; the quick/offline doctor is not a launch check. Resolve the
+failure before assigning manual browser review; do not disable Chrome's sandbox or
 silently switch to the user's personal browser profile. ChromeDriver for local
 Wallaby tests is a separate prerequisite in the
 [browser test guide](../../docs/development/local-development.md#browser-tests-and-ci).
