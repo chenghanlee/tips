@@ -26,6 +26,20 @@ config :tips,
 
 config :tips, Tips.Repo, timeout: 2_000
 
+# Search embedding runtime (Tips.Content.Search.EmbeddingProvider). One model on
+# one host at a time: changing either means embedding every stored document
+# again, and changing the dimensions also needs a migration.
+config :tips, Tips.Content.Search.EmbeddingProvider,
+  implementation: Tips.Content.Search.EmbeddingProvider.OpenRouter
+
+config :tips, Tips.Content.Search.EmbeddingProvider.OpenRouter,
+  model: "qwen/qwen3-embedding-8b",
+  host: "nebius",
+  upstream: "Nebius",
+  dimensions: 1024,
+  query_instruction:
+    "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:"
+
 # Search request budget (Tips.Content.Search.search_tips/4), in milliseconds.
 # The #234 embedding gate measured hosted query embeddings at p95 987 ms and
 # max 3,394 ms. The query call deadline covers the capacity wait below

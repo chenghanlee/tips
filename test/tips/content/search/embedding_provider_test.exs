@@ -1,9 +1,24 @@
 defmodule Tips.Content.Search.EmbeddingProviderTest do
-  use ExUnit.Case, async: true
+  # Two tests change the application's provider configuration.
+  use ExUnit.Case, async: false
 
   import Tips.SearchFixtures
 
   alias Tips.Content.Search.EmbeddingProvider
+  alias Tips.Content.Search.EmbeddingProvider.OpenRouter
+
+  defmodule FixedVector do
+    @behaviour EmbeddingProvider
+
+    @impl true
+    def client!(opts), do: opts
+
+    @impl true
+    def embed_document(_client, _text), do: {:ok, Tips.SearchFixtures.unit_literal()}
+
+    @impl true
+    def embed_query(_client, _query), do: {:error, :transport}
+  end
 
   test "requests the selected runtime and returns the normalized vector" do
     test = self()
@@ -12,7 +27,7 @@ defmodule Tips.Content.Search.EmbeddingProviderTest do
     Req.Test.stub(EmbeddingProvider, fn conn ->
       {:ok, body, conn} = Plug.Conn.read_body(conn)
       send(test, {:request, conn, JSON.decode!(body)})
-      respond_vector(conn, nil, [3, 4 | List.duplicate(0, 1022)], %{"provider" => "deepinfra"})
+      respond_vector(conn, nil, [3, 4 | List.duplicate(0, 1022)], %{"provider" => "nebius"})
     end)
 
     assert {:ok, vector} =
@@ -37,7 +52,7 @@ defmodule Tips.Content.Search.EmbeddingProviderTest do
              "model" => "qwen/qwen3-embedding-8b",
              "input" => [document],
              "dimensions" => 1024,
-             "provider" => %{"only" => ["deepinfra"], "allow_fallbacks" => false}
+             "provider" => %{"only" => ["nebius"], "allow_fallbacks" => false}
            }
 
     # Queries follow the gate's instruction directly, with no separator.
@@ -48,6 +63,44 @@ defmodule Tips.Content.Search.EmbeddingProviderTest do
 
     assert query ==
              "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:fix flaky tests"
+  end
+
+  test "the configured model and host select the request and the accepted response" do
+    test = self()
+    put_config(OpenRouter, model: "other/embedder", host: "other-host", upstream: "Other Host")
+
+    Req.Test.stub(EmbeddingProvider, fn conn ->
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      send(test, {:request, JSON.decode!(body)})
+
+      respond_vector(conn, nil, provider_vector(), %{
+        "model" => "Other/Embedder",
+        "provider" => "Other Host"
+      })
+    end)
+
+    assert {:ok, _vector} = embed("document")
+
+    assert_received {:request,
+                     %{
+                       "model" => "other/embedder",
+                       "provider" => %{"only" => ["other-host"], "allow_fallbacks" => false}
+                     }}
+
+    # A response from the default runtime is now from another model and host.
+    Req.Test.stub(EmbeddingProvider, &respond_vector(&1, nil))
+    assert {:error, :contract} = embed("document")
+  end
+
+  test "the configured implementation answers every request" do
+    put_config(EmbeddingProvider, implementation: FixedVector)
+    Req.Test.stub(EmbeddingProvider, fn _conn -> flunk("no request expected") end)
+
+    unit = unit_literal()
+    assert {:ok, ^unit} = embed("document")
+
+    assert {:error, :transport} =
+             EmbeddingProvider.embed_query(EmbeddingProvider.client!(), "query")
   end
 
   test "rejects invalid and oversized input without a request" do
@@ -69,7 +122,7 @@ defmodule Tips.Content.Search.EmbeddingProviderTest do
       {&respond_vector(&1, nil, [1 | List.duplicate(0, 1022)]), :contract},
       {&respond_vector(&1, nil, provider_vector() ++ List.duplicate(0.0, 3072)), :contract},
       {&respond_vector(&1, nil, provider_vector(), %{"model" => "other/model"}), :contract},
-      {&respond_vector(&1, nil, provider_vector(), %{"provider" => "Nebius"}), :contract},
+      {&respond_vector(&1, nil, provider_vector(), %{"provider" => "DeepInfra"}), :contract},
       {&respond_vector(&1, nil, provider_vector(), %{"provider" => nil}), :malformed},
       {&respond_vector(&1, nil, zero), :malformed},
       {&respond_vector(&1, nil, provider_vector(1.0e39)), :malformed},
@@ -121,7 +174,7 @@ defmodule Tips.Content.Search.EmbeddingProviderTest do
       conn
     end)
 
-    assert %Req.Request{private: %{deadline: 30_000}} =
+    assert {OpenRouter, %Req.Request{private: %{deadline: 30_000}}} =
              EmbeddingProvider.client!(deadline: 60_000)
 
     # Long enough for the request to reach the stub under full-suite load.
@@ -167,4 +220,10 @@ defmodule Tips.Content.Search.EmbeddingProviderTest do
   end
 
   defp embed(text), do: EmbeddingProvider.embed_document(EmbeddingProvider.client!(), text)
+
+  defp put_config(key, settings) do
+    config = Application.fetch_env!(:tips, key)
+    on_exit(fn -> Application.put_env(:tips, key, config) end)
+    Application.put_env(:tips, key, Keyword.merge(config, settings))
+  end
 end

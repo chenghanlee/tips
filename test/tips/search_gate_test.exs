@@ -6,6 +6,7 @@ defmodule Tips.SearchGateTest do
 
   alias Tips.Content
   alias Tips.Content.Search.EmbeddingProvider
+  alias Tips.Content.Search.EmbeddingProvider.OpenRouter
   alias Tips.Content.Tip
   alias Tips.{SearchGate, SearchGateVectors}
 
@@ -26,10 +27,10 @@ defmodule Tips.SearchGateTest do
                "data" => %{
                  "endpoints" => [
                    %{
-                     "tag" => "deepinfra/us",
-                     "provider_name" => "DeepInfra",
+                     "tag" => "nebius",
+                     "provider_name" => "Nebius",
                      "status" => 0,
-                     "context_length" => 32_768,
+                     "context_length" => 32_000,
                      "pricing" => %{"prompt" => "0.00000001"}
                    }
                  ]
@@ -89,19 +90,19 @@ defmodule Tips.SearchGateTest do
     {:ok, ids} = Repo.transact(fn -> {:ok, SearchGate.seed_corpus(fixtures.corpus)} end)
     fixture = SearchGateVectors.load!(ids)
 
-    stored =
-      for %{"id" => id} <- fixture["documents"] do
-        query =
-          case ids[id] do
-            {:tip, row} -> from(s in "tip_search", where: s.tip_id == ^row)
-            {:review, row} -> from(s in "review_search", where: s.review_id == ^row)
-          end
+    assert length(fixture["documents"]) == 40
 
-        Repo.one!(select(query, [s], fragment("?::text", s.embedding)))
-      end
+    for %{"id" => id, "embedding" => embedding} <- fixture["documents"] do
+      query =
+        case ids[id] do
+          {:tip, row} -> from(s in "tip_search", where: s.tip_id == ^row)
+          {:review, row} -> from(s in "review_search", where: s.review_id == ^row)
+        end
 
-    assert length(stored) == 40
-    assert stored == Enum.map(fixture["documents"], & &1["embedding"])
+      # Compared as vectors: pgvector prints float32 values in fewer digits.
+      stored = select(query, [s], fragment("? = ?::text::vector", s.embedding, ^embedding))
+      assert Repo.one!(stored), "#{id} was not stored"
+    end
   end
 
   test "hybrid search over the frozen vectors meets the gate's relevance rules" do
@@ -173,16 +174,16 @@ defmodule Tips.SearchGateTest do
 
   for {failure, third} <- [
         {"an HTTP error", {:status, 500}},
-        {"another upstream", {:upstream, "Nebius"}},
+        {"another upstream", {:upstream, "DeepInfra"}},
         {"an all-zero vector", :zero_vector},
         {"a vector at index 1", :index_one},
         {"no response before its deadline", :no_response}
       ] do
     test "stops the scan at the first document request that gets #{failure} and calls no query",
          %{fixtures: fixtures} do
-      provider = Application.get_env(:tips, EmbeddingProvider)
-      Application.put_env(:tips, EmbeddingProvider, Keyword.put(provider, :deadline, 200))
-      on_exit(fn -> Application.put_env(:tips, EmbeddingProvider, provider) end)
+      provider = Application.get_env(:tips, OpenRouter)
+      Application.put_env(:tips, OpenRouter, Keyword.put(provider, :deadline, 200))
+      on_exit(fn -> Application.put_env(:tips, OpenRouter, provider) end)
       stub_provider(unquote(Macro.escape(third)))
 
       assert {:stopped, report} =
@@ -216,9 +217,9 @@ defmodule Tips.SearchGateTest do
 
       {status, upstream} =
         case failure do
-          {:status, status} -> {status, "DeepInfra"}
+          {:status, status} -> {status, "Nebius"}
           {:upstream, upstream} -> {200, upstream}
-          _ok_or_vector -> {200, "DeepInfra"}
+          _ok_or_vector -> {200, "Nebius"}
         end
 
       embedding =
@@ -253,7 +254,7 @@ defmodule Tips.SearchGateTest do
       Req.Test.json(conn, %{
         "data" => [%{"index" => 0, "embedding" => vector.(input)}],
         "model" => "Qwen/Qwen3-Embedding-8B",
-        "provider" => "DeepInfra"
+        "provider" => "Nebius"
       })
     end)
   end

@@ -94,7 +94,7 @@ defmodule Tips.SearchFixtures do
         %{
           "data" => [%{"object" => "embedding", "index" => 0, "embedding" => vector}],
           "model" => "Qwen/Qwen3-Embedding-8B",
-          "provider" => "DeepInfra"
+          "provider" => "Nebius"
         },
         identity
       )

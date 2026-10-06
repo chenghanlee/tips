@@ -1,7 +1,7 @@
 defmodule Tips.Workers.EmbedSearchTest do
   use Tips.EmbeddingCase, async: false
 
-  alias Tips.Content.Search.EmbeddingProvider
+  alias Tips.Content.Search.EmbeddingProvider.OpenRouter
 
   setup do
     %{oban: start_oban!()}
@@ -60,16 +60,16 @@ defmodule Tips.Workers.EmbedSearchTest do
 
   test "an empty scan needs no provider key; a missing key fails before any admission",
        context do
-    provider = Application.fetch_env!(:tips, EmbeddingProvider)
+    provider = Application.fetch_env!(:tips, OpenRouter)
     provider_config = Application.fetch_env!(:tips, Tips.ProviderConfig)
 
     on_exit(fn ->
-      Application.put_env(:tips, EmbeddingProvider, provider)
+      Application.put_env(:tips, OpenRouter, provider)
       Application.put_env(:tips, Tips.ProviderConfig, provider_config)
     end)
 
     # Defeat both the synthetic test key and any key in the checkout's .env.
-    Application.put_env(:tips, EmbeddingProvider, Keyword.delete(provider, :api_key))
+    Application.put_env(:tips, OpenRouter, Keyword.delete(provider, :api_key))
     Application.put_env(:tips, Tips.ProviderConfig, Keyword.put(provider_config, :values, %{}))
     stub_provider()
 
