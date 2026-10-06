@@ -146,9 +146,9 @@ and watcher. Dependency sources under `deps/` remain available. A root reached
 through a symlink is admitted only under the exact spelling it was bound with.
 Out of this beta: an application in a subdirectory or monorepo.
 
-## Team provisioning
+## Pair provisioning
 
-`agent/teams/task_worktree.py` writes, per worktree:
+`agent/teams/team.py start` writes, per worktree:
 
 - `.dexter/dexter.sh`: `exec vendor/dexter --root <worktree> "$@"` with the
   selected sources exported. Its absolute path is `TIPS_DEXTER` in the session.
@@ -157,28 +157,22 @@ Out of this beta: an application in a subdirectory or monorepo.
 Claude's launch settings disable known language-server plugins, including
 in linked worktrees.
 
-Provisioning then runs three steps in the worktree, with the role's environment.
-Any failure stops the launch:
+Provisioning then runs three steps in the shared worktree. Any failure stops the launch:
 
-1. `mix deps.get --check-locked`, for a new checkout and for a review head.
-   Dexter indexes dependency sources from disk and does not watch `deps/`, so
-   they must exist first. A fetch that would rewrite `mix.lock` fails;
-   provisioning never changes a lock. A resumed developer worktree skips this
-   step: it may hold an unfinished dependency change, and its agent must be
-   able to start to finish it.
-2. `dexter.sh query workspace-symbols --raw --wait <timeout> MixProject`. It
-   starts the daemon and refuses a client if the index does not answer.
-3. `dexter.sh reindex`. A daemon that was already running indexed the checkout
-   before the fetch; this reconciles it with the disk.
+1. `mix deps.get --check-locked`, for a new worktree or one without `deps/`;
+   otherwise the existing dependencies are kept. A fetch that would change
+   `mix.lock` fails.
+2. `dexter.sh query workspace-symbols --raw --wait <timeout> MixProject` starts
+   the daemon and checks that its index answers.
+3. `dexter.sh reindex` reconciles the index with the disk.
 
-The same steps run when a reviewer's checkout is advanced in place, and again
-when the same review head is requested for a running reviewer. An agent
-that fetches or changes dependencies later runs `"$TIPS_DEXTER" reindex` itself.
+The developer and the tester share this daemon and index. After a later
+dependency change, follow [Reindex](../skills/dexter/SKILL.md#reindex).
 
 `team.py stop` runs `dexter.sh stop` per worktree before retiring it; an
 attached client keeps the daemon alive and the worktree is preserved. A daemon
 idles out after fifteen minutes without clients and restarts from its index on
-the next request. Do not run `git clean -x` in a team worktree: it removes the
+the next request. Do not run `git clean -x` in a pair worktree: it removes the
 bound command and the index under `.dexter/`.
 
 The daemon belongs to the worktree, not to a client. A `query` that starts the
@@ -210,7 +204,7 @@ agent/lsp/dexter/vendor/dexter version   # 0.7.2, then: local_build_id <id>
 ```
 
 A daemon and a client with different ids refuse each other and nothing replaces
-the running daemon. Before rebuilding over active teams, stop each worktree's
+the running daemon. Before rebuilding over active pairs, stop each worktree's
 daemon with its bound command, build, then re-provision.
 The build refuses to replace a binary used by a running daemon and aborts if
 it cannot inspect processes. Keep agents stopped until the build finishes.

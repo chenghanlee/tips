@@ -130,7 +130,7 @@ Include matching-excerpt hydration, selected-review lookup, and authenticated op
 
 ## Implementation foundation
 
-Implement business operations as ordinary Elixir functions using the Transaction Script pattern. Contexts call Ecto directly, with related schemas and query helpers alongside their feature code. Ecto migrations are executable schema truth. Use migration `execute` for database features that need SQL, with explicit rollback steps; tests run migrations, and a structure dump is optional. Prefer ordinary Ecto queries and changesets; keep focused parameterized SQL where clearer. Pin versions before using their APIs.
+Implement business operations as ordinary Elixir functions using the Transaction Script pattern. Contexts call Ecto directly, with related schemas and query helpers alongside their feature code. Ecto migrations are executable schema truth. Use migration `execute` for database features that need SQL, with explicit rollback steps; tests run migrations, and a structure dump is optional. Prefer ordinary Ecto queries and changesets; use focused parameterized SQL only where Ecto cannot express the query. Pin versions before using their APIs.
 
 Use one version mechanism per write. Prefer `Ecto.Changeset.optimistic_lock/3` for ordinary single-record changesets; use guarded `Repo.update_all` for conditional or set-shaped writes where clearer. Do not combine an Ecto lock increment with a second manual compare-and-increment. The [edit contract](#editing-and-conflicts) preserves the original expected version and whole-edit/no-op behavior. `Repo.insert` with an Ecto `on_conflict` query can express conditional vote and notification upserts; preserve the exact predicates, partial-index target and affected-row semantics.
 

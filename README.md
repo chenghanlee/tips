@@ -43,15 +43,15 @@ python3 scripts/check_docs.py
 `mix test` excludes browser tests. Follow the
 [browser test instructions](docs/development/local-development.md#browser-tests-and-ci)
 when a change needs browser coverage. CI runs the full suite, including browser tests.
+A PR that changes only Markdown skips CI's application and release steps.
 
 Follow [AGENTS.md](AGENTS.md) for engineering rules. Put the task scope, acceptance
 criteria and review evidence in the relevant GitHub issue and PR.
 
 ## Use agents (optional)
 
-- [Agent teams](agent/teams/README.md): the shared operating agreement, with one card per
-  role under `agent/teams/roles/`; [setup](agent/teams/SETUP.md) covers prerequisites and
-  configuration.
+- [Agent pairs](agent/teams/README.md): a dispatcher starts one developer and one tester
+  per issue; [setup](agent/teams/SETUP.md) covers prerequisites and configuration.
 - [Elixir language server](agent/lsp/README.md): one shared Dexter server per worktree,
   used as a CLI by Claude and Codex.
 
@@ -78,7 +78,7 @@ Agent tooling is separate from the application. You do not need it to run Tips.
 | `docs/development/` | Setup, testing and toolchain guides |
 | `docs/design/` | Current product and technical requirements |
 | `agent/skills/` | Shared, versioned skills for Codex and Claude |
-| `agent/teams/` | Agent coordination, configuration, instructions and tests |
+| `agent/teams/` | The pair workflow, its scripts, configuration and tests |
 | `agent/lsp/` | Agent language-server build script and local patch |
 
 Dexter's binary lives in ignored `agent/lsp/dexter/vendor/`; shared Elixir

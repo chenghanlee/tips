@@ -30,29 +30,50 @@ jobs:
         with:
           python-version: '3.12'
       - run: python scripts/check_docs.py
+      - name: Detect what changed
+        # A PR that changes only Markdown skips the application steps. The harness steps run
+        # when a PR changes the harness or this workflow. A push to main runs everything.
+        id: changes
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            printf 'code=true\nharness=true\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          range="origin/$GITHUB_BASE_REF...HEAD"
+          git diff --quiet "$range" -- . ':(exclude)*.md' || echo 'code=true' >> "$GITHUB_OUTPUT"
+          git diff --quiet "$range" -- agent/teams .github/workflows/checks.yml ':(exclude)*.md' ||
+            echo 'harness=true' >> "$GITHUB_OUTPUT"
       - name: Install Python check tools
+        if: steps.changes.outputs.harness == 'true'
         run: python -m pip install ruff==0.16.8 pyright==1.1.413
       - name: Lint agent harness
+        if: steps.changes.outputs.harness == 'true'
         run: ruff check agent/teams
       - name: Check agent harness formatting
+        if: steps.changes.outputs.harness == 'true'
         run: ruff format --check agent/teams
       - name: Type-check agent harness
+        if: steps.changes.outputs.harness == 'true'
         run: pyright --project agent/teams/pyproject.toml
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        if: steps.changes.outputs.code == 'true'
         with:
           elixir-version: '1.20.4'
           otp-version: '29.1'
           version-type: strict
       - name: Check agent harness
+        if: steps.changes.outputs.harness == 'true'
         run: |
           python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        if: steps.changes.outputs.code == 'true'
         with:
           path: |
             deps
             _build
           key: ${{ runner.os }}-${{ runner.arch }}-otp29.1-elixir1.20.4-test-${{ hashFiles('mix.lock') }}
       - name: Start extension-enabled PostgreSQL
+        if: steps.changes.outputs.code == 'true'
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -63,11 +84,13 @@ jobs:
           fi
           docker compose up -d --wait --no-build db
       - uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2
+        if: steps.changes.outputs.code == 'true'
         id: chrome
         with:
           chrome-version: '153.0.8010.52'
           install-chromedriver: true
       - name: Check browser and driver pins
+        if: steps.changes.outputs.code == 'true'
         env:
           TIPS_CHROME_BINARY: ${{ steps.chrome.outputs.chrome-path }}
           TIPS_CHROMEDRIVER: ${{ steps.chrome.outputs.chromedriver-path }}
@@ -79,6 +102,7 @@ jobs:
           test "$(printf '%s' "$driver_version" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')" = '153.0.8010.52'
           printf 'TIPS_CHROME_BINARY=%s\nTIPS_CHROMEDRIVER=%s\n' "$TIPS_CHROME_BINARY" "$TIPS_CHROMEDRIVER" >> "$GITHUB_ENV"
       - name: Allow Chrome to create its sandbox
+        if: steps.changes.outputs.code == 'true'
         # Ubuntu restricts user namespaces for binaries outside its packaged paths.
         run: |
           sudo tee /etc/apparmor.d/tips-chrome-for-testing > /dev/null <<EOF
@@ -90,15 +114,23 @@ jobs:
           EOF
           sudo apparmor_parser -r /etc/apparmor.d/tips-chrome-for-testing
       - name: Check sandboxed Chrome startup
+        if: steps.changes.outputs.code == 'true'
         run: timeout 20 "$TIPS_CHROME_BINARY" --headless --disable-gpu --dump-dom about:blank
       - run: mix deps.get --check-locked
+        if: steps.changes.outputs.code == 'true'
       - run: mix compile --warnings-as-errors
+        if: steps.changes.outputs.code == 'true'
       - run: mix format --check-formatted
+        if: steps.changes.outputs.code == 'true'
       - run: mix credo --strict
+        if: steps.changes.outputs.code == 'true'
       - run: mix assets.setup && mix assets.build
+        if: steps.changes.outputs.code == 'true'
       - name: Check migration rollback and reapply
+        if: steps.changes.outputs.code == 'true'
         run: mix ecto.create && mix ecto.migrate && mix ecto.rollback --all && mix ecto.migrate
       - run: mix test --include browser --trace
+        if: steps.changes.outputs.code == 'true'
       - name: Upload browser failure screenshots
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -115,8 +147,20 @@ jobs:
       TIPS_RELEASE_IMAGE: tips-release-smoke:ci
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Detect what changed
+        # A PR that changes only Markdown skips the release build.
+        id: changes
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != pull_request ] ||
+            ! git diff --quiet "origin/$GITHUB_BASE_REF...HEAD" -- . ':(exclude)*.md'; then
+            echo 'code=true' >> "$GITHUB_OUTPUT"
+          fi
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        if: steps.changes.outputs.code == 'true'
       - name: Build release
+        if: steps.changes.outputs.code == 'true'
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
@@ -126,6 +170,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Prepare extension-enabled PostgreSQL image
+        if: steps.changes.outputs.code == 'true'
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -135,4 +180,5 @@ jobs:
             docker compose build db
           fi
       - name: Smoke release migration, health, and restart
+        if: steps.changes.outputs.code == 'true'
         run: scripts/release_smoke.sh --skip-build
