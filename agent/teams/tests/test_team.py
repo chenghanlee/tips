@@ -983,10 +983,10 @@ class PairLifecycleTest(unittest.TestCase):
         changed = roots[0] / ".replace"
         changed.write_text(source.replace("Original documentation", "First tree only"))
         changed.replace(roots[0] / "sample.ex")
+        hover = ["query", "--raw", "hover", "sample.ex", "3", "8"]
         for root, doc in zip(roots, ("First tree only", "Original documentation"), strict=True):
             result = execute(
-                ["/bin/sh", root / ".dexter/dexter.sh", "query", "--raw", "hover", "sample.ex"]
-                + ["3", "8"],
+                ["/bin/sh", root / ".dexter/dexter.sh", *hover],
                 cwd=self.root,
                 env=self.env,
                 input_text="",
