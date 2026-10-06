@@ -7,7 +7,7 @@ labels: "kind:code"
 
 ## Outcome
 
-One bounded result, small enough for one PR. State what is included and what is not.
+One result that fits in one PR. State what is included and excluded.
 
 ## Acceptance scenarios
 

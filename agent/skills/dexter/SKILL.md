@@ -16,7 +16,7 @@ AGENTS.md says when to use it; this is the command reference.
 "$TIPS_DEXTER" lookup --help
 ```
 
-Help governs syntax, output, limits and exit status. Run only `lookup`, `query` and `reindex`; never `init`, `lsp` or `stop`.
+Use the help for syntax, output, limits and exit status. Run only `lookup`, `query` and `reindex`; never `init`, `lsp` or `stop`.
 
 If Dexter is missing, unavailable or denied, report the exact error once and use scoped `rg`. Do not start another language server.
 
@@ -44,12 +44,12 @@ If Dexter is missing, unavailable or denied, report the exact error once and use
 2. If its column in the saved file is unknown: `"$TIPS_DEXTER" query symbols <file>`, then take the line and column from the row with the name and arity you want. If you already have the current position, go to step 3.
 3. Run the positional query. Read `cursor:` first; it names the selected token. If it is not your name, fix the position and rerun.
 4. For call hierarchy, check `selected:` shows your callable and arity. A default-argument head selects only the maximum arity.
-5. Take positions again after an edit or checkout change.
+5. Get positions again after an edit or checkout change.
 
 ## Limits
 
 - Zero rows does not mean unused. An empty result exits 0.
-- Dynamic dispatch (`schema.changeset(...)`, `apply`, MFA tuples), macros and generated code can hide uses. Some `use` wrappers and atom dispatch resolve. Assume neither completeness nor absence.
+- Dynamic dispatch (`schema.changeset(...)`, `apply`, MFA tuples), macros and generated code can hide uses. Some `use` wrappers and atom dispatch resolve. Results may be incomplete.
 - Call hierarchy silently omits calls it cannot resolve. It does not replace `references`.
 - `--limit 0` lifts the row limit, except `workspace-symbols` stops at 50: narrow the search. If the tool client cuts output, narrow the query or save it to a file.
 - Index discovery excludes root `tmp/` and nested checkouts, except configured Elixir sources. `symbols` reads scratch files in the bound worktree. Files in another checkout are refused.
@@ -59,7 +59,7 @@ If Dexter is missing, unavailable or denied, report the exact error once and use
 
 ## Reindex
 
-The daemon watches saved files; normal edits need none. Run `"$TIPS_DEXTER" reindex` after:
+The daemon watches saved files; normal edits do not need reindexing. Run `"$TIPS_DEXTER" reindex` after:
 
 - you run `mix deps.get` or change a dependency;
 - you change the configured Elixir sources;

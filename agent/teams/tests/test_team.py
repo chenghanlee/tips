@@ -1065,6 +1065,7 @@ class PairLifecycleTest(unittest.TestCase):
         self.git("merge", "-q", "--ff-only", "task/29")
         (self.root / "databases").write_text(
             "tips_test_t1\ntips_test_t1r\ntips_test_t1r2\ntips_test_t2\ntips_test_t2r\n"
+            "tips_dev_t1r\ntips_dev_t2r\n"
         )
         self.clients_exit(1)
         self.team("stop", "29")
@@ -1072,9 +1073,9 @@ class PairLifecycleTest(unittest.TestCase):
         assert self.git("branch", "--list", "task/29") == ""
         assert [w["label"] for w in self.state()["workspaces"]] == ["tips-team-2-30"]
         calls = (self.root / "docker-calls").read_text()
-        for database in ("tips_test_t1", "tips_test_t1r", "tips_test_t1r2"):
+        for database in ("tips_test_t1", "tips_test_t1r", "tips_test_t1r2", "tips_dev_t1r"):
             assert f'DROP DATABASE "{database}"' in calls
-        assert "tips_test_t2" not in calls.replace("tips_test_t1r2", "")
+        assert "_t2" not in calls.replace("tips_test_t1r2", "")
         # The shared worktree's daemon is stopped once, before the checkout is removed.
         assert [e[1:] for e in self.events("dexter") if e[-1] == "stop"] == [[str(wt), "stop"]]
         assert self.worktree("30").is_dir()

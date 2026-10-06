@@ -5,7 +5,7 @@ For humans, from the repository root. Agents read the [pair workflow](README.md)
 ## How it runs
 
 ```
-USER         order the board · mark Ready · start the dispatcher once
+USER         order the board · mark Ready · tell the dispatcher · start it once
 DISPATCHER   tidy → pick → team.py start <issue> → set Active
 DEVELOPER    code → push → PR with "Closes #<issue>" + auto-merge → team.py turn <pr> test
 TESTER       review → findings → team.py turn <pr> dev      (loop until no P0 or P1)
@@ -19,16 +19,16 @@ DISPATCHER   team.py stop <issue> → next
 
 In GitHub: enable "Allow auto-merge" on the repository; in the ruleset "Reviewed main" turn off the strict up-to-date requirement and keep `checks`, `release`, `tips/independent-review` and resolved conversations; in Project 15 enable the workflow "Item closed" so a closed issue gets Status Done.
 
-Install Python 3.12 and the [configured client CLIs](config.toml). Authenticate the clients and the GitHub CLI (`gh`) for this repository. Agents also need GNU `timeout` (macOS: `brew install coreutils`) and `unbuffer` (Expect): the Elixir skill requires it on Mix commands.
+Install Python 3.12 and the [configured client CLIs](config.toml). Authenticate the clients and the GitHub CLI (`gh`) for this repository. Agents also need GNU `timeout` (macOS: `brew install coreutils`) and `unbuffer` (Expect): the Elixir skill requires it on Mix commands. Testers use `agent-browser` for manual browser review.
 
-The user maintains third-party skills in the main checkout. Both locations are Git-ignored:
+The user maintains third-party skills in these Git-ignored directories in the main checkout:
 
 - `.agents/skills/`: `elixir`, `phoenix`, `ecto`, `otp`, `oban` and `herdr`, for Codex.
 - `.claude/skills/`: the same five Elixir skills, for Claude.
 
 Update matching copies together. `team.py start` links the main checkout's `.agents/skills/` into each worktree and checks only that the directory exists.
 
-The repository owns one skill, the [Dexter reference](../skills/dexter/SKILL.md). Link it once into both locations from the main checkout:
+The repository versions one skill, the [Dexter reference](../skills/dexter/SKILL.md). Link it once into both locations from the main checkout:
 
 ```bash
 ln -s ../../agent/skills/dexter .agents/skills/dexter
@@ -51,7 +51,7 @@ Generated settings enable Credo for both clients. Claude launches use `--setting
 
 Build Dexter with the [LSP guide](../lsp/README.md#build): the pinned source plus the local patch, one binary. Put matching Elixir sources in the main checkout's `agent/lsp/vendor/elixir-<version>/` (the source tree contains `lib/elixir/lib/enum.ex`), or set `DEXTER_ELIXIR_LIB_ROOT` to their `lib/` directory. Stop pairs before replacing the shared build.
 
-Codex must be allowed to connect to Dexter's local Unix socket. The tested macOS `workspace-write` sandbox denies it with network access disabled; access works with network access enabled or a scoped `--allow-unix-socket /private/tmp/dexter-<uid>` allowance. Set the narrowest suitable user-owned permission before the first launch. With approval policy `never`, a denied connection cannot escalate. The launcher does not change sandbox settings.
+Codex launches with approval policy `never`, so a denied action cannot escalate, and the launcher does not change sandbox settings. Before the first pair, allow Codex to reach GitHub over HTTPS, the Herdr and Dexter Unix sockets, and the local database and test port. `--allow-unix-socket` is a flag of `codex sandbox`, not of the interactive client the launcher starts. Verify in a launched tester: `gh pr view 331 --json state`, `herdr agent get "$HERDR_PANE_ID"`, `"$TIPS_DEXTER" lookup Tips.Repo` and `unbuffer mix test`.
 
 ## Start the dispatcher
 
@@ -59,11 +59,11 @@ In a Herdr pane (`HERDR_ENV=1`) at the main checkout:
 
 ```bash
 CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=35 claude --permission-mode auto \
-  --append-system-prompt 'You are the dispatcher in agent/teams/README.md. At startup and on every done or blocked ring, apply its Common path and Rules; reread them if they are no longer in context.' \
+  --append-system-prompt 'You are the dispatcher in agent/teams/README.md. At startup, on every done or blocked ring and when the user says the board changed, apply its Common path and Rules; reread them if they are no longer in context.' \
   'Run herdr agent rename "$HERDR_PANE_ID" dispatcher, then begin.'
 ```
 
-Start only one. Pairs ring it by the name `dispatcher`. Every ring starts a turn over its whole context, so it compacts at 35%; GitHub holds the state it needs. It starts and stops pairs with `team.py` from this checkout; each pair gets its own Herdr workspace. Handle each client's repository trust prompt the first time. An unexpected approval prompt stops a launch; inspect it and follow the active approval policy.
+Start only one. Pairs ring it by the name `dispatcher`. Nothing watches GitHub: after you mark tasks Ready, type `board changed` in its pane. It asks you product and scope questions in that pane; answer there. Every ring starts a turn over its whole context, so it compacts at 35%; GitHub holds the state it needs. It starts and stops pairs with `team.py` from this checkout; each pair gets its own Herdr workspace. Handle each client's repository trust prompt the first time. An unexpected approval prompt stops a launch; inspect it and follow the active approval policy.
 
 ## Configuration
 
@@ -84,4 +84,4 @@ Follow [development](development.md). For optional local checks, install Ruff an
 
 ## Milestones
 
-Read the [Project 15 readme](https://github.com/users/chenghanlee/projects/15) with `gh project view 15 --owner chenghanlee`. Milestones and gate issues live there, never mirrored here.
+Read the [Project 15 readme](https://github.com/users/chenghanlee/projects/15) with `gh project view 15 --owner chenghanlee`. Keep milestones and gate issues there; do not copy them here.

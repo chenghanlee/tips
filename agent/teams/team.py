@@ -930,7 +930,8 @@ def check_worktrees(roots: set[Path]) -> None:
 
 def drop_databases(slot: int) -> None:
     prefix = cfg["team"]["db_suffix_prefix"] + str(slot)
-    stems = ["tips_test" + prefix + cfg["roles"][role]["db_suffix"] for role in ROLES]
+    suffixes = [prefix + cfg["roles"][role]["db_suffix"] for role in ROLES]
+    stems = [base + suffix for base in ("tips_test", "tips_dev") for suffix in suffixes]
     psql = [
         "docker",
         "compose",

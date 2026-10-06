@@ -13,6 +13,6 @@ Run these before pushing, in your worktree, if Ruff and Pyright are on `PATH`; o
 
 Provisioning and client-stop changes also require the real-daemon tests (`-k real_daemons`) with `TIPS_TEST_REAL_DEXTER` and `DEXTER_ELIXIR_LIB_ROOT` set (see the [LSP guide](../lsp/README.md)); CI runs them in the `dexter` job against the freshly built binary. Changes to Codex launch arguments or generated Codex configuration also require the installed-Codex tests with `TIPS_TEST_REAL_CODEX=1`. CI has no Codex client: record the local result on the PR.
 
-The reviewed `# noqa: S603` boundaries are `team.py:execute` and `StopAgentTest.client`: variable argument lists, no shell, resolved executable, fixed or test-owned arguments. These are per-call exceptions, not a disabled security rule. Suppress nothing else. When these calls change, the review covers trusted executable selection and arguments; passing lint cannot prove subprocess safety. Settings: [pyproject.toml](pyproject.toml).
+The reviewed `# noqa: S603` exceptions are `team.py:execute` and `StopAgentTest.client`: variable argument lists, no shell, resolved executable, fixed or test-owned arguments. These exceptions apply only to those calls. Do not suppress other warnings. When these calls change, review the executable selection and arguments for safety; lint does not verify this. Settings: [pyproject.toml](pyproject.toml).
 
 When a pair fails the same way twice, fix the tool or its error message before adding a workflow rule.
