@@ -276,14 +276,14 @@
   {
     "name": "corrupt-idat.png",
     "bytes": 469,
-    "recipe": "static.png with byte 72 inverted inside IDAT",
+    "recipe": "static.png with byte 10 of the first IDAT payload inverted, CRC recomputed",
     "expected": [
       {
         "reason": "malformed",
         "verdict": "reject"
       }
     ],
-    "sha256": "193c6ebb090a8c6936b58699542e7308db48616332190a5b595b2f683ae4b1fb"
+    "sha256": "11420b42932ccaa2d3b2b8656b6723b6968607963a09d326dcdf328a119112c4"
   },
   {
     "name": "png-crc-mismatch.png",
@@ -344,6 +344,30 @@
       }
     ],
     "sha256": "18127c99a596405baf0524da617537e7a20ca291952d90014e217c37cb467392"
+  },
+  {
+    "name": "apng-actl-duplicate.png",
+    "bytes": 1425,
+    "recipe": "animated.apng with acTL duplicate, CRCs recomputed",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "3351922961c3fc389745c04741f0dd4ceb35c34991d3334f6a3b034679216947"
+  },
+  {
+    "name": "apng-actl-after-idat.png",
+    "bytes": 1405,
+    "recipe": "animated.apng with acTL after_idat, CRCs recomputed",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "9f25802fe880add425ad7241686c1530a1a1b8363bcbfc161fa62b971e5bc3f7"
   },
   {
     "name": "apng-frame-outside-canvas.png",

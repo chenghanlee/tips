@@ -1,6 +1,6 @@
 {
   "failed": [],
-  "revision": "048a41e04ad7e5cf15aff1185cf4cf2c314f0644",
+  "revision": "261e8bff2eb0fbc5c108a198e1cf0585e216781f",
   "limits": {
     "deadline_s": 5,
     "address_space_bytes": 1073741824
@@ -18,12 +18,12 @@
       ],
       "fixture": "static.png",
       "animated": false,
-      "elapsed_ms": 32.1,
+      "elapsed_ms": 183.7,
       "exit_status": 0,
       "format": "png",
       "frames": 1,
       "height": 48,
-      "peak_rss_kib": 14784,
+      "peak_rss_kib": 25972,
       "verdict": "accept",
       "width": 64
     },
@@ -38,12 +38,12 @@
       ],
       "fixture": "animated.apng",
       "animated": true,
-      "elapsed_ms": 30.3,
+      "elapsed_ms": 187.7,
       "exit_status": 0,
       "format": "png",
       "frames": 5,
       "height": 48,
-      "peak_rss_kib": 14792,
+      "peak_rss_kib": 26168,
       "verdict": "accept",
       "width": 64
     },
@@ -58,12 +58,12 @@
       ],
       "fixture": "single-frame.apng",
       "animated": false,
-      "elapsed_ms": 29.3,
+      "elapsed_ms": 175.8,
       "exit_status": 0,
       "format": "png",
       "frames": 1,
       "height": 48,
-      "peak_rss_kib": 14788,
+      "peak_rss_kib": 25976,
       "verdict": "accept",
       "width": 64
     },
@@ -78,12 +78,12 @@
       ],
       "fixture": "static.jpg",
       "animated": false,
-      "elapsed_ms": 43.9,
+      "elapsed_ms": 200.7,
       "exit_status": 0,
       "format": "jpeg",
       "frames": 1,
       "height": 48,
-      "peak_rss_kib": 19984,
+      "peak_rss_kib": 31632,
       "verdict": "accept",
       "width": 64
     },
@@ -98,12 +98,12 @@
       ],
       "fixture": "static.gif",
       "animated": false,
-      "elapsed_ms": 44.7,
+      "elapsed_ms": 199.2,
       "exit_status": 0,
       "format": "gif",
       "frames": 1,
       "height": 48,
-      "peak_rss_kib": 19296,
+      "peak_rss_kib": 30784,
       "verdict": "accept",
       "width": 64
     },
@@ -118,12 +118,12 @@
       ],
       "fixture": "animated.gif",
       "animated": true,
-      "elapsed_ms": 43.5,
+      "elapsed_ms": 205.5,
       "exit_status": 0,
       "format": "gif",
       "frames": 5,
       "height": 48,
-      "peak_rss_kib": 19472,
+      "peak_rss_kib": 30960,
       "verdict": "accept",
       "width": 64
     },
@@ -138,12 +138,12 @@
       ],
       "fixture": "static.webp",
       "animated": false,
-      "elapsed_ms": 46.2,
+      "elapsed_ms": 198.8,
       "exit_status": 0,
       "format": "webp",
       "frames": 1,
       "height": 48,
-      "peak_rss_kib": 19732,
+      "peak_rss_kib": 31252,
       "verdict": "accept",
       "width": 64
     },
@@ -158,12 +158,12 @@
       ],
       "fixture": "animated.webp",
       "animated": true,
-      "elapsed_ms": 47.8,
+      "elapsed_ms": 204.2,
       "exit_status": 0,
       "format": "webp",
       "frames": 5,
       "height": 48,
-      "peak_rss_kib": 19744,
+      "peak_rss_kib": 31516,
       "verdict": "accept",
       "width": 64
     },
@@ -178,12 +178,12 @@
       ],
       "fixture": "single-frame.webp",
       "animated": false,
-      "elapsed_ms": 43.6,
+      "elapsed_ms": 203.0,
       "exit_status": 0,
       "format": "webp",
       "frames": 1,
       "height": 48,
-      "peak_rss_kib": 19732,
+      "peak_rss_kib": 31516,
       "verdict": "accept",
       "width": 64
     },
@@ -198,12 +198,12 @@
       ],
       "fixture": "spoofed-jpeg-as.png",
       "animated": false,
-      "elapsed_ms": 47.5,
+      "elapsed_ms": 222.5,
       "exit_status": 0,
       "format": "jpeg",
       "frames": 1,
       "height": 48,
-      "peak_rss_kib": 19564,
+      "peak_rss_kib": 31516,
       "verdict": "accept",
       "width": 64
     },
@@ -216,9 +216,9 @@
         }
       ],
       "fixture": "spoofed-text-as.gif",
-      "elapsed_ms": 43.1,
+      "elapsed_ms": 208.2,
       "exit_status": 0,
-      "peak_rss_kib": 19164,
+      "peak_rss_kib": 30648,
       "reason": "unclassifiable",
       "verdict": "reject"
     },
@@ -231,9 +231,9 @@
         }
       ],
       "fixture": "svg-as.png",
-      "elapsed_ms": 43.8,
+      "elapsed_ms": 205.6,
       "exit_status": 0,
-      "peak_rss_kib": 19160,
+      "peak_rss_kib": 30636,
       "reason": "unclassifiable",
       "verdict": "reject"
     },
@@ -246,9 +246,9 @@
         }
       ],
       "fixture": "bmp.bmp",
-      "elapsed_ms": 43.9,
+      "elapsed_ms": 199.8,
       "exit_status": 0,
-      "peak_rss_kib": 19204,
+      "peak_rss_kib": 30656,
       "reason": "unclassifiable",
       "verdict": "reject"
     },
@@ -261,9 +261,9 @@
         }
       ],
       "fixture": "tiff.tif",
-      "elapsed_ms": 42.3,
+      "elapsed_ms": 199.0,
       "exit_status": 0,
-      "peak_rss_kib": 19168,
+      "peak_rss_kib": 30652,
       "reason": "unclassifiable",
       "verdict": "reject"
     },
@@ -276,9 +276,9 @@
         }
       ],
       "fixture": "empty.png",
-      "elapsed_ms": 42.4,
+      "elapsed_ms": 200.9,
       "exit_status": 0,
-      "peak_rss_kib": 19168,
+      "peak_rss_kib": 30640,
       "reason": "unclassifiable",
       "verdict": "reject"
     },
@@ -291,9 +291,9 @@
         }
       ],
       "fixture": "random.bin",
-      "elapsed_ms": 46.0,
+      "elapsed_ms": 209.5,
       "exit_status": 0,
-      "peak_rss_kib": 19296,
+      "peak_rss_kib": 30772,
       "reason": "unclassifiable",
       "verdict": "reject"
     },
@@ -306,9 +306,9 @@
         }
       ],
       "fixture": "png-signature-garbage.png",
-      "elapsed_ms": 48.1,
+      "elapsed_ms": 200.4,
       "exit_status": 0,
-      "peak_rss_kib": 19164,
+      "peak_rss_kib": 30636,
       "reason": "unclassifiable",
       "verdict": "reject"
     },
@@ -321,9 +321,9 @@
         }
       ],
       "fixture": "truncated.png",
-      "elapsed_ms": 33.1,
+      "elapsed_ms": 172.4,
       "exit_status": 0,
-      "peak_rss_kib": 14664,
+      "peak_rss_kib": 25720,
       "reason": "malformed",
       "verdict": "reject"
     },
@@ -337,9 +337,9 @@
       ],
       "fixture": "truncated.jpg",
       "detail": "OSError",
-      "elapsed_ms": 47.6,
+      "elapsed_ms": 203.5,
       "exit_status": 0,
-      "peak_rss_kib": 19980,
+      "peak_rss_kib": 31636,
       "reason": "malformed",
       "verdict": "reject"
     },
@@ -352,9 +352,9 @@
         }
       ],
       "fixture": "truncated.gif",
-      "elapsed_ms": 47.4,
+      "elapsed_ms": 207.5,
       "exit_status": 0,
-      "peak_rss_kib": 19168,
+      "peak_rss_kib": 30780,
       "reason": "malformed",
       "verdict": "reject"
     },
@@ -368,9 +368,9 @@
       ],
       "fixture": "truncated.webp",
       "detail": "OSError",
-      "elapsed_ms": 43.0,
+      "elapsed_ms": 195.8,
       "exit_status": 0,
-      "peak_rss_kib": 19472,
+      "peak_rss_kib": 30716,
       "reason": "malformed",
       "verdict": "reject"
     },
@@ -383,9 +383,9 @@
         }
       ],
       "fixture": "truncated.apng",
-      "elapsed_ms": 28.8,
+      "elapsed_ms": 172.2,
       "exit_status": 0,
-      "peak_rss_kib": 14660,
+      "peak_rss_kib": 25720,
       "reason": "malformed",
       "verdict": "reject"
     },
@@ -398,9 +398,10 @@
         }
       ],
       "fixture": "corrupt-idat.png",
-      "elapsed_ms": 30.9,
+      "detail": "OSError",
+      "elapsed_ms": 182.1,
       "exit_status": 0,
-      "peak_rss_kib": 14660,
+      "peak_rss_kib": 25848,
       "reason": "malformed",
       "verdict": "reject"
     },
@@ -413,9 +414,9 @@
         }
       ],
       "fixture": "png-crc-mismatch.png",
-      "elapsed_ms": 29.2,
+      "elapsed_ms": 177.3,
       "exit_status": 0,
-      "peak_rss_kib": 14660,
+      "peak_rss_kib": 25720,
       "reason": "malformed",
       "verdict": "reject"
     },
@@ -428,9 +429,9 @@
         }
       ],
       "fixture": "png-iend-missing.png",
-      "elapsed_ms": 29.2,
+      "elapsed_ms": 175.8,
       "exit_status": 0,
-      "peak_rss_kib": 14660,
+      "peak_rss_kib": 25720,
       "reason": "malformed",
       "verdict": "reject"
     },
@@ -443,9 +444,9 @@
         }
       ],
       "fixture": "gif-trailer-missing.gif",
-      "elapsed_ms": 43.0,
+      "elapsed_ms": 200.3,
       "exit_status": 0,
-      "peak_rss_kib": 19164,
+      "peak_rss_kib": 30776,
       "reason": "malformed",
       "verdict": "reject"
     },
@@ -458,9 +459,9 @@
         }
       ],
       "fixture": "apng-actl-overcount.png",
-      "elapsed_ms": 28.8,
+      "elapsed_ms": 188.8,
       "exit_status": 0,
-      "peak_rss_kib": 14648,
+      "peak_rss_kib": 25720,
       "reason": "malformed",
       "verdict": "reject"
     },
@@ -473,9 +474,40 @@
         }
       ],
       "fixture": "apng-actl-undercount.png",
-      "elapsed_ms": 28.6,
+      "elapsed_ms": 176.3,
       "exit_status": 0,
-      "peak_rss_kib": 14660,
+      "peak_rss_kib": 25720,
+      "reason": "malformed",
+      "verdict": "reject"
+    },
+    {
+      "pass": true,
+      "expected": [
+        {
+          "reason": "malformed",
+          "verdict": "reject"
+        }
+      ],
+      "fixture": "apng-actl-duplicate.png",
+      "detail": "UserWarning",
+      "elapsed_ms": 175.6,
+      "exit_status": 0,
+      "peak_rss_kib": 25720,
+      "reason": "malformed",
+      "verdict": "reject"
+    },
+    {
+      "pass": true,
+      "expected": [
+        {
+          "reason": "malformed",
+          "verdict": "reject"
+        }
+      ],
+      "fixture": "apng-actl-after-idat.png",
+      "elapsed_ms": 172.9,
+      "exit_status": 0,
+      "peak_rss_kib": 25720,
       "reason": "malformed",
       "verdict": "reject"
     },
@@ -489,9 +521,9 @@
       ],
       "fixture": "apng-frame-outside-canvas.png",
       "detail": "SyntaxError",
-      "elapsed_ms": 28.7,
+      "elapsed_ms": 174.5,
       "exit_status": 0,
-      "peak_rss_kib": 14812,
+      "peak_rss_kib": 26168,
       "reason": "malformed",
       "verdict": "reject"
     },
@@ -505,9 +537,9 @@
       ],
       "fixture": "webp-anim-flag-unset.webp",
       "detail": "OSError",
-      "elapsed_ms": 43.5,
+      "elapsed_ms": 215.6,
       "exit_status": 0,
-      "peak_rss_kib": 19476,
+      "peak_rss_kib": 30716,
       "reason": "malformed",
       "verdict": "reject"
     },
@@ -520,9 +552,9 @@
         }
       ],
       "fixture": "gif-frame-outside-canvas.gif",
-      "elapsed_ms": 44.3,
+      "elapsed_ms": 218.5,
       "exit_status": 0,
-      "peak_rss_kib": 19472,
+      "peak_rss_kib": 30960,
       "reason": "malformed",
       "verdict": "reject"
     },
@@ -535,9 +567,9 @@
         }
       ],
       "fixture": "huge-dimensions.png",
-      "elapsed_ms": 29.7,
+      "elapsed_ms": 183.1,
       "exit_status": 0,
-      "peak_rss_kib": 15428,
+      "peak_rss_kib": 26488,
       "reason": "dimensions_over_limit",
       "verdict": "reject"
     },
@@ -550,9 +582,9 @@
         }
       ],
       "fixture": "frame-pixels-over.png",
-      "elapsed_ms": 29.8,
+      "elapsed_ms": 183.4,
       "exit_status": 0,
-      "peak_rss_kib": 14788,
+      "peak_rss_kib": 25848,
       "reason": "frame_pixels_over_limit",
       "verdict": "reject"
     },
@@ -567,12 +599,12 @@
       ],
       "fixture": "at-frame-pixel-limit-rgba.png",
       "animated": false,
-      "elapsed_ms": 384.8,
+      "elapsed_ms": 492.9,
       "exit_status": 0,
       "format": "png",
       "frames": 1,
       "height": 5000,
-      "peak_rss_kib": 171356,
+      "peak_rss_kib": 182616,
       "verdict": "accept",
       "width": 8000
     },
@@ -587,12 +619,12 @@
       ],
       "fixture": "at-frame-pixel-limit-rgba16.png",
       "animated": false,
-      "elapsed_ms": 705.9,
+      "elapsed_ms": 795.9,
       "exit_status": 0,
       "format": "png",
       "frames": 1,
       "height": 5000,
-      "peak_rss_kib": 171356,
+      "peak_rss_kib": 182516,
       "verdict": "accept",
       "width": 8000
     },
@@ -607,12 +639,12 @@
       ],
       "fixture": "at-frame-pixel-limit-2-frames.gif",
       "animated": true,
-      "elapsed_ms": 512.1,
+      "elapsed_ms": 599.1,
       "exit_status": 0,
       "format": "gif",
       "frames": 2,
       "height": 5000,
-      "peak_rss_kib": 507864,
+      "peak_rss_kib": 519580,
       "verdict": "accept",
       "width": 8000
     },
@@ -627,12 +659,12 @@
       ],
       "fixture": "at-frame-pixel-limit-2-frames.webp",
       "animated": true,
-      "elapsed_ms": 745.7,
+      "elapsed_ms": 613.3,
       "exit_status": 0,
       "format": "webp",
       "frames": 2,
       "height": 5000,
-      "peak_rss_kib": 647140,
+      "peak_rss_kib": 658992,
       "verdict": "accept",
       "width": 8000
     },
@@ -645,9 +677,9 @@
         }
       ],
       "fixture": "many-frames.gif",
-      "elapsed_ms": 52.3,
+      "elapsed_ms": 203.1,
       "exit_status": 0,
-      "peak_rss_kib": 19292,
+      "peak_rss_kib": 30776,
       "reason": "frames_over_limit",
       "verdict": "reject"
     },
@@ -662,12 +694,12 @@
       ],
       "fixture": "at-total-pixel-limit.gif",
       "animated": true,
-      "elapsed_ms": 880.9,
+      "elapsed_ms": 839.8,
       "exit_status": 0,
       "format": "gif",
       "frames": 25,
       "height": 2000,
-      "peak_rss_kib": 70052,
+      "peak_rss_kib": 81732,
       "verdict": "accept",
       "width": 2000
     },
@@ -682,12 +714,12 @@
       ],
       "fixture": "at-total-pixel-limit.webp",
       "animated": true,
-      "elapsed_ms": 977.2,
+      "elapsed_ms": 729.4,
       "exit_status": 0,
       "format": "webp",
       "frames": 25,
       "height": 2000,
-      "peak_rss_kib": 86244,
+      "peak_rss_kib": 98048,
       "verdict": "accept",
       "width": 2000
     },
@@ -702,12 +734,12 @@
       ],
       "fixture": "at-total-pixel-limit-4-frames.webp",
       "animated": true,
-      "elapsed_ms": 933.2,
+      "elapsed_ms": 717.5,
       "exit_status": 0,
       "format": "webp",
       "frames": 4,
       "height": 5000,
-      "peak_rss_kib": 436184,
+      "peak_rss_kib": 469932,
       "verdict": "accept",
       "width": 5000
     },
@@ -720,9 +752,9 @@
         }
       ],
       "fixture": "total-pixels-over.gif",
-      "elapsed_ms": 54.9,
+      "elapsed_ms": 211.6,
       "exit_status": 0,
-      "peak_rss_kib": 24404,
+      "peak_rss_kib": 35876,
       "reason": "total_pixels_over_limit",
       "verdict": "reject"
     },
@@ -735,9 +767,9 @@
         }
       ],
       "fixture": "over-10mb.png",
-      "elapsed_ms": 28.7,
+      "elapsed_ms": 171.4,
       "exit_status": 0,
-      "peak_rss_kib": 13836,
+      "peak_rss_kib": 24780,
       "reason": "bytes_over_limit",
       "verdict": "reject"
     }
@@ -751,7 +783,7 @@
       },
       "fixture": "at-total-pixel-limit.gif",
       "experiment": "deadline_kills_parser",
-      "observed": "exit 137 after 208.0 ms; parsers left: 0"
+      "observed": "exit 137 after 217.4 ms; parsers left: 0"
     },
     {
       "pass": true,
@@ -761,7 +793,7 @@
       },
       "fixture": "at-frame-pixel-limit-2-frames.webp",
       "experiment": "address_space_stops_parser",
-      "observed": "reject memory_limit exit 0"
+      "observed": "reject malformed exit 0"
     },
     {
       "pass": true,
@@ -770,13 +802,13 @@
       },
       "fixture": "at-total-pixel-limit.gif",
       "experiment": "parser_stops_without_caller",
-      "observed": "caller exited at once (timeout pid 680); parsers at 100 ms: 1; after deadline + 300 ms: 0"
+      "observed": "caller exited at once (timeout pid 684); parsers at 100 ms: 1; after deadline + 300 ms: 0"
     }
   ],
   "issue": 244,
   "tracked_changes_at_launch": "0",
   "versions": {
-    "os": "Linux aarch64; Debian GNU/Linux 12 (bookworm)",
+    "os": "Linux x86_64; Debian GNU/Linux 12 (bookworm)",
     "otp": "29",
     "elixir": "1.20.4",
     "python": "3.11.2",

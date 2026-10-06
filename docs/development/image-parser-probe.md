@@ -30,14 +30,14 @@ PNG writer in the probe.
 
 ## Recorded runs
 
-Both runs are at `048a41e` with no tracked changes:
+Both runs are at `261e8bf` with no tracked changes:
 
-- arm64 `20261006T175003Z`:
-  [report](image-parser-probe/arm64-20261006T175003Z-report.json),
-  [fixtures](image-parser-probe/arm64-20261006T175003Z-fixtures.json).
-- amd64 under Docker emulation `20261006T175047Z`:
-  [report](image-parser-probe/amd64-20261006T175047Z-report.json),
-  [fixtures](image-parser-probe/amd64-20261006T175047Z-fixtures.json).
+- arm64 `20261006T175819Z`:
+  [report](image-parser-probe/arm64-20261006T175819Z-report.json),
+  [fixtures](image-parser-probe/arm64-20261006T175819Z-fixtures.json).
+- amd64 under Docker emulation `20261006T175902Z`:
+  [report](image-parser-probe/amd64-20261006T175902Z-report.json),
+  [fixtures](image-parser-probe/amd64-20261006T175902Z-fixtures.json).
 
 Fixture bytes are stable across runs on one architecture: repeated arm64 runs gave
 identical hashes for all 45 fixtures. Across architectures, the lossy encodes
@@ -51,49 +51,51 @@ Peak RSS is the parser process's `ru_maxrss`.
 
 | Fixture | Bytes | Expected | Result | arm64 ms | arm64 peak RSS MiB | amd64 |
 |---|---|---|---|---|---|---|
-| `static.png` | 469 | accept png static | ✓ accept png static | 32 | 14 | same |
-| `animated.apng` | 1,405 | accept png animated | ✓ accept png animated | 30 | 14 | same |
-| `single-frame.apng` | 527 | accept png static | ✓ accept png static | 29 | 14 | same |
-| `static.jpg` | 1,976 | accept jpeg static | ✓ accept jpeg static | 44 | 20 | same |
-| `static.gif` | 1,650 | accept gif static | ✓ accept gif static | 45 | 19 | same |
-| `animated.gif` | 3,823 | accept gif animated | ✓ accept gif animated | 44 | 19 | same |
-| `static.webp` | 260 | accept webp static | ✓ accept webp static | 46 | 19 | same |
-| `animated.webp` | 1,350 | accept webp animated | ✓ accept webp animated | 48 | 19 | same |
+| `static.png` | 469 | accept png static | ✓ accept png static | 31 | 15 | same |
+| `animated.apng` | 1,405 | accept png animated | ✓ accept png animated | 32 | 15 | same |
+| `single-frame.apng` | 527 | accept png static | ✓ accept png static | 31 | 15 | same |
+| `static.jpg` | 1,976 | accept jpeg static | ✓ accept jpeg static | 45 | 20 | same |
+| `static.gif` | 1,650 | accept gif static | ✓ accept gif static | 44 | 19 | same |
+| `animated.gif` | 3,823 | accept gif animated | ✓ accept gif animated | 48 | 19 | same |
+| `static.webp` | 260 | accept webp static | ✓ accept webp static | 47 | 19 | same |
+| `animated.webp` | 1,350 | accept webp animated | ✓ accept webp animated | 44 | 19 | same |
 | `single-frame.webp` | 590 | accept webp static | ✓ accept webp static | 44 | 19 | same |
-| `spoofed-jpeg-as.png` | 1,976 | accept jpeg static | ✓ accept jpeg static | 48 | 19 | same |
+| `spoofed-jpeg-as.png` | 1,976 | accept jpeg static | ✓ accept jpeg static | 44 | 19 | same |
 | `spoofed-text-as.gif` | 27 | reject unclassifiable | ✓ reject unclassifiable | 43 | 19 | same |
 | `svg-as.png` | 64 | reject unclassifiable | ✓ reject unclassifiable | 44 | 19 | same |
-| `bmp.bmp` | 9,270 | reject unclassifiable | ✓ reject unclassifiable | 44 | 19 | same |
-| `tiff.tif` | 7,715 | reject unclassifiable | ✓ reject unclassifiable | 42 | 19 | same |
-| `empty.png` | 0 | reject unclassifiable | ✓ reject unclassifiable | 42 | 19 | same |
-| `random.bin` | 4,096 | reject unclassifiable | ✓ reject unclassifiable | 46 | 19 | same |
-| `png-signature-garbage.png` | 520 | reject malformed | ✓ reject unclassifiable | 48 | 19 | same |
-| `truncated.png` | 281 | reject malformed | ✓ reject malformed | 33 | 14 | same |
-| `truncated.jpg` | 1,185 | reject malformed | ✓ reject malformed | 48 | 20 | same |
-| `truncated.gif` | 2,293 | reject malformed | ✓ reject malformed | 47 | 19 | same |
-| `truncated.webp` | 810 | reject malformed | ✓ reject malformed | 43 | 19 | same |
+| `bmp.bmp` | 9,270 | reject unclassifiable | ✓ reject unclassifiable | 47 | 19 | same |
+| `tiff.tif` | 7,715 | reject unclassifiable | ✓ reject unclassifiable | 44 | 19 | same |
+| `empty.png` | 0 | reject unclassifiable | ✓ reject unclassifiable | 43 | 19 | same |
+| `random.bin` | 4,096 | reject unclassifiable | ✓ reject unclassifiable | 45 | 19 | same |
+| `png-signature-garbage.png` | 520 | reject malformed | ✓ reject unclassifiable | 47 | 19 | same |
+| `truncated.png` | 281 | reject malformed | ✓ reject malformed | 30 | 14 | same |
+| `truncated.jpg` | 1,185 | reject malformed | ✓ reject malformed | 45 | 20 | same |
+| `truncated.gif` | 2,293 | reject malformed | ✓ reject malformed | 44 | 19 | same |
+| `truncated.webp` | 810 | reject malformed | ✓ reject malformed | 44 | 19 | same |
 | `truncated.apng` | 843 | reject malformed | ✓ reject malformed | 29 | 14 | same |
-| `corrupt-idat.png` | 469 | reject malformed | ✓ reject malformed | 31 | 14 | same |
-| `png-crc-mismatch.png` | 469 | reject malformed | ✓ reject malformed | 29 | 14 | same |
-| `png-iend-missing.png` | 457 | reject malformed | ✓ reject malformed | 29 | 14 | same |
-| `gif-trailer-missing.gif` | 3,822 | reject malformed | ✓ reject malformed | 43 | 19 | same |
-| `apng-actl-overcount.png` | 1,405 | reject malformed | ✓ reject malformed | 29 | 14 | same |
-| `apng-actl-undercount.png` | 1,405 | reject malformed | ✓ reject malformed | 29 | 14 | same |
-| `apng-frame-outside-canvas.png` | 1,405 | reject malformed | ✓ reject malformed | 29 | 14 | same |
+| `corrupt-idat.png` | 469 | reject malformed | ✓ reject malformed | 32 | 15 | same |
+| `png-crc-mismatch.png` | 469 | reject malformed | ✓ reject malformed | 31 | 14 | same |
+| `png-iend-missing.png` | 457 | reject malformed | ✓ reject malformed | 30 | 14 | same |
+| `gif-trailer-missing.gif` | 3,822 | reject malformed | ✓ reject malformed | 44 | 19 | same |
+| `apng-actl-overcount.png` | 1,405 | reject malformed | ✓ reject malformed | 30 | 14 | same |
+| `apng-actl-undercount.png` | 1,405 | reject malformed | ✓ reject malformed | 30 | 14 | same |
+| `apng-actl-duplicate.png` | 1,425 | reject malformed | ✓ reject malformed | 30 | 14 | same |
+| `apng-actl-after-idat.png` | 1,405 | reject malformed | ✓ reject malformed | 30 | 14 | same |
+| `apng-frame-outside-canvas.png` | 1,405 | reject malformed | ✓ reject malformed | 29 | 15 | same |
 | `webp-anim-flag-unset.webp` | 1,350 | reject malformed | ✓ reject malformed | 44 | 19 | same |
-| `gif-frame-outside-canvas.gif` | 3,823 | reject malformed | ✓ reject malformed | 44 | 19 | same |
+| `gif-frame-outside-canvas.gif` | 3,823 | reject malformed | ✓ reject malformed | 45 | 19 | same |
 | `huge-dimensions.png` | 388,871 | reject dimensions_over_limit | ✓ reject dimensions_over_limit | 30 | 15 | same |
-| `frame-pixels-over.png` | 62,290 | reject frame_pixels_over_limit | ✓ reject frame_pixels_over_limit | 30 | 14 | same |
+| `frame-pixels-over.png` | 62,290 | reject frame_pixels_over_limit | ✓ reject frame_pixels_over_limit | 29 | 15 | same |
 | `at-frame-pixel-limit-rgba.png` | 155,586 | accept png static | ✓ accept png static | 385 | 167 | same |
 | `at-frame-pixel-limit-rgba16.png` | 311,100 | accept png static | ✓ accept png static | 706 | 167 | same |
-| `at-frame-pixel-limit-2-frames.gif` | 3,157,259 | accept gif animated | ✓ accept gif animated | 512 | 496 | same |
-| `at-frame-pixel-limit-2-frames.webp` | 1,225,700 | accept webp animated | ✓ accept webp animated | 746 | 632 | same |
-| `many-frames.gif` | 25,836 | reject frames_over_limit | ✓ reject frames_over_limit | 52 | 19 | same |
-| `at-total-pixel-limit.gif` | 3,291,062 | accept gif animated | ✓ accept gif animated | 881 | 68 | same |
-| `at-total-pixel-limit.webp` | 2,045,916 | accept webp animated | ✓ accept webp animated | 977 | 84 | same |
-| `at-total-pixel-limit-4-frames.webp` | 1,722,242 | accept webp animated | ✓ accept webp animated | 933 | 426 | same |
-| `total-pixels-over.gif` | 5,303,194 | reject total_pixels_over_limit | ✓ reject total_pixels_over_limit | 55 | 24 | same |
-| `over-10mb.png` | 12,003,753 | reject bytes_over_limit | ✓ reject bytes_over_limit | 29 | 14 | same |
+| `at-frame-pixel-limit-2-frames.gif` | 3,157,259 | accept gif animated | ✓ accept gif animated | 509 | 496 | same |
+| `at-frame-pixel-limit-2-frames.webp` | 1,225,700 | accept webp animated | ✓ accept webp animated | 719 | 632 | same |
+| `many-frames.gif` | 25,836 | reject frames_over_limit | ✓ reject frames_over_limit | 50 | 19 | same |
+| `at-total-pixel-limit.gif` | 3,291,062 | accept gif animated | ✓ accept gif animated | 832 | 68 | same |
+| `at-total-pixel-limit.webp` | 2,045,916 | accept webp animated | ✓ accept webp animated | 974 | 84 | same |
+| `at-total-pixel-limit-4-frames.webp` | 1,722,242 | accept webp animated | ✓ accept webp animated | 938 | 426 | same |
+| `total-pixels-over.gif` | 5,303,194 | reject total_pixels_over_limit | ✓ reject total_pixels_over_limit | 52 | 24 | same |
+| `over-10mb.png` | 12,003,753 | reject bytes_over_limit | ✓ reject bytes_over_limit | 27 | 13 | same |
 
 #61 failed these with Vix 0.41.0/libvips 8.18.3: `animated.apng` (read as static),
 `truncated.gif` and `truncated.apng` (accepted). ffprobe 8.1 also failed
@@ -146,7 +148,7 @@ so only the ceiling can stop the work.
 
 | Experiment | Setup | arm64 | amd64 |
 |---|---|---|---|
-| `deadline_kills_parser` | `at-total-pixel-limit.gif` (about 850 ms) with a 0.2 s deadline | killed, exit 137 at 208 ms; no parser left | same, 218 ms |
+| `deadline_kills_parser` | `at-total-pixel-limit.gif` (about 850 ms) with a 0.2 s deadline | killed, exit 137 at 213 ms; no parser left | same, 217 ms |
 | `address_space_stops_parser` | `at-frame-pixel-limit-2-frames.webp` (needs about 640 MiB) with a 512 MiB ceiling | rejected `memory_limit` | rejected `malformed` |
 | `parser_stops_without_caller` | The caller exits right after starting the parser with a 0.5 s deadline | parser running at 100 ms, gone at 800 ms | same |
 
