@@ -5,8 +5,8 @@ For humans, from the repository root. Agents read the [pair workflow](README.md)
 ## How it runs
 
 ```
-USER         order the board · mark Ready · tell the dispatcher · start it once
-DISPATCHER   tidy → pick → team.py start <issue> → set Active
+USER         set goals and constraints · answer decisions · start the dispatcher once
+DISPATCHER   assess milestone → prioritize eligible work → set Ready → start pair → set Active
 DEVELOPER    code → push → PR with "Closes #<issue>" + auto-merge → team.py turn <pr> test
 TESTER       review → findings → team.py turn <pr> dev      (loop until no P0 or P1)
 TESTER       LGTM → publish_review.py
@@ -55,13 +55,24 @@ Codex launches with approval policy `never`, so a denied action cannot escalate,
 
 ## Start the dispatcher
 
-In a Herdr pane (`HERDR_ENV=1`) at the main checkout:
+From a plain shell in a Herdr pane (`HERDR_ENV=1`) at the main checkout:
 
 ```bash
 agent/teams/dispatch
 ```
 
-Start only one. Pairs ring it by the name `dispatcher`. Nothing watches GitHub: after you mark tasks Ready, type `board changed` in its pane. It asks you product and scope questions in that pane; answer there. Every ring starts a turn over its whole context, so it compacts early (`dispatcher.compact_percent`); GitHub holds the state it needs. It starts and stops pairs with `team.py` from this checkout; each pair gets its own Herdr workspace. Handle each client's repository trust prompt the first time. An unexpected approval prompt stops a launch; inspect it and follow the active approval policy.
+From Codex or Claude Code already running inside Herdr, use the shell tool to run:
+
+```bash
+agent/teams/dispatch --new-pane
+```
+
+This opens a sibling pane without changing focus and runs the dispatcher there.
+The calling agent remains available. Inspect the new pane for startup or approval
+prompts; successful command submission does not mean the dispatcher is ready.
+Use the script in the main checkout.
+
+Start only one. Pairs notify it by the name `dispatcher`. It chooses and prepares the next task from the backlog using the milestone plan, dependencies and product value; you do not need to mark tasks Ready. Nothing watches GitHub: after changing priorities or external facts, type `board changed` in its pane. It asks unresolved product and scope questions in that pane; answer there. Every ring starts a turn over its whole context, so it compacts early (`dispatcher.compact_percent`); GitHub holds the state it needs. It starts and stops pairs with `team.py` from this checkout; each pair gets its own Herdr workspace. Handle each client's repository trust prompt the first time. An unexpected approval prompt stops a launch; inspect it and follow the active approval policy.
 
 ## Configuration
 
