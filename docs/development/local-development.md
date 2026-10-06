@@ -114,8 +114,8 @@ loading is separate deployment work.
 
 ### Isolated build caches
 
-If shared Hex/Mix caches are not writable in the agent sandbox, use a writable
-cache directory for that shell. From the worktree root:
+If the agent sandbox cannot write to shared Hex/Mix caches, use writable
+cache directories for that shell. From the worktree root:
 
 ```sh
 export HEX_HOME="$PWD/tmp/hex"
@@ -228,7 +228,7 @@ and `TIPS_TEST_PORT`. In a pair worktree each client keeps the values
 Each checkout already has its own `deps/` and `_build/`, so install dependencies
 in each worktree. Do not share or symlink those directories. For pair
 worktrees, `team.py start` exports `TIPS_PROVIDER_ENV_FILE` pointing at the main
-checkout's `.env`, so no worktree holds a copy; a manual worktree reads its own
+checkout's `.env`, so no worktree contains a copy; a manual worktree reads its own
 `.env` unless you export that variable. Export a manual worktree's
 database and port values in its shell.
 

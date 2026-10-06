@@ -17,7 +17,7 @@
 - Machine installs and machine or client settings need the user's action; propose the exact change. Locked repository dependencies and documented provisioning are allowed.
 - Never put secrets in source, logs, issues, PRs, handoffs or chat.
 - Never push implementation to `main`, edit another agent's work or reset its database.
-- Report a denied action with its exact error. Follow the documented recovery and the active approval policy; bypass neither.
+- Report a denied action with its exact error. Follow the documented recovery and active approval policy. Do not bypass either.
 
 ## Software design
 
@@ -50,7 +50,7 @@ Before reading, editing or reviewing Elixir code, load `elixir` and each skill t
 | Anything in a non-Elixir file or outside the index | Scoped `rg` or `grep` |
 | File names | `rg --files` |
 
-- Before changing any function's name, arity, return shape or behaviour, private functions included, find its uses with both Dexter `references` at its definition and scoped `rg` for its bare name and any atom or tuple that dispatches to it. Investigate every use that only one of them found.
+- Before changing a public or private function's name, arity, return shape or behaviour, find its uses with both Dexter `references` at its definition and scoped `rg` for its bare name and any atom or tuple that dispatches to it. Investigate every use that only one of them found.
 - An empty Dexter result does not prove absence: dynamic dispatch, macros and generated code hide uses. Check with `rg` before concluding that a function is unused.
 - After `mix deps.get` or a dependency change, run `"$TIPS_DEXTER" reindex`.
 - If `$TIPS_DEXTER` is unset or fails, report that once, with any error, and use scoped `rg`.
@@ -61,7 +61,7 @@ Before reading, editing or reviewing Elixir code, load `elixir` and each skill t
 - Test behaviour with integration tests. Add a unit test only for pure-logic boundary cases they do not reach, and an end-to-end test only for a user interaction that lower-level tests cannot exercise.
 - Default to no test changes. Read the existing tests for the issue's acceptance scenarios or the reported regression. If they detect the failure, leave them unchanged. Otherwise make the smallest set of changes that detects it: extend a test whose setup and action can exercise the scenario; add one only when none can. Changed functions, branches or input variants do not justify new cases.
 - Do not test frameworks, libraries, private functions or code structure.
-- For changed behaviour that no existing test establishes, write the acceptance or regression test first and confirm it fails for the intended reason.
+- If no existing test covers the changed behaviour, write the acceptance or regression test first and confirm it fails for the intended reason.
 - In the same PR, delete the tests your change makes redundant. Keep the only test of an acceptance scenario or regression.
 - Review test changes as a set against the existing tests for the same acceptance scenarios and regressions. When asking for removal or consolidation, name the existing test or the smaller replacement that keeps the coverage. Passing tests and a reason for each test do not show that the set is needed.
 
@@ -84,7 +84,7 @@ Fix the findings your change introduces; report the others.
 ## GitHub
 
 - Comment only for a decision, a finding or a blocker; no progress, status or acknowledgment comments.
-- Reviews: one finding per inline comment, on the line it concerns. The body holds only the verdict, the verification limits and findings outside the diff, each with its `path:line`.
+- Reviews: one finding per inline comment, on the line it concerns. Use the body only for the verdict, verification limits and findings outside the diff, each with its `path:line`.
 - Findings: start with [P0, P1 or P2](agent/teams/README.md#rules) and the change you ask for, then the consequence. For wrong behaviour give the steps or input, the actual result and the expected result; otherwise what it breaks or costs. A `suggestion` block is optional and must replace the commented lines exactly.
 - Replies: only to ask or answer a question the finding leaves open, link the commit that fixes it, or give the reason you decline it. The reviewer who opened a thread resolves it.
 - Blockers: what is blocked, the exact error or question, and who must act. Decisions: what and why, in one or two sentences.

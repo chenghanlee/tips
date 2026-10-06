@@ -1,46 +1,20 @@
 # Agent language tools
 
-Coding sessions get one **Dexter** language server per worktree: a single Go
+Each worktree uses one **Dexter** language server: a Go
 binary built from the pinned upstream revision plus one local patch. Claude and
 Codex both run its bound command, `"$TIPS_DEXTER"`, from their shell tool and
 attach to the same per-worktree daemon. There is one interface and one index:
 no editor client, plugin, adapter or MCP server.
 
-This is a read-only beta. Rename and other edits are not offered.
+This beta is read-only. It does not support renaming or other edits.
 
 ## Operations
 
-`"$TIPS_DEXTER" query --help` and `"$TIPS_DEXTER" lookup --help` are the
-contract for syntax, output, caps and exit status. Every checkout shares one
-binary, so its help describes what you are running. Where this guide differs,
-the help is right. The [Dexter skill](../skills/dexter/SKILL.md) says when to use Dexter.
+Follow the [AGENTS.md](../../AGENTS.md#elixir-navigation) Elixir navigation table and its
+use check. The [Dexter reference](../skills/dexter/SKILL.md) gives commands and
+position handling. If this guide differs from `"$TIPS_DEXTER" query --help` or
+`"$TIPS_DEXTER" lookup --help` on syntax, output, limits or exit status, follow the help.
 
-Run `"$TIPS_DEXTER" query <operation> <file> <line> <column>` from your shell:
-
-| Task | Operation | Try before |
-|---|---|---|
-| Know the name, not its position | `"$TIPS_DEXTER" lookup Module [function]` | guessing positions after edits |
-| Find a module or function by name | `workspace-symbols <name>` | `rg 'defmodule Name'`, `rg 'def name'` |
-| Outline a file, with each name's position | `symbols <file>` | reading the file |
-| Go from a call to its definition | `definition` | grepping for the `def` |
-| Find uses of a function or module | `references` | `rg -F 'name('` |
-| Read docs, spec and signature | `hover` | opening the file |
-| List implementations, from the `@callback` head | `implementation` | `rg '@behaviour'`, `rg '@impl'` |
-| Find callers of a function | `incoming-calls` | grepping for callers |
-| Find calls a function makes | `outgoing-calls` | reading its body |
-| Check which `Module.function/arity` a position selects | `prepare-call-hierarchy` | |
-
-- Positions: `lookup` gives the line; `symbols` gives the name's column. Take
-  them again after edits or checkout advancement. Read the `cursor:` line of
-  every positional answer to confirm the token; hierarchy also prints its
-  `selected:` callable.
-- Before changing or removing any function's name, arity or return shape,
-  private helpers included: run `references` at its definition, and a scoped
-  `rg` for the bare name and for any atom or tuple that dispatches to it. These
-  find candidate uses; source and tests establish the impact. Investigate
-  differences.
-- Use `definition` on unfamiliar call sites and `hover` for unfamiliar types or
-  specs.
 - Zero rows never means unused. `use Module, :atom`, MFA tuples, `apply` and
   generated code may have no indexed use.
 - Call hierarchy explains candidates and does not replace `references`. It
@@ -49,7 +23,7 @@ Run `"$TIPS_DEXTER" query <operation> <file> <line> <column>` from your shell:
 - A client truncation warning or an explicit limit means you have only part of
   the output; narrow the query or save it to a file.
 - `"$TIPS_DEXTER" reindex [file|path]` reconciles the index with the disk. Run
-  it after you fetch or change dependencies yourself.
+  it after fetching or changing dependencies.
 - Dexter reports no compiler errors: run Mix compile and tests.
 - If Dexter is unavailable, report it. Do not start another language server.
 
@@ -57,7 +31,7 @@ There is no reference search by name: it missed uses that the positional search
 finds. Take the definition's line from `lookup` and the name's column from
 `query symbols`, then run `query references` there.
 
-Queries admit the bound worktree, its dependency sources and the configured
+Queries accept files in the bound worktree, its dependency sources and the configured
 Elixir sources; a file from another checkout is refused with `does not belong
 to workspace`. Do not start another language server.
 
@@ -84,8 +58,8 @@ to workspace`. Do not start another language server.
   follows written source calls, not generated runtime wrapper edges.
   References at a default-argument head may cover multiple arities: compare
   them with incoming calls only at the same selected arity.
-- Call hierarchy answers are standard LSP items and carry no reasons: a call
-  the resolver cannot own is omitted without a completeness indicator. When
+- Call hierarchy answers are standard LSP items. They omit calls that cannot
+  be resolved, without explaining omissions or indicating completeness. When
   completeness matters, cross-check
   `references` against the sites of `incoming-calls` and review each
   reference with no matching site by hand: it may be a call the hierarchy
@@ -102,7 +76,7 @@ to workspace`. Do not start another language server.
   Text that moved since the index was built is re-checked and dropped when the
   occurrence no longer matches.
 - A known generated export can resolve to its module declaration when its
-  function source location cannot be resolved. This is a module anchor, not the function
+  function source location cannot be resolved. This points to the module, not the function
   body. Hierarchy items retain the callable identity and select the real module
   token within its declaration. Dexter does not reconstruct arbitrary
   compile-time macro expansion.
@@ -144,7 +118,7 @@ worktrees run concurrently. Nested checkouts, including scratch clones and
 linked worktrees under `.worktrees/`, are excluded from the parent's index
 and watcher. Dependency sources under `deps/` remain available. A root reached
 through a symlink is admitted only under the exact spelling it was bound with.
-Out of this beta: an application in a subdirectory or monorepo.
+This beta does not support an application in a subdirectory or monorepo.
 
 ## Pair provisioning
 
@@ -218,6 +192,6 @@ the Go static-analysis rule for it.
 Dexter indexes the Elixir standard library from source. Put the release matching
 `elixir --short-version` in the main checkout's ignored `agent/lsp/vendor/elixir-<version>/`
 (from the [Elixir repository](https://github.com/elixir-lang/elixir); the tree
-holds `VERSION` and `lib/elixir/lib/enum.ex`), or point `DEXTER_ELIXIR_LIB_ROOT`
+contains `VERSION` and `lib/elixir/lib/enum.ex`), or point `DEXTER_ELIXIR_LIB_ROOT`
 at another checkout's `lib/`. A Homebrew installation has no sources. Provisioning
 refuses to start unless the tree's `VERSION` matches the worktree's toolchain.
