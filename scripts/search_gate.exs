@@ -42,6 +42,8 @@ defmodule SearchGateScript do
     # Only the gate's own steps may call the provider: no cron scan, no queues.
     oban = Application.fetch_env!(:tips, Oban)
     Application.put_env(:tips, Oban, Keyword.merge(oban, queues: false, plugins: false))
+    # Production's level: development's per-query debug logging would add to measured latency.
+    Logger.configure(level: :info)
     {:ok, _apps} = Application.ensure_all_started(:tips)
     :real = Tips.ProviderConfig.mode()
 
