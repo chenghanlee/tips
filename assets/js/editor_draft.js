@@ -10,8 +10,8 @@
 // saved draft. A paused editor offers "Reload saved draft", which replaces
 // the input with the saved draft and resumes autosave; typing during that
 // read stays and keeps autosave paused. The hook sends
-// editor:restore only to apply a draft; the page replies "restored" or
-// "rejected" ("preserved" keeps input like "rejected").
+// editor:restore only to apply a draft; the page replies "restored",
+// "published" or "rejected".
 //
 // A reconnect reads no storage: LiveView recovers the form through
 // editor:recover, and this hook keeps its draft pair. A read still pending at
@@ -23,9 +23,19 @@
 // After a submit fails validation (editor:refused), the hook opens the
 // evidence disclosure when it holds an invalid field and focuses the error
 // summary. A summary link focuses its field.
+//
+// A submit saves exactly the submitted values first. When the page confirms
+// them (editor:clear), the hook clears the revision that holds them, only
+// while the slot still holds it, and reports the result (editor:cleared);
+// the page then leaves, or stays when other work kept the draft. If that
+// report is lost, or the page reconnects after the clear, the hook leaves for
+// the confirmed item itself. A restore the page answers "published" clears
+// the restored revision the same way. editor:settled says whether the
+// submission is still unresolved; after a reconnect, an unsettled submission
+// is looked up again (editor:reconcile), as its reply may have been lost.
 
 import {EDITOR_EVENTS} from "./editor_contract.js"
-import {create, load, save} from "./editor_draft_store.js"
+import {clear, create, load, save} from "./editor_draft_store.js"
 
 const SAVE_DELAY_MS = 500
 
@@ -53,7 +63,8 @@ export const EditorDraft = {
     // The pair of the stored draft this page may replace; null until it holds one.
     this.expected = null
     // reading -> restoring -> composing or paused; paused -> reloading ->
-    // restoring; destroyed at the end.
+    // restoring; composing or restoring -> clearing -> cleared or paused;
+    // destroyed at the end.
     this.phase = "reading"
     this.connected = true
     // The page disconnected during the first read, so it recovered the form
@@ -63,8 +74,17 @@ export const EditorDraft = {
     this.reading = null
     this.pending = null
     this.timer = null
-    this.writing = false
-    this.again = false
+    // Draft writes run one at a time, in order.
+    this.queue = Promise.resolve(null)
+    // Resolves to {status, pair}: whether the last submitted values were saved,
+    // and the pair that holds them.
+    this.submission = null
+    // Autosave paused because the slot holds other work.
+    this.kept = false
+    // Where a confirmed item is; the hook leaves for it after its clear.
+    this.destination = null
+    // A submission whose outcome the page has not settled.
+    this.unsettled = false
     this.typed = !sameAttrs(readAttrs(this.el, this.kind), this.record.intent.attrs, this.kind)
     this.onInput = () => {
       this.typed = true
@@ -75,7 +95,13 @@ export const EditorDraft = {
     this.reloadButton().addEventListener("click", this.onReload)
     this.onClick = (event) => this.followError(event)
     this.el.addEventListener("click", this.onClick)
+    this.onSubmit = () => this.submitted()
+    this.el.addEventListener("submit", this.onSubmit)
     this.handleEvent(EDITOR_EVENTS.refused, () => this.showErrors())
+    this.handleEvent(EDITOR_EVENTS.clear, (request) => this.clearSubmitted(request))
+    this.handleEvent(EDITOR_EVENTS.settled, ({unresolved}) => {
+      this.unsettled = unresolved
+    })
     load(this.record.storage).then((result) => this.settleRead(result))
   },
 
@@ -97,10 +123,14 @@ export const EditorDraft = {
 
   reconnected() {
     this.connected = true
+    // The remounted page no longer holds the confirmed receipt.
+    if (this.phase === "cleared") this.leave()
+    else if (this.unsettled) this.pushEvent(EDITOR_EVENTS.reconcile, {}, () => {})
   },
 
   destroyed() {
     const unsaved = this.phase === "composing" && this.timer !== null
+    const attrs = readAttrs(this.el, this.kind)
     clearTimeout(this.timer)
     this.timer = null
     this.phase = "destroyed"
@@ -108,9 +138,10 @@ export const EditorDraft = {
     this.pending = null
     this.el.removeEventListener("input", this.onInput)
     this.el.removeEventListener("click", this.onClick)
+    this.el.removeEventListener("submit", this.onSubmit)
     this.reloadButton().removeEventListener("click", this.onReload)
     // Best effort: the write may still finish after the page is gone.
-    if (unsaved) this.write()
+    if (unsaved) this.enqueue(() => attrs)
   },
 
   settleRead(result) {
@@ -136,7 +167,7 @@ export const EditorDraft = {
     if (this.reading !== token) return
     this.reading = null
     if (result.status !== "ok") {
-      this.pause(STATUS.unread, true)
+      this.pause(STATUS.unread, true, false)
     } else if (result.record === null) {
       // Nothing saved any more: keep the input and save it as a new draft.
       this.expected = null
@@ -162,6 +193,15 @@ export const EditorDraft = {
     this.pushEvent(EDITOR_EVENTS.restore, {identity: this.identity, record}, (reply) => {
       if (this.pending !== token) return
       this.pending = null
+      if (reply.status === "published") {
+        // The draft's publication is confirmed: the page restored it; clear it.
+        this.record = record
+        this.expected = record.draft
+        this.destination = reply.to
+        this.phase = "clearing"
+        clear(record.storage, record.draft).then(({status}) => this.settleClear(status))
+        return
+      }
       this.js().removeAttribute(fields, "disabled")
       if (reply.status !== "restored") {
         this.pause(STATUS.rejected)
@@ -183,10 +223,12 @@ export const EditorDraft = {
     if (this.typed) this.schedule()
   },
 
-  pause(message, reloadable = false) {
+  // `kept`: the slot holds other work than this page's input.
+  pause(message, reloadable = false, kept = true) {
     clearTimeout(this.timer)
     this.timer = null
     this.phase = "paused"
+    this.kept = kept
     this.showReload(reloadable)
     this.status(message)
   },
@@ -202,38 +244,101 @@ export const EditorDraft = {
     this.timer = setTimeout(() => this.flush(), SAVE_DELAY_MS)
   },
 
-  // One write at a time; typing during a write saves again afterwards.
-  async flush() {
+  flush() {
     this.timer = null
-    if (this.writing) {
-      this.again = true
-      return
-    }
-    this.writing = true
-    do {
-      this.again = false
-      await this.write()
-    } while (this.again && this.phase === "composing")
-    this.writing = false
+    this.enqueue(() => (this.phase === "composing" ? readAttrs(this.el, this.kind) : null))
+  },
+
+  // Queues a write of the values `attrs` returns when the write starts; null
+  // skips it. Resolves to the store's result, or null.
+  enqueue(attrs) {
+    const run = this.queue.then(() => {
+      const values = attrs()
+      return values === null ? null : this.write(values)
+    })
+    this.queue = run
+    return run
   },
 
   // Creates the slot's draft at revision 0, then saves under the pair it holds.
-  async write() {
+  async write(attrs) {
     const draft = this.expected ?? {draft_id: this.record.draft.draft_id, revision: 0}
-    const intent = {attrs: readAttrs(this.el, this.kind), uploads: this.record.intent.uploads}
-    const record = {...this.record, draft, intent}
+    const record = {...this.record, draft, intent: {attrs, uploads: this.record.intent.uploads}}
     const result =
       this.expected === null ? await create(record) : await save(record.storage, this.expected, record)
-    if (this.phase === "destroyed") return
+    if (this.phase === "destroyed") return result
     if (result.status === "ok") {
       this.record = result.record
       this.expected = result.record.draft
       if (this.phase === "composing") this.status(`Draft saved in this browser at ${clock()}`)
+    } else if (this.phase !== "composing") {
+      // A submission's write: the page decides what follows.
     } else if (result.status === "conflict") {
       this.pause(STATUS.conflict, true)
     } else {
       this.status(STATUS.unsaved)
     }
+    return result
+  },
+
+  // The form is submitting the values on screen; LiveView keeps the inputs
+  // read-only until the reply. Saves exactly these values, so that a
+  // confirmed receipt clears the revision that holds them. A save conflict,
+  // or autosave paused over other work, means the slot keeps other work.
+  // An unrestored or unreadable editor holds no revision.
+  submitted() {
+    this.unsettled = true
+    if (this.phase !== "composing") {
+      const status = this.phase === "paused" && this.kept ? "conflict" : "none"
+      this.submission = Promise.resolve({status, pair: null})
+      return
+    }
+    clearTimeout(this.timer)
+    this.timer = null
+    const attrs = readAttrs(this.el, this.kind)
+    this.submission = this.enqueue(() => attrs).then((result) => ({
+      status: result?.status ?? "none",
+      pair: result?.status === "ok" ? result.record.draft : null,
+    }))
+  },
+
+  // editor:clear: the page confirmed the submitted content. Clears the
+  // revision that holds it, only if the slot still holds that revision.
+  async clearSubmitted({storage, draft_id, to}) {
+    this.destination = to
+    if (this.phase === "cleared") return this.settleClear("ok")
+    this.phase = "clearing"
+    clearTimeout(this.timer)
+    this.timer = null
+    this.js().setAttribute(this.fields(), "disabled", "")
+    const submitted = await (this.submission ?? {status: "none", pair: null})
+    const ours =
+      submitted.pair !== null && submitted.pair.draft_id === draft_id && sameStorage(storage, this.record.storage)
+    const {status} = ours ? await clear(this.record.storage, submitted.pair) : submitted
+    this.settleClear(ours || status === "conflict" ? status : "none")
+  },
+
+  // Reports the clear: "ok", "none" (no revision of ours held the values) or
+  // "error" let the page leave; "conflict" keeps the other work and the
+  // editor. If the page does not leave, as when the report is lost, the hook
+  // leaves by itself.
+  settleClear(status) {
+    if (this.phase === "destroyed") return
+    if (status === "conflict") {
+      this.js().removeAttribute(this.fields(), "disabled")
+      this.pause(STATUS.conflict, true)
+      this.pushEvent(EDITOR_EVENTS.cleared, {status}, () => {})
+      return
+    }
+    this.phase = "cleared"
+    this.pushEvent(EDITOR_EVENTS.cleared, {status}).then(
+      ({left}) => left || this.leave(),
+      () => this.leave(),
+    )
+  },
+
+  leave() {
+    if (this.phase === "cleared" && this.destination) window.location.assign(this.destination)
   },
 
   // The page has patched in the errors before this runs. LiveView then
@@ -291,5 +396,9 @@ function readAttrs(form, kind) {
 
 // The form renders null as an empty field.
 const sameAttrs = (a, b, kind) => FIELDS[kind].every((field) => (a[field] ?? "") === (b[field] ?? ""))
+
+// Key order differs between the page's JSON and the store's copies.
+const sameStorage = (a, b) =>
+  a.account_id === b.account_id && ["tag", "tip_id", "kind", "id"].every((key) => a.slot[key] === b.slot[key])
 
 const clock = () => new Date().toLocaleTimeString([], {hour: "numeric", minute: "2-digit"})

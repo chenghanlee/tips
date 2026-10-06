@@ -6,31 +6,45 @@ defmodule TipsWeb.Editor do
   `assets/js/editor_draft.js`.
 
   The page assigns `:identity`, `:record`, `:attrs`, `:form`, `:check`,
-  `:refusal` and `:outcome`:
+  `:pending`, `:receipt`, `:saved`, `:refusal` and `:outcome`:
 
     * `:record` is the draft the page was mounted, restored or recovered with.
-      It holds the submission key, the edit base and expected version. The
-      hook owns the browser revision after its first save and never writes it
-      back to the page.
+      It holds the submission key, the edit base and expected version, and
+      after a submit the submitted values. The hook owns the browser revision
+      after its first save and never writes it back to the page.
     * `:attrs` are the current field values, exactly as typed. `phx-change`
       keeps them in step with the browser. It validates only after a submit
       failed validation; `:check` holds that submit's values and errors.
-    * `:refusal` explains a refused save and `:outcome` confirms a save.
+    * `:pending` is set while a submission's outcome is unresolved: `:absent`
+      (no publication now; Retry sends the same key), `:unchecked` (the
+      lookup failed; Check again) or `:signed_out`. Its values stay fixed.
+    * `:receipt` is a confirmed publication or save, with its destination
+      `:to`, whose draft the hook is clearing. `:saved` is the current saved edit after an unknown outcome.
+    * `:refusal` explains a refused or unconfirmed save and `:outcome` a save
+      whose browser draft was kept.
 
-  `submit/2` validates the whole form with `Tips.Content.change_content/2`,
-  readmits the session, then publishes or saves. Clearing the submitted draft
-  and leaving the editor are #80's.
+  A submit validates the whole form with `Tips.Content.change_content/2`,
+  readmits the session, then publishes or saves. A `:created`,
+  `:existing_equivalent`, `:updated` or `:noop` receipt pushes `editor:clear`;
+  once the hook has cleared the submitted draft, the page leaves for the
+  published item; the hook leaves by itself if that reply is lost. If other
+  browser work kept the draft, the page stays. Any other receipt keeps the
+  draft. An unknown outcome runs one lookup:
+  `Tips.Content.get_publication/4` for a publication, `get_edit_form/3` for an
+  edit, which shows the saved version beside the proposal and keeps the
+  expected version. A restored new draft is looked up before it is applied.
 
   The page renders `form_attrs/1` on its form and `hidden_inputs/1` inside it.
-  A browser record or recovered form is untrusted input: `restore/2` and
-  `recover/2` accept it only for the freshly mounted account and target, and
-  only in the shape the hook and store use.
+  A browser record or recovered form is untrusted input: `editor:restore` and
+  `editor:recover` accept it only for the freshly mounted account and target,
+  and only in the shape the hook and store use.
   """
   use Phoenix.Component
   use TipsWeb, :verified_routes
 
+  alias Phoenix.LiveView
   alias Tips.Content
-  alias TipsWeb.{AuthMailAdmission, CoreComponents, EditorContract, UserAuth}
+  alias TipsWeb.{AuthMailAdmission, CoreComponents, EditorContract, Reader, UserAuth}
 
   @kinds %{"tip" => :tip, "review" => :review}
 
@@ -94,6 +108,9 @@ defmodule TipsWeb.Editor do
     assign(socket,
       identity: %{account_id: account_id(socket), target: target},
       check: nil,
+      pending: nil,
+      receipt: nil,
+      saved: nil,
       refusal: nil,
       outcome: nil
     )
@@ -128,49 +145,109 @@ defmodule TipsWeb.Editor do
   defp account_id(socket), do: socket.assigns.current_scope.user.id
 
   @doc """
-  Keeps the typed values from a `phx-change` event. Validates changed fields
-  only after a submit failed validation.
+  Handles the editor form's events and the `EditorDraft` hook's:
+
+    * `"change"` keeps the typed values; it validates changed fields only
+      after a submit failed validation.
+    * `"submit"` publishes or saves (see the module documentation).
+    * `"editor:restore"` applies the record the hook read, replying
+      `restored`, `published` (its publication was already confirmed, so the
+      hook clears it) or `rejected`.
+    * `"editor:recover"` keeps a reconnected form's record and values.
+    * `"editor:reconcile"` looks up an unresolved submission again: Check
+      again, or the hook after a reconnect lost a submit's reply.
+    * `"editor:cleared"` is the hook's result for the confirmed draft.
   """
-  @spec change(Phoenix.LiveView.Socket.t(), map()) :: Phoenix.LiveView.Socket.t()
-  def change(socket, params) do
+  @spec handle_event(String.t(), map(), LiveView.Socket.t()) ::
+          {:noreply, LiveView.Socket.t()} | {:reply, map(), LiveView.Socket.t()}
+  def handle_event("change", params, socket), do: {:noreply, change(socket, params)}
+  def handle_event("submit", params, socket), do: {:noreply, submit(socket, params)}
+
+  def handle_event("editor:restore", params, socket) do
+    {reply, socket} = restore(socket, params)
+    {:reply, reply, settle(socket)}
+  end
+
+  def handle_event("editor:recover", params, socket), do: {:noreply, recover(socket, params)}
+
+  def handle_event("editor:reconcile", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(refusal: nil, outcome: nil)
+     |> fix(socket.assigns.attrs)
+     |> reconcile()
+     |> settle()}
+  end
+
+  def handle_event("editor:cleared", params, socket) do
+    {left?, socket} = cleared(socket, params)
+    {:reply, %{left: left?}, socket}
+  end
+
+  defp change(socket, params) do
     kind = kind(socket.assigns.identity.target)
     assign_attrs(socket, typed_attrs(kind, params[Atom.to_string(kind)], socket.assigns.attrs))
   end
 
-  @doc """
-  Handles the form's `submit`: validates every field, including untouched
-  ones, then readmits the session and publishes or saves the typed values.
-  Every refusal keeps the input. A failed validation pushes `editor:refused`,
-  so the hook opens the evidence disclosure around an error and focuses the
-  error summary.
-  """
-  @spec submit(Phoenix.LiveView.Socket.t(), map()) :: Phoenix.LiveView.Socket.t()
-  def submit(socket, params) do
-    socket = socket |> change(params) |> assign(refusal: nil, outcome: nil)
-    %{identity: %{target: target}, record: record, attrs: attrs} = socket.assigns
+  # Validates every field, including untouched ones, then readmits the session
+  # and publishes or saves the typed values. An unresolved submission sends
+  # its fixed values again. Every refusal keeps the input. A failed validation
+  # pushes `editor:refused`, so the hook opens the evidence disclosure around
+  # an error and focuses the error summary.
+  defp submit(socket, params) do
+    socket
+    |> assign(refusal: nil, outcome: nil)
+    |> submitted(params)
+    |> settle()
+  end
 
-    with %{valid?: true} <- Content.change_content(kind(target), attrs),
-         {:ok, socket} <- UserAuth.readmit(socket),
-         {:ok, receipt} <- write(socket.assigns.current_scope, record, attrs) do
-      socket |> assign(:check, nil) |> assign_attrs(attrs) |> saved(receipt)
-    else
-      %Ecto.Changeset{errors: errors} -> invalid(socket, errors)
-      {:error, %Ecto.Changeset{errors: errors}} -> invalid(socket, errors)
-      {:error, reason} -> socket |> assign(:check, nil) |> assign_attrs(attrs) |> refuse(reason)
+  defp submitted(%{assigns: %{pending: pending, record: record}} = socket, _params)
+       when pending != nil,
+       do: write(socket, record.intent.attrs)
+
+  defp submitted(socket, params) do
+    socket = change(socket, params)
+    attrs = socket.assigns.attrs
+
+    case Content.change_content(kind(socket.assigns.identity.target), attrs) do
+      %{valid?: true} -> socket |> assign(:check, nil) |> assign_attrs(attrs) |> write(attrs)
+      %{errors: errors} -> invalid(socket, errors)
     end
   end
 
-  defp write(scope, %{target: :new_tip, submission_key: key} = record, attrs),
-    do: Content.publish_tip(scope, key, attrs, uploads(record))
+  defp write(socket, attrs) do
+    socket = fix(socket, attrs)
 
-  defp write(scope, %{target: {:new_review, tip_id}, submission_key: key} = record, attrs),
-    do: Content.publish_review(scope, tip_id, key, attrs, uploads(record))
+    with {:ok, socket} <- UserAuth.readmit(socket),
+         {:ok, receipt} <- save(socket.assigns.current_scope, socket.assigns.record) do
+      acknowledge(socket, receipt)
+    else
+      {:error, %Ecto.Changeset{errors: errors}} ->
+        socket |> assign(:pending, nil) |> invalid(errors)
 
-  defp write(scope, %{target: {:edit, :tip, id}, expected_version: version} = record, attrs),
-    do: Content.edit_tip(scope, id, version, attrs, uploads(record))
+      {:error, :outcome_unknown} ->
+        reconcile(socket)
 
-  defp write(scope, %{target: {:edit, :review, id}, expected_version: version} = record, attrs),
-    do: Content.edit_review(scope, id, version, attrs, uploads(record))
+      {:error, reason} ->
+        refuse(socket, reason)
+    end
+  end
+
+  # The submitted values, kept with the key, base and version for a lookup,
+  # a retry and reconnect recovery.
+  defp fix(socket, attrs), do: update(socket, :record, &put_in(&1.intent.attrs, attrs))
+
+  defp save(scope, %{target: :new_tip, submission_key: key} = record),
+    do: Content.publish_tip(scope, key, record.intent.attrs, uploads(record))
+
+  defp save(scope, %{target: {:new_review, tip_id}, submission_key: key} = record),
+    do: Content.publish_review(scope, tip_id, key, record.intent.attrs, uploads(record))
+
+  defp save(scope, %{target: {:edit, :tip, id}, expected_version: version} = record),
+    do: Content.edit_tip(scope, id, version, record.intent.attrs, uploads(record))
+
+  defp save(scope, %{target: {:edit, :review, id}, expected_version: version} = record),
+    do: Content.edit_review(scope, id, version, record.intent.attrs, uploads(record))
 
   # Browser image metadata never proves saved bytes.
   defp uploads(%{intent: %{uploads: nil}}), do: nil
@@ -183,25 +260,118 @@ defmodule TipsWeb.Editor do
     socket
     |> assign(:check, %{attrs: socket.assigns.attrs, errors: errors})
     |> assign_attrs(socket.assigns.attrs)
-    |> Phoenix.LiveView.push_event("editor:refused", %{})
+    |> LiveView.push_event("editor:refused", %{})
   end
 
-  defp saved(socket, %{outcome: outcome}) when outcome in [:created, :existing_equivalent],
-    do: assign(socket, :outcome, "Published")
+  # Only content acknowledged as submitted clears the submitted draft.
+  defp acknowledge(socket, %{outcome: outcome} = receipt)
+       when outcome in [:created, :existing_equivalent, :updated, :noop] do
+    %{storage: storage, draft: %{draft_id: draft_id}} = socket.assigns.record
+    socket = confirm(socket, receipt)
 
-  defp saved(socket, %{outcome: outcome}) when outcome in [:updated, :noop],
-    do: assign(socket, :outcome, "Changes saved")
+    LiveView.push_event(socket, "editor:clear", %{
+      storage: storage_json(storage),
+      draft_id: draft_id,
+      to: socket.assigns.receipt.to
+    })
+  end
 
-  defp saved(socket, %{outcome: outcome})
-       when outcome in [:existing_different, :existing_unknown],
-       do: refuse(socket, :published_earlier)
+  defp acknowledge(socket, receipt) do
+    socket
+    |> assign(:pending, nil)
+    |> refuse(:published_earlier, receipt.state != :deleted && destination(socket, receipt))
+  end
 
-  defp refuse(socket, reason) do
+  # Holds the confirmed receipt and its destination until the hook's clear.
+  defp confirm(socket, receipt),
+    do: assign(socket, pending: nil, receipt: Map.put(receipt, :to, destination(socket, receipt)))
+
+  # One lookup of what an unknown outcome left saved. A publication is looked
+  # up by its key and the submitted values; an edit reads the saved version
+  # and keeps its expected version, so saving again keeps the version guard.
+  defp reconcile(socket), do: reconciled(socket, lookup(socket))
+
+  defp lookup(%{assigns: %{record: %{mode: :new} = record}} = socket) do
+    with {:ok, socket} <- UserAuth.readmit(socket) do
+      Content.get_publication(
+        socket.assigns.current_scope,
+        publication_kind(record.target),
+        record.submission_key,
+        %{attrs: record.intent.attrs, uploads: uploads(record)}
+      )
+    end
+  end
+
+  defp lookup(%{assigns: %{record: %{target: {:edit, kind, id}}}} = socket) do
+    with {:ok, socket} <- UserAuth.readmit(socket),
+         do: Content.get_edit_form(socket.assigns.current_scope, kind, id)
+  end
+
+  defp publication_kind(:new_tip), do: :tip
+  defp publication_kind({:new_review, tip_id}), do: {:review, tip_id}
+
+  defp reconciled(socket, {:ok, %{base: %{attrs: saved}}}),
+    do: socket |> assign(pending: nil, saved: saved) |> refuse(:unconfirmed_edit)
+
+  defp reconciled(socket, {:ok, nil}), do: unresolved(socket, :absent)
+  defp reconciled(socket, {:ok, receipt}), do: acknowledge(socket, receipt)
+  defp reconciled(socket, {:error, :unauthenticated}), do: unresolved(socket, :signed_out)
+  defp reconciled(socket, {:error, :outcome_unknown}), do: unresolved(socket, :unchecked)
+  defp reconciled(socket, {:error, reason}), do: socket |> assign(:pending, nil) |> refuse(reason)
+
+  defp unresolved(socket, pending),
+    do: socket |> assign(:pending, pending) |> refuse({:unresolved, pending})
+
+  # Tells the hook whether a submission is still unresolved, so it looks it
+  # up again after a reconnect.
+  defp settle(socket),
+    do:
+      LiveView.push_event(socket, "editor:settled", %{unresolved: socket.assigns.pending != nil})
+
+  # The hook's result for the confirmed draft: cleared, not stored or not
+  # clearable leave the editor; other browser work keeps it open. Returns
+  # whether the page is leaving; without a receipt (a remounted page) the
+  # hook leaves by itself.
+  defp cleared(%{assigns: %{receipt: nil}} = socket, _params), do: {false, socket}
+
+  defp cleared(%{assigns: %{receipt: receipt}} = socket, %{"status" => "conflict"}),
+    do: {false, assign(socket, receipt: nil, outcome: kept(receipt))}
+
+  defp cleared(%{assigns: %{receipt: receipt}} = socket, _params) do
+    {true,
+     socket
+     |> assign(:receipt, nil)
+     |> LiveView.put_flash(:info, done(receipt))
+     |> LiveView.push_navigate(to: receipt.to)}
+  end
+
+  defp done(%{outcome: outcome}) when outcome in [:updated, :noop], do: "Changes saved."
+  defp done(_receipt), do: "Published."
+
+  defp kept(%{outcome: outcome}) when outcome in [:updated, :noop],
+    do: "Changes saved. A different draft saved in this browser was kept; it isn't saved."
+
+  defp kept(_receipt),
+    do: "Published. A different draft saved in this browser was kept; it isn't published."
+
+  # The item's page, from its current projection.
+  defp destination(_socket, %{kind: :review, id: id}), do: ~p"/reviews/#{id}"
+
+  defp destination(socket, %{kind: :tip, id: id}) do
+    case Content.get_tip_page(UserAuth.viewer(socket), id) do
+      {:ok, %{tip: tip}} -> Reader.tip_path(tip)
+      {:error, _reason} -> ~p"/tips/#{id}/tip"
+    end
+  end
+
+  defp refuse(socket, reason, view \\ false) do
     %{target: target} = socket.assigns.identity
 
     assign(socket, :refusal, %{
       message: refusal(reason, kind(target), verb(target)),
-      sign_in: reason == :unauthenticated && sign_in_path(target)
+      sign_in: reason in [:unauthenticated, {:unresolved, :signed_out}] && sign_in_path(target),
+      check: reason == {:unresolved, :unchecked},
+      view: view
     })
   end
 
@@ -237,10 +407,23 @@ defmodule TipsWeb.Editor do
   defp refusal(:conflict, _kind, _verb), do: "This draft belongs to another tip."
 
   defp refusal(:published_earlier, kind, _verb),
-    do: "This draft was published earlier, maybe with other text. This #{kind} was not changed."
+    do:
+      "This draft was published earlier, and that #{kind} may differ from what is here. Nothing new was published."
 
-  defp refusal(:outcome_unknown, _kind, verb),
-    do: "We couldn't confirm whether this was #{past(verb)}."
+  defp refusal({:unresolved, :absent}, kind, _verb),
+    do:
+      "We couldn't confirm whether your #{kind} was published, and it isn't published now. Retry to publish it."
+
+  defp refusal({:unresolved, :unchecked}, _kind, verb),
+    do: "We couldn't check whether this was #{past(verb)}. Check again before you change it."
+
+  defp refusal({:unresolved, :signed_out}, _kind, verb),
+    do:
+      "We couldn't check whether this was #{past(verb)} because your sign-in has expired. Sign in again to check."
+
+  defp refusal(:unconfirmed_edit, kind, _verb),
+    do:
+      "We couldn't confirm whether your changes were saved. The saved #{kind} is below. If you save again and your changes were already saved, you'll be told the #{kind} changed."
 
   defp refusal({upload, _refs}, _kind, verb) when upload in [:upload_failed, :upload_pending],
     do: "An attachment isn't ready, so nothing was #{past(verb)}."
@@ -255,36 +438,52 @@ defmodule TipsWeb.Editor do
   defp editor_path({:edit, :tip, id}), do: ~p"/editor/tips/#{id}/edit"
   defp editor_path({:edit, :review, id}), do: ~p"/editor/reviews/#{id}/edit"
 
-  @doc """
-  Handles `editor:restore`: applies the record the hook read when its identity,
-  storage slot and target are this form's. Returns the reply to send.
-  """
-  @spec restore(Phoenix.LiveView.Socket.t(), map()) ::
-          {map(), Phoenix.LiveView.Socket.t()}
-  def restore(socket, %{"identity" => identity, "record" => json}) do
+  # Applies the record the hook read when its identity, storage slot and
+  # target are this form's. Returns the reply to send.
+  defp restore(socket, %{"identity" => identity, "record" => json}) do
     with true <- identity == identity_json(socket.assigns.identity),
          {:ok, record} <- own_record(socket, json) do
-      {reply("restored", json), assign_record(socket, record)}
+      reopen(socket, record, json)
     else
       _ -> {reply("rejected", json), socket}
     end
   end
 
-  def restore(socket, params), do: {reply("rejected", params["record"]), socket}
+  defp restore(socket, params), do: {reply("rejected", params["record"]), socket}
+
+  # A new draft may have been published from another page: its key is looked
+  # up first. An equivalent publication restores the draft while the hook
+  # clears it, so recovery keeps its key until the clear settles; a missing
+  # one restores the ordinary draft.
+  defp reopen(socket, %{mode: :new} = record, json) do
+    restored = assign_record(socket, record)
+
+    case lookup(restored) do
+      {:ok, nil} ->
+        {reply("restored", json), restored}
+
+      {:ok, %{outcome: :existing_equivalent} = receipt} ->
+        restored = confirm(restored, receipt)
+        {Map.put(reply("published", json), :to, restored.assigns.receipt.to), restored}
+
+      result ->
+        {reply("restored", json), reconciled(restored, result)}
+    end
+  end
+
+  defp reopen(socket, record, json), do: {reply("restored", json), assign_record(socket, record)}
 
   defp reply(status, json) when is_map(json),
     do: %{status: status, storage: json["storage"], draft: json["draft"]}
 
   defp reply(status, _json), do: %{status: status, storage: nil, draft: nil}
 
-  @doc """
-  Handles `editor:recover` after a reconnect. When the hidden identity is
-  this freshly mounted form's, keeps the hidden record (submission key, base,
-  expected version) and the recovered field values, blanks included.
-  Otherwise keeps the fresh mount and ignores the recovered values.
-  """
-  @spec recover(Phoenix.LiveView.Socket.t(), map()) :: Phoenix.LiveView.Socket.t()
-  def recover(socket, %{"editor" => %{"identity" => identity, "record" => record}} = params) do
+  # After a reconnect, when the hidden identity is this freshly mounted
+  # form's, keeps the hidden record (submission key, base, expected version)
+  # and the recovered field values, blanks included. Otherwise keeps the
+  # fresh mount and ignores the recovered values. Fixed fields are disabled
+  # and send no values, so the record's submitted values stay.
+  defp recover(socket, %{"editor" => %{"identity" => identity, "record" => record}} = params) do
     expected = identity_json(socket.assigns.identity)
     kind = kind(socket.assigns.identity.target)
 
@@ -299,7 +498,7 @@ defmodule TipsWeb.Editor do
     end
   end
 
-  def recover(socket, _params), do: socket
+  defp recover(socket, _params), do: socket
 
   # A record for this account's slot and this form's target. A handoff record
   # (an edit target in a new slot) is #93's.
@@ -477,14 +676,71 @@ defmodule TipsWeb.Editor do
   defp label(_kind, field), do: Phoenix.Naming.humanize(field)
 
   @doc """
+  Renders the saved version of an edit whose outcome was unknown, beside the
+  author's proposal.
+  """
+  attr :identity, :map, required: true
+  attr :saved, :map, default: nil, doc: "the saved `t:Tips.Content.attrs/0`"
+  attr :choices, :map, required: true, doc: "`Tips.Content.list_filter_choices/0`"
+
+  def saved_version(assigns) do
+    kind = kind(assigns.identity.target)
+
+    rows =
+      for field <- fields(kind) -- [:model_other],
+          value = shown(field, assigns.saved || %{}, assigns.choices),
+          value != nil,
+          do: {label(kind, field), value}
+
+    assigns = assign(assigns, :rows, rows)
+
+    ~H"""
+    <section
+      :if={@saved}
+      id={"#{form_id(@identity)}-saved"}
+      aria-labelledby={"#{form_id(@identity)}-saved-title"}
+      class="grid gap-3 rounded-md border p-4"
+    >
+      <h2 id={"#{form_id(@identity)}-saved-title"} class="font-semibold">Saved version</h2>
+      <dl class="grid gap-2">
+        <div :for={{label, value} <- @rows}>
+          <dt class="text-sm text-muted-foreground">{label}</dt>
+          <dd class="whitespace-pre-wrap">{value}</dd>
+        </div>
+      </dl>
+    </section>
+    """
+  end
+
+  defp shown(:model_id, %{model_other: other}, _choices) when other not in [nil, ""], do: other
+  defp shown(field, saved, choices), do: choice(field, Map.get(saved, field), choices)
+
+  defp choice(_field, value, _choices) when value in [nil, ""], do: nil
+
+  defp choice(field, value, choices) when field in [:tag_id, :model_id, :environment_id] do
+    list =
+      Map.fetch!(
+        choices,
+        %{tag_id: :tags, model_id: :models, environment_id: :environments}[field]
+      )
+
+    Enum.find_value(list, value, &(&1.id == value && &1.label))
+  end
+
+  defp choice(_field, value, _choices), do: value
+
+  @doc """
   Renders the draft status line, which the hook writes, the "Reload saved
   draft" button the hook shows while autosave is paused, the refusal or
-  confirmation of the last submit, and the submit button.
+  confirmation of the last submit, and the submit button. While a
+  submission is unresolved, the button retries it or is disabled until it
+  is checked again.
   """
   attr :identity, :map, required: true
   attr :submit, :string, required: true
   attr :refusal, :map, default: nil
   attr :outcome, :string, default: nil
+  attr :pending, :atom, default: nil
 
   def editor_bar(assigns) do
     ~H"""
@@ -508,15 +764,26 @@ defmodule TipsWeb.Editor do
         role="alert"
       >
         {@refusal.message} Your text stays on this page.
-        <:actions :if={@refusal.sign_in}>
-          <a href={@refusal.sign_in}>Sign in</a>
+        <:actions :if={@refusal.sign_in || @refusal.check || @refusal.view}>
+          <a :if={@refusal.sign_in} href={@refusal.sign_in}>Sign in</a>
+          <TipsWeb.UI.button
+            :if={@refusal.check}
+            type="button"
+            variant="outline"
+            phx-click="editor:reconcile"
+          >
+            Check again
+          </TipsWeb.UI.button>
+          <a :if={@refusal.view} href={@refusal.view}>View it</a>
         </:actions>
       </TipsWeb.UI.notice>
       <p id={"#{form_id(@identity)}-outcome"} role="status" class="text-sm font-medium">
         {@outcome}
       </p>
       <div>
-        <TipsWeb.UI.button type="submit" size="lg">{@submit}</TipsWeb.UI.button>
+        <TipsWeb.UI.button type="submit" size="lg" disabled={@pending in [:unchecked, :signed_out]}>
+          {if @pending == :absent, do: "Retry", else: @submit}
+        </TipsWeb.UI.button>
       </div>
     </div>
     """
@@ -566,12 +833,12 @@ defmodule TipsWeb.Editor do
   defp identity_json(%{account_id: account_id, target: target}),
     do: %{"account_id" => account_id, "target" => target_json(target)}
 
+  defp storage_json(%{account_id: account_id, slot: slot}),
+    do: %{"account_id" => account_id, "slot" => target_json(slot)}
+
   defp record_json(record) do
     %{
-      "storage" => %{
-        "account_id" => record.storage.account_id,
-        "slot" => target_json(record.storage.slot)
-      },
+      "storage" => storage_json(record.storage),
       "draft" => %{"draft_id" => record.draft.draft_id, "revision" => record.draft.revision},
       "mode" => Atom.to_string(record.mode),
       "target" => target_json(record.target),

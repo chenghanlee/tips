@@ -1,10 +1,12 @@
 defmodule TipsWeb.EditorTest do
   @moduledoc """
-  Acceptance evidence for #78 and #79 at the page: the editors' form identity
-  and draft record, review setup defaults, the restore and reconnect events
-  the `EditorDraft` hook and LiveView form recovery send, and submit-time
-  validation and refused saves. The hook itself is in
-  `TipsWeb.EditorDraftTest` and `TipsWeb.EditorSubmitTest`.
+  Acceptance evidence for #78, #79 and #80 at the page: the editors' form
+  identity and draft record, review setup defaults, the restore and reconnect
+  events the `EditorDraft` hook and LiveView form recovery send, submit-time
+  validation and refused saves, and which receipts clear the submitted draft.
+  The hook itself is in `TipsWeb.EditorDraftTest` and
+  `TipsWeb.EditorSubmitTest`; a failed lookup is in
+  `TipsWeb.EditorLookupTest`.
   """
   use TipsWeb.ConnCase, async: true
 
@@ -15,7 +17,8 @@ defmodule TipsWeb.EditorTest do
   import Tips.VisibilityFixtures
   import TipsWeb.ReaderPageHelpers
 
-  alias Tips.Accounts.UserToken
+  alias Tips.Accounts.{Scope, UserToken}
+  alias Tips.Content
   alias Tips.Content.{Review, Tip}
   alias Tips.Repo
 
@@ -120,10 +123,15 @@ defmodule TipsWeb.EditorTest do
 
     html = lv |> form(form_id, tip: %{tag_id: "other"}) |> render_submit()
     refute has?(html, "[aria-invalid]")
-    assert text(html, "#{form_id}-outcome") == "Published"
 
-    assert [%Tip{title: "Plan first", body: "Plan before you prompt.", tag_id: "other"}] =
+    assert [%Tip{id: id, title: "Plan first", body: "Plan before you prompt.", tag_id: "other"}] =
              Repo.all(from t in Tip, where: t.user_id == ^user.id)
+
+    # The hook clears the submitted draft, then the page leaves for the tip.
+    key = record(html, form_id)["submission_key"]
+    assert_push_event(lv, "editor:clear", %{draft_id: ^key})
+    render_hook(lv, "editor:cleared", %{"status" => "ok"})
+    assert_redirect(lv, "/tips/#{id}/plan-first")
   end
 
   test "an expired sign-in or a full ban refuses Publish and keeps the input", %{
@@ -251,8 +259,162 @@ defmodule TipsWeb.EditorTest do
     assert summary_links(html, form_id) == ["#review_body"]
 
     html = lv |> form(form_id, review: %{body: "Edited"}) |> render_submit()
-    assert text(html, "#{form_id}-outcome") == "Changes saved"
     assert %Review{body: "Edited", edit_version: 2} = Repo.get!(Review, review.id)
+    draft_id = record(html, form_id)["draft"]["draft_id"]
+    assert_push_event(lv, "editor:clear", %{draft_id: ^draft_id})
+    render_hook(lv, "editor:cleared", %{"status" => "ok"})
+    assert_redirect(lv, "/reviews/#{review.id}")
+  end
+
+  test "tabs sharing a key: only the published values clear their draft", %{
+    conn: conn,
+    user: user
+  } do
+    form_id = "#editor-#{user.id}-tip"
+    values = %{title: "Plan first", body: "Plan before you prompt.", tag_id: "other"}
+    {:ok, a, a_html} = live(conn, "/editor/tips/new")
+    record = record(a_html, form_id)
+    key = record["submission_key"]
+
+    # Tab B restored the same draft before tab A published it.
+    {:ok, b, b_html} = live(conn, "/editor/tips/new")
+
+    render_hook(b, "editor:restore", %{
+      "identity" => identity(b_html, form_id),
+      "record" => record
+    })
+
+    assert_reply(b, %{status: "restored"})
+
+    a |> form(form_id, tip: values) |> render_submit()
+    assert %Tip{id: id} = Repo.get_by!(Tip, submission_key: key)
+    to = "/tips/#{id}/plan-first"
+    assert_push_event(a, "editor:clear", %{draft_id: ^key, to: ^to})
+
+    # Other work kept the draft: no navigation.
+    html = render_hook(a, "editor:cleared", %{"status" => "conflict"})
+    assert_reply(a, %{left: false})
+    assert text(html, "#{form_id}-outcome") =~ "A different draft saved in this browser was kept"
+
+    # Tab B's different values are not the publication.
+    html = b |> form(form_id, tip: %{values | body: "Plan, then prompt."}) |> render_submit()
+    refute_push_event(b, "editor:clear", _)
+    assert text(html, "#{form_id}-refusal") =~ "This draft was published earlier"
+    assert attr(html, "#{form_id}-refusal a", "View it", "href") == "/tips/#{id}/plan-first"
+    assert textarea(html, "tip[body]") == "Plan, then prompt."
+
+    # Reopening: the published values clear, an unknown selection does not.
+    published =
+      put_in(record, ["intent", "attrs"], Map.merge(record["intent"]["attrs"], json(values)))
+
+    {:ok, c, c_html} = live(conn, "/editor/tips/new")
+
+    render_hook(c, "editor:restore", %{
+      "identity" => identity(c_html, form_id),
+      "record" => published
+    })
+
+    assert_reply(c, %{status: "published", to: ^to})
+    c_html = render(c)
+    assert record(c_html, form_id)["submission_key"] == key
+
+    # A reconnect before the clear settles still finds the publication.
+    {:ok, c2, c2_html} = live(conn, "/editor/tips/new")
+    recover(c2, c2_html, form_id, c_html, json(values))
+    render_hook(c2, "editor:reconcile", %{})
+    assert_push_event(c2, "editor:clear", %{draft_id: ^key, to: ^to})
+
+    render_hook(c, "editor:cleared", %{"status" => "ok"})
+    assert_redirect(c, to)
+
+    {:ok, d, d_html} = live(conn, "/editor/tips/new")
+    unknown = put_in(published, ["intent", "uploads"], nil)
+
+    render_hook(d, "editor:restore", %{
+      "identity" => identity(d_html, form_id),
+      "record" => unknown
+    })
+
+    assert_reply(d, %{status: "restored"})
+    refute_push_event(d, "editor:clear", _)
+    assert text(render(d), "#{form_id}-refusal") =~ "This draft was published earlier"
+
+    # A deleted publication can't be compared, so it clears nothing either.
+    {:ok, _receipt} = Content.delete_content(Scope.for_user(user), :tip, id)
+    html = b |> form(form_id, tip: values) |> render_submit()
+    refute_push_event(b, "editor:clear", _)
+    assert text(html, "#{form_id}-refusal") =~ "This draft was published earlier"
+    refute has?(html, "#{form_id}-refusal a")
+  end
+
+  test "a lost reply is looked up after the reconnect; a lost sign-in fixes the values", %{
+    conn: conn,
+    user: user
+  } do
+    form_id = "#editor-#{user.id}-tip"
+    values = %{"title" => "Plan first", "body" => "Plan before you prompt.", "tag_id" => "other"}
+    {:ok, _lv, before} = live(conn, "/editor/tips/new")
+    key = record(before, form_id)["submission_key"]
+
+    # The publish committed, but its reply was lost with the connection.
+    attrs = Map.merge(record(before, form_id)["intent"]["attrs"], values)
+    {:ok, _receipt} = Content.publish_tip(Scope.for_user(user), key, atoms(attrs), [])
+
+    {:ok, lv, fresh} = live(conn, "/editor/tips/new")
+    recover(lv, fresh, form_id, before, values)
+    render_hook(lv, "editor:reconcile", %{})
+    assert_push_event(lv, "editor:clear", %{draft_id: ^key})
+    assert_push_event(lv, "editor:settled", %{unresolved: false})
+
+    # Another draft's lookup finds the sign-in expired: its values stay fixed.
+    {:ok, lv, _html} = live(conn, "/editor/tips/new")
+    lv |> form(form_id, tip: values) |> render_change()
+    Repo.delete_all(from t in UserToken, where: t.user_id == ^user.id)
+    html = render_hook(lv, "editor:reconcile", %{})
+
+    assert_push_event(lv, "editor:settled", %{unresolved: true})
+    assert text(html, "#{form_id}-refusal") =~ "your sign-in has expired"
+    assert has?(html, "#{form_id}-refusal a[href^='/users/log-in']")
+    assert has?(html, "fieldset[disabled] #tip_body")
+    assert has?(html, "button[type=submit][disabled]")
+    assert record(html, form_id)["intent"]["attrs"]["body"] == "Plan before you prompt."
+  end
+
+  test "a lost edit reply shows the saved version beside the proposal and keeps the version",
+       %{conn: conn, user: user} do
+    review = review_fixture(tip_fixture(), %{user_id: user.id, body: "Saved body"})
+    path = "/editor/reviews/#{review.id}/edit"
+    form_id = "#editor-#{user.id}-review"
+    {:ok, _lv, before} = live(conn, path)
+    attrs = atoms(record(before, form_id)["intent"]["attrs"])
+
+    # Another save landed first; this page's reply was lost.
+    {:ok, %{edit_version: 2}} =
+      Content.edit_review(
+        Scope.for_user(user),
+        review.id,
+        1,
+        %{attrs | body: "Saved elsewhere"},
+        []
+      )
+
+    {:ok, lv, fresh} = live(conn, path)
+    recover(lv, fresh, form_id, before, %{"body" => "My proposal"})
+    html = render_hook(lv, "editor:reconcile", %{})
+
+    refute_push_event(lv, "editor:clear", _)
+    assert text(html, "#{form_id}-saved dd") == "Saved elsewhere"
+
+    assert text(html, "#{form_id}-refusal") =~
+             "We couldn't confirm whether your changes were saved"
+
+    assert textarea(html, "review[body]") == "My proposal"
+    assert record(html, form_id)["expected_version"] == 1
+
+    # Saving again is explicit and keeps the version guard.
+    html = lv |> form(form_id, review: %{body: "My proposal"}) |> render_submit()
+    assert text(html, "#{form_id}-refusal") =~ "This review changed after you opened it"
+    assert %Review{body: "Saved elsewhere", edit_version: 2} = Repo.get!(Review, review.id)
   end
 
   # What LiveView sends after a reconnect: the old page's hidden inputs with
@@ -270,6 +432,11 @@ defmodule TipsWeb.EditorTest do
       kind => values
     })
   end
+
+  defp json(values), do: Map.new(values, fn {field, value} -> {Atom.to_string(field), value} end)
+
+  defp atoms(attrs),
+    do: Map.new(attrs, fn {field, value} -> {String.to_existing_atom(field), value} end)
 
   defp summary_links(html, form_id),
     do: html |> find("#{form_id}-errors a") |> LazyHTML.attribute("href")

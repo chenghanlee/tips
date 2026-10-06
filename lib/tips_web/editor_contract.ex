@@ -49,12 +49,17 @@ defmodule TipsWeb.EditorContract do
 
   ## Clearing
 
-  After a submission the page sends a `t:clear_request/0` only for the exact
-  submitted draft: a `:created` or `:existing_equivalent` publication receipt
-  with the same kind, parent and submission key, or an `:updated` or `:noop`
-  edit receipt of the same item. Anything else preserves the proposal. The
-  request is an instruction: the hook clears only a stored record with the
-  same storage and draft pair, and newer work stays.
+  A submit first saves exactly the submitted values; the hook owns the
+  revision that holds them. The page sends a `t:clear_request/0` only for a
+  `:created` or `:existing_equivalent` publication receipt of the submitted
+  key, or an `:updated` or `:noop` edit receipt of the item. Anything else
+  preserves the proposal. The request is an instruction: the hook clears only
+  a stored record with the same storage and that draft pair, and newer work
+  stays. It replies `editor:cleared` with a `t:clear_status/0`; only
+  `:conflict` keeps the editor open. The page replies `%{left: boolean()}`;
+  unless the page is leaving, as after a remount, the hook opens the
+  request's `to` itself, and it does the same when a reconnect follows its
+  clear.
 
   ## Page and hook
 
@@ -71,15 +76,21 @@ defmodule TipsWeb.EditorContract do
   |---|---|---|
   | `editor:restore` | hook to LiveView | `t:restore_request/0`, replied with `t:restore_reply/0` |
   | `editor:recover` | form to LiveView | hidden identity and record with the current form fields |
+  | `editor:reconcile` | hook or Check again to LiveView | `%{}`: look up an unsettled submission |
   | `editor:handoff` | LiveView to hook | `t:handoff/0` |
   | `editor:clear` | LiveView to hook | `t:clear_request/0` |
+  | `editor:cleared` | hook to LiveView | `%{status: t:clear_status/0}`, replied with `%{left: boolean()}` |
+  | `editor:settled` | LiveView to hook | `%{unresolved: boolean()}` after a submit, restore or lookup |
   | `editor:refused` | LiveView to hook | `%{}`: a submit failed validation |
 
   The hook sends `editor:restore` only on a fresh mount, never on reconnect.
-  `:restored` settles recovery, not publication; `:preserved` keeps typed
-  input; `:rejected` means the recovered identity is not this form's. With no
-  record or a storage error the author composes without a restore reply.
-  Reconnect uses `editor:recover` and reads no storage.
+  `:restored` settles recovery, not publication; `:published` (with `to`, the
+  item's path) means the record's publication is confirmed, so the page
+  restores it and the hook clears it; `:rejected` means the recovered identity is not this
+  form's. With no record or a storage error the author composes without a
+  restore reply. Reconnect uses `editor:recover` and reads no storage; if a
+  submission was unsettled, the hook then sends `editor:reconcile`, as the
+  submission's reply may have been lost.
   """
 
   alias Tips.Content
@@ -135,24 +146,28 @@ defmodule TipsWeb.EditorContract do
   @type restore_request :: %{identity: identity(), record: draft_record()}
 
   @typedoc "How the page settled a restore."
-  @type restore_status :: :restored | :preserved | :rejected
+  @type restore_status :: :restored | :published | :rejected
 
   @typedoc "The reply to `editor:restore`, naming the record it settles."
   @type restore_reply :: %{
-          status: restore_status(),
-          storage: storage_identity(),
-          draft: draft_pair()
+          required(:status) => restore_status(),
+          required(:storage) => storage_identity(),
+          required(:draft) => draft_pair(),
+          optional(:to) => String.t()
         }
 
   @typedoc "`editor:handoff`: K's storage and current pair, and its edit-mode record."
   @type handoff :: %{storage: storage_identity(), expected: draft_pair(), record: draft_record()}
 
-  @typedoc "The draft a submission was made from."
-  @type submitted_draft :: %{storage: storage_identity(), draft: draft_pair(), target: target()}
+  @typedoc """
+  `editor:clear`: the slot and draft whose submitted revision to clear, and
+  the confirmed item's path.
+  """
+  @type clear_request :: %{storage: storage_identity(), draft_id: Ecto.UUID.t(), to: String.t()}
 
-  @typedoc "`editor:clear`: the submitted draft and the receipt that acknowledged it."
-  @type clear_request :: %{
-          submitted: submitted_draft(),
-          receipt: Content.publication_receipt() | Content.edit_receipt()
-        }
+  @typedoc """
+  The hook's clear: `:ok`, `:none` (no revision of this page held the
+  values), `:error` (storage failed) or `:conflict` (newer work stays).
+  """
+  @type clear_status :: :ok | :none | :error | :conflict
 end
