@@ -55,6 +55,13 @@ defmodule SearchGateScript do
       nil
     )
 
+    :telemetry.attach(
+      :search_gate_finch_start,
+      [:finch, :request, :start],
+      &Tips.SearchGate.handle_finch_start/4,
+      nil
+    )
+
     {:ok, fixtures} = Tips.SearchGate.load()
     {status, report} = Tips.SearchGate.run(fixtures, real: true)
 

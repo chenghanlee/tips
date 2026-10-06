@@ -10,10 +10,13 @@ defmodule Tips.SearchGate do
   report. It never retries and stops at the first provider error.
 
   Provider requests are observed outside the application: the script attaches
-  `handle_finch/4` to Finch's request telemetry, and tests call `observe/1`
-  from their stub. Each observation goes to the running gate. A failed
-  request during the document scan kills its own process, so the scan makes
-  no further request. Input text only matches a request to its document; it
+  `handle_finch_start/4` and `handle_finch/4` to Finch's request telemetry,
+  and tests call `request_started/0` and `observe/1` from their stub. Each
+  observation goes to the running gate. During the document scan a request
+  starts only if every earlier one ended with a valid embedding, so the scan
+  makes no request after a failure, including a request killed at its
+  deadline, which never ends. A request that never ends is reported with
+  outcome `"no response"`. Input text only matches a request to its document; it
   is never reported.
   """
 
@@ -22,7 +25,7 @@ defmodule Tips.SearchGate do
   alias Tips.Accounts
   alias Tips.Content
   alias Tips.Content.{Review, Search, Tip}
-  alias Tips.Content.Search.{EmbeddingProvider, ProviderCapacity}
+  alias Tips.Content.Search.{EmbeddingProvider, ProviderCapacity, Vector}
   alias Tips.Repo
   alias Tips.Workers.EmbedSearch
 
@@ -41,6 +44,11 @@ defmodule Tips.SearchGate do
   @saturated_requests 3
   @saturation_allowance_ms 250
   @observer {__MODULE__, :observer}
+  @model "qwen/qwen3-embedding-8b"
+  # Request counters of the current phase.
+  @started 1
+  @ended 2
+  @ok 3
 
   ## Fixtures
 
@@ -106,6 +114,8 @@ defmodule Tips.SearchGate do
       started: now_ms(),
       documents: %{},
       requests: [],
+      phase: nil,
+      counts: nil,
       report: %{}
     }
 
@@ -419,7 +429,12 @@ defmodule Tips.SearchGate do
 
   # Records the key's limits, never its label or usage.
   defp key(client) do
-    auth = {:bearer, Tips.ProviderConfig.fetch!("OPENROUTER_API_KEY")}
+    # The key the embedding requests will use.
+    api_key =
+      Application.get_env(:tips, EmbeddingProvider, [])[:api_key] ||
+        Tips.ProviderConfig.fetch!("OPENROUTER_API_KEY")
+
+    auth = {:bearer, api_key}
 
     case Req.get(client, url: "/key", auth: auth) do
       {:ok, %{status: 200, body: %{"data" => %{} = data}}} ->
@@ -445,7 +460,7 @@ defmodule Tips.SearchGate do
     callers = [self() | Process.get(:"$callers", [])]
     started = now_ms()
 
-    # Unlinked, so a request killed by `observe/1` ends the scan, not the gate.
+    # Unlinked, so a request killed by the observer ends the scan, not the gate.
     {pid, ref} =
       spawn_monitor(fn ->
         Process.put(:"$callers", callers)
@@ -460,7 +475,7 @@ defmodule Tips.SearchGate do
       end
 
     wall_ms = now_ms() - started
-    state = drain(state)
+    state = close_phase(state)
     requests = phase_requests(state, :documents)
     embedded = embedded_documents(state.corpus_ids)
 
@@ -756,6 +771,30 @@ defmodule Tips.SearchGate do
 
   def handle_finch(_event, _measurements, _metadata, _config), do: :ok
 
+  @doc "Finch `[:finch, :request, :start]` handler that counts OpenRouter requests."
+  def handle_finch_start(_event, _measurements, %{request: %{host: "openrouter.ai"}}, _config),
+    do: request_started()
+
+  def handle_finch_start(_event, _measurements, _metadata, _config), do: :ok
+
+  @doc """
+  Counts a provider request as it starts. During the document scan it kills
+  the calling process instead, before the request is sent, when an earlier
+  request did not end with a valid embedding.
+  """
+  def request_started do
+    case :persistent_term.get(@observer, nil) do
+      nil ->
+        :ok
+
+      %{phase: phase, counts: counts} ->
+        if phase == :documents and :counters.get(counts, @started) != :counters.get(counts, @ok),
+          do: Process.exit(self(), :kill)
+
+        :counters.add(counts, @started, 1)
+    end
+  end
+
   defp request_input(body) when is_binary(body) or is_list(body) do
     case JSON.decode(IO.iodata_to_binary(body)) do
       {:ok, %{"input" => [input]}} -> input
@@ -794,7 +833,7 @@ defmodule Tips.SearchGate do
     %{
       path: path,
       input: input,
-      outcome: outcome(status, path, response["provider"]),
+      outcome: outcome(status, path, response, embedding),
       duration_ms: duration_ms,
       model: response["model"],
       provider: response["provider"],
@@ -804,16 +843,22 @@ defmodule Tips.SearchGate do
     }
   end
 
-  # An embedding served by another upstream is a runtime failure, so it stops the run.
-  defp outcome(200, "embeddings", provider) do
-    if is_binary(provider) and String.downcase(provider) == @endpoint,
-      do: "ok",
-      else: "provider #{inspect(provider)}"
+  # An embedding the application would reject, or one served by another
+  # upstream, is a runtime failure, so it stops the run.
+  defp outcome(200, "embeddings", response, embedding) do
+    cond do
+      not same?(response["provider"], @endpoint) -> "provider #{inspect(response["provider"])}"
+      not same?(response["model"], @model) -> "model #{inspect(response["model"])}"
+      Vector.literal(embedding) == :error -> "malformed"
+      true -> "ok"
+    end
   end
 
-  defp outcome(200, _path, _provider), do: "ok"
-  defp outcome(nil, _path, _provider), do: "transport"
-  defp outcome(status, _path, _provider), do: "http #{status}"
+  defp outcome(200, _path, _response, _embedding), do: "ok"
+  defp outcome(nil, _path, _response, _embedding), do: "transport"
+  defp outcome(status, _path, _response, _embedding), do: "http #{status}"
+
+  defp same?(value, expected), do: is_binary(value) and String.downcase(value) == expected
 
   @doc """
   Sends `record` to the running gate. During the document scan a failed
@@ -824,8 +869,10 @@ defmodule Tips.SearchGate do
       nil ->
         :ok
 
-      %{pid: pid, phase: phase} ->
+      %{pid: pid, phase: phase, counts: counts} ->
         send(pid, {__MODULE__, :request, phase, now_ms(), record})
+        :counters.add(counts, @ended, 1)
+        if record.outcome == "ok", do: :counters.add(counts, @ok, 1)
         if phase == :documents and record.outcome != "ok", do: Process.exit(self(), :kill)
         :ok
     end
@@ -847,8 +894,34 @@ defmodule Tips.SearchGate do
   end
 
   defp phase(state, phase) do
-    :persistent_term.put(@observer, %{pid: self(), phase: phase})
-    state
+    state = close_phase(state)
+    counts = :counters.new(3, [:atomics])
+    :persistent_term.put(@observer, %{pid: self(), phase: phase, counts: counts})
+    %{state | phase: phase, counts: counts}
+  end
+
+  # Reports each request of the closing phase that started but never ended.
+  defp close_phase(%{counts: nil} = state), do: state
+
+  defp close_phase(%{counts: counts} = state) do
+    state = drain(state)
+    missing = :counters.get(counts, @started) - :counters.get(counts, @ended)
+
+    request = %{
+      path: "embeddings",
+      outcome: "no response",
+      duration_ms: nil,
+      model: nil,
+      provider: nil,
+      returned_length: nil,
+      prompt_tokens: nil,
+      cost_usd: nil,
+      phase: state.phase,
+      at_ms: now_ms() - state.started,
+      document: nil
+    }
+
+    %{state | requests: List.duplicate(request, missing) ++ state.requests, counts: nil}
   end
 
   defp drain(state) do
@@ -881,7 +954,7 @@ defmodule Tips.SearchGate do
     receive do
       {:stop, from} -> send(from, {:rss, baseline, peak})
     after
-      100 -> sample_rss(baseline, max(peak, rss_kib()))
+      100 -> sample_rss(baseline, max_rss(peak, rss_kib()))
     end
   end
 
@@ -894,14 +967,25 @@ defmodule Tips.SearchGate do
           method: "OS RSS of this BEAM, sampled every 100 ms from the start of the run",
           baseline_rss_kib: baseline,
           peak_rss_kib: peak,
-          incremental_mib: (peak - baseline) / 1024
+          incremental_mib: if(peak && baseline, do: (peak - baseline) / 1024)
         }
     end
   end
 
+  # A missed sample leaves the peak unknown, so the memory rule fails.
+  defp max_rss(peak, rss) when is_integer(peak) and is_integer(rss), do: max(peak, rss)
+  defp max_rss(_peak, _rss), do: nil
+
+  # `nil` when `ps` is missing or refused.
   defp rss_kib do
-    {out, 0} = System.cmd("ps", ["-o", "rss=", "-p", System.pid()])
-    out |> String.trim() |> String.to_integer()
+    with {out, 0} <- System.cmd("ps", ["-o", "rss=", "-p", System.pid()], stderr_to_stdout: true),
+         {kib, ""} <- out |> String.trim() |> Integer.parse() do
+      kib
+    else
+      _failed -> nil
+    end
+  rescue
+    ErlangError -> nil
   end
 
   ## Report
@@ -913,7 +997,7 @@ defmodule Tips.SearchGate do
         {:stop, reason, state} -> {reason, state}
       end
 
-    state = drain(state)
+    state = close_phase(state)
     requests = Enum.reverse(state.requests)
 
     report =

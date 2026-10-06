@@ -12,6 +12,8 @@ defmodule Tips.SearchGateTest do
     {:ok, fixtures} = SearchGate.load()
 
     Req.Test.stub(SearchGate, fn conn ->
+      SearchGate.request_started()
+
       {path, body} =
         case conn.request_path do
           "/api/v1/key" ->
@@ -43,7 +45,7 @@ defmodule Tips.SearchGateTest do
 
   test "runs every protocol step through the application and sends only eligible documents",
        %{fixtures: fixtures} do
-    stub_provider(fn _input, _documents_sent -> {200, "DeepInfra"} end)
+    stub_provider(nil)
 
     assert {_passed_or_failed, report} =
              SearchGate.run(fixtures,
@@ -101,17 +103,18 @@ defmodule Tips.SearchGateTest do
     assert stored == Enum.map(fixture["documents"], & &1["embedding"])
   end
 
-  for {failure, response} <- [
-        {"an HTTP error", {500, "DeepInfra"}},
-        {"another upstream", {200, "Nebius"}}
+  for {failure, third} <- [
+        {"an HTTP error", {:status, 500}},
+        {"another upstream", {:upstream, "Nebius"}},
+        {"an all-zero vector", :zero_vector},
+        {"no response before its deadline", :no_response}
       ] do
     test "stops the scan at the first document request that gets #{failure} and calls no query",
          %{fixtures: fixtures} do
-      failed = unquote(Macro.escape(response))
-
-      stub_provider(fn _input, documents_sent ->
-        if documents_sent == 3, do: failed, else: {200, "DeepInfra"}
-      end)
+      provider = Application.get_env(:tips, EmbeddingProvider)
+      Application.put_env(:tips, EmbeddingProvider, Keyword.put(provider, :deadline, 200))
+      on_exit(fn -> Application.put_env(:tips, EmbeddingProvider, provider) end)
+      stub_provider(unquote(Macro.escape(third)))
 
       assert {:stopped, report} =
                SearchGate.run(fixtures,
@@ -127,21 +130,34 @@ defmodule Tips.SearchGateTest do
   end
 
   # Responds as the selected runtime with bag-of-words vectors, so ranking has
-  # signal, and reports each request to the gate as Finch telemetry would.
-  defp stub_provider(response_for) do
+  # signal, and reports each request to the gate as Finch telemetry would. The
+  # third document request gets `third`, unless it is `nil`.
+  defp stub_provider(third) do
     test = self()
     counter = :counters.new(1, [])
 
     Req.Test.stub(EmbeddingProvider, fn conn ->
+      SearchGate.request_started()
       {:ok, body, conn} = Plug.Conn.read_body(conn)
       %{"input" => [input]} = JSON.decode!(body)
       send(test, {:provider_input, input})
       :counters.add(counter, 1, 1)
-      {status, upstream} = response_for.(input, :counters.get(counter, 1))
+      failure = if :counters.get(counter, 1) == 3, do: third
+      if failure == :no_response, do: Process.sleep(:infinity)
+
+      {status, upstream} =
+        case failure do
+          {:status, status} -> {status, "DeepInfra"}
+          {:upstream, upstream} -> {200, upstream}
+          _ok_or_vector -> {200, "DeepInfra"}
+        end
+
+      embedding =
+        if failure == :zero_vector, do: List.duplicate(0.0, 1024), else: bag_of_words(input)
 
       response =
         JSON.encode!(%{
-          "data" => [%{"index" => 0, "embedding" => bag_of_words(input)}],
+          "data" => [%{"index" => 0, "embedding" => embedding}],
           "model" => "Qwen/Qwen3-Embedding-8B",
           "provider" => upstream,
           "usage" => %{"prompt_tokens" => byte_size(input), "cost" => 1.0e-8}
