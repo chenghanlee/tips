@@ -27,7 +27,7 @@
     "real_command": "MIX_ENV=dev unbuffer mix ecto.reset && TIPS_REAL_PROVIDERS=1 MIX_ENV=dev unbuffer mix run --no-start scripts/search_gate.exs --real --output test/fixtures/search_probe/evidence/60-integrated-run-1.json",
     "application": "Started with Oban queues and plugins off, so only the steps below call the provider.",
     "steps": [
-      "1 preflight: OpenRouter endpoint listing (price, context, status of the DeepInfra endpoint) and key check. Stop if the estimated cost exceeds the budget.",
+      "1 preflight: OpenRouter endpoint listing and key check. The report lists every endpoint. Exactly one DeepInfra endpoint (tag deepinfra or deepinfra/<variant>) must be listed with its price and context; otherwise stop. Stop if the estimated cost exceeds the budget.",
       "2 documents: one Tips.Workers.EmbedSearch.perform/1 call, the production scan of up to 50 rows.",
       "3 query passes: three ordered passes over the ten queries through Tips.Content.search_tips/3 with no scope and no filters, concurrency one, no discarded warm-up. The first query of pass 1 is the cold request.",
       "4 query vectors: one EmbeddingProvider.embed_query/2 per query. Each vector is reused, with no further requests, for model-filtered retrieval and the deepest offset (180) through Tips.Content.Search.search/3. Keyword-only retrieval (no vector) is also recorded.",

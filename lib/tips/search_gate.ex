@@ -302,19 +302,19 @@ defmodule Tips.SearchGate do
     state = phase(state, :preflight)
     plug = if plug = state.opts[:preflight_plug], do: [plug: plug], else: []
     client = Req.new([base_url: @base_url, retry: false, redirect: false] ++ plug)
-
-    result =
-      with {:ok, endpoint} <- endpoint(client),
-           {:ok, key} <- key(client),
-           do: {:ok, endpoint, key}
-
-    state = drain(state)
+    {result, listed} = endpoint(client)
+    result = with {:ok, endpoint} <- result, {:ok, key} <- key(client), do: {:ok, endpoint, key}
+    state = state |> drain() |> put_report(:preflight, %{listed_endpoints: listed})
 
     case result do
       {:ok, endpoint, key} ->
         estimate = state.report.plan.token_bound * endpoint.prompt_price_usd_per_token
-        preflight = %{endpoint: endpoint, key: key, estimated_max_cost_usd: estimate}
-        state = put_report(state, :preflight, preflight)
+
+        state =
+          update_in(
+            state.report.preflight,
+            &Map.merge(&1, %{endpoint: endpoint, key: key, estimated_max_cost_usd: estimate})
+          )
 
         cond do
           estimate > gate["budget"]["max_cost_usd"] ->
@@ -335,29 +335,60 @@ defmodule Tips.SearchGate do
     end
   end
 
+  # Returns the one listed DeepInfra endpoint, tagged `deepinfra` or
+  # `deepinfra/<variant>`, and every listed endpoint for the report. Routing by
+  # provider cannot choose between two DeepInfra endpoints, so two stop the run.
   defp endpoint(client) do
     case Req.get(client, url: "/models/qwen/qwen3-embedding-8b/endpoints") do
       {:ok, %{status: 200, body: %{"data" => %{"endpoints" => endpoints}}}}
       when is_list(endpoints) ->
-        with %{"context_length" => context, "pricing" => %{"prompt" => price}} = endpoint <-
-               Enum.find(endpoints, &(&1["tag"] == @endpoint)),
-             {price, ""} <- Float.parse(price) do
-          {:ok,
-           %{
-             provider: endpoint["provider_name"],
-             tag: endpoint["tag"],
-             status: endpoint["status"],
-             context_tokens: context,
-             prompt_price_usd_per_token: price
-           }}
-        else
-          _missing -> {:error, :endpoint_unlisted}
+        listed = Enum.map(endpoints, &listing/1)
+
+        case Enum.filter(listed, &deepinfra?/1) do
+          [%{context_tokens: context, prompt_price_usd_per_token: price} = endpoint]
+          when is_integer(context) and is_float(price) ->
+            {{:ok, endpoint}, listed}
+
+          [] ->
+            {{:error, :endpoint_unlisted}, listed}
+
+          [_incomplete] ->
+            {{:error, :endpoint_incomplete}, listed}
+
+          _several ->
+            {{:error, :endpoints_ambiguous}, listed}
         end
 
       response ->
-        {:error, failure(response)}
+        {{:error, failure(response)}, []}
     end
   end
+
+  defp listing(%{} = endpoint) do
+    price =
+      with %{"pricing" => %{"prompt" => price}} when is_binary(price) <- endpoint,
+           {price, ""} <- Float.parse(price) do
+        price
+      else
+        _missing -> nil
+      end
+
+    %{
+      provider: endpoint["provider_name"],
+      tag: endpoint["tag"],
+      status: endpoint["status"],
+      quantization: endpoint["quantization"],
+      context_tokens: endpoint["context_length"],
+      prompt_price_usd_per_token: price
+    }
+  end
+
+  defp listing(other), do: %{unexpected: inspect(other)}
+
+  defp deepinfra?(%{tag: tag}) when is_binary(tag),
+    do: tag == @endpoint or String.starts_with?(tag, @endpoint <> "/")
+
+  defp deepinfra?(_listing), do: false
 
   # Records the key's limits, never its label or usage.
   defp key(client) do
