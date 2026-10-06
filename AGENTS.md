@@ -21,7 +21,7 @@
 
 ## Software design
 
-- Follow industry standards, conventions and rules. Explain any exceptions in the PR.
+- Follow industry standards, conventions and rules for the language, framework and problem you are working on. Explain any exceptions in the PR.
 - Use Elixir and Phoenix idioms and conventions, and proven design patterns from widely used similar software.
 - Check built-in features and proven libraries, frameworks and tools before writing your own. Reuse them when they meet the requirements. Build your own only when they do not; list the options checked and explain why they do not fit in the PR.
 - Prefer Ecto's query, changeset and migration DSLs. Use raw SQL only for a database feature those DSLs cannot express; bind runtime values as parameters.
