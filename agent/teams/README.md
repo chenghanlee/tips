@@ -92,7 +92,7 @@ Auto-merge requires `checks`, `release`, `tips/independent-review` and resolved
 threads. A merge closes the issue, sets the Project item to Done and deletes the
 remote branch.
 
-Run this watch command once:
+Run this watch command once each time the turn reaches this step:
 
 ```sh
 timeout "$TIPS_CHECK_TIMEOUT_SECONDS" gh pr checks <pr> --watch --required
@@ -101,7 +101,7 @@ timeout "$TIPS_CHECK_TIMEOUT_SECONDS" gh pr checks <pr> --watch --required
 Whether it passes, fails or times out, then run:
 
 ```sh
-gh pr view <pr> --json state,mergedAt
+gh pr view <pr> --json state,mergedAt,mergeStateStatus,autoMergeRequest
 ```
 
 Use the first matching outcome:
@@ -110,9 +110,31 @@ Use the first matching outcome:
 |---|---|
 | PR merged | Notify the dispatcher with `done`. |
 | PR not merged and a required check failed | Run `agent/teams/team.py turn <pr> dev`. |
+| Checks passed, PR open, auto-merge enabled, merge state neither `BLOCKED` nor `DIRTY` | Run the bounded merge wait below. |
 | Any other outcome | Report `blocked` to the dispatcher with the pending check or merge blocker. |
 
-Do not repeat the watch.
+GitHub may take several minutes to merge after checks pass. Run this once; it
+rechecks every 15 seconds and uses the existing check timeout as its ceiling:
+
+```sh
+timeout "$TIPS_CHECK_TIMEOUT_SECONDS" sh -c '
+  while :; do
+    result=$(gh pr view "$1" --json state,mergeStateStatus,autoMergeRequest \
+      --jq "[.state, .mergeStateStatus, (.autoMergeRequest != null)] | join(\" \")") || exit 1
+    case "$result" in
+      "MERGED "*) exit 0 ;;
+      "OPEN BLOCKED "*|"OPEN DIRTY "*) echo "$result"; exit 1 ;;
+      "OPEN "*" true") sleep 15 ;;
+      *) echo "Merge wait stopped: $result"; exit 1 ;;
+    esac
+  done
+' sh <pr>
+```
+
+After the wait exits or times out, read the PR state again. If merged, notify the
+dispatcher with `done`. Otherwise, return to the developer if a required check
+failed; report `blocked` for any other outcome, including an API error. Include
+the current merge state or exact error. Do not repeat either wait in this turn.
 
 ### 6. Dispatcher: remove the pair and assign the next task
 
@@ -139,8 +161,11 @@ Run commands from the repository root of your checkout. The dispatcher runs
 number. Rerunning `start` keeps a running client and relaunches a missing one.
 
 After sending a handoff, end your turn. The other agent's message starts a new
-turn. If sending fails, report the exact error; you still hold the turn. The only
-wait is the tester's check watch in the merge-confirmation step.
+turn. If sending fails, you still hold the turn: report `blocked` to the dispatcher
+with the exact command and error using [the blocker procedure](#report-and-resolve-blockers).
+This reports the failure; the dispatcher must not deliver a denied handoff by
+another route. If the report is also denied, report both errors to the user in
+your pane. The only waits are the tester's bounded check and merge waits in step 5.
 
 ### Determine the turn after a restart
 
@@ -203,6 +228,8 @@ Dispatcher actions:
 1. Set Status Blocked.
 2. Answer technical questions using the reported error and cited code. Ask the
    user in your pane about product, scope or any question you cannot answer.
+   For a denied command, do not run it for the agent, deliver its message another
+   way or tell the agent to retry; ask the user.
    Do not disable, re-arm or bypass auto-merge. If an approved PR with passing
    required checks has not merged, report it to the user; GitHub may merge it late.
 3. Record the answer on the issue.
@@ -236,7 +263,8 @@ If a developer's failing check also fails on the latest `main` run:
 ### Manual browser review
 
 Clients launch with `MIX_ENV=test`, which runs tests but cannot serve a manual
-browser session. Start the app with:
+browser session. Wait for `mix test` to exit before starting the app: both use
+`$TIPS_TEST_PORT`. Start the app with:
 
 ```sh
 MIX_ENV=dev unbuffer mix ecto.setup && MIX_ENV=dev PORT="$TIPS_TEST_PORT" unbuffer mix do assets.setup, assets.build, phx.server

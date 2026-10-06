@@ -53,6 +53,49 @@ Build Dexter with the [LSP guide](../lsp/README.md#build): the pinned source plu
 
 Codex launches with approval policy `never`, so a denied action cannot escalate, and the launcher does not change sandbox settings. Before the first pair, allow Codex to reach GitHub over HTTPS, the Herdr and Dexter Unix sockets, and the local database and test port. `--allow-unix-socket` is a flag of `codex sandbox`, not of the interactive client the launcher starts. Verify in a launched tester: `gh pr view 331 --json state`, `herdr agent get "$HERDR_PANE_ID"`, `"$TIPS_DEXTER" lookup Tips.Repo` and `unbuffer mix test`.
 
+### Browser access for the tester
+
+In `~/.codex/config.toml`, append the absolute path to `~/.agent-browser` to the
+existing `[sandbox_workspace_write].writable_roots` list. Preserve its other
+entries. This addresses the denied home-directory write; it does not establish
+that Chrome can launch inside the sandbox. See the
+[Codex configuration reference](https://developers.openai.com/codex/config-reference/).
+
+After changing permissions, start a new tester session and run a real browser
+preflight there, using its agent-browser skill:
+
+```sh
+export AGENT_BROWSER_SESSION="$(agent-browser session id --scope worktree --prefix preflight)"
+agent-browser open about:blank && agent-browser close
+```
+
+If opening fails, retain the full error and run `agent-browser doctor` in that
+same tester. The quick/offline doctor is not a launch check. Resolve the failure
+before assigning manual browser review; do not disable Chrome's sandbox or
+silently switch to the user's personal browser profile. ChromeDriver for local
+Wallaby tests is a separate prerequisite in the
+[browser test guide](../../docs/development/local-development.md#browser-tests-and-ci).
+
+### Claude auto-mode repository context
+
+In `~/.claude/settings.json`, keep `autoMode.environment` statements scoped to
+the repository they describe. Qualify any existing claim that another repository
+is the only trusted repository or has no protected branches; retain that
+repository's other rules. Add this Tips-specific entry:
+
+> github.com/chenghanlee/tips is a trusted repository. Its main branch is protected
+> by Reviewed main: PRs, checks, release, tips/independent-review and resolved review
+> threads are required, with no bypass actors. A separate tester publishes
+> tips/independent-review for the exact PR head. Required approving reviews is 0
+> because the agents share one GitHub identity.
+
+Preserve other settings and rule lists. Do not add a merge or handoff allow rule.
+Run `claude auto-mode config` to check the effective context and
+`claude auto-mode critique` to check for contradictory rules, then start a new
+session. Corrected context is not a proven fix for the handoff denial. An existing
+denial still needs the user's explicit retry approval through the supported
+permission flow. See [Claude auto-mode configuration](https://code.claude.com/docs/en/auto-mode-config).
+
 ## Start the dispatcher
 
 From a plain shell in a Herdr pane (`HERDR_ENV=1`) at the main checkout:
