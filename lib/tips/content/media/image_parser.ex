@@ -21,7 +21,8 @@ defmodule Tips.Content.Media.ImageParser do
   Each parser can use up to 1 GiB, so at most `:size` parsers run at once
   across the application. A caller waits at most `:queue_wait` milliseconds
   for a slot, then gets `{:error, :busy}`. A slot is held until its parser
-  process ends, even when the caller exits first. Settings live in `config/config.exs`.
+  process ends, even when the caller exits first; a caller that exits while
+  queued never starts its parser. Settings live in `config/config.exs`.
   """
 
   @behaviour NimblePool
@@ -65,23 +66,32 @@ defmodule Tips.Content.Media.ImageParser do
   end
 
   # The slot is held by a task the caller does not own, so a caller that exits or is
-  # killed leaves the slot taken until the parser process has ended. The task is
-  # bounded by the queue wait and the parser deadline.
+  # killed leaves the slot taken until the parser process has ended. A task whose
+  # caller has exited by the time it gets a slot never starts the parser: the
+  # page-owned path belongs to an attempt that has ended. The task is bounded by
+  # the queue wait and the parser deadline.
   defp with_slot(fun) do
+    caller = self()
+
     Tips.Content.Media.ParserTasks
-    |> Task.Supervisor.async_nolink(fn -> checkout(fun) end)
+    |> Task.Supervisor.async_nolink(fn -> checkout(caller, fun) end)
     |> Task.await(:infinity)
   end
 
-  defp checkout(fun) do
+  defp checkout(caller, fun) do
     NimblePool.checkout!(
       __MODULE__,
       :run,
-      fn _from, slot -> {fun.(), slot} end,
+      fn _from, slot -> {unless_exited(caller, fun), slot} end,
       config(:queue_wait)
     )
   catch
     :exit, {:timeout, {NimblePool, :checkout, [__MODULE__]}} -> {:error, :busy}
+  end
+
+  # Nobody receives this result when the caller has exited.
+  defp unless_exited(caller, fun) do
+    if Process.alive?(caller), do: fun.(), else: {:error, :invalid}
   end
 
   defp run(path, opts) do

@@ -6,7 +6,9 @@ defmodule Tips.Content.Media.ImageParserCapacityTest do
 
   @moduletag :tmp_dir
 
-  test "a cancelled caller keeps its slot until its parser exits", %{tmp_dir: dir} do
+  test "a cancelled caller holds a running parser slot and never starts a queued parser", %{
+    tmp_dir: dir
+  } do
     image = Path.join(dir, "image.png")
     File.write!(image, "")
 
@@ -23,14 +25,21 @@ defmodule Tips.Content.Media.ImageParserCapacityTest do
       path
     end
 
-    slow = parser.("slow", "touch #{dir}/$$.started; sleep 1; touch #{dir}/$$.done\n")
+    slow = parser.("slow", "touch \"#{dir}/$$.started\"; sleep 1; touch \"#{dir}/$$.done\"\n")
     size = :tips |> Application.fetch_env!(ImageParser) |> Keyword.fetch!(:size)
-    callers = for _ <- 1..size, do: spawn(fn -> ImageParser.classify(image, python: slow) end)
+    running = for _ <- 1..size, do: spawn(fn -> ImageParser.classify(image, python: slow) end)
     wait_until(fn -> length(Path.wildcard("#{dir}/*.started")) == size end)
-    Enum.each(callers, &Process.exit(&1, :kill))
+    queued = spawn(fn -> ImageParser.classify(image, python: slow) end)
+
+    wait_until(fn ->
+      length(Task.Supervisor.children(Tips.Content.Media.ParserTasks)) == size + 1
+    end)
+
+    Enum.each([queued | running], &Process.exit(&1, :kill))
 
     assert {:error, :unsupported} = ImageParser.classify(image, python: parser.("fast", ""))
     assert length(Path.wildcard("#{dir}/*.done")) == size
+    assert length(Path.wildcard("#{dir}/*.started")) == size
   end
 
   defp wait_until(fun) do
