@@ -519,7 +519,7 @@ Add one indexed server-generated UUID `session_family_id` to session rows in the
 
 Renewal locks the account first, then revalidates the predecessor session’s context, expiry and current account, and creates its successor from that valid row with the same family. Concurrent successors remain in one family. Logout takes the same account lock, deletes the entire browser family in the transaction, commits, then broadcasts its family topic. A late response/cookie for a deleted successor cannot restore admission, even if disconnect delivery fails. Another browser’s family remains signed in.
 
-An account switch locks old and new accounts in id order, validates the new login proof, revokes the prior browser family and starts a family for the new account. Email change revokes all old session families and starts a fresh family for the confirming browser. Account deletion revokes all tokens. Prune expired token rows in bounded maintenance batches by context validity; expiration or pruning of the first family token must not revoke valid successors. Reuse the shared Accounts validity definition for controllers, LiveViews, renewal and pruning. Test real cookies, concurrent responses, sudo recency and disconnects; generated code does not supply this adaptation unchanged.
+An account switch locks old and new accounts in id order, validates the new login proof, revokes the prior browser family and starts a family for the new account. Email change revokes all old session families and starts a fresh family for the confirming browser ([#102](https://github.com/chenghanlee/tips/issues/102)). Account deletion revokes all tokens ([#103](https://github.com/chenghanlee/tips/issues/103)). Prune expired token rows in bounded maintenance batches by context validity; expiration or pruning of the first family token must not revoke valid successors. Reuse the shared Accounts validity definition for controllers, LiveViews, renewal and pruning. Test real cookies, concurrent responses, sudo recency and disconnects; generated code does not supply this adaptation unchanged.
 
 ### Authentication email delivery
 
@@ -548,7 +548,7 @@ Allow an account owner to change their email after recent sign-in and verificati
 
 Use the generated authentication flow as the foundation, including its recent-authentication check (Phoenix's "sudo mode"). If that check has expired, require another magic-link sign-in through the current address before requesting the change. This is an account-setting operation owned by Accounts, not a Content operation. [Phoenix's authentication design](https://github.com/phoenixframework/phoenix/issues/6041) uses recent authentication for email changes; [Mastodon](https://docs.joinmastodon.org/user/contacts/) also exposes email changes in account settings.
 
-Accounts operations, adapting the generated functions rather than building a second authentication system:
+Accounts operations ([#102](https://github.com/chenghanlee/tips/issues/102)), adapting the generated functions rather than building a second authentication system:
 
 | Function | Contract |
 |---|---|
