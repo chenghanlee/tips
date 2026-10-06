@@ -27,8 +27,8 @@
   },
   {
     "name": "single-frame.apng",
-    "bytes": 469,
-    "recipe": "ffmpeg 5.1 -bitexact -f lavfi -i testsrc=size=64x48:rate=5:duration=1 -frames:v 1 -f apng",
+    "bytes": 527,
+    "recipe": "animated.apng reduced to acTL num_frames 1, its first fcTL and IDAT",
     "expected": [
       {
         "format": "png",
@@ -36,11 +36,11 @@
         "verdict": "accept"
       }
     ],
-    "sha256": "3aef4ad0b6b37570a7fcf7d12c92d01231bf2c1f049e632d328fd15bae73520f"
+    "sha256": "875c21aa6590faf35d673fd7dbd99bac8d56b07d9a0063b9e9ac01285ac0ee24"
   },
   {
     "name": "static.jpg",
-    "bytes": 1976,
+    "bytes": 1980,
     "recipe": "ffmpeg 5.1 -bitexact -f lavfi -i testsrc=size=64x48:rate=5:duration=1 -frames:v 1",
     "expected": [
       {
@@ -49,7 +49,7 @@
         "verdict": "accept"
       }
     ],
-    "sha256": "4e439b8c29aca58a96b1b165347143303c01d0b2e888e4af2fb70d6df02bcf58"
+    "sha256": "6830dd03a869827bd53b8943b643f98497f3908d885b6d15943c8ff737fbe234"
   },
   {
     "name": "static.gif",
@@ -118,7 +118,7 @@
   },
   {
     "name": "spoofed-jpeg-as.png",
-    "bytes": 1976,
+    "bytes": 1980,
     "recipe": "copy static.jpg",
     "expected": [
       {
@@ -127,7 +127,7 @@
         "verdict": "accept"
       }
     ],
-    "sha256": "4e439b8c29aca58a96b1b165347143303c01d0b2e888e4af2fb70d6df02bcf58"
+    "sha256": "6830dd03a869827bd53b8943b643f98497f3908d885b6d15943c8ff737fbe234"
   },
   {
     "name": "spoofed-text-as.gif",
@@ -227,7 +227,7 @@
   },
   {
     "name": "truncated.jpg",
-    "bytes": 1185,
+    "bytes": 1188,
     "recipe": "first 60% of static.jpg",
     "expected": [
       {
@@ -235,7 +235,7 @@
         "verdict": "reject"
       }
     ],
-    "sha256": "69696fa6a1bcece740a4b69fa9b34dbdfc8a8dd504195b1f798b728814dddc55"
+    "sha256": "5ee15c043c3a2c160e70332ee597ac2a78e92d3ba05c8cf69593bfdd9b727d61"
   },
   {
     "name": "truncated.gif",
@@ -286,6 +286,42 @@
     "sha256": "193c6ebb090a8c6936b58699542e7308db48616332190a5b595b2f683ae4b1fb"
   },
   {
+    "name": "png-crc-mismatch.png",
+    "bytes": 469,
+    "recipe": "static.png with IDAT CRC byte 453 inverted",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "6502e91765c8744437820401113db4a0ef3edaf587f7e16df8365ffa365ac9b8"
+  },
+  {
+    "name": "png-iend-missing.png",
+    "bytes": 457,
+    "recipe": "static.png without its final 12-byte IEND chunk",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "7e284b68039a5923f471edc3165c5be06f7fb78e03cbe07e04e60852bfdabe26"
+  },
+  {
+    "name": "gif-trailer-missing.gif",
+    "bytes": 3822,
+    "recipe": "animated.gif without its final 0x3B trailer byte",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "f9145977b7b49dc967c0579e0cf291c39f926b68a354e396515060ce68665143"
+  },
+  {
     "name": "apng-actl-overcount.png",
     "bytes": 1405,
     "recipe": "animated.apng with acTL num_frames set 1, CRC recomputed",
@@ -305,11 +341,6 @@
       {
         "reason": "malformed",
         "verdict": "reject"
-      },
-      {
-        "format": "png",
-        "animated": false,
-        "verdict": "accept"
       }
     ],
     "sha256": "18127c99a596405baf0524da617537e7a20ca291952d90014e217c37cb467392"
@@ -334,31 +365,21 @@
       {
         "reason": "malformed",
         "verdict": "reject"
-      },
-      {
-        "format": "webp",
-        "animated": true,
-        "verdict": "accept"
       }
     ],
     "sha256": "9907dc66a86abc3307444db7dc256bcbaa7c7c0f062d324d18e3b10781faa30b"
   },
   {
-    "name": "gif-trailer-missing.gif",
-    "bytes": 3822,
-    "recipe": "animated.gif without its final 0x3B trailer byte",
+    "name": "gif-frame-outside-canvas.gif",
+    "bytes": 3823,
+    "recipe": "animated.gif with the last image descriptor's offsets set to 9000,9000",
     "expected": [
       {
         "reason": "malformed",
         "verdict": "reject"
-      },
-      {
-        "format": "gif",
-        "animated": true,
-        "verdict": "accept"
       }
     ],
-    "sha256": "f9145977b7b49dc967c0579e0cf291c39f926b68a354e396515060ce68665143"
+    "sha256": "371eb87dd732b52670fe19f9485b8eb2e4086d3d1a41d0594e71607a5888a7d8"
   },
   {
     "name": "huge-dimensions.png",
@@ -425,7 +446,7 @@
   },
   {
     "name": "at-frame-pixel-limit-2-frames.webp",
-    "bytes": 1225700,
+    "bytes": 1229886,
     "recipe": "img2webp 1.2.4 -lossy -q 50 of 2 ffmpeg frames from testsrc2=size=8000x5000:rate=2:duration=1",
     "expected": [
       {
@@ -434,7 +455,7 @@
         "verdict": "accept"
       }
     ],
-    "sha256": "23a594af4ff601eaab302146ffcac1339f6dc6e704a82da8903761c0a7fb1f63"
+    "sha256": "1c50e5e94756e69cd812920856f2e06f10177e845aaddb73171b4cfe9c6d6407"
   },
   {
     "name": "many-frames.gif",
@@ -463,7 +484,7 @@
   },
   {
     "name": "at-total-pixel-limit.webp",
-    "bytes": 2045916,
+    "bytes": 2056682,
     "recipe": "img2webp 1.2.4 -lossy -q 50 of 25 ffmpeg frames from testsrc2=size=2000x2000:rate=25:duration=1",
     "expected": [
       {
@@ -472,11 +493,11 @@
         "verdict": "accept"
       }
     ],
-    "sha256": "d83a83985f3c612e6f61b58d34ab5efe44d57e63e0524d442182b6b4056f3aac"
+    "sha256": "bdb8766a448ebdf32d1d91a2052d36a3b77b9de9e3ffc33600778e10a5b5c80c"
   },
   {
     "name": "at-total-pixel-limit-4-frames.webp",
-    "bytes": 1722242,
+    "bytes": 1730588,
     "recipe": "img2webp 1.2.4 -lossy -q 50 of 4 ffmpeg frames from testsrc2=size=5000x5000:rate=4:duration=1",
     "expected": [
       {
@@ -485,7 +506,7 @@
         "verdict": "accept"
       }
     ],
-    "sha256": "2286d06e747ed043cca449678797318784fb8c5f56c49eb5bc514fac6d073a39"
+    "sha256": "623e95ead92f746f7d6db30f9688e923b1758603faa6788d5b75b27ceda54cf7"
   },
   {
     "name": "total-pixels-over.gif",
