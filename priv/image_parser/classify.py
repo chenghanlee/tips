@@ -1,9 +1,9 @@
-"""Classify one image file and print one JSON line. Disposable probe for issue #244.
+"""Classify one image file and print one JSON line. Called by Tips.Content.Media.ImageParser.
 
 Usage: python -I classify.py <path>
 
-The caller runs this in its own OS process under `timeout` and `prlimit`; those
-enforce the time and memory ceilings. This script enforces the byte, dimension,
+The caller runs this in its own OS process under `timeout` and, on Linux, `prlimit`;
+those enforce the time and memory ceilings. This script enforces the byte, dimension,
 frame and pixel ceilings before decoding, then decodes every frame so truncated or
 corrupt data fails instead of passing on a valid header.
 
@@ -16,7 +16,6 @@ warning is raised as an error.
 
 import json
 import os
-import resource
 import sys
 import warnings
 import zlib
@@ -141,15 +140,9 @@ def main(path):
         result = {"verdict": "reject", "reason": str(reject)}
     except MemoryError:
         result = {"verdict": "reject", "reason": "memory_limit"}
-    except (OSError, EOFError, SyntaxError, ValueError, UserWarning) as error:
-        result = {
-            "verdict": "reject",
-            "reason": "malformed",
-            "detail": type(error).__name__,
-        }
+    except (OSError, EOFError, SyntaxError, ValueError, UserWarning):
+        result = {"verdict": "reject", "reason": "malformed"}
 
-    # ru_maxrss is KiB on Linux.
-    result["peak_rss_kib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     print(json.dumps(result))
 
 

@@ -3,30 +3,16 @@
 Result for [#244](https://github.com/chenghanlee/tips/issues/244): **Pillow 12.3.0
 is selected,** with structure checks of our own. Run in its own OS process
 under `timeout` and `prlimit`, it passes all 45 fixtures and all three enforcement experiments on linux/arm64 and
-linux/amd64. [#62](https://github.com/chenghanlee/tips/issues/62) builds on the
-[contract below](#contract-for-62).
+linux/amd64.
 
-The probe code in `scripts/image_parser_probe/` is disposable. #62 moves
-`classify.py` into the application and deletes the rest.
-
-## Run it
-
-```sh
-bash scripts/image_parser_probe.sh                                # host architecture
-PROBE_PLATFORM=linux/amd64 bash scripts/image_parser_probe.sh    # emulated amd64
-```
-
-The script needs Docker. It records the revision and tracked-change count, builds
-the probe image, writes the fixtures and their hashes to `fixtures.json`, then
-classifies each fixture. Output goes to `tmp/image-parser-probe/<run-id>/`. It
-exits nonzero if any fixture or experiment fails.
-
-The probe image uses the release builder's pinned Debian bookworm base, Debian's
-Python 3.11.2, and the Pillow wheel pinned by hash in
-[requirements.txt](../../scripts/image_parser_probe/requirements.txt). The wheel
-bundles libwebp 1.6.0, libjpeg-turbo 3.1.4.1 and zlib-ng, so it pins the native decoders.
-Fixtures come from Debian's FFmpeg 5.1 and libwebp 1.2.4 tools and from a small
-PNG writer in the probe.
+The application runs the probe's `classify.py` from `priv/image_parser/`; see
+`Tips.Content.Media.ImageParser` and [Image/GIF upload integration](../design/backend-design.md#imagegif-upload-integration)
+for the ceilings and outcomes. #62 removed the probe harness; it is at
+[`c37b2a7`](https://github.com/chenghanlee/tips/tree/c37b2a7606f90ead2ceb7511aad64887f935e12f/scripts/image_parser_probe).
+It ran in Docker on the release builder's Debian bookworm base with Debian's
+Python 3.11.2 and the hash-pinned Pillow wheel, which bundles libwebp 1.6.0,
+libjpeg-turbo 3.1.4.1 and zlib-ng. Fixtures came from Debian's FFmpeg 5.1 and
+libwebp 1.2.4 tools and from a small PNG writer in the probe.
 
 ## Recorded runs
 
@@ -157,34 +143,7 @@ so only the ceiling can stop the work.
 can outlive the deadline. When an allocation fails, Python raises `MemoryError`,
 or libwebp returns an error that Pillow raises as `OSError`. Both are rejections.
 
-## Contract for #62
-
-### Command
-
-```sh
-timeout --signal=KILL 5 prlimit --as=1073741824 -- <venv>/bin/python -I classify.py <path>
-```
-
-`classify.py` applies the size ceilings and the [structure checks](#structure-checks),
-then decodes every frame. It prints one JSON line. An accepted file prints `verdict`, `format`
-(`png`/`jpeg`/`webp`/`gif`), `animated`, `width`, `height` and `frames`. A rejected
-file prints `verdict` and `reason`. Exit 137 is SIGKILL, normally from the deadline. Any
-other nonzero exit, or output that is not one JSON line, is a parser failure.
-
-### Ceilings
-
-| Ceiling | Value | Enforced by |
-|---|---|---|
-| Bytes | 10,000,000 | caller before spawning, and `classify.py` |
-| Width or height | 8,192 px | `classify.py`, from the header before decoding |
-| Pixels per frame | 40,000,000 | same |
-| Frames | 300 | same, from the declared count |
-| Pixels across frames | 100,000,000 | same |
-| Wall time | 5 s | `timeout --signal=KILL` |
-| Address space | 1 GiB | `prlimit --as` (Linux only) |
-
-These are #61's proposed bounds, adopted unchanged. The 40 MP frame limit rejects a
-48 MP phone photo (8064×6048) even when it is under 10 MB.
+## Measured needs
 
 The largest legitimate need measured was a two-frame 40 MP WebP: 632 MiB peak RSS
 on arm64 and 644 MiB on amd64, finishing in 0.7 s. In a manual arm64 run outside the
@@ -192,40 +151,3 @@ recorded reports, an equivalent file failed under a 640 MiB ceiling and passed
 under 768 MiB. The slowest was a 25-frame 100 MP WebP: about
 1 s. Timings come from Docker on an Apple Silicon Mac, not the
 VPS.
-
-Each parser can use up to 1 GiB. Parse an attempt's files one at a time, and cap
-concurrent parsers across the application to fit host memory.
-
-### Failure semantics
-
-Map the child's result to three outcomes, not to its reason strings:
-
-| Outcome | Child result |
-|---|---|
-| `{:error, :too_large}` | `bytes_over_limit`, `dimensions_over_limit`, `frame_pixels_over_limit`, `frames_over_limit`, `total_pixels_over_limit` |
-| `{:error, :unsupported}` | `unclassifiable`: not PNG, JPEG, WebP or GIF by content |
-| `{:error, :invalid}` | `malformed`, `memory_limit`, deadline (exit 137), and any other parser failure |
-
-An accepted file sets `is_animated` to `frames > 1` and derives the stored
-extension and Content-Type from `format`, not from the client's file name.
-
-### Platform dependencies
-
-- **Release image:** the final stage has no Python. Add Debian's `python3` and
-  `python3-venv`, then install Pillow from the hash-pinned requirements file.
-  `timeout` (coreutils) and `prlimit` (util-linux) are already in Debian slim.
-- **Hashes:** `requirements.txt` pins the CPython 3.11 manylinux wheels for x86_64
-  and aarch64 only. CI's Python and macOS development need their own pinned wheel
-  hashes.
-- **macOS:** there is no `prlimit`, and macOS does not enforce `RLIMIT_AS`. On
-  macOS, drop `prlimit` and run the memory-ceiling test on Linux only. CI runs on
-  Linux, so the ceiling is still tested on every run. Homebrew coreutils provides
-  `timeout`.
-
-### Verification
-
-- `bash scripts/image_parser_probe.sh` reproduces this report until #62
-  replaces it.
-- #62's integration tests use these fixtures. At minimum they cover one accept per
-  format, an animated APNG and an animated WebP, one truncated file, one
-  over-limit header, and the deadline and address-space kills.

@@ -83,11 +83,12 @@ defmodule Tips.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get", "ecto.setup", "assets.setup", "assets.build"],
+      setup: ["deps.get", "image_parser.setup", "ecto.setup", "assets.setup", "assets.build"],
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.drop": [&guard_database_reset/1, "ecto.drop"],
       "ecto.reset": [&guard_database_reset/1, "ecto.drop", "ecto.setup"],
-      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
+      test: ["image_parser.setup", "ecto.create --quiet", "ecto.migrate --quiet", "test"],
+      "image_parser.setup": &image_parser_setup/1,
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["compile", "tailwind tips", "esbuild tips"],
       "assets.deploy": [
@@ -97,6 +98,25 @@ defmodule Tips.MixProject do
       ],
       precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
     ]
+  end
+
+  # Installs Pillow for Tips.Content.Media.ImageParser into _build/image_parser, again
+  # whenever priv/image_parser/requirements.txt changes.
+  defp image_parser_setup(_args) do
+    venv = "_build/image_parser"
+    requirements = File.read!("priv/image_parser/requirements.txt")
+
+    if File.read(Path.join(venv, "requirements.txt")) != {:ok, requirements} do
+      File.rm_rf!(venv)
+
+      command =
+        "python3 -m venv #{venv} && #{venv}/bin/pip install --quiet --disable-pip-version-check " <>
+          "--require-hashes " <>
+          "--no-deps -r priv/image_parser/requirements.txt"
+
+      if Mix.shell().cmd(command) != 0, do: Mix.raise("Installing the image parser failed")
+      File.write!(Path.join(venv, "requirements.txt"), requirements)
+    end
   end
 
   defp guard_database_reset(_args) do

@@ -53,7 +53,16 @@ FROM debian:bookworm-20260918-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends libstdc++6 openssl libncurses6 locales ca-certificates \
+    python3 python3-venv \
   && rm -rf /var/lib/apt/lists/*
+
+# Pillow for the image parser (Tips.Content.Media.ImageParser). timeout and prlimit
+# come with the base image.
+COPY priv/image_parser/requirements.txt /tmp/image_parser_requirements.txt
+RUN python3 -m venv /app/image_parser \
+  && /app/image_parser/bin/pip install --no-cache-dir --require-hashes --no-deps \
+    -r /tmp/image_parser_requirements.txt \
+  && rm /tmp/image_parser_requirements.txt
 
 # Set the locale
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
