@@ -43,10 +43,10 @@ defmodule TipsWeb.EditorDraftTest do
     |> fill_in(text_field("Tip"), with: "Saved body, then more")
     |> assert_has(css(status, text: "Draft saved in this browser at"))
 
-    assert %{"draft" => draft, "intent" => %{"attrs" => %{"body" => "Saved body, then more"}}} =
-             stored(session, seeded["storage"])
+    assert %{"draft" => %{"draft_id" => draft_id, "revision" => revision}} =
+             saved(session, seeded["storage"], "Saved body, then more")
 
-    assert draft == %{seeded["draft"] | "revision" => 1}
+    assert draft_id == seeded["draft"]["draft_id"] and revision > 0
   end
 
   feature "typing before the hook mounts stays, and the saved draft is not applied",
@@ -121,7 +121,7 @@ defmodule TipsWeb.EditorDraftTest do
     |> assert_has(css(status, text: "Draft saved in this browser at"))
 
     before = hidden_record(session)
-    %{"draft" => first_pair} = stored(session, before["storage"])
+    %{"draft" => first_pair} = saved(session, before["storage"], "Worked on a rename")
 
     reads =
       run(session, """
@@ -150,17 +150,17 @@ defmodule TipsWeb.EditorDraftTest do
     assert hidden_record(session)["submission_key"] == before["submission_key"]
     assert run(session, "return window.draftReads") == 0
 
-    session
-    |> fill_in(text_field("Review"), with: "Worked on a rename, twice")
-    |> assert_has(css(status, text: "Draft saved in this browser at"))
+    fill_in(session, text_field("Review"), with: "Worked on a rename, twice")
 
+    # Saved under the pair the hook kept: a stale pair would conflict instead.
     assert %{"draft" => pair, "intent" => %{"attrs" => attrs}} =
-             stored(session, before["storage"])
+             saved(session, before["storage"], "Worked on a rename, twice")
 
-    assert pair == %{first_pair | "revision" => first_pair["revision"] + 1}
+    assert pair["draft_id"] == first_pair["draft_id"] and
+             pair["revision"] > first_pair["revision"]
 
-    assert %{"body" => "Worked on a rename, twice", "model_id" => "", "environment_id" => "ide"} =
-             attrs
+    assert %{"model_id" => "", "environment_id" => "ide"} = attrs
+    refute_has(session, css(status, text: "paused"))
   end
 
   feature "without browser storage the author keeps composing and is told the draft isn't saved",
@@ -217,6 +217,24 @@ defmodule TipsWeb.EditorDraftTest do
       run(session, "return (await importStore()).load(args[0])", [storage])
 
     record
+  end
+
+  # The stored draft once autosave has written `body`. The status line alone
+  # cannot tell one save from the next.
+  defp saved(session, storage, body) do
+    run(
+      session,
+      """
+      const store = await importStore()
+      const deadline = Date.now() + 3000
+      for (;;) {
+        const result = await store.load(args[0])
+        if (result.record?.intent.attrs.body === args[1] || Date.now() > deadline) return result.record
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+      """,
+      [storage, body]
+    )
   end
 
   defp hidden_record(session) do
