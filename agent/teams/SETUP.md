@@ -57,16 +57,25 @@ Codex launches with approval policy `never`, so a denied action cannot escalate,
 
 In `~/.codex/config.toml`, append the absolute path to `~/.agent-browser` to the
 existing `[sandbox_workspace_write].writable_roots` list. Preserve its other
-entries. This addresses the denied home-directory write; it does not establish
-that Chrome can launch inside the sandbox. See the
+entries. This addresses the denied home-directory write. See the
 [Codex configuration reference](https://developers.openai.com/codex/config-reference/).
 
-After changing permissions, start a new tester session and run a real browser
-preflight there, using its agent-browser skill:
+Chrome cannot start inside the Codex sandbox. Add this rule to
+`~/.codex/rules/default.rules` so that the command that starts the browser runs
+outside it:
+
+```
+prefix_rule(pattern=["agent-browser", "open"], decision="allow")
+```
+
+After changing permissions or rules, start a new tester session and run a real
+browser preflight there, each line as its own command. The
+[manual browser review](README.md#manual-browser-review) section explains the
+command form:
 
 ```sh
-export AGENT_BROWSER_SESSION="$(agent-browser session id --scope worktree --prefix preflight)"
-agent-browser open about:blank && agent-browser close
+agent-browser open about:blank --session preflight
+agent-browser close --session preflight
 ```
 
 If opening fails, retain the full error and run `agent-browser doctor` in that

@@ -270,7 +270,21 @@ browser session. Wait for `mix test` to exit before starting the app: both use
 MIX_ENV=dev unbuffer mix ecto.setup && MIX_ENV=dev PORT="$TIPS_TEST_PORT" unbuffer mix do assets.setup, assets.build, phx.server
 ```
 
-Use `agent-browser` to test the app. Read mail at `/dev/mailbox`. The development
+Use `agent-browser` to test the app. A Codex tester starts each browser session
+with this command, run alone, with a literal session name:
+
+```sh
+agent-browser open about:blank --session <name>
+```
+
+Chrome cannot start inside the Codex sandbox. Only a command that begins with
+exactly `agent-browser open` runs outside it. A flag before `open`, a leading
+environment assignment, a shell variable or a `&&` chain keeps the command inside
+the sandbox, and the launch fails with `Chrome exited early`. Once the session is
+open, every other `agent-browser` command works in any form, including `open`
+with the app's URL. `close` ends the session; start the next one the same way.
+
+Read mail at `/dev/mailbox`. The development
 app calls real providers; test those scenarios only with the user's authorization
 on the issue. Stop the server before handing off or notifying the dispatcher.
 
