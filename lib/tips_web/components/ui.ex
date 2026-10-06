@@ -387,7 +387,8 @@ defmodule TipsWeb.UI do
 
   `technique` and `environment` are `{label, href}`; `model` is
   `{:curated, label, href}` or `{:free_text, label}`. Free-text models are
-  always plain text; `linkable={false}` makes every part plain text.
+  always plain text; `linkable={false}` makes every part plain text. Links
+  navigate, or with `patch` patch the current LiveView's URL.
 
       <TipsWeb.UI.setup_meta technique={{"Planning", "/?technique=planning"}} model={{:free_text, "local-qwen"}} />
   """
@@ -395,6 +396,7 @@ defmodule TipsWeb.UI do
   attr :model, :any, default: nil
   attr :environment, :any, default: nil
   attr :linkable, :boolean, default: true
+  attr :patch, :boolean, default: false
 
   def setup_meta(assigns) do
     parts =
@@ -410,7 +412,12 @@ defmodule TipsWeb.UI do
     ~H"""
     <span class="contents">
       <%= for {label, href} <- @parts do %>
-        <.link :if={@linkable && href} navigate={href} class="inline-flex min-h-6 items-center">
+        <.link
+          :if={@linkable && href}
+          navigate={!@patch && href}
+          patch={@patch && href}
+          class="inline-flex min-h-6 items-center"
+        >
           {label}
         </.link>
         <span :if={!(@linkable && href)}>{label}</span>

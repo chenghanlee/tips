@@ -159,9 +159,15 @@ defmodule TipsWeb.SearchLive.Index do
   def handle_params(params, _uri, socket) do
     case request(params, socket.assigns.options) do
       request when request == socket.assigns.request -> {:noreply, socket}
-      request -> {:noreply, run(assign(socket, request: request, search_error: nil))}
+      request -> {:noreply, socket |> clear_error(request) |> assign(request: request) |> run()}
     end
   end
+
+  # Only a new submitted query clears the blank-search message. Clearing it on
+  # a filter or page change rerenders the search field and replaces text the
+  # reader is still editing.
+  defp clear_error(%{assigns: %{request: %{q: q}}} = socket, %{q: q}), do: socket
+  defp clear_error(socket, _request), do: assign(socket, search_error: nil)
 
   @impl true
   def handle_event("search", %{"q" => q}, socket) do
@@ -283,10 +289,12 @@ defmodule TipsWeb.SearchLive.Index do
   defp author(%{handle: handle}), do: %{handle: handle, href: nil}
   defp author(:deleted_account), do: %{handle: "[deleted]", href: nil}
 
-  # A curated label sets only its own filter, keeping the query and the other
-  # filters, on page 1. Free-text models are plain text.
+  # A curated label patches only its own filter, keeping the query and the
+  # other filters, on page 1; the filter already applied keeps the current URL.
+  # Free-text models are plain text.
   defp setup(tip, request) do
     %{
+      patch: true,
       technique: {tip.tag.label, filter_path(request, :technique, tip.tag.id)},
       model: model(tip.model, request),
       environment:
@@ -301,8 +309,11 @@ defmodule TipsWeb.SearchLive.Index do
   defp model(%{id: id, label: label}, request),
     do: {:curated, label, filter_path(request, :model, id)}
 
-  defp filter_path(request, filter, id),
-    do: path(%{request | filters: Map.put(request.filters, filter, id), page: 1})
+  defp filter_path(request, filter, id) do
+    if request.filters[filter] == id,
+      do: path(request),
+      else: path(%{request | filters: Map.put(request.filters, filter, id), page: 1})
+  end
 
   defp age(at) do
     case DateTime.diff(DateTime.utc_now(), at) do

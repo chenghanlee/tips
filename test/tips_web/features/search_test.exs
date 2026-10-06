@@ -17,7 +17,7 @@ defmodule TipsWeb.SearchFeatureTest do
     :ok
   end
 
-  feature "initial HTML shows results; blank search and filter changes keep focus",
+  feature "initial HTML shows results; blank search and filter changes keep focus and the draft",
           %{session: session} do
     session
     |> visit("/search?q=flake")
@@ -28,10 +28,19 @@ defmodule TipsWeb.SearchFeatureTest do
     |> assert_has(css("#q-error", text: "Enter a task or keywords to search."))
     |> assert_has(css("#result-rows li a", text: "Reproduce the flake first"))
     |> assert_focus("q")
+    |> fill_in(css("#q"), with: "draft terms")
+    |> click(link("Other technique"))
+    |> assert_has(css("#results-heading", text: "Technique: Other technique"))
+    |> assert_draft("draft terms")
     |> choose_focused("technique", "persona")
     |> assert_has(css("#results-empty", text: "No tips match these filters"))
     |> assert_focus("technique")
+    |> assert_draft("draft terms")
     |> then(&assert(current_url(&1) =~ "/search?q=flake&technique=persona"))
+  end
+
+  defp assert_draft(session, text) do
+    execute_script(session, "return document.getElementById('q').value", [], &assert(&1 == text))
   end
 
   # Selects with the control focused, as a reader does. WebDriver's option

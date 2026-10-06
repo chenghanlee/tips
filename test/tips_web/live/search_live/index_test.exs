@@ -126,6 +126,12 @@ defmodule TipsWeb.SearchLive.IndexTest do
       assert [_row] = html |> find("#result-rows li") |> Enum.to_list()
     end
 
+    # A row's label for the filter already applied keeps the URL, without remounting.
+    workflow = element(lv, "#result-rows a", "Workflow")
+    assert render(workflow) =~ ~s(data-phx-link="patch")
+    assert render(workflow) =~ ~s(href="/search?page=2&amp;q=flake&amp;technique=workflow")
+    render_click(workflow)
+
     html = lv |> form("form[role=search]", %{q: " flake "}) |> render_submit()
     refute has?(html, "#q-error")
     refute_received {:provider_input, _input}
