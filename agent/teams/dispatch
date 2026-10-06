@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Start the dispatcher in this Herdr pane. Its settings are [dispatcher] in config.toml.
+cd "$(dirname "$0")/../.." || exit
+settings=$(python3 -c '
+import sys, tomllib
+d = tomllib.load(open(sys.argv[1], "rb"))["dispatcher"]
+print(d["model"], d["effort"], d["compact_percent"])
+' "${TIPS_TEAM_CONFIG:-agent/teams/config.toml}") || exit
+read -r model effort compact_percent <<<"$settings"
+# Every ring starts a turn over the whole context, so compact early; GitHub holds the state.
+CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=$compact_percent exec claude --permission-mode auto \
+  --model "$model" --effort "$effort" \
+  --append-system-prompt 'You are the dispatcher in agent/teams/README.md. At startup, on every done or blocked ring and when the user says the board changed, apply its Common path and Rules; reread them if they are no longer in context.' \
+  'Run herdr agent rename "$HERDR_PANE_ID" dispatcher, then begin.'
