@@ -45,9 +45,13 @@ defmodule Tips.SearchGateTest do
     %{fixtures: fixtures}
   end
 
-  test "runs every protocol step through the application and sends only eligible documents",
+  test "runs every protocol step through the application, sends only eligible documents and records a slow query as a fallback",
        %{fixtures: fixtures} do
-    stub_provider(nil)
+    search = Application.fetch_env!(:tips, Content.Search)
+    Application.put_env(:tips, Content.Search, Keyword.put(search, :query_embedding, 500))
+    on_exit(fn -> Application.put_env(:tips, Content.Search, search) end)
+    %{"text" => slow} = Enum.find(fixtures.queries, &(&1["id"] == "q02"))
+    stub_provider(nil, slow)
 
     assert {_passed_or_failed, report} =
              SearchGate.run(fixtures,
@@ -55,7 +59,13 @@ defmodule Tips.SearchGateTest do
                require_empty: false
              )
 
-    assert %{stopped: nil, usage: %{requests: 90, failed_requests: 0}} = report
+    assert %{stopped: nil, usage: %{requests: 90, failed_requests: 1}} = report
+
+    assert [%{query: "q02", result: "keyword", reason: "{:embedding, :deadline}"}] =
+             for(%{pass: 1, result: result} = pass <- report.passes, result != "hybrid", do: pass)
+
+    assert [%{phase: :passes, outcome: "no response"}] =
+             for(%{outcome: outcome} = request <- report.requests, outcome != "ok", do: request)
 
     assert %{embedded: 40, requests: 40, unmatched_inputs: 0, ineligible_embedded: []} =
              report.scan
@@ -71,8 +81,9 @@ defmodule Tips.SearchGateTest do
 
     passed = for %{passed: true, name: name} <- report.gates, do: name
 
-    for gate <- ~w(provider_requests_succeed single_identity passes_hybrid long_input_sent_whole
-                   filters_exact deep_offset_empty saturation_within_budget burst_pages),
+    for gate <- ~w(provider_requests_succeed query_deadlines_recorded single_identity
+                   hybrid_per_pass long_input_sent_whole search_tips_max_ms filters_exact
+                   deep_offset_empty saturation_within_budget burst_pages),
         do: assert(gate in passed, "#{gate} failed: #{inspect(report.gates)}")
 
     assert JSON.encode!(report)
@@ -201,18 +212,18 @@ defmodule Tips.SearchGateTest do
 
   # Responds as the selected runtime with bag-of-words vectors, so ranking has
   # signal, and reports each request to the gate as Finch telemetry would. The
-  # third document request gets `third`, unless it is `nil`.
-  defp stub_provider(third) do
+  # third document request gets `third`, unless it is `nil`. The first request
+  # for the query `slow` never answers.
+  defp stub_provider(third, slow \\ nil) do
     test = self()
-    counter = :counters.new(1, [])
+    counter = :counters.new(2, [])
 
     Req.Test.stub(EmbeddingProvider, fn conn ->
       SearchGate.request_started()
       {:ok, body, conn} = Plug.Conn.read_body(conn)
       %{"input" => [input]} = JSON.decode!(body)
       send(test, {:provider_input, input})
-      :counters.add(counter, 1, 1)
-      failure = if :counters.get(counter, 1) == 3, do: third
+      failure = failure(counter, input, third, slow)
       if failure == :no_response, do: Process.sleep(:infinity)
 
       {status, upstream} =
@@ -243,6 +254,19 @@ defmodule Tips.SearchGateTest do
       |> Plug.Conn.put_resp_content_type("application/json")
       |> Plug.Conn.send_resp(status, response)
     end)
+  end
+
+  # Counts requests in slot 1 and requests for `slow` in slot 2.
+  defp failure(counter, input, third, slow) do
+    :counters.add(counter, 1, 1)
+    slow? = slow != nil and String.ends_with?(input, slow)
+    if slow?, do: :counters.add(counter, 2, 1)
+
+    cond do
+      :counters.get(counter, 1) == 3 -> third
+      slow? and :counters.get(counter, 2) == 1 -> :no_response
+      true -> nil
+    end
   end
 
   # Responds to each query embedding request with `vector.(input)`.
