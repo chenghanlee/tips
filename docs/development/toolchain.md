@@ -39,7 +39,7 @@ is installed; selection alone does not establish compatibility.
 | Library | Selection and integration requirements |
 |---|---|
 | Background jobs | [Oban 2.24.1](https://hex.pm/packages/oban/2.24.1), using the application's Ecto Repo and PostgreSQL |
-| UI components | [SaladUI 1.0.0](https://hex.pm/packages/salad_ui/1.0.0) in library mode, [verified](https://github.com/chenghanlee/tips/issues/41) with Phoenix 1.8.14, LiveView 1.2.12, Tailwind 4.3.0 and esbuild 0.25.4; adds `tw_merge` 0.1.1, `igniter` 0.8.4 and `sourceror` 1.12.3. After `mix salad.setup`: delete its prepended bare `@import "tailwindcss";`, its `.dark` block and `@custom-variant dark`, the unused `salad_ui.css`, `tailwind.colors.json`, typography plugin and `tw-animate.css`, and revert its `app.js` patch (Tips uses no SaladUI JavaScript components); write the base border rule as `border-color: var(--border)`, gate `form_message` errors with `used_input?/1`, and call components by module to avoid `CoreComponents` name clashes. daisyUI is removed; [tokens.md](../design/visual/tokens.md) holds the values. Native `<details>` needs `JS.ignore_attributes(["open"])` to stay open across patches |
+| UI components | [SaladUI 1.0.0](https://hex.pm/packages/salad_ui/1.0.0) in library mode, [verified](https://github.com/chenghanlee/tips/issues/41) with Phoenix 1.8.14, LiveView 1.2.12, Tailwind 4.3.0 and esbuild 0.25.4; adds `tw_merge` 0.1.1, `igniter` 0.8.4 and `sourceror` 1.12.3. After `mix salad.setup`: delete its prepended bare `@import "tailwindcss";`, its `.dark` block and `@custom-variant dark`, the unused `salad_ui.css`, `tailwind.colors.json`, typography plugin and `tw-animate.css`, and revert its `app.js` patch (Tips uses no SaladUI JavaScript components); write the base border rule as `border-color: var(--border)`, gate `form_message` errors with `used_input?/1`, and call components by module to avoid `CoreComponents` name clashes. daisyUI is removed; `assets/css/app.css` holds the token values and [tokens.md](../design/visual/tokens.md) their rules. Native `<details>` needs `JS.ignore_attributes(["open"])` to stay open across patches |
 | Markdown | [MDEx 0.13.5](https://hex.pm/packages/mdex/0.13.5); verify native dependency support on each target platform and the [rendering policy](../design/backend-design.md#markdown-embeds-and-secure-headers) |
 | Browser tests | [Wallaby 0.31.0](https://hex.pm/packages/wallaby/0.31.0), with matching Chrome and ChromeDriver |
 
@@ -49,8 +49,9 @@ class-merging dependencies, and commit all resolved transitive dependencies.
 ## PostgreSQL image and extension contract
 
 [db/Dockerfile](../../db/Dockerfile) builds the extension-enabled image from
-prebuilt packages for amd64 and arm64. It checks architecture-specific archive
-checksums and refuses a PostgreSQL version change. If the pinned pgvector
+prebuilt packages for amd64 and arm64. It checks the pg_textsearch archive
+against a pinned SHA-256 per architecture; the pgvector package relies on APT
+signature checks. It refuses a PostgreSQL version change. If the pinned pgvector
 package leaves the live signed index, it uses the PGDG archive for that package
 only. It does not switch versions or compile extensions from source.
 
@@ -66,12 +67,14 @@ Local arm64 builds use the same recipe. The published image is amd64 only.
 The smoke checks extension versions and isolated search queries; full search
 acceptance belongs in the [data model](../design/data-model.md#search).
 
-The selected deployment image is:
+Each main-branch publish moves the tag to a new digest. Read the current digest
+from the latest successful main-branch run, or from the GHCR package versions:
 
-```text
-ghcr.io/chenghanlee/tips-postgres@sha256:bd7e57646cbb85dd277fd1752d77df9ca81a4e354bcdcd7203b8fd92f366a460
+```sh
+run=$(gh run list --workflow db-image.yml --branch main --event push --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+gh run view "$run" --log | grep -o 'tips-postgres@sha256:[0-9a-f]*' | sort -u
 ```
 
-Deploy by registry manifest digest. Verify an authenticated pull during
+Deploy by registry manifest digest, not by tag. Verify an authenticated pull during
 deployment setup. Use a credential with package read access and
 `docker login --password-stdin`; keep credentials out of Compose and Git.

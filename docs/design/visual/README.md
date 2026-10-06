@@ -1,21 +1,24 @@
 # Visual baseline
 
-This directory is the Tips visual baseline for the reader and editor pages. It
-settles the look, the tokens and the shared component interfaces so
-[P16.02](https://github.com/chenghanlee/tips/issues/42) can implement them
-without further design decisions. It follows
-[frontend-design.md](../frontend-design.md) and the SaladUI result in
+This directory is the Tips visual baseline for the reader and editor pages: the
+tokens, the component interfaces and static page exemplars. It follows
+[frontend-design.md](../frontend-design.md) and the SaladUI selection in
 [toolchain.md](../../development/toolchain.md#library-selections).
 
 ## Files
 
 | File | What it is |
 |---|---|
-| [tokens.md](tokens.md) | Colour, type, spacing, radius, focus and width tokens; the `--border` resolution and daisyUI removal |
-| [components.md](components.md) | Shared component interfaces and page-specific components, with owners |
+| [tokens.md](tokens.md) | Colour, type, spacing, radius, focus and width tokens, with their contrast rules |
+| [components.md](components.md) | Component names, rules for every component, and specs for components not in the code |
 | `reader-browse.html` | Browse and search page, with loading, error, blank-search, empty and out-of-range states |
 | `reader-tip.html` | Tip page with media, reviews, placeholders and the single-review view |
 | `editor-review.html` | Review composer with attachments, errors, draft status and recovery states |
+
+The exemplars fix layout and how each state looks: widths, spacing, control
+heights and the compact text-only feed row. They do not fix HEEx, module
+paths, function heads, tests or wiring (LiveView events, hooks, uploads, draft
+storage, vote behaviour). Media and content in them are placeholders.
 
 The HTML files are static and self-contained: inline CSS, no web fonts, no
 external requests. The only script is a few optional lines in
@@ -57,32 +60,13 @@ enforces a 500 px minimum window, so the page lays out at 500 px and the
 screenshot crops it. Use DevTools emulation as above, or the DevTools Protocol
 `Emulation.setDeviceMetricsOverride` with `width: 320`.
 
-## Settled here
-
-- Token values, including the Tips changes to SaladUI defaults (`--radius`,
-  `--destructive`, `--input`) and the 2 px focus outline.
-- Removing daisyUI when SaladUI is installed, which resolves the `--border`
-  clash.
-- Layout: widths, spacing, control heights, the compact text-only feed row,
-  and how each state looks.
-- Which components exist, what they wrap, their attrs and slots, and who builds
-  them.
-
-## Settled in P16.02 and the feature tasks
-
-- HEEx code, module paths, exact function heads and tests.
-- Wiring: LiveView events, hooks, uploads, draft storage and vote behaviour.
-  The exemplars show state; they do not implement it.
-- Real media, real content and the rest of the page areas; P16.03
-  ([#117](https://github.com/chenghanlee/tips/issues/117)) reviews those.
-
 ## Copy
 
 Where [frontend-design.md](../frontend-design.md) fixes the wording, the
-exemplars use it exactly. It does not fix these lines, which feature owners may
-reword without a design change: the search label and helper, the Model and
-Environment filter note, "Saving…", "Net +N", "Loading results…", the
-retrieval-error line, "No tips on page N.", the Copy failure line, "Play video",
-"Open full-size image", the Review and image-description helpers, video state
-explanations, the connection, stale-save, conflict and handoff notices, and the
-error-summary heading.
+exemplars use it exactly. It does not fix these lines, which may change without
+a design change: the search label and helper, the Model and Environment filter
+note, "Saving…", "Net +N", "Loading results…", the retrieval-error line, "No
+tips on page N.", the Copy failure line, "Play video", "Open full-size image",
+the Review and image-description helpers, video state explanations, the
+connection, stale-save, conflict and handoff notices, and the error-summary
+heading.

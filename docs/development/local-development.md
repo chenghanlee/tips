@@ -2,16 +2,12 @@
 
 Run commands from the repository root.
 
-The app includes passwordless magic-link sign-in, local email previews, Oban and a
-database health endpoint. Remaining provider integration work is tracked in GitHub
-issues.
-
 Install Elixir **1.20.4**, Erlang/OTP **29.1**, Python **3.12**, Docker with Compose, and a C build
 toolchain (Xcode Command Line Tools on macOS, or a C compiler and `make` on Linux)
 for native dependencies such as `lazy_html`. Python runs documentation checks and optional
-agent tooling. See the [toolchain guide](toolchain.md)
-for all dependency and asset pins. Start the shared extension-enabled PostgreSQL
-**18.6** server from the main checkout with `docker compose up -d --wait db`.
+agent tooling. [Version sources](toolchain.md#version-sources) lists
+all dependency, asset and image pins. Start the shared extension-enabled PostgreSQL
+server from the main checkout with `docker compose up -d --wait db`.
 Wait for a successful health check before running database setup or migrations.
 
 From a fresh checkout:
@@ -24,8 +20,9 @@ cp .env.example .env
 
 The example selects the local Compose superuser on port 5433. Dev and test load
 only the [provider settings](#provider-settings) from `.env` automatically. The
-database and port settings are read by compile-time configuration, so export them
-in each new shell:
+database and port settings come only from the exported environment
+(`config/dev.exs`, `config/test.exs`, `config/runtime.exs`), so export them in
+each new shell:
 
 ```sh
 set -a
@@ -54,8 +51,11 @@ a provider. Development mail stays in the local Swoosh
 mailbox at <http://localhost:4000/dev/mailbox>. Sign-in is passwordless, by
 magic link; a session family is renewed and revoked together. Oban runs in the
 same application and Repo with `media`, `embeddings`, and `maintenance` queues,
-each with concurrency 1. `Tips.Workers.ExpireRegistrations` is scheduled every
-minute on `maintenance`. Tests use Oban's manual testing mode.
+each with concurrency 1. Cron runs `Tips.Workers.ExpireRegistrations` every
+minute on `maintenance` and `Tips.Workers.EmbedSearch` every minute on
+`embeddings`. Without `OPENROUTER_API_KEY`, each `EmbedSearch` run fails while
+any tip or review lacks a vector. The pruner keeps finished jobs for seven days.
+Tests use Oban's manual testing mode.
 
 With the server running, check both routes from a second shell (adjust the port
 if you changed it):
@@ -190,7 +190,7 @@ Use the [pair workflow](../../agent/teams/README.md) for coordination and
 ### Extension-enabled database
 
 Run `docker compose up -d --wait db` from the main checkout to start the shared PostgreSQL
-18.6 image with pgvector 0.8.6 and pg_textsearch 1.4.0. [Compose](../../compose.yaml) serves it on
+image with pgvector and pg_textsearch ([versions](toolchain.md#version-sources)). [Compose](../../compose.yaml) serves it on
 `127.0.0.1:5433` with the local-only user/password `postgres`/`postgres` and
 persists data in a named volume. `docker compose down` preserves that data.
 Development and tests default to this port (`PGPORT=5433`). Migrations create
@@ -274,7 +274,7 @@ all browser tests are excluded.
 From a task worktree with its own dependencies and build directory:
 
 ```sh
-export PGPORT=5433 TIPS_DB_SUFFIX=_36 TIPS_TEST_PORT=4036 MIX_ENV=test
+export PGPORT=5433 TIPS_DB_SUFFIX=_a TIPS_TEST_PORT=4031 MIX_ENV=test
 export TIPS_CHROME_BINARY='/absolute/path/to/chrome'
 export TIPS_CHROMEDRIVER='/absolute/path/to/chromedriver'
 "$TIPS_CHROME_BINARY" --version
@@ -289,23 +289,26 @@ TIPS_BROWSER=1 mix test test/tips_web/features/live_smoke_test.exs --trace
 
 Both version commands must report `153.0.8010.52`. On macOS the browser
 executable is inside `Google Chrome for Testing.app/Contents/MacOS/`.
-ChromeDriver may instead be on PATH. The browser smoke uses one connected
-registration journey at 390×844. It checks
-invalid-email correction, account creation, and compiled input border/focus styles.
-It uses an isolated SQL sandbox; inserts are rolled back and mail uses the Swoosh
-test adapter. The viewport choice does not establish responsive layout, keyboard
-traversal or physical mobile browser coverage.
+ChromeDriver may instead be on PATH.
+
+Browser tests live in `test/tips_web/features/`. They run in a 1280×800 window
+(`config/test.exs`) unless a test resizes it. The smoke test,
+`live_smoke_test.exs`, resizes to 390×844 and runs one connected registration
+journey. It checks invalid-email correction, account creation, and compiled
+input border/focus styles. Each test uses an isolated SQL sandbox; inserts are
+rolled back and mail uses the Swoosh test adapter. The 390×844 viewport does not
+prove responsive layout, keyboard traversal or mobile-browser behaviour.
 
 The required `checks` CI job runs documentation validation,
 introduced-commit secret scanning, locked dependencies, compilation with
-warnings as errors, formatting, assets, migrations and the full suite including
-these browser tests. It uses the pinned runtime, database image and browser
-pair. The required checks job also runs `mix credo --strict`.
+warnings as errors, formatting, `mix credo --strict`, assets, migrations and the
+full suite including these browser tests. It uses the pinned runtime, database
+image and browser pair.
 
 On browser assertion failures, Wallaby saves screenshots under `screenshots/`
 (gitignored). CI uploads them as `browser-failure-screenshots`; inspect that
-artifact and the `mix test --trace` logs from the failed run. These smoke tests
-use synthetic accounts only and need no production secrets.
+artifact and the `mix test --trace` logs from the failed run. Browser tests use
+synthetic data only and need no production secrets.
 
 #### Browser milestone coverage
 
@@ -315,11 +318,9 @@ draft races. Chrome needs its OS libraries, CA certificates, fonts, a writable
 temporary profile directory and local process/loopback access. Run it as a
 non-root user.
 
-| Coverage | Check |
-|---|---|
-| Linux desktop, 1280×800 | Future milestone checks for real journeys needing this viewport |
-| Chrome, 390×844 viewport | Automated signup and compiled-style smoke; no responsive-layout or mobile-engine guarantee |
-| Safari on macOS and physical iOS; Chrome on physical Android | Manual milestone checks for keyboard/focus, draft recovery, uploads and private video playback; record OS/browser/device versions with the results |
+Check keyboard/focus, draft recovery, uploads and private video playback by hand
+in Safari on macOS, Safari on a physical iOS device and Chrome on a physical
+Android device. Record the OS, browser and device versions with the results.
 
 Use dispatched events or the required button path to test drag reordering.
 Use branded Google Chrome for real Stream playback: Cloudflare's
