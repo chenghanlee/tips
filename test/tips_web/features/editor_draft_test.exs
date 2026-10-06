@@ -71,7 +71,23 @@ defmodule TipsWeb.EditorDraftTest do
     assert_value(session, "#tip_body", "Typed before the page connected")
     assert stored(session, seeded["storage"]) == seeded
 
+    # Typing while the reload reads storage stays too.
+    editor_tab = window_handle(session)
+    blocker_tab = open_tab(session)
+    hold_store(session, blocker_tab)
+    focus_window(session, editor_tab)
+    click(session, button("Reload saved draft"))
+    fill_in(session, text_field("Tip"), with: "Typed during the reload")
+    release_store(session, blocker_tab)
+    focus_window(session, editor_tab)
+    settle_store(session)
+
+    refute run(session, "return document.querySelector(\"fieldset[id$='-fields']\").disabled"),
+           "the reload restored over the typing"
+
     session
+    |> assert_has(css(status, text: @paused))
+    |> assert_value("#tip_body", "Typed during the reload")
     |> click(button("Reload saved draft"))
     |> assert_has(css(status, text: "Recovered your draft from this browser."))
     |> assert_value("#tip_title", "Saved title")
@@ -105,15 +121,7 @@ defmodule TipsWeb.EditorDraftTest do
     open_editor(session, "/editor/tips/new")
     recovered = hidden_record(session)
 
-    run(session, """
-    const main = document.querySelector("[data-phx-main]")
-    const until = async (test) => { while (!test()) await new Promise((r) => setTimeout(r, 50)) }
-    window.liveSocket.disconnect()
-    await until(() => !main.classList.contains("phx-connected"))
-    window.liveSocket.connect()
-    await until(() => main.classList.contains("phx-connected"))
-    """)
-
+    reconnect(session)
     release_store(session, blocker_tab)
     focus_window(session, editor_tab)
 
@@ -124,6 +132,25 @@ defmodule TipsWeb.EditorDraftTest do
 
     assert hidden_record(session)["submission_key"] == recovered["submission_key"]
     assert stored(session, seeded["storage"]) == seeded
+
+    # A reload interrupted by a reconnect restores nothing; reloading again
+    # applies the draft another tab saved in between.
+    hold_store(session, blocker_tab)
+    focus_window(session, editor_tab)
+    count_reads(session)
+    click(session, button("Reload saved draft"))
+    await_reads(session, 1)
+    reconnect(session)
+    queue_save(session, blocker_tab, seeded, "Saved in another tab")
+    focus_window(session, editor_tab)
+    click(session, button("Reload saved draft"))
+    await_reads(session, 2)
+    release_store(session, blocker_tab)
+    focus_window(session, editor_tab)
+
+    session
+    |> assert_has(css(status, text: "Recovered your draft from this browser."))
+    |> assert_value("#tip_body", "Saved in another tab")
   end
 
   feature "reconnect recovers typed values and blanks without reading storage",
@@ -141,24 +168,9 @@ defmodule TipsWeb.EditorDraftTest do
     before = hidden_record(session)
     %{"draft" => first_pair} = saved(session, before["storage"], "Worked on a rename")
 
-    reads =
-      run(session, """
-      window.draftReads = 0
-      const transaction = IDBDatabase.prototype.transaction
-      IDBDatabase.prototype.transaction = function (store, mode) {
-        if (mode !== "readwrite") window.draftReads += 1
-        return transaction.apply(this, arguments)
-      }
-      const main = document.querySelector("[data-phx-main]")
-      const until = async (test) => { while (!test()) await new Promise((r) => setTimeout(r, 50)) }
-      window.liveSocket.disconnect()
-      await until(() => !main.classList.contains("phx-connected"))
-      window.liveSocket.connect()
-      await until(() => main.classList.contains("phx-connected"))
-      return window.draftReads
-      """)
-
-    assert reads == 0
+    count_reads(session)
+    reconnect(session)
+    assert run(session, "return window.draftReads") == 0
 
     session
     |> assert_value("#review_body", "Worked on a rename")
@@ -253,6 +265,86 @@ defmodule TipsWeb.EditorDraftTest do
       """,
       [storage, body]
     )
+  end
+
+  # Waits for the editor's queued storage reads to settle: a readwrite
+  # transaction starts only after them.
+  defp settle_store(session) do
+    run(session, """
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("tips-editor-drafts")
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    const transaction = db.transaction("drafts", "readwrite")
+    transaction.objectStore("drafts").get(0)
+    await new Promise((resolve, reject) => {
+      transaction.oncomplete = resolve
+      transaction.onabort = () => reject(transaction.error)
+    })
+    db.close()
+    """)
+  end
+
+  # Starts saving `body` over `record` in `tab`, queued behind the held store,
+  # and returns once its transaction exists.
+  defp queue_save(session, tab, record, body) do
+    focus_window(session, tab)
+
+    run(
+      session,
+      """
+      const store = await importStore()
+      const transaction = IDBDatabase.prototype.transaction
+      const created = new Promise((resolve) => {
+        IDBDatabase.prototype.transaction = function () {
+          IDBDatabase.prototype.transaction = transaction
+          resolve()
+          return transaction.apply(this, arguments)
+        }
+      })
+      store.save(args[0].storage, args[0].draft, args[1])
+      await created
+      """,
+      [record, put_in(record, ["intent", "attrs", "body"], body)]
+    )
+  end
+
+  # Counts the page's storage reads in `window.draftReads`.
+  defp count_reads(session) do
+    run(session, """
+    window.draftReads = 0
+    const transaction = IDBDatabase.prototype.transaction
+    IDBDatabase.prototype.transaction = function (store, mode) {
+      if (mode !== "readwrite") window.draftReads += 1
+      return transaction.apply(this, arguments)
+    }
+    """)
+  end
+
+  defp await_reads(session, count) do
+    run(
+      session,
+      """
+      const deadline = Date.now() + 5000
+      while (window.draftReads < args[0]) {
+        if (Date.now() > deadline) throw new Error(`${window.draftReads} storage reads`)
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+      """,
+      [count]
+    )
+  end
+
+  defp reconnect(session) do
+    run(session, """
+    const main = document.querySelector("[data-phx-main]")
+    const until = async (test) => { while (!test()) await new Promise((r) => setTimeout(r, 50)) }
+    window.liveSocket.disconnect()
+    await until(() => !main.classList.contains("phx-connected"))
+    window.liveSocket.connect()
+    await until(() => main.classList.contains("phx-connected"))
+    """)
   end
 
   defp hidden_record(session) do
