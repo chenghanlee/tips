@@ -61,17 +61,15 @@ entries. This addresses the denied home-directory write. See the
 [Codex configuration reference](https://developers.openai.com/codex/config-reference/).
 
 Chrome cannot start inside the Codex sandbox. Add this rule to
-`~/.codex/rules/default.rules` so that the command that starts the browser runs
-outside it:
+`~/.codex/rules/default.rules` so `agent-browser open` runs outside it:
 
 ```
 prefix_rule(pattern=["agent-browser", "open"], decision="allow")
 ```
 
-After changing permissions or rules, start a new tester session and run a real
-browser preflight there, each line as its own command. The
-[manual browser review](README.md#manual-browser-review) section explains the
-command form:
+After changing permissions or rules, start a new tester session and run this
+preflight there, one command per call, in the
+[required form](README.md#manual-browser-review):
 
 ```sh
 agent-browser open about:blank --session preflight
