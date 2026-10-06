@@ -1,0 +1,559 @@
+[
+  {
+    "name": "static.png",
+    "bytes": 469,
+    "recipe": "ffmpeg 5.1 -bitexact -f lavfi -i testsrc=size=64x48:rate=5:duration=1 -frames:v 1",
+    "expected": [
+      {
+        "format": "png",
+        "animated": false,
+        "verdict": "accept"
+      }
+    ],
+    "sha256": "3aef4ad0b6b37570a7fcf7d12c92d01231bf2c1f049e632d328fd15bae73520f"
+  },
+  {
+    "name": "animated.apng",
+    "bytes": 1405,
+    "recipe": "ffmpeg 5.1 -bitexact -f lavfi -i testsrc=size=64x48:rate=5:duration=1 -plays 0 -f apng",
+    "expected": [
+      {
+        "format": "png",
+        "animated": true,
+        "verdict": "accept"
+      }
+    ],
+    "sha256": "14b9f00e517c75a90087ef7c08d6b6f9adde58c360b20e9fa3236a71ad1decf5"
+  },
+  {
+    "name": "single-frame.apng",
+    "bytes": 527,
+    "recipe": "animated.apng reduced to acTL num_frames 1, its first fcTL and IDAT",
+    "expected": [
+      {
+        "format": "png",
+        "animated": false,
+        "verdict": "accept"
+      }
+    ],
+    "sha256": "875c21aa6590faf35d673fd7dbd99bac8d56b07d9a0063b9e9ac01285ac0ee24"
+  },
+  {
+    "name": "static.jpg",
+    "bytes": 1976,
+    "recipe": "ffmpeg 5.1 -bitexact -f lavfi -i testsrc=size=64x48:rate=5:duration=1 -frames:v 1",
+    "expected": [
+      {
+        "format": "jpeg",
+        "animated": false,
+        "verdict": "accept"
+      }
+    ],
+    "sha256": "4e439b8c29aca58a96b1b165347143303c01d0b2e888e4af2fb70d6df02bcf58"
+  },
+  {
+    "name": "static.gif",
+    "bytes": 1650,
+    "recipe": "ffmpeg 5.1 -bitexact -f lavfi -i testsrc=size=64x48:rate=5:duration=1 -frames:v 1",
+    "expected": [
+      {
+        "format": "gif",
+        "animated": false,
+        "verdict": "accept"
+      }
+    ],
+    "sha256": "e524d2dd96acf745a135e84cb178491f546ff8a06d687a0a391c34c4adbad938"
+  },
+  {
+    "name": "animated.gif",
+    "bytes": 3823,
+    "recipe": "ffmpeg 5.1 -bitexact -f lavfi -i testsrc=size=64x48:rate=5:duration=1 -loop 0",
+    "expected": [
+      {
+        "format": "gif",
+        "animated": true,
+        "verdict": "accept"
+      }
+    ],
+    "sha256": "910f5814d0e830d3d6ce5a528a6ee7787de587162a54f0dc3977724a665c0068"
+  },
+  {
+    "name": "static.webp",
+    "bytes": 260,
+    "recipe": "cwebp 1.2.4 -lossless static.png",
+    "expected": [
+      {
+        "format": "webp",
+        "animated": false,
+        "verdict": "accept"
+      }
+    ],
+    "sha256": "2632e55bad6b96b46d79f76f56b0e706b26ab7c32f172de845884e50f4871996"
+  },
+  {
+    "name": "animated.webp",
+    "bytes": 1350,
+    "recipe": "img2webp 1.2.4 -lossy -q 50 of 5 ffmpeg frames from testsrc=size=64x48:rate=5:duration=1",
+    "expected": [
+      {
+        "format": "webp",
+        "animated": true,
+        "verdict": "accept"
+      }
+    ],
+    "sha256": "8d7344f1c96f5558ef182e19ae492e05aec667f33f239c1c094c98270693146e"
+  },
+  {
+    "name": "single-frame.webp",
+    "bytes": 590,
+    "recipe": "img2webp 1.2.4 -lossy -q 50 of 1 ffmpeg frames from testsrc=size=64x48:rate=5:duration=1",
+    "expected": [
+      {
+        "format": "webp",
+        "animated": false,
+        "verdict": "accept"
+      }
+    ],
+    "sha256": "9f9251c8315356d0b7a61f26ebfccb8fb2a4d5550634688c50a3762be42c7f73"
+  },
+  {
+    "name": "spoofed-jpeg-as.png",
+    "bytes": 1976,
+    "recipe": "copy static.jpg",
+    "expected": [
+      {
+        "format": "jpeg",
+        "animated": false,
+        "verdict": "accept"
+      }
+    ],
+    "sha256": "4e439b8c29aca58a96b1b165347143303c01d0b2e888e4af2fb70d6df02bcf58"
+  },
+  {
+    "name": "spoofed-text-as.gif",
+    "bytes": 27,
+    "recipe": "write 27 fixed bytes",
+    "expected": [
+      {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "5538684e34aa237b4b532f35c8cb5af6de938e00b9a885fe072bac222181b9b2"
+  },
+  {
+    "name": "svg-as.png",
+    "bytes": 64,
+    "recipe": "write 64 fixed bytes",
+    "expected": [
+      {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "b983506ec03173e11b4c8da38c40b58f93155134686bbb36a3ef08438ac6cf0c"
+  },
+  {
+    "name": "bmp.bmp",
+    "bytes": 9270,
+    "recipe": "ffmpeg 5.1 -bitexact -f lavfi -i testsrc=size=64x48:rate=5:duration=1 -frames:v 1",
+    "expected": [
+      {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "bd859d6a0f58afbb3457e02a690b89b5a73ad7b3ec8cbffbb19a5b88ca12e4e2"
+  },
+  {
+    "name": "tiff.tif",
+    "bytes": 7715,
+    "recipe": "ffmpeg 5.1 -bitexact -f lavfi -i testsrc=size=64x48:rate=5:duration=1 -frames:v 1",
+    "expected": [
+      {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "af776918956dd963bff8bac0154873efca889664220e62d074dec9958f912b88"
+  },
+  {
+    "name": "empty.png",
+    "bytes": 0,
+    "recipe": "write 0 fixed bytes",
+    "expected": [
+      {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "random.bin",
+    "bytes": 4096,
+    "recipe": "write 4096 fixed bytes",
+    "expected": [
+      {
+        "reason": "unclassifiable",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "9319eb12037c7212a169058fa02ebbdc6bfd8246701d8b7add850e99dbd5f010"
+  },
+  {
+    "name": "png-signature-garbage.png",
+    "bytes": 520,
+    "recipe": "write 520 fixed bytes",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "f613adfbe8a22cc1d191a12655d89bdfcfe154800b8d8a0e39a6685329b3446d"
+  },
+  {
+    "name": "truncated.png",
+    "bytes": 281,
+    "recipe": "first 60% of static.png",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "e1634a9a25fcb9df164f679da20af11628082633c53918a9a52e6b13354cf195"
+  },
+  {
+    "name": "truncated.jpg",
+    "bytes": 1185,
+    "recipe": "first 60% of static.jpg",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "69696fa6a1bcece740a4b69fa9b34dbdfc8a8dd504195b1f798b728814dddc55"
+  },
+  {
+    "name": "truncated.gif",
+    "bytes": 2293,
+    "recipe": "first 60% of animated.gif",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "e894506bbbb6f1feefcbbc594bf56c4444cc3771f4ff440a255e459978d5aed1"
+  },
+  {
+    "name": "truncated.webp",
+    "bytes": 810,
+    "recipe": "first 60% of animated.webp",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "e2a70d6b80adb51a1c3db5839f4d50f41316e7f82f5d1306f7f958f85368ee63"
+  },
+  {
+    "name": "truncated.apng",
+    "bytes": 843,
+    "recipe": "first 60% of animated.apng",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "3d894bf87d055c3d4bfd8c6de1a98e6513b0db8e45689f4a93965ec88295a55e"
+  },
+  {
+    "name": "corrupt-idat.png",
+    "bytes": 469,
+    "recipe": "static.png with byte 10 of the first IDAT payload inverted, CRC recomputed",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "11420b42932ccaa2d3b2b8656b6723b6968607963a09d326dcdf328a119112c4"
+  },
+  {
+    "name": "png-crc-mismatch.png",
+    "bytes": 469,
+    "recipe": "static.png with IDAT CRC byte 453 inverted",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "6502e91765c8744437820401113db4a0ef3edaf587f7e16df8365ffa365ac9b8"
+  },
+  {
+    "name": "png-iend-missing.png",
+    "bytes": 457,
+    "recipe": "static.png without its final 12-byte IEND chunk",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "7e284b68039a5923f471edc3165c5be06f7fb78e03cbe07e04e60852bfdabe26"
+  },
+  {
+    "name": "gif-trailer-missing.gif",
+    "bytes": 3822,
+    "recipe": "animated.gif without its final 0x3B trailer byte",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "f9145977b7b49dc967c0579e0cf291c39f926b68a354e396515060ce68665143"
+  },
+  {
+    "name": "apng-actl-overcount.png",
+    "bytes": 1405,
+    "recipe": "animated.apng with acTL num_frames set 1, CRC recomputed",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "f61d73aa1f51a50cbe550a8699108c0f73d84fa5ce9fd2ae7ab54907d09b5d01"
+  },
+  {
+    "name": "apng-actl-undercount.png",
+    "bytes": 1405,
+    "recipe": "animated.apng with acTL num_frames set :one, CRC recomputed",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "18127c99a596405baf0524da617537e7a20ca291952d90014e217c37cb467392"
+  },
+  {
+    "name": "apng-actl-duplicate.png",
+    "bytes": 1425,
+    "recipe": "animated.apng with acTL duplicate, CRCs recomputed",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "3351922961c3fc389745c04741f0dd4ceb35c34991d3334f6a3b034679216947"
+  },
+  {
+    "name": "apng-actl-after-idat.png",
+    "bytes": 1405,
+    "recipe": "animated.apng with acTL after_idat, CRCs recomputed",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "9f25802fe880add425ad7241686c1530a1a1b8363bcbfc161fa62b971e5bc3f7"
+  },
+  {
+    "name": "apng-frame-outside-canvas.png",
+    "bytes": 1405,
+    "recipe": "animated.apng with second fcTL x_offset 32, CRC recomputed",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "db475f57325f1dc100aec9a7091438bd6d45862de6f3fe4f0f33ce2ebaf6ff2d"
+  },
+  {
+    "name": "webp-anim-flag-unset.webp",
+    "bytes": 1350,
+    "recipe": "animated.webp with the VP8X animation flag cleared",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "9907dc66a86abc3307444db7dc256bcbaa7c7c0f062d324d18e3b10781faa30b"
+  },
+  {
+    "name": "gif-frame-outside-canvas.gif",
+    "bytes": 3823,
+    "recipe": "animated.gif with the last image descriptor's offsets set to 9000,9000",
+    "expected": [
+      {
+        "reason": "malformed",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "371eb87dd732b52670fe19f9485b8eb2e4086d3d1a41d0594e71607a5888a7d8"
+  },
+  {
+    "name": "huge-dimensions.png",
+    "bytes": 388871,
+    "recipe": "Elixir PNG writer 20000x20000 color type 0 depth 8, zero rows, zlib level 9",
+    "expected": [
+      {
+        "reason": "dimensions_over_limit",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "5f561e0b081884e646e3d2d7a18a7882c421863979a094f3c5fbc1f85188da69"
+  },
+  {
+    "name": "frame-pixels-over.png",
+    "bytes": 62290,
+    "recipe": "Elixir PNG writer 8000x8000 color type 0 depth 8, zero rows, zlib level 9",
+    "expected": [
+      {
+        "reason": "frame_pixels_over_limit",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "e8dddb40a77508aa1e5b53ad608a5007065812df088c2f4a1ebc33ef07cc0aea"
+  },
+  {
+    "name": "at-frame-pixel-limit-rgba.png",
+    "bytes": 155586,
+    "recipe": "Elixir PNG writer 8000x5000 color type 6 depth 8, zero rows, zlib level 9",
+    "expected": [
+      {
+        "format": "png",
+        "animated": false,
+        "verdict": "accept"
+      }
+    ],
+    "sha256": "7c9d5c6cd13a5a82c9f61c869aab9e56964fede17928ce260013a62290ffc881"
+  },
+  {
+    "name": "at-frame-pixel-limit-rgba16.png",
+    "bytes": 311100,
+    "recipe": "Elixir PNG writer 8000x5000 color type 6 depth 16, zero rows, zlib level 9",
+    "expected": [
+      {
+        "format": "png",
+        "animated": false,
+        "verdict": "accept"
+      }
+    ],
+    "sha256": "1453d745ff4032d153ef630a953512226b0690f222b781423ea52461ddcd214f"
+  },
+  {
+    "name": "at-frame-pixel-limit-2-frames.gif",
+    "bytes": 3157259,
+    "recipe": "ffmpeg 5.1 -bitexact -f lavfi -i testsrc2=size=8000x5000:rate=2:duration=1 -loop 0",
+    "expected": [
+      {
+        "format": "gif",
+        "animated": true,
+        "verdict": "accept"
+      }
+    ],
+    "sha256": "947799428103c9204903c193ef6d61b33a03aad5ba6832142c6c07ee4df54a68"
+  },
+  {
+    "name": "at-frame-pixel-limit-2-frames.webp",
+    "bytes": 1225700,
+    "recipe": "img2webp 1.2.4 -lossy -q 50 of 2 ffmpeg frames from testsrc2=size=8000x5000:rate=2:duration=1",
+    "expected": [
+      {
+        "format": "webp",
+        "animated": true,
+        "verdict": "accept"
+      }
+    ],
+    "sha256": "23a594af4ff601eaab302146ffcac1339f6dc6e704a82da8903761c0a7fb1f63"
+  },
+  {
+    "name": "many-frames.gif",
+    "bytes": 25836,
+    "recipe": "ffmpeg 5.1 -bitexact -f lavfi -i color=c=red:size=16x16:rate=50:duration=20 -loop 0",
+    "expected": [
+      {
+        "reason": "frames_over_limit",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "e6945acaf30ba58cfc48bad4b73a946a2171d4a425039db67909999af395d46f"
+  },
+  {
+    "name": "at-total-pixel-limit.gif",
+    "bytes": 3291062,
+    "recipe": "ffmpeg 5.1 -bitexact -f lavfi -i testsrc2=size=2000x2000:rate=25:duration=1 -loop 0",
+    "expected": [
+      {
+        "format": "gif",
+        "animated": true,
+        "verdict": "accept"
+      }
+    ],
+    "sha256": "0ca189283357e90ab2bb675b485b3475bb87f334387b88e3304ae0eaba7b0658"
+  },
+  {
+    "name": "at-total-pixel-limit.webp",
+    "bytes": 2045916,
+    "recipe": "img2webp 1.2.4 -lossy -q 50 of 25 ffmpeg frames from testsrc2=size=2000x2000:rate=25:duration=1",
+    "expected": [
+      {
+        "format": "webp",
+        "animated": true,
+        "verdict": "accept"
+      }
+    ],
+    "sha256": "d83a83985f3c612e6f61b58d34ab5efe44d57e63e0524d442182b6b4056f3aac"
+  },
+  {
+    "name": "at-total-pixel-limit-4-frames.webp",
+    "bytes": 1722242,
+    "recipe": "img2webp 1.2.4 -lossy -q 50 of 4 ffmpeg frames from testsrc2=size=5000x5000:rate=4:duration=1",
+    "expected": [
+      {
+        "format": "webp",
+        "animated": true,
+        "verdict": "accept"
+      }
+    ],
+    "sha256": "2286d06e747ed043cca449678797318784fb8c5f56c49eb5bc514fac6d073a39"
+  },
+  {
+    "name": "total-pixels-over.gif",
+    "bytes": 5303194,
+    "recipe": "ffmpeg 5.1 -bitexact -f lavfi -i testsrc=size=2000x2000:rate=10:duration=3 -loop 0",
+    "expected": [
+      {
+        "reason": "total_pixels_over_limit",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "ee14e1f3a4e5e35368b5efec2b476796bc9b97a9586e6a114951e4025647b9e0"
+  },
+  {
+    "name": "over-10mb.png",
+    "bytes": 12003753,
+    "recipe": "Elixir PNG writer 2000x2000 RGB, rows of repeated SHA-256(row index), zlib level 0",
+    "expected": [
+      {
+        "reason": "bytes_over_limit",
+        "verdict": "reject"
+      }
+    ],
+    "sha256": "13bd4e3d747568621bef9dc2cb7acca39e9a343dea7779b74498000926535de2"
+  }
+]
