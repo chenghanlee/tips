@@ -5,14 +5,21 @@ defmodule TipsWeb.Editor do
   events. Types and rules are in `TipsWeb.EditorContract`; the hook is
   `assets/js/editor_draft.js`.
 
-  The page assigns `:identity`, `:record`, `:attrs` and `:form`:
+  The page assigns `:identity`, `:record`, `:attrs`, `:form`, `:check`,
+  `:refusal` and `:outcome`:
 
     * `:record` is the draft the page was mounted, restored or recovered with.
       It holds the submission key, the edit base and expected version. The
       hook owns the browser revision after its first save and never writes it
       back to the page.
     * `:attrs` are the current field values, exactly as typed. `phx-change`
-      keeps them in step with the browser, without validation.
+      keeps them in step with the browser. It validates only after a submit
+      failed validation; `:check` holds that submit's values and errors.
+    * `:refusal` explains a refused save and `:outcome` confirms a save.
+
+  `submit/2` validates the whole form with `Tips.Content.change_content/2`,
+  readmits the session, then publishes or saves. Clearing the submitted draft
+  and leaving the editor are #80's.
 
   The page renders `form_attrs/1` on its form and `hidden_inputs/1` inside it.
   A browser record or recovered form is untrusted input: `restore/2` and
@@ -20,9 +27,10 @@ defmodule TipsWeb.Editor do
   only in the shape the hook and store use.
   """
   use Phoenix.Component
+  use TipsWeb, :verified_routes
 
   alias Tips.Content
-  alias TipsWeb.EditorContract
+  alias TipsWeb.{AuthMailAdmission, CoreComponents, EditorContract, UserAuth}
 
   @kinds %{"tip" => :tip, "review" => :review}
 
@@ -83,7 +91,12 @@ defmodule TipsWeb.Editor do
   end
 
   defp assign_identity(socket, target) do
-    assign(socket, :identity, %{account_id: account_id(socket), target: target})
+    assign(socket,
+      identity: %{account_id: account_id(socket), target: target},
+      check: nil,
+      refusal: nil,
+      outcome: nil
+    )
   end
 
   defp assign_record(socket, record) do
@@ -94,17 +107,153 @@ defmodule TipsWeb.Editor do
 
   defp assign_attrs(socket, attrs) do
     kind = kind(socket.assigns.identity.target)
-    assign(socket, attrs: attrs, form: to_form(form_params(kind, attrs), as: kind))
+    errors = errors(socket.assigns.check, kind, attrs)
+
+    assign(socket,
+      attrs: attrs,
+      form: to_form(form_params(kind, attrs), as: kind, errors: errors)
+    )
+  end
+
+  # Before a refused submit, none. After one, the submitted errors of fields
+  # the author has not changed since, and the current errors of those they have.
+  defp errors(nil, _kind, _attrs), do: []
+
+  defp errors(%{attrs: submitted, errors: errors}, kind, attrs) do
+    changed? = fn {field, _error} -> Map.get(attrs, field) != Map.get(submitted, field) end
+    %{errors: current} = Content.change_content(kind, attrs)
+    Enum.reject(errors, changed?) ++ Enum.filter(current, changed?)
   end
 
   defp account_id(socket), do: socket.assigns.current_scope.user.id
 
-  @doc "Keeps the typed values from a `phx-change` event. Nothing is validated."
+  @doc """
+  Keeps the typed values from a `phx-change` event. Validates changed fields
+  only after a submit failed validation.
+  """
   @spec change(Phoenix.LiveView.Socket.t(), map()) :: Phoenix.LiveView.Socket.t()
   def change(socket, params) do
     kind = kind(socket.assigns.identity.target)
     assign_attrs(socket, typed_attrs(kind, params[Atom.to_string(kind)], socket.assigns.attrs))
   end
+
+  @doc """
+  Handles the form's `submit`: validates every field, including untouched
+  ones, then readmits the session and publishes or saves the typed values.
+  Every refusal keeps the input. A failed validation pushes `editor:refused`,
+  so the hook opens the evidence disclosure around an error and focuses the
+  error summary.
+  """
+  @spec submit(Phoenix.LiveView.Socket.t(), map()) :: Phoenix.LiveView.Socket.t()
+  def submit(socket, params) do
+    socket = socket |> change(params) |> assign(refusal: nil, outcome: nil)
+    %{identity: %{target: target}, record: record, attrs: attrs} = socket.assigns
+
+    with %{valid?: true} <- Content.change_content(kind(target), attrs),
+         {:ok, socket} <- UserAuth.readmit(socket),
+         {:ok, receipt} <- write(socket.assigns.current_scope, record, attrs) do
+      socket |> assign(:check, nil) |> assign_attrs(attrs) |> saved(receipt)
+    else
+      %Ecto.Changeset{errors: errors} -> invalid(socket, errors)
+      {:error, %Ecto.Changeset{errors: errors}} -> invalid(socket, errors)
+      {:error, reason} -> socket |> assign(:check, nil) |> assign_attrs(attrs) |> refuse(reason)
+    end
+  end
+
+  defp write(scope, %{target: :new_tip, submission_key: key} = record, attrs),
+    do: Content.publish_tip(scope, key, attrs, uploads(record))
+
+  defp write(scope, %{target: {:new_review, tip_id}, submission_key: key} = record, attrs),
+    do: Content.publish_review(scope, tip_id, key, attrs, uploads(record))
+
+  defp write(scope, %{target: {:edit, :tip, id}, expected_version: version} = record, attrs),
+    do: Content.edit_tip(scope, id, version, attrs, uploads(record))
+
+  defp write(scope, %{target: {:edit, :review, id}, expected_version: version} = record, attrs),
+    do: Content.edit_review(scope, id, version, attrs, uploads(record))
+
+  # Browser image metadata never proves saved bytes.
+  defp uploads(%{intent: %{uploads: nil}}), do: nil
+  defp uploads(%{intent: %{uploads: uploads}}), do: Enum.map(uploads, &attachment/1)
+
+  defp attachment({:missing_image, slot, _image}), do: {:missing_image, slot}
+  defp attachment(media), do: media
+
+  defp invalid(socket, errors) do
+    socket
+    |> assign(:check, %{attrs: socket.assigns.attrs, errors: errors})
+    |> assign_attrs(socket.assigns.attrs)
+    |> Phoenix.LiveView.push_event("editor:refused", %{})
+  end
+
+  defp saved(socket, %{outcome: outcome}) when outcome in [:created, :existing_equivalent],
+    do: assign(socket, :outcome, "Published")
+
+  defp saved(socket, %{outcome: outcome}) when outcome in [:updated, :noop],
+    do: assign(socket, :outcome, "Changes saved")
+
+  defp saved(socket, %{outcome: outcome})
+       when outcome in [:existing_different, :existing_unknown],
+       do: refuse(socket, :published_earlier)
+
+  defp refuse(socket, reason) do
+    %{target: target} = socket.assigns.identity
+
+    assign(socket, :refusal, %{
+      message: refusal(reason, kind(target), verb(target)),
+      sign_in: reason == :unauthenticated && sign_in_path(target)
+    })
+  end
+
+  defp verb({:edit, _kind, _id}), do: "save"
+  defp verb(_new), do: "publish"
+
+  defp refusal(:unauthenticated, _kind, verb),
+    do:
+      "Your sign-in has expired, so nothing was #{past(verb)}. Sign in again, then #{verb} again."
+
+  defp refusal(:forbidden, _kind, _verb),
+    do:
+      "This account can't publish or edit. You can still read, and delete your own tips, reviews or account."
+
+  defp refusal(:unconfirmed, _kind, verb),
+    do: "Confirm your email address before you #{verb}. Nothing was #{past(verb)}."
+
+  defp refusal({:rate_limited, seconds}, _kind, verb),
+    do:
+      "Too many attempts, so nothing was #{past(verb)}. Try again in #{AuthMailAdmission.retry_in(seconds)}."
+
+  defp refusal({:capacity, seconds}, _kind, verb),
+    do:
+      "Tips is busy, so nothing was #{past(verb)}. Try again in #{AuthMailAdmission.retry_in(seconds)}."
+
+  defp refusal(:not_found, :review, "publish"), do: "This tip is no longer open for reviews."
+  defp refusal(:not_found, kind, _verb), do: "This #{kind} is no longer available."
+  defp refusal(:already_reviewed, _kind, _verb), do: "You have already reviewed this tip."
+
+  defp refusal(:conflict, kind, "save"),
+    do: "This #{kind} changed after you opened it, so your changes were not saved."
+
+  defp refusal(:conflict, _kind, _verb), do: "This draft belongs to another tip."
+
+  defp refusal(:published_earlier, kind, _verb),
+    do: "This draft was published earlier, maybe with other text. This #{kind} was not changed."
+
+  defp refusal(:outcome_unknown, _kind, verb),
+    do: "We couldn't confirm whether this was #{past(verb)}."
+
+  defp refusal({upload, _refs}, _kind, verb) when upload in [:upload_failed, :upload_pending],
+    do: "An attachment isn't ready, so nothing was #{past(verb)}."
+
+  defp past("publish"), do: "published"
+  defp past("save"), do: "saved"
+
+  defp sign_in_path(target), do: UserAuth.with_return_to(~p"/users/log-in", editor_path(target))
+
+  defp editor_path(:new_tip), do: ~p"/editor/tips/new"
+  defp editor_path({:new_review, tip_id}), do: ~p"/editor/tips/#{tip_id}/reviews/new"
+  defp editor_path({:edit, :tip, id}), do: ~p"/editor/tips/#{id}/edit"
+  defp editor_path({:edit, :review, id}), do: ~p"/editor/reviews/#{id}/edit"
 
   @doc """
   Handles `editor:restore`: applies the record the hook read when its identity,
@@ -173,6 +322,7 @@ defmodule TipsWeb.Editor do
       id: form_id(identity),
       "phx-hook": "EditorDraft",
       "phx-change": "change",
+      "phx-submit": "submit",
       "phx-auto-recover": "editor:recover",
       "data-editor-identity": JSON.encode!(identity_json(identity)),
       "data-editor-record": JSON.encode!(record_json(record))
@@ -284,12 +434,57 @@ defmodule TipsWeb.Editor do
   end
 
   @doc """
+  Renders the error summary of the last refused submit: one link per error,
+  to its field. The hook focuses it and opens the evidence disclosure around
+  a linked field.
+  """
+  attr :form, Phoenix.HTML.Form, required: true
+  attr :identity, :map, required: true
+
+  def error_summary(assigns) do
+    kind = kind(assigns.identity.target)
+    order = fields(kind) |> Enum.with_index() |> Map.new()
+
+    errors =
+      assigns.form.errors
+      |> Enum.sort_by(fn {field, _error} -> Map.get(order, field, map_size(order)) end)
+      |> Enum.map(fn {field, error} ->
+        {field_id(kind, field, assigns.identity),
+         "#{label(kind, field)}: #{CoreComponents.translate_error(error)}"}
+      end)
+
+    assigns = assign(assigns, :errors, errors)
+
+    ~H"""
+    <TipsWeb.UI.error_summary id={"#{form_id(@identity)}-errors"} errors={@errors} />
+    """
+  end
+
+  defp field_id(kind, field, identity) do
+    if field in fields(kind), do: "#{kind}_#{field}", else: "#{form_id(identity)}-fields"
+  end
+
+  defp label(:tip, :body), do: "Tip"
+  defp label(:review, :body), do: "Review"
+  defp label(_kind, :title), do: "Title"
+  defp label(_kind, :tag_id), do: "Technique"
+  defp label(_kind, :model_id), do: "Model"
+  defp label(_kind, :model_other), do: "Model name"
+  defp label(_kind, :environment_id), do: "Environment"
+  defp label(_kind, :prompt), do: "Prompt"
+  defp label(_kind, :output), do: "Result text"
+  defp label(_kind, :uploads), do: "Attachments"
+  defp label(_kind, field), do: Phoenix.Naming.humanize(field)
+
+  @doc """
   Renders the draft status line, which the hook writes, the "Reload saved
-  draft" button the hook shows while autosave is paused, and the submit
-  button. Submitting is #79 and #80, so that button stays disabled until then.
+  draft" button the hook shows while autosave is paused, the refusal or
+  confirmation of the last submit, and the submit button.
   """
   attr :identity, :map, required: true
   attr :submit, :string, required: true
+  attr :refusal, :map, default: nil
+  attr :outcome, :string, default: nil
 
   def editor_bar(assigns) do
     ~H"""
@@ -306,8 +501,22 @@ defmodule TipsWeb.Editor do
           Reload saved draft
         </TipsWeb.UI.button>
       </div>
+      <TipsWeb.UI.notice
+        :if={@refusal}
+        id={"#{form_id(@identity)}-refusal"}
+        tone="error"
+        role="alert"
+      >
+        {@refusal.message} Your text stays on this page.
+        <:actions :if={@refusal.sign_in}>
+          <a href={@refusal.sign_in}>Sign in</a>
+        </:actions>
+      </TipsWeb.UI.notice>
+      <p id={"#{form_id(@identity)}-outcome"} role="status" class="text-sm font-medium">
+        {@outcome}
+      </p>
       <div>
-        <TipsWeb.UI.button type="submit" size="lg" disabled>{@submit}</TipsWeb.UI.button>
+        <TipsWeb.UI.button type="submit" size="lg">{@submit}</TipsWeb.UI.button>
       </div>
     </div>
     """

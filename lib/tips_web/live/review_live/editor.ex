@@ -3,10 +3,11 @@ defmodule TipsWeb.ReviewLive.Editor do
   The review editor: `/editor/tips/:tip_id/reviews/new` and
   `/editor/reviews/:id/edit`.
 
-  Mounts the draft form, its `EditorDraft` hook, browser draft restore and
-  reconnect recovery (`TipsWeb.Editor`). A fresh review form starts with the
-  tip's model and environment; a restored, recovered or saved review keeps
-  its own values, blanks included. Publishing and saving are #79 and #80.
+  Mounts the draft form, its `EditorDraft` hook, browser draft restore,
+  reconnect recovery, submit-time validation and publishing or saving
+  (`TipsWeb.Editor`). A fresh review form starts with the tip's model and
+  environment; a restored, recovered or saved review keeps its own values,
+  blanks included.
   """
   use TipsWeb, :live_view
 
@@ -24,6 +25,7 @@ defmodule TipsWeb.ReviewLive.Editor do
       </TipsWeb.UI.notice>
       <.form :if={!@load_failed} for={@form} class="grid gap-6" {Editor.form_attrs(assigns)}>
         <Editor.hidden_inputs identity={@identity} record={@record} />
+        <Editor.error_summary form={@form} identity={@identity} />
         <fieldset id={"#{Editor.form_id(@identity)}-fields"} class="grid gap-6">
           <TipsWeb.UI.field
             field={@form[:body]}
@@ -42,6 +44,8 @@ defmodule TipsWeb.ReviewLive.Editor do
         <Editor.editor_bar
           identity={@identity}
           submit={if @live_action == :new, do: "Publish", else: "Save changes"}
+          refusal={@refusal}
+          outcome={@outcome}
         />
       </.form>
     </Layouts.app>
@@ -107,6 +111,8 @@ defmodule TipsWeb.ReviewLive.Editor do
 
   @impl true
   def handle_event("change", params, socket), do: {:noreply, Editor.change(socket, params)}
+
+  def handle_event("submit", params, socket), do: {:noreply, Editor.submit(socket, params)}
 
   def handle_event("editor:recover", params, socket),
     do: {:noreply, Editor.recover(socket, params)}

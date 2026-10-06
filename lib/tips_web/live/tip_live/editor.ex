@@ -2,8 +2,9 @@ defmodule TipsWeb.TipLive.Editor do
   @moduledoc """
   The tip editor: `/editor/tips/new` and `/editor/tips/:id/edit`.
 
-  Mounts the draft form, its `EditorDraft` hook, browser draft restore and
-  reconnect recovery (`TipsWeb.Editor`). Publishing and saving are #79 and #80.
+  Mounts the draft form, its `EditorDraft` hook, browser draft restore,
+  reconnect recovery, submit-time validation and publishing or saving
+  (`TipsWeb.Editor`).
   """
   use TipsWeb, :live_view
 
@@ -20,6 +21,7 @@ defmodule TipsWeb.TipLive.Editor do
       </TipsWeb.UI.notice>
       <.form :if={!@load_failed} for={@form} class="grid gap-6" {Editor.form_attrs(assigns)}>
         <Editor.hidden_inputs identity={@identity} record={@record} />
+        <Editor.error_summary form={@form} identity={@identity} />
         <fieldset id={"#{Editor.form_id(@identity)}-fields"} class="grid gap-6">
           <TipsWeb.UI.field field={@form[:title]} label="Title" />
           <TipsWeb.UI.field
@@ -43,6 +45,8 @@ defmodule TipsWeb.TipLive.Editor do
         <Editor.editor_bar
           identity={@identity}
           submit={if @live_action == :new, do: "Publish", else: "Save changes"}
+          refusal={@refusal}
+          outcome={@outcome}
         />
       </.form>
     </Layouts.app>
@@ -80,6 +84,8 @@ defmodule TipsWeb.TipLive.Editor do
 
   @impl true
   def handle_event("change", params, socket), do: {:noreply, Editor.change(socket, params)}
+
+  def handle_event("submit", params, socket), do: {:noreply, Editor.submit(socket, params)}
 
   def handle_event("editor:recover", params, socket),
     do: {:noreply, Editor.recover(socket, params)}

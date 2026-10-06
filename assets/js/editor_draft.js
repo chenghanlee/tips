@@ -19,6 +19,10 @@
 // destroyed, or after a reload or restore fell back on disconnect, are
 // ignored.
 // Autosave starts once recovery settles.
+//
+// After a submit fails validation (editor:refused), the hook opens the
+// evidence disclosure when it holds an invalid field and focuses the error
+// summary. A summary link focuses its field.
 
 import {EDITOR_EVENTS} from "./editor_contract.js"
 import {create, load, save} from "./editor_draft_store.js"
@@ -69,6 +73,9 @@ export const EditorDraft = {
     this.el.addEventListener("input", this.onInput)
     this.onReload = () => this.reload()
     this.reloadButton().addEventListener("click", this.onReload)
+    this.onClick = (event) => this.followError(event)
+    this.el.addEventListener("click", this.onClick)
+    this.handleEvent(EDITOR_EVENTS.refused, () => this.showErrors())
     load(this.record.storage).then((result) => this.settleRead(result))
   },
 
@@ -100,6 +107,7 @@ export const EditorDraft = {
     this.reading = null
     this.pending = null
     this.el.removeEventListener("input", this.onInput)
+    this.el.removeEventListener("click", this.onClick)
     this.reloadButton().removeEventListener("click", this.onReload)
     // Best effort: the write may still finish after the page is gone.
     if (unsaved) this.write()
@@ -226,6 +234,32 @@ export const EditorDraft = {
     } else {
       this.status(STATUS.unsaved)
     }
+  },
+
+  // The page has patched in the errors before this runs. LiveView then
+  // refocuses the submit button when the submit settles, so focus after it.
+  showErrors() {
+    const details = this.el.querySelector("details")
+    if (details?.querySelector('[aria-invalid="true"]')) details.open = true
+    setTimeout(() => {
+      if (this.phase !== "destroyed") this.errorSummary()?.focus()
+    })
+  },
+
+  followError(event) {
+    const link = event.target.closest("a[href^='#']")
+    if (!link || !this.errorSummary()?.contains(link)) return
+    const field = document.getElementById(link.getAttribute("href").slice(1))
+    // Other targets keep the ordinary jump.
+    if (!field?.matches("input, select, textarea")) return
+    event.preventDefault()
+    const details = field.closest("details")
+    if (details) details.open = true
+    field.focus()
+  },
+
+  errorSummary() {
+    return this.el.querySelector(`#${CSS.escape(this.el.id)}-errors`)
   },
 
   fields() {

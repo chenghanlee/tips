@@ -73,6 +73,7 @@ defmodule TipsWeb.EditorContract do
   | `editor:recover` | form to LiveView | hidden identity and record with the current form fields |
   | `editor:handoff` | LiveView to hook | `t:handoff/0` |
   | `editor:clear` | LiveView to hook | `t:clear_request/0` |
+  | `editor:refused` | LiveView to hook | `%{}`: a submit failed validation |
 
   The hook sends `editor:restore` only on a fresh mount, never on reconnect.
   `:restored` settles recovery, not publication; `:preserved` keeps typed

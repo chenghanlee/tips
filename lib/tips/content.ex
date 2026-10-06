@@ -30,7 +30,8 @@ defmodule Tips.Content do
 
   Publication exists for text: `publish_tip/4`, `publish_review/5` and
   `get_publication/4`. Text edits exist: `get_edit_form/3`, `edit_tip/5` and
-  `edit_review/5`. Media claims (#65) are reserved and do not exist yet. Inputs and results are the types below. The comparator is
+  `edit_review/5`. Editors check typed text with `change_content/2`, which
+  writes nothing. Media claims (#65) are reserved and do not exist yet. Inputs and results are the types below. The comparator is
   `compare_intents/3`.
 
     * `publish_tip(scope, submission_key, attrs, uploads)` returns
@@ -293,7 +294,9 @@ defmodule Tips.Content do
     Projection,
     Publication,
     Read,
+    Review,
     Search,
+    Tip,
     Vocabulary
   }
 
@@ -524,6 +527,24 @@ defmodule Tips.Content do
           | :review_notification
           | :report_resolution
           | :notification_removal
+
+  @doc """
+  Checks a form's author-editable text with the rules a publication or edit
+  applies, without writing or authorizing anything. Returns the changeset
+  with action `:validate`; its errors name only `kind`'s editable fields.
+  The submission key and parent come from the write, and curated choices are
+  checked only by it.
+  """
+  @spec change_content(kind(), map()) :: Ecto.Changeset.t()
+  def change_content(kind, attrs) do
+    fields = Intent.fields(kind)
+    changeset = content_changeset(kind, Map.take(attrs, fields))
+    errors = Keyword.take(changeset.errors, fields)
+    %{changeset | errors: errors, valid?: errors == [], action: :validate}
+  end
+
+  defp content_changeset(:tip, attrs), do: Tip.changeset(%Tip{}, attrs)
+  defp content_changeset(:review, attrs), do: Review.changeset(%Review{}, attrs)
 
   @doc """
   Compares two editable intents of one `kind`: a saved intent or edit base

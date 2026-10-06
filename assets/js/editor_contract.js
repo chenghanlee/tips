@@ -10,14 +10,16 @@ export const EDITOR_HOOK = "EditorDraft"
 
 /**
  * Page events. restore: hook to LiveView, replied with EditorRestoreReply.
- * recover: form to LiveView through phx-auto-recover. handoff and clear:
- * LiveView to hook.
+ * recover: form to LiveView through phx-auto-recover. handoff, clear and
+ * refused: LiveView to hook; refused has an empty payload and means a submit
+ * failed validation.
  */
 export const EDITOR_EVENTS = Object.freeze({
   restore: "editor:restore",
   recover: "editor:recover",
   handoff: "editor:handoff",
   clear: "editor:clear",
+  refused: "editor:refused",
 })
 
 /**
