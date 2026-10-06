@@ -19,6 +19,23 @@ four reservations, each confirmed by `GET` 404
 sends 5 MiB non-final chunks from a 15 MB clip and stops a case whose first chunk is
 not acknowledged with 204 and the expected `Upload-Offset`.
 
+The second run, at `335a117` with no tracked changes, stopped on a provider error
+([run](stream-completion-probe/tester-blocked-20261006T192535Z-5bae.json),
+[cleanup](stream-completion-probe/cleanup-20261006T192849Z-a22b.json)):
+
+- All four 5 MiB first chunks: 204, `Upload-Offset` 5242880.
+- Control: the final `PATCH`, throttled over 20 s, started 40 s before expiry and got
+  500, code 10000 ("Internal Server Error"), 17 s before expiry. `HEAD` then reported
+  the full 15,356,905-byte offset, yet the video stayed `pendingupload`.
+- All three boundary `PATCH` requests got 400, code 10017 ("Expiration for upload has
+  passed"), answered after their bodies finished sending. This is partial evidence
+  only: the control failed and the run was interrupted before its timing assertions.
+- All four reservations were deleted, each confirmed by `GET` 404.
+
+Next, `diagnose` separates a provider fault from the throttled body: two uploads 15
+minutes from expiry, one sending the rest unthrottled, then one throttled over 20 s
+like the control.
+
 Already known from the [#61 probe](https://github.com/chenghanlee/tips/blob/bb876b87e7e5f920faef8b6d722d2d46b6dda768/docs/development/media-provider-probe.md#stream_deadline):
 
 - `uploaded` is set at reservation, before any byte. No field records completion time.
@@ -46,11 +63,13 @@ retry). The slow `PATCH` stands in for the browser and has a 180 s receive timeo
 ## Run it
 
 Needs `TIPS_REAL_PROVIDERS=1`, the provider file named by `TIPS_PROVIDER_ENV_FILE`,
-a checkout with no tracked changes and `ffmpeg` on `PATH`. It makes four reservations,
-deletes them and confirms each with `GET` 404.
+a checkout with no tracked changes and `ffmpeg` on `PATH`. `run` makes four
+reservations and `diagnose` two; each deletes them and confirms each with `GET` 404.
+`diagnose` sends the throttled upload only if the unthrottled one completes.
 
 ```sh
 TIPS_REAL_PROVIDERS=1 unbuffer mix run --no-start scripts/stream_completion_probe.exs run
+TIPS_REAL_PROVIDERS=1 unbuffer mix run --no-start scripts/stream_completion_probe.exs diagnose
 TIPS_REAL_PROVIDERS=1 unbuffer mix run --no-start scripts/stream_completion_probe.exs cleanup
 ```
 

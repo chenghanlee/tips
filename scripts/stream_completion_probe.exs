@@ -3,10 +3,11 @@
 # See docs/development/stream-completion-probe.md.
 #
 #     TIPS_REAL_PROVIDERS=1 mix run --no-start scripts/stream_completion_probe.exs run
+#     TIPS_REAL_PROVIDERS=1 mix run --no-start scripts/stream_completion_probe.exs diagnose
 #     TIPS_REAL_PROVIDERS=1 mix run --no-start scripts/stream_completion_probe.exs cleanup
 #
-# `run` refuses a dirty checkout. It makes four reservations with one 10 s clip each and
-# deletes them at the end. `cleanup` deletes every reservation named in tmp/ inventories or
+# Every mode refuses a dirty checkout. `run` makes four reservations with one 10 s clip
+# each and `diagnose` two; both delete them at the end. `cleanup` deletes every reservation named in tmp/ inventories or
 # found by the `tips-probe-243-` name prefix. Output goes to tmp/stream-completion-probe/.
 defmodule StreamCompletionProbe do
   @out "tmp/stream-completion-probe"
@@ -30,8 +31,9 @@ defmodule StreamCompletionProbe do
   ]
 
   def main(["run"]), do: guard(fn -> report("run", &run/1) end)
+  def main(["diagnose"]), do: guard(fn -> report("diagnose", &diagnose/1) end)
   def main(["cleanup"]), do: guard(fn -> report("cleanup", &cleanup/1) end)
-  def main(_argv), do: refuse("usage: run | cleanup")
+  def main(_argv), do: refuse("usage: run | diagnose | cleanup")
 
   defp guard(fun) do
     {dirty, 0} = System.cmd("git", ["status", "--porcelain", "--untracked-files=no"])
@@ -292,6 +294,87 @@ defmodule StreamCompletionProbe do
     {:ok, a, _} = DateTime.from_iso8601(a)
     {:ok, b, _} = DateTime.from_iso8601(b)
     DateTime.before?(a, b)
+  end
+
+  ## Diagnose
+
+  # Two uploads far from expiry: the rest of the file in one unthrottled PATCH, then the
+  # same throttled over 20 s like the `before` control. The second runs only if the first
+  # completes, so a plain-upload failure stops the probe.
+  @diagnose_expiry_s 900
+
+  defp diagnose(ctx) do
+    fixture = fixture()
+    data = File.read!(fixture.path)
+    expiry = DateTime.utc_now() |> DateTime.add(@diagnose_expiry_s) |> DateTime.truncate(:second)
+
+    reservations =
+      Enum.map(["unthrottled", "throttled-20s"], &{&1, reserve(ctx, &1, byte_size(data), expiry)})
+
+    [{_label, unthrottled}, {_label2, throttled}] = reservations
+    first = diagnose_case(ctx, unthrottled, data, 0)
+
+    second =
+      if completed?(first),
+        do: diagnose_case(ctx, throttled, data, 20_000),
+        else: %{case: "throttled-20s", skipped: "unthrottled upload did not complete"}
+
+    deleted = for {_label, {:ok, r}} <- reservations, do: delete_confirmed(ctx, r.uid)
+
+    assertions = [
+      assertion("unthrottled_completes", true, completed?(first), diagnose_evidence(first)),
+      assertion("throttled_completes", true, completed?(second), diagnose_evidence(second)),
+      assertion("every_reservation_deleted", true, Enum.all?(deleted, &(&1.get_after == 404)), %{
+        deleted: deleted
+      })
+    ]
+
+    %{
+      fixture: Map.delete(fixture, :path),
+      requested_expiry: DateTime.to_iso8601(expiry),
+      cases: [first, second],
+      deleted: deleted,
+      assertions: assertions,
+      verdict: verdict(assertions)
+    }
+  end
+
+  defp diagnose_case(_ctx, {:error, record}, _data, _duration_ms),
+    do: %{case: "reservation", reservation: record}
+
+  defp diagnose_case(ctx, {:ok, r}, data, duration_ms) do
+    first = patch(ctx, r, 0, binary_part(data, 0, @chunk), 0)
+
+    if acknowledged?(first, @chunk) do
+      rest =
+        patch(ctx, r, @chunk, binary_part(data, @chunk, byte_size(data) - @chunk), duration_ms)
+
+      %{
+        case: r.label,
+        uid: r.uid,
+        first_chunk: first,
+        spanning_patch: rest,
+        after_spanning_patch: observe(ctx, r),
+        observations: poll(ctx, r, 24),
+        final_video: last_video(ctx, r.uid)
+      }
+    else
+      %{case: r.label, uid: r.uid, first_chunk: first}
+    end
+  end
+
+  defp diagnose_evidence(result) do
+    %{
+      first_chunk_status: get_in(result, [:first_chunk, :status]),
+      rest_status: get_in(result, [:spanning_patch, :status]),
+      rest_sent_at: get_in(result, [:spanning_patch, :sent_at]),
+      rest_body_done_at: get_in(result, [:spanning_patch, :body_done_at]),
+      rest_response_at: get_in(result, [:spanning_patch, :response_at]),
+      rest_body: get_in(result, [:spanning_patch, :body]),
+      head_offset_after: get_in(result, [:after_spanning_patch, :head_offset]),
+      final_state: get_in(result, [:final_video, "status", "state"]),
+      skipped: result[:skipped]
+    }
   end
 
   ## Cleanup
