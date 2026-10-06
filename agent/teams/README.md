@@ -228,6 +228,8 @@ Dispatcher actions:
 1. Set Status Blocked.
 2. Answer technical questions using the reported error and cited code. Ask the
    user in your pane about product, scope or any question you cannot answer.
+   For a denied command, do not run it for the agent, deliver its message another
+   way or tell the agent to retry; ask the user.
    Do not disable, re-arm or bypass auto-merge. If an approved PR with passing
    required checks has not merged, report it to the user; GitHub may merge it late.
 3. Record the answer on the issue.

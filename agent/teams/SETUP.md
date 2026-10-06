@@ -86,7 +86,7 @@ repository's other rules. Add this Tips-specific entry:
 > github.com/chenghanlee/tips is a trusted repository. Its main branch is protected
 > by Reviewed main: PRs, checks, release, tips/independent-review and resolved review
 > threads are required, with no bypass actors. A separate tester publishes
-> tips/independent-review for the exact PR head. Native approving reviews is zero
+> tips/independent-review for the exact PR head. Required approving reviews is 0
 > because the agents share one GitHub identity.
 
 Preserve other settings and rule lists. Do not add a merge or handoff allow rule.
