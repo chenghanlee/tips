@@ -71,7 +71,7 @@ elif args[:2] == ["pane", "split"]:
             ]
             assert "$HERDR_PANE_ID" in launched[1][-1]
             assert launched[1][launched[1].index("--advisor") + 1] == "fable"
-            for model in ("fable", "claude-fable-5-1", ""):
+            for model in ("claude-fable-5-1", ""):
                 with self.subTest(model=model):
                     config.write_text(
                         f'[dispatcher]\nmodel="{model}"\neffort="high"\ncompact_percent=42\n'

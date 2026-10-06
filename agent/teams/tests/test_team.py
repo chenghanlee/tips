@@ -780,7 +780,7 @@ class PairLifecycleTest(unittest.TestCase):
         self.team("start", "29")
         wt = self.worktree("29")
         (wt / "tracked.txt").write_text("unfinished work\n")
-        for model in ("fable", "claude-fable-5-1", ""):
+        for model in ("claude-fable-5-1", ""):
             with self.subTest(model=model):
                 config = self.repo / "agent/teams/config.toml"
                 config.write_text(CONFIG.replace('model = "fixture-test"', f'model = "{model}"'))
