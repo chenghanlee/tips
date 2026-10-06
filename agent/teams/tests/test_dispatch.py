@@ -70,3 +70,17 @@ elif args[:2] == ["pane", "split"]:
                 "high",
             ]
             assert "$HERDR_PANE_ID" in launched[1][-1]
+            assert launched[1][launched[1].index("--advisor") + 1] == "fable"
+            for model in ("fable", "claude-fable-5-1", ""):
+                with self.subTest(model=model):
+                    config.write_text(
+                        f'[dispatcher]\nmodel="{model}"\neffort="high"\ncompact_percent=42\n'
+                    )
+                    execute([scripts / "dispatch"], env=env, check=True)
+                    args = json.loads(log.read_text().splitlines()[-1])[1]
+                    assert "--advisor" not in args
+                    assert args[args.index("--effort") + 1] == "high"
+                    if model:
+                        assert args[args.index("--model") + 1] == model
+                    else:
+                        assert "--model" not in args

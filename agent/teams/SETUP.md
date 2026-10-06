@@ -78,6 +78,8 @@ Start only one. Pairs notify it by the name `dispatcher`. It chooses and prepare
 
 Edit [config.toml](config.toml): the number of pairs, client, model and effort per role, the dispatcher's model, effort and compaction point, port and database allocation, permissions and time budgets. Scripts read the main checkout's file; `TIPS_TEAM_CONFIG=/absolute/path` selects a staged one. Settings apply at the next launch.
 
+Claude launches with `--advisor fable` when its configured model is nonempty and does not name Fable; this requires Fable access. Fable models and an empty model (the client default) leave the advisor setting to the client.
+
 | Allocation | Components |
 |---|---|
 | Database suffix | `team.db_suffix_prefix`, slot number, `roles.<role>.db_suffix` |
