@@ -284,7 +284,18 @@ defmodule Tips.Content do
 
   alias Tips.Accounts
   alias Tips.Accounts.Scope
-  alias Tips.Content.{Deletion, Edit, Intent, Moderation, Projection, Publication, Read, Search}
+
+  alias Tips.Content.{
+    Deletion,
+    Edit,
+    Intent,
+    Moderation,
+    Projection,
+    Publication,
+    Read,
+    Search,
+    Vocabulary
+  }
 
   @typedoc """
   Who reads: `nil` for an anonymous viewer, or the server-held reference to
@@ -622,6 +633,13 @@ defmodule Tips.Content do
   @spec search_tips(Scope.t() | nil, String.t(), keyword()) ::
           {:ok, Search.page()} | {:error, Search.error()}
   defdelegate search_tips(scope, query, opts \\ []), to: Search
+
+  @doc """
+  Returns the active curated tags, models and environments in display order:
+  the values the discovery filters accept.
+  """
+  @spec list_filter_choices() :: Vocabulary.choices()
+  defdelegate list_filter_choices, to: Vocabulary, as: :active_choices
 
   @doc """
   Deletes the author's own tip or review, irreversibly. See "Deletion and
