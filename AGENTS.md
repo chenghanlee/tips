@@ -37,9 +37,9 @@
 ## GitHub
 
 - Comment only for a decision, a review finding or a blocker. No progress, status or acknowledgment comments.
-- Review: submit one review per pass, on the exact head. Put each finding inline on the line it concerns, one finding per comment. Use the review body only for a finding with no line in the diff, and name its `path:line`.
-- Finding: line one is the severity (`P0`, `P1` or `P2`, [defined here](agent/teams/README.md#rules)) and the required change. Then the failure: steps or input, actual result, expected result. Add a `suggestion` block when the fix is a few lines.
-- Reply to a finding only with the commit that fixes it or the reason you decline it. The reviewer who opened a thread resolves it.
+- Review: follow the [PR review record](agent/teams/README.md#pr-review-record). Put each finding inline on the line it concerns, one finding per comment. The review body holds only the verdict, the verification limits and findings with no line in the diff, each with its `path:line`.
+- Finding: line one is the severity (`P0`, `P1` or `P2`, [defined here](agent/teams/README.md#rules)) and the change you ask for. Then the consequence. For wrong behaviour: the steps or input, the actual result and the expected result. Otherwise: what it breaks or costs. A `suggestion` block is optional, for a fix of a few lines.
+- Reply to a finding only to ask a question it leaves open, to link the commit that fixes it, or to give the reason you decline it. The reviewer who opened a thread resolves it.
 - Blocker: what is blocked, the exact error or question, and who must act. Decision: what was decided and why, in one or two sentences.
 - Link evidence instead of pasting it: a commit-SHA permalink for code, the run URL for CI. Quote only the failing lines.
 - Do not list passing checks. Report failed, pending and unrun checks, and local evidence that CI does not cover.
