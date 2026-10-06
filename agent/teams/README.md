@@ -9,8 +9,8 @@ decisions, findings and blockers there. Use Herdr to notify the next agent.
 
 | Role | Agent name | Responsibilities |
 |---|---|---|
-| User | n/a | Order the board, mark tasks Ready and notify the dispatcher. Answer product, scope, purchase and credential questions. Start the dispatcher once. |
-| Dispatcher | `dispatcher` | Update the board, select tasks, start and stop pairs, and handle blockers. Do not write code or review changes. |
+| User | n/a | Set product goals and constraints. Answer unresolved product, scope, purchase and credential questions. Start the dispatcher once; notify it when priorities or external facts change. |
+| Dispatcher | `dispatcher` | Act as the Tips technical program manager: prioritize work, prepare eligible tasks, update the board, start and stop pairs, and handle blockers. Do not write code or review changes. |
 | Developer | `team-N-dev` | Implement and verify the issue, open the PR, address findings and fix failed checks. |
 | Tester | `team-N-test` | Review the pushed PR head, run tests or the app, publish approval and confirm the merge. |
 
@@ -21,17 +21,38 @@ decisions, findings and blockers there. Use Herdr to notify the next agent.
 At startup, after each `done` or `blocked` message, and when the user reports a
 board change:
 
-1. Read open PRs, running pairs (`herdr workspace list`), worktrees
-   (`git worktree list`) and the latest `main` run.
+1. Read the Project 15 readme for milestone order and gates, the board and open
+   issues, open PRs, running pairs (`herdr workspace list`), worktrees
+   (`git worktree list`) and the latest `main` run. Read candidate issues, their
+   prerequisite links, relevant design sections and recent decisions before choosing.
 2. Set merged issues to Done. For an issue with a running pair, keep Blocked if
-   its question is unanswered; otherwise set Active. Leave all other statuses
-   as the user set them.
-3. For each free slot, start the first eligible Ready item in board order.
-   The slot limit is `team.max_teams` in [config.toml](config.toml).
-   Skip an item only if it has an open "blocked by" issue, or if its body and an
-   active issue's body name the same database table, API or data rule.
-4. After each successful start, set Status Active and Agent on the Project item.
-5. End your turn. Pairs notify you when they finish or need help.
+   its question is unanswered; otherwise set Active. For other blocked issues,
+   check the recorded reason. Clear a dependency blocker only when its prerequisites
+   are complete; keep unanswered questions, missing access and explicit user holds.
+3. For each free slot, choose the eligible task with the highest value for the
+   current milestone. Follow explicit user priorities. Otherwise prioritize work
+   that unblocks the milestone gate or other tasks, completes a usable product
+   flow, or fixes a demonstrated regression. Use board order to break ties.
+   Prefer product progress over optional tooling. The slot limit is
+   `team.max_teams` in [config.toml](config.toml); do not fill slots with conflicting work.
+4. Consider Backlog as well as Ready. Ready means the dispatcher has checked that
+   the task can start; it does not require the user to select it. Before starting,
+   confirm prerequisites are complete, the issue has a bounded outcome and
+   acceptance scenarios, and no running pair or open PR already owns the work.
+   Defer a task if its issue body and an active issue's body name the same database
+   table, API or data rule. Package parents are summaries, not pair assignments.
+5. Fill in missing task details or split work into one-PR issues using the existing
+   design and decisions. Resolve technical sequencing yourself. Ask the user only
+   when a product or scope decision is not settled, or their access, purchase or
+   approval is required. Do not change requirements or waive gates to make work eligible.
+6. Record the selection decision and its reason on the issue, set Ready, and run
+   `agent/teams/team.py start <issue>`. After a successful start, set Status Active
+   and Agent on the Project item. Reassess the remaining candidates for each free slot.
+7. If no task is eligible, identify the prerequisite or decision that would unlock
+   the next useful task. Resolve it within your authority or report the specific
+   blocker and who must act. An empty Ready queue alone is not a reason to stop.
+8. End your turn after assigning work or reporting the blocker. Pairs notify you
+   when they finish or need help; no polling loop is required.
 
 ### 2. Developer: implement and hand off
 
@@ -96,7 +117,7 @@ Do not repeat the watch.
 ### 6. Dispatcher: remove the pair and assign the next task
 
 Run `agent/teams/team.py stop <issue>`, then select another task for the free slot.
-If no Ready item can start, tell the user.
+Apply the selection process above, including Backlog and resolved blockers.
 
 ## Commands
 
