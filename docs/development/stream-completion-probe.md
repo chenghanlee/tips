@@ -2,22 +2,29 @@
 
 Evidence for [#243](https://github.com/chenghanlee/tips/issues/243): what Cloudflare
 Stream does with a tus `PATCH` that is still sending when the upload expiry passes,
-and which fields a completed upload carries. The
-[video deadline contract](../design/data-model.md#video-states-and-deadlines) relies
-on it.
+and which fields a completed upload carries. It informed the 10-minute cleanup margin
+in the [video deadline contract](../design/data-model.md#video-states-and-deadlines).
+The probe script was removed; it is at
+[`75f819e`](https://github.com/chenghanlee/tips/blob/75f819e4e95431ba7765add2d99348116295d0aa/scripts/stream_completion_probe.exs).
 
 ## Result
 
-**Pending.** No complete run is recorded yet.
+**Unproven.** No run completed an upload, so whether Stream can complete a `PATCH`
+still sending at expiry is not measured. The user stopped further runs and accepted a
+10-minute margin after the upload deadline instead
+([decision](https://github.com/chenghanlee/tips/issues/243#issuecomment-6024452901)).
+Partial evidence: three expiry-spanning `PATCH` requests were refused with 400, code
+10017, when their bodies finished. Ten of the 20 authorized uploads were used; every
+reservation was deleted and confirmed by `GET` 404.
 
 The first run, at `f440270` with no tracked changes, measured nothing: Stream rejected
 every 256 KiB first chunk with 400, code 10015, "Minimum allowed ChunkSize for a
 non-final chunk is 5242880 bytes". The tester stopped it before expiry and deleted all
 four reservations, each confirmed by `GET` 404
 ([run](stream-completion-probe/tester-aborted-20261006T191501Z-0938.json),
-[cleanup](stream-completion-probe/cleanup-20261006T191603Z-3126.json)). Since then the
-probe sends 5 MiB non-final chunks and stops a case whose chunk is not acknowledged
-with 204 and the expected `Upload-Offset`.
+[cleanup](stream-completion-probe/cleanup-20261006T191603Z-3126.json)). Later versions
+sent 5 MiB non-final chunks and stopped a case whose chunk was not acknowledged with
+204 and the expected `Upload-Offset`.
 
 The second run, at `335a117` with no tracked changes, stopped on a provider error
 ([run](stream-completion-probe/tester-blocked-20261006T192535Z-5bae.json),
@@ -37,12 +44,12 @@ from expiry ([report](stream-completion-probe/diagnose-20261006T193911Z-4c50.jso
 after a 5 MiB first chunk (204), the unthrottled 10 MB rest got 500, code 10000; `HEAD`
 showed the full 15,339,962-byte offset and the video stayed `pendingupload`. The
 throttled upload was skipped. Both reservations were deleted, each confirmed by
-`GET` 404. Ten of the 20 authorized uploads are used.
+`GET` 404.
 
-The #61 client completed the same kind of upload, so the probe now sends uploads the
-way that client did. Differences from the #61 client before this change:
+The #61 client completed the same kind of upload. The last probe version sent uploads
+the way that client did, but was never run. Differences from the #61 client:
 
-| | #61 client | Runs 2 and 3 | Now |
+| | #61 client | Runs 2 and 3 | Last version, not run |
 |---|---|---|---|
 | Largest `PATCH` | 5 MiB chunks; final chunk shorter | final `PATCH` of about 10 MB | 5 MiB chunks; final chunk shorter |
 | Fixture | 720p, 30 fps, 6 Mbit/s, 12 s, no audio | 720p with a noise filter, 12 Mbit/s constant bitrate with filler, AAC audio | #61 recipe at 10 s and 10 Mbit/s, about 13 MB |
@@ -61,11 +68,8 @@ Already known from the [#61 probe](https://github.com/chenghanlee/tips/blob/bb87
 
 ## Cases
 
-One reservation each, run one after another, with the same 10 s, 720p clip of about
-13 MB: two 5 MiB chunks and a shorter final one. Each reservation expires 130 s after it
-is made (Stream refuses less than two minutes). Each case sends its chunks unthrottled
-except one slow `PATCH`. Times are relative to `uploadExpiry`. A boundary case counts
-only if its slow `PATCH` started before expiry and was still sending after it.
+Each case had one reservation expiring 130 s after it was made (Stream refuses less
+than two minutes) and one slow `PATCH`. Times are relative to `uploadExpiry`.
 
 | Case | Slow `PATCH` | Question |
 |---|---|---|
@@ -74,31 +78,6 @@ only if its slow `PATCH` started before expiry and was still sending after it.
 | `span-60` | final chunk, −10 s to +60 s | The same with a longer overrun. |
 | `nonfinal-span-10` | second 5 MiB chunk, −10 s to +10 s, then the final chunk at once if stored | Does Stream store a non-final chunk that spans expiry? |
 
-Server-side API calls use the production timeouts (5 s connect, 5 s receive, no
-retry). The slow `PATCH` stands in for the browser and has a 180 s receive timeout.
-
-## Run it
-
-Needs `TIPS_REAL_PROVIDERS=1`, the provider file named by `TIPS_PROVIDER_ENV_FILE`,
-a checkout with no tracked changes and `ffmpeg` on `PATH`. `run` makes four
-reservations and `diagnose` two; each deletes them and confirms each with `GET` 404.
-`diagnose` uploads twice, 15 minutes from expiry: once unthrottled, then, only if that
-completes, with the final chunk throttled over 20 s like the `before` control.
-`run` stops before the next reservation when the control does not complete, a chunk is
-not acknowledged, the case crashes, a boundary request gets anything but 204 or 400
-with code 10017, or any request gets no response, a server error or, for a video read,
-anything but 200. Any such response also fails both `run` and `diagnose`. It still writes the partial report and deletes every
-reservation it made. A slow `PATCH` records `body_done_at` only when its whole body was
-sent.
-
-```sh
-TIPS_REAL_PROVIDERS=1 unbuffer mix run --no-start scripts/stream_completion_probe.exs run
-TIPS_REAL_PROVIDERS=1 unbuffer mix run --no-start scripts/stream_completion_probe.exs diagnose
-TIPS_REAL_PROVIDERS=1 unbuffer mix run --no-start scripts/stream_completion_probe.exs cleanup
-```
-
-`cleanup` is only for a run that stopped early: it deletes every reservation in the
-inventories or found by the `tips-probe-243-` name prefix. Output goes to ignored
-`tmp/stream-completion-probe/`: the redacted report, the redacted call log under
-`private/` and the inventory. The report records the git SHA, tracked changes,
-fixture hash and recipe, every call's status and `date` header, and the cleanup.
+Server-side API calls used the production timeouts (5 s connect, 5 s receive, no
+retry). Reports record the launch SHA, tracked changes, fixture hash and recipe, every
+call's status and `date` header, and the cleanup.
