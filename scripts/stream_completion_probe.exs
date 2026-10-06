@@ -21,8 +21,9 @@ defmodule StreamCompletionProbe do
   @patch_receive_timeout 180_000
   @expiry_s 130
 
-  # Slow PATCH start and end, in seconds relative to uploadExpiry. `final` sends the rest
-  # of the file; `nonfinal` sends one more 5 MiB chunk across expiry, then the rest at once.
+  # Slow PATCH start and end, in seconds relative to uploadExpiry. Every case first sends
+  # unthrottled 5 MiB chunks. `final` then sends the last chunk slowly; `nonfinal` sends
+  # the second 5 MiB chunk slowly, then the last chunk at once if Stream stored it.
   @cases [
     %{label: "before", start: -40, finish: -20, kind: :final},
     %{label: "span-10", start: -10, finish: 10, kind: :final},
@@ -52,25 +53,16 @@ defmodule StreamCompletionProbe do
 
   ## Run
 
+  # Cases run one after another, each with its own reservation and expiry.
   defp run(ctx) do
     fixture = fixture()
     data = File.read!(fixture.path)
-    expiry = DateTime.utc_now() |> DateTime.add(@expiry_s) |> DateTime.truncate(:second)
-
-    reservations =
-      Enum.map(@cases, fn c -> {c, reserve(ctx, c.label, byte_size(data), expiry)} end)
-
-    results =
-      reservations
-      |> Enum.map(fn {c, r} -> Task.async(fn -> run_case(ctx, c, r, data, expiry) end) end)
-      |> Task.await_many(:timer.minutes(10))
-
-    deleted = Enum.map(owned(reservations), &delete_confirmed(ctx, &1))
-    assertions = assertions(results, deleted, expiry)
+    results = Enum.map(@cases, &run_case(ctx, &1, data))
+    deleted = for %{uid: uid} <- results, do: delete_confirmed(ctx, uid)
+    assertions = assertions(results, deleted)
 
     %{
       fixture: Map.delete(fixture, :path),
-      requested_expiry: DateTime.to_iso8601(expiry),
       cases: results,
       deleted: deleted,
       assertions: assertions,
@@ -78,59 +70,72 @@ defmodule StreamCompletionProbe do
     }
   end
 
-  defp run_case(_ctx, c, {:error, record}, _data, _expiry),
-    do: %{case: c.label, reservation: record}
+  defp run_case(ctx, c, data) do
+    expiry = DateTime.utc_now() |> DateTime.add(@expiry_s) |> DateTime.truncate(:second)
 
-  # A rejected first chunk means no unfinished transfer exists, so the case stops there.
-  defp run_case(ctx, c, {:ok, r}, data, expiry) do
-    first = patch(ctx, r, 0, binary_part(data, 0, @chunk), 0)
-    {:ok, reserved} = video(ctx, r.uid)
-
-    if acknowledged?(first, @chunk),
-      do: span_case(ctx, c, r, data, expiry, first, reserved),
-      else: %{
-        case: c.label,
-        uid: r.uid,
-        first_chunk: first,
-        reserved_video: observation(reserved)
-      }
+    case reserve(ctx, c.label, byte_size(data), expiry) do
+      {:ok, r} -> upload_case(ctx, c, r, data, expiry)
+      {:error, record} -> %{case: c.label, expiry: iso(expiry), reservation: record}
+    end
   end
 
-  defp span_case(ctx, c, r, data, expiry, first, reserved) do
-    sleep_until(expiry, c.start)
+  # A lead chunk that is not acknowledged stops the case: no valid unfinished transfer exists.
+  defp upload_case(ctx, c, r, data, expiry) do
+    slow_from = if c.kind == :final, do: last_chunk_offset(data), else: @chunk
+    {lead, lead_ok?} = send_chunks(ctx, r, data, 0, slow_from)
+    {:ok, reserved} = video(ctx, r.uid)
 
-    {body_size, rest} =
-      case c.kind do
-        :final -> {byte_size(data) - @chunk, nil}
-        :nonfinal -> {@chunk, 2 * @chunk}
-      end
-
-    spanning =
-      patch(ctx, r, @chunk, binary_part(data, @chunk, body_size), (c.finish - c.start) * 1000)
-
-    after_span = observe(ctx, r)
-
-    tail =
-      if rest && after_span.head_offset == rest,
-        do: patch(ctx, r, rest, binary_part(data, rest, byte_size(data) - rest), 0)
-
-    observations = poll(ctx, r, 24)
-
-    %{
+    base = %{
       case: c.label,
-      planned: Map.take(c, [:start, :finish, :kind]),
       uid: r.uid,
-      length: byte_size(data),
+      expiry: iso(expiry),
+      planned: Map.take(c, [:start, :finish, :kind]),
       reservation: r.record,
       reserved_video: observation(reserved),
-      first_chunk: first,
-      spanning_patch: spanning,
-      after_spanning_patch: after_span,
-      tail_patch: tail,
-      observations: observations,
+      lead_chunks: lead,
+      lead_acknowledged: lead_ok?
+    }
+
+    if lead_ok?, do: Map.merge(base, slow_case(ctx, c, r, data, expiry, slow_from)), else: base
+  end
+
+  defp slow_case(ctx, c, r, data, expiry, from) do
+    sleep_until(expiry, c.start)
+    size = if c.kind == :final, do: byte_size(data) - from, else: @chunk
+    slow = patch(ctx, r, from, binary_part(data, from, size), (c.finish - c.start) * 1000)
+    after_slow = observe(ctx, r)
+    to = from + size
+
+    tail =
+      if to < byte_size(data) and after_slow.head_offset == to,
+        do: ctx |> send_chunks(r, data, to, byte_size(data)) |> elem(0)
+
+    %{
+      spanning_patch: slow,
+      after_spanning_patch: after_slow,
+      tail_patches: tail,
+      observations: poll(ctx, r, 24),
       final_video: last_video(ctx, r.uid)
     }
   end
+
+  # Sends data[offset, to) unthrottled in chunks of at most 5 MiB, like the #61 client.
+  # Stops at the first chunk not acknowledged with 204 and the advanced offset.
+  defp send_chunks(ctx, r, data, offset, to, sent \\ [])
+
+  defp send_chunks(_ctx, _r, _data, offset, to, sent) when offset >= to,
+    do: {Enum.reverse(sent), true}
+
+  defp send_chunks(ctx, r, data, offset, to, sent) do
+    size = min(@chunk, to - offset)
+    record = patch(ctx, r, offset, binary_part(data, offset, size), 0)
+
+    if acknowledged?(record, offset + size),
+      do: send_chunks(ctx, r, data, offset + size, to, [record | sent]),
+      else: {Enum.reverse([record | sent]), false}
+  end
+
+  defp last_chunk_offset(data), do: div(byte_size(data) - 1, @chunk) * @chunk
 
   defp sleep_until(expiry, offset_s) do
     at = DateTime.add(expiry, offset_s)
@@ -187,23 +192,20 @@ defmodule StreamCompletionProbe do
     }
   end
 
-  defp assertions(results, deleted, expiry) do
+  defp assertions(results, deleted) do
     by = Map.new(results, &{&1.case, &1})
     before = by["before"]
 
     [
       assertion(
-        "first_chunks_acknowledged",
+        "lead_chunks_acknowledged",
         true,
-        Enum.all?(results, &acknowledged?(&1[:first_chunk], @chunk)),
-        Map.new(
-          results,
-          &{&1.case, Map.take(&1[:first_chunk] || %{}, [:status, :headers, :body])}
-        )
+        Enum.all?(results, &(&1[:lead_acknowledged] == true)),
+        Map.new(results, &{&1.case, lead_evidence(&1[:lead_chunks])})
       ),
-      assertion("before_finished_before_expiry", true, before?(before, :response_at, expiry), %{
+      assertion("before_finished_before_expiry", true, before?(before, :response_at), %{
         response_at: get_in(before, [:spanning_patch, :response_at]),
-        expiry: DateTime.to_iso8601(expiry)
+        expiry: before[:expiry]
       }),
       assertion("before_expiry_completes", true, completed?(before), %{
         patch_status: get_in(before, [:spanning_patch, :status]),
@@ -211,7 +213,7 @@ defmodule StreamCompletionProbe do
       }),
       assertion("uploaded_is_reservation_time", true, uploaded_before_first_byte?(before), %{
         uploaded: get_in(before, [:reserved_video, :uploaded]),
-        first_chunk_sent_at: get_in(before, [:first_chunk, :sent_at])
+        first_chunk_sent_at: first_sent_at(before)
       }),
       assertion(
         "completed_video_timestamps",
@@ -223,7 +225,7 @@ defmodule StreamCompletionProbe do
         )
       )
     ] ++
-      Enum.flat_map(["span-10", "span-60", "nonfinal-span-10"], &span_assertions(by[&1], expiry)) ++
+      Enum.flat_map(["span-10", "span-60", "nonfinal-span-10"], &span_assertions(by[&1])) ++
       [
         assertion(
           "every_reservation_deleted",
@@ -238,16 +240,16 @@ defmodule StreamCompletionProbe do
 
   # A case measures the boundary only if its PATCH started before expiry and was still
   # handing body bytes to the socket after it.
-  defp span_assertions(result, expiry) do
+  defp span_assertions(result) do
     spans? =
-      before?(result, :sent_at, expiry) and not before?(result, :body_done_at, expiry) and
+      before?(result, :sent_at) and not before?(result, :body_done_at) and
         get_in(result, [:spanning_patch, :body_done_at]) != nil
 
     [
       assertion("#{result.case}_spans_expiry", true, spans?, %{
         sent_at: get_in(result, [:spanning_patch, :sent_at]),
         body_done_at: get_in(result, [:spanning_patch, :body_done_at]),
-        expiry: DateTime.to_iso8601(expiry)
+        expiry: result[:expiry]
       }),
       span_outcome(result)
     ]
@@ -261,7 +263,7 @@ defmodule StreamCompletionProbe do
       status: get_in(result, [:spanning_patch, :status]),
       response_offset: get_in(result, [:spanning_patch, :headers, "upload-offset"]),
       head_offset_after: get_in(result, [:after_spanning_patch, :head_offset]),
-      tail_status: get_in(result, [:tail_patch, :status]),
+      tail_statuses: Enum.map(result[:tail_patches] || [], & &1.status),
       final_state: get_in(result, [:final_video, "status", "state"]),
       completed: completed?(result)
     })
@@ -272,21 +274,27 @@ defmodule StreamCompletionProbe do
 
   defp acknowledged?(_record, _expected), do: false
 
-  defp before?(result, key, expiry) do
-    case get_in(result, [:spanning_patch, key]) do
-      nil -> false
-      at -> before_iso?(at, DateTime.to_iso8601(expiry))
+  defp before?(result, key) do
+    case {get_in(result, [:spanning_patch, key]), result[:expiry]} do
+      {at, expiry} when is_binary(at) and is_binary(expiry) -> before_iso?(at, expiry)
+      _missing -> false
     end
   end
+
+  defp lead_evidence(nil), do: []
+  defp lead_evidence(records), do: Enum.map(records, &Map.take(&1, [:label, :status, :headers]))
+
+  defp first_sent_at(%{lead_chunks: [first | _rest]}), do: first.sent_at
+  defp first_sent_at(_result), do: nil
 
   defp completed?(%{final_video: %{"status" => %{"state" => state}}}),
     do: state not in ["pendingupload"]
 
   defp completed?(_result), do: false
 
-  defp uploaded_before_first_byte?(%{reserved_video: %{uploaded: uploaded}, first_chunk: first})
+  defp uploaded_before_first_byte?(%{reserved_video: %{uploaded: uploaded}} = result)
        when is_binary(uploaded),
-       do: before_iso?(uploaded, first.sent_at)
+       do: before_iso?(uploaded, first_sent_at(result))
 
   defp uploaded_before_first_byte?(_result), do: false
 
@@ -298,40 +306,38 @@ defmodule StreamCompletionProbe do
 
   ## Diagnose
 
-  # Two uploads far from expiry: the rest of the file in one unthrottled PATCH, then the
-  # same throttled over 20 s like the `before` control. The second runs only if the first
-  # completes, so a plain-upload failure stops the probe.
+  # Two uploads far from expiry, sent like the #61 client: 5 MiB chunks, then the last
+  # chunk unthrottled; then the same with the last chunk throttled over 20 s like the
+  # `before` control. The second is reserved only if the first completes.
   @diagnose_expiry_s 900
 
   defp diagnose(ctx) do
     fixture = fixture()
     data = File.read!(fixture.path)
     expiry = DateTime.utc_now() |> DateTime.add(@diagnose_expiry_s) |> DateTime.truncate(:second)
-
-    reservations =
-      Enum.map(["unthrottled", "throttled-20s"], &{&1, reserve(ctx, &1, byte_size(data), expiry)})
-
-    [{_label, unthrottled}, {_label2, throttled}] = reservations
-    first = diagnose_case(ctx, unthrottled, data, 0)
+    first = diagnose_case(ctx, "unthrottled", data, expiry, 0)
 
     second =
       if completed?(first),
-        do: diagnose_case(ctx, throttled, data, 20_000),
+        do: diagnose_case(ctx, "throttled-20s", data, expiry, 20_000),
         else: %{case: "throttled-20s", skipped: "unthrottled upload did not complete"}
 
-    deleted = for {_label, {:ok, r}} <- reservations, do: delete_confirmed(ctx, r.uid)
+    deleted = for %{uid: uid} <- [first, second], do: delete_confirmed(ctx, uid)
 
     assertions = [
       assertion("unthrottled_completes", true, completed?(first), diagnose_evidence(first)),
       assertion("throttled_completes", true, completed?(second), diagnose_evidence(second)),
-      assertion("every_reservation_deleted", true, Enum.all?(deleted, &(&1.get_after == 404)), %{
-        deleted: deleted
-      })
+      assertion(
+        "every_reservation_deleted",
+        true,
+        Enum.all?(deleted, &(&1.get_after == 404)),
+        %{deleted: deleted}
+      )
     ]
 
     %{
       fixture: Map.delete(fixture, :path),
-      requested_expiry: DateTime.to_iso8601(expiry),
+      requested_expiry: iso(expiry),
       cases: [first, second],
       deleted: deleted,
       assertions: assertions,
@@ -339,38 +345,40 @@ defmodule StreamCompletionProbe do
     }
   end
 
-  defp diagnose_case(_ctx, {:error, record}, _data, _duration_ms),
-    do: %{case: "reservation", reservation: record}
+  defp diagnose_case(ctx, label, data, expiry, duration_ms) do
+    case reserve(ctx, label, byte_size(data), expiry) do
+      {:ok, r} ->
+        last = last_chunk_offset(data)
+        {lead, lead_ok?} = send_chunks(ctx, r, data, 0, last)
+        base = %{case: label, uid: r.uid, lead_chunks: lead, lead_acknowledged: lead_ok?}
 
-  defp diagnose_case(ctx, {:ok, r}, data, duration_ms) do
-    first = patch(ctx, r, 0, binary_part(data, 0, @chunk), 0)
+        if lead_ok? do
+          final =
+            patch(ctx, r, last, binary_part(data, last, byte_size(data) - last), duration_ms)
 
-    if acknowledged?(first, @chunk) do
-      rest =
-        patch(ctx, r, @chunk, binary_part(data, @chunk, byte_size(data) - @chunk), duration_ms)
+          Map.merge(base, %{
+            spanning_patch: final,
+            after_spanning_patch: observe(ctx, r),
+            observations: poll(ctx, r, 24),
+            final_video: last_video(ctx, r.uid)
+          })
+        else
+          base
+        end
 
-      %{
-        case: r.label,
-        uid: r.uid,
-        first_chunk: first,
-        spanning_patch: rest,
-        after_spanning_patch: observe(ctx, r),
-        observations: poll(ctx, r, 24),
-        final_video: last_video(ctx, r.uid)
-      }
-    else
-      %{case: r.label, uid: r.uid, first_chunk: first}
+      {:error, record} ->
+        %{case: label, reservation: record}
     end
   end
 
   defp diagnose_evidence(result) do
     %{
-      first_chunk_status: get_in(result, [:first_chunk, :status]),
-      rest_status: get_in(result, [:spanning_patch, :status]),
-      rest_sent_at: get_in(result, [:spanning_patch, :sent_at]),
-      rest_body_done_at: get_in(result, [:spanning_patch, :body_done_at]),
-      rest_response_at: get_in(result, [:spanning_patch, :response_at]),
-      rest_body: get_in(result, [:spanning_patch, :body]),
+      lead_statuses: Enum.map(result[:lead_chunks] || [], & &1.status),
+      final_status: get_in(result, [:spanning_patch, :status]),
+      final_sent_at: get_in(result, [:spanning_patch, :sent_at]),
+      final_body_done_at: get_in(result, [:spanning_patch, :body_done_at]),
+      final_response_at: get_in(result, [:spanning_patch, :response_at]),
+      final_body: get_in(result, [:spanning_patch, :body]),
       head_offset_after: get_in(result, [:after_spanning_patch, :head_offset]),
       final_state: get_in(result, [:final_video, "status", "state"]),
       skipped: result[:skipped]
@@ -417,8 +425,6 @@ defmodule StreamCompletionProbe do
     |> Enum.filter(&String.starts_with?(get_in(&1, ["meta", "name"]) || "", @prefix))
     |> Enum.map(& &1["uid"])
   end
-
-  defp owned(reservations), do: for({_c, {:ok, r}} <- reservations, do: r.uid)
 
   defp delete_confirmed(ctx, uid) do
     {d, _record} =
@@ -487,37 +493,48 @@ defmodule StreamCompletionProbe do
     end
   end
 
-  # Sends `data` at `offset`, spread evenly over `duration_ms` when it is positive.
+  # An unthrottled body goes as one binary, as in the #61 client. A throttled body is a
+  # stream of 50 pieces with an explicit Content-Length; the stream's after-callback runs
+  # once the last piece has been handed to the socket.
   defp patch(ctx, r, offset, data, duration_ms) do
-    pieces = if duration_ms > 0, do: 50, else: 1
-    piece = div(byte_size(data) + pieces - 1, pieces)
     done = :atomics.new(1, [])
 
-    body =
-      data
-      |> chunks(piece)
-      |> Stream.with_index()
-      |> Stream.map(fn {bytes, i} ->
-        if i > 0, do: Process.sleep(div(duration_ms, pieces))
-        bytes
-      end)
-      |> Stream.concat(Stream.map([nil], fn _ -> mark_done(done) end))
+    {body, length} =
+      if duration_ms > 0,
+        do: {throttled(data, duration_ms, done), [{"content-length", "#{byte_size(data)}"}]},
+        else: {data, []}
 
     {_result, record} =
       request(ctx, "patch:#{r.label}@#{offset}+#{byte_size(data)}",
         method: :patch,
         url: r.location,
-        headers: [
-          {"tus-resumable", "1.0.0"},
-          {"upload-offset", Integer.to_string(offset)},
-          {"content-type", "application/offset+octet-stream"},
-          {"content-length", Integer.to_string(byte_size(data))}
-        ],
+        headers:
+          [
+            {"tus-resumable", "1.0.0"},
+            {"upload-offset", Integer.to_string(offset)},
+            {"content-type", "application/offset+octet-stream"}
+          ] ++ length,
         body: body,
         receive_timeout: @patch_receive_timeout
       )
 
     Map.put(record, :body_done_at, done_at(done))
+  end
+
+  @pieces 50
+
+  defp throttled(data, duration_ms, done) do
+    data
+    |> chunks(div(byte_size(data) + @pieces - 1, @pieces))
+    |> Stream.with_index()
+    |> Stream.transform(
+      fn -> nil end,
+      fn {bytes, i}, acc ->
+        if i > 0, do: Process.sleep(div(duration_ms, @pieces))
+        {[bytes], acc}
+      end,
+      fn _acc -> :atomics.put(done, 1, System.system_time(:millisecond)) end
+    )
   end
 
   defp chunks(<<>>, _size), do: []
@@ -528,12 +545,6 @@ defmodule StreamCompletionProbe do
     do: [
       binary_part(data, 0, size) | chunks(binary_part(data, size, byte_size(data) - size), size)
     ]
-
-  # An empty iodata element marks the instant the last body byte was handed to the socket.
-  defp mark_done(done) do
-    :atomics.put(done, 1, System.system_time(:millisecond))
-    ""
-  end
 
   defp done_at(done) do
     case :atomics.get(done, 1) do
@@ -699,23 +710,23 @@ defmodule StreamCompletionProbe do
     System.halt(if report.verdict == "pass" and leaked == 0, do: 0, else: 1)
   end
 
-  # A 10 s 720p clip of about 15 MB: noise keeps the constant bitrate full, so the file
-  # holds two 5 MiB non-final chunks and a final one.
+  # The #61 two-chunk recipe (720p, 30 fps, no audio, 6 Mbit/s for 12 s) at 10 s and
+  # 10 Mbit/s: about 13 MB, so two 5 MiB non-final chunks and a shorter final one.
   defp fixture do
     dir = Path.join(@out, "fixtures")
     File.mkdir_p!(dir)
     path = Path.join(dir, "clip-10s.mp4")
 
     args =
-      ~w(-f lavfi -i testsrc2=size=1280x720:rate=30:duration=10 -f lavfi -i sine=frequency=440:duration=10
-         -vf noise=alls=40:allf=t+u -c:v libx264 -pix_fmt yuv420p -preset veryfast -b:v 12M -minrate 12M
-         -maxrate 12M -bufsize 12M -x264-params nal-hrd=cbr -c:a aac -shortest -movflags +faststart)
+      ~w(-f lavfi -i testsrc2=size=1280x720:rate=30:duration=10 -c:v libx264 -pix_fmt yuv420p
+         -preset veryfast -b:v 10M -maxrate 10M -bufsize 20M -movflags +faststart)
 
     {_out, 0} = System.cmd("ffmpeg", ~w(-hide_banner -loglevel error -y) ++ args ++ [path])
     bin = File.read!(path)
 
-    if byte_size(bin) <= 2 * @chunk,
-      do: raise("fixture has #{byte_size(bin)} bytes; need over #{2 * @chunk}")
+    unless byte_size(bin) > 2 * @chunk and byte_size(bin) <= 3 * @chunk,
+      do:
+        raise("fixture has #{byte_size(bin)} bytes; need two full chunks and a shorter final one")
 
     %{
       path: path,
@@ -740,6 +751,7 @@ defmodule StreamCompletionProbe do
   end
 
   defp now, do: DateTime.utc_now() |> DateTime.to_iso8601()
+  defp iso(at), do: DateTime.to_iso8601(at)
 end
 
 StreamCompletionProbe.main(System.argv())
