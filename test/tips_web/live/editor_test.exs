@@ -1,16 +1,23 @@
 defmodule TipsWeb.EditorTest do
   @moduledoc """
-  Acceptance evidence for #78 at the page: the editors' form identity and
-  draft record, review setup defaults, and the restore and reconnect events
-  the `EditorDraft` hook and LiveView form recovery send. The hook itself is
-  in `TipsWeb.EditorDraftTest`.
+  Acceptance evidence for #78 and #79 at the page: the editors' form identity
+  and draft record, review setup defaults, the restore and reconnect events
+  the `EditorDraft` hook and LiveView form recovery send, and submit-time
+  validation and refused saves. The hook itself is in
+  `TipsWeb.EditorDraftTest` and `TipsWeb.EditorSubmitTest`.
   """
   use TipsWeb.ConnCase, async: true
 
+  import Ecto.Query
   import Phoenix.LiveViewTest
   import Tips.AccountsFixtures
   import Tips.ContentFixtures
+  import Tips.VisibilityFixtures
   import TipsWeb.ReaderPageHelpers
+
+  alias Tips.Accounts.UserToken
+  alias Tips.Content.{Review, Tip}
+  alias Tips.Repo
 
   setup :register_and_log_in_user
 
@@ -85,6 +92,72 @@ defmodule TipsWeb.EditorTest do
     assert selected(html, "review[environment_id]") == nil
   end
 
+  test "Publish validates untouched fields, keeps long input and revalidates only after a failure",
+       %{conn: conn, user: user} do
+    form_id = "#editor-#{user.id}-tip"
+    {:ok, lv, html} = live(conn, "/editor/tips/new")
+    refute html =~ "maxlength"
+
+    # Typing before the first submit shows no errors.
+    html = lv |> form(form_id, tip: %{title: "Plan first", body: ""}) |> render_change()
+    refute has?(html, "[aria-invalid]")
+
+    long = String.duplicate("Plan. ", 3_400)
+    html = lv |> form(form_id, tip: %{body: long}) |> render_submit()
+
+    assert_push_event(lv, "editor:refused", %{})
+    assert summary_links(html, form_id) == ["#tip_body", "#tip_tag_id"]
+    # The technique was never touched.
+    assert has?(html, ~s(#tip_tag_id[aria-invalid="true"]))
+    refute has?(html, ~s(#tip_title[aria-invalid]))
+    assert value(html, "tip[title]") == "Plan first"
+    assert textarea(html, "tip[body]") == long
+
+    # Correcting the body clears its error; the technique's stays.
+    html = lv |> form(form_id, tip: %{body: "Plan before you prompt."}) |> render_change()
+    assert summary_links(html, form_id) == ["#tip_tag_id"]
+    refute has?(html, ~s(#tip_body[aria-invalid]))
+
+    html = lv |> form(form_id, tip: %{tag_id: "other"}) |> render_submit()
+    refute has?(html, "[aria-invalid]")
+    assert text(html, "#{form_id}-outcome") == "Published"
+
+    assert [%Tip{title: "Plan first", body: "Plan before you prompt.", tag_id: "other"}] =
+             Repo.all(from t in Tip, where: t.user_id == ^user.id)
+  end
+
+  test "an expired sign-in or a full ban refuses Publish and keeps the input", %{
+    conn: conn,
+    user: user
+  } do
+    tip = tip_fixture()
+    path = "/editor/tips/#{tip.id}/reviews/new"
+    form_id = "#editor-#{user.id}-review"
+    {:ok, lv, _html} = live(conn, path)
+
+    # The session ended without a disconnect reaching this page.
+    Repo.delete_all(from t in UserToken, where: t.user_id == ^user.id)
+    html = lv |> form(form_id, review: %{body: "Worked on a rename."}) |> render_submit()
+
+    assert text(html, "#{form_id}-refusal") =~ "Your sign-in has expired"
+
+    assert attr(html, "#{form_id}-refusal a", "Sign in", "href") ==
+             "/users/log-in?" <> URI.encode_query(return_to: path)
+
+    assert textarea(html, "review[body]") == "Worked on a rename."
+
+    # Signing in again publishes nothing by itself.
+    {:ok, lv, _html} = live(log_in_user(build_conn(), user), path)
+    refute Repo.exists?(Review)
+
+    full_ban!(user)
+    html = lv |> form(form_id, review: %{body: "Worked on a rename."}) |> render_submit()
+
+    assert text(html, "#{form_id}-refusal") =~ "This account can't publish or edit"
+    assert textarea(html, "review[body]") == "Worked on a rename."
+    refute Repo.exists?(Review)
+  end
+
   test "reconnect recovery keeps a new tip's key, its blanks and the typed values", %{
     conn: conn,
     user: user
@@ -106,6 +179,8 @@ defmodule TipsWeb.EditorTest do
     html = render(lv)
 
     assert record(html, form_id)["submission_key"] == record(before, form_id)["submission_key"]
+    # Recovery does not validate the blank body.
+    refute has?(html, "[aria-invalid]")
     assert value(html, "tip[title]") == "  Plan first "
     assert textarea(html, "tip[body]") == ""
     assert selected(html, "tip[tag_id]") == "other"
@@ -169,6 +244,15 @@ defmodule TipsWeb.EditorTest do
     html = render(lv)
     assert textarea(html, "review[body]") == "Saved body"
     assert record(html, form_id)["draft"] == record(fresh, form_id)["draft"]
+
+    # Save validates against the same rules, then saves at the loaded version.
+    html = lv |> form(form_id, review: %{body: " "}) |> render_submit()
+    assert_push_event(lv, "editor:refused", %{})
+    assert summary_links(html, form_id) == ["#review_body"]
+
+    html = lv |> form(form_id, review: %{body: "Edited"}) |> render_submit()
+    assert text(html, "#{form_id}-outcome") == "Changes saved"
+    assert %Review{body: "Edited", edit_version: 2} = Repo.get!(Review, review.id)
   end
 
   # What LiveView sends after a reconnect: the old page's hidden inputs with
@@ -186,6 +270,9 @@ defmodule TipsWeb.EditorTest do
       kind => values
     })
   end
+
+  defp summary_links(html, form_id),
+    do: html |> find("#{form_id}-errors a") |> LazyHTML.attribute("href")
 
   defp record(html, form_id), do: html |> data(form_id, "data-editor-record") |> JSON.decode!()
 

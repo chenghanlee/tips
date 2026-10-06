@@ -610,8 +610,8 @@ defmodule TipsWeb.UI do
 
   @doc """
   Renders the submit-time error list: a focusable alert whose links jump to
-  each field. The page moves focus to it (`JS.focus(to: "#error-summary")`).
-  Renders nothing without errors.
+  each field. The page moves focus to it after each failed submit; the
+  editors do this in their `EditorDraft` hook. Renders nothing without errors.
 
       <TipsWeb.UI.error_summary errors={[{"review_body", "Review: write what happened"}]} />
   """
