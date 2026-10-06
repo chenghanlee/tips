@@ -92,5 +92,16 @@ config :tips, Tips.Content.Search.EmbeddingProvider,
   api_key: "synthetic-test-key",
   plug: {Req.Test, Tips.Content.Search.EmbeddingProvider}
 
+# R2 requests reach Req.Test stubs with synthetic settings. Only `:real_provider` tests
+# override both to reach the development bucket.
+config :tips, Tips.Content.Media.R2,
+  plug: {Req.Test, Tips.Content.Media.R2},
+  settings: %{
+    endpoint: "https://r2.test",
+    bucket: "tips-test",
+    access_key_id: "synthetic-access-key",
+    secret_access_key: "synthetic-secret-key"
+  }
+
 # Saturation tests wait for capacity; keep each wait short.
 config :tips, Tips.Content.Search.ProviderCapacity, size: 8, queue_wait: 200

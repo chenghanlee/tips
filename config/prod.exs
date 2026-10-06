@@ -19,6 +19,9 @@ config :tips, TipsWeb.Endpoint,
     ]
   ]
 
+# The release image installs Pillow in this virtualenv (see Dockerfile).
+config :tips, Tips.Content.Media.ImageParser, python: "/app/image_parser/bin/python"
+
 # Configure Swoosh API Client
 config :swoosh, api_client: Swoosh.ApiClient.Req
 

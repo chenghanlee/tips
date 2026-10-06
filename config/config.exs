@@ -40,6 +40,17 @@ config :tips, Tips.Content.Search, total: 8_000, query_embedding: 4_500
 # for a slot, then uses keyword search. Sizes are not load-tested.
 config :tips, Tips.Content.Search.ProviderCapacity, size: 8, queue_wait: 1_000
 
+# Image parser (Tips.Content.Media.ImageParser): Pillow in a virtualenv, a 5 s
+# deadline and a 1 GiB address-space ceiling per parser. The largest legitimate
+# file measured in #244 peaked at 644 MiB. Two parsers at once fit 2 GiB; a third
+# caller waits up to `queue_wait` ms. Sizes are not load-tested.
+config :tips, Tips.Content.Media.ImageParser,
+  python: Path.expand("../_build/image_parser/bin/python", __DIR__),
+  deadline_ms: 5_000,
+  address_space: 1_073_741_824,
+  size: 2,
+  queue_wait: 10_000
+
 config :tips, Oban,
   repo: Tips.Repo,
   queues: [media: 1, embeddings: 1, maintenance: 1],

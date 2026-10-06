@@ -38,6 +38,14 @@ trap 'exit 143' TERM
 sql() { "${compose[@]}" exec -T db psql -X -U postgres -d "$1" -v ON_ERROR_STOP=1 -Atc "$2"; }
 sql postgres 'CREATE DATABASE tips_release'
 "${compose[@]}" run --rm --no-deps app bin/migrate
+# The parser runs as the application runs it, on an image Pillow writes.
+parsed=$("${compose[@]}" run --rm --no-deps app sh -c '
+  python=/app/image_parser/bin/python
+  $python -I -c "from PIL import Image; Image.new(\"RGB\", (2, 2)).save(\"/tmp/smoke.gif\")"
+  timeout --signal=KILL 5 prlimit --as=1073741824 -- \
+    $python -I /app/lib/tips-*/priv/image_parser/classify.py /tmp/smoke.gif')
+[[ "$parsed" == *'"verdict": "accept", "format": "gif"'* ]] || { echo "Image parser failed: $parsed" >&2; exit 1; }
+echo 'PASS: image parser classifies under its deadline and memory ceiling'
 before=$(sql tips_release 'SELECT count(*) FROM schema_migrations')
 [[ "$before" =~ ^[1-9][0-9]*$ ]] || { echo "Expected committed migrations, got: $before" >&2; exit 1; }
 "${compose[@]}" up -d --no-build app

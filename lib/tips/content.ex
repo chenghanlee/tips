@@ -79,8 +79,9 @@ defmodule Tips.Content do
       dropped silently.
 
   An image file's temporary path is valid only during the page attempt that
-  owns it. Content uploads images and refreshes pending videos before its
-  transaction; provider calls never run while database locks are held.
+  owns it. Content uploads images with `Tips.Content.Media.store_images/2` and
+  refreshes pending videos before its transaction; provider calls never run
+  while database locks are held.
 
   Publication stores exactly the submitted setup. It never fills omitted or
   cleared review fields from the parent tip. It validates the tag, model and

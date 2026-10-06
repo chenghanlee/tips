@@ -4,8 +4,11 @@ Run commands from the repository root.
 
 Install Elixir **1.20.4**, Erlang/OTP **29.1**, Python **3.12**, Docker with Compose, and a C build
 toolchain (Xcode Command Line Tools on macOS, or a C compiler and `make` on Linux)
-for native dependencies such as `lazy_html`. Python runs documentation checks and optional
-agent tooling. [Version sources](toolchain.md#version-sources) lists
+for native dependencies such as `lazy_html`. Python runs the image parser, documentation
+checks and optional agent tooling. `mix setup` and `mix test` run `mix image_parser.setup`,
+which installs Pillow into `_build/image_parser` from hash-pinned wheels for CPython 3.12,
+or 3.14 on Apple Silicon. On macOS, the parser also needs `timeout` from Homebrew
+`coreutils`. [Version sources](toolchain.md#version-sources) lists
 all dependency, asset and image pins. Start the shared extension-enabled PostgreSQL
 server from the main checkout with `docker compose up -d --wait db`.
 Wait for a successful health check before running database setup or migrations.
