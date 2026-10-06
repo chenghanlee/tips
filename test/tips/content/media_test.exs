@@ -109,6 +109,8 @@ defmodule Tips.Content.MediaTest do
     image = {:image_file, "new", file(dir, "static.png", "new.png"), nil}
 
     assert {:error, :too_many_attachments} = Media.store_images([image | retained])
+    # Without new images, no R2 client is built: these settings could not build one.
+    assert {:ok, []} = Media.store_images(retained, settings: %{})
 
     nine_mb = for n <- 1..6, do: {:image_file, "#{n}", sparse(dir, "#{n}.png", 9_000_000), nil}
     assert {:error, :too_many_new_bytes} = Media.store_images(nine_mb ++ Enum.take(retained, 4))

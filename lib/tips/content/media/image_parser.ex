@@ -20,7 +20,8 @@ defmodule Tips.Content.Media.ImageParser do
 
   Each parser can use up to 1 GiB, so at most `:size` parsers run at once
   across the application. A caller waits at most `:queue_wait` milliseconds
-  for a slot, then gets `{:error, :busy}`. Settings live in `config/config.exs`.
+  for a slot, then gets `{:error, :busy}`. A slot is held until its parser
+  process ends, even when the caller exits first. Settings live in `config/config.exs`.
   """
 
   @behaviour NimblePool
@@ -63,7 +64,16 @@ defmodule Tips.Content.Media.ImageParser do
     end
   end
 
+  # The slot is held by a task the caller does not own, so a caller that exits or is
+  # killed leaves the slot taken until the parser process has ended. The task is
+  # bounded by the queue wait and the parser deadline.
   defp with_slot(fun) do
+    Tips.Content.Media.ParserTasks
+    |> Task.Supervisor.async_nolink(fn -> checkout(fun) end)
+    |> Task.await(:infinity)
+  end
+
+  defp checkout(fun) do
     NimblePool.checkout!(
       __MODULE__,
       :run,

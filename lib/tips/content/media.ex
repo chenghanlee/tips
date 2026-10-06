@@ -73,7 +73,7 @@ defmodule Tips.Content.Media do
     with :ok <- check_count(selection),
          :ok <- check_new_bytes(files),
          {:ok, parsed} <- parse(files) do
-      put(parsed, R2.client!(opts))
+      put(parsed, opts)
     end
   end
 
@@ -122,7 +122,12 @@ defmodule Tips.Content.Media do
     end
   end
 
-  defp put(parsed, client) do
+  # A selection without new images needs no R2 client or settings.
+  defp put([], _opts), do: {:ok, []}
+
+  defp put(parsed, opts) do
+    client = R2.client!(opts)
+
     parsed
     |> Enum.reduce_while([], fn {slot, file, description, image}, stored ->
       {extension, content_type} = @types[image.format]
