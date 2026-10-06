@@ -21,9 +21,9 @@
 
 ## Software design
 
-- Follow established industry standards, conventions and rules for the problem domain. Document any deviation and the requirement it addresses in the PR.
+- Follow industry standards, conventions and rules. Explain any exceptions in the PR.
 - Use Elixir and Phoenix idioms and conventions, and proven design patterns from widely used similar software.
-- Before writing custom mechanisms or tools, check built-in features and maintained, battle-tested libraries, frameworks and tools. Reuse an existing solution when it meets the requirements. Write a custom replacement only when none does; document the unmet requirement and alternatives considered in the PR.
+- Check built-in features and proven libraries, frameworks and tools before writing your own. Reuse them when they meet the requirements. Build your own only when they do not; list the options checked and explain why they do not fit in the PR.
 - Prefer Ecto's query, changeset and migration DSLs. Use raw SQL only for a database feature those DSLs cannot express; bind runtime values as parameters.
 - Build the simplest working MVP: no enterprise complexity or backwards compatibility. Accept complexity only to simplify the user's experience.
 - In the same PR, update the docs that describe what you changed and delete the code, files and docs your change leaves unused.
