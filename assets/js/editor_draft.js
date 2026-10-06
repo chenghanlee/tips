@@ -8,14 +8,16 @@
 // typing before the hook started or during a slow read stays. Otherwise, and
 // when the page rejects the draft, autosave pauses so it cannot overwrite the
 // saved draft. A paused editor offers "Reload saved draft", which replaces
-// the input with the saved draft and resumes autosave. The hook sends
+// the input with the saved draft and resumes autosave; typing during that
+// read stays and keeps autosave paused. The hook sends
 // editor:restore only to apply a draft; the page replies "restored" or
 // "rejected" ("preserved" keeps input like "rejected").
 //
 // A reconnect reads no storage: LiveView recovers the form through
 // editor:recover, and this hook keeps its draft pair. A read still pending at
 // a disconnect never restores. Results that arrive after the hook is
-// destroyed, or after a restore fell back on disconnect, are ignored.
+// destroyed, or after a reload or restore fell back on disconnect, are
+// ignored.
 // Autosave starts once recovery settles.
 
 import {EDITOR_EVENTS} from "./editor_contract.js"
@@ -53,6 +55,8 @@ export const EditorDraft = {
     // The page disconnected during the first read, so it recovered the form
     // from the DOM: that read never restores.
     this.interrupted = false
+    // Tokens of the current reload read and restore; results for others are stale.
+    this.reading = null
     this.pending = null
     this.timer = null
     this.writing = false
@@ -72,7 +76,10 @@ export const EditorDraft = {
     this.connected = false
     if (this.phase === "reading") this.interrupted = true
     // Its result is ignored; the author can reload again once connected.
-    if (this.phase === "reloading") this.pause(STATUS.paused, true)
+    if (this.phase === "reloading") {
+      this.reading = null
+      this.pause(STATUS.paused, true)
+    }
     // The reply cannot arrive now. Fall back to the unrestored form.
     if (this.phase === "restoring") {
       this.pending = null
@@ -90,6 +97,7 @@ export const EditorDraft = {
     clearTimeout(this.timer)
     this.timer = null
     this.phase = "destroyed"
+    this.reading = null
     this.pending = null
     this.el.removeEventListener("input", this.onInput)
     this.reloadButton().removeEventListener("click", this.onReload)
@@ -109,12 +117,16 @@ export const EditorDraft = {
     }
   },
 
-  // The author chose the saved draft over the input on the page.
+  // The author chose the saved draft over the input on the page at the click.
   async reload() {
     if (this.phase !== "paused" || !this.connected) return
     this.phase = "reloading"
+    this.typed = false
+    const token = {}
+    this.reading = token
     const result = await load(this.record.storage)
-    if (this.phase !== "reloading") return
+    if (this.reading !== token) return
+    this.reading = null
     if (result.status !== "ok") {
       this.pause(STATUS.unread, true)
     } else if (result.record === null) {
@@ -124,6 +136,8 @@ export const EditorDraft = {
       this.showReload(false)
       this.status("")
       this.compose()
+    } else if (this.typed) {
+      this.pause(STATUS.paused, true)
     } else {
       this.restore(result.record)
     }
