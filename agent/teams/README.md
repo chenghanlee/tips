@@ -116,8 +116,7 @@ Do not repeat the watch.
 
 ### 6. Dispatcher: remove the pair and assign the next task
 
-Confirm the PR merged. If not, handle the message as blocked. Do not disable or
-re-arm auto-merge.
+Confirm the PR merged. If not, handle the message as blocked.
 
 Run `agent/teams/team.py stop <issue>`, then select another task for the free slot.
 Apply the selection process above, including Backlog and resolved blockers.
@@ -204,6 +203,8 @@ Dispatcher actions:
 1. Set Status Blocked.
 2. Answer technical questions using the reported error and cited code. Ask the
    user in your pane about product, scope or any question you cannot answer.
+   Do not disable, re-arm or bypass auto-merge. If an approved PR with passing
+   required checks has not merged, report it to the user; GitHub may merge it late.
 3. Record the answer on the issue.
 4. Set Status Active and notify the agent named in the blocker comment.
 
