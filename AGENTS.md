@@ -21,12 +21,11 @@
 
 ## Software design
 
-- Follow industry standards, conventions and rules for the language, framework and problem you are working on. Explain any exceptions in the PR.
-- Use Elixir and Phoenix idioms and conventions, and proven design patterns from widely used similar software.
-- Check built-in features and proven libraries, frameworks and tools before writing your own. Reuse them when they meet the requirements. Build your own only when they do not; list the options checked and explain why they do not fit in the PR.
-- Prefer Ecto's query, changeset and migration DSLs. Use raw SQL only for a database feature those DSLs cannot express; bind runtime values as parameters.
-- Build the simplest working MVP: no enterprise complexity or backwards compatibility. Accept complexity only to simplify the user's experience.
-- In the same PR, update the docs that describe what you changed and delete the code, files and docs your change leaves unused.
+- Build the simplest solution that meets the requirements. Add nothing for hypothetical future needs or backwards compatibility. Among solutions that meet the requirements, prefer the one easier for the product's users over the one with less code.
+- Follow applicable standards and language and framework idioms. Explain deviations in the PR.
+- Before building a custom solution, check built-in features, locked dependencies, and commonly used libraries, tools and frameworks for the task. Build one only if none meets the requirements or reuse costs more to integrate and maintain than building and maintaining your own. Say what you checked and why in the PR.
+- Use Ecto's query, changeset and migration DSLs. Use raw SQL or `fragment` only for what they cannot express. Bind runtime values as parameters.
+- In the same PR, update the docs for what you changed and delete the code, files and docs it leaves unused.
 
 ## Skills
 
