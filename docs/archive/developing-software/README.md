@@ -1,11 +1,16 @@
-# Developing software skill revision
+# Archived developing-software brainstorm
+
+Historical record of the brainstorm promoted in [PR #385](https://github.com/chenghanlee/tips/pull/385).
+This archive is not agent instructions.
 
 The revised instructions now live in the active
-[developing-software skill](../../agent/skills/developing-software/SKILL.md), with
-[performance measurement](../../agent/skills/developing-software/references/performance-measurement.md)
+[developing-software skill](../../../agent/skills/developing-software/SKILL.md), with
+[performance measurement](../../../agent/skills/developing-software/references/performance-measurement.md)
 loaded when needed. Edit those sources rather than maintaining a second copy here.
 The [last brainstorm draft](https://github.com/chenghanlee/tips/blob/988e174/docs/brainstorm/developing-software-skill.md)
-preserves the pre-promotion text.
+and its [measurement reference](https://github.com/chenghanlee/tips/blob/988e174/docs/brainstorm/performance-measurement.md)
+preserve the pre-promotion text in Git history. Both remain reachable through main
+without retaining the merged branch or worktree.
 
 The objective remains code, architecture and decision quality per total token spent
 on investigation, design, implementation, tool output, verification and repairs.
@@ -16,5 +21,5 @@ Design and testing rules moved from AGENTS.md to the skill. AGENTS.md routes pla
 implementation and testing there; reviewers use the same standard. Pair coordination,
 repository checks, boundaries and navigation retain their existing owners.
 
-The [evaluation plan](developing-software-evaluations.md) remains pending. Promotion
+The [evaluation plan](evaluations.md) remains pending. Promotion
 was requested without running the behavioral comparisons; no measured benefit is claimed.

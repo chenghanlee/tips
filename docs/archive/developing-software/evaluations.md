@@ -1,8 +1,10 @@
 # Developing software revision: authoring checks and evaluations
 
-Authoring notes for the [promoted revision](../../agent/skills/developing-software/SKILL.md), assessed
+Authoring notes for the [promoted revision](../../../agent/skills/developing-software/SKILL.md), assessed
 against the supplied [Skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).
-This file is for evaluating the skill, not an instruction file to load during implementation.
+This plan is retained with the [archived brainstorm](README.md). Its evaluations
+remain pending; archiving the design discussion does not mark them complete. This
+file is not an instruction file to load during implementation.
 
 ## Contents
 
@@ -36,7 +38,7 @@ This file is for evaluating the skill, not an instruction file to load during im
 
 ## Comparison method
 
-Start with the existing [replay scenarios](../../agent/skills/developing-software/evals.json):
+Start with the existing [replay scenarios](../../../agent/skills/developing-software/evals.json):
 three scenario definitions across two historical tasks (issue 78 and issue 62,
 including replacement of the issue 244 probe). They pin base and first-review heads
 and provide a manual replay/grading protocol; they are not an executable harness.
