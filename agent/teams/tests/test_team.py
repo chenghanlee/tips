@@ -242,8 +242,11 @@ while True: time.sleep(.05)
             cwd=self.root,
         )
         self.processes.append(p)
+        # The host writes "client" after its Popen returns, so "child" can appear first
+        # and either file can exist before its pid is written.
+        pid_files = [self.root / "client", self.root / "child"]
         for _ in range(100):
-            if (self.root / "child").exists():
+            if all(f.exists() and f.read_text() for f in pid_files):
                 break
             time.sleep(0.02)
         (self.root / "state.json").write_text(

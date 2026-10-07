@@ -31,8 +31,9 @@ jobs:
           python-version: '3.12'
       - run: python scripts/check_docs.py
       - name: Detect what changed
-        # A PR that changes only Markdown skips the application steps. The harness steps run
-        # when a PR changes the harness or this workflow. A push to main runs everything.
+        # A PR that changes only Markdown or agent/ (the harness, skills and Dexter tooling,
+        # which dexter.yml checks) skips the application steps. The harness steps run when a
+        # PR changes the harness or this workflow. A push to main runs everything.
         id: changes
         run: |
           if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
@@ -40,7 +41,8 @@ jobs:
             exit 0
           fi
           range="origin/$GITHUB_BASE_REF...HEAD"
-          git diff --quiet "$range" -- . ':(exclude)*.md' || echo 'code=true' >> "$GITHUB_OUTPUT"
+          git diff --quiet "$range" -- . ':(exclude)*.md' ':(exclude)agent/' ||
+            echo 'code=true' >> "$GITHUB_OUTPUT"
           git diff --quiet "$range" -- agent/teams .github/workflows/checks.yml ':(exclude)*.md' ||
             echo 'harness=true' >> "$GITHUB_OUTPUT"
       - name: Install Python check tools
