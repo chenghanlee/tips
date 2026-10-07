@@ -50,8 +50,13 @@ defmodule Tips.Content.ReadTest do
             state ->
               result = Content.get_tip_page(ref, tip.id)
 
-              assert {label, {:ok, %{tip: placeholder(state, tip.id), own_review: nil}}} ==
-                       {label, result}
+              assert {label,
+                      {:ok,
+                       %{
+                         tip: placeholder(state, tip.id),
+                         own_review: nil,
+                         reviews: %{entries: [], has_more: false}
+                       }}} == {label, result}
 
               refute_leak(result, private, label)
           end
@@ -166,6 +171,107 @@ defmodule Tips.Content.ReadTest do
                Content.get_review_page(nil, Integer.to_string(review.id))
 
       assert id == review.id
+    end
+  end
+
+  describe "ranked reviews" do
+    test "Best and New list thirty live reviews per page, the viewer's own at its rank" do
+      tip = tip_fixture()
+      start = DateTime.add(DateTime.utc_now(:second), -100)
+
+      # up_count n ranks review n above n - 1 for Best; created_at reverses it for New.
+      reviews =
+        for n <- 1..31 do
+          review_fixture(tip, %{up_count: n, created_at: DateTime.add(start, -n)})
+        end
+
+      for marker <- [:hidden, :deleted, :deleted_and_hidden] do
+        put_marker!(review_fixture(tip, %{up_count: 100, created_at: start}), marker)
+      end
+
+      own = Enum.at(reviews, 4)
+      %{ref: ref} = session(Tips.Repo.get!(User, own.user_id))
+      ids = fn page -> Enum.map(page.entries, & &1.id) end
+      best = reviews |> Enum.reverse() |> Enum.map(& &1.id)
+      new = Enum.map(reviews, & &1.id)
+
+      assert {:ok, %{reviews: page, own_review: %{id: own_id}}} =
+               Content.get_tip_page(ref, tip.id)
+
+      assert own_id == own.id
+      assert {ids.(page), page.has_more} == {Enum.take(best, 30), true}
+
+      assert %{state: :visible, capabilities: %{edit: true}} =
+               Enum.find(page.entries, &(&1.id == own.id))
+
+      assert_plain(page)
+
+      assert {:ok, %{reviews: page}} = Content.get_tip_page(nil, tip.id, offset: 30)
+      assert {ids.(page), page.has_more} == {Enum.drop(best, 30), false}
+
+      assert {:ok, %{reviews: page}} = Content.get_tip_page(nil, tip.id, sort: :new)
+      assert {ids.(page), page.has_more} == {Enum.take(new, 30), true}
+
+      assert {:ok, %{reviews: %{entries: [], has_more: false}}} =
+               Content.get_tip_page(nil, tip.id, sort: :new, offset: 60)
+    end
+
+    test "setup filters match only explicitly reported setups; All includes unspecified ones" do
+      tip = tip_fixture()
+
+      setups = [
+        both: %{model_id: "claude", environment_id: "cli"},
+        model: %{model_id: "claude"},
+        environment: %{environment_id: "cli"},
+        free_text: %{model_other: "claude"},
+        none: %{}
+      ]
+
+      ids = Map.new(setups, fn {name, attrs} -> {review_fixture(tip, attrs).id, name} end)
+
+      list = fn opts ->
+        {:ok, %{reviews: %{entries: entries}}} = Content.get_tip_page(nil, tip.id, opts)
+        entries |> Enum.map(&ids[&1.id]) |> Enum.sort()
+      end
+
+      assert list.([]) == [:both, :environment, :free_text, :model, :none]
+      assert list.(model_id: "claude") == [:both, :model]
+      assert list.(environment_id: "cli") == [:both, :environment]
+      assert list.(model_id: "claude", environment_id: "cli") == [:both]
+      assert list.(model_id: "gpt") == []
+    end
+
+    test "unavailable tips keep listing their visible reviews" do
+      tip = tip_fixture()
+      review = review_fixture(tip, %{body: "Still visible"})
+
+      for marker <- [:hidden, :deleted] do
+        put_marker!(tip, marker)
+
+        assert {:ok, %{tip: %{state: state}, reviews: %{entries: [entry]}}} =
+                 Content.get_tip_page(nil, tip.id)
+
+        assert state != :visible
+        assert %{id: id, body: "Still visible", tip: %{state: ^state}} = entry
+        assert id == review.id
+      end
+    end
+
+    test "malformed list options are rejected" do
+      tip = tip_fixture()
+
+      for opts <- [
+            [sort: :hot],
+            [offset: 20],
+            [offset: -30],
+            [model_id: :claude],
+            [tag_id: "other"],
+            [sort: :new, sort: :best],
+            [:new]
+          ] do
+        assert {opts, {:error, :invalid_option}} ==
+                 {opts, Content.get_tip_page(nil, tip.id, opts)}
+      end
     end
   end
 
@@ -302,7 +408,8 @@ defmodule Tips.Content.ReadTest do
                 {:ok,
                  %{
                    tip: placeholder(state, tip.id),
-                   own_review: %{id: review.id, removed: true, capabilities: capabilities}
+                   own_review: %{id: review.id, removed: true, capabilities: capabilities},
+                   reviews: %{entries: [], has_more: false}
                  }}} ==
                  {marker, Content.get_tip_page(ref, tip.id)}
 
@@ -509,8 +616,12 @@ defmodule Tips.Content.ReadTest do
       # An unreadable hidden tip returns no dates or edit metadata.
       put_marker!(edited, :hidden)
 
-      assert {:ok, %{tip: placeholder(:removed, edited.id), own_review: nil}} ==
-               Content.get_tip_page(nil, edited.id)
+      assert {:ok, page} = Content.get_tip_page(nil, edited.id)
+
+      assert Map.take(page, [:tip, :own_review]) == %{
+               tip: placeholder(:removed, edited.id),
+               own_review: nil
+             }
     end
   end
 

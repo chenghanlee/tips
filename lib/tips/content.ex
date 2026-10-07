@@ -4,7 +4,7 @@ defmodule Tips.Content do
 
   ## Reading
 
-  `get_tip_page/2` and `get_review_page/2` return the tip and selected-review
+  `get_tip_page/3` and `get_review_page/2` return the tip and selected-review
   destinations. Each takes a `t:viewer/0` and an id, and returns only
   `Tips.Content.Projection` output.
 
@@ -23,8 +23,23 @@ defmodule Tips.Content do
 
   `get_review_page/2` reads the review first and uses its stored parent as tip
   context. It returns exactly that review or its removal notice; it takes no
-  list filters, sort or page and never substitutes another review. Ranked
-  review pages are later browse work.
+  list filters, sort or page and never substitutes another review.
+
+  `get_tip_page/3` also returns `reviews: %{entries: [review], has_more:
+  boolean}`: at most 30 live reviews, each a
+  `t:Tips.Content.Projection.visible_review/0`, and whether a 31st exists.
+  It lists them under a deleted or hidden tip too. The viewer's own live
+  review keeps its rank; a hidden one is reached through `own_review`.
+  Options:
+
+    * `:sort` - `:best` (default) orders by best score, `:new` by creation
+      time; both break ties by the higher id. Edits never move a review.
+    * `:offset` - a multiple of 30, default 0. There is no last page.
+    * `:model_id`, `:environment_id` - exact matches on the reviewer's
+      setup, combined with AND. A review that reported no setup, or a
+      free-text model, never matches. An unset filter adds no condition.
+
+  A malformed option is `{:error, :invalid_option}`.
 
   ### Browsing
 
@@ -424,8 +439,12 @@ defmodule Tips.Content do
   """
   @type viewer :: Accounts.SessionRef.t() | nil
 
-  @typedoc "The tip page: tip context and the viewer's own-review header link."
-  @type tip_page :: %{tip: Projection.tip_detail(), own_review: Projection.own_review() | nil}
+  @typedoc "The tip page: tip context, the viewer's own-review header link and a review page."
+  @type tip_page :: %{
+          tip: Projection.tip_detail(),
+          own_review: Projection.own_review() | nil,
+          reviews: Read.reviews()
+        }
 
   @typedoc "Why a destination read returned nothing."
   @type read_error :: :unauthenticated | :not_found
@@ -802,11 +821,13 @@ defmodule Tips.Content do
 
   @doc """
   Reads the tip page for `viewer`: the projected tip, deleted or removed tips
-  as placeholders, and the viewer's own undeleted review as an id and current
-  capabilities, even under an unavailable tip. See "Reading".
+  as placeholders, the viewer's own undeleted review as an id and current
+  capabilities, even under an unavailable tip, and one ranked page of live
+  reviews. See "Reading".
   """
-  @spec get_tip_page(viewer(), term()) :: {:ok, tip_page()} | {:error, read_error()}
-  defdelegate get_tip_page(viewer, tip_id), to: Read
+  @spec get_tip_page(viewer(), term(), keyword()) ::
+          {:ok, tip_page()} | {:error, read_error() | :invalid_option}
+  defdelegate get_tip_page(viewer, tip_id, opts \\ []), to: Read
 
   @doc """
   Reads the selected-review destination (`/reviews/:id`) for `viewer`: the

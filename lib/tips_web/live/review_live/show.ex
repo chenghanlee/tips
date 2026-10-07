@@ -3,12 +3,14 @@ defmodule TipsWeb.ReviewLive.Show do
   The single-review view, `/reviews/:id`: the review's current tip context and
   only that review, with its disclosure open, or the supplied reason it is
   unavailable. No list sort, filters or pages; "Show all reviews" opens the
-  tip permalink.
+  tip permalink on page 1 with no filters, keeping only a `sort=new`
+  parameter that the tip page's review links add. The review's own Delete
+  is handled by `TipsWeb.ReviewActions`.
   """
   use TipsWeb, :live_view
 
   alias Tips.Content
-  alias TipsWeb.{Reader, UserAuth}
+  alias TipsWeb.{Reader, ReviewActions, UserAuth}
 
   @impl true
   def render(assigns) do
@@ -22,13 +24,13 @@ defmodule TipsWeb.ReviewLive.Show do
       <Reader.tip_context tip={@tip} />
       <%= case @review do %>
         <% {:visible, review} -> %>
-          <Reader.review_card review={review} open />
-          <p><.link navigate={Reader.tip_path(@tip)}>Show all reviews</.link></p>
+          <Reader.review_card review={review} open confirm_delete={@confirm_delete == review.id} />
+          <p><.link navigate={Reader.tip_path(@tip, @sort_params)}>Show all reviews</.link></p>
         <% reason -> %>
           <UI.notice id="review-unavailable">
             {unavailable(reason)}
             <:actions>
-              <.link navigate={Reader.tip_path(@tip)}>Show all reviews</.link>
+              <.link navigate={Reader.tip_path(@tip, @sort_params)}>Show all reviews</.link>
             </:actions>
           </UI.notice>
       <% end %>
@@ -37,16 +39,21 @@ defmodule TipsWeb.ReviewLive.Show do
   end
 
   @impl true
-  def mount(%{"id" => id}, _session, socket) do
+  def mount(%{"id" => id} = params, _session, socket) do
     case Content.get_review_page(UserAuth.viewer(socket), id) do
       {:ok, %{tip: tip, review: review}} ->
+        sort_params = [sort: if(params["sort"] == "new", do: "new")]
+
         {:ok,
-         assign(socket,
+         socket
+         |> assign(
            tip: tip,
            review: review,
-           path: ~p"/reviews/#{id}",
+           sort_params: sort_params,
+           path: Reader.review_path(id, sort_params),
            page_title: "Review of #{tip.title}"
-         )}
+         )
+         |> ReviewActions.attach()}
 
       {:error, :not_found} ->
         raise TipsWeb.NotFoundError

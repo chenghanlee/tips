@@ -62,6 +62,17 @@ defmodule TipsWeb.ReviewLive.ShowTest do
       refute has?(html, "nav[aria-label=Pages]"), render
       assert attr(html, "a", "Show all reviews", "href") == tip_path, render
     end
+
+    # List parameters do not change the selected review; Show all keeps only the sort.
+    path = "/reviews/#{review.id}?sort=new&model=gpt&environment=ide&page=2"
+
+    for {render, html, _title} <- renders(conn, path) do
+      assert has?(html, "#review-#{review.id} details[open]"), render
+      refute html =~ "Competitor body", render
+      refute has?(html, "select"), render
+      refute has?(html, "nav[aria-label=Pages]"), render
+      assert attr(html, "a", "Show all reviews", "href") == tip_path <> "?sort=new", render
+    end
   end
 
   test "review stays readable under hidden and deleted tips, with the placeholder as context",
@@ -161,7 +172,52 @@ defmodule TipsWeb.ReviewLive.ShowTest do
     for {render, html, _title} <- renders(as(conn, author), "/reviews/#{review.id}") do
       assert text(html, notice) =~ "Removed by moderation", render
       refute html =~ "/editor/reviews/#{review.id}/edit", render
+      assert has?(html, "#review-#{review.id}-delete"), render
     end
+  end
+
+  test "Delete asks once, then shows the review as deleted by its author", %{conn: conn} do
+    tip = tip_fixture(user_fixture(), %{title: @title})
+    author = user_fixture()
+    review = review_fixture(tip, %{user_id: author.id, body: "Own review body"})
+    {:ok, lv, _html} = live(as(conn, author), "/reviews/#{review.id}")
+
+    lv |> element("#review-#{review.id}-delete") |> render_click()
+    assert lv |> render() |> text("#review-#{review.id}-delete-confirm") =~ "can't be undone"
+
+    lv |> element("#review-#{review.id}-delete-confirm button", "Cancel") |> render_click()
+    refute has_element?(lv, "#review-#{review.id}-delete-confirm")
+    assert Tips.Repo.reload!(review).deleted_at == nil
+
+    lv |> element("#review-#{review.id}-delete") |> render_click()
+
+    {:ok, lv, html} =
+      lv
+      |> element("#review-#{review.id}-delete-confirm button", "Delete review")
+      |> render_click()
+      |> follow_redirect(as(conn, author), "/reviews/#{review.id}")
+
+    assert text(html, "#review-unavailable") =~ "Review deleted by author"
+    assert lv |> render() |> text("#flash-info") =~ "Review deleted."
+    refute html =~ "Own review body"
+  end
+
+  test "a review with attachments is not deleted and says why", %{conn: conn} do
+    author = user_fixture()
+    review = review_fixture(tip_fixture(), %{user_id: author.id})
+    Tips.MediaFixtures.image_fixture(review)
+    {:ok, lv, _html} = live(as(conn, author), "/reviews/#{review.id}")
+
+    lv |> element("#review-#{review.id}-delete") |> render_click()
+
+    html =
+      lv
+      |> element("#review-#{review.id}-delete-confirm button", "Delete review")
+      |> render_click()
+
+    assert text(html, "#flash-error") =~ "with attachments can't be deleted yet"
+    assert has_element?(lv, "#review-#{review.id}")
+    assert Tips.Repo.reload!(review).deleted_at == nil
   end
 
   test "unknown and malformed review ids are not found, with no tip context", %{conn: conn} do

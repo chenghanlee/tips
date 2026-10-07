@@ -229,6 +229,182 @@ defmodule TipsWeb.TipLive.ShowTest do
     end
   end
 
+  describe "review list" do
+    test "a thirty-review page renders each review in full and pages through the URL",
+         %{conn: conn} do
+      tip = tip_fixture(user_fixture(), %{title: @title})
+      start = DateTime.add(DateTime.utc_now(:second), -1000)
+
+      reviews =
+        for n <- 1..31 do
+          review_fixture(tip, %{
+            up_count: n,
+            body: "Review **#{n}** body",
+            prompt: "Prompt #{n}",
+            output: "Result #{n}",
+            model_id: "claude",
+            environment_id: "cli",
+            created_at: DateTime.add(start, n),
+            edited_at: if(n == 31, do: DateTime.add(start, 500))
+          })
+        end
+
+      [first | _rest] = best = Enum.reverse(reviews)
+      path = tip_path(tip)
+
+      for {render, html, _title} <- renders(conn, path) do
+        cards = find(html, "#review-list > article")
+        assert Enum.count(cards) == 30, render
+        assert ids(cards) == best |> Enum.take(30) |> Enum.map(& &1.id), render
+
+        card = "#review-#{first.id}"
+        assert text(html, "#{card} strong") == "31", render
+        assert text(html, card) =~ "Published", render
+        assert text(html, card) =~ "Updated", render
+        assert text(html, card) =~ ~r/Reviewer setup:\s*Claude\s*CLI/, render
+        assert text(html, card) =~ "Helpful 31", render
+
+        assert verbatim(html, "#{card} details:not([open]) #review-#{first.id}-prompt pre") =~
+                 "Prompt 31",
+               render
+
+        assert attr(html, "#{card} h2 a", first |> author_handle(), "href") ==
+                 "/reviews/#{first.id}",
+               render
+
+        assert attr(html, "nav[aria-label=Pages] a", "Next", "href") == path <> "?page=2", render
+        refute has?(html, "nav[aria-label=Pages] a[rel=prev]"), render
+      end
+
+      for {render, html, _title} <- renders(conn, path <> "?page=2") do
+        assert ids(find(html, "#review-list > article")) == [hd(reviews).id], render
+        assert attr(html, "nav[aria-label=Pages] a", "Previous", "href") == path, render
+        refute has?(html, "nav[aria-label=Pages] a[rel=next]"), render
+      end
+
+      for {render, html, _title} <- renders(conn, path <> "?page=3") do
+        assert text(html, "#reviews-empty") == "No reviews on page 3.", render
+        assert attr(html, "nav[aria-label=Pages] a", "First page", "href") == path, render
+      end
+    end
+
+    test "sort and setup filters patch the URL on page one; All includes unspecified setups",
+         %{conn: conn} do
+      tip = tip_fixture(user_fixture(), %{title: @title})
+      old = DateTime.add(DateTime.utc_now(:second), -100)
+      claude = review_fixture(tip, %{model_id: "claude", up_count: 5, created_at: old})
+      unspecified = review_fixture(tip, %{model_other: "claude"})
+      path = tip_path(tip)
+
+      {:ok, lv, html} = live(conn, path <> "?page=2")
+      assert text(html, "#review-filters") =~ "reviews reporting this setup"
+
+      lv |> form("#review-filters", %{sort: "new"}) |> render_change()
+      assert_patch(lv, path <> "?sort=new")
+
+      assert lv |> render() |> find("#review-list > article") |> ids() == [
+               unspecified.id,
+               claude.id
+             ]
+
+      lv |> form("#review-filters", %{sort: "new", model: "claude"}) |> render_change()
+      assert_patch(lv, path <> "?sort=new&model=claude")
+      assert lv |> render() |> find("#review-list > article") |> ids() == [claude.id]
+
+      lv
+      |> form("#review-filters", %{sort: "new", model: "claude", environment: "cli"})
+      |> render_change()
+
+      assert_patch(lv, path <> "?sort=new&model=claude&environment=cli")
+      assert lv |> render() |> text("#reviews-empty") == "No reviews match these filters"
+
+      lv |> element("#review-filters a", "Clear filters") |> render_click()
+      assert_patch(lv, path <> "?sort=new")
+
+      assert lv |> render() |> find("#review-list > article") |> ids() == [
+               unspecified.id,
+               claude.id
+             ]
+
+      # A review link keeps the sort for Show all reviews.
+      assert attr(render(lv), "#review-#{claude.id} h2 a", author_handle(claude), "href") ==
+               "/reviews/#{claude.id}?sort=new"
+    end
+
+    test "the earlier-review note appears only for a readable review older than the tip edit",
+         %{conn: conn} do
+      edited_at = DateTime.utc_now(:second)
+      tip = tip_fixture(user_fixture(), %{title: @title, edited_at: edited_at})
+      later = review_fixture(tip, %{created_at: DateTime.add(edited_at, 60)})
+      note = "This tip has been updated; earlier reviews may describe an earlier version."
+
+      for {render, html, _title} <- renders(conn, tip_path(tip)) do
+        refute has?(html, "#earlier-reviews-note"), render
+      end
+
+      earlier = review_fixture(tip, %{created_at: DateTime.add(edited_at, -60)})
+      earlier = put_marker!(earlier, :hidden)
+
+      for {render, html, _title} <- renders(conn, tip_path(tip)) do
+        refute has?(html, "#earlier-reviews-note"), render
+      end
+
+      put_marker!(earlier, :live)
+
+      for {render, html, _title} <- renders(conn, tip_path(tip)) do
+        assert text(html, "#earlier-reviews-note") == note, render
+        assert has?(html, "#review-#{later.id}"), render
+      end
+
+      put_marker!(tip, :hidden)
+
+      for {render, html, _title} <- renders(conn, "/tips/#{tip.id}/removed-tip") do
+        refute has?(html, "#earlier-reviews-note"), render
+        assert has?(html, "#review-#{earlier.id}"), render
+      end
+    end
+
+    test "own review keeps its rank with a badge and the same Edit and Delete actions",
+         %{conn: conn} do
+      tip = tip_fixture(user_fixture(), %{title: @title})
+      owner = user_fixture()
+      review_fixture(tip, %{up_count: 9})
+      own = review_fixture(tip, %{user_id: owner.id, up_count: 1})
+      other = review_fixture(tip)
+      card = "#review-#{own.id}"
+
+      for {render, html, _title} <- renders(as(conn, owner), tip_path(tip)) do
+        assert Enum.at(ids(find(html, "#review-list > article")), 1) == own.id, render
+        assert text(html, "#{card} [data-badge]") == "Your review", render
+        assert attr(html, "#{card} a", "Edit", "href") == "/editor/reviews/#{own.id}/edit"
+        assert has?(html, "#{card}-delete"), render
+        refute has?(html, "#review-#{other.id} [data-badge]"), render
+        refute has?(html, "#review-#{other.id}-delete"), render
+        refute html =~ "/editor/reviews/#{other.id}/edit", render
+      end
+
+      full_ban!(owner)
+
+      for {render, html, _title} <- renders(as(conn, owner), tip_path(tip)) do
+        assert has?(html, "#{card}-delete"), render
+        refute html =~ "/editor/reviews/#{own.id}/edit", render
+      end
+
+      {:ok, lv, _html} = live(as(conn, owner), tip_path(tip))
+      lv |> element("#{card}-delete") |> render_click()
+
+      {:ok, _lv, html} =
+        lv
+        |> element("#{card}-delete-confirm button", "Delete review")
+        |> render_click()
+        |> follow_redirect(as(conn, owner), tip_path(tip))
+
+      assert html =~ "Review deleted."
+      refute has?(html, card)
+      assert has?(html, "#review-#{other.id}")
+    end
+  end
+
   test "unknown and malformed tip ids are not found", %{conn: conn} do
     missing = tip_fixture().id + 1_000_000
 
@@ -259,6 +435,15 @@ defmodule TipsWeb.TipLive.ShowTest do
   defp placeholder_slug(:deleted), do: "deleted-tip"
 
   defp tip_path(tip), do: "/tips/#{tip.id}/#{@slug}"
+
+  defp ids(cards) do
+    Enum.map(cards, fn card ->
+      ["review-" <> id] = LazyHTML.attribute(card, "id")
+      String.to_integer(id)
+    end)
+  end
+
+  defp author_handle(review), do: Tips.Repo.get!(Tips.Accounts.User, review.user_id).handle
 
   defp assert_redirects_to(conn, path, expected) do
     assert redirected_to(get(conn, path)) == expected
