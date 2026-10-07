@@ -43,6 +43,8 @@ Follow [AGENTS.md](../../AGENTS.md), the applicable language and framework skill
 and the [pair workflow](../../agent/teams/README.md) when paired. The steps below
 guide implementation decisions; they do not add reporting or approval gates.
 
+Understand → Resolve uncertainty → Change → Refine the design → Verify → Finish.
+
 ### Understand
 
 Read the requirement, relevant code and existing tests. Separate required behavior
@@ -74,6 +76,28 @@ Repeated flags, special cases and duplicated decisions are reasons to inspect
 the model and ownership before adding more code.
 
 Proceed when the required behavior works through the affected flow.
+
+### Refine the design
+
+Treat the first working implementation as evidence about the design. With what
+you now know, would you choose the same ownership, state representation and
+interfaces? Identify complexity caused by assumptions the implementation disproved.
+
+Refactor or replace the affected parts when a concrete alternative makes the
+required behavior easier to understand, change or operate. Prefer the smallest
+revision that removes the cause. "Throw one away" means being willing to discard
+an approach despite the effort already spent; it does not require a second
+implementation for every task. For a difficult uncertainty, a disposable experiment
+may resolve the design before the first complete implementation.
+
+Preserve required observable behavior and use relevant tests to check each
+refactoring increment. Remove superseded paths and update affected documentation.
+Keep refinement within the assignment; raise broader redesigns through the existing
+scope process. Do not add abstractions for hypothetical future requirements.
+
+Proceed when no identified design problem justifies further change for this task.
+Keeping the first design is a valid result. Return to this step earlier whenever
+implementation evidence warrants it.
 
 ### Verify
 
@@ -139,4 +163,6 @@ Open questions:
 - Which rules change behavior beyond the workflow and repository instructions?
 - Which safeguards need examples, and which are already precise enough?
 - Does the agent recognize when it has sufficient evidence to proceed?
+- Does refinement remove demonstrated complexity without causing compulsory
+  rewrites or speculative redesign?
 - Can the common path stay short while retaining the active skill's useful detail?
