@@ -21,13 +21,13 @@ defmodule TipsWeb.BrowseFeatureTest do
     |> assert_has(css("#feed-heading", text: "New tips"))
     |> assert_has(css("#tip-rows li", count: 20))
     |> assert_focus("sort")
-    |> then(&assert(current_url(&1) =~ ~r{/\?sort=new$}))
+    |> assert_url(~r{/\?sort=new$})
     |> choose_focused("environment", "cli")
     |> assert_has(css("#tips-empty", text: "No tips match these filters"))
     |> assert_focus("environment")
     |> click(link("Clear filters"))
     |> assert_has(css("#tip-rows li", count: 20))
-    |> then(&assert(current_url(&1) =~ ~r{/\?sort=new$}))
+    |> assert_url(~r{/\?sort=new$})
   end
 
   feature "Back restores the page URL and the reading position", %{session: session} do
@@ -109,6 +109,11 @@ defmodule TipsWeb.BrowseFeatureTest do
       """,
       [id, value]
     )
+  end
+
+  defp assert_url(session, pattern) do
+    assert current_url(session) =~ pattern
+    session
   end
 
   defp assert_focus(session, id) do

@@ -113,29 +113,30 @@ defmodule Tips.Content.BrowseTest do
   end
 
   # An unset filter must add no predicate, not `(param IS NULL OR column =
-  # param)`, so each sort and the tag filter can walk their partial index.
-  test "unset filters add no predicate and each order reads its index", %{author: author} do
+  # param)`, and each order must come from a partial index rather than a sort.
+  # Which index serves a tag filter depends on table statistics.
+  test "unset filters add no predicate and an index gives each order", %{author: author} do
     tip_fixture(author, %{tag_id: "workflow"})
     Repo.query!("SET LOCAL enable_seqscan = off")
     Repo.query!("SET LOCAL enable_sort = off")
 
-    for {opts, index} <- [
-          {[sort: :hot], "tips_hot"},
-          {[sort: :new], "tips_new"},
-          {[sort: :hot, tag_id: "workflow"], "tips_hot_by_tag"},
-          {[sort: :new, tag_id: "workflow"], "tips_new_by_tag"}
+    for opts <- [
+          [sort: :hot],
+          [sort: :new],
+          [sort: :hot, tag_id: "workflow"],
+          [sort: :new, tag_id: "workflow", model_id: "claude", environment_id: "cli"]
         ] do
       {sql, params} = Repo.to_sql(:all, Browse.query(opts))
       %{rows: [[[plan]]]} = Repo.query!("EXPLAIN (FORMAT JSON) " <> sql, params)
-      assert index in indexes(plan["Plan"]), inspect({opts, plan})
+      nodes = nodes(plan["Plan"])
+      assert "Index Scan" in nodes, inspect({opts, plan})
+      refute "Sort" in nodes, inspect({opts, plan})
       refute sql =~ ~r/\bOR\b/i, sql
     end
   end
 
   defp ids(entries), do: Enum.map(entries, & &1.id)
 
-  defp indexes(%{} = node) do
-    own = if index = node["Index Name"], do: [index], else: []
-    own ++ Enum.flat_map(Map.get(node, "Plans", []), &indexes/1)
-  end
+  defp nodes(%{"Node Type" => type} = node),
+    do: [type | Enum.flat_map(Map.get(node, "Plans", []), &nodes/1)]
 end
