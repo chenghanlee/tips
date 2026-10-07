@@ -96,8 +96,10 @@ Base: `04462e318e5e807085987e8bd0d7016d883572be`.
 First-review head: `b460b23dd43f13b1a4a619d28439ea3ef1a9ee94`.
 Use the issue body and linked requirements as of 2026-10-07 as the developer request,
 not the later repair instructions below. Historical brief recovery and replay setup
-remain pending. Fable reports that the original pair loaded the active skill; treat
-that head as historical active-skill evidence, not a no-skill baseline.
+remain pending. The [pair workflow at that head](https://github.com/chenghanlee/tips/blob/b460b23dd43f13b1a4a619d28439ea3ef1a9ee94/agent/teams/README.md#2-developer-implement-and-hand-off)
+required loading developing-software. Actual loading has not been verified from the
+session trace, so do not classify that head as a controlled active-skill or no-skill
+run.
 
 **Evaluator context:** the issue requires a full ban to remove contribution actions
 while own-content deletion remains available, and confirmed updates must not reorder

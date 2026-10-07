@@ -23,7 +23,8 @@ When this candidate is approved for promotion:
   the current worktree. Use its design and testing rules, applying conditional checks
   when their triggers occur."
 - Update reviewing-code and the team review prompt to reference the skill's design
-  and testing rules. Update the pair workflow's repair-section reference.
+  and testing rules. Update the pair workflow's repair-section reference to
+  "Repair and refactor".
 - Promote [performance measurement](performance-measurement.md) as a conditional
   reference under the skill's `references/` directory and update its links.
 - Place the candidate metadata in real YAML frontmatter at the start of `SKILL.md`;
@@ -47,13 +48,16 @@ description: Guides implementation planning, features, fixes, refactors and test
 
 # Developing software
 
-Use these sections as decision guidance, not sequential gates. Apply conditional
-checks when their triggers occur. Investigate until remaining uncertainty would
-not change the approach or required verification. Spend more where mistakes could
-lose data, cause external effects or be expensive to undo.
+Use general guidance throughout the task; apply checks marked **Trigger** or **When**
+when their conditions occur. These are decision cues, not sequential gates. Follow
+[AGENTS.md](../../AGENTS.md) for repository boundaries, navigation, skill routing,
+checks and collaboration.
 
-Follow [AGENTS.md](../../AGENTS.md) for repository boundaries, navigation, checks
-and collaboration. Apply the relevant language and framework skills.
+## Scope the task
+
+Investigate until remaining uncertainty would not change the approach or required
+verification. Spend more where mistakes could lose data, cause external effects or
+be expensive to undo.
 
 Identify the acceptance scenarios and scope before investigating. Follow task links
 and repository entry points to the authoritative requirements, affected contracts
@@ -66,25 +70,21 @@ Do not add adjacent capabilities.
 
 ## Build the simplest working solution
 
-Choose the simplest design that delivers the required behavior through the complete
-affected flow. Include the failure handling the requirement needs. A shorter
-implementation that leaves required behavior unfinished is not simpler to maintain.
+Build the simplest design that delivers the required behavior through the complete
+affected flow, including required failure handling. A shorter implementation that
+leaves required behavior unfinished is not simpler to maintain. Among complete
+solutions, prefer fewer interacting parts, clearer ownership and less coordination;
+prefer the user's experience over reducing code.
 
-Start with existing code and framework mechanisms. Add a new abstraction,
-dependency, process, configuration option or stored state only when you can explain
-what current requirement it serves and why the simpler approach is insufficient.
+Add an abstraction, dependency, process, configuration option or stored state only
+when you can name the current requirement it serves and why the simpler approach
+is insufficient. Do not build for hypothetical scale, reuse or compatibility.
 
-When several approaches meet the requirements, prefer the one with fewer interacting
-parts, clearer ownership and less coordination. Prefer the option easier for the
-product's users when reducing code would make their experience worse.
+## Reuse existing mechanisms and follow conventions
 
-Do not build for hypothetical scale, reuse or compatibility.
-
-### Reuse existing mechanisms and follow conventions
-
-Before building a custom mechanism, check built-in features, locked dependencies
-and commonly used libraries or tools. Prefer stable interfaces with behavior you
-can establish from documentation, source or a focused probe. Include verification,
+Before building a custom mechanism, check existing code, built-in features, locked
+dependencies and commonly used libraries or tools. Prefer stable interfaces with
+behavior you can establish from documentation, source or a focused probe. Include verification,
 workarounds and future fixes in the integration and maintenance cost. Build your own
 only when none meets the requirements or that total cost exceeds building and
 maintaining your own. When you build your own, say what you checked and why in the PR.
@@ -117,7 +117,7 @@ Limits, patterns, enums, labels, messages and filters can appear in constraints,
 migrations, helper text, documentation, fixtures and other runtimes. Copies of one
 rule may look different.
 
-Keep one authoritative source for each rule and fact. Derive other representations
+For that rule or fact, keep one authoritative source. Derive other representations
 where practical; when copies are necessary, define how they stay consistent. Update
 each representation affected by the requirement. Consolidate only when it simplifies
 this task or removes a concrete inconsistency, and that gain justifies the coupling
@@ -202,13 +202,12 @@ Derive expected behavior from the requirement independently of the implementatio
 Code and tests can agree while both violate the requirement. Tests should allow
 another implementation that satisfies the same contract.
 
-Test acceptance scenarios and reported regressions. Do not add tests merely because
-functions, branches or inputs changed.
-
+Cover acceptance scenarios and reported regressions with the smallest set of test
+changes. Do not add tests merely because functions, branches or inputs changed.
 Read existing tests first. Leave adequate coverage unchanged; update assertions for
 changed requirements; extend an existing test when it can cover the missing scenario
-with the same setup and action. Add a test only when none can. Make the smallest set
-of changes that covers the required scenarios.
+with the same setup and action. Add a test only when none can cover the required
+scenario.
 
 For new behavior or a regression, write or update the test before changing the
 implementation. Confirm that it fails for the expected reason.
@@ -233,22 +232,26 @@ predictive and inspiring.
   state with a time limit. A sleep does not prove completion; a timeout is not a pass.
 - **When code and tests disagree:** let the contract decide which is wrong. Do not
   change fixtures merely to make incorrect behavior pass.
-- **Before deleting or replacing tests:** map still-required scenarios to surviving
-  coverage. Delete tests for obsolete requirements or those made unnecessary by the
+- **When deleting or replacing tests:** first map still-required scenarios to
+  surviving coverage. Delete tests for obsolete requirements or those made unnecessary by the
   change; preserve coverage of every acceptance scenario and regression that still
   applies.
 
 ## Check performance claims and bounds
 
-**Trigger:** a performance claim or observed regression; a change to how work grows
-with data (a query inside a loop, a new preload, an unbounded result set, a transaction
-wrapping an external call, parallel work, work that outlives the caller); or a change
-to what the browser must load or do before content is visible or an interaction
-completes (a new or reordered request, a critical-path asset or font, payload size,
-client-side work on interaction, async content that moves the layout). The trigger
-selects the risk to assess, not a measurement of every changed asset. A performance
-claim or an uncertain cost that could change the design requires profiling; an
-ordinary bounded change with neither needs no measurement.
+**Trigger:** any of the following:
+
+- A performance claim or observed regression.
+- A change to how work grows with data: a query inside a loop, a new preload, an
+  unbounded result set, a transaction wrapping an external call, parallel work or
+  work that outlives the caller.
+- A change to what the browser must load or do before content is visible or an
+  interaction completes: a new or reordered request, a critical-path asset or font,
+  payload size, client-side work on interaction or async content that moves the layout.
+
+The trigger selects the risk to assess, not a measurement of every changed asset.
+A performance claim or an uncertain cost that could change the design requires
+profiling; an ordinary bounded change with neither needs no measurement.
 
 Name the property at risk and the workload. Profile the suspected cost, not test-suite
 elapsed time. Before measuring, read the relevant part of
@@ -259,7 +262,7 @@ Match filters, indexes and pagination to the access pattern. Keep transaction an
 lock lifetimes limited to the work that needs them, accounting for contention and
 connection occupancy.
 
-## Reconsider the design
+## Repair and refactor
 
 **When a result contradicts expectations, or a bug or review finding exposes a
 defect:** identify the failed assumption before adding another condition. Check
@@ -267,17 +270,17 @@ other sites and transitions that depend on it, and repair those that share the
 defect. Verify the whole affected contract, including behavior the reported failure
 did not exercise.
 
-When this task reveals repeated violations of one consequential invariant, use an
-existing enforcement point where it covers the affected paths, fix the remaining
+**When this task reveals repeated violations of one consequential invariant:** use
+an existing enforcement point where it covers the affected paths, fix the remaining
 violations and keep checks at each trust boundary. Add custom enforcement only
 within the task's scope and when preventing recurrence justifies its execution and
 maintenance cost; check the invariant itself and make failures name the rule and
 the correction.
 
-Refactor when the task requires it, or when the current implementation reveals an
-ownership, interface or state problem that materially complicates the required
-behavior or its verification. Name that problem and keep the revision within the
-affected flow. Inconsistency elsewhere or hypothetical reuse does not justify
+**When considering a refactor:** proceed only if the task requires it or the current
+implementation reveals an ownership, interface or state problem that materially
+complicates the required behavior or its verification. Name that problem and keep
+the revision within the affected flow. Inconsistency elsewhere or hypothetical reuse does not justify
 expanding the task. Preserve required behavior and verify each increment. Effort
 already spent is not a reason to retain an approach. Stop when the named problem is
 resolved and required verification passes.
@@ -295,8 +298,7 @@ documentation and tests in the same PR.
 Run the [required repository checks](../../AGENTS.md#checks). Follow the existing
 blocker, [PR review](../../agent/teams/README.md#pr-review-record) and handoff procedures.
 
-Keep durable contracts and decision reasons in the existing repository documentation
-that owns them, with links from the relevant entry point. Update that source instead
-of adding competing instructions. Record task-specific trade-offs, unresolved
-assumptions and verification limits in the existing PR or handoff so later work
-knows when to revisit them.
+Record durable contracts and decision reasons in the repository documentation that
+owns them, linked from the relevant entry point; update it rather than creating
+competing instructions. Record task-specific trade-offs, open assumptions and
+verification limits in the PR or handoff so later work knows when to revisit them.
