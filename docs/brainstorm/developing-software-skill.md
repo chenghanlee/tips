@@ -219,8 +219,9 @@ predictive and inspiring.
 ## Check performance claims and bounds
 
 **Trigger:** adding or changing a query, preload, pagination strategy, transaction,
-index, timeout, retry, queue, capacity or size limit, parallel work, or a design
-justified by performance.
+index, page loading, navigation, browser interactions, assets, client requests,
+timeout, retry, queue, capacity or size limit, parallel work, or a design justified
+by performance.
 
 Identify the expected workload, what grows and the relevant time and resource
 limits. Investigate costs that could change the design; a routine bounded lookup
@@ -238,9 +239,42 @@ For database work:
   for contention and connection occupancy, especially when external calls or slow
   work occur inside a transaction.
 
+For frontend work, select the metrics affected by the change rather than running a
+full audit for every UI edit:
+
+- **Visible content:** distinguish [First Paint (FP) from First Contentful Paint
+  (FCP)](https://developer.mozilla.org/en-US/docs/Web/API/PerformancePaintTiming).
+  First pixels may be only a background; FCP marks the first content. Use Largest
+  Contentful Paint (LCP) for when the largest visible content element renders.
+  Inspect the critical request and rendering path before adding loading machinery.
+- **Interaction and rendering:** use [Interaction to Next Paint
+  (INP)](https://web.dev/articles/inp) for responsiveness. For requests or LiveView
+  updates, also measure action-to-visible-result time; a quick loading indicator
+  does not establish a quick result. Inspect frame times and main-thread work when
+  interactions or scrolling stall. [Total Blocking Time (TBT)](https://web.dev/articles/tbt) is a lab
+  diagnostic, not a substitute for exercising interactions.
+- **Visual stability:** use Cumulative Layout Shift (CLS) to find unexpected movement.
+  Reserve space for images and async content when their arrival shifts the interface.
+- **Network:** inspect request waterfalls, round trips, payload sizes and cache
+  behavior. [Time to First Byte (TTFB)](https://web.dev/articles/ttfb) includes more
+  than network latency; use [resource timings](https://developer.mozilla.org/en-US/docs/Web/API/Performance_API/Resource_timing)
+  and server timings as needed to distinguish connection, server and transfer costs.
+  Remove unnecessary serial requests and critical-path bytes before adding caches
+  or prefetching.
+
+Use the task's performance requirements. [Core Web Vitals](https://web.dev/articles/vitals)
+reference values are LCP <= 2.5 s, INP <= 200 ms and CLS <= 0.1 at the 75th percentile
+of real visits, assessed separately for mobile and desktop; these are reference
+values, not additional acceptance gates.
+
+Without real-user data, compare before and after under the same representative
+device, network, cache and interaction conditions. Exercise the affected flow;
+a fast localhost load or an aggregate Lighthouse score alone does not establish
+user-perceived performance. Report these as lab results, not field percentiles.
+
 Across the whole operation, account for sequential work, concurrency, queueing,
-retries, cleanup and work that outlives the caller. A per-query or per-step bound
-does not bound the operation.
+retries, cleanup, network round trips, browser rendering and work that outlives the
+caller. A per-query or per-step bound does not bound the operation.
 
 For work governed by a shared deadline, quota or concurrency limit, identify which
 results stop new work and what happens to work already in progress.
