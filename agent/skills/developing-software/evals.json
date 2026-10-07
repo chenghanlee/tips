@@ -2,12 +2,14 @@
   "how_to_run": [
     "For each scenario, check out `base` in an isolated worktree and give the developer the issue body as it stood at `base`'s commit date; do not supply issue or PR comments written after that date.",
     "The baseline is `baseline_head`: the head the original developer pushed for first review without this skill. The skill run starts from `base` with the skill loaded and the same issue body.",
-    "A grader who has not seen SKILL.md scores both heads against `expected_behavior` and `process` from the code and tests only. A narrative that claims a check without code or test evidence scores nothing.",
+    "A grader who has not seen SKILL.md scores `expected_behavior` from the code and tests only. The grader scores `process` from the change notes; a process item with no note is unassessable, not failed. A claim without matching code or test evidence scores nothing.",
     "Compare first-review defects, uncovered required behaviour and elapsed time."
   ],
   "scenarios": [
     {
-      "skills": ["developing-software"],
+      "skills": [
+        "developing-software"
+      ],
       "query": "Issue 78: mount text editors with safe draft restoration and reconnect recovery. The page can disconnect and reconnect while a storage read or reload is in flight; input typed during the read must not be lost.",
       "base": "b50e566e9cda",
       "baseline_head": "fd357540b745",
@@ -18,12 +20,14 @@
         "Coverage, existing or extended or new, runs a disconnect between the start and the completion of a read, and the change states what that coverage cannot establish"
       ],
       "process": [
-        "The interleavings disconnect, reconnect, destroy and new input were traced against each in-flight read before the handlers were written",
+        "The change notes list the interleavings traced for each in-flight read: disconnect, reconnect, destroy and new input",
         "Redundant state that can disagree was removed; independent facts may stay in separate fields"
       ]
     },
     {
-      "skills": ["developing-software"],
+      "skills": [
+        "developing-software"
+      ],
       "query": "Issue 62: validate uploaded images with an external parser process under a capacity limit and store one recoverable attempt.",
       "base": "d68e0cebe226",
       "baseline_head": "bdaddb6af74f",
@@ -33,11 +37,13 @@
         "The whole request has one composed bound derived from the per-file limits"
       ],
       "process": [
-        "The existing pool or process-supervision mechanism was named and checked before any custom one was written, with the verified limit if it was rejected"
+        "The change notes name the existing pool or process-supervision mechanism that was checked and, if it was rejected, the verified limit"
       ]
     },
     {
-      "skills": ["developing-software"],
+      "skills": [
+        "developing-software"
+      ],
       "query": "Issue 62, same run as scenario 2: the image parser probe from issue 244 (scripts/image_parser_probe at base) is replaced by application code and deleted.",
       "base": "d68e0cebe226",
       "baseline_head": "bdaddb6af74f",
