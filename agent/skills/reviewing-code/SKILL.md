@@ -59,8 +59,9 @@ triggers it.
   behaviour, without moving costs elsewhere. Can you remove a part, state, duplicate
   path, compatibility code, dead code or unused documentation without losing required
   behaviour, failure isolation or testability?
-- Idiom: Check code against applicable language and framework standards, conventions
-  and documented best practices. Does custom code duplicate a documented feature of a
+- Idiom: Check the idioms and conventions of the language and framework, including
+  control flow, data handling and programming model. Check applicable standards and
+  documented best practices. Does custom code duplicate a documented feature of a
   built-in, locked dependency or established tool? Compare custom code with the Ecto
   DSL, changesets and forms; LiveView lifecycle and uploads; OTP supervision; Oban for
   durable work; and standard serializers, browser APIs and test helpers. Check whether
