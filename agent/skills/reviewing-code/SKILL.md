@@ -7,15 +7,18 @@ description: Reviews tips PRs, diffs and commits for defects, test gaps, unneces
 
 Review required behaviour independently of the code and its tests. Follow
 [AGENTS.md](../../../AGENTS.md), including the required language and framework skills.
+Repository rules take precedence over general language and framework skill advice.
 Read [developing-software](../developing-software/SKILL.md) as the shared design and
 testing standard; this skill adds review methods and probes, not a second rule set.
 Read repository files and skill references from the current worktree.
 
 ## Establish scope
 
-Establish the reviewed commit or diff and its requirements. Read the relevant tests,
-linked design sections and prior findings. In a pair, follow
-[step 3](../../teams/README.md#3-tester-review-the-pushed-head) for review execution.
+Establish the reviewed commit or diff. Read the issue and acceptance scenarios, PR
+body, diff, changed files and their callers, existing tests, linked design sections
+and prior review threads. For a local review, use the user brief in place of absent
+issue or PR records. In a pair, [step 3](../../teams/README.md#3-tester-review-the-pushed-head)
+owns turn-taking and handoff; this section owns what to inspect.
 
 ## Review
 
@@ -33,7 +36,8 @@ line and the input, state or sequence that triggers it.
   through duplicate or out-of-order updates across tabs, reconnects and timeouts;
   cancellation or restart after a write; and migrations on existing rows. Compare
   submitted, stored, retried and displayed values. For durable jobs, inspect serialized
-  inputs and whether the business write and job insertion must commit together.
+  or stale inputs, repeated effects under retry, and whether the business write and
+  job insertion must commit together.
 - Contracts: Trace both sides of [affected contracts](../developing-software/SKILL.md#trace-the-affected-contract)
   and [fallible boundaries](../developing-software/SKILL.md#fallible-boundaries).
   For example, inspect callback mount, update and teardown; partial provider responses;

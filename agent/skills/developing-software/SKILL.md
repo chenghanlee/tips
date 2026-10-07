@@ -70,13 +70,15 @@ A correct handler result alone does not establish a correct outcome.
 ownership and dependency boundaries while choosing the simplest local
 implementation. A new feature alone does not justify a new layer or framework.
 
-**When changing a shared rule or stored fact:** find its other representations.
+**When changing a shared rule, stored fact or runtime state representation:** find
+its other representations.
 Limits, patterns, enums, labels, messages and filters can appear in constraints,
 migrations, helper text, documentation, fixtures and other runtimes. Copies of one
 rule may look different.
 
-For that rule or fact, keep one authoritative source. Derive other representations
-where practical; when copies are necessary, define how they stay consistent. Update
+For that rule or fact, keep one authoritative source. Derive duplicate state rather
+than storing copies that can disagree; keep independent facts separate. When stored
+copies are necessary, define how they stay consistent. Update
 each representation affected by the requirement. Consolidate only when it simplifies
 this task or removes a concrete inconsistency, and that gain justifies the coupling
 and verification cost. Historical migrations are evidence to inspect, not
