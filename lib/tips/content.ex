@@ -1,6 +1,6 @@
 defmodule Tips.Content do
   @moduledoc """
-  The Content context: tips, reviews, votes, media and search.
+  The Content context: tips, reviews, votes, reports, media and search.
 
   ## Reading
 
@@ -291,6 +291,35 @@ defmodule Tips.Content do
   `{:error, :outcome_unknown}`: read the current vote before offering another
   change.
 
+  ### Reporting
+
+  `report_content(scope, kind, id, attrs)` stores the scope's report of a
+  suspected rule violation on a tip or review. `attrs` takes `reason`
+  (`spam`, `harmful`, `fabricated` or `other`; `fabricated` means suspected
+  invented experience or evidence) and an optional `detail` of at most 1000
+  characters; a blank detail is stored as `nil`. Malformed input is a
+  changeset.
+
+  A report checks the scope and spends one `Tips.AdmissionLimiter.check_write/2`,
+  like the other writes. The transaction locks the reporter's account
+  (`:contribute` eligibility), then only the reported tip or review `FOR SHARE`:
+  a review report never locks its parent. A missing, hidden or deleted target
+  is `{:error, :not_found}`. An author deletion that commits first therefore
+  rejects the report; one that waits resolves it.
+
+  Each reporter has at most one open report per target. `{:ok,
+  t:report_receipt/0}` comes only after confirmed persistence: `:stored` for
+  the new report, or `:already_open` with the earlier open report's id when
+  one exists. `:already_open` stores nothing, so the submitted reason and
+  detail were not saved. After the earlier report is resolved, a new report
+  is allowed on unchanged content. If that report is resolved while the
+  receipt is read, or a database error or lost connection occurs, the result
+  is `{:error, :outcome_unknown}`: keep the input and let the reporter submit
+  again explicitly. Nothing retries automatically.
+
+  A report changes no visibility, version, counter, vote, ranking, account or
+  notification.
+
   ### Transaction participants
 
   Each row commits its effects together, in one transaction, or none of them.
@@ -308,6 +337,8 @@ defmodule Tips.Content do
   | Unchanged deletion, hide or restore | none |
   | Vote change | `:vote`, `:vote_notification` |
   | Unchanged vote | none |
+  | New report | `:report` |
+  | Already open report | none |
 
   `Tips.Content.Search` writers already require a caller transaction. A
   search or required notification failure rolls back the publication. The
@@ -549,6 +580,28 @@ defmodule Tips.Content do
           | {:rate_limited | :capacity, retry_after_seconds :: pos_integer()}
           | :outcome_unknown
 
+  @typedoc """
+  A confirmed report on the target `kind` and `id`. `report_id` is the new
+  report for `:stored` and the earlier open one for `:already_open`. See
+  "Reporting".
+  """
+  @type report_receipt :: %{
+          kind: kind(),
+          id: pos_integer(),
+          report_id: pos_integer(),
+          outcome: :stored | :already_open
+        }
+
+  @typedoc "A rejected or uncertain report. Malformed input is a changeset. See \"Reporting\"."
+  @type report_error ::
+          :unauthenticated
+          | :unconfirmed
+          | :forbidden
+          | :not_found
+          | Ecto.Changeset.t()
+          | {:rate_limited | :capacity, retry_after_seconds :: pos_integer()}
+          | :outcome_unknown
+
   @typedoc "A desired vote: Helpful (`1`), Not helpful (`-1`) or none (`nil`)."
   @type vote :: Projection.vote()
 
@@ -589,6 +642,7 @@ defmodule Tips.Content do
           | :notification_removal
           | :vote
           | :vote_notification
+          | :report
 
   @doc """
   Checks a form's author-editable text with the rules a publication or edit
@@ -739,6 +793,14 @@ defmodule Tips.Content do
           {:ok, vote_receipt()} | {:error, vote_error()}
   def set_vote(scope, kind, id, desired) when desired in [1, -1, nil],
     do: Voting.set(scope, kind, id, desired)
+
+  @doc """
+  Reports a suspected rule violation on a tip or review. See "Reporting".
+  """
+  @spec report_content(Scope.t() | nil, kind(), pos_integer(), map()) ::
+          {:ok, report_receipt()} | {:error, report_error()}
+  def report_content(scope, kind, id, attrs) when is_map(attrs),
+    do: Moderation.report(scope, kind, id, attrs)
 
   @doc """
   Reads one moderation case for a moderator's session. See "Deletion and
