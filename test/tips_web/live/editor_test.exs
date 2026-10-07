@@ -110,6 +110,7 @@ defmodule TipsWeb.EditorTest do
 
     assert_push_event(lv, "editor:refused", %{})
     assert summary_links(html, form_id) == ["#tip_body", "#tip_tag_id"]
+    assert text(html, "#{form_id}-errors") =~ "Tip: this is too long (max: 10000)"
     # The technique was never touched.
     assert has?(html, ~s(#tip_tag_id[aria-invalid="true"]))
     refute has?(html, ~s(#tip_title[aria-invalid]))
@@ -148,7 +149,7 @@ defmodule TipsWeb.EditorTest do
     html = lv |> form(form_id, review: long) |> render_submit()
 
     assert text(html, "#{form_id}-refusal") =~
-             "This review is too long to publish. Shorten it by about 1 word."
+             "This review is too long. Shorten it by about 1 word."
 
     assert textarea(html, "review[body]") == long.body
     assert textarea(html, "review[prompt]") == long.prompt

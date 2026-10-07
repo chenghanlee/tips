@@ -426,10 +426,10 @@ defmodule TipsWeb.Editor do
       "We couldn't confirm whether your changes were saved. The saved #{kind} is below. If you save again and your changes were already saved, you'll be told the #{kind} changed."
 
   defp refusal({:too_long, 1}, kind, _verb),
-    do: "This #{kind} is too long to publish. Shorten it by about 1 word."
+    do: "This #{kind} is too long. Shorten it by about 1 word."
 
   defp refusal({:too_long, words}, kind, _verb),
-    do: "This #{kind} is too long to publish. Shorten it by about #{words} words."
+    do: "This #{kind} is too long. Shorten it by about #{words} words."
 
   defp refusal({upload, _refs}, _kind, verb) when upload in [:upload_failed, :upload_pending],
     do: "An attachment isn't ready, so nothing was #{past(verb)}."
