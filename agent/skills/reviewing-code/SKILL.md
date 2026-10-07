@@ -24,15 +24,16 @@ callers and code that uses the results. For each suspected defect, identify the 
 line and the input, state or sequence that triggers it.
 
 - Behaviour: Check observable results, user interactions and recovery against the
-  requirements, acceptance scenarios, regressions and PR claims. For example, check
-  feedback in loading, empty and error states; recovery from stale or conflicting
-  updates; and UI copy, focus, keyboard access and docs against the glossary.
+  requirements, acceptance scenarios, regressions and PR claims. Check required
+  feedback and recovery for each reachable state. For example, cover loading, empty,
+  error, stale and conflict states, and check UI copy, focus, keyboard access and docs
+  against the requirements and glossary.
 - State and data: Check that state stays consistent and effects preserve required
   invariants through concurrency, interruptions and recovery. Compare submitted,
   stored, retried and displayed values; identify authority, committed effects and
-  resource ownership. For example, trace duplicate or out-of-order updates across
-  reconnects; cancellation or restart after a write; and
-  migrations on existing rows. Check transactions, constraints and external cleanup.
+  resource ownership. For example, trace duplicate or out-of-order updates across tabs
+  or after reconnects or timeouts; cancellation or restart after a write; and migrations
+  on existing rows. Check transactions, constraints and external cleanup.
   For durable jobs, check serialized or stale inputs, repeated effects and whether
   the business write and job insertion must commit together. A lost reply does not
   prove rollback.
@@ -48,21 +49,22 @@ line and the input, state or sequence that triggers it.
   and duplicates, ordering and values just below, at and above limits.
 - Complexity and performance: Check how work and resource use grow with input size,
   history, user count and arrival rate, and whether they meet required limits. Include
-  execution time, query count, memory, payload size and queues. For example, check N+1
-  queries, repeated work per render or event, and unbounded loads or retention. Include
-  work on records the user never sees and blocking work against required budgets.
+  execution time, query count, memory, payload size and queues, including work on
+  records the user never sees and blocking work against required budgets. For example,
+  check N+1 queries, repeated work per render or event, and unbounded loads or retention.
 - Trust: Identify trust boundaries and trace untrusted data into decisions and effects.
   Check identity, authorization, validation and sensitive-data handling at each boundary.
-  For example, substitute an id or replay an operation after permissions change;
-  trace untrusted content into HTML, URLs, provider destinations or commands; and check
-  disclosure through output or logs. Include reads and effects in jobs, sockets and
-  browser storage.
+  Try substituting an id and replaying an operation after permissions change. For
+  example, trace untrusted content into HTML, URLs, provider destinations or commands,
+  and check disclosure through output or logs. Include reads and effects in jobs,
+  sockets and browser storage.
 - Tests: Check that changed and existing tests detect violations of requirements and
   regressions, run reliably, and do not enforce incidental implementation choices.
   For example, check doubles against real contracts, isolation of shared state, waits
   for asynchronous work and browser elements retained across navigation. Find missing
   or redundant coverage and tests of frameworks or private implementation details.
-  Prefer extending an existing test; preserve required order, timing and representation.
+  Prefer extending an existing test. Check that assertions cover required order, timing
+  and representation without enforcing incidental details.
 - Simplicity: Look for unnecessary parts or user steps that can be removed while
   preserving required behaviour, failure isolation and testability, without moving
   costs elsewhere. For example, check duplicate state or paths, compatibility code
@@ -102,8 +104,9 @@ followed by the requirement, consequence and evidence.
   explicit repository rule requires it. Name the standard, show that it meets the
   requirement, and explain how the custom code differs, what it costs and what should
   replace it. For deviations from language or framework guidance, assess the stated
-  justification and cite the guidance and consequence. For a repository-rule
-  violation, cite the rule.
+  justification and cite the guidance and consequence. If no explanation is given,
+  report the missing explanation under AGENTS.md's rule on deviations. For a
+  repository-rule violation, cite the rule.
 
 Report what you reviewed and what remains unfinished or blocked. "No findings" is
 valid. Do not aim for a finding count or list choices you approve of.
