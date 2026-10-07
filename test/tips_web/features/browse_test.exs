@@ -94,29 +94,4 @@ defmodule TipsWeb.BrowseFeatureTest do
     assert_received {:script_value, value}
     value
   end
-
-  # Selects with the control focused, as a reader does. WebDriver's option
-  # click does not reliably focus the select in headless Chrome.
-  defp choose_focused(session, id, value) do
-    execute_script(
-      session,
-      """
-      const select = document.getElementById(arguments[0]);
-      select.focus();
-      select.value = arguments[1];
-      select.dispatchEvent(new Event("input", {bubbles: true}));
-      select.dispatchEvent(new Event("change", {bubbles: true}));
-      """,
-      [id, value]
-    )
-  end
-
-  defp assert_url(session, pattern) do
-    assert current_url(session) =~ pattern
-    session
-  end
-
-  defp assert_focus(session, id) do
-    execute_script(session, "return document.activeElement.id", [], &assert(&1 == id))
-  end
 end

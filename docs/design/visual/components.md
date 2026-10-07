@@ -43,7 +43,9 @@ and search share: URL filter and page parsing, `filter_selects` and the
 
 `TipsWeb.Reader` (`lib/tips_web/components/reader.ex`) is the interface for
 `tip_header`, `tip_context`, `contribution_control`, `markdown`,
-`verbatim_block`, `removed_notice` and `review_card`.
+`verbatim_block`, `removed_notice` and `review_card`. A review card's Delete
+opens one confirmation in the card; `TipsWeb.ReviewActions` handles its events
+on the tip page and the single-review view.
 
 ## Not in the code
 
@@ -53,7 +55,6 @@ Parts of built components:
 |---|---|---|
 | `verbatim_block` | Copy | Attr `copy_label` ("Copy prompt", "Copy result"); a `<button>` beside the label. Status region `aria-live="polite"`: "Copied" or the manual-copy line |
 | `tip_header`, `review_card` | Votes | `TipsWeb.UI.vote_control` with `variant="detail"` |
-| `review_card` | Delete | Delete beside Edit, by `review.capabilities` |
 
 Components:
 

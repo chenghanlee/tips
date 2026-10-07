@@ -17,6 +17,7 @@ defmodule Tips.FeatureCase do
     quote do
       use Wallaby.Feature
       import Wallaby.Query
+      import Tips.FeatureHelpers
     end
   end
 end

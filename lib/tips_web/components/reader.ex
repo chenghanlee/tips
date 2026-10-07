@@ -6,6 +6,9 @@ defmodule TipsWeb.Reader do
   (`state: :deleted | :removed`), which carries nothing but its id, title and
   slug. Text only: attachments render nothing until `attachment_view` (#99).
   Editor targets are plain paths until the editor routes (#78) mount them.
+
+  A review card's Delete sends `confirm_delete`, `cancel_delete` and `delete`
+  events; `TipsWeb.ReviewActions` handles them on each page that renders cards.
   """
   use TipsWeb, :html
 
@@ -24,23 +27,39 @@ defmodule TipsWeb.Reader do
   @doc "The tip permalink from its projected id and slug, placeholders included."
   def tip_path(%{id: id, slug: slug}), do: ~p"/tips/#{id}/#{slug}"
 
+  @doc "The tip permalink with review-list URL parameters; `nil` values are left out."
+  def tip_path(tip, params), do: tip_path(tip) <> query(params)
+
+  @doc """
+  The single-review view of `id`. `params` carries only the review sort, for
+  its Show all reviews link.
+  """
+  def review_path(id, params \\ []), do: ~p"/reviews/#{id}" <> query(params)
+
+  defp query(params) do
+    case Enum.reject(params, fn {_key, value} -> is_nil(value) end) do
+      [] -> ""
+      params -> "?" <> URI.encode_query(params)
+    end
+  end
+
   # The contribution control state for the tip page header, first match wins:
   # own review, unavailable tip, anonymous viewer, review capability, none.
-  defp contribution(_tip, %{id: review_id}, _signed_in?),
-    do: {:own_review, ~p"/reviews/#{review_id}"}
+  defp contribution(_tip, %{id: review_id}, _signed_in?, sort_params),
+    do: {:own_review, review_path(review_id, sort_params)}
 
-  defp contribution(%{state: state}, nil, _signed_in?) when state != :visible,
+  defp contribution(%{state: state}, nil, _signed_in?, _sort_params) when state != :visible,
     do: {:not_accepting, nil}
 
-  defp contribution(%{removed: true}, nil, _signed_in?), do: {:not_accepting, nil}
+  defp contribution(%{removed: true}, nil, _signed_in?, _sort_params), do: {:not_accepting, nil}
 
-  defp contribution(tip, nil, false),
+  defp contribution(tip, nil, false, _sort_params),
     do: {:sign_in, TipsWeb.UserAuth.with_return_to(~p"/users/log-in", tip_path(tip))}
 
-  defp contribution(%{id: id, capabilities: %{review: true}}, nil, true),
+  defp contribution(%{id: id, capabilities: %{review: true}}, nil, true, _sort_params),
     do: {:write, "/editor/tips/#{id}/reviews/new"}
 
-  defp contribution(_tip, nil, true), do: {:none, nil}
+  defp contribution(_tip, nil, true, _sort_params), do: {:none, nil}
 
   @doc """
   Renders the tip page header: title, author, dates, setup, the tip's vote counts,
@@ -50,9 +69,12 @@ defmodule TipsWeb.Reader do
   attr :tip, :map, required: true
   attr :own_review, :map, default: nil
   attr :signed_in, :boolean, required: true
+  attr :sort_params, :list, default: [], doc: "the review sort, kept by the Your review link"
 
   def tip_header(assigns) do
-    {state, href} = contribution(assigns.tip, assigns.own_review, assigns.signed_in)
+    {state, href} =
+      contribution(assigns.tip, assigns.own_review, assigns.signed_in, assigns.sort_params)
+
     assigns = assign(assigns, contribution_state: state, contribution_href: href)
 
     ~H"""
@@ -199,10 +221,15 @@ defmodule TipsWeb.Reader do
   @doc """
   Renders one readable review: author, dates, reviewer setup, Markdown body,
   the Prompt and Result disclosure, vote counts and the viewer's actions. `open`
-  opens the disclosure, as on the single-review view.
+  opens the disclosure, as on the single-review view. `href` is the author
+  heading's link, the card's own anchor by default. `own` adds the Your review
+  badge. `confirm_delete` shows the delete confirmation.
   """
   attr :review, :map, required: true
   attr :open, :boolean, default: false
+  attr :href, :string, default: nil
+  attr :own, :boolean, default: false
+  attr :confirm_delete, :boolean, default: false
 
   def review_card(assigns) do
     assigns = assign(assigns, :dom_id, "review-#{assigns.review.id}")
@@ -210,8 +237,12 @@ defmodule TipsWeb.Reader do
     ~H"""
     <article id={@dom_id} aria-labelledby={"#{@dom_id}-author"} class="grid gap-3 border-b py-4">
       <div class="grid gap-1">
-        <h2 id={"#{@dom_id}-author"} class="text-base font-semibold">
-          <a href={"##{@dom_id}"}>{author(@review.author)}</a>
+        <h2 id={"#{@dom_id}-author"} class="flex flex-wrap items-center gap-2 text-base font-semibold">
+          <.link :if={@href} navigate={@href}>{author(@review.author)}</.link>
+          <a :if={!@href} href={"##{@dom_id}"}>{author(@review.author)}</a>
+          <span :if={@own} data-badge class="rounded-md border px-2 text-sm font-medium">
+            Your review
+          </span>
         </h2>
         <div class="flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground">
           <.dates created_at={@review.created_at} edited_at={@review.edited_at} />
@@ -250,7 +281,11 @@ defmodule TipsWeb.Reader do
         helpful={@review.up_count}
         not_helpful={@review.down_count}
       />
-      <.actions capabilities={@review.capabilities} edit_href={"/editor/reviews/#{@review.id}/edit"} />
+      <.actions
+        capabilities={@review.capabilities}
+        edit_href={"/editor/reviews/#{@review.id}/edit"}
+        delete={%{id: @review.id, dom_id: @dom_id, confirm: @confirm_delete}}
+      />
     </article>
     """
   end
@@ -269,14 +304,52 @@ defmodule TipsWeb.Reader do
     """
   end
 
-  # Edit by capability. Delete joins this group with its operation (#81).
+  # Edit and, on a review, Delete, each by capability. Delete opens one
+  # confirmation; Cancel returns focus to Delete.
   attr :capabilities, :map, required: true
   attr :edit_href, :string, required: true
+  attr :delete, :map, default: nil, doc: "a review's `id`, `dom_id` and `confirm` state"
 
   defp actions(assigns) do
+    assigns = assign(assigns, :delete, assigns.capabilities.delete && assigns.delete)
+
     ~H"""
-    <div :if={@capabilities.edit} class="flex flex-wrap gap-2">
-      <.link href={@edit_href} class={link_button_class("outline", "sm")}>Edit</.link>
+    <div :if={@capabilities.edit or @delete} class="flex flex-wrap gap-2">
+      <.link :if={@capabilities.edit} href={@edit_href} class={link_button_class("outline", "sm")}>
+        Edit
+      </.link>
+      <UI.button
+        :if={@delete}
+        id={"#{@delete.dom_id}-delete"}
+        variant="outline"
+        phx-click="confirm_delete"
+        phx-value-id={@delete.id}
+        aria-expanded={to_string(@delete.confirm)}
+      >
+        Delete
+      </UI.button>
+    </div>
+    <div
+      :if={@delete && @delete.confirm}
+      id={"#{@delete.dom_id}-delete-confirm"}
+      role="group"
+      aria-labelledby={"#{@delete.dom_id}-delete-question"}
+      class="grid gap-2 rounded-md border p-3"
+    >
+      <p id={"#{@delete.dom_id}-delete-question"} tabindex="-1" phx-mounted={JS.focus()}>
+        Delete this review? This can't be undone.
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <UI.button variant="destructive" phx-click="delete" phx-disable-with="Deleting...">
+          Delete review
+        </UI.button>
+        <UI.button
+          variant="outline"
+          phx-click={JS.push("cancel_delete") |> JS.focus(to: "##{@delete.dom_id}-delete")}
+        >
+          Cancel
+        </UI.button>
+      </div>
     </div>
     """
   end

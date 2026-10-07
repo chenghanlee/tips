@@ -17,10 +17,16 @@ defmodule Tips.Content.Read do
 
   # Positive bigint ids; anything else cannot name a row.
   @row_ids 1..9_223_372_036_854_775_807
+  @page_size 30
+  @filters [:model_id, :environment_id]
+  @options [:sort, :offset | @filters]
+
+  @type reviews :: %{entries: [Projection.visible_review()], has_more: boolean()}
 
   @doc false
-  def get_tip_page(viewer, tip_id) do
-    with {:ok, scope} <- admit(viewer),
+  def get_tip_page(viewer, tip_id, opts \\ []) do
+    with {:ok, options} <- options(opts),
+         {:ok, scope} <- admit(viewer),
          {:ok, id} <- row_id(tip_id),
          %Tip{} = tip <- Repo.get(Tip, id) do
       own_review = own_review(scope, tip)
@@ -28,7 +34,8 @@ defmodule Tips.Content.Read do
       {:ok,
        %{
          tip: Projection.tip(scope, tip, tip_hydration(scope, tip, own_review)),
-         own_review: Projection.own_review(scope, own_review)
+         own_review: Projection.own_review(scope, own_review),
+         reviews: reviews(scope, tip, options)
        }}
     else
       nil -> {:error, :not_found}
@@ -65,6 +72,65 @@ defmodule Tips.Content.Read do
   def project(scope, %Review{} = review) do
     hydration = review_hydration(scope, review)
     Projection.review(scope, review, Map.put(hydration, :parent, Repo.get!(Tip, review.tip_id)))
+  end
+
+  # One ranked page of live reviews, with the lookahead row. Every row is live,
+  # so each is readable and hydrated; the parent may be a placeholder.
+  defp reviews(scope, tip, %{sort: sort, offset: offset, filters: filters}) do
+    {rows, lookahead} =
+      from([r, _u] in ranked_reviews(tip.id, filters),
+        order_by: ^review_order(sort),
+        limit: @page_size + 1,
+        offset: ^offset
+      )
+      |> Repo.all()
+      |> Enum.split(@page_size)
+
+    ids = Enum.map(rows, fn {review, _author} -> review.id end)
+    votes = viewer_votes(scope, ids)
+    media = Enum.group_by(media(:review_id, ids), & &1.review_id)
+    labels = Vocabulary.label_maps()
+
+    entries =
+      Enum.map(rows, fn {review, author} ->
+        Projection.review(scope, review, %{
+          parent: tip,
+          author: author,
+          labels: labels,
+          viewer_vote: votes[review.id],
+          media: Map.get(media, review.id, [])
+        })
+      end)
+
+    %{entries: entries, has_more: lookahead != []}
+  end
+
+  # Same predicate as the `reviews_best` and `reviews_new` partial indexes.
+  defp ranked_reviews(tip_id, filters) do
+    from r in live_reviews(tip_id),
+      join: u in User,
+      on: u.id == r.user_id,
+      where: ^filters,
+      select: {r, struct(u, [:id, :handle, :deleted_at])}
+  end
+
+  defp review_order(:best), do: [desc: :best_score, desc: :id]
+  defp review_order(:new), do: [desc: :created_at, desc: :id]
+
+  defp options(opts) do
+    with true <- Keyword.keyword?(opts),
+         keys = Keyword.keys(opts),
+         [] <- keys -- @options,
+         true <- keys == Enum.uniq(keys),
+         sort when sort in [:best, :new] <- Keyword.get(opts, :sort, :best),
+         offset when is_integer(offset) and offset >= 0 and rem(offset, @page_size) == 0 <-
+           Keyword.get(opts, :offset, 0),
+         filters = Keyword.take(opts, @filters),
+         true <- Enum.all?(filters, fn {_key, id} -> is_binary(id) end) do
+      {:ok, %{sort: sort, offset: offset, filters: filters}}
+    else
+      _invalid -> {:error, :invalid_option}
+    end
   end
 
   # Anonymous viewers take the public path without a token query; anything else
@@ -133,12 +199,25 @@ defmodule Tips.Content.Read do
     )
   end
 
-  defp media(parent, id) do
+  defp viewer_votes(nil, _review_ids), do: %{}
+
+  defp viewer_votes(%Scope{user: %User{id: user_id}}, review_ids) do
+    from(v in Vote,
+      where: v.user_id == ^user_id and v.review_id in ^review_ids,
+      select: {v.review_id, v.value}
+    )
+    |> Repo.all()
+    |> Map.new()
+  end
+
+  defp media(parent, ids) when is_list(ids) do
     Repo.all(
       from a in Asset,
-        where: field(a, ^parent) == ^id and is_nil(a.cleanup_at) and not is_nil(a.position)
+        where: field(a, ^parent) in ^ids and is_nil(a.cleanup_at) and not is_nil(a.position)
     )
   end
+
+  defp media(parent, id), do: media(parent, [id])
 
   defp latest_review_at(%Tip{id: tip_id}) do
     Repo.one(from r in live_reviews(tip_id), select: max(r.created_at))
