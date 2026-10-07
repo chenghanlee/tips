@@ -23,12 +23,6 @@ defmodule TipsWeb.Router do
   end
 
   scope "/", TipsWeb do
-    pipe_through :browser
-
-    get "/", PageController, :home
-  end
-
-  scope "/", TipsWeb do
     get "/healthz", HealthController, :show
   end
 
@@ -80,6 +74,7 @@ defmodule TipsWeb.Router do
       live "/users/log-in", UserLive.Login, :new
       live "/users/log-in/:token", UserLive.Confirmation, :new
 
+      live "/", BrowseLive.Index, :index
       live "/search", SearchLive.Index, :index
       live "/tips/:id/:slug", TipLive.Show, :show
       live "/reviews/:id", ReviewLive.Show, :show

@@ -11,8 +11,8 @@ defmodule Tips.Content.Read do
 
   alias Tips.Accounts
   alias Tips.Accounts.{Scope, User}
-  alias Tips.Content.{Environment, Model, Projection, Review, Tag, Tip, Visibility, Vote}
   alias Tips.Content.Media.Asset
+  alias Tips.Content.{Projection, Review, Tip, Visibility, Vocabulary, Vote}
   alias Tips.Repo
 
   # Positive bigint ids; anything else cannot name a row.
@@ -85,7 +85,7 @@ defmodule Tips.Content.Read do
     if readable?(scope, tip) do
       %{
         author: Repo.get!(User, tip.user_id),
-        labels: labels(),
+        labels: Vocabulary.label_maps(),
         viewer_vote: viewer_vote(scope, :tip_id, tip.id),
         media: media(:tip_id, tip.id),
         own_review: own_review,
@@ -101,7 +101,7 @@ defmodule Tips.Content.Read do
     if readable?(scope, review) do
       %{
         author: Repo.get!(User, review.user_id),
-        labels: labels(),
+        labels: Vocabulary.label_maps(),
         viewer_vote: viewer_vote(scope, :review_id, review.id),
         media: media(:review_id, review.id)
       }
@@ -169,11 +169,4 @@ defmodule Tips.Content.Read do
   defp live_reviews(tip_id) do
     from r in Review, where: r.tip_id == ^tip_id and is_nil(r.deleted_at) and is_nil(r.dead_at)
   end
-
-  # Curated lists are small; load all, including retired choices old rows keep.
-  defp labels do
-    %{tags: label_map(Tag), models: label_map(Model), environments: label_map(Environment)}
-  end
-
-  defp label_map(schema), do: Map.new(Repo.all(from c in schema, select: {c.id, c.label}))
 end

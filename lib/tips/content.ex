@@ -26,6 +26,25 @@ defmodule Tips.Content do
   list filters, sort or page and never substitutes another review. Ranked
   review pages are later browse work.
 
+  ### Browsing
+
+  `list_tips/2` returns one page of the shared Hot or New feed. Like search,
+  it lists only live tips for every viewer, authors and moderators included;
+  the scope only sets each row's vote and capability hints. Options:
+
+    * `:sort` - `:hot` (default) orders by hot score, `:new` by creation
+      time; both break ties by the higher id.
+    * `:offset` - a multiple of 20, default 0. There is no last page.
+    * `:tag_id`, `:model_id`, `:environment_id` - exact matches on the tip
+      author's setup, combined with AND. A review's setup never matches, and
+      neither does a free-text model. An unset filter adds no condition.
+
+  The result is `{:ok, %{entries: [summary], has_more: boolean}}`: at most
+  20 `t:Tips.Content.Projection.summary/0` rows, and whether a 21st row
+  exists. No total is counted. Each call reads the current ranking, so
+  consecutive pages can repeat or skip a tip whose rank changed. A malformed
+  option is `{:error, :invalid_option}`.
+
   ## Publication and edit contract
 
   Publication exists for text: `publish_tip/4`, `publish_review/5` and
@@ -357,6 +376,7 @@ defmodule Tips.Content do
   alias Tips.Accounts.Scope
 
   alias Tips.Content.{
+    Browse,
     Deletion,
     Edit,
     Intent,
@@ -778,6 +798,14 @@ defmodule Tips.Content do
   @spec search_tips(Scope.t() | nil, String.t(), keyword()) ::
           {:ok, Search.page()} | {:error, Search.error()}
   defdelegate search_tips(scope, query, opts \\ []), to: Search
+
+  @doc """
+  Lists one page of live tips in Hot or New order, with exact setup filters.
+  See "Browsing".
+  """
+  @spec list_tips(Scope.t() | nil, keyword()) ::
+          {:ok, Browse.page()} | {:error, :invalid_option}
+  defdelegate list_tips(scope, opts \\ []), to: Browse
 
   @doc """
   Returns the active curated tags, models and environments in display order:

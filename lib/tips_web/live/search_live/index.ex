@@ -10,14 +10,10 @@ defmodule TipsWeb.SearchLive.Index do
   heading and starts a new one. LiveView drops the result or exit of a task
   that a newer `start_async/3` replaced, so stale pages never render.
 
-  Normalization:
-
-    * `q` has its whitespace trimmed and collapsed; a missing or blank `q`
-      shows the empty form and searches nothing.
-    * A filter value that is not an active curated id is All.
-    * A `page` that is not a positive integer is 1. Pages past the bounded
-      search window, and empty pages after the first, are out of range: they
-      offer Previous and First page.
+  `TipsWeb.Discovery` normalizes the URL. A missing or blank `q` shows the
+  empty form and searches nothing. Pages past the bounded search window, and
+  empty pages after the first, are out of range: they offer Previous and
+  First page.
 
   Submitting the search form or changing a filter only patches the URL, and
   both reset to page 1. A blank submit shows the shared message and keeps the
@@ -28,15 +24,11 @@ defmodule TipsWeb.SearchLive.Index do
   use TipsWeb, :live_view
 
   alias Tips.Content
-  alias TipsWeb.{Reader, UI}
+  alias TipsWeb.{Discovery, UI}
 
   @page_size 20
   # Search ranks a window of at most 200 tips: pages 1 to 10.
   @last_page 10
-  @blank_message "Enter a task or keywords to search."
-  @filters [:technique, :model, :environment]
-  @filter_labels %{technique: "Technique", model: "Model", environment: "Environment"}
-  @search_options %{technique: :tag_id, model: :model_id, environment: :environment_id}
   @sources %{body: "Review", prompt: "Prompt", result: "Result", setup: "Reviewer setup"}
 
   @impl true
@@ -47,19 +39,12 @@ defmodule TipsWeb.SearchLive.Index do
       <UI.search_form value={@request.q} error={@search_error} action={~p"/search"} />
       <UI.filter_bar
         id="filters"
-        active={filtered?(@request)}
-        clear_href={path(%{@request | filters: no_filters(), page: 1})}
-        note="Changing a selection updates the list. Model and Environment match the tip author's setup."
+        active={Discovery.filtered?(@request.filters)}
+        clear_href={path(%{@request | filters: Discovery.no_filters(), page: 1})}
+        note={Discovery.filter_note()}
         phx-change="filter"
       >
-        <UI.filter_select
-          :for={filter <- filters()}
-          id={Atom.to_string(filter)}
-          name={Atom.to_string(filter)}
-          label={filter_label(filter)}
-          options={[{"All", ""} | Enum.map(@options[filter], &{&1.label, &1.id})]}
-          value={@request.filters[filter]}
-        />
+        <Discovery.filter_selects options={@options} filters={@request.filters} />
       </UI.filter_bar>
       <section
         :if={@request.q}
@@ -71,7 +56,7 @@ defmodule TipsWeb.SearchLive.Index do
         <h1 id="results-heading" class="text-xl font-semibold">
           Results for “{@request.q}”
           <span class="text-sm font-normal text-muted-foreground">
-            {heading_details(@request, @options)}
+            {Discovery.heading_details(@request, @options)}
           </span>
         </h1>
         <.results result={@result} request={@request} />
@@ -111,7 +96,9 @@ defmodule TipsWeb.SearchLive.Index do
   defp results(%{result: {:ok, %{entries: []}}} = assigns) do
     ~H"""
     <UI.notice id="results-empty">
-      {if filtered?(@request), do: "No tips match these filters", else: "No tips match this search"}
+      {if Discovery.filtered?(@request.filters),
+        do: "No tips match these filters",
+        else: "No tips match this search"}
     </UI.notice>
     """
   end
@@ -121,7 +108,7 @@ defmodule TipsWeb.SearchLive.Index do
 
     ~H"""
     <ol id="result-rows">
-      <UI.tip_row :for={entry <- @page.entries} tip={row(entry.tip, @request)}>
+      <UI.tip_row :for={entry <- @page.entries} tip={Discovery.row(entry.tip, @request, &path/1)}>
         <:excerpt
           :if={entry.excerpt}
           source={Map.fetch!(sources(), entry.excerpt.source)}
@@ -173,15 +160,9 @@ defmodule TipsWeb.SearchLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
-    options = Content.list_filter_choices()
-
     {:ok,
      assign(socket,
-       options: %{
-         technique: options.tags,
-         model: options.models,
-         environment: options.environments
-       },
+       options: Discovery.filter_options(),
        request: nil,
        result: nil,
        search_error: nil
@@ -233,8 +214,8 @@ defmodule TipsWeb.SearchLive.Index do
   def handle_event("search", %{"q" => q}, socket) do
     request = socket.assigns.request
 
-    case normalize_query(q) do
-      nil -> {:noreply, assign(socket, search_error: @blank_message)}
+    case Discovery.normalize_query(q) do
+      nil -> {:noreply, assign(socket, search_error: Discovery.blank_message())}
       q when q == request.q -> {:noreply, assign(socket, search_error: nil)}
       q -> {:noreply, push_patch(socket, to: path(%{request | q: q, page: 1}))}
     end
@@ -243,7 +224,7 @@ defmodule TipsWeb.SearchLive.Index do
   def handle_event("filter", params, socket) do
     request = socket.assigns.request
 
-    case filters(params, socket.assigns.options) do
+    case Discovery.filters(params, socket.assigns.options) do
       filters when filters == request.filters -> {:noreply, socket}
       filters -> {:noreply, push_patch(socket, to: path(%{request | filters: filters, page: 1}))}
     end
@@ -268,10 +249,9 @@ defmodule TipsWeb.SearchLive.Index do
   defp search(_scope, %{page: page}) when page > @last_page, do: :out_of_range
 
   defp search(scope, %{q: q, filters: filters, page: page}) do
-    opts =
-      for {filter, id} <- filters, id, do: {Map.fetch!(@search_options, filter), id}
+    opts = [offset: (page - 1) * @page_size] ++ Discovery.content_filters(filters)
 
-    case Content.search_tips(scope, q, [offset: (page - 1) * @page_size] ++ opts) do
+    case Content.search_tips(scope, q, opts) do
       {:ok, %{entries: []}} when page > 1 -> :out_of_range
       result -> result
     end
@@ -280,117 +260,15 @@ defmodule TipsWeb.SearchLive.Index do
   ## URL state
 
   defp request(params, options) do
-    %{q: normalize_query(params["q"]), filters: filters(params, options), page: page(params)}
+    %{
+      q: Discovery.normalize_query(params["q"]),
+      filters: Discovery.filters(params, options),
+      page: Discovery.page(params)
+    }
   end
 
-  defp normalize_query(q) when is_binary(q) do
-    case String.split(q) do
-      [] -> nil
-      words -> Enum.join(words, " ")
-    end
-  end
+  defp path(request), do: Discovery.search_path(request)
 
-  defp normalize_query(_q), do: nil
-
-  defp filters(params, options) do
-    Map.new(@filters, fn filter ->
-      value = params[Atom.to_string(filter)]
-      {filter, if(Enum.any?(options[filter], &(&1.id == value)), do: value)}
-    end)
-  end
-
-  defp no_filters, do: Map.new(@filters, &{&1, nil})
-
-  defp filtered?(request), do: Enum.any?(request.filters, fn {_filter, id} -> id end)
-
-  defp page(%{"page" => page}) when is_binary(page) do
-    case Integer.parse(page) do
-      {page, ""} when page > 0 -> page
-      _invalid -> 1
-    end
-  end
-
-  defp page(_params), do: 1
-
-  defp path(%{q: q, filters: filters, page: page}) do
-    query =
-      [q: q] ++
-        Enum.map(@filters, &{&1, filters[&1]}) ++
-        [page: if(page > 1, do: page)]
-
-    ~p"/search?#{Enum.reject(query, fn {_key, value} -> is_nil(value) end)}"
-  end
-
-  ## Presentation
-
-  defp filters, do: @filters
-  defp filter_label(filter), do: Map.fetch!(@filter_labels, filter)
   defp sources, do: @sources
   defp last_page, do: @last_page
-
-  defp heading_details(request, options) do
-    filters =
-      for filter <- @filters, id = request.filters[filter] do
-        "#{filter_label(filter)}: #{Enum.find(options[filter], &(&1.id == id)).label}"
-      end
-
-    pages = if request.page > 1, do: ["Page #{request.page}"], else: []
-    Enum.map_join(filters ++ pages, "", &" · #{&1}")
-  end
-
-  defp row(tip, request) do
-    %{
-      id: "tip-#{tip.id}",
-      title: tip.title,
-      href: Reader.tip_path(tip),
-      net_score: tip.score,
-      review_count: tip.review_count,
-      age: age(tip.created_at),
-      datetime: DateTime.to_iso8601(tip.created_at),
-      author: author(tip.author),
-      setup: setup(tip, request)
-    }
-  end
-
-  # No profile page exists yet, so the author is plain text.
-  defp author(%{handle: handle}), do: %{handle: handle, href: nil}
-  defp author(:deleted_account), do: %{handle: "[deleted]", href: nil}
-
-  # A curated label patches only its own filter, keeping the query and the
-  # other filters, on page 1; the filter already applied keeps the current URL.
-  # Free-text models are plain text.
-  defp setup(tip, request) do
-    %{
-      patch: true,
-      technique: {tip.tag.label, filter_path(request, :technique, tip.tag.id)},
-      model: model(tip.model, request),
-      environment:
-        tip.environment &&
-          {tip.environment.label, filter_path(request, :environment, tip.environment.id)}
-    }
-  end
-
-  defp model(nil, _request), do: nil
-  defp model(%{id: nil, label: label}, _request), do: {:free_text, label}
-
-  defp model(%{id: id, label: label}, request),
-    do: {:curated, label, filter_path(request, :model, id)}
-
-  defp filter_path(request, filter, id) do
-    if request.filters[filter] == id,
-      do: path(request),
-      else: path(%{request | filters: Map.put(request.filters, filter, id), page: 1})
-  end
-
-  defp age(at) do
-    case DateTime.diff(DateTime.utc_now(), at) do
-      seconds when seconds < 60 -> "just now"
-      seconds when seconds < 3600 -> ago(div(seconds, 60), "minute")
-      seconds when seconds < 86_400 -> ago(div(seconds, 3600), "hour")
-      seconds -> ago(div(seconds, 86_400), "day")
-    end
-  end
-
-  defp ago(1, unit), do: "1 #{unit} ago"
-  defp ago(count, unit), do: "#{count} #{unit}s ago"
 end

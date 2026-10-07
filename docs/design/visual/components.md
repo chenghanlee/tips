@@ -33,6 +33,12 @@ function's `@doc` and `attr` declarations give its attrs, slots and use:
 - `notice`: Heroicon `exclamation-triangle` for errors, `arrow-path` for
   reconnecting.
 
+## Discovery
+
+`TipsWeb.Discovery` (`lib/tips_web/components/discovery.ex`) holds what browse
+and search share: URL filter and page parsing, `filter_selects` and the
+`tip_row` map with filter links that patch the current page.
+
 ## Tip page
 
 `TipsWeb.Reader` (`lib/tips_web/components/reader.ex`) is the interface for
