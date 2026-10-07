@@ -161,7 +161,7 @@ defmodule Tips.FeatureHelpers do
         await_found(fun, tries - 1)
 
       nil ->
-        flunk("the write did not commit")
+        flunk("nothing was found within 5 s")
 
       found ->
         found

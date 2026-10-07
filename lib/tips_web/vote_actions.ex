@@ -8,7 +8,8 @@ defmodule TipsWeb.VoteActions do
   `vote` events and their results. The page passes `update`, a function
   `(socket, fun) -> socket` that replaces each displayed tip and review
   projection with `fun.(kind, projection)`. A result therefore changes rows in
-  place and never reorders a list.
+  place and never reorders a list. A page whose rows are still loading reads
+  them again instead, since that read predates the result.
 
     * Each button sends the vote it asks for, never a toggle, so a click made
       before an earlier result showed cannot reverse it.

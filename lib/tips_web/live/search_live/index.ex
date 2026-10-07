@@ -20,7 +20,9 @@ defmodule TipsWeb.SearchLive.Index do
   URL, heading and results. Typing does nothing.
 
   `TipsWeb.VoteActions` handles each row's vote control. A confirmed vote
-  updates only that row's net score and selection, in place.
+  updates only that row's net score and selection, in place. A vote result
+  that arrives while results load starts the search again: the running one
+  predates the result.
   """
   use TipsWeb, :live_view
 
@@ -260,6 +262,8 @@ defmodule TipsWeb.SearchLive.Index do
     entries = Enum.map(entries, &%{&1 | tip: fun.(:tip, &1.tip)})
     assign(socket, :result, {:ok, %{page | entries: entries}})
   end
+
+  defp update_vote(%{assigns: %{result: :loading}} = socket, _fun), do: begin_results(socket)
 
   defp update_vote(socket, _fun), do: socket
 

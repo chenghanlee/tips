@@ -16,6 +16,7 @@ defmodule TipsWeb.VoteTest do
   import Tips.ContentFixtures
   import Tips.SearchFixtures, only: [indexed_tip!: 2, stub_provider: 1]
   import Tips.VisibilityFixtures
+  import Tips.FeatureHelpers, only: [await_found: 1]
   import TipsWeb.ReaderPageHelpers
 
   alias Tips.Accounts.{User, UserToken}
@@ -151,6 +152,7 @@ defmodule TipsWeb.VoteTest do
     author = Repo.get!(User, review.user_id)
     conn = log_in_user(conn, author)
     views = for {_, path, _, _, _} <- pages, do: live(conn, path)
+    {:ok, search, _html} = live(conn, "/search?q=bisect")
     # A new read would rank these first.
     indexed_tip!(user_fixture(), %{title: "Bisect the release", tag_id: "workflow", up_count: 50})
     review_fixture(tip, %{body: "Newest review", up_count: 50})
@@ -186,6 +188,28 @@ defmodule TipsWeb.VoteTest do
         :detail -> assert count(html, control, target, :plain) == expected(target), label
       end
     end
+
+    # Search results that started loading before the refusal show no vote actions.
+    test = self()
+    {:ok, hold} = Agent.start_link(fn -> true end)
+
+    stub_provider(fn conn, _input ->
+      if Agent.get_and_update(hold, &{&1, false}) do
+        send(test, {:searching, self()})
+        receive do: (:answer -> :ok)
+      end
+
+      Plug.Conn.send_resp(conn, 503, "")
+    end)
+
+    render_submit(search, "search", %{"q" => "flaky"})
+    assert_receive {:searching, provider}
+    render_click(search, "vote", %{"target" => "tip-#{tip.id}", "vote" => "helpful"})
+    await_found(fn -> if has_element?(search, "#flash-error", "can't vote"), do: true end)
+    send(provider, :answer)
+    html = render_async(search, 1_000)
+    assert has?(html, "#tip-#{tip.id}")
+    refute has?(html, ~s([phx-click="vote"]))
   end
 
   defp expected(%Tip{}), do: {1, 0}
