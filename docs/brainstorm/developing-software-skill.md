@@ -243,6 +243,22 @@ Identify the expected workload, what grows and the relevant time and resource
 limits. Investigate costs that could change the design; a routine bounded lookup
 does not require a benchmark.
 
+For a performance claim or optimization, use a profiler or trace that observes the
+suspected cost. Test-suite duration mixes setup, fixtures, scheduling and assertions;
+it does not establish application performance. Tests may drive the workload, but
+measure the operation and resource being investigated.
+
+| Suspected cost | Evidence to use |
+|---|---|
+| Browser rendering or interaction | A [browser performance trace](https://developer.chrome.com/docs/devtools/performance) of the affected flow; inspect main-thread work, frames and paints. |
+| Network or external-service delay | A request waterfall and request/server traces; separate round trips, server work and transfer time. |
+| Database execution or contention | Query timings/counts, pool and lock statistics; [EXPLAIN ANALYZE with BUFFERS](https://www.postgresql.org/docs/current/using-explain.html) on representative disposable data when execution detail is needed. ANALYZE executes the query. |
+| Application CPU or memory | A runtime profiler available in the installed toolchain, such as [mix profile.tprof](https://hexdocs.pm/mix/Mix.Tasks.Profile.Tprof.html); choose its mode for the suspected resource cost. |
+
+Use the profile to locate the bottleneck, then compare the affected operation before
+and after under the same workload and conditions. Account for profiler overhead;
+a shorter suite run or one favorable sample is not sufficient evidence of a gain.
+
 For database work:
 
 - Check how query count and rows read or returned grow with the data. Look for
@@ -295,8 +311,7 @@ caller. A per-query or per-step bound does not bound the operation.
 For work governed by a shared deadline, quota or concurrency limit, identify which
 results stop new work and what happens to work already in progress.
 
-Measure uncertain costs when the design depends on them. Limit measurement claims
-to the workload actually tested.
+Limit measurement claims to the workload actually tested.
 
 ## Reconsider the design
 
