@@ -1035,6 +1035,7 @@ class PairLifecycleTest(unittest.TestCase):
         assert ring[2] == "team-1-test"
         assert "https://github.com/o/r/pull/7" in ring[3]
         assert pushed in ring[3]
+        assert "agent/skills/reviewing-code/SKILL.md from this worktree" in ring[3]
 
     def test_turn_to_developer_always_rings_and_reports_a_checkout_problem(self) -> None:
         self.team("start", "29")

@@ -28,12 +28,16 @@ The user maintains third-party skills in these Git-ignored directories in the ma
 
 Update matching copies together. `team.py start` links the main checkout's `.agents/skills/` into each worktree and checks only that the directory exists.
 
-The repository versions one skill, the [Dexter reference](../skills/dexter/SKILL.md). Link it once into both locations from the main checkout:
+The repository versions two skills, the [Dexter reference](../skills/dexter/SKILL.md) and [reviewing-code](../skills/reviewing-code/SKILL.md). Link them once into both locations from the main checkout:
 
 ```bash
 ln -s ../../agent/skills/dexter .agents/skills/dexter
 ln -s ../../agent/skills/dexter .claude/skills/dexter
+ln -s ../../agent/skills/reviewing-code .agents/skills/reviewing-code
+ln -s ../../agent/skills/reviewing-code .claude/skills/reviewing-code
 ```
+
+These links serve discovery in the main checkout. A pair tester reads the versioned file in its own worktree, as the pair workflow says, because the linked skills directory points at the main checkout's copy.
 
 Install only the `mix-credo` plugin, for the clients you use:
 

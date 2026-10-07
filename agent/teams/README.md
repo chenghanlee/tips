@@ -70,57 +70,24 @@ board change:
    changed files and their callers, existing tests, linked design sections and prior
    review threads. Run the tests. For UI tasks, also check acceptance scenarios
    through [manual browser review](#manual-browser-review).
-2. On the initial review of a PR, fork the three child [reviewers](#reviewers) with
-   `spawn_agent` and `fork_turns = "all"`, giving each the SHA and its duties. Fork
-   before writing any verdict.
-3. Review as the parent reviewer. Finish this pass before adjudicating child findings.
-4. Verify each child finding against the code and the requirements. One finding per
-   defect; severity by the [table](#severity); drop findings without evidence. Answer
-   a child's missing-fact question once. Take over unfinished child scope; if required
-   work stays blocked, follow the [blocker procedure](#report-and-resolve-blockers).
-   Missing results are not "no findings".
-5. End all child work, including pending tool activity. Confirm the worktree is clean
-   and HEAD matches the reviewed SHA. Report every P0 and P1 in the first review.
-   With findings: submit the review and run `agent/teams/team.py turn <pr> dev`.
-   Without: continue to approval.
+2. Read `agent/skills/reviewing-code/SKILL.md` from this worktree and apply it to the
+   pushed SHA. Verify each suspected defect against the code and the requirements. One
+   finding per defect; severity by the [table](#severity). If required review work
+   stays blocked, follow the [blocker procedure](#report-and-resolve-blockers).
+   Report unfinished scope; it is not "no findings".
+3. Confirm the worktree is clean and HEAD matches the reviewed SHA. Report every P0
+   and P1 in the first review. With findings: submit the review and run
+   `agent/teams/team.py turn <pr> dev`. Without: continue to approval.
 
-Review ordinary fixes yourself. Fork one relevant child when a fix adds substantial
-new design or behaviour. Only the tester writes `tmp/review.json`, publishes, resolves
-threads, watches checks and rings Herdr; child exchanges are internal, not
-[pair messages](#messages-between-agents).
-
-#### Reviewers
-
-All four: Review the given SHA by the duties below. Persona names are reminders of a
-perspective, not rules or authorities: do not quote or imitate the person, guess their
-views, or drop a concrete finding outside your angle. Follow AGENTS.md navigation and
-skills. Follow evidence beyond the shared context; check that `deps/` matches the
-reviewed version. Repository rules outrank personal preference; style alone is not a
-finding.
-
-Return one short paragraph per finding: proposed severity, `path:line`, the change you
-ask for, the requirement it serves, the consequence, the evidence. For behaviour: input,
-actual, expected; say whether it is code reasoning or an executed run. For design:
-present cost and a simpler replacement that keeps required behaviour. End with coverage
-and limits, including unfinished work. "No findings" is valid. No inventories of
-approved choices, no finding quota.
-
-Children: read-only. No edits, scratch files, test or browser runs, GitHub or Herdr
-commands, or further spawns. Ask the parent for facts or checks you cannot do.
-
-| Reviewer | Persona | Duties |
-|---|---|---|
-| Parent | Leslie Lamport | Check every acceptance scenario and regression, including ordinary inputs, authorization and data integrity. For stateful code, trace the transitions and look for a sequence that breaks a required invariant under concurrency, cancellation, timeouts, retries or partial failure. Check claims in comments and the PR against code, requirements and dependency semantics. |
-| Child 1 | Rich Hickey | Find unneeded complexity in abstractions, processes, dependencies and data boundaries. Built-in features, locked dependencies and established tools before custom code; compare integration and upkeep cost. Flag dead code and docs, and support for requirements that do not exist. Propose a simplification only if it keeps required behaviour. |
-| Child 2 | José Valim | Check language and framework contracts at integration boundaries: does each caller handle the locked dependency's real return values, exceptions, timeout scope and lifecycle rules? For Elixir: pattern matching and error handling, changesets, Ecto DSL over raw SQL, LiveView lifecycle, OTP contracts, per the skills and version-matched docs. Cite the contract and the consequence. |
-| Child 3 | Kent Beck | Compare changed tests, setup and helpers with existing tests, acceptance scenarios and regressions. Find missing coverage and unneeded tests. Do assertions check guaranteed behaviour, or incidental ordering, representation or timing? Observable UI order is behaviour. Check isolation and async waits, including navigation invalidating a selected browser element. Apply AGENTS.md Tests and the Test Desiderata trade-offs. For a removal or merge, name the existing test or smaller replacement that keeps every scenario. Tests of frameworks, private functions or structure are findings. |
+For fixes, check each repair and the scenarios it affects, and apply the skill to new
+behaviour or design.
 
 ### 4. Developer and tester: address findings
 
 1. Developer: fix every P0 and P1. Address each P2 under the [severity rules](#severity).
 2. Developer: push and hand off to the tester.
-3. Tester: review the changes since the previous review yourself, as step 3 says
-   for fixes. Resolve each thread that is fixed or declined with a reason.
+3. Tester: review the changes since the previous review, as step 3 says for fixes.
+   Resolve each thread that is fixed or declined with a reason.
 4. Repeat until the approval conditions are met.
 
 ### 5. Tester: approve and confirm the merge
@@ -246,8 +213,7 @@ Every message starts a turn using the recipient's full context. Send only:
 
 Do not send acknowledgments, progress or status updates, thanks, or replies that
 only confirm receipt. Include everything the recipient needs in one message or
-in the linked record. The tester's child reviewers talk to the tester only; their
-results are not pair messages.
+in the linked record.
 
 ### Report and resolve blockers
 
