@@ -29,7 +29,7 @@
 
 ## Skills
 
-When assigned a PR, diff or commit review, read [reviewing-code](agent/skills/reviewing-code/SKILL.md) from the current worktree and apply it. The language and framework skills below still apply.
+Before implementing a feature, fix or refactor, read [developing-software](agent/skills/developing-software/SKILL.md) from the current worktree and apply the sections whose trigger matches the change. When assigned a PR, diff or commit review, read [reviewing-code](agent/skills/reviewing-code/SKILL.md) from the current worktree and apply it. The language and framework skills below still apply.
 
 Before reading, editing or reviewing Elixir code, load `elixir` and each skill that applies:
 
