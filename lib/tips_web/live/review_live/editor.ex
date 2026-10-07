@@ -17,7 +17,7 @@ defmodule TipsWeb.ReviewLive.Editor do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope} editor>
+    <Layouts.app flash={@flash} current_scope={@current_scope} unread={@unread_notifications} editor>
       <h1 class="text-2xl font-semibold">{@page_title}</h1>
       <p :if={@tip}>Your review of <a href={Reader.tip_path(@tip)}>{@tip.title}</a></p>
       <TipsWeb.UI.notice :if={@load_failed} tone="error" role="alert">

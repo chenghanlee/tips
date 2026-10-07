@@ -11,11 +11,13 @@ defmodule TipsWeb.RouterTest do
     assert hooks == %{
              current_user: [
                {TipsWeb.LiveAcceptance, :default},
-               {TipsWeb.UserAuth, :mount_current_scope}
+               {TipsWeb.UserAuth, :mount_current_scope},
+               {TipsWeb.InboxBadge, :default}
              ],
              require_authenticated_user: [
                {TipsWeb.LiveAcceptance, :default},
-               {TipsWeb.UserAuth, :require_authenticated}
+               {TipsWeb.UserAuth, :require_authenticated},
+               {TipsWeb.InboxBadge, :default}
              ]
            }
   end
@@ -36,8 +38,11 @@ defmodule TipsWeb.RouterTest do
           do: {session.name, Enum.map(session.extra.on_mount, & &1.id)}
 
     assert hooks == %{
-      current_user: [{TipsWeb.UserAuth, :mount_current_scope}],
-      require_authenticated_user: [{TipsWeb.UserAuth, :require_authenticated}]
+      current_user: [{TipsWeb.UserAuth, :mount_current_scope}, {TipsWeb.InboxBadge, :default}],
+      require_authenticated_user: [
+        {TipsWeb.UserAuth, :require_authenticated},
+        {TipsWeb.InboxBadge, :default}
+      ]
     }
     """
 

@@ -34,7 +34,7 @@ defmodule TipsWeb.SearchLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
+    <Layouts.app flash={@flash} current_scope={@current_scope} unread={@unread_notifications}>
       <h1 :if={!@request.q} class="sr-only">Search tips</h1>
       <UI.search_form value={@request.q} error={@search_error} action={~p"/search"} />
       <UI.filter_bar

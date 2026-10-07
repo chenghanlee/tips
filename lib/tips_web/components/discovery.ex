@@ -165,7 +165,8 @@ defmodule TipsWeb.Discovery do
   defp model(%{id: id, label: label}, filter_path),
     do: {:curated, label, filter_path.(:model, id)}
 
-  defp age(at) do
+  @doc ~s(How long ago `at` was: "just now", "5 minutes ago", "2 days ago".)
+  def age(at) do
     case DateTime.diff(DateTime.utc_now(), at) do
       seconds when seconds < 60 -> "just now"
       seconds when seconds < 3600 -> ago(div(seconds, 60), "minute")

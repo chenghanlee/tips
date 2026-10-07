@@ -13,7 +13,7 @@ defmodule TipsWeb.UserLive.Login do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
+    <Layouts.app flash={@flash} current_scope={@current_scope} unread={@unread_notifications}>
       <div class="mx-auto max-w-sm space-y-6">
         <div class="space-y-1 text-center">
           <h1 class="text-2xl font-semibold">Log in</h1>

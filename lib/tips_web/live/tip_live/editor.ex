@@ -14,7 +14,7 @@ defmodule TipsWeb.TipLive.Editor do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope} editor>
+    <Layouts.app flash={@flash} current_scope={@current_scope} unread={@unread_notifications} editor>
       <h1 class="text-2xl font-semibold">{@page_title}</h1>
       <TipsWeb.UI.notice :if={@load_failed} tone="error" role="alert">
         This tip couldn't be loaded. Reload the page to try again.

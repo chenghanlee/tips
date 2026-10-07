@@ -9,7 +9,7 @@ defmodule TipsWeb.UserLive.Settings do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
+    <Layouts.app flash={@flash} current_scope={@current_scope} unread={@unread_notifications}>
       <div class="space-y-1 text-center">
         <h1 class="text-2xl font-semibold">Account Settings</h1>
         <p class="text-sm text-muted-foreground">
