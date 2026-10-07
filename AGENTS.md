@@ -19,17 +19,9 @@
 - Never push directly to `main`, edit another agent's work or reset its database.
 - Report a denied action with its exact error, secrets redacted. Follow the client's approval policy ([setup](agent/teams/SETUP.md#one-time-setup)); in a pair, follow the [blocker procedure](agent/teams/README.md#report-and-resolve-blockers). Do not bypass the denial.
 
-## Software design
-
-- Build the simplest solution that meets the requirements. Add nothing for hypothetical future needs or for compatibility the requirements do not ask for. Among solutions that meet the requirements, prefer the one easier for the product's users over the one with less code.
-- Follow applicable standards and language and framework idioms. Explain deviations in the PR.
-- Before building a custom solution, check built-in features, locked dependencies, and commonly used libraries, tools and frameworks for the task. Build one only if none meets the requirements or reuse costs more to integrate and maintain than building and maintaining your own. Say what you checked and why in the PR.
-- Use Ecto's query, changeset and migration DSLs. Use raw SQL or `fragment` only for what they cannot express. Bind runtime values as parameters.
-- In the same PR, update the docs for what you changed and delete the code, files and docs it leaves unused.
-
 ## Skills
 
-Before implementing a feature, fix or refactor, read [developing-software](agent/skills/developing-software/SKILL.md) from the current worktree and apply the sections whose trigger matches the change. When assigned a PR, diff or commit review, read [reviewing-code](agent/skills/reviewing-code/SKILL.md) from the current worktree and apply it. The language and framework skills below still apply.
+Before planning an implementation, changing code or writing tests, read [developing-software](agent/skills/developing-software/SKILL.md) from the current worktree. It owns software design and testing rules; apply its conditional checks when their triggers occur. When assigned a PR, diff or commit review, read [reviewing-code](agent/skills/reviewing-code/SKILL.md) from the current worktree and apply it. The language and framework skills below still apply.
 
 Before reading, editing or reviewing Elixir code, load `elixir` and each skill that applies:
 
@@ -60,16 +52,6 @@ These five are user-maintained files outside version control ([setup](agent/team
 - Before changing a public or private function's name, arity, return shape or behaviour, find its uses with both Dexter `references` at its definition and scoped `rg` for its bare name and any atom or tuple that dispatches to it. Investigate every use that only one of them found.
 - An empty Dexter result does not prove absence: dynamic dispatch, macros and generated code hide uses. Check with `rg` before concluding that a function is unused.
 - After `mix deps.get` or a dependency change, run `"$TIPS_DEXTER" reindex`.
-
-## Tests
-
-- Test the acceptance scenarios in the issue or user brief, and reported regressions. Do not add tests just because functions, branches or inputs changed.
-- Read existing tests first. If they already check the required behaviour, leave them unchanged. If a requirement changed, update their assertions. If a scenario or regression has no test, extend an existing test that can check it with the same setup and action. Add a test only if none can. Make the smallest set of changes that covers the scenarios and regressions.
-- To test new behaviour or a regression, write or update the test before changing the code. Check that it fails for the reason you expect.
-- Use integration tests to check that components work together through their public entry points. Add a unit test only for a boundary case in pure logic that integration tests do not cover. Add a browser test only for a user interaction that lower-level tests cannot check.
-- Test the application's behaviour through its public entry points, including its use of a framework or library. Do not test the framework or library itself, private functions or code structure.
-- Before adding or changing tests, weigh the trade-offs using the relevant [Test Desiderata](https://testdesiderata.com/) factors: isolated, composable, deterministic, fast, writable, readable, behavioral, structure-insensitive, automated, specific, predictive and inspiring. Follow the rules above when choosing.
-- In the same PR, delete tests for requirements that no longer apply and tests your change makes unnecessary. Keep tests for every acceptance scenario and regression that still applies.
 
 ## Checks
 

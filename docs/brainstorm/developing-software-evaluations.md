@@ -1,6 +1,6 @@
-# Developing software candidate: authoring checks and evaluations
+# Developing software revision: authoring checks and evaluations
 
-Authoring notes for the [brainstorm candidate](developing-software-skill.md), assessed
+Authoring notes for the [promoted revision](../../agent/skills/developing-software/SKILL.md), assessed
 against the supplied [Skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).
 This file is for evaluating the skill, not an instruction file to load during implementation.
 
@@ -15,10 +15,10 @@ This file is for evaluating the skill, not an instruction file to load during im
 
 ## Authoring assessment
 
-- Discovery: the proposed gerund name and third-person description identify the
-  capability, repository, triggers and review routing. The metadata is shown in a
-  code block because this is a brainstorm; promotion must produce real frontmatter.
-- Structure: the candidate body is below 500 lines. Its one bundled reference is
+- Discovery: the gerund name and third-person description identify the
+  capability, repository, triggers and review routing. The active skill uses real
+  YAML frontmatter.
+- Structure: the revised body is below 500 lines. Its one bundled reference is
   linked directly at the measurement decision and is below 100 lines, so it needs
   no table of contents. Keep authoring notes out of the installed skill.
 - Freedom: design choices remain contextual; contracts, authorization, test
@@ -27,10 +27,10 @@ This file is for evaluating the skill, not an instruction file to load during im
 - Actionability: triggers and short counterexamples identify when to act. Evidence,
   repair and refinement sections provide feedback and stopping conditions without
   requiring a compliance report.
-- Tools and maintenance: this Markdown-only candidate ships no executable scripts
+- Tools and maintenance: this Markdown-only skill ships no executable scripts
   or MCP calls. Profiling uses tools available in the installed environment. Metric
   thresholds and profiler capabilities have linked sources; recheck them when
-  changing the reference or promoting it, rather than adding date-based instructions.
+  changing the reference, rather than adding date-based instructions.
 - Evidence: Opus and Fable critique informed revisions. This is authoring feedback,
   not evidence of better implementations or lower total token use.
 
@@ -41,7 +41,7 @@ three scenario definitions across two historical tasks (issue 78 and issue 62,
 including replacement of the issue 244 probe). They pin base and first-review heads
 and provide a manual replay/grading protocol; they are not an executable harness.
 Reuse those definitions before building new fixtures. Leave the active eval file
-unchanged; this document defines the candidate comparison protocol.
+unchanged; this document defines the revision comparison protocol.
 
 For each replay, use its pinned base in an isolated worktree and recover the issue
 brief and linked requirements as they stood before implementation. Withhold later
@@ -50,10 +50,12 @@ exact brief and instruction versions used; if historical requirements cannot be
 recovered, report that limit rather than claiming an equivalent replay.
 
 Use fresh sessions with the same task, checkout, tools and model settings in each arm:
-(1) repository instructions without developing-software, (2) the active skill, and
-(3) the candidate. Preserve design and test requirements in every arm; for the
-candidate, remove their AGENTS.md copies in the disposable fixture to represent the
-proposed ownership change. Keep all other routing and instructions equivalent.
+(1) repository instructions without developing-software, (2) the previous skill at
+`988e174`, and (3) the promoted revision, pinned to its exact commit when running.
+Preserve design and test requirements in every arm: the first two retain their
+AGENTS.md copies; the revised arm uses the skill as their owner. Keep all other
+routing and instructions equivalent. Skill versions and evaluation-task base
+revisions are separate inputs; record both.
 Historical first-review heads are evidence of observed defects, not controlled
 no-skill runs or substitutes for a fresh arm with matched tools and settings.
 
@@ -141,8 +143,8 @@ a speed claim. No production percentile or product-usefulness claim is inferred.
 
 ## Pending validation
 
-No candidate replay, model comparison or real-task observation has occurred in this
-iteration. Historical implementations are not candidate validation.
+No revised-skill replay, model comparison or real-task observation has occurred in this
+iteration. Historical implementations are not revision validation.
 After these comparisons, observe real implementation tasks and revise only for
 demonstrated failures or wasted work. Structural checks and reviewer consensus alone
-do not establish the quality-per-token improvement this candidate aims to achieve.
+do not establish the quality-per-token improvement this revision aims to achieve.

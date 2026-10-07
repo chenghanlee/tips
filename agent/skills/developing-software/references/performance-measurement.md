@@ -1,9 +1,7 @@
-# Performance measurement reference candidate
+# Performance measurement
 
-Supporting reference for the
-[developing-software candidate](developing-software-skill.md#check-performance-claims-and-bounds).
-This is brainstorm material, not active repository instructions. Read the relevant
-section when measuring a performance property identified by the candidate.
+Read the relevant section when measuring a performance property identified by
+[developing-software](../SKILL.md#check-performance-claims-and-bounds).
 
 ## Choose the measurement tool
 

@@ -817,8 +817,10 @@ def turn(pr: str, recipient: str) -> None:
             raise RuntimeError(f"{problem} Commit and push, then hand over.")
         message = (
             f"Your turn: review {url} at {head}. Follow README step 3; read and apply "
-            "agent/skills/reviewing-code/SKILL.md from this worktree. Follow AGENTS.md Tests "
-            f"and GitHub and the README PR review record. With findings: submit them and run "
+            "agent/skills/reviewing-code/SKILL.md from this worktree, using "
+            "agent/skills/developing-software/SKILL.md as the design and testing standard. "
+            "Follow AGENTS.md GitHub and the README PR review record. "
+            "With findings: submit them and run "
             f"agent/teams/team.py turn {pr} dev. Without: publish the approval without "
             "waiting for CI, keep the turn and do README step 5."
         )
