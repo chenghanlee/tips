@@ -59,12 +59,13 @@ triggers it.
   behaviour, without moving costs elsewhere. Can you remove a part, state, duplicate
   path, compatibility code, dead code or unused documentation without losing required
   behaviour, failure isolation or testability?
-- Idiom: Does custom code duplicate a documented feature of a built-in, locked
-  dependency or established tool? Compare custom code with the Ecto DSL, changesets and
-  forms; LiveView lifecycle and uploads; OTP supervision; Oban for durable work; and
-  standard serializers, browser APIs and test helpers. Check whether plain functions can
-  replace processes. Respect documented error contracts; `with` does not catch
-  exceptions.
+- Idiom: Check code against applicable language and framework standards, conventions
+  and documented best practices. Does custom code duplicate a documented feature of a
+  built-in, locked dependency or established tool? Compare custom code with the Ecto
+  DSL, changesets and forms; LiveView lifecycle and uploads; OTP supervision; Oban for
+  durable work; and standard serializers, browser APIs and test helpers. Check whether
+  plain functions can replace processes. Respect documented error contracts; `with`
+  does not catch exceptions.
 
 ## Report
 
@@ -89,7 +90,9 @@ followed by the requirement, consequence and evidence.
   a standard meets the requirement at lower integration and maintenance cost, or an
   explicit repository rule requires it. Name the standard, show that it meets the
   requirement, and explain how the custom code differs, what it costs and what should
-  replace it. For a repository-rule violation, cite the rule.
+  replace it. For deviations from language or framework guidance, assess the stated
+  justification and cite the guidance and consequence. For a repository-rule
+  violation, cite the rule.
 
 Report what you reviewed and what remains unfinished or blocked. "No findings" is
 valid. Do not aim for a finding count or list choices you approve of.
