@@ -42,9 +42,7 @@ triggers it.
   size and queue length grow with input size, history size, user count or arrival rate?
   Check N+1 queries, repeated work per render or event, unbounded loads or retention,
   work that grows with records the user never sees, and blocking calls against the
-  required latency and resource budgets. State what grows or which budget applies, the
-  workload, the consequence and a fix that preserves required behaviour. Distinguish
-  measurements from estimates. A scan or synchronous call alone is not a defect.
+  required latency and resource budgets.
 - Trust: Try substituting an id and replaying an operation after permissions change.
   Check authorization for reads and effects, including jobs, sockets and browser
   storage. Follow untrusted content into HTML, URLs, provider destinations and
@@ -60,19 +58,13 @@ triggers it.
 - Simplicity: Simpler means fewer unnecessary parts or user steps for the same required
   behaviour, without moving costs elsewhere. Can you remove a part, state, duplicate
   path, compatibility code, dead code or unused documentation without losing required
-  behaviour, failure isolation or testability? Show the current cost and proposed
-  replacement, including user effort and maintenance. Fewer lines or modules alone do
-  not prove simplicity.
+  behaviour, failure isolation or testability?
 - Idiom: Does custom code duplicate a documented feature of a built-in, locked
   dependency or established tool? Compare custom code with the Ecto DSL, changesets and
   forms; LiveView lifecycle and uploads; OTP supervision; Oban for durable work; and
   standard serializers, browser APIs and test helpers. Check whether plain functions can
-  replace processes. Report a custom protocol, format, state machine, wrapper or
-  convention when a standard meets the requirement at lower integration and
-  maintenance cost, or an explicit repository rule requires it. Name the standard, show
-  that it meets the requirement, and explain how the custom code differs, what it costs
-  and what should replace it. For a repository-rule violation, cite the rule. Respect
-  documented error contracts; `with` does not catch exceptions.
+  replace processes. Respect documented error contracts; `with` does not catch
+  exceptions.
 
 ## Report
 
@@ -85,7 +77,19 @@ the findings in the requested output. This skill does not authorize publishing a
 review or merging.
 
 Report one finding per defect. Start with the severity and the requested change,
-followed by the requirement, consequence and evidence. For behaviour, give the input
-and the actual and expected results. For simplicity or idiom, give the cost and
-replacement. Report what you reviewed and what remains unfinished or blocked. "No
-findings" is valid. Do not aim for a finding count or list choices you approve of.
+followed by the requirement, consequence and evidence.
+
+- Behaviour: Give the input and the actual and expected results.
+- Complexity and performance: State what grows or which budget applies, the workload,
+  the consequence and a fix that preserves required behaviour. Distinguish measurements
+  from estimates. A scan or synchronous call alone is not a defect.
+- Simplicity: Show the current cost and proposed replacement, including user effort
+  and maintenance. Fewer lines or modules alone do not prove simplicity.
+- Idiom: Report a custom protocol, format, state machine, wrapper or convention when
+  a standard meets the requirement at lower integration and maintenance cost, or an
+  explicit repository rule requires it. Name the standard, show that it meets the
+  requirement, and explain how the custom code differs, what it costs and what should
+  replace it. For a repository-rule violation, cite the rule.
+
+Report what you reviewed and what remains unfinished or blocked. "No findings" is
+valid. Do not aim for a finding count or list choices you approve of.
