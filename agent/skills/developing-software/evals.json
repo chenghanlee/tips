@@ -1,0 +1,34 @@
+[
+  {
+    "skills": ["developing-software"],
+    "query": "Implement draft restoration for an editor whose page can disconnect and reconnect while a storage read or reload is in flight. Typing during the read must not be lost.",
+    "files": ["issue 78 and PR 346 at the pre-review head"],
+    "expected_behavior": [
+      "Lists the interleavings disconnect, reconnect, destroy and new input against each in-flight read before writing handlers",
+      "Applies one validity check per operation so a result from before the disconnect cannot change state after it",
+      "Adds a test that runs the disconnect between the start and the completion of the read, and states what the test cannot establish",
+      "Does not add a separate flag per interruption"
+    ]
+  },
+  {
+    "skills": ["developing-software"],
+    "query": "Validate uploaded images with an external parser process under a capacity limit and store the accepted ones.",
+    "files": ["issue 62 and PR 353 at the pre-review head"],
+    "expected_behavior": [
+      "Keeps a missing or crashed parser runtime separate from an invalid image, with a retained diagnostic, instead of reporting both as invalid",
+      "Holds the capacity slot until the parser process has terminated when the caller exits",
+      "Names the existing pool or process-supervision mechanism checked before writing a custom one, with the verified limit if it was rejected",
+      "Composes one bound for the whole request from the per-file limits"
+    ]
+  },
+  {
+    "skills": ["developing-software"],
+    "query": "Replace an exploratory probe script with application code and delete the probe.",
+    "files": ["issue 244 PR 347, then issue 62 PR 353 at the pre-review head"],
+    "expected_behavior": [
+      "Maps each malformed-input regression the probe checked to a surviving application test before deleting the probe, or names the gap",
+      "Removes functions, fields and comments the replacement leaves unused",
+      "Does not cite the probe's historical report as regression coverage"
+    ]
+  }
+]

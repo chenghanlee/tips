@@ -1,14 +1,26 @@
 ---
 name: developing-software
-description: Guides the design and implementation of features, fixes and refactors in any language or project. Checks dependency claims before custom mechanisms, shared rules before copies, lifecycle and authority invariants, failure categories, cost bounds and whether tests can detect the likely fault. Applies to implementation work; excludes code reviews and standalone planning discussions.
+description: Guides the design and implementation of code changes in any language or project. Checks dependency claims before custom mechanisms, shared rules before copies, lifecycle and authority invariants, failure categories, cost bounds and whether tests can detect the likely fault. Use when implementing a feature, fix or refactor, designing a module, choosing between a library and custom code, handling failures, or writing tests. Not for code reviews or standalone planning discussions.
 ---
 
 # Developing software
 
 Follow the project's rules and its language and framework guidance; they take
 precedence. Apply only the sections whose trigger matches the change. Record evidence
-in existing tests and change notes; do not produce a checklist report. Evidence is a source, an execution result or a
-reproducible scenario. A statement that a check was done is not evidence.
+in existing tests and change notes; do not produce a checklist report. Evidence is a
+source, an execution result or a reproducible scenario. A statement that a check was
+done is not evidence.
+
+## Workflow
+
+1. Before writing code: sections 1 to 3.
+2. While writing: sections 4 to 7 as their triggers match.
+3. Before pushing: section 8, then reread the diff against every triggered section.
+   Fix what fails and reread again until nothing fails.
+4. After a finding, and before handoff: sections 9 and 10.
+
+Three evaluation scenarios in [evals.json](evals.json) check the skill against a
+baseline without it.
 
 ## 1. Behaviour and scope
 
