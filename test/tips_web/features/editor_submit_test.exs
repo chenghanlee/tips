@@ -77,17 +77,6 @@ defmodule TipsWeb.EditorSubmitTest do
              "Worked on a rename."
   end
 
-  defp sign_in(session, user) do
-    {token, _hashed} = generate_user_magic_link_token(user)
-
-    session
-    |> visit("/users/log-in/#{token}")
-    |> click(button("Log me in only this time"))
-    # The browser matches the email itself, so no text is read from the log-in page's
-    # header while the navigation replaces it.
-    |> assert_has(xpath(~s|//header[contains(., "#{user.email}")]|))
-  end
-
   defp js(session, script) do
     execute_script(session, script, [], &send(self(), {:js, &1}))
     assert_received {:js, value}

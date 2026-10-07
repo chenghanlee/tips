@@ -78,7 +78,7 @@ defmodule TipsWeb.SearchLive.IndexTest do
 
       refute html =~ "<b>loop</b>", render
 
-      for selector <- ["img", "video", "iframe", "button"] do
+      for selector <- ["img", "video", "iframe"] do
         refute has?(html, "#{row} #{selector}"), "#{render} #{selector}"
       end
 

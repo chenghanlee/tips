@@ -464,7 +464,7 @@ defmodule TipsWeb.UI do
   text. `vote` holds the `vote_control/1` attrs; without it the row has no
   vote control.
 
-      <TipsWeb.UI.tip_row tip={tip} vote={%{target: tip.id, selected: nil}}>
+      <TipsWeb.UI.tip_row tip={tip} vote={%{target: "tip-12", return: "/tips/12/plan", selected: nil}}>
         <:excerpt source="Review" href={tip.href}>{excerpt}</:excerpt>
       </TipsWeb.UI.tip_row>
   """
@@ -522,20 +522,24 @@ defmodule TipsWeb.UI do
   defp review_count(count), do: "#{count} reviews"
 
   @doc """
-  Renders Helpful / Not helpful. Emits `phx-click="vote"` with `target` and
-  `choice` values; behaviour is wired by #110.
+  Renders Helpful / Not helpful. Each button emits `phx-click="vote"` with
+  `target`, `return` and the `vote` it asks for: its own choice, or `none`
+  when that choice is already selected. `TipsWeb.VoteActions` handles it.
+  Button ids are `id` plus `-helpful` or `-not_helpful`.
 
   While `pending`, both buttons carry `aria-disabled` (not `disabled`, so
-  focus stays on the clicked button), clicks are ignored and a polite status
-  says "Saving…".
+  focus stays on the clicked button) and clicks are ignored. `status` is the
+  polite status text, such as "Saving…".
 
-      <TipsWeb.UI.vote_control variant="detail" target="review-12" selected={:helpful} counts={%{helpful: 8, not_helpful: 1}} />
+      <TipsWeb.UI.vote_control id="review-12-vote" variant="detail" target="review-12" return="/reviews/12" selected={:helpful} counts={%{helpful: 8, not_helpful: 1}} />
   """
-  attr :id, :string, default: nil
+  attr :id, :string, required: true
   attr :variant, :string, values: ~w(compact detail), default: "compact"
   attr :target, :string, required: true
+  attr :return, :string, required: true, doc: "the target's permalink, for sign-in"
   attr :selected, :atom, values: [:helpful, :not_helpful, nil], default: nil
   attr :pending, :boolean, default: false
+  attr :status, :string, default: nil
   attr :counts, :map, default: %{helpful: 0, not_helpful: 0}
   attr :describedby, :string, default: nil, doc: "id of the voted item's title"
 
@@ -544,19 +548,21 @@ defmodule TipsWeb.UI do
     <div id={@id} class="mt-1 flex flex-wrap items-center gap-2" aria-busy={@pending && "true"}>
       <.button
         :for={{choice, label} <- [helpful: "Helpful", not_helpful: "Not helpful"]}
+        id={"#{@id}-#{choice}"}
         type="button"
         variant={if @selected == choice, do: "default", else: "outline"}
-        class="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+        class="aria-disabled:cursor-not-allowed aria-disabled:opacity-50 phx-click-loading:opacity-50"
         aria-pressed={to_string(@selected == choice)}
         aria-disabled={@pending && "true"}
         aria-describedby={@describedby}
         phx-click={!@pending && "vote"}
         phx-value-target={@target}
-        phx-value-choice={choice}
+        phx-value-vote={if @selected == choice, do: "none", else: choice}
+        phx-value-return={@return}
       >
         {label}{if @variant == "detail", do: " #{Map.fetch!(@counts, choice)}"}
       </.button>
-      <span role="status" class="text-sm">{if @pending, do: "Saving…"}</span>
+      <span role="status" class="text-sm">{@status}</span>
     </div>
     """
   end

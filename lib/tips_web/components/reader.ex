@@ -9,6 +9,7 @@ defmodule TipsWeb.Reader do
 
   A review card's Delete sends `confirm_delete`, `cancel_delete` and `delete`
   events; `TipsWeb.ReviewActions` handles them on each page that renders cards.
+  Vote controls send `vote` events, which `TipsWeb.VoteActions` handles.
   """
   use TipsWeb, :html
 
@@ -62,14 +63,15 @@ defmodule TipsWeb.Reader do
   defp contribution(_tip, nil, true, _sort_params), do: {:none, nil}
 
   @doc """
-  Renders the tip page header: title, author, dates, setup, the tip's vote counts,
-  its actions and the contribution control. A placeholder renders only its
-  title and the contribution control.
+  Renders the tip page header: title, author, dates, setup, the tip's vote
+  control or counts, its actions and the contribution control. A placeholder
+  renders only its title and the contribution control.
   """
   attr :tip, :map, required: true
   attr :own_review, :map, default: nil
   attr :signed_in, :boolean, required: true
   attr :sort_params, :list, default: [], doc: "the review sort, kept by the Your review link"
+  attr :vote, :map, default: nil, doc: "`TipsWeb.VoteActions.control/4` attrs; nil shows counts"
 
   def tip_header(assigns) do
     {state, href} =
@@ -90,9 +92,10 @@ defmodule TipsWeb.Reader do
         </div>
       <% end %>
       <div class="flex flex-wrap items-center gap-3">
-        <.vote_counts
+        <.votes
           :if={@tip.state == :visible}
           id="tip-vote"
+          vote={@vote}
           helpful={@tip.up_count}
           not_helpful={@tip.down_count}
         />
@@ -220,12 +223,13 @@ defmodule TipsWeb.Reader do
 
   @doc """
   Renders one readable review: author, dates, reviewer setup, Markdown body,
-  the Prompt and Result disclosure, vote counts and the viewer's actions. `open`
-  opens the disclosure, as on the single-review view. `href` is the author
-  heading's link, the card's own anchor by default. `own` adds the Your review
-  badge. `confirm_delete` shows the delete confirmation.
+  the Prompt and Result disclosure, the vote control or counts and the
+  viewer's actions. `open` opens the disclosure, as on the single-review view.
+  `href` is the author heading's link, the card's own anchor by default. `own`
+  adds the Your review badge. `confirm_delete` shows the delete confirmation.
   """
   attr :review, :map, required: true
+  attr :vote, :map, default: nil, doc: "`TipsWeb.VoteActions.control/4` attrs; nil shows counts"
   attr :open, :boolean, default: false
   attr :href, :string, default: nil
   attr :own, :boolean, default: false
@@ -276,10 +280,12 @@ defmodule TipsWeb.Reader do
           text={@review.output}
         />
       </UI.disclosure>
-      <.vote_counts
+      <.votes
         id={"#{@dom_id}-vote"}
+        vote={@vote}
         helpful={@review.up_count}
         not_helpful={@review.down_count}
+        describedby={"#{@dom_id}-author"}
       />
       <.actions
         capabilities={@review.capabilities}
@@ -290,12 +296,20 @@ defmodule TipsWeb.Reader do
     """
   end
 
-  # Plain-text counts; the interactive `vote_control` replaces them with #110.
+  # The detail vote control, or plain counts for a viewer who cannot vote.
   attr :id, :string, required: true
+  attr :vote, :map, required: true
   attr :helpful, :integer, required: true
   attr :not_helpful, :integer, required: true
+  attr :describedby, :string, default: nil
 
-  defp vote_counts(assigns) do
+  defp votes(%{vote: vote} = assigns) when is_map(vote) do
+    ~H"""
+    <UI.vote_control id={@id} variant="detail" describedby={@describedby} {@vote} />
+    """
+  end
+
+  defp votes(assigns) do
     ~H"""
     <p id={@id} class="flex flex-wrap gap-x-3 text-sm">
       <span>Helpful {@helpful}</span>

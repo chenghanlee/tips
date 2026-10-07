@@ -63,16 +63,16 @@ defmodule TipsWeb.EditorReconcileTest do
     session |> open_editor("/editor/tips/new") |> compose("Plan before you prompt.", form)
     %{"storage" => storage, "submission_key" => key} = hidden_record(session)
 
-    drop_replies(session)
+    drop_frames(session, ["phx_reply"])
     click(session, button("Publish"))
-    await(fn -> Repo.get_by(Tip, submission_key: key) end)
+    await_found(fn -> Repo.get_by(Tip, submission_key: key) end)
 
     # The lookup confirms it and the hook clears the draft, but its report
     # never reaches the page.
     drop_push(session, "editor:cleared")
-    reconnect(session)
+    reconnect_live(session)
     await_cleared(session, storage)
-    reconnect(session)
+    reconnect_live(session)
 
     assert_has(session, css("h1", text: "Plan first"))
   end
@@ -83,10 +83,10 @@ defmodule TipsWeb.EditorReconcileTest do
     open_editor(session, "/editor/tips/#{tip.id}/edit")
     fill_in(session, text_field("Tip"), with: "Edited body")
 
-    drop_replies(session)
+    drop_frames(session, ["phx_reply"])
     click(session, button("Save changes"))
-    await(fn -> Repo.get_by(Tip, id: tip.id, edit_version: 2) end)
-    reconnect(session)
+    await_found(fn -> Repo.get_by(Tip, id: tip.id, edit_version: 2) end)
+    reconnect_live(session)
 
     session
     |> assert_has(
@@ -96,15 +96,6 @@ defmodule TipsWeb.EditorReconcileTest do
 
     assert field_value(session, "#tip_body") == "Edited body"
     assert hidden_record(session)["expected_version"] == 1
-  end
-
-  defp sign_in(session, user) do
-    {token, _hashed} = generate_user_magic_link_token(user)
-
-    session
-    |> visit("/users/log-in/#{token}")
-    |> click(button("Log me in only this time"))
-    |> assert_has(css("header", text: user.email))
   end
 
   defp open_editor(session, path) do
@@ -121,20 +112,6 @@ defmodule TipsWeb.EditorReconcileTest do
     |> assert_has(css("#{form}-status", text: "Draft saved in this browser at"))
   end
 
-  # Drops every reply frame from the server, as a lost connection would,
-  # until `reconnect/1`.
-  defp drop_replies(session) do
-    run(session, """
-    const socket = window.liveSocket.getSocket()
-    const receive = socket.onConnMessage.bind(socket)
-    window.dropReplies = true
-    socket.onConnMessage = (event) => {
-      if (window.dropReplies && JSON.parse(event.data)[3] === "phx_reply") return
-      receive(event)
-    }
-    """)
-  end
-
   # Never sends the page's `event` pushes.
   defp drop_push(session, event) do
     run(
@@ -148,31 +125,6 @@ defmodule TipsWeb.EditorReconcileTest do
       """,
       [event]
     )
-  end
-
-  # Returns once `connect()` is called; the page may then leave. Connects only
-  # after the disconnect's teardown: an earlier teardown still running closes
-  # the next connection.
-  defp reconnect(session) do
-    run(session, """
-    await new Promise((resolve) => window.liveSocket.disconnect(resolve))
-    window.dropReplies = false
-    window.liveSocket.connect()
-    """)
-  end
-
-  defp await(fun, tries \\ 100) do
-    case fun.() do
-      nil when tries > 1 ->
-        Process.sleep(50)
-        await(fun, tries - 1)
-
-      nil ->
-        flunk("the write did not commit")
-
-      found ->
-        found
-    end
   end
 
   defp await_cleared(session, storage) do
