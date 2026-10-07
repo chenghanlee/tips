@@ -43,7 +43,9 @@ triggers it.
   Check N+1 queries, repeated work per render or event, unbounded loads or retention,
   work that grows with records the user never sees, and blocking calls against the
   required latency and resource budgets.
-- Trust: Try substituting an id and replaying an operation after permissions change.
+- Trust: Identify trust boundaries and trace untrusted data into decisions and effects.
+  Check identity, authorization, validation and sensitive-data handling at each boundary.
+  Try substituting an id and replaying an operation after permissions change.
   Check authorization for reads and effects, including jobs, sockets and browser
   storage. Follow untrusted content into HTML, URLs, provider destinations and
   commands. Check for unauthorized disclosure through output or logs.
