@@ -36,11 +36,20 @@ defmodule TipsWeb.Layouts do
     default: nil,
     doc: "public pages: the permalink the header's Log in and Register links return to"
 
+  attr :unread, :integer,
+    default: 0,
+    doc: "the header bell's unread badge, from `TipsWeb.InboxBadge`"
+
   slot :inner_block, required: true
 
   def app(assigns) do
     ~H"""
-    <TipsWeb.UI.site_header current_scope={@current_scope} editor={@editor} return_to={@return_to} />
+    <TipsWeb.UI.site_header
+      current_scope={@current_scope}
+      editor={@editor}
+      return_to={@return_to}
+      unread={@unread}
+    />
 
     <main class={[
       "mx-auto space-y-6 px-4 py-8",

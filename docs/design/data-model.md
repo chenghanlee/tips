@@ -703,7 +703,7 @@ from unnest($2::bigint[], $3::int[]) v(id, count)
 where n.user_id = $1 and n.id = v.id and n.count = v.count and n.read_at is null;
 ```
 
-The three notification types are `tip_upvoted` ("Your tip got new helpful votes"), `review_upvoted` ("Your review got new helpful votes"), and `tip_reviewed` ("handle reviewed your tip"). Vote notifications show activity time, without actor names or numeric event totals. Keep the internal count for folding and race-safe mark-read; it is not a count of distinct voters.
+The three notification types are `tip_upvoted` ("Your tip got new helpful votes"), `review_upvoted` ("Your review got new helpful votes"), and `tip_reviewed` ("handle reviewed your tip", or "Your tip got a review" while the recipient cannot read that review, so a hidden review's author stays unnamed). Vote notifications show activity time, without actor names or numeric event totals. Keep the internal count for folding and race-safe mark-read; it is not a count of distinct voters.
 
 ### Search
 

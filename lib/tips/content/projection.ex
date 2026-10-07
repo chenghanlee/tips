@@ -43,7 +43,7 @@ defmodule Tips.Content.Projection do
   alias Tips.Accounts
   alias Tips.Accounts.{Scope, User}
   alias Tips.Content.Media.Asset
-  alias Tips.Content.{Review, Tip, Visibility}
+  alias Tips.Content.{Notification, Review, Tip, Visibility}
 
   @deleted_title "Deleted tip"
   @removed_title "Removed tip"
@@ -279,6 +279,22 @@ defmodule Tips.Content.Projection do
           optional(:parent) => tip_row()
         }
 
+  @typedoc """
+  One inbox row. `tip` is the target tip or a review's parent, masked like
+  every other link. `review_id` is set for review targets. `actor` names the
+  reviewer of a `:tip_reviewed` row only while the review is readable; vote
+  rows never name voters or carry their event count.
+  """
+  @type inbox_entry :: %{
+          id: pos_integer(),
+          type: Notification.type(),
+          unread: boolean(),
+          updated_at: DateTime.t(),
+          tip: tip_link(),
+          review_id: pos_integer() | nil,
+          actor: author() | nil
+        }
+
   @typedoc "Tip hydration and, only when the review is readable, review hydration."
   @type selected_hydration :: %{
           required(:tip) => hydration(),
@@ -289,6 +305,7 @@ defmodule Tips.Content.Projection do
   @typep tip_row :: %Tip{}
   @typep review_row :: %Review{}
   @typep asset_row :: %Asset{}
+  @typep notification_row :: %Notification{}
 
   @doc """
   Projects a tip's title and slug for page titles, slug redirects, social
@@ -425,6 +442,40 @@ defmodule Tips.Content.Projection do
         nil
     end
   end
+
+  @doc """
+  Projects an inbox row. `tip` is the notified tip, or the parent of the
+  notified `review`. `author` is the review's author when the row names it, else
+  `nil`. A target that does not match the row raises `FunctionClauseError`.
+  """
+  @spec inbox_entry(scope(), notification_row(), tip_row(), review_row() | nil, User.t() | nil) ::
+          inbox_entry()
+  def inbox_entry(scope, %Notification{} = notification, %Tip{} = tip, review, author) do
+    %{
+      id: notification.id,
+      type: notification.type,
+      unread: is_nil(notification.read_at),
+      updated_at: notification.updated_at,
+      tip: metadata(scope, target_tip!(notification, tip, review)),
+      review_id: notification.review_id,
+      actor: actor(scope, notification, review, author)
+    }
+  end
+
+  defp target_tip!(%Notification{tip_id: id, review_id: nil}, %Tip{id: id} = tip, nil), do: tip
+
+  defp target_tip!(
+         %Notification{tip_id: nil, review_id: id},
+         %Tip{id: tip_id} = tip,
+         %Review{id: id, tip_id: tip_id}
+       ),
+       do: tip
+
+  defp actor(scope, %Notification{type: :tip_reviewed}, review, author) do
+    if Visibility.decision(scope, review) == :visible, do: author(%{author: author}, review)
+  end
+
+  defp actor(_scope, _notification, _review, _author), do: nil
 
   @doc """
   Projects the full text of one source of a matched review, for a search

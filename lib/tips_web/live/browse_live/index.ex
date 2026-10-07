@@ -29,7 +29,7 @@ defmodule TipsWeb.BrowseLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
+    <Layouts.app flash={@flash} current_scope={@current_scope} unread={@unread_notifications}>
       <UI.search_form error={@search_error} action={~p"/search"} />
       <UI.filter_bar
         id="filters"

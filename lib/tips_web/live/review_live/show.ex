@@ -13,7 +13,12 @@ defmodule TipsWeb.ReviewLive.Show do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope} return_to={@path}>
+    <Layouts.app
+      flash={@flash}
+      current_scope={@current_scope}
+      unread={@unread_notifications}
+      return_to={@path}
+    >
       <Reader.tip_context tip={@tip} />
       <%= case @review do %>
         <% {:visible, review} -> %>

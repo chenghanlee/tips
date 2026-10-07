@@ -45,6 +45,32 @@ defmodule Tips.Content do
   consecutive pages can repeat or skip a tip whose rank changed. A malformed
   option is `{:error, :invalid_option}`.
 
+  ### Inbox
+
+  `get_inbox(viewer, opts)` reads one page of the viewer's notifications,
+  newest activity first (`updated_at`, then the higher id). It readmits the
+  session like the readers above; `nil` or a revoked session is
+  `{:error, :unauthenticated}`. Options:
+
+    * `:offset` - a multiple of 20, default 0. There is no last page.
+    * `:mark_read` - `true` once per connected inbox visit, default `false`.
+
+  The page, its targets and, with `:mark_read`, every unread `(id, count)`
+  pair of the account come from one repeatable-read, read-only snapshot,
+  including rows on other pages. The page shows the snapshot, so a marking
+  visit renders its rows unread. A separate update then sets `read_at` only
+  on captured rows still unread at their captured count: a fold or new row
+  committed after the snapshot stays unread. Marking changes no time, count or
+  order. A malformed option is `{:error, :invalid_option}`.
+
+  Each entry is a `t:Tips.Content.Projection.inbox_entry/0`: the target tip
+  through the deletion-first projection, never a raw joined title, and the
+  reviewer's handle on a review notification only while the viewer may read
+  that review. Vote rows name no voter and carry no event count.
+
+  `count_unread_notifications(scope)` is the unread badge for a freshly
+  admitted scope, capped at 100.
+
   ## Publication and edit contract
 
   Publication exists for text: `publish_tip/4`, `publish_review/5` and
@@ -381,6 +407,7 @@ defmodule Tips.Content do
     Edit,
     Intent,
     Moderation,
+    Notification,
     Projection,
     Publication,
     Read,
@@ -806,6 +833,18 @@ defmodule Tips.Content do
   @spec list_tips(Scope.t() | nil, keyword()) ::
           {:ok, Browse.page()} | {:error, :invalid_option}
   defdelegate list_tips(scope, opts \\ []), to: Browse
+
+  @doc """
+  Reads one inbox page and, with `mark_read: true`, marks the unread
+  notifications it captured. See "Inbox".
+  """
+  @spec get_inbox(viewer(), keyword()) ::
+          {:ok, Notification.page()} | {:error, :unauthenticated | :invalid_option}
+  defdelegate get_inbox(viewer, opts \\ []), to: Notification, as: :inbox
+
+  @doc "Counts the scope's unread notifications, up to 100. See \"Inbox\"."
+  @spec count_unread_notifications(Scope.t()) :: 0..100
+  defdelegate count_unread_notifications(scope), to: Notification, as: :count_unread
 
   @doc """
   Returns the active curated tags, models and environments in display order:

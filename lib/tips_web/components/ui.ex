@@ -27,7 +27,8 @@ defmodule TipsWeb.UI do
   @textarea_overrides "text-base focus-visible:ring-0 aria-invalid:border-destructive"
 
   @doc """
-  Renders the top bar: the Tips home link and the account links.
+  Renders the top bar: the Tips home link and the account links. A signed-in
+  reader also gets the inbox bell, with the `unread` badge capped at "99+".
 
   With `editor`, every exit is an ordinary `<a href>` so the editor's leave
   warning covers it. With `return_to`, Log in and Register carry that page as
@@ -38,6 +39,7 @@ defmodule TipsWeb.UI do
   attr :current_scope, :map, default: nil
   attr :editor, :boolean, default: false
   attr :return_to, :string, default: nil
+  attr :unread, :integer, default: 0
 
   def site_header(assigns) do
     assigns =
@@ -58,6 +60,22 @@ defmodule TipsWeb.UI do
         <.exit_link editor={@editor} href={~p"/"} class="font-semibold no-underline">Tips</.exit_link>
         <div class="flex flex-wrap items-center justify-end gap-x-4 text-sm">
           <%= if @current_scope do %>
+            <.exit_link
+              editor={@editor}
+              href={~p"/inbox"}
+              id="inbox-link"
+              aria-label={inbox_label(@unread)}
+              class="gap-1"
+            >
+              <CoreComponents.icon name="hero-bell" class="size-5" />
+              <span
+                :if={@unread > 0}
+                id="inbox-badge"
+                class="rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground"
+              >
+                {badge(@unread)}
+              </span>
+            </.exit_link>
             <span class="text-muted-foreground">{@current_scope.user.email}</span>
             <.exit_link editor={@editor} href={~p"/users/settings"}>Settings</.exit_link>
             <.link href={~p"/users/log-out"} method="delete" class="inline-flex min-h-8 items-center">
@@ -73,20 +91,30 @@ defmodule TipsWeb.UI do
     """
   end
 
+  defp inbox_label(0), do: "Inbox"
+  defp inbox_label(unread) when unread > 99, do: "Inbox, more than 99 unread"
+  defp inbox_label(unread), do: "Inbox, #{unread} unread"
+
+  defp badge(unread) when unread > 99, do: "99+"
+  defp badge(unread), do: unread
+
   attr :editor, :boolean, required: true
   attr :href, :string, required: true
   attr :class, :any, default: nil
+  attr :rest, :global
   slot :inner_block, required: true
 
   defp exit_link(%{editor: true} = assigns) do
     ~H"""
-    <a href={@href} class={["inline-flex min-h-8 items-center", @class]}>{render_slot(@inner_block)}</a>
+    <a href={@href} class={["inline-flex min-h-8 items-center", @class]} {@rest}>
+      {render_slot(@inner_block)}
+    </a>
     """
   end
 
   defp exit_link(assigns) do
     ~H"""
-    <.link navigate={@href} class={["inline-flex min-h-8 items-center", @class]}>
+    <.link navigate={@href} class={["inline-flex min-h-8 items-center", @class]} {@rest}>
       {render_slot(@inner_block)}
     </.link>
     """
