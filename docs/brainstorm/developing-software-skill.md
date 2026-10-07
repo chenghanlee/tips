@@ -4,10 +4,12 @@ Intermediate candidate for the
 [developing-software skill](../../agent/skills/developing-software/SKILL.md).
 This document does not replace the active skill or repository rules.
 
-The objective is to improve software design and code quality per total token spent
-on design and implementation, including investigation, tool output, testing and
-repairs. Required behavior and checks remain constraints. Opus and Fable reviewed
-the instructions; their predicted benefits have not been behaviorally evaluated.
+The objective is to maximize code quality, software architecture quality and
+decision quality per total token spent on decision-making, design and implementation,
+including investigation, tool output, testing and repairs. Judge additions by the
+mistakes or repeated work they prevent, not prompt length alone. Required behavior
+and checks remain constraints. Opus and Fable reviewed earlier iterations; predicted
+benefits have not been behaviorally evaluated.
 
 ## Proposed promotion
 
@@ -51,7 +53,9 @@ lose data, cause external effects or be expensive to undo.
 Follow [AGENTS.md](../../AGENTS.md) for repository boundaries, navigation, checks
 and collaboration. Apply the relevant language and framework skills.
 
-Identify the acceptance scenarios and scope before investigating. Resolve routine
+Identify the acceptance scenarios and scope before investigating. Follow task links
+and repository entry points to the authoritative requirements, affected contracts
+and relevant decisions; read what resolves the current question. Resolve routine
 choices from the task, existing decisions and repository conventions. When
 alternatives satisfy the same requirements, choose the simplest without asking.
 Ask through the existing workflow only when an unresolved ambiguity changes what
@@ -79,9 +83,15 @@ machinery when requirements or evidence justify it.
 ### Reuse existing mechanisms and follow conventions
 
 Before building a custom mechanism, check built-in features, locked dependencies
-and commonly used libraries or tools. Build your own only when none meets the
-requirements or reuse costs more to integrate and maintain. When you build your
-own, say what you checked and why in the PR.
+and commonly used libraries or tools. Prefer stable, composable interfaces whose
+relevant behavior you can inspect and verify. Build your own only when none meets
+the requirements or reuse costs more to integrate and maintain, including workarounds,
+verification and future fixes. Local code is not automatically cheaper. When you
+build your own, say what you checked and why in the PR.
+
+Before copying a nearby pattern, check it against the current contract and
+conventions. Repetition in the repository does not establish that a pattern is
+correct.
 
 When the design depends on a dependency's behavior, verify the specific guarantee
 at the installed version and configuration. Link the supporting source in the PR.
@@ -97,6 +107,10 @@ only for what they cannot express, and bind runtime values as parameters.
 outcome and what must remain true. Find affected callers using the repository's
 navigation rules, and check the consequences through to the final state and effects.
 A correct handler result alone does not establish a correct outcome.
+
+**When adding a dependency between modules or domains:** respect documented
+ownership and dependency boundaries while choosing the simplest local
+implementation. A new feature alone does not justify a new layer or framework.
 
 **When changing a shared rule or stored fact:** find its other representations.
 Limits, patterns, enums, labels, messages and filters can appear in constraints,
@@ -122,9 +136,11 @@ conflict explicit rather than silently changing the contract.
 message handler or other entry point that receives input from a user or external
 system.
 
-Validate the input and authorize the action where it is received, even if mount,
-an earlier step or another layer already checked. Earlier checks may be stale when
-the action runs.
+Parse and validate untrusted input into a defined internal representation at the
+receiving boundary; reuse schema or SDK guarantees where they establish the needed
+contract. Do not spread guesses about data shapes through downstream code.
+Authorize the action where it is received, even if mount, an earlier step or another
+layer already checked. Earlier checks may be stale when the action runs.
 
 ### State, resources and delayed work
 
@@ -294,10 +310,18 @@ did not exercise.
 state or repeated special cases:** identify an alternative that removes the observed
 problem. Prefer the smallest revision that addresses its cause.
 
-Within the design this task needs, refactor or replace parts when a concrete
-improvement justifies the change and verification cost. Preserve required behavior
+Within the design this task needs, prioritize improvements that prevent costly or
+recurring defects or remove a demonstrated bottleneck. Refactor or replace parts
+when the gain justifies the change and verification cost. Preserve required behavior
 and verify each increment. Effort already spent is not a reason to retain an
 approach. Stop when no identified improvement justifies its cost.
+
+**When a consequential invariant is repeatedly missed:** prefer an existing schema,
+constraint, compiler check, linter or behavioral test over another prose reminder.
+Add custom enforcement only when preventing recurrence justifies its execution and
+maintenance cost. Check the invariant, not an incidental implementation shape, so
+valid alternatives remain possible. Make failures identify the violation and the
+correction needed.
 
 ## Finish
 
@@ -312,6 +336,8 @@ documentation and tests in the same PR.
 Run the [required repository checks](../../AGENTS.md#checks). Follow the existing
 blocker, [PR review](../../agent/teams/README.md#pr-review-record) and handoff procedures.
 
-Preserve consequential decision reasons, unresolved assumptions and material
-verification limits in the existing PR or handoff so later work knows when to
-revisit them.
+Keep durable contracts and decision reasons in the existing repository documentation
+that owns them, with links from the relevant entry point. Update that source instead
+of adding competing instructions. Record task-specific trade-offs, unresolved
+assumptions and verification limits in the existing PR or handoff so later work
+knows when to revisit them.
