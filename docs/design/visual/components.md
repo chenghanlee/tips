@@ -54,7 +54,8 @@ on the tip page and the single-review view.
 viewer without the vote capability gets no buttons: detail shows plain counts.
 `TipsWeb.VoteActions` (`lib/tips_web/vote_actions.ex`) builds the control's
 attrs and handles its events on browse, search, the tip page and the
-single-review view.
+single-review view. A vote refused because the account is banned or
+unconfirmed reloads the page, so its actions match the account.
 
 ## Not in the code
 

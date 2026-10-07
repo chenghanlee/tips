@@ -148,13 +148,32 @@ defmodule TipsWeb.VoteTest do
        %{conn: conn, pages: pages, tip: tip, review: review} do
     vote_fixture(tip, %{value: 1})
     vote_fixture(review, %{value: -1})
-    conn = log_in_user(conn, full_ban!(Repo.get!(User, review.user_id)))
+    author = Repo.get!(User, review.user_id)
+    conn = log_in_user(conn, author)
+    views = for {_, path, _, _, _} <- pages, do: elem(live(conn, path), 1)
+    full_ban!(author)
 
-    for {page, path, control, target, layout} <- pages,
-        {render, html, _title} <- renders(conn, path) do
-      label = "#{page} #{render}"
+    # A page opened before the ban reloads at its next vote click.
+    clicked =
+      for {{page, path, control, target, layout}, lv} <- Enum.zip(pages, views) do
+        lv |> element("#{control}-helpful") |> render_click()
+
+        assert {^path, %{"error" => "Your account can't vote."}} = assert_redirect(lv, 1_000),
+               page
+
+        {:ok, _lv, html} = live(conn, path)
+        {"#{page} after a click", html, control, target, layout}
+      end
+
+    loaded =
+      for {page, path, control, target, layout} <- pages,
+          {render, html, _title} <- renders(conn, path),
+          do: {"#{page} #{render}", html, control, target, layout}
+
+    for {label, html, control, target, layout} <- clicked ++ loaded do
       refute has?(html, "#{control} button"), label
       refute has?(html, ~s([phx-click="vote"])), label
+      refute has?(html, ~s(a[href="/editor/reviews/#{review.id}/edit"])), label
 
       if String.starts_with?(control, "#review"),
         do: assert(has?(html, "#review-#{review.id}-delete"), label)

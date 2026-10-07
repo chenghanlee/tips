@@ -19,12 +19,14 @@ defmodule TipsWeb.VoteActions do
     * A signed-out click, or one whose session expired, goes to log in and
       returns to the target's permalink. Nothing is kept, so the reader clicks
       again.
+    * A refusal because the account is banned or unconfirmed reloads the
+      page with the message, so all its actions match the account.
 
   A URL change drops the messages and keeps the requests in flight.
   """
   use TipsWeb, :verified_routes
 
-  import Phoenix.Component, only: [assign: 3, update: 3]
+  import Phoenix.Component, only: [assign: 2, assign: 3, update: 3]
   import Phoenix.LiveView
 
   alias Tips.Content
@@ -32,7 +34,7 @@ defmodule TipsWeb.VoteActions do
 
   def attach(socket, update) do
     socket
-    |> assign(:vote_status, %{})
+    |> assign(vote_status: %{}, vote_page: nil)
     |> attach_hook(:vote_actions, :handle_event, &handle_event/3)
     |> attach_hook(:vote_actions, :handle_async, &handle_async(&1, &2, &3, update))
     |> attach_hook(:vote_actions, :handle_params, &handle_params/3)
@@ -144,6 +146,15 @@ defmodule TipsWeb.VoteActions do
   defp handle_async({:vote, _target}, {:ok, {:error, :unauthenticated}}, socket, _update),
     do: {:halt, UserAuth.require_login(socket)}
 
+  # The page's capabilities predate the refusal; a new mount reads them again.
+  defp handle_async({:vote, _target}, {:ok, {:error, reason}}, socket, _update)
+       when reason in [:forbidden, :unconfirmed] do
+    {:halt,
+     socket
+     |> put_flash(:error, refusal(reason))
+     |> push_navigate(to: socket.assigns.vote_page, replace: true)}
+  end
+
   defp handle_async({:vote, target}, {:ok, {:error, reason}}, socket, _update),
     do: {:halt, put_status(socket, target, false, refusal(reason))}
 
@@ -196,8 +207,14 @@ defmodule TipsWeb.VoteActions do
   defp put_status(socket, target, pending, status),
     do: update(socket, :vote_status, &Map.put(&1, target, %{pending: pending, status: status}))
 
-  defp handle_params(_params, _uri, socket),
-    do: {:cont, update(socket, :vote_status, &Map.filter(&1, fn {_target, s} -> s.pending end))}
+  defp handle_params(_params, uri, socket) do
+    %URI{path: path, query: query} = URI.parse(uri)
+
+    {:cont,
+     socket
+     |> assign(:vote_page, URI.to_string(%URI{path: path, query: query}))
+     |> update(:vote_status, &Map.filter(&1, fn {_target, s} -> s.pending end))}
+  end
 
   defp refusal(:not_found), do: "This is no longer available for voting."
   defp refusal(:unconfirmed), do: "Confirm your email address to vote."
