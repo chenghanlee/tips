@@ -1,34 +1,53 @@
-[
-  {
-    "skills": ["developing-software"],
-    "query": "Implement draft restoration for an editor whose page can disconnect and reconnect while a storage read or reload is in flight. Typing during the read must not be lost.",
-    "files": ["issue 78 and PR 346 at the pre-review head"],
-    "expected_behavior": [
-      "Lists the interleavings disconnect, reconnect, destroy and new input against each in-flight read before writing handlers",
-      "Applies one validity check per operation so a result from before the disconnect cannot change state after it",
-      "Adds a test that runs the disconnect between the start and the completion of the read, and states what the test cannot establish",
-      "Does not add a separate flag per interruption"
-    ]
-  },
-  {
-    "skills": ["developing-software"],
-    "query": "Validate uploaded images with an external parser process under a capacity limit and store the accepted ones.",
-    "files": ["issue 62 and PR 353 at the pre-review head"],
-    "expected_behavior": [
-      "Keeps a missing or crashed parser runtime separate from an invalid image, with a retained diagnostic, instead of reporting both as invalid",
-      "Holds the capacity slot until the parser process has terminated when the caller exits",
-      "Names the existing pool or process-supervision mechanism checked before writing a custom one, with the verified limit if it was rejected",
-      "Composes one bound for the whole request from the per-file limits"
-    ]
-  },
-  {
-    "skills": ["developing-software"],
-    "query": "Replace an exploratory probe script with application code and delete the probe.",
-    "files": ["issue 244 PR 347, then issue 62 PR 353 at the pre-review head"],
-    "expected_behavior": [
-      "Maps each malformed-input regression the probe checked to a surviving application test before deleting the probe, or names the gap",
-      "Removes functions, fields and comments the replacement leaves unused",
-      "Does not cite the probe's historical report as regression coverage"
-    ]
-  }
-]
+{
+  "how_to_run": [
+    "For each scenario, check out `base` in an isolated worktree and give the developer the issue body as it stood at `base`'s commit date; do not supply issue or PR comments written after that date.",
+    "The baseline is `baseline_head`: the head the original developer pushed for first review without this skill. The skill run starts from `base` with the skill loaded and the same issue body.",
+    "A grader who has not seen SKILL.md scores both heads against `expected_behavior` and `process` from the code and tests only. A narrative that claims a check without code or test evidence scores nothing.",
+    "Compare first-review defects, uncovered required behaviour and elapsed time."
+  ],
+  "scenarios": [
+    {
+      "skills": ["developing-software"],
+      "query": "Issue 78: mount text editors with safe draft restoration and reconnect recovery. The page can disconnect and reconnect while a storage read or reload is in flight; input typed during the read must not be lost.",
+      "base": "b50e566e9cda",
+      "baseline_head": "fd357540b745",
+      "expected_behavior": [
+        "Input typed while a read is in flight survives the read's completion",
+        "A valid saved draft is still restored when nothing was typed",
+        "A read result started before a disconnect cannot change state after the reconnect",
+        "Coverage, existing or extended or new, runs a disconnect between the start and the completion of a read, and the change states what that coverage cannot establish"
+      ],
+      "process": [
+        "The interleavings disconnect, reconnect, destroy and new input were traced against each in-flight read before the handlers were written",
+        "Redundant state that can disagree was removed; independent facts may stay in separate fields"
+      ]
+    },
+    {
+      "skills": ["developing-software"],
+      "query": "Issue 62: validate uploaded images with an external parser process under a capacity limit and store one recoverable attempt.",
+      "base": "d68e0cebe226",
+      "baseline_head": "bdaddb6af74f",
+      "expected_behavior": [
+        "A missing or crashed parser runtime is reported and logged as an operational failure, distinct from an invalid image",
+        "When the caller exits, the capacity slot is released only after the parser process has terminated",
+        "The whole request has one composed bound derived from the per-file limits"
+      ],
+      "process": [
+        "The existing pool or process-supervision mechanism was named and checked before any custom one was written, with the verified limit if it was rejected"
+      ]
+    },
+    {
+      "skills": ["developing-software"],
+      "query": "Issue 62, same run as scenario 2: the image parser probe from issue 244 (scripts/image_parser_probe at base) is replaced by application code and deleted.",
+      "base": "d68e0cebe226",
+      "baseline_head": "bdaddb6af74f",
+      "expected_behavior": [
+        "Each malformed-input regression the probe checked (CRC-only corruption, missing trailer, later oversized frame, duplicate or late animation control chunks) has a surviving application test, or the gap is named",
+        "Functions, fields and comments the replacement leaves unused are removed"
+      ],
+      "process": [
+        "The probe's historical report is not cited as regression coverage"
+      ]
+    }
+  ]
+}
