@@ -20,9 +20,9 @@ defmodule TipsWeb.VoteActions do
     * A signed-out click, or one whose session expired, goes to log in and
       returns to the target's permalink. Nothing is kept, so the reader clicks
       again.
-    * A refusal because the account is banned or unconfirmed removes the
-      Vote, Edit, Report and Review actions of every row, as a new read would.
-      Own-content Delete stays.
+    * A refusal because the account is banned or unconfirmed admits the
+      session again and removes the Vote, Edit, Report and Review actions of
+      every row, as a new read would. Own-content Delete stays.
 
   A URL change drops the messages and keeps the requests in flight.
   """
@@ -145,13 +145,21 @@ defmodule TipsWeb.VoteActions do
     do: {:halt, UserAuth.require_login(socket)}
 
   # The rows' capabilities predate the refusal. A reload would rerank the page.
+  # The refusal can follow a change committed after the click's admission, so
+  # admitting again gives later reads the scope that was refused.
   defp handle_async({:vote, target}, {:ok, {:error, reason}}, socket, update)
        when reason in [:forbidden, :unconfirmed] do
-    {:halt,
-     socket
-     |> update.(fn _kind, row -> without_contribution(row) end)
-     |> update(:vote_status, &Map.delete(&1, target))
-     |> put_flash(:error, refusal(reason))}
+    case UserAuth.readmit(socket) do
+      {:ok, socket} ->
+        {:halt,
+         socket
+         |> update.(fn _kind, row -> without_contribution(row) end)
+         |> update(:vote_status, &Map.delete(&1, target))
+         |> put_flash(:error, refusal(reason))}
+
+      {:error, :unauthenticated} ->
+        {:halt, UserAuth.require_login(socket)}
+    end
   end
 
   defp handle_async({:vote, target}, {:ok, {:error, reason}}, socket, _update),
