@@ -816,16 +816,16 @@ def turn(pr: str, recipient: str) -> None:
         if problem:
             raise RuntimeError(f"{problem} Commit and push, then hand over.")
         message = (
-            f"Your turn: review {url} at {head}. Apply AGENTS.md Tests and GitHub and the "
-            "README PR review record; judge the test changes as a set. With findings: submit "
-            f"them and run agent/teams/team.py turn {pr} dev. Without: publish the approval "
-            "without waiting for CI, keep the turn and do README step 9."
+            f"Your turn: review {url} at {head}. Follow README step 3 and its Reviewers "
+            "section, AGENTS.md Tests and GitHub, and the README PR review record. With "
+            f"findings: submit them and run agent/teams/team.py turn {pr} dev. Without: "
+            "publish the approval without waiting for CI, keep the turn and do README step 5."
         )
     else:
         message = (
             f"Your turn on {url}: run agent/teams/pr_review.py list {pr} and "
             f"gh pr checks {pr} --required. Repair the findings or failed checks, push and "
-            "hand back; if stuck, apply README Stuck."
+            "hand back; if stuck, follow the README blocker procedure."
         )
         if problem:
             # Handing back never refuses: only the developer can repair the checkout.
