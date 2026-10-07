@@ -162,7 +162,7 @@ defmodule TipsWeb.TipLive.Show do
      socket
      |> assign(options: options, request: nil)
      |> ReviewActions.attach()
-     |> VoteActions.attach(&update_vote/3)}
+     |> VoteActions.attach(&update_vote/2)}
   end
 
   @impl true
@@ -209,18 +209,15 @@ defmodule TipsWeb.TipLive.Show do
     end
   end
 
-  defp update_vote(%{assigns: %{tip: %{id: id} = tip}} = socket, {:tip, id}, fun),
-    do: assign(socket, :tip, fun.(tip))
+  defp update_vote(%{assigns: %{tip: tip, reviews: reviews}} = socket, fun) do
+    reviews =
+      case reviews do
+        %{entries: entries} -> %{reviews | entries: Enum.map(entries, &fun.(:review, &1))}
+        :out_of_range -> :out_of_range
+      end
 
-  defp update_vote(
-         %{assigns: %{reviews: %{entries: entries} = reviews}} = socket,
-         {:review, id},
-         fun
-       ),
-       do:
-         assign(socket, :reviews, %{reviews | entries: VoteActions.update_row(entries, id, fun)})
-
-  defp update_vote(socket, _target, _fun), do: socket
+    assign(socket, tip: fun.(:tip, tip), reviews: reviews)
+  end
 
   # A page past the last offset still reads the tip, with an empty list.
   defp read(socket, %{id: id, sort: sort, filters: filters, page: page}) do

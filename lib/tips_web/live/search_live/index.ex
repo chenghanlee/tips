@@ -180,7 +180,7 @@ defmodule TipsWeb.SearchLive.Index do
        result: nil,
        search_error: nil
      )
-     |> VoteActions.attach(&update_vote/3)}
+     |> VoteActions.attach(&update_vote/2)}
   end
 
   @impl true
@@ -256,21 +256,12 @@ defmodule TipsWeb.SearchLive.Index do
   def handle_async(:results, {:exit, _reason}, socket),
     do: {:noreply, assign(socket, result: {:error, :unavailable})}
 
-  defp update_vote(
-         %{assigns: %{result: {:ok, %{entries: entries} = page}}} = socket,
-         {:tip, id},
-         fun
-       ) do
-    entries =
-      Enum.map(entries, fn
-        %{tip: %{id: ^id} = tip} = entry -> %{entry | tip: fun.(tip)}
-        entry -> entry
-      end)
-
+  defp update_vote(%{assigns: %{result: {:ok, %{entries: entries} = page}}} = socket, fun) do
+    entries = Enum.map(entries, &%{&1 | tip: fun.(:tip, &1.tip)})
     assign(socket, :result, {:ok, %{page | entries: entries}})
   end
 
-  defp update_vote(socket, _target, _fun), do: socket
+  defp update_vote(socket, _fun), do: socket
 
   defp page_title(%{q: nil}), do: "Search"
   defp page_title(%{q: q}), do: "#{q} · Search"

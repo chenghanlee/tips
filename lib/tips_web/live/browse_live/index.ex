@@ -121,7 +121,7 @@ defmodule TipsWeb.BrowseLive.Index do
        result: nil,
        search_error: nil
      )
-     |> VoteActions.attach(&update_vote/3)}
+     |> VoteActions.attach(&update_vote/2)}
   end
 
   @impl true
@@ -177,10 +177,10 @@ defmodule TipsWeb.BrowseLive.Index do
     end
   end
 
-  defp update_vote(%{assigns: %{result: %{entries: entries} = result}} = socket, {:tip, id}, fun),
-    do: assign(socket, :result, %{result | entries: VoteActions.update_row(entries, id, fun)})
+  defp update_vote(%{assigns: %{result: %{entries: entries} = result}} = socket, fun),
+    do: assign(socket, :result, %{result | entries: Enum.map(entries, &fun.(:tip, &1))})
 
-  defp update_vote(socket, _target, _fun), do: socket
+  defp update_vote(socket, _fun), do: socket
 
   defp heading(:hot), do: "Hot tips"
   defp heading(:new), do: "New tips"

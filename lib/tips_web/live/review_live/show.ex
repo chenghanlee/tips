@@ -60,7 +60,7 @@ defmodule TipsWeb.ReviewLive.Show do
            page_title: "Review of #{tip.title}"
          )
          |> ReviewActions.attach()
-         |> VoteActions.attach(&update_vote/3)}
+         |> VoteActions.attach(&update_vote/2)}
 
       {:error, :not_found} ->
         raise TipsWeb.NotFoundError
@@ -70,14 +70,10 @@ defmodule TipsWeb.ReviewLive.Show do
     end
   end
 
-  defp update_vote(
-         %{assigns: %{review: {:visible, %{id: id} = review}}} = socket,
-         {:review, id},
-         fun
-       ),
-       do: assign(socket, :review, {:visible, fun.(review)})
+  defp update_vote(%{assigns: %{review: {:visible, review}}} = socket, fun),
+    do: assign(socket, :review, {:visible, fun.(:review, review)})
 
-  defp update_vote(socket, _target, _fun), do: socket
+  defp update_vote(socket, _fun), do: socket
 
   defp unavailable(:deleted), do: "Review deleted by author"
   defp unavailable(:removed), do: "Review removed by moderators"

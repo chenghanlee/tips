@@ -6,9 +6,9 @@ defmodule TipsWeb.VoteActions do
   `attach/2` assigns `vote_status`, the `pending` flag and `status` text of
   each `{kind, id}` target with a request in flight or a message, and handles
   `vote` events and their results. The page passes `update`, a function
-  `(socket, {kind, id}, fun) -> socket` that applies `fun` to the displayed
-  projection of that target, if it is still shown. A result therefore changes
-  only that row and never reorders a list.
+  `(socket, fun) -> socket` that replaces each displayed tip and review
+  projection with `fun.(kind, projection)`. A result therefore changes rows in
+  place and never reorders a list.
 
     * Each button sends the vote it asks for, never a toggle, so a click made
       before an earlier result showed cannot reverse it.
@@ -19,14 +19,15 @@ defmodule TipsWeb.VoteActions do
     * A signed-out click, or one whose session expired, goes to log in and
       returns to the target's permalink. Nothing is kept, so the reader clicks
       again.
-    * A refusal because the account is banned or unconfirmed reloads the
-      page with the message, so all its actions match the account.
+    * A refusal because the account is banned or unconfirmed removes the
+      Vote, Edit, Report and Review actions of every row, as a new read would.
+      Own-content Delete stays.
 
   A URL change drops the messages and keeps the requests in flight.
   """
   use TipsWeb, :verified_routes
 
-  import Phoenix.Component, only: [assign: 2, assign: 3, update: 3]
+  import Phoenix.Component, only: [assign: 3, update: 3]
   import Phoenix.LiveView
 
   alias Tips.Content
@@ -34,7 +35,7 @@ defmodule TipsWeb.VoteActions do
 
   def attach(socket, update) do
     socket
-    |> assign(vote_status: %{}, vote_page: nil)
+    |> assign(:vote_status, %{})
     |> attach_hook(:vote_actions, :handle_event, &handle_event/3)
     |> attach_hook(:vote_actions, :handle_async, &handle_async(&1, &2, &3, update))
     |> attach_hook(:vote_actions, :handle_params, &handle_params/3)
@@ -61,10 +62,6 @@ defmodule TipsWeb.VoteActions do
   end
 
   def control(_kind, _item, _scope, _vote_status), do: nil
-
-  @doc "Applies `fun` to the row of `rows` with `id`."
-  def update_row(rows, id, fun),
-    do: Enum.map(rows, fn row -> if row.id == id, do: fun.(row), else: row end)
 
   defp return(:tip, tip), do: Reader.tip_path(tip)
   defp return(:review, review), do: Reader.review_path(review.id)
@@ -146,13 +143,14 @@ defmodule TipsWeb.VoteActions do
   defp handle_async({:vote, _target}, {:ok, {:error, :unauthenticated}}, socket, _update),
     do: {:halt, UserAuth.require_login(socket)}
 
-  # The page's capabilities predate the refusal; a new mount reads them again.
-  defp handle_async({:vote, _target}, {:ok, {:error, reason}}, socket, _update)
+  # The rows' capabilities predate the refusal. A reload would rerank the page.
+  defp handle_async({:vote, target}, {:ok, {:error, reason}}, socket, update)
        when reason in [:forbidden, :unconfirmed] do
     {:halt,
      socket
-     |> put_flash(:error, refusal(reason))
-     |> push_navigate(to: socket.assigns.vote_page, replace: true)}
+     |> update.(fn _kind, row -> without_contribution(row) end)
+     |> update(:vote_status, &Map.delete(&1, target))
+     |> put_flash(:error, refusal(reason))}
   end
 
   defp handle_async({:vote, target}, {:ok, {:error, reason}}, socket, _update),
@@ -201,20 +199,32 @@ defmodule TipsWeb.VoteActions do
   # Copies only the vote fields the displayed row has; summaries have no counts.
   defp show(socket, target, state, update) do
     fields = Map.take(state, [:viewer_vote, :up_count, :down_count, :score])
-    update.(socket, target, &Map.merge(&1, Map.take(fields, Map.keys(&1))))
+
+    update.(socket, fn
+      kind, %{id: id} = row when {kind, id} == target ->
+        Map.merge(row, Map.take(fields, Map.keys(row)))
+
+      _kind, row ->
+        row
+    end)
   end
+
+  # The capabilities `Tips.Content.Projection` gives a viewer who may not
+  # contribute. Placeholders have none.
+  defp without_contribution(%{capabilities: capabilities} = row) do
+    denied =
+      Map.take(%{vote: false, edit: false, report: false, review: false}, Map.keys(capabilities))
+
+    %{row | capabilities: Map.merge(capabilities, denied)}
+  end
+
+  defp without_contribution(row), do: row
 
   defp put_status(socket, target, pending, status),
     do: update(socket, :vote_status, &Map.put(&1, target, %{pending: pending, status: status}))
 
-  defp handle_params(_params, uri, socket) do
-    %URI{path: path, query: query} = URI.parse(uri)
-
-    {:cont,
-     socket
-     |> assign(:vote_page, URI.to_string(%URI{path: path, query: query}))
-     |> update(:vote_status, &Map.filter(&1, fn {_target, s} -> s.pending end))}
-  end
+  defp handle_params(_params, _uri, socket),
+    do: {:cont, update(socket, :vote_status, &Map.filter(&1, fn {_target, s} -> s.pending end))}
 
   defp refusal(:not_found), do: "This is no longer available for voting."
   defp refusal(:unconfirmed), do: "Confirm your email address to vote."

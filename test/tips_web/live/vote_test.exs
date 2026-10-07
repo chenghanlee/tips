@@ -150,18 +150,21 @@ defmodule TipsWeb.VoteTest do
     vote_fixture(review, %{value: -1})
     author = Repo.get!(User, review.user_id)
     conn = log_in_user(conn, author)
-    views = for {_, path, _, _, _} <- pages, do: elem(live(conn, path), 1)
+    views = for {_, path, _, _, _} <- pages, do: live(conn, path)
+    # A new read would rank these first.
+    indexed_tip!(user_fixture(), %{title: "Bisect the release", tag_id: "workflow", up_count: 50})
+    review_fixture(tip, %{body: "Newest review", up_count: 50})
     full_ban!(author)
 
-    # A page opened before the ban reloads at its next vote click.
+    # A page opened before the ban drops its contribution actions at the next
+    # vote click, in place.
     clicked =
-      for {{page, path, control, target, layout}, lv} <- Enum.zip(pages, views) do
+      for {{page, _path, control, target, layout}, {:ok, lv, html}} <- Enum.zip(pages, views) do
+        order = row_order(html)
         lv |> element("#{control}-helpful") |> render_click()
-
-        assert {^path, %{"error" => "Your account can't vote."}} = assert_redirect(lv, 1_000),
-               page
-
-        {:ok, _lv, html} = live(conn, path)
+        html = render_async(lv)
+        assert text(html, "#flash-error") == "Your account can't vote.", page
+        assert row_order(html) == order, page
         {"#{page} after a click", html, control, target, layout}
       end
 
