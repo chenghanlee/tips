@@ -6,7 +6,6 @@ defmodule Tips.Content.Media.VideoUploadTest do
 
   alias Tips.Accounts.Scope
   alias Tips.Content
-  alias Tips.Content.Media
   alias Tips.Content.Media.{Asset, CloudflareStream}
 
   @size 12_345_678
@@ -341,51 +340,5 @@ defmodule Tips.Content.Media.VideoUploadTest do
     assert seconds > 0
     assert length(requests()) == 20
     assert Repo.aggregate(Asset, :count) == 20
-  end
-
-  @tag :real_provider
-  test "a real reservation is private and bounded, and its uid is stored before release", data do
-    real = [plug: nil, settings: nil]
-
-    assert {:ok, %{media_id: id, upload_url: url, expires_at: expires_at}} =
-             Media.begin_video_upload(
-               data.scope,
-               {:new_tip, Ecto.UUID.generate()},
-               %{size: @size},
-               real
-             )
-
-    # Returned only after this write: the uid Stream named the reservation with.
-    assert %Asset{stream_uid: uid, state: :uploading} = Repo.get!(Asset, id)
-    client = CloudflareStream.client!(real)
-
-    try do
-      assert is_binary(uid)
-
-      # The URL alone authorizes the tus transfer, with no API token.
-      assert {:ok, %{status: 200} = head} =
-               Req.head(url, headers: [tus_resumable: "1.0.0"], retry: false)
-
-      assert Req.Response.get_header(head, "upload-offset") == ["0"]
-      assert Req.Response.get_header(head, "upload-length") == [Integer.to_string(@size)]
-
-      assert {:ok, %{status: 200, body: body}} = Req.get(client, url: "/#{uid}")
-
-      assert %{
-               "uid" => ^uid,
-               "requireSignedURLs" => true,
-               "maxDurationSeconds" => 180,
-               "meta" => %{"name" => name},
-               "status" => %{"state" => "pendingupload"},
-               "uploadExpiry" => upload_expiry
-             } = JSON.decode!(body)["result"]
-
-      assert name == "tips-media-#{id}"
-      assert {:ok, ^expires_at, 0} = DateTime.from_iso8601(upload_expiry)
-    after
-      assert {:ok, %{status: 200}} = Req.delete(client, url: "/#{uid}")
-    end
-
-    assert {:ok, %{status: 404}} = Req.get(client, url: "/#{uid}")
   end
 end

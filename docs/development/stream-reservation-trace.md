@@ -1,25 +1,28 @@
 # Stream reservation trace
 
-Evidence for [#63](https://github.com/chenghanlee/tips/issues/63): one real
-reservation through `Tips.Content.Media.begin_video_upload/4`, from the
-`:real_provider` test "a real reservation is private and bounded, and its uid is
-stored before release" in `test/tips/content/media/video_upload_test.exs`. Run it with
-`TIPS_REAL_PROVIDERS=1`.
+Evidence for [#63](https://github.com/chenghanlee/tips/issues/63): real reservations
+through `Tips.Content.Media.begin_video_upload/4`, from
+`test/tips/content/media/video_upload_real_test.exs`. Run it with
+`TIPS_REAL_PROVIDERS=1`; it takes about 2.5 minutes.
+
+Every transaction commits outside the SQL sandbox, and each check of the row runs on
+its own connection, so it sees only committed state. A test plug forwards Tips's
+reservation request to Stream and decides when, and whether, Stream's response
+reaches Tips. Each test deletes every reservation Stream created and confirms it with
+`GET` 404.
 
 ## Result
 
-Run on 2026-10-07 at 21:03 UTC. The account id, uid and upload URL token are left out.
+All five cases passed on 2026-10-07 at 21:22 UTC. Afterwards, Stream listed no video
+named `tips-media-*`.
 
-| Step | Observed |
-|---|---|
-| Row before the call | `uploading`, NULL uid, `created_at` 21:03:02Z, `expires_at` 22:03:02Z |
-| Reservation | 201; Stream `uploaded` 21:03:03.54Z, `created` 21:03:03.55Z |
-| Row when the URL was returned | `uploading`, `stream_uid` equal to the `stream-media-id` header |
-| tus `HEAD` on the URL, no API token | 200, `Upload-Offset: 0`, `Upload-Length: 12345678` |
-| `GET /stream/<uid>` | `requireSignedURLs: true`, `maxDurationSeconds: 180`, `uploadExpiry` 22:03:02Z (the row's `expires_at`), `meta.name` `tips-media-<media id>`, state `pendingupload` |
-| Cleanup | `DELETE` 200, then `GET` 404 |
+| Case | Real Stream | Tips |
+|---|---|---|
+| Success | 201; `requireSignedURLs: true`, `maxDurationSeconds: 180`, `uploadExpiry` equal to the row's `expires_at`, `meta.name` `tips-media-<media id>`, state `pendingupload`. tus `HEAD` on the URL with no API token: 200, `Upload-Offset: 0` | Before the call, the committed row is `uploading` with a NULL uid. When the URL is returned, the committed row holds the `stream-media-id` uid, before the first request to the URL |
+| Lost response | 201 reached the plug; Tips got a timeout. The reservation stays `pendingupload` | `{:upload_failed, [id]}`; the row stays `uploading` with a NULL uid |
+| Response after cleanup | 201, returned after a cleanup committed on another connection | `{:upload_failed, [id]}`; the uid stays NULL and the cleanup row is not revived |
+| Response after the deadline | The row's deadline and the reservation expiry moved together to 125 seconds ahead (Stream refuses less than two minutes); the 201 was held until both passed. A tus `PATCH` to the withheld URL then got 400, code 10017 | `{:upload_failed, [id]}`; the uid stays NULL and the row keeps its deadline |
+| Rejected reservation | Expiry 30 seconds ahead: 400, code 10005 | `{:upload_failed, [id]}`; the row is `failed` with a NULL uid |
 
-The URL host was `upload.cloudflarestream.com` under `/tus`. The uid was stored before
-the URL was returned and used: the test reads the row before its first request to the
-URL. The lost-response, late-response and lock-wait cases need a provider response
-that cannot be timed reliably, so the Req.Test and lock-session tests cover them.
+The lock-wait race needs a lock held during the uid write, so the lock-session test
+`video_upload_concurrency_test.exs` covers it with a stubbed provider response.
