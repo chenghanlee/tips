@@ -18,8 +18,10 @@ When this candidate is approved for promotion:
 - Move the complete Software design and Tests rules from AGENTS.md into the skill,
   preserving their requirements and removing the copies from AGENTS.md.
 - Keep repository boundaries, navigation, checks, writing and collaboration
-  procedures in AGENTS.md. Route implementation planning, code changes and testing
-  to the skill.
+  procedures in AGENTS.md. Replace its development-skill route with: "Before planning
+  an implementation, changing code or writing tests, read developing-software from
+  the current worktree. Use its design and testing rules, applying conditional checks
+  when their triggers occur."
 - Update reviewing-code and the team review prompt to reference the skill's design
   and testing rules. Update the pair workflow's repair-section reference.
 - Promote [performance measurement](performance-measurement.md) as a conditional
@@ -248,25 +250,14 @@ selects the risk to assess, not a measurement of every changed asset. A performa
 claim or an uncertain cost that could change the design requires profiling; an
 ordinary bounded change with neither needs no measurement.
 
-Name the property at risk and the workload. Profile the suspected cost; test-suite
-duration mixes setup and assertions and is not application performance. Compare the
-affected operation before and after under the same workload and conditions, and
-report lab results as lab results. For requests or LiveView updates, measure
-action-to-visible-result time; a quick loading indicator is not a quick result.
-Before measuring, read the relevant part of
+Name the property at risk and the workload. Profile the suspected cost, not test-suite
+elapsed time. Before measuring, read the relevant part of
 [performance measurement](performance-measurement.md).
 
-For database work:
-
-- Check how query count and rows read or returned grow with the data. Look for
-  queries inside loops, unnecessary preloads and unbounded result sets; small
-  fixtures can hide those costs.
-- Use filters, indexes and pagination that match the access pattern. When performance
-  depends on an index or query strategy, inspect the query plan with representative
-  data instead of assuming the database will use it.
-- Keep transactions and lock lifetimes limited to the work that needs them. Account
-  for contention and connection occupancy, especially when external calls or slow
-  work occur inside a transaction.
+For database work, check how query count and rows read or returned grow with data.
+Match filters, indexes and pagination to the access pattern. Keep transaction and
+lock lifetimes limited to the work that needs them, accounting for contention and
+connection occupancy.
 
 ## Reconsider the design
 

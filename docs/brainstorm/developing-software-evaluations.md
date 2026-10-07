@@ -36,20 +36,35 @@ This file is for evaluating the skill, not an instruction file to load during im
 
 ## Comparison method
 
-The three evaluations below define tasks and observable outcomes. Fixtures and runs
-are pending. Prepare isolated, reproducible fixtures from a fixed repository revision
-before running them; keep the evaluator's assertions and seeded defects out of the
-developer prompt. Do not modify the active skill to run a comparison.
+Start with the existing [replay scenarios](../../agent/skills/developing-software/evals.json):
+three scenario definitions across two historical tasks (issue 78 and issue 62,
+including replacement of the issue 244 probe). They pin base and first-review heads
+and provide a manual replay/grading protocol; they are not an executable harness.
+Reuse those definitions before building new fixtures. Leave the active eval file
+unchanged; this document defines the candidate comparison protocol.
+
+For each replay, use its pinned base in an isolated worktree and recover the issue
+brief and linked requirements as they stood before implementation. Withhold later
+review comments, fixes and evaluator assertions from the developer. Record the
+exact brief and instruction versions used; if historical requirements cannot be
+recovered, report that limit rather than claiming an equivalent replay.
 
 Use fresh sessions with the same task, checkout, tools and model settings in each arm:
 (1) repository instructions without developing-software, (2) the active skill, and
 (3) the candidate. Preserve design and test requirements in every arm; for the
 candidate, remove their AGENTS.md copies in the disposable fixture to represent the
 proposed ownership change. Keep all other routing and instructions equivalent.
+Historical first-review heads are evidence of observed defects, not controlled
+no-skill runs or substitutes for a fresh arm with matched tools and settings.
 
 Evaluate each intended developer model, including the models used in this discussion
 if they will implement tasks. Add Haiku or Sonnet only if they are intended targets;
 reviewing prose with Opus or Fable does not count as an implementation run.
+
+Use a grader who has not seen the skill or arm identity. Score required behavior
+from code and tests; score process separately from traces or change notes. An absent
+process record is unassessable, not failed, and a claim without matching evidence
+scores nothing. Do not make a particular implementation strategy a grading criterion.
 
 Record acceptance failures, repair work, unnecessary scope, reference reads, tool
 calls and total task tokens through required verification and repair. Use reported
@@ -63,9 +78,10 @@ the agent discovers the skill and reads the performance reference when needed.
 **Developer request:** “Raise the contribution text limit from 500 to 800 characters.
 Keep validation and helper text consistent. Preserve other behavior.”
 
-**Fixture:** a changeset limit, database constraint in an applied migration, UI helper
-text, client maxlength and existing boundary tests. Include an unrelated duplicate
-helper to detect unnecessary cleanup. Use disposable data and the normal migration path.
+**Status:** defined scenario only; no real fixture or pinned task yet. The proposed
+fixture has a changeset limit, database constraint in an applied migration, UI helper
+text, client maxlength and existing boundary tests. Prefer a matching real task;
+build a synthetic fixture only if this gap warrants the additional evaluation cost.
 
 **Expected outcomes:** 800 characters are accepted and 801 rejected through the
 public flow; affected representations agree; the applied migration is preserved and
@@ -74,21 +90,32 @@ No unrelated consolidation, browser audit or benchmark is justified by this task
 
 ## Evaluation 2: authorization changes during an open session
 
-**Developer request:** “A user who becomes ineligible after opening the page can
-still vote. Reject that vote, remove contribution actions and show the existing
-eligibility message. Preserve existing votes and unrelated page behavior.”
+**Replay source:** [issue 110](https://github.com/chenghanlee/tips/issues/110),
+[PR 384](https://github.com/chenghanlee/tips/pull/384).
+Base: `04462e318e5e807085987e8bd0d7016d883572be`.
+First-review head: `b460b23dd43f13b1a4a619d28439ea3ef1a9ee94`.
+Use the issue body and linked requirements as of 2026-10-07 as the developer request,
+not the later repair instructions below. Historical brief recovery and replay setup
+remain pending. Fable reports that the original pair loaded the active skill; treat
+that head as historical active-skill evidence, not a no-skill baseline.
 
-**Fixture:** a LiveView mounted while eligible, eligibility changed before the event,
-and a context function also called by another entry point. Include a delayed read
-that can return stale action availability after refusal. Existing fixtures include
-an initially ineligible user, which cannot reproduce the reported transition.
+**Evaluator context:** the issue requires a full ban to remove contribution actions
+while own-content deletion remains available, and confirmed updates must not reorder
+the list. Delayed-search cases operationalize those requirements; they are not
+literal steps in the issue. The PR's [stale read repair](https://github.com/chenghanlee/tips/commit/3a4477c603f98ac11ce486d1ff26228c9491c156)
+and [scope refresh repair](https://github.com/chenghanlee/tips/commit/f7a44a07cc89845d34d4d6c1b4a969a12d70f00a)
+document the observed failures. Keep that evidence out of the developer prompt.
 
-**Expected outcomes:** the regression test reaches the eligible-to-ineligible
-transition and fails before the repair for the expected reason. No vote is written;
-the final UI remains consistent after the delayed reply. A changed result shape is
-handled or propagated by affected callers. No default fallback hides failure, and
-no unrelated error-tuple normalization enters the diff. Allow any design satisfying
-these outcomes; do not require request tags or another particular mechanism.
+**Expected outcomes:** a vote refused for a full ban writes no vote; contribution
+actions disappear in place without reranking; own-content Delete remains available.
+A search begun before refusal cannot restore those actions, and later reads use
+the post-refusal permissions. Grade the issue's remaining acceptance criteria too;
+these focused checks do not replace the full task. Allow any design satisfying the
+contract, without requiring request tags, reloads or another mechanism.
+
+**Process evidence:** assess whether the regression test reached the claimed
+transition and failed for the expected reason before the repair from recorded runs,
+not from the final code alone. Also record unnecessary cleanup and repair work.
 
 ## Evaluation 3: end-to-end performance with database and browser costs
 
@@ -97,9 +124,11 @@ slow with 1,000 contributions. Identify and reduce the bottlenecks while preserv
 results and pagination. Report comparable before-and-after evidence. There is no
 real-user telemetry.”
 
-**Fixture:** representative seeded data, a per-row database lookup, a serial browser
-request before results appear, and a fast loading indicator. Provide the repository's
-installed profiling tools and fixed device, network and cache conditions.
+**Status:** defined scenario only; no real fixture or pinned task yet. The proposed
+fixture has representative data, a per-row database lookup, a serial browser request
+before results appear and a fast loading indicator. Prefer a real performance task;
+otherwise weigh fixture cost against the untested measurement/reference-navigation
+behavior. Fix tool, device, network and cache conditions before any comparison.
 
 **Expected outcomes:** the agent reads the measurement reference, measures query
 count/timing and the browser request/rendering path, and selects changes from that
@@ -110,7 +139,8 @@ a speed claim. No production percentile or product-usefulness claim is inferred.
 
 ## Pending validation
 
-No fixture execution, model comparison or real-task observation has occurred.
+No candidate replay, model comparison or real-task observation has occurred in this
+iteration. Historical implementations are not candidate validation.
 After these comparisons, observe real implementation tasks and revise only for
 demonstrated failures or wasted work. Structural checks and reviewer consensus alone
 do not establish the quality-per-token improvement this candidate aims to achieve.

@@ -17,11 +17,15 @@ investigated.
 | Database execution or contention | Query timings/counts, pool and lock statistics; [EXPLAIN ANALYZE with BUFFERS](https://www.postgresql.org/docs/current/using-explain.html) on representative disposable data when execution detail is needed. ANALYZE executes the query. |
 | Application CPU or memory | A runtime profiler available in the installed toolchain, such as [mix profile.tprof](https://hexdocs.pm/mix/Mix.Tasks.Profile.Tprof.html); choose its mode for the suspected resource cost. |
 
+When a database performance claim depends on an index or query strategy, inspect
+its query plan with representative data instead of assuming the database will use it.
+
 ## Compare measurements
 
 Use the profile to locate the bottleneck, then compare the affected operation before
 and after under the same workload and conditions. Account for profiler overhead;
-a shorter suite run or one favorable sample is not sufficient evidence of a gain.
+one favorable sample is not sufficient evidence of a gain. Test-suite duration mixes
+setup and assertions and is not application performance.
 
 Without real-user data, compare before and after under the same representative
 device, network, cache and interaction conditions. Exercise the affected flow;
