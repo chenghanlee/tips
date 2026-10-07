@@ -57,7 +57,8 @@ board change:
 ### 2. Developer: implement and hand off
 
 1. Use the repository to fill in missing facts in the issue.
-2. Implement, verify and push the change.
+2. Read `agent/skills/developing-software/SKILL.md` from this worktree. Implement,
+   verify and push the change, applying the sections whose trigger matches it.
 3. Open the PR with `Closes #<issue>` and enable auto-merge:
    `gh pr merge <pr> --auto --merge`.
 4. Run `agent/teams/team.py turn <pr> test`.
@@ -85,6 +86,7 @@ behaviour or design.
 ### 4. Developer and tester: address findings
 
 1. Developer: fix every P0 and P1. Address each P2 under the [severity rules](#severity).
+   Repair as the developing-software skill's "Repairing a finding" section says.
 2. Developer: push and hand off to the tester.
 3. Tester: review the changes since the previous review, as step 3 says for fixes.
    Resolve each thread that is fixed or declined with a reason.

@@ -1048,6 +1048,7 @@ class PairLifecycleTest(unittest.TestCase):
         ring = self.events("agent", "prompt")[-1]
         assert ring[2] == "team-1-dev"
         assert "pr_review.py list 7" in ring[3]
+        assert "agent/skills/developing-software/SKILL.md from this worktree" in ring[3]
         assert "Fix the checkout first" not in ring[3]
         # Only the developer can repair the tree, so a problem is reported, not refused.
         (wt / "scratch.txt").write_text("left behind\n")

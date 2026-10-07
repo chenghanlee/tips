@@ -825,7 +825,8 @@ def turn(pr: str, recipient: str) -> None:
     else:
         message = (
             f"Your turn on {url}: run agent/teams/pr_review.py list {pr} and "
-            f"gh pr checks {pr} --required. Repair the findings or failed checks, push and "
+            f"gh pr checks {pr} --required. Repair the findings or failed checks as "
+            "agent/skills/developing-software/SKILL.md from this worktree says, push and "
             "hand back; if stuck, follow the README blocker procedure."
         )
         if problem:
