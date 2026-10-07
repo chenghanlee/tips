@@ -3,9 +3,10 @@
 Tips helps developers find and share practical AI techniques and firsthand results.
 It is an Elixir/Phoenix application with PostgreSQL.
 
-The app has a placeholder home page, read-only tip and review pages, passwordless
-magic-link sign-in, session-family management, admission and content/search foundations,
-scheduled registration-cleanup and search-embedding jobs and a database health check.
+The app has a Hot/New tip feed with filters, search, read-only tip and review
+pages, passwordless magic-link sign-in, session-family management, admission and
+content/search foundations, scheduled registration-cleanup and search-embedding
+jobs and a database health check.
 The Content context can publish, edit and delete text and let moderators hide or
 restore it; no web screens use these yet.
 The design documents describe target product behavior; GitHub issues and PRs track

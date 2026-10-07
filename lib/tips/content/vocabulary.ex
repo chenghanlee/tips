@@ -22,6 +22,24 @@ defmodule Tips.Content.Vocabulary do
     %{tags: active(Tag), models: active(Model), environments: active(Environment)}
   end
 
+  @typedoc "Every curated label by id, retired ones included, for projection hydration."
+  @type label_maps :: %{
+          tags: %{String.t() => String.t()},
+          models: %{String.t() => String.t()},
+          environments: %{String.t() => String.t()}
+        }
+
+  @doc """
+  Returns every tag, model and environment label by id, retired choices
+  included because old rows keep them. Curated lists are small.
+  """
+  @spec label_maps() :: label_maps()
+  def label_maps do
+    %{tags: label_map(Tag), models: label_map(Model), environments: label_map(Environment)}
+  end
+
+  defp label_map(schema), do: Map.new(Repo.all(from c in schema, select: {c.id, c.label}))
+
   defp active(schema) do
     Repo.all(
       from c in schema,

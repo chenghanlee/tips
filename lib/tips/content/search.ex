@@ -169,7 +169,7 @@ defmodule Tips.Content.Search do
   require Logger
 
   alias Tips.Accounts.{Scope, User}
-  alias Tips.Content.{Environment, Model, Projection, Review, Tag, Tip, Vote}
+  alias Tips.Content.{Environment, Model, Projection, Review, Tag, Tip, Vocabulary, Vote}
   alias Tips.Content.Search.{EmbeddingProvider, Vector}
   alias Tips.Repo
 
@@ -405,7 +405,7 @@ defmodule Tips.Content.Search do
           tips: tips,
           reviews: matched_reviews(query, candidates),
           votes: viewer_votes(scope, Map.keys(tips)),
-          labels: labels()
+          labels: Vocabulary.label_maps()
         }
 
         Enum.map(candidates, &entry(scope, query, &1, loaded))
@@ -749,12 +749,6 @@ defmodule Tips.Content.Search do
   end
 
   defp viewer_votes(nil, _tip_ids), do: %{}
-
-  defp labels do
-    %{tags: label_map(Tag), models: label_map(Model), environments: label_map(Environment)}
-  end
-
-  defp label_map(schema), do: Map.new(Repo.all(from c in schema, select: {c.id, c.label}))
 
   defp excerpt(_scope, _query, _tip, nil, _labels), do: nil
 
