@@ -261,7 +261,7 @@ defmodule Tips.Content do
   A database error or lost connection returns `{:error, :outcome_unknown}`;
   reload before deciding to repeat.
 
-  ## Voting
+  ### Voting
 
   `set_vote(scope, kind, id, desired)` sets the scope's vote on a tip or review
   to Helpful (`1`), Not helpful (`-1`) or no vote (`nil`). It sends the wanted
