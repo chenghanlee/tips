@@ -1,8 +1,11 @@
 defmodule Tips.Content.Moderation do
   @moduledoc """
-  Moderation cases and guarded hide/restore for `Tips.Content`.
+  Reports, moderation cases and guarded hide/restore for `Tips.Content`.
 
-  See "Deletion and moderation" in `Tips.Content`. A case is read in one short
+  See "Reporting" and "Deletion and moderation" in `Tips.Content`. A report
+  locks the reporter, then only its direct target `FOR SHARE`, so author
+  deletion and hiding either wait for it and see the report, or commit first
+  and make it fail. A case is read in one short
   repeatable-read transaction, so its content, media, version and open reports
   come from one snapshot. Hide and restore lock the moderator, then the tip,
   then the review (`Tips.Content.Deletion`), and compare the version and the
@@ -53,6 +56,87 @@ defmodule Tips.Content.Moderation do
       end
     end)
   end
+
+  @doc "See `Tips.Content.report_content/4`."
+  @spec report(Scope.t() | nil, term(), term(), map()) ::
+          {:ok, Tips.Content.report_receipt()} | {:error, Tips.Content.report_error()}
+  def report(scope, kind, id, attrs) do
+    unknown_on_database_error(fn ->
+      with {:ok, user} <- Deletion.actor(scope),
+           :ok <- Publication.admit(scope),
+           {:ok, kind} <- Deletion.kind(kind),
+           {:ok, id} <- Deletion.write_id(id),
+           {:ok, changeset} <- report_changeset(kind, user.id, id, attrs) do
+        changeset
+        |> store(kind, user.id, id)
+        |> settle_report(kind, user.id, id)
+      end
+    end)
+  end
+
+  ## Report
+
+  defp report_changeset(kind, user_id, id, attrs) do
+    changeset =
+      %Flag{user_id: user_id}
+      |> Map.put(Deletion.key(kind), id)
+      |> Flag.report_changeset(attrs)
+
+    if changeset.valid?, do: {:ok, changeset}, else: {:error, %{changeset | action: :insert}}
+  end
+
+  defp store(changeset, kind, user_id, id) do
+    Repo.transact(fn ->
+      with :ok <- Deletion.lock_account(user_id, :contribute),
+           :ok <- share_reportable(kind, id) do
+        Repo.insert(changeset)
+      end
+    end)
+  end
+
+  # Only the direct target, never a review's parent tip. Hidden and deleted
+  # content cannot be reported, as its capabilities say.
+  defp share_reportable(kind, id) do
+    reportable =
+      from(c in Deletion.schema(kind),
+        where: c.id == ^id and is_nil(c.deleted_at) and is_nil(c.dead_at),
+        lock: "FOR SHARE",
+        select: c.id
+      )
+
+    if Repo.one(reportable), do: :ok, else: {:error, :not_found}
+  end
+
+  defp settle_report({:ok, flag}, kind, _user_id, id),
+    do: {:ok, report_receipt(kind, id, flag.id, :stored)}
+
+  # Validation passed, so a rejected insert is the one-open-report index.
+  defp settle_report({:error, %Ecto.Changeset{}}, kind, user_id, id),
+    do: open_receipt(kind, user_id, id)
+
+  defp settle_report({:error, _reason} = error, _kind, _user_id, _id), do: error
+
+  # The insert rolled back. The lock waits for a resolution in progress, so the
+  # receipt is the open report's actual state. If that report was resolved,
+  # this submission stored nothing and there is no receipt to give.
+  defp open_receipt(kind, user_id, id) do
+    open =
+      from(f in Flag,
+        where:
+          f.user_id == ^user_id and field(f, ^Deletion.key(kind)) == ^id and
+            is_nil(f.resolved_at),
+        lock: "FOR SHARE",
+        select: f.id
+      )
+
+    case Repo.one(open) do
+      nil -> {:error, :outcome_unknown}
+      report_id -> {:ok, report_receipt(kind, id, report_id, :already_open)}
+    end
+  end
+
+  defp report_receipt(kind, id, report_id, outcome),
+    do: %{kind: kind, id: id, report_id: report_id, outcome: outcome}
 
   ## Case read
 
