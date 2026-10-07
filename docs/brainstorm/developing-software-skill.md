@@ -22,9 +22,13 @@ When this candidate is approved for promotion:
   to the skill.
 - Update reviewing-code and the team review prompt to reference the skill's design
   and testing rules. Update the pair workflow's repair-section reference.
-- Validate the skill, documentation links and affected harness code. Compare
-  implementation behavior and total token cost on representative tasks before
-  claiming an improvement.
+- Promote [performance measurement](performance-measurement.md) as a conditional
+  reference under the skill's `references/` directory and update its links.
+- Place the candidate metadata in real YAML frontmatter at the start of `SKILL.md`;
+  omit this brainstorm preamble from the installed skill.
+- Validate the skill, documentation links and affected harness code. Run the
+  [authoring evaluations](developing-software-evaluations.md) before claiming an
+  improvement in implementation behavior or total token cost.
 
 The migration and behavioral evaluation have not been performed. The draft below
 contains the proposed skill metadata and instructions. Its links resolve from this
@@ -35,15 +39,11 @@ brainstorm document; adjust them for the skill directory on promotion.
 ```yaml
 ---
 name: developing-software
-description: Design and implement features, fixes and refactors in this repository. Use when planning implementation, changing code or writing tests. Code reviews use reviewing-code, which references this skill's design and testing rules.
+description: Guides implementation planning, features, fixes, refactors and tests in the tips Phoenix/Elixir repository. Applies when designing a code change, implementing required behavior or choosing tests. Code reviews use reviewing-code, which references this skill's design and testing rules.
 ---
 ```
 
 # Developing software
-
-Establish the required behavior, choose the simplest suitable design, challenge
-consequential assumptions, and revise the design when implementation reveals a
-concrete improvement.
 
 Use these sections as decision guidance, not sequential gates. Apply conditional
 checks when their triggers occur. Investigate until remaining uncertainty would
@@ -76,18 +76,16 @@ When several approaches meet the requirements, prefer the one with fewer interac
 parts, clearer ownership and less coordination. Prefer the option easier for the
 product's users when reducing code would make their experience worse.
 
-Do not build for hypothetical scale, reuse or compatibility. Check concrete growth
-and resource limits where they could invalidate the approach; introduce additional
-machinery when requirements or evidence justify it.
+Do not build for hypothetical scale, reuse or compatibility.
 
 ### Reuse existing mechanisms and follow conventions
 
 Before building a custom mechanism, check built-in features, locked dependencies
-and commonly used libraries or tools. Prefer stable, composable interfaces whose
-relevant behavior you can inspect and verify. Build your own only when none meets
-the requirements or reuse costs more to integrate and maintain, including workarounds,
-verification and future fixes. Local code is not automatically cheaper. When you
-build your own, say what you checked and why in the PR.
+and commonly used libraries or tools. Prefer stable interfaces with behavior you
+can establish from documentation, source or a focused probe. Include verification,
+workarounds and future fixes in the integration and maintenance cost. Build your own
+only when none meets the requirements or that total cost exceeds building and
+maintaining your own. When you build your own, say what you checked and why in the PR.
 
 Before copying a nearby pattern, check it against the current contract and
 conventions. Repetition in the repository does not establish that a pattern is
@@ -145,7 +143,8 @@ layer already checked. Earlier checks may be stale when the action runs.
 ### State, resources and delayed work
 
 **Trigger:** adding or changing an async callback, process, job, mount or reconnect
-path, transaction, lock, OS process, stored retry or delayed action.
+path, transaction, lock, OS process, retry, delayed action, timeout, deadline, quota
+or resource limit.
 
 Identify where the affected state can change and which transitions could break the
 requirement. Establish who owns each resource, who releases it and what survives
@@ -160,6 +159,11 @@ the caller's exit.
   retry that cannot succeed.
 - Record completion only when the required work is done. Reuse production's success
   decision; cleanup running is not evidence of success.
+- When adding or changing a timeout, retry, deadline, quota or resource limit: bound
+  the whole operation. Add up sequential work, retries, queueing, cleanup and work
+  that outlives the caller; a per-step timeout does not bound the operation.
+- For a shared deadline, quota or concurrency limit, define which results stop new
+  work and what happens to work already in progress.
 
 ### Fallible boundaries
 
@@ -234,30 +238,23 @@ predictive and inspiring.
 
 ## Check performance claims and bounds
 
-**Trigger:** adding or changing a query, preload, pagination strategy, transaction,
-index, page loading, navigation, browser interactions, assets, client requests,
-timeout, retry, queue, capacity or size limit, parallel work, or a design justified
-by performance.
+**Trigger:** a performance claim or observed regression; a change to how work grows
+with data (a query inside a loop, a new preload, an unbounded result set, a transaction
+wrapping an external call, parallel work, work that outlives the caller); or a change
+to what the browser must load or do before content is visible or an interaction
+completes (a new or reordered request, a critical-path asset or font, payload size,
+client-side work on interaction, async content that moves the layout). The trigger
+selects the risk to assess, not a measurement of every changed asset. A performance
+claim or an uncertain cost that could change the design requires profiling; an
+ordinary bounded change with neither needs no measurement.
 
-Identify the expected workload, what grows and the relevant time and resource
-limits. Investigate costs that could change the design; a routine bounded lookup
-does not require a benchmark.
-
-For a performance claim or optimization, use a profiler or trace that observes the
-suspected cost. Test-suite duration mixes setup, fixtures, scheduling and assertions;
-it does not establish application performance. Tests may drive the workload, but
-measure the operation and resource being investigated.
-
-| Suspected cost | Evidence to use |
-|---|---|
-| Browser rendering or interaction | A [browser performance trace](https://developer.chrome.com/docs/devtools/performance) of the affected flow; inspect main-thread work, frames and paints. |
-| Network or external-service delay | A request waterfall and request/server traces; separate round trips, server work and transfer time. |
-| Database execution or contention | Query timings/counts, pool and lock statistics; [EXPLAIN ANALYZE with BUFFERS](https://www.postgresql.org/docs/current/using-explain.html) on representative disposable data when execution detail is needed. ANALYZE executes the query. |
-| Application CPU or memory | A runtime profiler available in the installed toolchain, such as [mix profile.tprof](https://hexdocs.pm/mix/Mix.Tasks.Profile.Tprof.html); choose its mode for the suspected resource cost. |
-
-Use the profile to locate the bottleneck, then compare the affected operation before
-and after under the same workload and conditions. Account for profiler overhead;
-a shorter suite run or one favorable sample is not sufficient evidence of a gain.
+Name the property at risk and the workload. Profile the suspected cost; test-suite
+duration mixes setup and assertions and is not application performance. Compare the
+affected operation before and after under the same workload and conditions, and
+report lab results as lab results. For requests or LiveView updates, measure
+action-to-visible-result time; a quick loading indicator is not a quick result.
+Before measuring, read the relevant part of
+[performance measurement](performance-measurement.md).
 
 For database work:
 
@@ -271,48 +268,6 @@ For database work:
   for contention and connection occupancy, especially when external calls or slow
   work occur inside a transaction.
 
-For frontend work, select the metrics affected by the change rather than running a
-full audit for every UI edit:
-
-- **Visible content:** distinguish [First Paint (FP) from First Contentful Paint
-  (FCP)](https://developer.mozilla.org/en-US/docs/Web/API/PerformancePaintTiming).
-  First pixels may be only a background; FCP marks the first content. Use Largest
-  Contentful Paint (LCP) for when the largest visible content element renders.
-  Inspect the critical request and rendering path before adding loading machinery.
-- **Interaction and rendering:** use [Interaction to Next Paint
-  (INP)](https://web.dev/articles/inp) for responsiveness. For requests or LiveView
-  updates, also measure action-to-visible-result time; a quick loading indicator
-  does not establish a quick result. Inspect frame times and main-thread work when
-  interactions or scrolling stall. [Total Blocking Time (TBT)](https://web.dev/articles/tbt) is a lab
-  diagnostic, not a substitute for exercising interactions.
-- **Visual stability:** use Cumulative Layout Shift (CLS) to find unexpected movement.
-  Reserve space for images and async content when their arrival shifts the interface.
-- **Network:** inspect request waterfalls, round trips, payload sizes and cache
-  behavior. [Time to First Byte (TTFB)](https://web.dev/articles/ttfb) includes more
-  than network latency; use [resource timings](https://developer.mozilla.org/en-US/docs/Web/API/Performance_API/Resource_timing)
-  and server timings as needed to distinguish connection, server and transfer costs.
-  Remove unnecessary serial requests and critical-path bytes before adding caches
-  or prefetching.
-
-Use the task's performance requirements. [Core Web Vitals](https://web.dev/articles/vitals)
-reference values are LCP <= 2.5 s, INP <= 200 ms and CLS <= 0.1 at the 75th percentile
-of real visits, assessed separately for mobile and desktop; these are reference
-values, not additional acceptance gates.
-
-Without real-user data, compare before and after under the same representative
-device, network, cache and interaction conditions. Exercise the affected flow;
-a fast localhost load or an aggregate Lighthouse score alone does not establish
-user-perceived performance. Report these as lab results, not field percentiles.
-
-Across the whole operation, account for sequential work, concurrency, queueing,
-retries, cleanup, network round trips, browser rendering and work that outlives the
-caller. A per-query or per-step bound does not bound the operation.
-
-For work governed by a shared deadline, quota or concurrency limit, identify which
-results stop new work and what happens to work already in progress.
-
-Limit measurement claims to the workload actually tested.
-
 ## Reconsider the design
 
 **When a result contradicts expectations, or a bug or review finding exposes a
@@ -321,22 +276,20 @@ other sites and transitions that depend on it, and repair those that share the
 defect. Verify the whole affected contract, including behavior the reported failure
 did not exercise.
 
-**When implementation reveals unclear ownership, an awkward interface, conflicting
-state or repeated special cases:** identify an alternative that removes the observed
-problem. Prefer the smallest revision that addresses its cause.
+When this task reveals repeated violations of one consequential invariant, use an
+existing enforcement point where it covers the affected paths, fix the remaining
+violations and keep checks at each trust boundary. Add custom enforcement only
+within the task's scope and when preventing recurrence justifies its execution and
+maintenance cost; check the invariant itself and make failures name the rule and
+the correction.
 
-Within the design this task needs, prioritize improvements that prevent costly or
-recurring defects or remove a demonstrated bottleneck. Refactor or replace parts
-when the gain justifies the change and verification cost. Preserve required behavior
-and verify each increment. Effort already spent is not a reason to retain an
-approach. Stop when no identified improvement justifies its cost.
-
-**When a consequential invariant is repeatedly missed:** prefer an existing schema,
-constraint, compiler check, linter or behavioral test over another prose reminder.
-Add custom enforcement only when preventing recurrence justifies its execution and
-maintenance cost. Check the invariant, not an incidental implementation shape, so
-valid alternatives remain possible. Make failures identify the violation and the
-correction needed.
+Refactor when the task requires it, or when the current implementation reveals an
+ownership, interface or state problem that materially complicates the required
+behavior or its verification. Name that problem and keep the revision within the
+affected flow. Inconsistency elsewhere or hypothetical reuse does not justify
+expanding the task. Preserve required behavior and verify each increment. Effort
+already spent is not a reason to retain an approach. Stop when the named problem is
+resolved and required verification passes.
 
 ## Finish
 
