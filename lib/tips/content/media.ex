@@ -50,7 +50,7 @@ defmodule Tips.Content.Media do
   No reservation is retried on the same row; a fresh upload gets a new row.
   A response that rejects the reservation marks the row `failed`. A lost
   response, or one the guard refuses, leaves the uid NULL: no browser has the
-  URL, and the expiry worker retires the row locally at its deadline.
+  URL, and the expiry worker (#66) retires the row locally at its deadline.
   """
 
   import Ecto.Changeset
@@ -203,7 +203,11 @@ defmodule Tips.Content.Media do
       reservable =
         from(a in unfinished(asset.id),
           where:
-            datetime_add(a.created_at, ^@upload_seconds, "second") > fragment("clock_timestamp()")
+            fragment(
+              "? + ? * interval '1 second' > clock_timestamp()",
+              a.created_at,
+              ^@upload_seconds
+            )
         )
 
       case Repo.update_all(reservable, set: [stream_uid: uid]) do
