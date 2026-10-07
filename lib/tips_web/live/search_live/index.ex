@@ -19,12 +19,13 @@ defmodule TipsWeb.SearchLive.Index do
   both reset to page 1. A blank submit shows the shared message and keeps the
   URL, heading and results. Typing does nothing.
 
-  Rows render without the vote control until voting (P10) wires it.
+  `TipsWeb.VoteActions` handles each row's vote control. A confirmed vote
+  updates only that row's net score and selection, in place.
   """
   use TipsWeb, :live_view
 
   alias Tips.Content
-  alias TipsWeb.{Discovery, UI}
+  alias TipsWeb.{Discovery, UI, VoteActions}
 
   @page_size 20
   # Search ranks a window of at most 200 tips: pages 1 to 10.
@@ -59,7 +60,12 @@ defmodule TipsWeb.SearchLive.Index do
             {Discovery.heading_details(@request, @options)}
           </span>
         </h1>
-        <.results result={@result} request={@request} />
+        <.results
+          result={@result}
+          request={@request}
+          current_scope={@current_scope}
+          vote_status={@vote_status}
+        />
       </section>
       <script :type={Phoenix.LiveView.ColocatedHook} name=".RestoreScroll">
         // LiveView restores a history entry's scroll position when a Back patch
@@ -86,6 +92,8 @@ defmodule TipsWeb.SearchLive.Index do
 
   attr :result, :any, required: true
   attr :request, :map, required: true
+  attr :current_scope, :any, required: true
+  attr :vote_status, :map, required: true
 
   defp results(%{result: :loading} = assigns) do
     ~H"""
@@ -108,7 +116,11 @@ defmodule TipsWeb.SearchLive.Index do
 
     ~H"""
     <ol id="result-rows">
-      <UI.tip_row :for={entry <- @page.entries} tip={Discovery.row(entry.tip, @request, &path/1)}>
+      <UI.tip_row
+        :for={entry <- @page.entries}
+        tip={Discovery.row(entry.tip, @request, &path/1)}
+        vote={VoteActions.control(:tip, entry.tip, @current_scope, @vote_status)}
+      >
         <:excerpt
           :if={entry.excerpt}
           source={Map.fetch!(sources(), entry.excerpt.source)}
@@ -161,12 +173,14 @@ defmodule TipsWeb.SearchLive.Index do
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
-     assign(socket,
+     socket
+     |> assign(
        options: Discovery.filter_options(),
        request: nil,
        result: nil,
        search_error: nil
-     )}
+     )
+     |> VoteActions.attach(&update_vote/3)}
   end
 
   @impl true
@@ -241,6 +255,22 @@ defmodule TipsWeb.SearchLive.Index do
 
   def handle_async(:results, {:exit, _reason}, socket),
     do: {:noreply, assign(socket, result: {:error, :unavailable})}
+
+  defp update_vote(
+         %{assigns: %{result: {:ok, %{entries: entries} = page}}} = socket,
+         {:tip, id},
+         fun
+       ) do
+    entries =
+      Enum.map(entries, fn
+        %{tip: %{id: ^id} = tip} = entry -> %{entry | tip: fun.(tip)}
+        entry -> entry
+      end)
+
+    assign(socket, :result, {:ok, %{page | entries: entries}})
+  end
+
+  defp update_vote(socket, _target, _fun), do: socket
 
   defp page_title(%{q: nil}), do: "Search"
   defp page_title(%{q: q}), do: "#{q} · Search"

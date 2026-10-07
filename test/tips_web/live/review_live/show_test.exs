@@ -55,7 +55,6 @@ defmodule TipsWeb.ReviewLive.ShowTest do
       assert text(html, card) =~ "IDE", render
       refute html =~ "/?model=gpt", render
       assert text(html, card) =~ "Helpful 1", render
-      refute html =~ ~s(phx-click="vote"), render
 
       refute html =~ "Competitor body", render
       refute has?(html, "select"), render

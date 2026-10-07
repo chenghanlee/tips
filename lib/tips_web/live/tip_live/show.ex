@@ -14,11 +14,14 @@ defmodule TipsWeb.TipLive.Show do
   Changing a select or Clear filters patches the URL on page 1, keeping the
   sort. An empty page after the first is out of range. Review links carry the
   sort, so Show all reviews on the single-review view keeps it.
+
+  `TipsWeb.VoteActions` handles the tip's and each review's vote control. A
+  confirmed vote updates only that item's counts and selection, in place.
   """
   use TipsWeb, :live_view
 
   alias Tips.Content
-  alias TipsWeb.{Discovery, Reader, ReviewActions, UserAuth}
+  alias TipsWeb.{Discovery, Reader, ReviewActions, UserAuth, VoteActions}
 
   @page_size 30
   # Postgres offsets are bigints; later pages cannot be requested.
@@ -43,6 +46,7 @@ defmodule TipsWeb.TipLive.Show do
         own_review={@own_review}
         signed_in={!!@current_scope}
         sort_params={sort_params(@request.sort)}
+        vote={VoteActions.control(:tip, @tip, @current_scope, @vote_status)}
       />
       <%= if @tip.state == :visible do %>
         <Reader.markdown id="tip-body" text={@tip.body} />
@@ -91,6 +95,8 @@ defmodule TipsWeb.TipLive.Show do
           tip={@tip}
           own_review={@own_review}
           confirm_delete={@confirm_delete}
+          current_scope={@current_scope}
+          vote_status={@vote_status}
         />
       </section>
     </Layouts.app>
@@ -102,6 +108,8 @@ defmodule TipsWeb.TipLive.Show do
   attr :tip, :map, required: true
   attr :own_review, :map, required: true
   attr :confirm_delete, :integer, required: true
+  attr :current_scope, :any, required: true
+  attr :vote_status, :map, required: true
 
   defp reviews(%{reviews: :out_of_range} = assigns) do
     ~H"""
@@ -134,6 +142,7 @@ defmodule TipsWeb.TipLive.Show do
         href={Reader.review_path(review.id, sort_params(@request.sort))}
         own={!!@own_review and @own_review.id == review.id}
         confirm_delete={@confirm_delete == review.id}
+        vote={VoteActions.control(:review, review, @current_scope, @vote_status)}
       />
     </div>
     <UI.page_nav
@@ -148,7 +157,12 @@ defmodule TipsWeb.TipLive.Show do
   @impl true
   def mount(_params, _session, socket) do
     options = %{Discovery.filter_options() | technique: []}
-    {:ok, socket |> assign(options: options, request: nil) |> ReviewActions.attach()}
+
+    {:ok,
+     socket
+     |> assign(options: options, request: nil)
+     |> ReviewActions.attach()
+     |> VoteActions.attach(&update_vote/3)}
   end
 
   @impl true
@@ -194,6 +208,19 @@ defmodule TipsWeb.TipLive.Show do
         UserAuth.require_login(socket)
     end
   end
+
+  defp update_vote(%{assigns: %{tip: %{id: id} = tip}} = socket, {:tip, id}, fun),
+    do: assign(socket, :tip, fun.(tip))
+
+  defp update_vote(
+         %{assigns: %{reviews: %{entries: entries} = reviews}} = socket,
+         {:review, id},
+         fun
+       ),
+       do:
+         assign(socket, :reviews, %{reviews | entries: VoteActions.update_row(entries, id, fun)})
+
+  defp update_vote(socket, _target, _fun), do: socket
 
   # A page past the last offset still reads the tip, with an empty list.
   defp read(socket, %{id: id, sort: sort, filters: filters, page: page}) do

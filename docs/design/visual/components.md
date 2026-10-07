@@ -47,6 +47,15 @@ and search share: URL filter and page parsing, `filter_selects` and the
 opens one confirmation in the card; `TipsWeb.ReviewActions` handles its events
 on the tip page and the single-review view.
 
+## Votes
+
+`tip_row` shows `vote_control` with the net score; `tip_header` and
+`review_card` show it with `variant="detail"` and both counts. A signed-in
+viewer without the vote capability gets no buttons: detail shows plain counts.
+`TipsWeb.VoteActions` (`lib/tips_web/vote_actions.ex`) builds the control's
+attrs and handles its events on browse, search, the tip page and the
+single-review view.
+
 ## Not in the code
 
 Parts of built components:
@@ -54,7 +63,6 @@ Parts of built components:
 | Component | Part | Spec |
 |---|---|---|
 | `verbatim_block` | Copy | Attr `copy_label` ("Copy prompt", "Copy result"); a `<button>` beside the label. Status region `aria-live="polite"`: "Copied" or the manual-copy line |
-| `tip_header`, `review_card` | Votes | `TipsWeb.UI.vote_control` with `variant="detail"` |
 
 Components:
 

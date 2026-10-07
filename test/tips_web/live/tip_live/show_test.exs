@@ -57,7 +57,6 @@ defmodule TipsWeb.TipLive.ShowTest do
 
         assert text(html, "#tip-vote") =~ "Helpful 2", render
         assert text(html, "#tip-vote") =~ "Not helpful 1", render
-        refute html =~ ~s(phx-click="vote"), render
       end
     end
 

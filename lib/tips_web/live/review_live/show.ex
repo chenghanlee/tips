@@ -5,12 +5,13 @@ defmodule TipsWeb.ReviewLive.Show do
   unavailable. No list sort, filters or pages; "Show all reviews" opens the
   tip permalink on page 1 with no filters, keeping only a `sort=new`
   parameter that the tip page's review links add. The review's own Delete
-  is handled by `TipsWeb.ReviewActions`.
+  is handled by `TipsWeb.ReviewActions`, its vote control by
+  `TipsWeb.VoteActions`.
   """
   use TipsWeb, :live_view
 
   alias Tips.Content
-  alias TipsWeb.{Reader, ReviewActions, UserAuth}
+  alias TipsWeb.{Reader, ReviewActions, UserAuth, VoteActions}
 
   @impl true
   def render(assigns) do
@@ -24,7 +25,12 @@ defmodule TipsWeb.ReviewLive.Show do
       <Reader.tip_context tip={@tip} />
       <%= case @review do %>
         <% {:visible, review} -> %>
-          <Reader.review_card review={review} open confirm_delete={@confirm_delete == review.id} />
+          <Reader.review_card
+            review={review}
+            open
+            confirm_delete={@confirm_delete == review.id}
+            vote={VoteActions.control(:review, review, @current_scope, @vote_status)}
+          />
           <p><.link navigate={Reader.tip_path(@tip, @sort_params)}>Show all reviews</.link></p>
         <% reason -> %>
           <UI.notice id="review-unavailable">
@@ -53,7 +59,8 @@ defmodule TipsWeb.ReviewLive.Show do
            path: Reader.review_path(id, sort_params),
            page_title: "Review of #{tip.title}"
          )
-         |> ReviewActions.attach()}
+         |> ReviewActions.attach()
+         |> VoteActions.attach(&update_vote/3)}
 
       {:error, :not_found} ->
         raise TipsWeb.NotFoundError
@@ -62,6 +69,15 @@ defmodule TipsWeb.ReviewLive.Show do
         {:ok, UserAuth.require_login(socket)}
     end
   end
+
+  defp update_vote(
+         %{assigns: %{review: {:visible, %{id: id} = review}}} = socket,
+         {:review, id},
+         fun
+       ),
+       do: assign(socket, :review, {:visible, fun.(review)})
+
+  defp update_vote(socket, _target, _fun), do: socket
 
   defp unavailable(:deleted), do: "Review deleted by author"
   defp unavailable(:removed), do: "Review removed by moderators"

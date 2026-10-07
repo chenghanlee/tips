@@ -144,7 +144,7 @@ defmodule TipsWeb.UITest do
 
     doc =
       parse(~H"""
-      <UI.tip_row tip={@tip} vote={%{target: "tip-1", selected: :helpful}}>
+      <UI.tip_row tip={@tip} vote={%{target: "tip-1", return: "/tips/1", selected: :helpful}}>
         <:excerpt source="Review" href="/tips/1#r1">the loop caught a race</:excerpt>
       </UI.tip_row>
       """)
@@ -158,8 +158,15 @@ defmodule TipsWeb.UITest do
   end
 
   describe "vote_control" do
-    test "pending votes ignore clicks while selected votes remain clickable" do
-      doc = html(&UI.vote_control/1, target: "t1", pending: true, selected: nil)
+    test "pending votes ignore clicks; each button asks for its resulting vote" do
+      doc =
+        html(&UI.vote_control/1,
+          id: "t1-vote",
+          target: "t1",
+          return: "/tips/1",
+          pending: true,
+          status: "Saving…"
+        )
 
       assert LazyHTML.attribute(LazyHTML.query(doc, "button"), "aria-disabled") == [
                "true",
@@ -171,8 +178,10 @@ defmodule TipsWeb.UITest do
 
       doc =
         html(&UI.vote_control/1,
+          id: "t1-vote",
           variant: "detail",
           target: "t1",
+          return: "/tips/1",
           selected: :not_helpful,
           counts: %{helpful: 8, not_helpful: 1}
         )
@@ -185,6 +194,11 @@ defmodule TipsWeb.UITest do
       assert text(doc, "button") =~ "Helpful 8"
       assert text(doc, "button") =~ "Not helpful 1"
       assert LazyHTML.attribute(LazyHTML.query(doc, "button"), "phx-click") == ["vote", "vote"]
+
+      assert LazyHTML.attribute(LazyHTML.query(doc, "button"), "phx-value-vote") == [
+               "helpful",
+               "none"
+             ]
     end
   end
 end

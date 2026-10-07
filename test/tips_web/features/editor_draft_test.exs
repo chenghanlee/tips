@@ -211,17 +211,6 @@ defmodule TipsWeb.EditorDraftTest do
     |> assert_value("#tip_title", "Still typing")
   end
 
-  defp sign_in(session, user) do
-    {token, _hashed} = generate_user_magic_link_token(user)
-
-    session
-    |> visit("/users/log-in/#{token}")
-    |> click(button("Log me in only this time"))
-    # The browser matches the email itself, so no text is read from the log-in page's
-    # header while the navigation replaces it.
-    |> assert_has(xpath(~s|//header[contains(., "#{user.email}")]|))
-  end
-
   defp open_editor(session, path) do
     session
     |> visit(path)

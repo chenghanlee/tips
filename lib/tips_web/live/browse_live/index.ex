@@ -15,12 +15,13 @@ defmodule TipsWeb.BrowseLive.Index do
   shared message and stays. An empty page after the first is out of range:
   it offers Previous and First page.
 
-  Rows render without the vote control until voting (#110) wires it.
+  `TipsWeb.VoteActions` handles each row's vote control. A confirmed vote
+  updates only that row's net score and selection, in place.
   """
   use TipsWeb, :live_view
 
   alias Tips.Content
-  alias TipsWeb.Discovery
+  alias TipsWeb.{Discovery, VoteActions}
 
   @page_size 20
   # Postgres offsets are bigints; later pages cannot be requested.
@@ -54,7 +55,12 @@ defmodule TipsWeb.BrowseLive.Index do
             {Discovery.heading_details(@request, @options)}
           </span>
         </h1>
-        <.tips result={@result} request={@request} />
+        <.tips
+          result={@result}
+          request={@request}
+          current_scope={@current_scope}
+          vote_status={@vote_status}
+        />
       </section>
     </Layouts.app>
     """
@@ -62,6 +68,8 @@ defmodule TipsWeb.BrowseLive.Index do
 
   attr :result, :any, required: true
   attr :request, :map, required: true
+  attr :current_scope, :any, required: true
+  attr :vote_status, :map, required: true
 
   defp tips(%{result: :out_of_range} = assigns) do
     ~H"""
@@ -88,7 +96,11 @@ defmodule TipsWeb.BrowseLive.Index do
   defp tips(assigns) do
     ~H"""
     <ol id="tip-rows">
-      <UI.tip_row :for={tip <- @result.entries} tip={Discovery.row(tip, @request, &path/1)} />
+      <UI.tip_row
+        :for={tip <- @result.entries}
+        tip={Discovery.row(tip, @request, &path/1)}
+        vote={VoteActions.control(:tip, tip, @current_scope, @vote_status)}
+      />
     </ol>
     <UI.page_nav
       page={@request.page}
@@ -102,12 +114,14 @@ defmodule TipsWeb.BrowseLive.Index do
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
-     assign(socket,
+     socket
+     |> assign(
        options: Discovery.filter_options(),
        request: nil,
        result: nil,
        search_error: nil
-     )}
+     )
+     |> VoteActions.attach(&update_vote/3)}
   end
 
   @impl true
@@ -162,6 +176,11 @@ defmodule TipsWeb.BrowseLive.Index do
       {:ok, result} -> result
     end
   end
+
+  defp update_vote(%{assigns: %{result: %{entries: entries} = result}} = socket, {:tip, id}, fun),
+    do: assign(socket, :result, %{result | entries: VoteActions.update_row(entries, id, fun)})
+
+  defp update_vote(socket, _target, _fun), do: socket
 
   defp heading(:hot), do: "Hot tips"
   defp heading(:new), do: "New tips"
