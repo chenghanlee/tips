@@ -90,7 +90,7 @@ defmodule Tips.Content.Deletion do
     )
   end
 
-  ## Shared with Tips.Content.Moderation
+  ## Shared with Tips.Content.Moderation and Tips.Content.Voting
 
   @doc false
   # Locks the acting account and checks its current eligibility for `operation`.
@@ -117,7 +117,9 @@ defmodule Tips.Content.Deletion do
     end
   end
 
-  defp lock_one(schema, id) do
+  @doc false
+  # Locks one tip or review row, without its parent; votes lock only their target.
+  def lock_one(schema, id) do
     case Repo.one(from(c in schema, where: c.id == ^id, lock: "FOR NO KEY UPDATE")) do
       nil -> {:error, :not_found}
       row -> {:ok, row}
