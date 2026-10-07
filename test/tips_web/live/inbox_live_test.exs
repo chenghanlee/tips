@@ -41,13 +41,17 @@ defmodule TipsWeb.InboxLiveTest do
     assert unread_count(recipient) == 0
     assert badge(render(lv)) == nil
 
-    # A later arrival stays unread through page changes in the same visit.
+    # A later arrival stays unread through page changes in the same visit, and
+    # each page load counts it in the badge.
     later = notification_fixture(recipient)
     html = lv |> element("a[rel=next]") |> render_click()
     assert_patch(lv, ~p"/inbox?page=2")
     assert text(html, "#notification-#{hd(rows).id} [data-role=unread]") == ""
-    lv |> element("a[rel=prev]") |> render_click()
+    assert badge(html) == "1"
+    html = lv |> element("a[rel=prev]") |> render_click()
     assert_patch(lv, ~p"/inbox")
+    assert text(html, "#notification-#{later.id} [data-role=unread]") == "Unread"
+    assert badge(html) == "1"
     assert unread_count(recipient) == 1
 
     # A remount is a new visit and marks it.

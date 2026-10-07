@@ -7,7 +7,9 @@ defmodule TipsWeb.InboxLive.Index do
   visit also marks every unread notification it captured, on all pages, then
   refreshes the header badge. Later page changes in the visit only read; a
   remount is a new visit and marks again. Rows of the marking visit render
-  unread, from the snapshot; later pages render their current state.
+  unread, from the snapshot; later pages render their current state. Every
+  page load, after any marking, recounts the header badge, so it includes
+  later arrivals.
   """
   use TipsWeb, :live_view
 
@@ -105,9 +107,9 @@ defmodule TipsWeb.InboxLive.Index do
         |> assign(
           page: page,
           result: result(result, page),
-          marked: socket.assigns.marked or mark?
+          marked: socket.assigns.marked or mark?,
+          unread_notifications: Content.count_unread_notifications(socket.assigns.current_scope)
         )
-        |> refresh_badge(mark?)
 
       {:error, :unauthenticated} ->
         UserAuth.require_login(socket)
@@ -117,15 +119,6 @@ defmodule TipsWeb.InboxLive.Index do
   defp result(_result, page) when page > @last_page, do: :out_of_range
   defp result(%{entries: []}, page) when page > 1, do: :out_of_range
   defp result(result, _page), do: result
-
-  # Later arrivals stay unread, so the badge is recounted rather than zeroed.
-  defp refresh_badge(socket, true),
-    do:
-      assign(socket,
-        unread_notifications: Content.count_unread_notifications(socket.assigns.current_scope)
-      )
-
-  defp refresh_badge(socket, false), do: socket
 
   defp message(%{type: :tip_upvoted}), do: "Your tip got new helpful votes"
   defp message(%{type: :review_upvoted}), do: "Your review got new helpful votes"
