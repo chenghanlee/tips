@@ -88,6 +88,10 @@ defmodule Tips.Content.Search.EmbeddingProvider do
     {implementation, implementation.client!(opts)}
   end
 
+  @doc "The largest document, in UTF-8 bytes, that `embed_document/2` accepts."
+  @spec max_document_bytes() :: pos_integer()
+  def max_document_bytes, do: @max_document_bytes
+
   @doc "The largest query, in UTF-8 bytes, that `embed_query/2` accepts."
   @spec max_query_bytes() :: pos_integer()
   def max_query_bytes, do: @max_query_bytes

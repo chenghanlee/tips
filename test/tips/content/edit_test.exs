@@ -404,6 +404,50 @@ defmodule Tips.Content.EditTest do
       assert text =~ "Edited body"
       assert DateTime.compare(edited.text_at, embedded.text_at) == :gt
     end
+
+    test "#{kind}: an edit over 30,000 search bytes is refused; one at the limit saves" do
+      kind = unquote(kind)
+      {author, row} = content(kind)
+      index!(kind, row.id)
+      indexed = search_state(kind, row.id)
+
+      # 10,000 two-byte characters pass the field limit but fill 20,000 bytes.
+      assert {:error, {:too_long, 1}} =
+               edit(kind, scope(author), row.id, 1, limit_attrs(kind, 1), [])
+
+      assert reload(row) == row
+      assert search_state(kind, row.id) == indexed
+
+      assert {:ok, %{outcome: :updated, edit_version: 2}} =
+               edit(kind, scope(author), row.id, 1, limit_attrs(kind, 0), [])
+
+      assert %{text: text, vector?: false} = search_state(kind, row.id)
+      assert byte_size(text) == 30_000
+    end
+  end
+
+  # Documents of exactly 30,000 + `over` bytes: the tip's is "Limit", the
+  # body, the prompt and the tag label "Workflow"; the review's is the body
+  # and the prompt.
+  defp limit_attrs(:tip, over) do
+    %{
+      @tip_attrs
+      | title: "Limit",
+        body: String.duplicate("é", 10_000),
+        prompt: String.duplicate("x", 9_984 + over),
+        model_id: nil,
+        environment_id: nil
+    }
+  end
+
+  defp limit_attrs(:review, over) do
+    %{
+      @review_attrs
+      | body: String.duplicate("é", 10_000),
+        prompt: String.duplicate("x", 9_999 + over),
+        model_other: nil,
+        output: nil
+    }
   end
 
   defp content(:tip) do

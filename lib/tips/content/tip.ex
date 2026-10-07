@@ -3,6 +3,9 @@ defmodule Tips.Content.Tip do
   use Ecto.Schema
   import Ecto.Changeset
 
+  # Reddit's wording for an over-limit field.
+  @too_long "this is too long (max: %{count})"
+
   schema "tips" do
     belongs_to :user, Tips.Accounts.User
     belongs_to :tag, Tips.Content.Tag, type: :string
@@ -43,15 +46,17 @@ defmodule Tips.Content.Tip do
       :output
     ])
     |> validate_required([:submission_key, :title, :body, :tag_id])
-    |> validate_length(:title, min: 3, max: 140, count: :codepoints)
+    |> validate_length(:title, min: 3, count: :codepoints)
+    |> validate_length(:title, max: 300, count: :codepoints, message: @too_long)
     |> validate_format(:title, ~r/\S/u)
-    |> validate_length(:body, min: 3, max: 20_000, count: :codepoints)
+    |> validate_length(:body, min: 3, count: :codepoints)
+    |> validate_length(:body, max: 10_000, count: :codepoints, message: @too_long)
     |> validate_format(:body, ~r/\S/u)
-    |> validate_length(:model_other, max: 80, count: :codepoints)
+    |> validate_length(:model_other, max: 80, count: :codepoints, message: @too_long)
     |> validate_format(:model_other, ~r/\S/u)
-    |> validate_length(:prompt, max: 20_000, count: :codepoints)
+    |> validate_length(:prompt, max: 10_000, count: :codepoints, message: @too_long)
     |> validate_format(:prompt, ~r/\S/u)
-    |> validate_length(:output, max: 20_000, count: :codepoints)
+    |> validate_length(:output, max: 10_000, count: :codepoints, message: @too_long)
     |> validate_format(:output, ~r/\S/u)
     |> validate_no_null_bytes()
     |> validate_model_choice()

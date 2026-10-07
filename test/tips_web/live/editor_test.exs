@@ -110,6 +110,7 @@ defmodule TipsWeb.EditorTest do
 
     assert_push_event(lv, "editor:refused", %{})
     assert summary_links(html, form_id) == ["#tip_body", "#tip_tag_id"]
+    assert text(html, "#{form_id}-errors") =~ "Tip: this is too long (max: 10000)"
     # The technique was never touched.
     assert has?(html, ~s(#tip_tag_id[aria-invalid="true"]))
     refute has?(html, ~s(#tip_title[aria-invalid]))
@@ -134,7 +135,7 @@ defmodule TipsWeb.EditorTest do
     assert_redirect(lv, "/tips/#{id}/plan-first")
   end
 
-  test "an expired sign-in or a full ban refuses Publish and keeps the input", %{
+  test "a long document, an expired sign-in or a full ban refuses Publish and keeps the input", %{
     conn: conn,
     user: user
   } do
@@ -142,6 +143,17 @@ defmodule TipsWeb.EditorTest do
     path = "/editor/tips/#{tip.id}/reviews/new"
     form_id = "#editor-#{user.id}-review"
     {:ok, lv, _html} = live(conn, path)
+
+    # Each field is within its limit; together they are 30,001 bytes.
+    long = %{body: String.duplicate("é", 10_000), prompt: String.duplicate("x", 10_000)}
+    html = lv |> form(form_id, review: long) |> render_submit()
+
+    assert text(html, "#{form_id}-refusal") =~
+             "This review is too long. Shorten it by about 1 word."
+
+    assert textarea(html, "review[body]") == long.body
+    assert textarea(html, "review[prompt]") == long.prompt
+    refute Repo.exists?(Review)
 
     # The session ended without a disconnect reaching this page.
     Repo.delete_all(from t in UserToken, where: t.user_id == ^user.id)

@@ -137,7 +137,7 @@ create table tips (
   edited_at       timestamptz,
   deleted_at      timestamptz,                          -- author
   dead_at         timestamptz,                          -- deliberate moderator hiding
-  constraint tips_title_chk       check (title ~ '[^[:space:]]' and length(title) between 3 and 140),
+  constraint tips_title_chk       check (title ~ '[^[:space:]]' and length(title) between 3 and 300),
   constraint tips_body_chk        check (body ~ '[^[:space:]]' and length(body) between 3 and 20000),
   constraint tips_model_one_chk   check (num_nonnulls(model_id, model_other) <= 1),
   constraint tips_model_other_chk check (model_other is null or (model_other ~ '[^[:space:]]' and length(model_other) <= 80)),
@@ -364,7 +364,7 @@ Authentication adapts Phoenix's generated email magic-link migration. The [backe
 | `prompt`, `output` | Text as typed | `<pre>` block, escaped. A prompt may contain markdown that the reader needs to see as written. |
 | `title`, `detail`, `media.description` | Plain text | Escaped; image descriptions supply the image alternative. Missing descriptions get a generic fallback, not a claim of equivalent access. |
 
-Length limits match the form and are initial estimates. Increase a limit when a valid submission needs it. Public queries select named columns to avoid returning unnecessary data.
+The changesets limit a title to 3–300 characters and a body, prompt or output to 10,000 characters, and the forms state these limits. The database checks above allow 20,000 for body, prompt and output because the search gate loads its fixed corpus directly (`Tips.SearchGate.split_body/1`). A tip or review whose search document would exceed 30,000 UTF-8 bytes is not saved (see [Publish a tip or review](#publish-a-tip-or-review)). Limits are initial estimates. Increase a limit when a valid submission needs it. Public queries select named columns to avoid returning unnecessary data.
 
 ## Indexes
 
@@ -547,7 +547,7 @@ After fresh admission, submission-key lookup and image preparation, use one tran
 3. Insert the search row, self vote and new image rows; lock, validate and attach selected staged video rows. Triggers update counters; app code does not duplicate those changes.
 4. Fold `tip_reviewed` only for a new live review by someone other than the parent author. Commit before reporting success. No provider write follows publication: attached videos become playable through the signed routes as soon as the content is live.
 
-Build tip search text from title, body, prompt, output, tag and model/environment labels or free text; build review text from body, prompt, output and its own model/environment labels or free text. Only a new content insert runs the side effects. A same-key retry returns the original identity/state and comparison outcome, including unknown after deletion. A different key for an existing undeleted review returns "already reviewed" after the key check; link to edit. The embedding scan finds committed search rows without a per-row job.
+Build tip search text from title, body, prompt, output, tag and model/environment labels or free text; build review text from body, prompt, output and its own model/environment labels or free text. The shared writer refuses a document over 30,000 UTF-8 bytes, the embedding provider's input limit; the publish, edit, retag or label rebuild transaction then rolls back, and the editor shows how many words to remove. Only a new content insert runs the side effects. A same-key retry returns the original identity/state and comparison outcome, including unknown after deletion. A different key for an existing undeleted review returns "already reviewed" after the key check; link to edit. The embedding scan finds committed search rows without a per-row job.
 
 ### Vote
 

@@ -425,6 +425,12 @@ defmodule TipsWeb.Editor do
     do:
       "We couldn't confirm whether your changes were saved. The saved #{kind} is below. If you save again and your changes were already saved, you'll be told the #{kind} changed."
 
+  defp refusal({:too_long, 1}, kind, _verb),
+    do: "This #{kind} is too long. Shorten it by about 1 word."
+
+  defp refusal({:too_long, words}, kind, _verb),
+    do: "This #{kind} is too long. Shorten it by about #{words} words."
+
   defp refusal({upload, _refs}, _kind, verb) when upload in [:upload_failed, :upload_pending],
     do: "An attachment isn't ready, so nothing was #{past(verb)}."
 
@@ -619,14 +625,14 @@ defmodule TipsWeb.Editor do
         type="textarea"
         rows={4}
         label="Prompt (optional)"
-        helper="Shown exactly as you type it."
+        helper="Up to 10,000 characters. Shown exactly as you type it."
       />
       <TipsWeb.UI.field
         field={@form[:output]}
         type="textarea"
         rows={4}
         label="Result text (optional)"
-        helper="Shown exactly as you type it."
+        helper="Up to 10,000 characters. Shown exactly as you type it."
       />
     </TipsWeb.UI.disclosure>
     """

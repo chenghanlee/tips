@@ -5,10 +5,12 @@ defmodule Tips.Content.PublicationTest do
   alias Tips.AdmissionLimiter
   alias Tips.Content
   alias Tips.Content.{Notification, Review, Tag, Tip, Vote}
+  alias Tips.Content.Search.Embeddings
 
   import Tips.AccountsFixtures
   import Tips.ContentFixtures
   import Tips.MediaFixtures
+  import Tips.SearchFixtures, only: [search_row: 1, stub_provider: 0]
   import Tips.VisibilityFixtures
 
   @tip_attrs %{
@@ -152,6 +154,28 @@ defmodule Tips.Content.PublicationTest do
 
     assert Repo.all_by(Notification, review_id: own_id) == []
     assert %Tip{review_count: 2} = Repo.reload!(parent)
+  end
+
+  for kind <- [:tip, :review] do
+    test "#{kind}: a search document over 30,000 bytes is refused; one at the limit embeds" do
+      kind = unquote(kind)
+      scope = scope(user_fixture())
+
+      # 10,000 two-byte characters pass the field limit but fill 20,000 bytes.
+      over = limit_attrs(kind, 1)
+      assert {:error, {:too_long, 1}} = publish(kind, scope, over)
+      assert Repo.aggregate("tip_search", :count) == 0
+      assert Repo.aggregate("review_search", :count) == 0
+      assert Repo.all(from(c in schema(kind), where: c.body == ^over.body)) == []
+
+      assert {:ok, %{outcome: :created, id: id}} = publish(kind, scope, limit_attrs(kind, 0))
+      assert byte_size(search_text(kind, id)) == 30_000
+
+      stub_provider()
+      assert %{embedded: 1, failed: failed} = Embeddings.scan()
+      assert failed == %{}
+      assert %{embedding: "[1," <> _} = search_row({kind, id})
+    end
   end
 
   describe "existing keys reconcile before validation without repeating effects" do
@@ -521,6 +545,38 @@ defmodule Tips.Content.PublicationTest do
     Repo.delete!(tip)
     tip.id
   end
+
+  # Documents of exactly 30,000 + `over` bytes: the tip's is "Limit", the
+  # body, the prompt and the tag label "Workflow"; the review's is the body
+  # and the prompt.
+  defp limit_attrs(:tip, over) do
+    %{
+      @tip_attrs
+      | title: "Limit",
+        body: String.duplicate("é", 10_000),
+        prompt: String.duplicate("x", 9_984 + over),
+        model_id: nil,
+        environment_id: nil
+    }
+  end
+
+  defp limit_attrs(:review, over) do
+    %{
+      @review_attrs
+      | body: String.duplicate("é", 10_000),
+        prompt: String.duplicate("x", 9_999 + over),
+        model_other: nil,
+        output: nil
+    }
+  end
+
+  defp publish(:tip, scope, attrs), do: Content.publish_tip(scope, key(), attrs, [])
+
+  defp publish(:review, scope, attrs),
+    do: Content.publish_review(scope, tip_fixture().id, key(), attrs, [])
+
+  defp schema(:tip), do: Tip
+  defp schema(:review), do: Review
 
   defp votes(target), do: Repo.all(from(v in Vote, where: ^target))
 

@@ -257,8 +257,8 @@ defmodule Tips.Content.Publication do
       with :ok <- lock_author(user.id),
            {:ok, parent_author_id} <- lock_parent(parent_id),
            :ok <- lock_choices(changeset, base_kind(kind)),
-           {:ok, row} <- Repo.insert(changeset) do
-        write_dependents(base_kind(kind), row, parent_author_id)
+           {:ok, row} <- Repo.insert(changeset),
+           :ok <- write_dependents(base_kind(kind), row, parent_author_id) do
         {:ok, row}
       end
     end)
@@ -318,14 +318,17 @@ defmodule Tips.Content.Publication do
   end
 
   defp write_dependents(:tip, tip, nil) do
-    :ok = Search.write_tip_text(tip.id)
-    Repo.insert!(%Vote{user_id: tip.user_id, tip_id: tip.id, value: 1})
+    with :ok <- Search.write_tip_text(tip.id) do
+      Repo.insert!(%Vote{user_id: tip.user_id, tip_id: tip.id, value: 1})
+      :ok
+    end
   end
 
   defp write_dependents(:review, review, parent_author_id) do
-    :ok = Search.write_review_text(review.id)
-    Repo.insert!(%Vote{user_id: review.user_id, review_id: review.id, value: 1})
-    :ok = Notification.fold(:tip_reviewed, parent_author_id, review.user_id, review)
+    with :ok <- Search.write_review_text(review.id) do
+      Repo.insert!(%Vote{user_id: review.user_id, review_id: review.id, value: 1})
+      :ok = Notification.fold(:tip_reviewed, parent_author_id, review.user_id, review)
+    end
   end
 
   defp settle({:ok, row}, _scope, kind, _key, _intent),

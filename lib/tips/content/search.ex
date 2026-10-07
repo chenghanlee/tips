@@ -130,6 +130,12 @@ defmodule Tips.Content.Search do
   and the rest are joined with newlines. Case, punctuation and Unicode
   normalization form are kept, and stored content is never changed.
 
+  A document over `EmbeddingProvider.max_document_bytes/0` (30,000 UTF-8
+  bytes) is not stored: the writer returns `{:error, {:too_long, words}}`,
+  where `words` estimates how many words to remove from the document's average
+  word size, at least 1. The caller must roll back, so no publication, edit,
+  retag or label rebuild leaves a stored document over the cap.
+
   Writers participate in the caller's transaction; they do not authorize,
   lock or check versions. The caller holds the contribution row under the
   shared lock order (tips by id, then reviews by id) before writing, so the
@@ -190,6 +196,9 @@ defmodule Tips.Content.Search do
   @typedoc "A ranked tip and its best matching review, produced by `rank/2`."
   @type candidate :: %{tip_id: pos_integer(), review_id: pos_integer() | nil, score: float()}
 
+  @typedoc "A document over the cap, with about how many words to remove."
+  @type too_long :: {:too_long, words :: pos_integer()}
+
   @type error ::
           :blank_query
           | :query_too_long
@@ -202,10 +211,11 @@ defmodule Tips.Content.Search do
 
   @doc """
   Rebuilds the tip's search document from its persisted content and labels.
+  See "Documents" for `{:error, {:too_long, words}}`.
 
   Raises `Ecto.NoResultsError` when the tip does not exist.
   """
-  @spec write_tip_text(tip_id :: pos_integer()) :: :ok
+  @spec write_tip_text(tip_id :: pos_integer()) :: :ok | {:error, too_long()}
   def write_tip_text(tip_id) do
     ensure_transaction!()
 
@@ -232,10 +242,11 @@ defmodule Tips.Content.Search do
 
   @doc """
   Rebuilds the review's search document from its persisted content and own labels.
+  See "Documents" for `{:error, {:too_long, words}}`.
 
   Raises `Ecto.NoResultsError` when the review does not exist.
   """
-  @spec write_review_text(review_id :: pos_integer()) :: :ok
+  @spec write_review_text(review_id :: pos_integer()) :: :ok | {:error, too_long()}
   def write_review_text(review_id) do
     ensure_transaction!()
 
@@ -252,13 +263,15 @@ defmodule Tips.Content.Search do
   end
 
   @doc "Stores already-built tip search text. Prefer `write_tip_text/1`."
-  @spec write_tip_text(tip_id :: pos_integer(), search_text :: String.t()) :: :ok
+  @spec write_tip_text(tip_id :: pos_integer(), search_text :: String.t()) ::
+          :ok | {:error, too_long()}
   def write_tip_text(tip_id, search_text) do
     write_text(:tip, tip_id, search_text)
   end
 
   @doc "Stores already-built review search text. Prefer `write_review_text/1`."
-  @spec write_review_text(review_id :: pos_integer(), search_text :: String.t()) :: :ok
+  @spec write_review_text(review_id :: pos_integer(), search_text :: String.t()) ::
+          :ok | {:error, too_long()}
   def write_review_text(review_id, search_text) do
     write_text(:review, review_id, search_text)
   end
@@ -796,8 +809,20 @@ defmodule Tips.Content.Search do
 
   defp write_text(kind, id, search_text) do
     ensure_transaction!()
-    Repo.query!(upsert_sql(kind), [id, search_text])
-    :ok
+    over = byte_size(search_text) - EmbeddingProvider.max_document_bytes()
+
+    if over > 0 do
+      {:error, {:too_long, words_over(search_text, over)}}
+    else
+      Repo.query!(upsert_sql(kind), [id, search_text])
+      :ok
+    end
+  end
+
+  # The document's average word size scales the excess bytes to words.
+  defp words_over(search_text, over) do
+    words = search_text |> String.split() |> length()
+    max(1, ceil(over * words / byte_size(search_text)))
   end
 
   defp ensure_transaction! do

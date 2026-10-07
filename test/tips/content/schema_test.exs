@@ -102,14 +102,14 @@ defmodule Tips.Content.SchemaTest do
     for {schema, fields} <- [
           {Tip,
            [
-             title: {3, 140},
-             body: {3, 20_000},
+             title: {3, 300},
+             body: {3, 10_000},
              model_other: {1, 80},
-             prompt: {1, 20_000},
-             output: {1, 20_000}
+             prompt: {1, 10_000},
+             output: {1, 10_000}
            ]},
           {Review,
-           [body: {1, 20_000}, model_other: {1, 80}, prompt: {1, 20_000}, output: {1, 20_000}]}
+           [body: {1, 10_000}, model_other: {1, 80}, prompt: {1, 10_000}, output: {1, 10_000}]}
         ],
         {field, {min, max}} <- fields do
       extra_values = if schema == Tip and field == :title, do: ["e\u0301x"], else: []
