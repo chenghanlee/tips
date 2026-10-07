@@ -1,0 +1,20 @@
+# Developing software skill revision
+
+The revised instructions now live in the active
+[developing-software skill](../../agent/skills/developing-software/SKILL.md), with
+[performance measurement](../../agent/skills/developing-software/references/performance-measurement.md)
+loaded when needed. Edit those sources rather than maintaining a second copy here.
+The [last brainstorm draft](https://github.com/chenghanlee/tips/blob/988e174/docs/brainstorm/developing-software-skill.md)
+preserves the pre-promotion text.
+
+The objective remains code, architecture and decision quality per total token spent
+on investigation, design, implementation, tool output, verification and repairs.
+Required behavior and checks are constraints. Opus and Fable reviewed the wording;
+those critiques do not establish improved implementation quality or token efficiency.
+
+Design and testing rules moved from AGENTS.md to the skill. AGENTS.md routes planning,
+implementation and testing there; reviewers use the same standard. Pair coordination,
+repository checks, boundaries and navigation retain their existing owners.
+
+The [evaluation plan](developing-software-evaluations.md) remains pending. Promotion
+was requested without running the behavioral comparisons; no measured benefit is claimed.

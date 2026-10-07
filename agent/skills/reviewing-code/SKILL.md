@@ -7,14 +7,18 @@ description: Reviews tips PRs, diffs and commits for defects, test gaps, unneces
 
 Review required behaviour independently of the code and its tests. Follow
 [AGENTS.md](../../../AGENTS.md), including the required language and framework skills.
-Repository rules take precedence over general skill advice. Read repository files
-from the current worktree.
+Repository rules take precedence over general language and framework skill advice.
+Read [developing-software](../developing-software/SKILL.md) as the shared design and
+testing standard; this skill adds review methods and probes, not a second rule set.
+Read repository files and skill references from the current worktree.
 
 ## Establish scope
 
-Establish the reviewed commit or diff and its requirements. Read the relevant tests,
-linked design sections and prior findings. In a pair, follow
-[step 3](../../teams/README.md#3-tester-review-the-pushed-head) for review execution.
+Establish the reviewed commit or diff. Read the issue and acceptance scenarios, PR
+body, diff, changed files and their callers, existing tests, linked design sections
+and prior review threads. For a local review, use the user brief in place of absent
+issue or PR records. In a pair, [step 3](../../teams/README.md#3-tester-review-the-pushed-head)
+owns turn-taking and handoff; this section owns what to inspect.
 
 ## Review
 
@@ -28,55 +32,45 @@ line and the input, state or sequence that triggers it.
   feedback and recovery for each reachable state. For example, cover loading, empty,
   error, stale and conflict states, and check UI copy, focus, keyboard access and docs
   against the requirements and glossary.
-- State and data: Check that state stays consistent and effects preserve required
-  invariants through concurrency, interruptions and recovery. Compare submitted,
-  stored, retried and displayed values; identify authority, committed effects and
-  resource ownership. For example, trace duplicate or out-of-order updates across tabs
-  or after reconnects or timeouts; cancellation or restart after a write; and migrations
-  on existing rows. Check transactions, constraints and external cleanup.
-  For durable jobs, check serialized or stale inputs, repeated effects and whether
-  the business write and job insertion must commit together. A lost reply does not
-  prove rollback.
-- Contracts: Check each side of a boundary against its contract for inputs, results,
-  failures, timing, resource ownership and lifecycle. Verify dependencies against
-  source or docs for the locked versions and configuration in use. For example, check
-  callback mount, update and teardown; exceptions, exits, timeouts or partial provider
-  responses; and command exit status, release configuration, migrations and readiness.
-  Include boundaries such as browser storage, media parsers and uploads.
+- State and data: Probe the [state and resource rules](../developing-software/SKILL.md#state-resources-and-delayed-work)
+  through duplicate or out-of-order updates across tabs, reconnects and timeouts;
+  cancellation or restart after a write; and migrations on existing rows. Compare
+  submitted, stored, retried and displayed values. For durable jobs, inspect serialized
+  or stale inputs, repeated effects under retry, and whether the business write and
+  job insertion must commit together.
+- Contracts: Trace both sides of [affected contracts](../developing-software/SKILL.md#trace-the-affected-contract)
+  and [fallible boundaries](../developing-software/SKILL.md#fallible-boundaries).
+  For example, inspect callback mount, update and teardown; partial provider responses;
+  command exit status, release configuration, migrations and readiness. Include
+  browser storage, media parsers and uploads.
 - Inputs: Check accepted and rejected values against domain rules at every entry point,
   including previously stored data and boundary values. For example, try nil, empty,
   whitespace or malformed values; encoded identifiers and character versus byte limits;
   and duplicates, ordering and values just below, at and above limits.
-- Complexity and performance: Check how work and resource use grow with input size,
-  history, user count and arrival rate, and whether they meet required limits. Include
-  execution time, query count, memory, payload size and queues, including work on
-  records the user never sees and blocking work against required budgets. For example,
-  check N+1 queries, repeated work per render or event, and unbounded loads or retention.
+- Complexity and performance: Assess claims and costs against the
+  [performance guidance](../developing-software/SKILL.md#check-performance-claims-and-bounds).
+  Vary input size, history, user count and arrival rate when they affect the claim.
+  Look for work on records the user never sees, repeated work per render or event,
+  and unbounded retention; use measurements when the conclusion depends on them.
 - Trust: Identify trust boundaries and trace untrusted data into decisions and effects.
   Check identity, authorization, validation and sensitive-data handling at each boundary.
   Try substituting an id and replaying an operation after permissions change. For
   example, trace untrusted content into HTML, URLs, provider destinations or commands,
   and check disclosure through output or logs. Include reads and effects in jobs,
   sockets and browser storage.
-- Tests: Check that changed and existing tests detect violations of requirements and
-  regressions, run reliably, and do not enforce incidental implementation choices.
-  For example, check doubles against real contracts, isolation of shared state, waits
-  for asynchronous work and browser elements retained across navigation. Find missing
-  or redundant coverage and tests of frameworks or private implementation details.
-  Prefer extending an existing test. Check that assertions cover required order, timing
-  and representation without enforcing incidental details.
-- Simplicity: Look for unnecessary parts or user steps that can be removed while
-  preserving required behaviour, failure isolation and testability, without moving
-  costs elsewhere. For example, check duplicate state or paths, compatibility code
-  without a current requirement, and dead code or unused documentation.
-- Idiom: Check code against the idioms, conventions, standards and documented best
-  practices of its language and framework. Include control flow, data handling and
-  programming model. Check whether custom code duplicates a built-in, locked
-  dependency or established tool. For example, compare queries and forms with the
+- Tests: Apply the [test selection and evidence rules](../developing-software/SKILL.md#choose-and-maintain-tests)
+  to changed and existing coverage. Identify which acceptance scenario a missing or
+  redundant test affects. Probe isolation of shared state and browser elements retained
+  across navigation. Check that assertions cover required order, timing and representation.
+- Simplicity: Apply [the simplest complete solution](../developing-software/SKILL.md#build-the-simplest-working-solution)
+  criterion. Compare the proposed removal or replacement against user effort, failure
+  isolation and testability; check whether it merely moves costs elsewhere.
+- Idiom: Apply [reuse and conventions](../developing-software/SKILL.md#reuse-existing-mechanisms-and-follow-conventions)
+  and the applicable language/framework skills. Compare queries and forms with the
   framework's DSL and validation facilities; stateful processes with plain functions;
-  and custom lifecycle or job handling with LiveView, OTP or Oban. Compare custom
-  serializers, browser integrations and test helpers with standard facilities. Respect
-  documented error contracts; Elixir's `with`, for example, does not catch exceptions.
+  and lifecycle or job handling with LiveView, OTP or Oban. Check custom serializers,
+  browser integrations and test helpers against available facilities. Verify claims
+  about error handling; Elixir's `with`, for example, does not catch exceptions.
 
 ## Verify and report
 
@@ -88,8 +82,8 @@ Use the [severity table](../../teams/README.md#severity). For a PR, follow the
 the findings in the requested output. This skill does not authorize publishing a
 review or merging.
 
-Report one finding per defect. Start with the severity and the requested change,
-followed by the requirement, consequence and evidence.
+Use the finding format in [AGENTS.md](../../../AGENTS.md#github). Support each finding
+with the evidence appropriate to its type:
 
 - Behaviour: Give the input and the actual and expected results.
 - Complexity and performance: State what grows or which budget applies, the workload,
@@ -105,8 +99,8 @@ followed by the requirement, consequence and evidence.
   requirement, and explain how the custom code differs, what it costs and what should
   replace it. For deviations from language or framework guidance, assess the stated
   justification and cite the guidance and consequence. If no explanation is given,
-  report the missing explanation under AGENTS.md's rule on deviations. For a
-  repository-rule violation, cite the rule.
+  cite the [deviation rule](../developing-software/SKILL.md#reuse-existing-mechanisms-and-follow-conventions).
+  For a repository-rule violation, cite its owning document.
 
 Report what you reviewed and what remains unfinished or blocked. "No findings" is
 valid. Do not aim for a finding count or list choices you approve of.

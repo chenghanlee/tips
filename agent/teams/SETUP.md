@@ -37,7 +37,7 @@ for skill in dexter developing-software reviewing-code; do
 done
 ```
 
-These links serve discovery in the main checkout. A pair developer or tester reads the versioned file in its own worktree, as the pair workflow says, because the linked skills directory points at the main checkout's copy.
+These links serve discovery in the main checkout. A pair developer or tester reads the versioned file and any linked skill references in its own worktree, as the pair workflow says, because the linked skills directory points at the main checkout's copy.
 
 Install only the `mix-credo` plugin, for the clients you use:
 

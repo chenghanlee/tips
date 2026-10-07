@@ -4,8 +4,10 @@ GitHub stores workflow state in the issue, the PR reviews and checks, and
 [Project 15](https://github.com/users/chenghanlee/projects/15) (`--owner chenghanlee`).
 Read these records when assigned, after a restart and at each handoff. Record
 decisions, findings and blockers there. Use Herdr to notify the next agent.
-[AGENTS.md](../../AGENTS.md) defines engineering rules. The user completes
-[setup](SETUP.md) once.
+[AGENTS.md](../../AGENTS.md) owns repository boundaries, navigation, checks and skill
+routing. [Developing-software](../skills/developing-software/SKILL.md) owns design and
+testing rules; [reviewing-code](../skills/reviewing-code/SKILL.md) owns review methods.
+This document owns pair coordination. The user completes [setup](SETUP.md) once.
 
 | Role | Agent name | Responsibilities |
 |---|---|---|
@@ -57,8 +59,8 @@ board change:
 ### 2. Developer: implement and hand off
 
 1. Use the repository to fill in missing facts in the issue.
-2. Read `agent/skills/developing-software/SKILL.md` from this worktree. Implement,
-   verify and push the change, applying the sections whose trigger matches it.
+2. Plan, implement and verify using [developing-software](../skills/developing-software/SKILL.md)
+   from this worktree, then push the change.
 3. Open the PR with `Closes #<issue>` and enable auto-merge:
    `gh pr merge <pr> --auto --merge`.
 4. Run `agent/teams/team.py turn <pr> test`.
@@ -67,15 +69,12 @@ board change:
 
 ### 3. Tester: review the pushed head
 
-1. Record the PR head SHA. Read the issue and acceptance scenarios, PR body, diff,
-   changed files and their callers, existing tests, linked design sections and prior
-   review threads. Run the tests. For UI tasks, also check acceptance scenarios
-   through [manual browser review](#manual-browser-review).
-2. Read `agent/skills/reviewing-code/SKILL.md` from this worktree and apply it to the
-   pushed SHA. Verify each suspected defect against the code and the requirements. One
-   finding per defect; severity by the [table](#severity). If required review work
-   stays blocked, follow the [blocker procedure](#report-and-resolve-blockers).
-   Report unfinished scope; it is not "no findings".
+1. Record the PR head SHA. Read [reviewing-code](../skills/reviewing-code/SKILL.md)
+   from this worktree to establish scope and review that head against the shared
+   design and testing standard. Run the tests. For UI tasks, also check acceptance
+   scenarios through [manual browser review](#manual-browser-review).
+2. If required review work stays blocked, follow the
+   [blocker procedure](#report-and-resolve-blockers).
 3. Confirm the worktree is clean and HEAD matches the reviewed SHA. Report every P0
    and P1 in the first review. With findings: submit the review and run
    `agent/teams/team.py turn <pr> dev`. Without: continue to approval.
@@ -86,7 +85,7 @@ behaviour or design.
 ### 4. Developer and tester: address findings
 
 1. Developer: fix every P0 and P1. Address each P2 under the [severity rules](#severity).
-   Repair as the developing-software skill's "Repairing a finding" section says.
+   Follow [Repair and refactor](../skills/developing-software/SKILL.md#repair-and-refactor).
 2. Developer: push and hand off to the tester.
 3. Tester: review the changes since the previous review, as step 3 says for fixes.
    Resolve each thread that is fixed or declined with a reason.
