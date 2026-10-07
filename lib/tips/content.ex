@@ -261,6 +261,36 @@ defmodule Tips.Content do
   A database error or lost connection returns `{:error, :outcome_unknown}`;
   reload before deciding to repeat.
 
+  ### Voting
+
+  `set_vote(scope, kind, id, desired)` sets the scope's vote on a tip or review
+  to Helpful (`1`), Not helpful (`-1`) or no vote (`nil`). It sends the wanted
+  state, not a toggle, so a retried request cannot reverse itself. It returns
+  `{:ok, t:vote_receipt/0}` or `{:error, t:vote_error/0}`.
+
+  A vote checks the scope and spends one `Tips.AdmissionLimiter.check_write/2`,
+  like the other writes. The transaction locks the voter's account
+  (`:contribute` eligibility), then only the voted tip or review: a review vote
+  never locks its parent, and a review under a hidden or deleted tip still
+  takes votes. A missing, hidden or deleted target is `{:error, :not_found}`
+  for every voter, author included; the vote capability is false there too. A
+  hide, deletion or ban that commits first therefore rejects the vote; one that
+  waits sees the committed vote.
+
+  A request that matches the stored vote is `:unchanged` and writes nothing.
+  A rejection is always an error, never `:unchanged`. A real change writes or
+  removes the vote row once; the counter trigger updates the target, never its
+  `edit_version`. Each change to Helpful is one helpful-vote event and folds
+  the author's `tip_upvoted` or `review_upvoted` notification: voting, removing
+  and voting again counts twice, and so does Not helpful then Helpful. The
+  author's own vote notifies no one. The receipt's counters and score are read
+  under the target lock after the write, not derived from a delta.
+
+  Lifting a ban never recreates votes that invalidation removed; a later
+  explicit vote is a new event. A database error or lost connection returns
+  `{:error, :outcome_unknown}`: read the current vote before offering another
+  change.
+
   ### Transaction participants
 
   Each row commits its effects together, in one transaction, or none of them.
@@ -276,6 +306,8 @@ defmodule Tips.Content do
   | Hide | `:content_version`, `:report_resolution` |
   | Restore | `:content_version` |
   | Unchanged deletion, hide or restore | none |
+  | Vote change | `:vote`, `:vote_notification` |
+  | Unchanged vote | none |
 
   `Tips.Content.Search` writers already require a caller transaction. A
   search or required notification failure rolls back the publication. The
@@ -298,7 +330,8 @@ defmodule Tips.Content do
     Review,
     Search,
     Tip,
-    Vocabulary
+    Vocabulary,
+    Voting
   }
 
   @typedoc """
@@ -516,6 +549,32 @@ defmodule Tips.Content do
           | {:rate_limited | :capacity, retry_after_seconds :: pos_integer()}
           | :outcome_unknown
 
+  @typedoc "A desired vote: Helpful (`1`), Not helpful (`-1`) or none (`nil`)."
+  @type vote :: Projection.vote()
+
+  @typedoc """
+  The confirmed vote and the target's counters after it. `score` is
+  `up_count - down_count`. See "Voting".
+  """
+  @type vote_receipt :: %{
+          kind: kind(),
+          id: pos_integer(),
+          vote: vote(),
+          up_count: non_neg_integer(),
+          down_count: non_neg_integer(),
+          score: integer(),
+          outcome: :changed | :unchanged
+        }
+
+  @typedoc "A rejected vote. See \"Voting\"."
+  @type vote_error ::
+          :unauthenticated
+          | :unconfirmed
+          | :forbidden
+          | :not_found
+          | {:rate_limited | :capacity, retry_after_seconds :: pos_integer()}
+          | :outcome_unknown
+
   @typedoc "A database effect that commits with its operation. See the participant table."
   @type effect ::
           :content
@@ -528,6 +587,8 @@ defmodule Tips.Content do
           | :review_notification
           | :report_resolution
           | :notification_removal
+          | :vote
+          | :vote_notification
 
   @doc """
   Checks a form's author-editable text with the rules a publication or edit
@@ -670,6 +731,14 @@ defmodule Tips.Content do
   @spec delete_content(Scope.t() | nil, kind(), pos_integer()) ::
           {:ok, lifecycle_receipt()} | {:error, delete_error()}
   defdelegate delete_content(scope, kind, id), to: Deletion, as: :delete
+
+  @doc """
+  Sets the scope's vote on a tip or review to `desired`. See "Voting".
+  """
+  @spec set_vote(Scope.t() | nil, kind(), pos_integer(), vote()) ::
+          {:ok, vote_receipt()} | {:error, vote_error()}
+  def set_vote(scope, kind, id, desired) when desired in [1, -1, nil],
+    do: Voting.set(scope, kind, id, desired)
 
   @doc """
   Reads one moderation case for a moderator's session. See "Deletion and
