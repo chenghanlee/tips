@@ -266,6 +266,43 @@ defmodule Tips.Content do
   reapply. An `:outcome_unknown` edit reloads saved state and keeps the input;
   never replay it with a freshly loaded version.
 
+  ### Video upload
+
+  `begin_video_upload(scope, target, file_attrs)` reserves one private Stream
+  upload for a video the author selected, before publication. It returns
+  `{:ok, t:Tips.Content.Media.video_upload/0}` or
+  `{:error, t:video_upload_error/0}`. The browser sends the bytes directly to
+  `upload_url` by tus until `expires_at`, one hour after the reservation;
+  `media_id` is the `{:staged_video, media_id}` the draft keeps. The steps
+  and row states are in `Tips.Content.Media`.
+
+    * `target` is the server-built `t:Tips.Content.Media.Target.t/0` tuple.
+      `Tips.Content.Media.Target` is the only encoding; a string or any other
+      shape is a `:target` changeset error.
+    * `file_attrs` is read for `size` only, the declared byte length, which
+      must be 1 to 1,000,000,000. Everything else, such as a uid, account id
+      or target, is ignored.
+
+  The checks run in this order, each before any later work:
+
+    1. A missing scope is `:unauthenticated`; invalid input is a changeset.
+    2. For a new-submission target, a key this author already published is
+       `{:published, t:publication_receipt/0}` (any state, deleted
+       included): the draft continues as an edit of that publication. A
+       review key under another tip is `:conflict`.
+    3. One `Tips.AdmissionLimiter.check_upload/2`, never refunded.
+    4. One transaction locks the author (`:contribute` eligibility), then
+       share-locks the target: a new review needs a live parent tip; an edit
+       needs the author's own undeleted tip or review, which may be hidden.
+       Anything else is `:not_found`.
+
+  Selecting a file writes only the media row: no content, vote,
+  notification, report or search row. `{:upload_failed, [media_id]}` means
+  no URL was released for that row, and a fresh upload is needed; it
+  covers a rejected reservation, a lost response and a response after the
+  deadline or cleanup. A database error is `:outcome_unknown`; no URL was
+  returned either.
+
   ### Staged video handoff
 
   A publication-to-edit handoff may attach an owned, ready, unattached,
@@ -421,6 +458,7 @@ defmodule Tips.Content do
     Deletion,
     Edit,
     Intent,
+    Media,
     Moderation,
     Notification,
     Projection,
@@ -558,6 +596,14 @@ defmodule Tips.Content do
 
   @typedoc "Why a publication lookup returned no answer."
   @type lookup_error :: :unauthenticated | :conflict | :outcome_unknown
+
+  @typedoc "Why no upload URL was returned. See \"Video upload\"."
+  @type video_upload_error ::
+          Accounts.operation_error()
+          | {:published, publication_receipt()}
+          | {:rate_limited | :capacity, retry_after_seconds :: pos_integer()}
+          | {:upload_failed, [media_id()]}
+          | :outcome_unknown
 
   @typedoc """
   The editor's starting point from one authorized snapshot. `base` is the
@@ -793,6 +839,15 @@ defmodule Tips.Content do
   defdelegate get_publication(scope, kind, submission_key, submitted_intent),
     to: Publication,
     as: :get
+
+  @doc """
+  Reserves a private Stream upload of one video for `target`. See
+  "Video upload" above.
+  """
+  @spec begin_video_upload(Scope.t() | nil, Media.Target.t(), %{size: pos_integer()}) ::
+          {:ok, Media.video_upload()} | {:error, video_upload_error()}
+  def begin_video_upload(scope, target, file_attrs),
+    do: Media.begin_video_upload(scope, target, file_attrs)
 
   @doc """
   Reads the author's editable snapshot of a tip or review. See "Editing".

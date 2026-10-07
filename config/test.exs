@@ -103,5 +103,11 @@ config :tips, Tips.Content.Media.R2,
     secret_access_key: "synthetic-secret-key"
   }
 
+# Stream requests reach Req.Test stubs with synthetic settings. Only `:real_provider` tests
+# override both to reach the development account.
+config :tips, Tips.Content.Media.CloudflareStream,
+  plug: {Req.Test, Tips.Content.Media.CloudflareStream},
+  settings: %{account_id: "synthetic-account", api_token: "synthetic-stream-token"}
+
 # Saturation tests wait for capacity; keep each wait short.
 config :tips, Tips.Content.Search.ProviderCapacity, size: 8, queue_wait: 200
