@@ -24,13 +24,17 @@ defmodule TipsWeb.TipLive.Editor do
         <Editor.error_summary form={@form} identity={@identity} />
         <fieldset disabled={@pending != nil} class="contents">
           <fieldset id={"#{Editor.form_id(@identity)}-fields"} class="grid gap-6">
-            <TipsWeb.UI.field field={@form[:title]} label="Title" />
+            <TipsWeb.UI.field
+              field={@form[:title]}
+              label="Title"
+              helper="Up to 300 characters."
+            />
             <TipsWeb.UI.field
               field={@form[:body]}
               type="textarea"
               rows={8}
               label="Tip"
-              helper="Explain when to use this, the steps, and what happened when you tried it. Markdown is supported."
+              helper="Explain when to use this, the steps, and what happened when you tried it. Markdown is supported. Up to 10,000 characters."
             />
             <TipsWeb.UI.field
               field={@form[:tag_id]}

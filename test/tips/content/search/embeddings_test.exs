@@ -12,8 +12,12 @@ defmodule Tips.Content.Search.EmbeddingsTest do
     author = user_fixture()
     tips = for n <- 1..40, do: indexed_tip!(author, %{title: "Tip #{n}"})
 
-    # Valid content whose document exceeds the provider's 30,000-byte input bound.
-    edit!(Enum.at(tips, 3), body: String.duplicate("é", 20_000))
+    # A stored document over the provider's 30,000-byte input bound, which the
+    # writers refuse; the provider still guards against one.
+    Repo.query!("UPDATE tip_search SET search_text = $2 WHERE tip_id = $1", [
+      Enum.at(tips, 3).id,
+      "Tip 4\n" <> String.duplicate("é", 15_000)
+    ])
 
     for {tip, n} <- tips |> Enum.take(20) |> Enum.with_index(1),
         do: indexed_review!(tip, %{body: "Review #{n}"})

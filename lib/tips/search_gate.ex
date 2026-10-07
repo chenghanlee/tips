@@ -37,7 +37,6 @@ defmodule Tips.SearchGate do
   @models ~w(claude gpt gemini)
   @environments ~w(chat ide cli)
   @base_url "https://openrouter.ai/api/v1"
-  @max_document_bytes 30_000
   @max_body_codepoints 20_000
   @tokens_per_input 8
   @passes 3
@@ -290,7 +289,7 @@ defmodule Tips.SearchGate do
       plan.eligible_documents != gate["corpus_setup"]["eligible_documents"] ->
         {:stop, :eligible_count, state}
 
-      plan.max_document_bytes > @max_document_bytes ->
+      plan.max_document_bytes > EmbeddingProvider.max_document_bytes() ->
         {:stop, :document_too_large, state}
 
       planned["total"] + reserved > budget["max_requests"] ->
@@ -361,7 +360,8 @@ defmodule Tips.SearchGate do
           estimate > gate["budget"]["max_cost_usd"] ->
             {:stop, :cost_budget, state}
 
-          endpoint.context_tokens < tokens(String.duplicate("x", @max_document_bytes)) ->
+          endpoint.context_tokens <
+              tokens(String.duplicate("x", EmbeddingProvider.max_document_bytes())) ->
             {:stop, :endpoint_context, state}
 
           is_number(key.limit_remaining_usd) and key.limit_remaining_usd < estimate ->

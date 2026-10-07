@@ -33,7 +33,7 @@ defmodule TipsWeb.ReviewLive.Editor do
               type="textarea"
               rows={8}
               label="Review"
-              helper="Describe what happened when you tried this tip yourself: what you did, what worked and what didn't. Markdown is supported."
+              helper="Describe what happened when you tried this tip yourself: what you did, what worked and what didn't. Markdown is supported. Up to 10,000 characters."
             />
             <Editor.evidence_fields form={@form} id={"#{Editor.form_id(@identity)}-evidence"} />
             <Editor.setup_fields

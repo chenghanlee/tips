@@ -161,6 +161,57 @@ defmodule Tips.Content.SearchTextTest do
     end
   end
 
+  describe "writers refuse documents over 30,000 bytes" do
+    test "a retag or label rebuild that would exceed the cap rolls back with its caller" do
+      long = String.duplicate("é", 10_000)
+      tag = curated!(Tag, "Abc")
+      model = curated!(Model, "Abc")
+
+      # "Limit", the body, the prompt and "Abc" fill exactly 30,000 bytes.
+      tip =
+        tip_fixture(user_fixture(), %{
+          title: "Limit",
+          body: long,
+          prompt: String.duplicate("x", 9_989),
+          tag_id: tag.id
+        })
+
+      review =
+        review_fixture(tip_fixture(), %{
+          body: long,
+          prompt: String.duplicate("x", 9_995),
+          model_id: model.id
+        })
+
+      write!(:tip, tip.id)
+      write!(:review, review.id)
+      tip_search = search_state(:tip, tip.id)
+      review_search = search_state(:review, review.id)
+      assert byte_size(tip_search.text) == 30_000
+      assert byte_size(review_search.text) == 30_000
+
+      longer = curated!(Tag, "Abcd")
+
+      assert {:error, {:too_long, 1}} =
+               Repo.transact(fn ->
+                 update!(tip, tag_id: longer.id)
+                 write(:tip, tip.id)
+               end)
+
+      assert reload(tip) == tip
+      assert search_state(:tip, tip.id) == tip_search
+
+      assert {:error, {:too_long, 1}} =
+               Repo.transact(fn ->
+                 update!(model, label: "Abcd")
+                 write(:review, review.id)
+               end)
+
+      assert Repo.get!(Model, model.id).label == "Abc"
+      assert search_state(:review, review.id) == review_search
+    end
+  end
+
   describe "two canonical writes in one transaction have distinct freshness" do
     for kind <- [:tip, :review] do
       test "#{kind} tokens strictly increase without sleeping" do

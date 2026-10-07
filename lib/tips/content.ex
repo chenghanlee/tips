@@ -90,6 +90,12 @@ defmodule Tips.Content do
   available"; an unknown id reaches the actual foreign key, which the
   changeset maps to "does not exist".
 
+  A new or edited tip or review whose search document would exceed 30,000
+  UTF-8 bytes is not saved and returns `{:error, {:too_long, words}}`, where
+  `words` is about how many words to remove (see "Documents" in
+  `Tips.Content.Search`). The fields are each within their own limits; only
+  their combined size, measured in the content transaction, is over.
+
   ### Complete intent and comparison
 
   Content owns one whole-intent comparator, used both for same-key
@@ -481,6 +487,7 @@ defmodule Tips.Content do
           | {:rate_limited | :capacity, retry_after_seconds :: pos_integer()}
           | {:upload_failed, [attachment_ref()]}
           | {:upload_pending, [media_id()]}
+          | Search.too_long()
           | :outcome_unknown
 
   @typedoc "Why a publication lookup returned no answer."
@@ -524,6 +531,7 @@ defmodule Tips.Content do
           | {:rate_limited | :capacity, retry_after_seconds :: pos_integer()}
           | {:upload_failed, [attachment_ref()]}
           | {:upload_pending, [media_id()]}
+          | Search.too_long()
           | :outcome_unknown
 
   @typedoc "A confirmed deletion, hide or restore with the committed version and state."

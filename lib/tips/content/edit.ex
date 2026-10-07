@@ -283,8 +283,8 @@ defmodule Tips.Content.Edit do
            changeset
            |> optimistic_lock(:edit_version)
            |> put_change(:edited_at, DateTime.utc_now(:second))
-           |> Repo.update(stale_error_field: :edit_version) do
-      :ok = write_search(kind, row.id)
+           |> Repo.update(stale_error_field: :edit_version),
+         :ok <- write_search(kind, row.id) do
       {:ok, {:updated, row}}
     end
   end
@@ -312,6 +312,8 @@ defmodule Tips.Content.Edit do
   defp settle({:error, %Changeset{} = changeset}, kind, user_id, id) do
     if stale?(changeset), do: recover(kind, user_id, id), else: {:error, changeset}
   end
+
+  defp settle({:error, {:too_long, _words}} = too_long, _kind, _user_id, _id), do: too_long
 
   defp stale?(changeset),
     do: Enum.any?(changeset.errors, fn {_field, {_message, keys}} -> keys[:stale] end)

@@ -89,7 +89,7 @@ defmodule Tips.Repo.Migrations.CreateContentTables do
     end
 
     create constraint(:tips, :tips_title_chk,
-             check: "title ~ '[^[:space:]]' and length(title) between 3 and 140"
+             check: "title ~ '[^[:space:]]' and length(title) between 3 and 300"
            )
 
     create constraint(:tips, :tips_body_chk,
