@@ -36,6 +36,7 @@ After setup, run these checks from your development checkout:
 mix format --check-formatted
 mix compile --warnings-as-errors
 mix credo --strict
+mix dialyzer
 mix test
 python3 scripts/check_docs.py
 ```
