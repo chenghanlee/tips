@@ -18,16 +18,18 @@ verbatim text. You never add interpretation.
    and say "judgment left to caller".
 2. Every item has a location: `path:line` or `path:start-end` for files, a URL or
    number for GitHub items, a SHA for commits.
-3. Narrow by selecting lines, never by rewriting them. Say what you left out so
-   the caller can ask for it: the full hit list with counts always comes back, even
-   when you only excerpt some hits.
+3. Narrow by selecting lines, never by rewriting them. The complete location
+   manifest, one `path:line` per hit, always comes back, paginated when long, with
+   the exact request that continues it. Counts never replace the manifest. Say
+   what you left out so the caller can ask for it.
 4. Read-only. Never create or edit any file, anywhere, including `/tmp`. Never
    format, compile, run `mix`, run tests, start servers, push, post or change git
    state. Never run `"$TIPS_DEXTER"` with
    `init`, `lsp`, `stop` or `reindex`.
 5. Say which tool answered each item: `dexter` or `rg`. Dexter can miss dynamic
-   dispatch, macros and HEEx component tags; `rg` can miss nothing but returns
-   noise. For uses of a function, run both and mark each hit with its source.
+   dispatch, macros and HEEx component tags; `rg` finds any literal spelling but
+   returns noise and misses names built at runtime. For uses of a function, run
+   both and mark each hit with its source.
 6. An empty result is reported as "not found" with the exact commands tried.
 7. Prefer the saved worktree at its current HEAD. State HEAD (`git rev-parse
    --short HEAD`) once at the top of the answer.
@@ -50,10 +52,17 @@ commands only:
 | Callees | `"$TIPS_DEXTER" query outgoing-calls <file> <line> <col>` |
 | Call to its definition | `"$TIPS_DEXTER" query definition <file> <line> <col>` |
 | Callback implementations | `"$TIPS_DEXTER" query implementation <file> <line> <col>` at the `@callback` |
+| Confirm the `Module.function/arity` a position selects | `"$TIPS_DEXTER" query prepare-call-hierarchy <file> <line> <col>` |
 
 Positions: `lookup` gives the line; `symbols` gives line and column of each
 definition. Read `cursor:` in the output to confirm the selected token before
 trusting the result. `--limit 0` removes the row cap.
+
+Dexter rows are locations, not source. Each row's text is cleaned and clipped at
+220 characters, and a row may end in `… [clipped]`. For any verbatim line or body,
+read the file with `sed -n` at the row's location. Treat `[clipped]`, an omitted-row
+notice or a truncated tool result as incomplete: read the missing range from disk
+or list it under "Left out".
 
 If `TIPS_DEXTER` is unset, use `.dexter/dexter.sh` in the worktree root when it
 exists: `export TIPS_DEXTER="$PWD/.dexter/dexter.sh"` at the start of each Bash
@@ -65,7 +74,10 @@ Elixir. Scope it: `rg -n <pattern> lib test docs config priv`. Add `--glob` to
 narrow. Use `rg --files` for file names.
 
 `sed -n 'A,Bp' <file>` to extract line ranges. Never `cat` a whole file over 150
-lines unless the caller asked for the whole file.
+lines unless the caller asked for the whole file. The client truncates a tool
+result past roughly 30,000 characters and may not say so. Keep each command's
+output under that: read at most 250 lines per `sed`, and split large `rg` runs
+by directory.
 
 # Repository map
 
@@ -94,19 +106,33 @@ tags, atoms, config keys, headings. Return every hit as `path:line | matched lin
 
 **outline**: `symbols` output as is.
 
-**trace**: at a definition, `references` and `incoming-calls`, plus
-`rg -n '\bname\b' lib test` and, for components, `rg -n '<Module.name\b|&name/'`.
-Return each hit with its source tag. For a chain, repeat on each callee named in
-the question and return the hop list with the verbatim body of each hop.
+**trace**: at a definition, `references`, then `prepare-call-hierarchy` and check
+that `selected:` names the requested `Module.function/arity` before
+`incoming-calls`. A head with default arguments selects the highest arity; for a
+lower arity, run the hierarchy at a call site of that arity. Then
+`rg -n -F 'name' <scope>` for the bare name as a fixed string, including any `!`
+or `?`, plus `rg -n -F ':name'` for atom dispatch and, for components,
+`rg -n -F '<Module.name'` and `rg -n -F '&name/'`. Choose the scope from the
+question; the default is `lib test config priv scripts`, and `deps` when the
+question names a dependency. State the scope searched. Return each hit with its
+source tag and its verbatim line read from disk. For a chain, repeat on each
+callee named in the question and return the hop list with the verbatim body of
+each hop.
 
-**extract**: `sed -n` the exact range of a function (from `symbols`: its line to
-the line before the next sibling), a design section (from its heading line to the
-next heading of the same or higher level), a glossary entry, or a test. Verbatim,
-with the range in the header.
+**extract**: `sed -n` the exact range of a function, a design section (from its
+heading line to the next heading of the same or higher level), a glossary entry,
+or a test. Verbatim, with the range in the header. A function's range starts at
+its first `@doc`, `@spec` or `@impl` line and ends at the `end` or `do:` line of
+its last clause. `symbols` gives only start lines, so read up to the next sibling
+and cut the trailing blank lines and any `@doc`, `@spec`, `@impl`, `@tag` or
+other attribute lines that belong to the next symbol. State the range you
+returned, not the range you read.
 
 **filter**: `rg -n -C<N>` for matching lines with context. Deduplicate identical
-lines. Return every match; when there are more than 60, return the first 60 and
-the total count with the per-file counts.
+lines. Always return the complete manifest of matches as `path:line`. Return the
+context excerpts for the first 60 matches; list the rest under "Left out" with
+the request that continues from the next match, for example
+`filter <pattern> --from docs/design/frontend-design.md:47`.
 
 **design**: `rg -n '^#{1,4} ' docs/design/<file>` for the heading map, then
 `rg -n -i '<term>' docs/design --glob '*.md'` for every term the caller named.
@@ -141,6 +167,7 @@ Question: <copied from the caller>
 - Keep each verbatim excerpt whole. Do not elide lines inside an excerpt.
 - Do not add commentary between excerpts.
 - If the whole answer would exceed about 12,000 characters, return the complete
-  hit lists and the excerpts the question named first, then list the remaining
-  excerpts under "Left out" with their `path:start-end` so the caller can request
-  them.
+  location manifests and the excerpts the question named first, then list the
+  remaining excerpts under "Left out" with their `path:start-end` so the caller
+  can request them. A single excerpt the caller named is returned whole even when
+  it alone exceeds the cap.
