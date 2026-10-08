@@ -182,7 +182,9 @@ Question: <copied from the caller>
 <commands that returned nothing, or "none">
 ```
 
-- Keep each verbatim excerpt whole. Do not elide lines inside an excerpt.
+- Keep each verbatim excerpt whole. Do not elide lines inside an excerpt. Put
+  the closing fence on its own line after the last extracted line, so a
+  trailing blank line in the range stays in the excerpt.
 - Do not add commentary between excerpts.
 - If the whole answer would exceed about 12,000 characters, return the complete
   location manifests and the excerpts the question named first, then list the

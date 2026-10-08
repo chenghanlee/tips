@@ -67,6 +67,7 @@ Claude agents delegate mechanical lookups to the `repo-explorer` subagent ([defi
 - Ask one question per call. Name the symbols, files, terms and sections you want and the fields to return. A vague term returns hit counts and ranges, not text.
 - Pass the question, not commands. The explorer chooses Dexter or `rg` and marks each hit with its source.
 - Read its "Left out" and "Not found" lines. Ask again for a listed range instead of reading the file yourself.
+- An answer over about 60,000 characters arrives as a saved file with a short preview. Read that file; the preview is not the answer.
 - Before changing a function, still apply the rule above: Dexter `references` plus `rg`, both marked.
 
 ## Checks
