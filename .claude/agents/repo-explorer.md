@@ -126,7 +126,9 @@ its first `@doc`, `@spec` or `@impl` line and ends at the `end` or `do:` line of
 its last clause. `symbols` gives only start lines, so read up to the next sibling
 and cut the trailing blank lines and any `@doc`, `@spec`, `@impl`, `@tag` or
 other attribute lines that belong to the next symbol. State the range you
-returned, not the range you read.
+returned, not the range you read, and make it the exact `A,B` you passed to
+`sed`. Before returning, confirm the excerpt's first line with `sed -n 'Ap'`;
+an off-by-one header is a wrong answer.
 
 **filter**: `rg -n -C<N>` for matching lines with context. Deduplicate identical
 lines. Always return the complete manifest of matches as `path:line`. Return the
