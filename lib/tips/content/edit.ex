@@ -172,7 +172,7 @@ defmodule Tips.Content.Edit do
        when is_integer(id) and (is_binary(description) or is_nil(description)),
        do: nil
 
-  defp selection_error({:staged_video, id}) when is_integer(id) and id > 0, do: nil
+  defp selection_error({:staged_video, id}) when id in @row_ids, do: nil
 
   defp selection_error({:image_file, slot, _file, _description}),
     do: {"is not supported yet", slot: slot}
