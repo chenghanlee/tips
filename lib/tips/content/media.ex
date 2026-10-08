@@ -64,6 +64,42 @@ defmodule Tips.Content.Media do
   entered cleanup. The first state after `pendingupload` sets the fixed
   recovery deadline, `created_at` plus 49 hours, whenever it is observed. A
   `pendingupload` result, a timeout, an error or a rate limit writes nothing.
+
+  ## Claims
+
+  `claim/2` is the content transaction's media participant: it attaches the
+  selected staged videos to the saved tip or review and places the whole
+  ordered selection. `validate_selection/2` checks the selection's shape
+  before that transaction.
+
+  Lock order. A content transaction locks the account, then content rows
+  (a parent tip before its review), then curated choices, and media rows
+  after those, in ascending id. Its later search, self-vote and notification
+  writes touch rows no media operation locks. `claim/2` locks every selected
+  row the author owns in one statement in that order; another author's id is
+  neither locked nor read. A standalone media operation, such as discard, expiry or cleanup,
+  locks only media rows and never takes an account or content lock while it
+  holds one. It locks its rows with `FOR NO KEY UPDATE`, as claims do, then
+  rechecks them, so claim and cleanup of one row serialize and the first to
+  commit wins.
+
+  After the locks, one statement rechecks each row and reads the wall clock
+  then, after any wait:
+
+    * a staged video is claimable when it is the author's unattached video,
+      not in cleanup, `ready`, before its deadline, and its stored target is
+      the saved item's edit target or the exact original publication target:
+      `{:new_tip, key}` for the tip with that submission key, or
+      `{:new_review, tip_id, key}` for the review with that key under that
+      parent. The target is never rewritten.
+    * a retained row must still be attached to the item and not in cleanup.
+
+  Any `uploading` or `processing` video is `{:upload_pending, ids}`; any other
+  ineligible row, including a missing or foreign id, is `{:upload_failed, ids}`,
+  which wins. A rejection writes nothing; the caller rolls back and every
+  staged video stays reusable. On success each claimed video gets its parent
+  and position and loses its expiry and cooldown; retained rows move to their
+  new positions under deferred slot constraints.
   """
 
   import Ecto.Changeset
@@ -471,6 +507,140 @@ defmodule Tips.Content.Media do
     do: "#{code}: #{message}"
 
   defp database_reason(error), do: Exception.message(error)
+
+  @doc """
+  Adds an `:uploads` error to `changeset` for a selection over ten slots and
+  for each media id selected more than once.
+  """
+  @spec validate_selection(Ecto.Changeset.t(), [Content.attachment()]) :: Ecto.Changeset.t()
+  def validate_selection(changeset, selection) do
+    changeset =
+      if length(selection) > @max_attachments,
+        do:
+          add_error(changeset, :uploads, "should have at most %{count} item(s)",
+            count: @max_attachments,
+            validation: :length,
+            kind: :max,
+            type: :list
+          ),
+        else: changeset
+
+    ids = media_ids(selection)
+    # Each id that occurs again after its first occurrence, once.
+    repeated = Enum.uniq(ids -- Enum.uniq(ids))
+
+    Enum.reduce(repeated, changeset, fn id, changeset ->
+      add_error(changeset, :uploads, "is selected more than once", media_id: id)
+    end)
+  end
+
+  defp media_ids(selection) do
+    for upload <- selection, id = media_id(upload), do: id
+  end
+
+  defp media_id({:retained, id, _description}), do: id
+  defp media_id({:staged_video, id}), do: id
+  defp media_id(_other), do: nil
+
+  @doc """
+  Claims the staged videos in `selection` for `content`, the tip or review
+  the caller's transaction saved, and places every selected row at its index.
+  `selection` holds only `{:retained, id, description}` and
+  `{:staged_video, id}`. Run it inside that transaction, after the account,
+  content and curated-choice locks. See "Claims" in the module documentation.
+  """
+  @spec claim(Ecto.Schema.t(), [Content.attachment()]) ::
+          :ok | {:error, {:upload_failed | :upload_pending, [Content.media_id()]}}
+  def claim(_content, []), do: :ok
+
+  def claim(content, selection) do
+    ids = media_ids(selection)
+
+    # One statement locks the rows in ascending id; Postgres sorts before locking.
+    Repo.all(
+      from(a in Asset,
+        where: a.id in ^ids and a.user_id == ^content.user_id,
+        order_by: a.id,
+        lock: "FOR NO KEY UPDATE",
+        select: a.id
+      )
+    )
+
+    # A later statement, so the deadline is read after any lock wait.
+    rows =
+      Repo.all(
+        from(a in Asset,
+          where: a.id in ^ids and a.user_id == ^content.user_id,
+          select: {a, fragment("? > clock_timestamp()", a.expires_at)}
+        )
+      )
+      |> Map.new(fn {asset, unexpired} -> {asset.id, {asset, unexpired == true}} end)
+
+    checks = Enum.map(selection, &{&1, check(&1, Map.get(rows, media_id(&1)), content)})
+
+    case {rejected(checks, :failed), rejected(checks, :pending)} do
+      {[], []} -> place(content, checks, rows)
+      {[], pending} -> {:error, {:upload_pending, pending}}
+      {failed, _pending} -> {:error, {:upload_failed, failed}}
+    end
+  end
+
+  defp check({:retained, _id, _description}, {%Asset{cleanup_at: nil} = asset, _}, content) do
+    if Map.fetch!(asset, parent_key(content)) == content.id, do: :retained, else: :failed
+  end
+
+  defp check({:staged_video, _id}, {asset, true}, content) do
+    with %Asset{kind: :video, tip_id: nil, review_id: nil, cleanup_at: nil} <- asset,
+         true <- asset.target in claimable_targets(content) do
+      case asset.state do
+        :ready -> :claim
+        state when state in [:uploading, :processing] -> :pending
+        :failed -> :failed
+      end
+    else
+      _ineligible -> :failed
+    end
+  end
+
+  defp check(_upload, _missing_or_ineligible, _content), do: :failed
+
+  # The item's own edit target, or the exact publication it was created by.
+  defp claimable_targets(%Tip{} = tip),
+    do: [{:edit_tip, tip.id}, {:new_tip, tip.submission_key}]
+
+  defp claimable_targets(%Review{} = review),
+    do: [{:edit_review, review.id}, {:new_review, review.tip_id, review.submission_key}]
+
+  defp rejected(checks, result), do: for({upload, ^result} <- checks, do: media_id(upload))
+
+  # Writes each claimed video and each retained row whose position changed.
+  defp place(content, checks, rows) do
+    parent = parent_key(content)
+
+    writes =
+      for {{upload, result}, position} <- Enum.with_index(checks),
+          id = media_id(upload),
+          {%Asset{position: current}, _unexpired} = rows[id],
+          result == :claim or current != position do
+        changes =
+          if result == :claim,
+            do: [{parent, content.id}, position: position, expires_at: nil, reconcile_after: nil],
+            else: [position: position]
+
+        {id, changes}
+      end
+
+    # Moved retained rows may swap positions; the slot constraints are checked at commit.
+    if Enum.any?(writes, &match?({_id, [position: _position]}, &1)),
+      do: Repo.query!("SET CONSTRAINTS media_tip_slot, media_review_slot DEFERRED")
+
+    Enum.each(writes, fn {id, changes} ->
+      {1, _} = Repo.update_all(from(a in Asset, where: a.id == ^id), set: changes)
+    end)
+  end
+
+  defp parent_key(%Tip{}), do: :tip_id
+  defp parent_key(%Review{}), do: :review_id
 
   @doc """
   Validates and stores the new image files in `selection`. See the module

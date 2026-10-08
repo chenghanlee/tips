@@ -91,8 +91,9 @@ defmodule Tips.Content do
   Publication exists for text: `publish_tip/4`, `publish_review/5` and
   `get_publication/4`. Text edits exist: `get_edit_form/3`, `edit_tip/5` and
   `edit_review/5`. Editors check typed text with `change_content/2`, which
-  writes nothing. Media claims (#65) are reserved and do not exist yet. Inputs and results are the types below. The comparator is
-  `compare_intents/3`.
+  writes nothing. Publications and edits claim staged videos; image files
+  are not supported yet. Inputs and results are the types below. The
+  comparator is `compare_intents/3`.
 
     * `publish_tip(scope, submission_key, attrs, uploads)` returns
       `{:ok, t:publication_receipt/0}` or `{:error, t:publication_error/0}`.
@@ -133,15 +134,35 @@ defmodule Tips.Content do
       in its metadata;
     * each `{:retained, media_id, _}` in a new publication gets an `:uploads`
       error with `media_id: media_id` in its metadata;
-    * until #65 adds media claims, a new publication accepts only `uploads: []`:
-      each `{:staged_video, media_id}` or `{:image_file, slot, _, _}` gets an
-      `:uploads` error naming its media id or slot. Attachments are never
+    * a selection over ten slots gets an `:uploads` error, and a media id
+      selected more than once gets one naming it;
+    * each `{:image_file, slot, _, _}` gets an `:uploads` error naming its
+      slot until image publication exists (#82). Attachments are never
       dropped silently.
 
   An image file's temporary path is valid only during the page attempt that
   owns it. Content uploads images with `Tips.Content.Media.store_images/2` and
   refreshes pending videos before its transaction; provider calls never run
   while database locks are held.
+
+  ### Staged video claims
+
+  Each `{:staged_video, media_id}` is claimed inside the content transaction
+  from committed state: the author's unattached, ready video, not in cleanup
+  and before its deadline by wall time after any lock wait, whose stored
+  target is the item's own: the publication's `{:new_tip, key}` or
+  `{:new_review, tip_id, key}`, or an edit's `{:edit_tip, id}` or
+  `{:edit_review, id}` (or the original publication's, see "Staged video
+  handoff"). Possessing an id or key grants nothing. Any other id, including
+  another author's, an attached or an expired one, is
+  `{:error, {:upload_failed, [media_id]}}`; otherwise a video still uploading
+  or processing is `{:error, {:upload_pending, [media_id]}}`. Either rejects
+  the whole publication or edit, which writes nothing and leaves every staged
+  video reusable. A commit attaches each video once at its index in the
+  selection, clears its expiry and cooldown and keeps its target. Media row
+  locks follow the account, content and curated-choice locks, in ascending
+  id; claims and cleanup of a row serialize on its lock (see
+  "Claims" in `Tips.Content.Media`).
 
   Publication stores exactly the submitted setup. It never fills omitted or
   cleared review fields from the parent tip. It validates the tag, model and
@@ -235,13 +256,16 @@ defmodule Tips.Content do
   like a new publication: every attempt, including an invalid, no-op or
   conflicting one, spends one write and is not refunded. It then checks
   complete intent (see above) and a positive integer `expected_version`
-  (otherwise an `:edit_version` error). Text edits keep the saved selection:
-  `uploads` must be the complete current `{:retained, id, description}` list
-  in order, or `[]` when there are no attachments. A staged video, image file
-  or missing image is an `:uploads` error before the transaction; a removed,
-  added, reordered or redescribed attachment is an `:uploads` error naming its
-  media id where one exists. Only a newly selected curated choice must be
-  active; a saved retired choice may stay.
+  (otherwise an `:edit_version` error). Edits keep the saved selection and
+  may add staged videos: the `{:retained, id, description}` entries of
+  `uploads` must be the complete current list in its order, with staged
+  videos anywhere among them, or `[]` when there are none. An image file or
+  missing image is an `:uploads` error before the transaction; a removed,
+  reordered or redescribed attachment, or a retained id not attached here, is
+  an `:uploads` error naming its media id where one exists. A staged video
+  that is not claimable rejects the edit (see "Staged video claims"). Only a
+  newly selected curated choice must be active; a saved retired choice may
+  stay.
 
   The transaction locks the author, then the content row, and checks
   `:contribute` eligibility, ownership and deletion (`:not_found`). A failed
@@ -257,8 +281,9 @@ defmodule Tips.Content do
   Ecto skips an update without changes, so `optimistic_lock/2` alone does not
   catch a stale no-op. At the current version, an unchanged whole intent is
   `:noop`: no version, date, search, media or notification change. An actual
-  change advances `edit_version` once and returns `:updated` with the
-  committed version.
+  change, including an added staged video, advances `edit_version` once and
+  returns `:updated` with the committed version. The version check precedes
+  any claim, so a stale edit claims nothing.
 
   After a conflict, the editor compares its original base with the latest
   base. Only `:equivalent` offers an explicit save at the current version;
@@ -336,7 +361,7 @@ defmodule Tips.Content do
   `{:new_review, tip_id, key}` to `edit_review` of that author's review with
   `key` under `tip_id`. The claim resolves these immutable facts; it never
   rewrites the `Tips.Content.Media.Target`, rebinds media or edits a deleted
-  original.
+  original. The edit's own expected-version check still applies first.
 
   ### Deletion and moderation
 

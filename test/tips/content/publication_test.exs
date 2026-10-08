@@ -356,7 +356,8 @@ defmodule Tips.Content.PublicationTest do
         {:missing_image, "slot-1"},
         {:retained, 5, nil},
         {:staged_video, 7},
-        {:image_file, "slot-2", %{path: "/tmp/x.png", filename: "x.png"}, nil}
+        {:image_file, "slot-2", %{path: "/tmp/x.png", filename: "x.png"}, nil},
+        {:staged_video, -1}
       ]
 
       assert {:error, changeset} = Content.publish_tip(scope, key(), @tip_attrs, uploads)
@@ -364,8 +365,8 @@ defmodule Tips.Content.PublicationTest do
       assert [
                {"must be selected again", [slot: "slot-1"]},
                {"cannot be kept in a new publication", [media_id: 5]},
-               {"is not supported yet", [media_id: 7]},
-               {"is not supported yet", [slot: "slot-2"]}
+               {"is not supported yet", [slot: "slot-2"]},
+               {"is invalid", []}
              ] = for({:uploads, error} <- changeset.errors, do: error)
 
       assert {:error, changeset} =
