@@ -2,54 +2,81 @@
 
 ## Haiku delegation
 
-Haiku is optional in Claude Code: `Agent`, `model: "haiku"`, `subagent_type: "general-purpose"`. Same tools as you, runs in parallel, cheaper per fresh token. A scoped command or script that answers the question is always acceptable instead.
-
-### Economics
-
-- Every token in your context is billed again on each later request, on each advisor call while it is in the request, and for Fable on each cache rewrite after an hour-long hold. Haiku saves money only by keeping text out of your context, for as long as that text would have stayed there.
-- A smaller context saved no time in this project's sessions. Haiku saves time only while you do independent work, or when one answer replaces several of your requests.
-- Haiku's discount is large for fresh input and output under 100K prompt tokens, small for cached context, smaller above 100K. A verbatim relay saves nothing. Our [two verbatim lookup trials](https://github.com/chenghanlee/tips/pull/388#issuecomment-6055995214) favored direct Opus; the task-log analysis established no other win yet.
+Use Haiku only to carry out steps and rules supplied by Opus or Fable.
+Keep analysis and judgment with the parent. Delegation is optional: `Agent`, `model: "haiku"`,
+`subagent_type: "general-purpose"`. Prefer a command or script when it suffices.
 
 ### Choose
 
-Consider Haiku when all hold:
+Use Haiku only when all three hold:
 
-1. You can bound the assignment and verify its result.
-2. The result is much smaller than the reading, or replaces several of your requests, or runs while you do independent work.
-3. The net saving survives assignment, child execution, integration, verification and rework. Prefer a scoped command when it suffices.
-4. The work is reading, summarizing, collecting, or drafting a change whose behaviour you already chose.
+1. You specify the sources, allowed actions, what to select or omit, what to change
+   or preserve, the output format and when to stop. Haiku must not invent missing
+   rules or decide what matters, what evidence means or which behavior is correct.
+2. You can check the result for errors and missing information against the sources,
+   stated requirements or a test.
+3. You can name the work or input it would save, or independent work you can do
+   meanwhile. The saving must plausibly exceed assignment, child execution,
+   integration, checking and rework.
 
-Never use Haiku for:
+### When not to use Haiku
 
-- Waiting: CI, merge, tests, providers, the tester, the user.
-- Deciding: requirements, design, locking, authorization, ordering, concurrency, test contracts, relevance of a hit, severity, acceptance, blockers, done.
-- Required reads: the issue and linked design, pair workflow, skills, blocker comments, the diff under review, the advisor's reply, post-compaction rereads.
-- Replacing the advisor or the independent reviewer, gaining authority, bypassing a denial, real provider calls, secrets, anything needing user authorization.
-- Forking your context into it, or digesting text already in your history. Compress before ingestion.
-- Polling, keepalive calls, `sleep`.
+- The work needs analysis or judgment: interpreting requirements, weighing evidence,
+  deciding what matters, diagnosing a cause or choosing behavior. Do that yourself;
+  delegate only the steps left after those decisions.
+- You cannot give clear instructions or check the result. Resolve the missing
+  requirements or verification method first.
+- You must repeat the work to trust it, or delegation adds more work than it saves.
+  Handing off a wait does not shorten it.
+
+Keep required reads, permission decisions, required verification and final decisions
+about design, test requirements, severity, acceptance, blockers and completion.
+A child cannot replace the advisor or independent reviewer, grant permission or
+bypass a denial.
+
+### Costs and evidence
+
+- Less text in your context can reduce later input, advisor and cache-write costs.
+  Count only requests that would retain it. A new summary does not erase old text.
+- Replacing parent output or requests can save money. Compare total work at the
+  applicable model and cache prices; cheaper tokens alone do not prove a saving.
+- Replacing steps or overlapping independent work may save time. Our logs establish
+  no time saving from smaller context alone; assume none without measurement.
+
+Our [two lookup trials](https://github.com/chenghanlee/tips/pull/388#issuecomment-6055995214)
+favored direct Opus. The task logs established no other win. Treat new uses as trials.
 
 ### Assign
 
-Send minimal sufficient context and a short contract:
+Send only the context needed, with this contract:
 
 ```text
-Task: <bounded outcome and acceptance criteria>
-Scope: <sources/revision, essential context, constraints to preserve verbatim>
-Permissions: read-only unless <writes/checks> are explicitly assigned.
-Return: <artifact and size limit>; source references, omissions and uncertainties.
-Finish: complete the scope and permitted checks, then stop; no extra work.
-        Report check results, blockers and anything unfinished.
+Task: <result and acceptance criteria>
+Scope: <sources/revision, selection and change rules, text to preserve exactly>
+Permissions: read-only unless <writes/checks> are assigned.
+Return: <artifact and size limit>; sources, omissions and check results.
+Stop: finish the assigned work and checks; add nothing else.
+      If instructions are missing, ambiguous or conflict, report the gap; do not decide.
 ```
 
-Keep the default medium effort; [low effort](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5) skips searches, checks or completion, and brevity instructions do not reduce thinking.
+[Anthropic recommends medium effort](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5)
+as the Claude Code starting point. Low effort can skip searches, checks or completion.
+Asking for a short answer does not reliably reduce thinking cost.
 
-### Run and verify
+### Run and check
 
-- Writers get exclusive files; checks get exclusive build, database and port access; the role's environment is preserved.
-- Use completion notifications, not polling. Count parallelism only for a background child while you do independent work.
-- Finish or stop children and their processes before handing off or reporting `done` or `blocked`. Children never post to GitHub. The [pair workflow](agent/teams/README.md) applies to them.
-- Inspect patches, verify consequential claims, read the gaps yourself. A check must exercise the change; a failed launch is not a check. Required verification stays yours.
+- Give writers exclusive files and checks exclusive build, database and port access.
+  Preserve the role's environment.
+- Count overlap only for a background child while you do independent work.
+  Use completion notifications, not polling or keepalives.
+- Finish or stop children and their processes before handoff, `done` or `blocked`.
+  Children never post to GitHub. Follow the [pair workflow](agent/teams/README.md).
+- Inspect changes and check results before use. Checks must exercise the change;
+  a failed launch is not a check. Resolve missing evidence yourself.
 
 ### Measure
 
-Record in the PR or handoff, or for the dispatcher in a root `tmp/` note: the direct-work baseline, result size and use, rework, later defects. Retain session and child IDs and usage records for total cost, including advisor and cache charges, without double-counting. Compare pilots with comparable direct work on total cost and elapsed task time. Label estimates. A fast child or a short answer alone proves no gain.
+In the PR or handoff, record the direct-work comparison, result size and use, rework
+and later defects. Dispatchers use a root `tmp/` note. Retain session/child IDs and
+usage records, including advisor and cache costs, without double-counting.
+Compare total cost and task time. Label estimates; a fast child is not proof of a gain.
