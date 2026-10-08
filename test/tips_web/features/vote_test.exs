@@ -19,7 +19,7 @@ defmodule TipsWeb.VoteFeatureTest do
     tip = tip_fixture(user_fixture(), %{title: "Plan first"})
     voter = user_fixture()
     sign_in(session, voter)
-    %{voter: voter, path: "/tips/#{tip.id}/plan-first"}
+    %{voter: voter, path: "/tips/#{TipsWeb.TipId.encode(tip.id)}/plan-first"}
   end
 
   feature "a newer choice made while an older result is delayed is the one that stays",

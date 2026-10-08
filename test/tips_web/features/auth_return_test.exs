@@ -12,7 +12,7 @@ defmodule TipsWeb.AuthReturnFeatureTest do
 
   setup do
     tip = tip_fixture(user_fixture(), %{title: "Pin the model version"})
-    %{tip: tip, tip_path: "/tips/#{tip.id}/pin-the-model-version"}
+    %{tip: tip, tip_path: "/tips/#{TipsWeb.TipId.encode(tip.id)}/pin-the-model-version"}
   end
 
   @sessions 2

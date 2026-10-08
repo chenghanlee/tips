@@ -132,7 +132,7 @@ defmodule TipsWeb.EditorTest do
     key = record(html, form_id)["submission_key"]
     assert_push_event(lv, "editor:clear", %{draft_id: ^key})
     render_hook(lv, "editor:cleared", %{"status" => "ok"})
-    assert_redirect(lv, "/tips/#{id}/plan-first")
+    assert_redirect(lv, "/tips/#{TipsWeb.TipId.encode(id)}/plan-first")
   end
 
   test "a long document, an expired sign-in or a full ban refuses Publish and keeps the input", %{
@@ -300,7 +300,7 @@ defmodule TipsWeb.EditorTest do
 
     a |> form(form_id, tip: values) |> render_submit()
     assert %Tip{id: id} = Repo.get_by!(Tip, submission_key: key)
-    to = "/tips/#{id}/plan-first"
+    to = "/tips/#{TipsWeb.TipId.encode(id)}/plan-first"
     assert_push_event(a, "editor:clear", %{draft_id: ^key, to: ^to})
 
     # Other work kept the draft: no navigation.
@@ -312,7 +312,10 @@ defmodule TipsWeb.EditorTest do
     html = b |> form(form_id, tip: %{values | body: "Plan, then prompt."}) |> render_submit()
     refute_push_event(b, "editor:clear", _)
     assert text(html, "#{form_id}-refusal") =~ "This draft was published earlier"
-    assert attr(html, "#{form_id}-refusal a", "View it", "href") == "/tips/#{id}/plan-first"
+
+    assert attr(html, "#{form_id}-refusal a", "View it", "href") ==
+             "/tips/#{TipsWeb.TipId.encode(id)}/plan-first"
+
     assert textarea(html, "tip[body]") == "Plan, then prompt."
 
     # Reopening: the published values clear, an unknown selection does not.

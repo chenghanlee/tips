@@ -112,7 +112,7 @@ defmodule TipsWeb.InboxLiveTest do
              "Your tip got new helpful votes"
 
     assert attr(html, "#notification-#{tip_votes.id} a", "Bisect first", "href") ==
-             "/tips/#{tip.id}/bisect-first"
+             "/tips/#{TipsWeb.TipId.encode(tip.id)}/bisect-first"
 
     assert squished(html, "#notification-#{review_votes.id} [data-role=message]") ==
              "Your review got new helpful votes"

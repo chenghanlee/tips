@@ -33,7 +33,7 @@ defmodule TipsWeb.VoteTest do
     indexed_tip!(author, %{title: "Bisect the build", tag_id: "workflow", up_count: 5})
     first = review_fixture(tip, %{body: "First review", up_count: 1})
     review = review_fixture(tip, %{body: "Second review"})
-    tip_path = "/tips/#{tip.id}/bisect-the-flaky-test"
+    tip_path = "/tips/#{TipsWeb.TipId.encode(tip.id)}/bisect-the-flaky-test"
 
     pages = [
       {"browse", "/", "#tip-#{tip.id}-vote", tip, :summary},

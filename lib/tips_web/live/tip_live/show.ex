@@ -4,7 +4,8 @@ defmodule TipsWeb.TipLive.Show do
   projected tip, its header and text, then one ranked page of its live
   reviews.
 
-  Loads by id; any other slug redirects to the projected one, including the
+  Loads by the base36 id `TipsWeb.TipId` reads; an id it rejects is not found.
+  Any other slug redirects to the projected one, including the
   neutral placeholder slugs, keeping the list parameters. As on browse, the
   URL is the only list state and `handle_params/3` reads the page on every URL
   change; an unchanged request loads nothing. A `sort` other than `new` is
@@ -21,7 +22,7 @@ defmodule TipsWeb.TipLive.Show do
   use TipsWeb, :live_view
 
   alias Tips.Content
-  alias TipsWeb.{Discovery, Reader, ReviewActions, UserAuth, VoteActions}
+  alias TipsWeb.{Discovery, Reader, ReviewActions, TipId, UserAuth, VoteActions}
 
   @page_size 30
   # Postgres offsets are bigints; later pages cannot be requested.
@@ -167,9 +168,12 @@ defmodule TipsWeb.TipLive.Show do
 
   @impl true
   def handle_params(%{"id" => id, "slug" => slug} = params, _uri, socket) do
-    case request(id, params, socket.assigns.options) do
-      request when request == socket.assigns.request -> {:noreply, socket}
-      request -> {:noreply, load(socket, request, slug)}
+    case TipId.decode(id) do
+      {:ok, id} ->
+        {:noreply, load_changed(socket, request(id, params, socket.assigns.options), slug)}
+
+      :error ->
+        raise TipsWeb.NotFoundError
     end
   end
 
@@ -184,6 +188,9 @@ defmodule TipsWeb.TipLive.Show do
       else:
         {:noreply, push_patch(socket, to: list_path(socket.assigns.tip, %{changed | page: 1}))}
   end
+
+  defp load_changed(%{assigns: %{request: request}} = socket, request, _slug), do: socket
+  defp load_changed(socket, request, slug), do: load(socket, request, slug)
 
   defp load(socket, request, slug) do
     case read(socket, request) do
