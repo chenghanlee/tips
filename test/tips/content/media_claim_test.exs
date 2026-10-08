@@ -221,6 +221,37 @@ defmodule Tips.Content.MediaClaimTest do
     end
   end
 
+  test "a staged id outside the bigint range is a changeset error in every save" do
+    author = user_fixture()
+    tip = tip_fixture(author, @tip_attrs)
+    review = review_fixture(tip_fixture(), Map.put(@review_attrs, :user_id, author.id))
+    max = 9_223_372_036_854_775_807
+
+    saves = [
+      &Content.publish_tip(scope(author), Ecto.UUID.generate(), @tip_attrs, &1),
+      &Content.publish_review(
+        scope(author),
+        tip_fixture().id,
+        Ecto.UUID.generate(),
+        @review_attrs,
+        &1
+      ),
+      &Content.edit_tip(scope(author), tip.id, 1, @tip_attrs, &1),
+      &Content.edit_review(scope(author), review.id, 1, @review_attrs, &1)
+    ]
+
+    for save <- saves do
+      assert {:error, %Ecto.Changeset{} = changeset} = save.([{:staged_video, max + 1}])
+      assert [{"is invalid", []}] = for({:uploads, error} <- changeset.errors, do: error)
+
+      # The largest id is valid input; no such row exists.
+      assert {:error, {:upload_failed, [^max]}} = save.([{:staged_video, max}])
+    end
+
+    assert %Tip{edit_version: 1} = Repo.reload!(tip)
+    assert %Review{edit_version: 1} = Repo.reload!(review)
+  end
+
   describe "edits claim staged videos with the expected-version guard" do
     test "edit_tip interleaves claims with the retained set and advances the version once" do
       author = user_fixture()

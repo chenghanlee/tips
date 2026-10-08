@@ -47,6 +47,9 @@ defmodule Tips.Content.Publication do
     review: [:body, :model_id, :model_other, :environment_id, :prompt, :output]
   }
 
+  # Positive bigint ids; anything else cannot name a row.
+  @row_ids 1..9_223_372_036_854_775_807
+
   # Curated choices a new write must select while active.
   @choices %{
     tip: [tag_id: Tag, model_id: Model, environment_id: Environment],
@@ -125,7 +128,7 @@ defmodule Tips.Content.Publication do
 
   defp parent_id(:tip), do: {:ok, nil}
 
-  defp parent_id({:review, id}) when id in 1..9_223_372_036_854_775_807//1, do: {:ok, id}
+  defp parent_id({:review, id}) when id in @row_ids, do: {:ok, id}
   defp parent_id({:review, _id}), do: {:error, :not_found}
 
   ## Key lookup
@@ -251,8 +254,7 @@ defmodule Tips.Content.Publication do
   defp upload_error({:retained, media_id, _description}),
     do: {"cannot be kept in a new publication", media_id: media_id}
 
-  defp upload_error({:staged_video, media_id}) when is_integer(media_id) and media_id > 0,
-    do: nil
+  defp upload_error({:staged_video, media_id}) when media_id in @row_ids, do: nil
 
   defp upload_error({:image_file, slot, _file, _description}),
     do: {"is not supported yet", slot: slot}
