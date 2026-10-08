@@ -2,26 +2,31 @@
 
 ## Haiku delegation
 
-Haiku is optional in Claude Code: `Agent`, `model: "haiku"`,
-`subagent_type: "general-purpose"`.
+Haiku is optional in Claude Code: `Agent`, `model: "haiku"`, `subagent_type: "general-purpose"`. Same tools as you, runs in parallel, cheaper per fresh token. A scoped command or script that answers the question is always acceptable instead.
+
+### Economics
+
+- Every token in your context is billed again on each later request, on each advisor call while it is in the request, and for Fable on each cache rewrite after an hour-long hold. Haiku saves money only by keeping text out of your context, for as long as that text would have stayed there.
+- A smaller context saved no time in this project's sessions. Haiku saves time only while you do independent work, or when one answer replaces several of your requests.
+- Haiku's discount is large for fresh input and output under 100K prompt tokens, small for cached context, smaller above 100K. A verbatim relay saves nothing. Our [two verbatim lookup trials](https://github.com/chenghanlee/tips/pull/388#issuecomment-6055995214) favored direct Opus; the task-log analysis established no other win yet.
 
 ### Choose
 
-Consider Haiku when you can bound the assignment, verify its result, and identify a
-plausible net saving in cost or completion time. Savings may come from less retained
-input, replaced parent work, or safe parallelism. Count assignment, child execution,
-integration, verification and rework. Prefer scoped commands when they suffice.
+Consider Haiku when all hold:
 
-Do it yourself when you cannot bound or verify the task, or verification and rework
-would erase the saving. Keep required reads and final decisions yourself.
-Children may analyze evidence under your criteria and draft changes whose behavior
-you have chosen. They cannot replace the advisor or independent reviewer, gain
-authority, or bypass a denial.
+1. You can bound the assignment and verify its result.
+2. The result is much smaller than the reading, or replaces several of your requests, or runs while you do independent work.
+3. The net saving survives assignment, child execution, integration, verification and rework. Prefer a scoped command when it suffices.
+4. The work is reading, summarizing, collecting, or drafting a change whose behaviour you already chose.
 
-Our [two verbatim lookup trials](https://github.com/chenghanlee/tips/pull/388#issuecomment-6055995214)
-favored direct Opus; the task-log analysis did not establish other wins. Compress
-before ingestion: summarizing text already in your history removes nothing.
-Savings depend on how long avoided text would remain in later requests.
+Never use Haiku for:
+
+- Waiting: CI, merge, tests, providers, the tester, the user.
+- Deciding: requirements, design, locking, authorization, ordering, concurrency, test contracts, relevance of a hit, severity, acceptance, blockers, done.
+- Required reads: the issue and linked design, pair workflow, skills, blocker comments, the diff under review, the advisor's reply, post-compaction rereads.
+- Replacing the advisor or the independent reviewer, gaining authority, bypassing a denial, real provider calls, secrets, anything needing user authorization.
+- Forking your context into it, or digesting text already in your history. Compress before ingestion.
+- Polling, keepalive calls, `sleep`.
 
 ### Assign
 
@@ -36,27 +41,15 @@ Finish: complete the scope and permitted checks, then stop; no extra work.
         Report check results, blockers and anything unfinished.
 ```
 
-[Anthropic recommends medium effort](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5)
-as Claude Code's starting point; low effort can skip searches, checks or completion.
-Brevity instructions do not control thinking cost. For changing facts, ensure the
-current date is available and request fresh evidence; avoid blanket searches.
+Keep the default medium effort; [low effort](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5) skips searches, checks or completion, and brevity instructions do not reduce thinking.
 
 ### Run and verify
 
-Give writers exclusive files and checks exclusive build/database/port access;
-preserve the role's environment. Count parallelism only for a background child
-while you do independent work. Use completion notifications, not polling.
-Finish or stop children and their processes before handing off or reporting `done`
-or `blocked`. Children never post to GitHub; the [pair workflow](agent/teams/README.md) applies.
-
-Inspect patches, verify consequential claims and resolve relevant gaps. Checks
-must exercise the change; a failed launch is not a check. You remain responsible
-for required verification.
+- Writers get exclusive files; checks get exclusive build, database and port access; the role's environment is preserved.
+- Use completion notifications, not polling. Count parallelism only for a background child while you do independent work.
+- Finish or stop children and their processes before handing off or reporting `done` or `blocked`. Children never post to GitHub. The [pair workflow](agent/teams/README.md) applies to them.
+- Inspect patches, verify consequential claims, read the gaps yourself. A check must exercise the change; a failed launch is not a check. Required verification stays yours.
 
 ### Measure
 
-Record the direct-work baseline, result size/use, rework and later defects in the
-PR or handoff; dispatchers use a worktree `tmp/` note. Retain session/child IDs and
-usage records for total cost, including advisor/cache charges without double-counting.
-Compare selected pilots with comparable direct work on total cost and elapsed
-task time. Label estimates; a fast child or short answer alone proves no gain.
+Record in the PR or handoff, or for the dispatcher in a root `tmp/` note: the direct-work baseline, result size and use, rework, later defects. Retain session and child IDs and usage records for total cost, including advisor and cache charges, without double-counting. Compare pilots with comparable direct work on total cost and elapsed task time. Label estimates. A fast child or a short answer alone proves no gain.
