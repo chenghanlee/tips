@@ -2,46 +2,55 @@
 
 ## Haiku subagents
 
-Haiku is available to Opus and Fable through the `Agent` tool with `model` "haiku" and `subagent_type` "general-purpose". It is about 40 times cheaper per token than Opus and faster, runs in parallel with your own work, and has the same tools you have. You decide when to use it. Nothing routes through it by force.
+Opus and Fable can launch Haiku subagents with the `Agent` tool, `model` "haiku", `subagent_type` "general-purpose". Haiku has your tools, runs in parallel with you, and is cheaper and faster per token. Whether to use it is your call. Nothing is routed through it, and a scoped command or script that answers the question is always an acceptable choice instead.
 
-Facts that set the economics, measured on this project's sessions ([PR #388](https://github.com/chenghanlee/tips/pull/388)):
+What this project's own sessions showed ([PR #388](https://github.com/chenghanlee/tips/pull/388), the closed mechanical explorer):
 
-- Context size costs no time. A request takes about 3 seconds plus 8 seconds per 1K output tokens, whatever the context size. Delegation saves time only when Haiku works while you do something else, or when it replaces several of your requests.
-- Every token you keep in context is paid again on each later request, on each advisor call (uncached, 50 times the cache-hit price) and, for Fable, on each cache rewrite after a hold longer than an hour. Delegation saves money when the answer Haiku returns is much smaller than what you would have read.
-- Haiku's cheap tier ends at a 100K-token prompt. Do not fork your own context into it.
+- A token kept in your context is paid again on every later request, on every advisor call while it is still in the request (advisor input was uncached in the observed calls), and for Fable on every cache rewrite after a hold longer than an hour. Money is saved by keeping text out of your context, not by moving the reading elsewhere.
+- Those sessions showed no time saving from a smaller context alone. Time is saved only when Haiku works while you do something else, or when its one answer replaces several of your requests.
+- Haiku's price advantage is largest for fresh input and output (Opus 5.5 to Haiku 5.5, prompts under 100K tokens), smaller for cached context, and much smaller above 100K tokens. It is not a total-job saving. A verbatim relay through Haiku saves nothing: you ingest it all anyway.
 
-### Principles
+### Consider Haiku when all of these hold
 
-1. Delegate reading, not deciding. Haiku may summarize and compress. You keep requirements, architecture, acceptance, authorization, locking and concurrency decisions, and every judgment about what counts.
-2. Ask one question with a checkable answer: scope searched, `path:line` on every row, constraints and decisions quoted verbatim, and a "left out" list. Reject an answer that has none of these.
-3. Delegate when the answer is much smaller than the reading, or when you have independent work to do meanwhile. Do not delegate one known command, a function body you are about to edit, a passing check run, or a wait.
-4. Keep the required reads yourself: the issue and its linked design sections, the pair workflow, the skills, blocker comments, the diff under review.
-5. Compress before ingestion. A digest of text already in your context removes nothing.
-6. Launch Haiku calls in parallel and keep working; results arrive on their own. Do not poll or `sleep`.
-7. Haiku never writes during another agent's turn, never touches files you did not assign to it, never runs `mix` against a shared database, and never routes around a denied action.
+1. The answer is much smaller than the reading it replaces, and a scoped command cannot already give that small answer.
+2. The question can be stated once, with an answer you can check: scope searched, `path:line` on every row, constraints and decisions quoted verbatim, a "left out" list.
+3. The work is reading, compressing, collecting, or a mechanical change against a contract you have already fixed.
+4. Either you have independent work to do while it runs, or it replaces several of your requests. If you would wait for it with nothing else to do, do the work yourself.
 
-### Triggers
+Haiku may summarize and compress. Anything you must act on word for word, such as copy, error text, config values, authorization text and decisions, comes back verbatim or not at all.
 
-| Who | Scenario | Ask Haiku for | Expected gain |
-|---|---|---|---|
-| Fable | Board or issue-thread state across several issues | One row per item: number, state, blocker, who must act, last decision quoted with its URL | 15K fewer tokens kept all day; about $0.50 per use, more before a rewrite |
-| Fable | Why something happened in an agent transcript or log | A short timeline with file, line and timestamp, uncertainties marked | Replaces 4-10 of your requests |
-| Opus | Where a rule, limit or copy string is enforced, shown, tested and configured | A table grouped by role with exact value, unit and `path:line`, unresolved matches listed | Replaces noisy search sorting; about $0.25 per use |
-| Opus | Which fixture, setup and cleanup to use before writing tests | Nearest existing test, fixture signatures and defaults verbatim, committed versus sandbox rows, cleanup pattern | Pays only when the hunt spans several files |
-| Opus | A failed CI run or test suite with long output | The failing blocks with exact errors and exit status, one cause guess per failure, labelled as a guess | Replaces log paging; a parser first, Haiku when failures interlock |
-| Opus | Before `done` on a task with scattered evidence | Each acceptance criterion with its evidence or "not established", never "covered" because a test exists | One avoided review round is 8-17 minutes |
-| Opus | Supplementary design or prior-probe material beyond the required sections | Constraining paragraphs verbatim, the rest in a few lines, with ranges | Avoids reading a 40-60K overflow in full |
-| Opus | A mechanical write bundle after you fixed the behaviour: moving duplicated helpers, wiring one designed component into several pages | A patch in the worktree's `tmp/` or edits to files you assigned, then you inspect and run the checks | Replaces your typing turns; about $0.10-0.20 per bundle |
+### Do not use Haiku for
 
-### Prompt shape
+- A single known command, a function body you are about to edit, a small hunt, a passing check run. The call costs more than it saves.
+- Waiting: CI, merge, a test suite, a provider call, the tester's turn, a user hold. Haiku watching a clock does not shorten it.
+- Deciding: requirements, architecture, locking, authorization, transaction ordering, concurrency, test contracts, what a search hit means, severity, acceptance, blocker calls, what counts as done. A cheap implementation of a wrong contract costs a review round.
+- Required reads: the issue and its linked design sections, the pair workflow, the skills, blocker comments, the diff you are reviewing, the advisor's reply. Rules and policy are read first-hand, including the rereads after compaction.
+- Routing around a denied action or a permission prompt, real provider calls, secrets, anything that needs the user's authorization.
+- A substitute for the advisor. The advisor reasons over your whole conversation; Haiku cannot.
+- Forking your context. Keep each prompt small and self-contained; Haiku's cheap tier ends at 100K prompt tokens and it cannot reason over your history.
+- Digesting text already in your context. That adds tokens and removes none. Compress before ingestion.
+- Keeping caches warm. No polling, no keepalive calls, no `sleep`.
+
+### Ownership and turns
+
+- During your turn, a Haiku child that writes gets files you do not touch meanwhile, or returns a patch in the worktree's `tmp/` that you apply. You inspect every change and run the normal checks.
+- Every child finishes or is stopped before you hand off with `team.py turn <pr> test`, and no child uses the worktree, the build or the database after that. The [pair workflow](agent/teams/README.md) rules apply to your children as to you.
+- Haiku never runs `mix` against a shared database, never edits another agent's work and never posts to GitHub.
+
+### Asking
 
 ```
 Question: <one question>
 Scope: <paths, or "lib test config">
-Return: <table or list>, every row with path:line; quote <what> verbatim; end with "Left out:" and "Searched:".
-Rules: read only; do not write files; Dexter is at .dexter/dexter.sh (export TIPS_DEXTER="$PWD/.dexter/dexter.sh"); use both Dexter and rg for uses of a function.
+Return: <table or list>, every row with path:line; quote <what> verbatim;
+        end with "Left out:" and "Searched:".
+Rules: read only; do not write files; Dexter is at .dexter/dexter.sh
+       (export TIPS_DEXTER="$PWD/.dexter/dexter.sh"); use both Dexter and rg
+       for uses of a function.
 ```
 
-### Record what happened
+Launch independent calls together and keep working; results arrive on their own. Reject an answer with no scope, no locations or no "left out" list, and read the gap yourself.
 
-Until a pilot shows a measured gain, list each Haiku call in the PR description or handoff: the question, characters returned, whether you used the answer, and what it got wrong. The dispatcher records the same in its session notes.
+### Record
+
+No Haiku job here has a measured gain yet. Until one does, record in the PR description or the handoff, per call: the question, characters returned, whether you used it, what it got wrong, and what a scoped command would have returned instead. Per task: child token usage, your rework after a child's answer, elapsed time of the delegated step, and the session cost total from the client's cost counter. The dispatcher keeps the same record in its session notes. Without this record a pilot cannot be judged.
