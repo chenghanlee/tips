@@ -48,7 +48,9 @@ favored direct Opus. The task logs established no other win. Treat new uses as t
 
 ### Assign
 
-Send only the context needed, with this contract:
+Send only the context needed, never your conversation history. Haiku's lower price
+tier ends at 100K prompt tokens, and it cannot reason over your history anyway.
+Use this contract:
 
 ```text
 Task: <result and acceptance criteria>
