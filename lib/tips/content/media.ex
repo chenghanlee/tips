@@ -388,11 +388,13 @@ defmodule Tips.Content.Media do
   defp observe(%{state: :pendingupload}), do: nil
   defp observe(%{state: :error}), do: :failed
 
-  defp observe(%{ready_to_stream: true, duration_s: duration}) when duration > @max_video_seconds,
-    do: :failed
+  defp observe(%{ready_to_stream: true, duration_s: duration})
+       when is_number(duration) and duration > @max_video_seconds,
+       do: :failed
 
-  defp observe(%{ready_to_stream: true, duration_s: duration}) when duration > 0,
-    do: {:ready, duration / 1}
+  defp observe(%{ready_to_stream: true, duration_s: duration})
+       when is_number(duration) and duration > 0,
+       do: {:ready, duration / 1}
 
   defp observe(_processing), do: :processing
 

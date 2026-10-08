@@ -33,6 +33,13 @@ defmodule Tips.Repo.Migrations.FixMediaRecoveryDeadline do
            )
 
     # A known-uid row that left 'uploading' has completed its transfer and holds the recovery deadline.
+    # Existing deadlines move to that fixed value first; a NULL expiry stays NULL.
+    execute """
+    update media set expires_at = created_at +
+      case when stream_uid is not null and state <> 'uploading' then interval '49 hours' else interval '1 hour' end
+    where expires_at is not null
+    """
+
     create constraint(:media, :media_deadline_chk,
              check: """
              expires_at is null or expires_at = created_at +

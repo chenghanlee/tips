@@ -41,6 +41,8 @@ defmodule Tips.Content.Media.VideoStatusTest do
       "status" => %{"state" => state, "errorReasonCode" => Keyword.get(opts, :reason, "")}
     }
 
+    # Stream documents `readyToStream` and `duration` as optional.
+    result = Map.drop(result, Keyword.get(opts, :omit, []))
     body = JSON.encode!(%{"success" => true, "errors" => [], "result" => result})
 
     conn
@@ -80,7 +82,11 @@ defmodule Tips.Content.Media.VideoStatusTest do
         {"ready", [duration: 12.5], :ready, 12.5, 49},
         {"ready", [duration: 180], :ready, 180.0, 49},
         {"ready", [duration: 180.5], :failed, nil, 49},
-        {"error", [reason: "ERR_DURATION_EXCEED_CONSTRAINT"], :failed, nil, 49}
+        {"error", [reason: "ERR_DURATION_EXCEED_CONSTRAINT"], :failed, nil, 49},
+        {"inprogress", [omit: ~w(readyToStream duration)], :processing, nil, 49},
+        {"error", [omit: ~w(readyToStream duration)], :failed, nil, 49},
+        {"ready", [omit: ~w(duration)], :processing, nil, 49},
+        {"ready", [duration: 30, omit: ~w(readyToStream)], :processing, nil, 49}
       ]
 
       rows = for _case <- cases, do: reserved(data.user, %{reconcile_after: cooldown})
@@ -95,7 +101,12 @@ defmodule Tips.Content.Media.VideoStatusTest do
         video(conn, state, opts)
       end)
 
-      assert {:ok, statuses} = Content.get_video_uploads(data.scope, Enum.map(rows, & &1.id))
+      # One call takes at most ten ids.
+      statuses =
+        for chunk <- Enum.chunk_every(rows, 10),
+            {:ok, statuses} = Content.get_video_uploads(data.scope, Enum.map(chunk, & &1.id)),
+            status <- statuses,
+            do: status
 
       for {row, {stream_state, _opts, state, duration, hours}} <- Enum.zip(rows, cases) do
         assert %Asset{state: ^state, duration_s: ^duration} = saved = Repo.reload!(row)

@@ -19,12 +19,14 @@ defmodule Tips.Content.Media.CloudflareStream do
 
   @typedoc """
   A video's processing state, from [the API](https://developers.cloudflare.com/api/resources/stream/methods/get/).
-  `duration_s` is `-1` until Stream knows it.
+  `readyToStream` and `duration` are optional there: a missing readiness flag is
+  `false`, and a missing duration is `nil`. `duration_s` is `-1` while Stream
+  does not know it.
   """
   @type status :: %{
           state: :pendingupload | :downloading | :queued | :inprogress | :ready | :error,
           ready_to_stream: boolean(),
-          duration_s: number()
+          duration_s: number() | nil
         }
 
   @states Map.new(~w(pendingupload downloading queued inprogress ready error)a, &{"#{&1}", &1})
@@ -112,7 +114,7 @@ defmodule Tips.Content.Media.CloudflareStream do
   Reads the processing state of the video `uid`.
 
   Every error is uncertain: `{:http, 429}` is a rate limit, and `:incomplete`
-  a response without a known state, readiness flag and duration.
+  a response without a known state.
   """
   @spec status(Req.Request.t(), String.t()) :: {:ok, status()} | {:error, error()}
   def status(client, uid) do
@@ -123,10 +125,15 @@ defmodule Tips.Content.Media.CloudflareStream do
 
   defp video_status({:ok, %Req.Response{status: 200, body: body}}) do
     with {:ok, %{"result" => %{"status" => %{"state" => state}} = video}} <- JSON.decode(body),
-         {:ok, state} <- Map.fetch(@states, state),
-         %{"readyToStream" => ready, "duration" => duration}
-         when is_boolean(ready) and is_number(duration) <- video do
-      {:ok, %{state: state, ready_to_stream: ready, duration_s: duration}}
+         {:ok, state} <- Map.fetch(@states, state) do
+      duration = video["duration"]
+
+      {:ok,
+       %{
+         state: state,
+         ready_to_stream: video["readyToStream"] == true,
+         duration_s: if(is_number(duration), do: duration)
+       }}
     else
       _incomplete -> {:error, :incomplete}
     end
