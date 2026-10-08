@@ -24,13 +24,15 @@ defmodule TipsWeb.AuthReturnTest do
       |> init_test_session(%{"admission_limiter" => limiter})
       |> Plug.Test.put_peer_data(%{address: @peer, port: 40_000, ssl_cert: nil})
 
-    tip = tip_fixture(user_fixture(), %{title: "Pin the model version"})
+    # Above the sequence's ids, where base36 and decimal differ.
+    tip =
+      tip_fixture(user_fixture(), %{id: 9_223_372_036_854_775_806, title: "Pin the model version"})
 
     %{
       conn: conn,
       tip: tip,
       review: review_fixture(tip),
-      tip_path: "/tips/#{TipsWeb.TipId.encode(tip.id)}/pin-the-model-version"
+      tip_path: "/tips/1y2p0ij32e8e6/pin-the-model-version"
     }
   end
 
