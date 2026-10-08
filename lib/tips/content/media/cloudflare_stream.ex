@@ -1,6 +1,6 @@
 defmodule Tips.Content.Media.CloudflareStream do
   @moduledoc """
-  Video reservations in Cloudflare Stream, through its API.
+  Video reservations and status reads in Cloudflare Stream, through its API.
 
   Each call is one bounded request: 5-second connect and receive timeouts, no
   retries or redirects. Errors carry a status or `:transport`, never a URL,
@@ -16,6 +16,18 @@ defmodule Tips.Content.Media.CloudflareStream do
   @uid_header "stream-media-id"
 
   @type error :: {:http, pos_integer()} | :transport | :incomplete
+
+  @typedoc """
+  A video's processing state, from [the API](https://developers.cloudflare.com/api/resources/stream/methods/get/).
+  `duration_s` is `-1` until Stream knows it.
+  """
+  @type status :: %{
+          state: :pendingupload | :downloading | :queued | :inprogress | :ready | :error,
+          ready_to_stream: boolean(),
+          duration_s: number()
+        }
+
+  @states Map.new(~w(pendingupload downloading queued inprogress ready error)a, &{"#{&1}", &1})
 
   @doc """
   Builds the request client. Options, over the application environment for
@@ -95,4 +107,31 @@ defmodule Tips.Content.Media.CloudflareStream do
 
   defp reservation({:ok, %Req.Response{status: status}}), do: {:error, {:http, status}}
   defp reservation({:error, _exception}), do: {:error, :transport}
+
+  @doc """
+  Reads the processing state of the video `uid`.
+
+  Every error is uncertain: `{:http, 429}` is a rate limit, and `:incomplete`
+  a response without a known state, readiness flag and duration.
+  """
+  @spec status(Req.Request.t(), String.t()) :: {:ok, status()} | {:error, error()}
+  def status(client, uid) do
+    client
+    |> Req.get(url: "/" <> URI.encode(uid, &URI.char_unreserved?/1))
+    |> video_status()
+  end
+
+  defp video_status({:ok, %Req.Response{status: 200, body: body}}) do
+    with {:ok, %{"result" => %{"status" => %{"state" => state}} = video}} <- JSON.decode(body),
+         {:ok, state} <- Map.fetch(@states, state),
+         %{"readyToStream" => ready, "duration" => duration}
+         when is_boolean(ready) and is_number(duration) <- video do
+      {:ok, %{state: state, ready_to_stream: ready, duration_s: duration}}
+    else
+      _incomplete -> {:error, :incomplete}
+    end
+  end
+
+  defp video_status({:ok, %Req.Response{status: status}}), do: {:error, {:http, status}}
+  defp video_status({:error, _exception}), do: {:error, :transport}
 end

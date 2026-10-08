@@ -51,11 +51,25 @@ defmodule Tips.Content.Media do
   A response that rejects the reservation marks the row `failed`. A lost
   response, or one the guard refuses, leaves the uid NULL: no browser has the
   URL, and the expiry worker (#66) retires the row locally at its deadline.
+
+  ## Video status
+
+  `get_video_uploads/3` reads Stream only for owned, unattached, known-uid rows
+  that are `uploading` or `processing` and not in cleanup, including rows past
+  their upload deadline. At most three reads run at once, outside any
+  transaction. Each result goes through `transition_video/3`, the guarded
+  transition the expiry worker (#66) shares: one conditional `UPDATE` whose
+  `WHERE` Postgres re-evaluates on the current row after any lock wait, so a
+  late result cannot change a row that has since moved on, been attached or
+  entered cleanup. The first state after `pendingupload` sets the fixed
+  recovery deadline, `created_at` plus 49 hours, whenever it is observed. A
+  `pendingupload` result, a timeout, an error or a rate limit writes nothing.
   """
 
   import Ecto.Changeset
   import Ecto.Query
 
+  alias Tips.Accounts
   alias Tips.Accounts.{Scope, User}
   alias Tips.AdmissionLimiter
   alias Tips.Content
@@ -70,6 +84,14 @@ defmodule Tips.Content.Media do
   @max_video_bytes 1_000_000_000
   # The upload deadline after the row's `created_at`, also the reservation's expiry.
   @upload_seconds 3600
+  # The recovery deadline of a completed upload after the row's `created_at`.
+  @recovery_seconds 49 * 3600
+  @max_video_seconds 180
+  @max_id 9_223_372_036_854_775_807
+  # Status reads in flight at once for one call.
+  @status_concurrency 3
+  # Each read has 5-second connect and receive timeouts; this ends one that outlives both.
+  @status_timeout_ms 11_000
 
   @types %{
     png: {"png", "image/png"},
@@ -100,6 +122,21 @@ defmodule Tips.Content.Media do
           upload_url: String.t(),
           expires_at: DateTime.t()
         }
+
+  @typedoc """
+  An upload's committed state after a refresh. `:removed` is a row in cleanup
+  or gone. `refresh` is `:uncertain` when its status read timed out or failed,
+  and `:rate_limited` when Stream refused it; the state is then unchanged.
+  """
+  @type video_status :: %{
+          media_id: Content.media_id(),
+          state: :uploading | :processing | :ready | :failed | :removed,
+          expires_at: DateTime.t() | nil,
+          refresh: :ok | :uncertain | :rate_limited
+        }
+
+  @typedoc "A trusted Stream result that completes an upload or its processing."
+  @type observation :: :processing | {:ready, duration_s :: float()} | :failed
 
   @doc "See `Tips.Content.begin_video_upload/3`."
   @spec begin_video_upload(Scope.t() | nil, term(), term(), keyword()) ::
@@ -169,21 +206,35 @@ defmodule Tips.Content.Media do
   end
 
   # The share lock holds the checked content until commit, after the author lock.
-  defp lock_target(_user_id, {:new_tip, _key}), do: :ok
-
-  defp lock_target(_user_id, {:new_review, tip_id, _key}),
-    do: share_lock(from(t in Tip, where: t.id == ^tip_id and is_nil(t.dead_at)))
-
-  defp lock_target(user_id, {:edit_tip, id}),
-    do: share_lock(from(t in Tip, where: t.id == ^id and t.user_id == ^user_id))
-
-  defp lock_target(user_id, {:edit_review, id}),
-    do: share_lock(from(r in Review, where: r.id == ^id and r.user_id == ^user_id))
-
-  defp share_lock(query) do
-    query = from(c in query, where: is_nil(c.deleted_at), select: c.id, lock: "FOR SHARE")
-    if Repo.one(query), do: :ok, else: {:error, :not_found}
+  defp lock_target(user_id, target) do
+    case target_query(user_id, target) do
+      nil -> :ok
+      query -> found(from(c in query, lock: "FOR SHARE"))
+    end
   end
+
+  defp live_target(user_id, target) do
+    case target_query(user_id, target) do
+      nil -> :ok
+      query -> found(query)
+    end
+  end
+
+  # The content an upload target needs: a live parent tip, or the author's own undeleted item.
+  defp target_query(_user_id, {:new_tip, _key}), do: nil
+
+  defp target_query(_user_id, {:new_review, tip_id, _key}),
+    do: live(from(t in Tip, where: t.id == ^tip_id and is_nil(t.dead_at)))
+
+  defp target_query(user_id, {:edit_tip, id}),
+    do: live(from(t in Tip, where: t.id == ^id and t.user_id == ^user_id))
+
+  defp target_query(user_id, {:edit_review, id}),
+    do: live(from(r in Review, where: r.id == ^id and r.user_id == ^user_id))
+
+  defp live(query), do: from(c in query, where: is_nil(c.deleted_at), select: c.id)
+
+  defp found(query), do: if(Repo.one(query), do: :ok, else: {:error, :not_found})
 
   defp provision(client, asset, size) do
     case CloudflareStream.reserve(client, size, asset.expires_at, "tips-media-#{asset.id}") do
@@ -227,6 +278,180 @@ defmodule Tips.Content.Media do
     from(a in Asset,
       where:
         a.id == ^id and a.state == :uploading and is_nil(a.stream_uid) and is_nil(a.cleanup_at)
+    )
+  end
+
+  @doc "See `Tips.Content.get_video_uploads/2`. `opts` are passed to `CloudflareStream.client!/1`."
+  @spec get_video_uploads(Scope.t() | nil, term(), keyword()) ::
+          {:ok, [video_status()]} | {:error, Content.video_status_error()}
+  def get_video_uploads(scope, upload_ids, opts \\ []) do
+    unknown_on_database_error(fn ->
+      with {:ok, user} <- author(scope),
+           {:ok, ids} <- validate_upload_ids(upload_ids),
+           :ok <- readmit(user),
+           {:ok, assets} <- owned_videos(user.id, ids),
+           :ok <- live_targets(user.id, assets) do
+        refreshes = assets |> Enum.filter(&pending?/1) |> refresh(opts)
+        {:ok, statuses(ids, refreshes)}
+      end
+    end)
+  end
+
+  defp validate_upload_ids(upload_ids) do
+    {%{}, %{upload_ids: {:array, :integer}}}
+    |> cast(%{upload_ids: upload_ids}, [:upload_ids])
+    |> validate_required([:upload_ids])
+    |> validate_length(:upload_ids, max: @max_attachments)
+    |> validate_change(:upload_ids, fn :upload_ids, ids ->
+      cond do
+        Enum.any?(ids, &(&1 not in 1..@max_id)) -> [upload_ids: "must be media ids"]
+        Enum.uniq(ids) != ids -> [upload_ids: "must not repeat"]
+        true -> []
+      end
+    end)
+    |> apply_action(:validate)
+    |> case do
+      {:ok, %{upload_ids: ids}} -> {:ok, ids}
+      {:error, _changeset} = error -> error
+    end
+  end
+
+  # Unlocked: a stale answer allows only a status read, which grants nothing.
+  defp readmit(%User{id: id}) do
+    case Repo.get(User, id) do
+      nil -> {:error, :unauthenticated}
+      user -> Accounts.check_eligibility(user, :contribute)
+    end
+  end
+
+  defp owned_videos(user_id, ids) do
+    assets =
+      Repo.all(
+        from(a in Asset, where: a.id in ^ids and a.user_id == ^user_id and a.kind == :video)
+      )
+
+    if length(assets) == length(ids), do: {:ok, assets}, else: {:error, :not_found}
+  end
+
+  defp live_targets(user_id, assets) do
+    assets
+    |> Enum.map(& &1.target)
+    |> Enum.uniq()
+    |> Enum.find_value(:ok, fn target ->
+      with :ok <- live_target(user_id, target), do: nil
+    end)
+  end
+
+  defp pending?(%Asset{
+         state: state,
+         stream_uid: uid,
+         cleanup_at: nil,
+         tip_id: nil,
+         review_id: nil
+       })
+       when state in [:uploading, :processing] and is_binary(uid),
+       do: true
+
+  defp pending?(_asset), do: false
+
+  # Provider reads run in tasks; every write runs here, after the reads.
+  defp refresh([], _opts), do: %{}
+
+  defp refresh(assets, opts) do
+    client = CloudflareStream.client!(opts)
+
+    assets
+    |> Task.async_stream(&CloudflareStream.status(client, &1.stream_uid),
+      max_concurrency: @status_concurrency,
+      timeout: @status_timeout_ms,
+      on_timeout: :kill_task
+    )
+    |> Enum.zip(assets)
+    |> Map.new(fn {result, asset} -> {asset.id, apply_read(asset, result)} end)
+  end
+
+  defp apply_read(asset, {:ok, {:ok, status}}) do
+    case observe(status) do
+      nil ->
+        :ok
+
+      observation ->
+        transition_video(asset.id, asset.stream_uid, observation)
+        :ok
+    end
+  end
+
+  defp apply_read(_asset, {:ok, {:error, {:http, 429}}}), do: :rate_limited
+  defp apply_read(_asset, _uncertain), do: :uncertain
+
+  # Ready means playable within the duration limit. `pendingupload` is no completion.
+  defp observe(%{state: :pendingupload}), do: nil
+  defp observe(%{state: :error}), do: :failed
+
+  defp observe(%{ready_to_stream: true, duration_s: duration}) when duration > @max_video_seconds,
+    do: :failed
+
+  defp observe(%{ready_to_stream: true, duration_s: duration}) when duration > 0,
+    do: {:ready, duration / 1}
+
+  defp observe(_processing), do: :processing
+
+  defp statuses(ids, refreshes) do
+    assets = Map.new(Repo.all(from(a in Asset, where: a.id in ^ids)), &{&1.id, &1})
+
+    for id <- ids do
+      {state, expires_at} = committed(Map.get(assets, id))
+      %{media_id: id, state: state, expires_at: expires_at, refresh: Map.get(refreshes, id, :ok)}
+    end
+  end
+
+  # The expiry worker may delete a never-released row between the reads.
+  defp committed(nil), do: {:removed, nil}
+  defp committed(%Asset{cleanup_at: nil} = asset), do: {asset.state, asset.expires_at}
+  defp committed(%Asset{} = asset), do: {:removed, asset.expires_at}
+
+  @doc """
+  Applies a trusted Stream result to the unattached video `id` with uid `uid`,
+  never in cleanup. `:processing` moves only an `uploading` row; ready and
+  failed results move an `uploading` or `processing` row. Every applied result
+  sets the recovery deadline, `created_at` plus 49 hours, and clears the expiry
+  cooldown. There is no wall-clock check. Returns `:unchanged` when the row no
+  longer matches, so a late or out-of-order result never regresses a row,
+  revives cleanup or restores an expiry that attachment cleared.
+  """
+  @spec transition_video(Content.media_id(), String.t(), observation()) :: :applied | :unchanged
+  def transition_video(id, uid, observation) do
+    {state, duration_s, from_states} = transition(observation)
+
+    query =
+      from(a in unattached(id, uid),
+        where: a.state in ^from_states,
+        update: [
+          set: [
+            state: ^state,
+            duration_s: ^duration_s,
+            reconcile_after: nil,
+            expires_at: fragment("? + ? * interval '1 second'", a.created_at, ^@recovery_seconds)
+          ]
+        ]
+      )
+
+    case Repo.update_all(query, []) do
+      {1, _} -> :applied
+      {0, _} -> :unchanged
+    end
+  end
+
+  # The new state and duration, and the states it may replace.
+  defp transition(:processing), do: {:processing, nil, [:uploading]}
+  defp transition({:ready, duration_s}), do: {:ready, duration_s, [:uploading, :processing]}
+  defp transition(:failed), do: {:failed, nil, [:uploading, :processing]}
+
+  defp unattached(id, uid) do
+    from(a in Asset,
+      where:
+        a.id == ^id and a.stream_uid == ^uid and is_nil(a.cleanup_at) and is_nil(a.tip_id) and
+          is_nil(a.review_id)
     )
   end
 

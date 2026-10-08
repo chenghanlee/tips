@@ -303,6 +303,31 @@ defmodule Tips.Content do
   deadline or cleanup. A database error is `:outcome_unknown`; no URL was
   returned either.
 
+  ### Video status
+
+  `get_video_uploads(scope, upload_ids)` refreshes up to ten of the author's
+  video uploads from Stream and returns each one's committed state, in the
+  given order, as `t:Tips.Content.Media.video_status/0`. The editor calls it
+  from page-owned async work and schedules the next call itself. It never
+  publishes, attaches or transfers media, and browser progress never
+  declares readiness. The checks run in this order, each before any provider
+  request:
+
+    1. A missing scope is `:unauthenticated`. `upload_ids` must be a list of
+       at most ten distinct media ids, or it is a changeset.
+    2. The account must still have `:contribute` eligibility.
+    3. Every id must be one of the author's videos, and each upload's target
+       must still be valid as in "Video upload" step 4. Otherwise the whole
+       call is `:not_found`.
+
+  Only unattached, known-uid uploads that are `uploading` or `processing`
+  and not in cleanup are read; ready, failed, attached and removed uploads
+  need no request. The reads and the guarded state changes are in
+  `Tips.Content.Media`; the deadlines follow "Video states and deadlines" in
+  the data model. A timed-out or failed read leaves the upload's state as it
+  was, with `refresh: :uncertain`: still checking, not failed. A database
+  error is `:outcome_unknown`.
+
   ### Staged video handoff
 
   A publication-to-edit handoff may attach an owned, ready, unattached,
@@ -605,6 +630,9 @@ defmodule Tips.Content do
           | {:upload_failed, [media_id()]}
           | :outcome_unknown
 
+  @typedoc "Why no upload states were returned. See \"Video status\"."
+  @type video_status_error :: Accounts.operation_error() | :outcome_unknown
+
   @typedoc """
   The editor's starting point from one authorized snapshot. `base` is the
   complete immutable editable intent with `:retained` media in order; `media`
@@ -848,6 +876,13 @@ defmodule Tips.Content do
           {:ok, Media.video_upload()} | {:error, video_upload_error()}
   def begin_video_upload(scope, target, file_attrs),
     do: Media.begin_video_upload(scope, target, file_attrs)
+
+  @doc """
+  Refreshes the author's selected video uploads. See "Video status" above.
+  """
+  @spec get_video_uploads(Scope.t() | nil, [media_id()]) ::
+          {:ok, [Media.video_status()]} | {:error, video_status_error()}
+  def get_video_uploads(scope, upload_ids), do: Media.get_video_uploads(scope, upload_ids)
 
   @doc """
   Reads the author's editable snapshot of a tip or review. See "Editing".

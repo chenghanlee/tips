@@ -23,6 +23,7 @@ defmodule Tips.MediaFixtures do
     |> insert_asset!()
   end
 
+  # Without an `expires_at`, the row gets the deadline `media_deadline_chk` requires.
   def staged_video_fixture(%User{} = user, attrs \\ %{}) do
     created_at = DateTime.utc_now(:second)
 
@@ -31,10 +32,10 @@ defmodule Tips.MediaFixtures do
       kind: :video,
       state: :uploading,
       target: {:new_tip, Ecto.UUID.generate()},
-      expires_at: DateTime.add(created_at, 3600),
       created_at: created_at
     }
     |> Map.merge(Map.new(attrs))
+    |> then(&Map.put_new(&1, :expires_at, DateTime.add(&1.created_at, deadline_seconds(&1))))
     |> insert_asset!()
   end
 
@@ -49,7 +50,6 @@ defmodule Tips.MediaFixtures do
       stream_uid: "stream-#{Ecto.UUID.generate()}",
       target: edit_target(parent),
       duration_s: 12.5,
-      completed_at: created_at,
       position: 0,
       created_at: created_at
     })
@@ -66,6 +66,12 @@ defmodule Tips.MediaFixtures do
     |> Ecto.Changeset.change(cleanup_at: cleanup_at, position: nil)
     |> Repo.update!()
   end
+
+  defp deadline_seconds(%{stream_uid: uid, state: state})
+       when is_binary(uid) and state != :uploading,
+       do: 49 * 3600
+
+  defp deadline_seconds(_upload), do: 3600
 
   defp parent_fields(%Tip{id: id, user_id: user_id}), do: %{tip_id: id, user_id: user_id}
 

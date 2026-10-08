@@ -58,6 +58,33 @@ defmodule Tips.Content.Media.VideoUploadRealTest do
     end
   end
 
+  defp refresh(scope, ids) do
+    :ok = Sandbox.checkout(Repo, sandbox: false)
+
+    try do
+      Media.get_video_uploads(scope, ids, plug: nil, settings: nil)
+    after
+      Sandbox.checkin(Repo)
+    end
+  end
+
+  # Refreshes every 3 seconds until `done?` holds, for at most 90 seconds.
+  defp refresh_until(scope, id, done?, attempts \\ 30) do
+    assert {:ok, [status]} = refresh(scope, [id])
+
+    cond do
+      done?.(status) ->
+        status
+
+      attempts > 1 ->
+        Process.sleep(3_000)
+        refresh_until(scope, id, done?, attempts - 1)
+
+      true ->
+        flunk("upload #{id} stayed #{inspect(status)}")
+    end
+  end
+
   # Reads committed state from a connection the operation does not use.
   defp committed(id), do: Task.await(Task.async(fn -> unboxed(fn -> Repo.get(Asset, id) end) end))
 
@@ -244,6 +271,39 @@ defmodule Tips.Content.Media.VideoUploadRealTest do
 
     assert body =~ "10017"
     assert %{"status" => %{"state" => "pendingupload"}} = video(data.client, uid)
+  end
+
+  test "status reads keep a pending upload, then move the finished one to ready", data do
+    file = File.read!(Path.expand("../../../fixtures/videos/two_seconds.mp4", __DIR__))
+
+    plug = fn conn ->
+      {_id, _metadata, response} = forward(conn, data.log)
+      reply(conn, response)
+    end
+
+    assert {:ok, %{media_id: id, upload_url: url}} = begin(data.scope, byte_size(file), plug)
+
+    # Stream reports `pendingupload`: a definite answer that changes nothing.
+    assert {:ok, [%{state: :uploading, refresh: :ok}]} = refresh(data.scope, [id])
+    assert %Asset{state: :uploading, created_at: created_at} = committed(id)
+
+    assert {:ok, %{status: 204}} =
+             Req.patch(url,
+               body: file,
+               headers: [
+                 tus_resumable: "1.0.0",
+                 upload_offset: "0",
+                 content_type: "application/offset+octet-stream"
+               ],
+               retry: false
+             )
+
+    status = refresh_until(data.scope, id, &(&1.state not in [:uploading, :processing]))
+
+    assert %{state: :ready, refresh: :ok, expires_at: expires_at} = status
+    assert DateTime.diff(expires_at, created_at) == 49 * 3600
+    assert %Asset{state: :ready, duration_s: duration, reconcile_after: nil} = committed(id)
+    assert duration > 0 and duration <= 180
   end
 
   test "a rejected reservation fails the row with no uid", data do

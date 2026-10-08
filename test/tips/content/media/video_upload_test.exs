@@ -313,10 +313,16 @@ defmodule Tips.Content.Media.VideoUploadTest do
   end
 
   # The deadline becomes the current wall time: past by the time the uid is persisted.
+  # One statement time keeps `media_deadline_chk`'s one-hour difference exact.
   defp late_change(asset, created_at: :deadline_now) do
     from(a in Asset,
       where: a.id == ^asset.id,
-      update: [set: [created_at: fragment("clock_timestamp() - interval '1 hour'")]]
+      update: [
+        set: [
+          created_at: fragment("statement_timestamp() - interval '1 hour'"),
+          expires_at: fragment("statement_timestamp()")
+        ]
+      ]
     )
     |> Repo.update_all([])
   end
