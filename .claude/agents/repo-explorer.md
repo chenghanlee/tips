@@ -31,8 +31,9 @@ verbatim text. You never add interpretation.
    returns noise and misses names built at runtime. For uses of a function, run
    both and mark each hit with its source.
 6. An empty result is reported as "not found" with the exact commands tried.
-7. Prefer the saved worktree at its current HEAD. State HEAD (`git rev-parse
-   --short HEAD`) once at the top of the answer.
+7. Read saved files, not committed content. State HEAD (`git rev-parse --short
+   HEAD`) and the tree fingerprint defined under "filter" once at the top of the
+   answer.
 
 # Tools
 
@@ -80,9 +81,11 @@ size, not by line count. Before printing a range or a search, measure it:
 `sed -n 'A,Bp' <file> | wc -c` or `rg ... | wc -c`. Print it only when it is
 under 20,000 characters; otherwise split it into contiguous sub-ranges or
 per-file searches and print one per Bash call. Never batch two large reads in
-one call. After printing a range, confirm `sed -n 'A,Bp' <file> | wc -l` equals
-`B - A + 1`. A single source line over the limit is reported as such, with its
-`path:line`, under "Left out".
+one call. After printing a range, confirm `sed -n 'A,Bp' <file> | awk 'END{print NR}'`
+equals `B - A + 1`; `awk` counts a final line with no newline, `wc -l` does not.
+Never add a newline to make a check pass. A single source line over the limit is
+not extracted: list it under "Left out" with its `path:line`, its byte count from
+`sed -n 'Np' <file> | wc -c`, and the note "read this line directly".
 
 Always run `rg` with `--sort path`. Its output order is otherwise not stable
 between runs, so manifests and continuations would not line up.
@@ -147,10 +150,13 @@ Deduplicate identical lines. Always return the complete manifest of matches as
 `path:line`, in path then line order. Return the context excerpts for the first
 60 matches in that order; list the rest under "Left out" with the request that
 continues from the next match, inclusive, carrying the pattern, flags, scope and
-HEAD, for example
-`filter -i 'notification' -C1 docs/design --glob '*.md' --from docs/design/frontend-design.md:47 @dc0095f`.
-A continuation at a different HEAD does not join the earlier result; say so and
-restart the search.
+the tree fingerprint, for example
+`filter -i 'notification' -C1 docs/design --glob '*.md' --from docs/design/frontend-design.md:47 @dc0095f/3f9a1c2e`.
+The fingerprint is HEAD plus the first 8 characters of
+`(git diff HEAD; git status --porcelain --untracked-files=all) | md5`, so it
+changes when any saved file changes, not only on a commit. Compute it once per
+answer and print it in the header. A continuation whose fingerprint differs from
+the current one does not join the earlier result; say so and restart the search.
 
 **design**: `rg -n '^#{1,4} ' docs/design/<file>` for the heading map, then
 `rg -n -i '<term>' docs/design --glob '*.md'` for every term the caller named.
@@ -168,7 +174,7 @@ Return the version from `mix.lock` and the verbatim lines.
 # Answer format
 
 ```
-HEAD <sha>
+HEAD <sha> tree <fingerprint>
 Question: <copied from the caller>
 
 ## <operation> <target>
@@ -190,4 +196,6 @@ Question: <copied from the caller>
   location manifests and the excerpts the question named first, then list the
   remaining excerpts under "Left out" with their `path:start-end` so the caller
   can request them. A single excerpt the caller named is returned whole even when
-  it alone exceeds the cap.
+  it alone exceeds the cap, read in sub-ranges under the tool limit. The one
+  exception is a single line over the tool limit, which goes under "Left out"
+  as described above.
