@@ -43,9 +43,6 @@ bypass a denial.
 - Replacing steps or overlapping independent work may save time. Our logs establish
   no time saving from smaller context alone; assume none without measurement.
 
-Our [two lookup trials](https://github.com/chenghanlee/tips/pull/388#issuecomment-6055995214)
-favored direct Opus. The task logs established no other win. Treat new uses as trials.
-
 ### Assign
 
 Send only inputs needed for the assigned steps. Do not copy or fork your full
@@ -62,9 +59,8 @@ Stop: finish the assigned work and checks; add nothing else.
       If instructions are missing, ambiguous or conflict, report the gap; do not decide.
 ```
 
-[Anthropic recommends medium effort](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5)
-as the Claude Code starting point. Low effort can skip searches, checks or completion.
-Asking for a short answer does not reliably reduce thinking cost.
+Start Haiku at `effort: "high"`. [Low effort](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5)
+skips searches, checks or completion. Asking for a short answer does not reduce thinking cost.
 
 ### Run and check
 
@@ -76,10 +72,3 @@ Asking for a short answer does not reliably reduce thinking cost.
   Children never post to GitHub. Follow the [pair workflow](agent/teams/README.md).
 - Inspect changes and check results before use. Checks must exercise the change;
   a failed launch is not a check. Resolve missing evidence yourself.
-
-### Measure
-
-In the PR or handoff, record the direct-work comparison, result size and use, rework
-and later defects. Dispatchers use a root `tmp/` note. Retain session/child IDs and
-usage records, including advisor and cache costs, without double-counting.
-Compare total cost and task time. Label estimates; a fast child is not proof of a gain.
