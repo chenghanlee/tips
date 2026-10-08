@@ -16,7 +16,8 @@ report to write before each tool call.
 
 ## When to read
 
-These are decision cues, not sequential gates. Required guidance must be available
+Select rows for the decision you are making now. These are decision cues, not
+sequential gates. Required guidance must be available
 before the decision it constrains. Read the relevant sections, not every reference
 by default. Reuse applicable current text already in context; reload it after context
 loss, a source change or a newly relevant trigger. Report an unavailable required

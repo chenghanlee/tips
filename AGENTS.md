@@ -10,7 +10,7 @@
 | Fresh checkout, browser tests or worktree isolation | [Local development](docs/development/local-development.md) |
 | Product behaviour or copy | [Glossary](docs/design/glossary.md) |
 | Before pushing a change | The [checks](#checks) for the files you changed |
-| Any PR | [PR review record](agent/teams/pr-review-record.md) |
+| Before reviewing a PR or publishing its review | [PR review record](agent/teams/pr-review-record.md) |
 
 ## Boundaries
 

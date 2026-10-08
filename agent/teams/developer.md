@@ -7,12 +7,13 @@ Determine whose turn it is before acting.
 
 1. Use the repository to fill in missing facts in the issue.
 2. Plan, implement and verify using [developing-software](../skills/developing-software/SKILL.md)
-   from this worktree. Apply [Finish](../skills/developing-software/references/finish.md)
-   and the [required checks](../../AGENTS.md#checks) before pushing the change.
-3. Open the PR with `Closes #<issue>` and enable auto-merge:
+   from this worktree.
+3. Before pushing, apply [Finish](../skills/developing-software/references/finish.md)
+   and run the [required checks](../../AGENTS.md#checks), then push the change.
+4. Open the PR with `Closes #<issue>` and enable auto-merge:
    `gh pr merge <pr> --auto --merge`.
-4. Run `agent/teams/team.py turn <pr> test`.
-5. After a successful handoff, stop using the worktree, build and database until
+5. Run `agent/teams/team.py turn <pr> test`.
+6. After a successful handoff, stop using the worktree, build and database until
    the tester returns the turn.
 
 ## Address findings
@@ -20,8 +21,7 @@ Determine whose turn it is before acting.
 Follow the [shared repair exchange](README.md#address-findings) and
 [review-reply rules](../../AGENTS.md#github). Before repairing a finding or failed
 check, read [Repair and refactor](../skills/developing-software/references/design-and-change.md#repair-and-refactor).
-Before publishing or handing off, apply [Finish](../skills/developing-software/references/finish.md)
-and the [required checks](../../AGENTS.md#checks).
+Then follow the publication and handoff steps above.
 
 For manual UI verification, use [browser review](browser-review.md). On a blocker,
 follow the [reporting procedure](README.md#report-and-resolve-blockers).
