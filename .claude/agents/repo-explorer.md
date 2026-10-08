@@ -75,9 +75,17 @@ narrow. Use `rg --files` for file names.
 
 `sed -n 'A,Bp' <file>` to extract line ranges. Never `cat` a whole file over 150
 lines unless the caller asked for the whole file. The client truncates a tool
-result past roughly 30,000 characters and may not say so. Keep each command's
-output under that: read at most 250 lines per `sed`, and split large `rg` runs
-by directory.
+result past roughly 30,000 characters and may not say so, so bound output by
+size, not by line count. Before printing a range or a search, measure it:
+`sed -n 'A,Bp' <file> | wc -c` or `rg ... | wc -c`. Print it only when it is
+under 20,000 characters; otherwise split it into contiguous sub-ranges or
+per-file searches and print one per Bash call. Never batch two large reads in
+one call. After printing a range, confirm `sed -n 'A,Bp' <file> | wc -l` equals
+`B - A + 1`. A single source line over the limit is reported as such, with its
+`path:line`, under "Left out".
+
+Always run `rg` with `--sort path`. Its output order is otherwise not stable
+between runs, so manifests and continuations would not line up.
 
 # Repository map
 
@@ -122,19 +130,27 @@ each hop.
 **extract**: `sed -n` the exact range of a function, a design section (from its
 heading line to the next heading of the same or higher level), a glossary entry,
 or a test. Verbatim, with the range in the header. A function's range starts at
-its first `@doc`, `@spec` or `@impl` line and ends at the `end` or `do:` line of
-its last clause. `symbols` gives only start lines, so read up to the next sibling
-and cut the trailing blank lines and any `@doc`, `@spec`, `@impl`, `@tag` or
-other attribute lines that belong to the next symbol. State the range you
-returned, not the range you read, and make it the exact `A,B` you passed to
-`sed`. Before returning, confirm the excerpt's first line with `sed -n 'Ap'`;
-an off-by-one header is a wrong answer.
+its first `@doc`, `@spec` or `@impl` line, or at its head when it has none, and
+ends after the complete expression of its last clause: the clause's own closing
+`end`, not a nested `end`, or for the `do:` form the last line of the expression
+that follows `do:`, which may sit on later lines. `symbols` gives only start
+lines, so read up to the next sibling and cut the trailing blank lines and any
+`@doc`, `@spec`, `@impl`, `@tag` or other attribute lines that belong to the
+next symbol. State the range you returned, not the range you read, and make it
+the exact `A,B` you passed to `sed`. Before returning, confirm line A with
+`sed -n 'Ap'` and line B with `sed -n 'Bp'`, and confirm that line B+1 is blank,
+a new definition, an attribute or the module's `end`. An off-by-one header is a
+wrong answer.
 
-**filter**: `rg -n -C<N>` for matching lines with context. Deduplicate identical
-lines. Always return the complete manifest of matches as `path:line`. Return the
-context excerpts for the first 60 matches; list the rest under "Left out" with
-the request that continues from the next match, for example
-`filter <pattern> --from docs/design/frontend-design.md:47`.
+**filter**: `rg -n -C<N> --sort path` for matching lines with context.
+Deduplicate identical lines. Always return the complete manifest of matches as
+`path:line`, in path then line order. Return the context excerpts for the first
+60 matches in that order; list the rest under "Left out" with the request that
+continues from the next match, inclusive, carrying the pattern, flags, scope and
+HEAD, for example
+`filter -i 'notification' -C1 docs/design --glob '*.md' --from docs/design/frontend-design.md:47 @dc0095f`.
+A continuation at a different HEAD does not join the earlier result; say so and
+restart the search.
 
 **design**: `rg -n '^#{1,4} ' docs/design/<file>` for the heading map, then
 `rg -n -i '<term>' docs/design --glob '*.md'` for every term the caller named.
