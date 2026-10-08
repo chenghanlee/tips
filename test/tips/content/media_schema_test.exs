@@ -35,18 +35,36 @@ defmodule Tips.Content.MediaSchemaTest do
       end
     end
 
-    test "media_ready_chk requires trusted completion and a duration in (0, 180]" do
+    test "media_ready_chk requires a duration in (0, 180]" do
       video = staged_video_fixture(user_fixture(), ready_video_attrs())
 
-      for attrs <- [
-            %{duration_s: 0.0},
-            %{duration_s: 180.5},
-            %{duration_s: nil},
-            %{completed_at: nil},
-            %{stream_uid: nil}
-          ] do
+      for attrs <- [%{duration_s: 0.0}, %{duration_s: 180.5}, %{duration_s: nil}] do
         assert_raise Ecto.ConstraintError, ~r/media_ready_chk/, fn ->
           video |> change(attrs) |> Repo.update!()
+        end
+      end
+    end
+
+    test "media_deadline_chk allows only the upload or the recovery deadline" do
+      user = user_fixture()
+      uploading = staged_video_fixture(user, %{stream_uid: unique_stream_uid()})
+
+      completed =
+        staged_video_fixture(user, %{state: :processing, stream_uid: unique_stream_uid()})
+
+      failed_unreleased = staged_video_fixture(user, %{state: :failed})
+
+      for {video, seconds} <- [
+            {uploading, 49 * 3600},
+            {uploading, 3601},
+            {completed, 3600},
+            {completed, 48 * 3600},
+            {failed_unreleased, 49 * 3600}
+          ] do
+        expires_at = DateTime.add(video.created_at, seconds)
+
+        assert_raise Ecto.ConstraintError, ~r/media_deadline_chk/, fn ->
+          video |> change(expires_at: expires_at) |> Repo.update!()
         end
       end
     end
@@ -60,7 +78,7 @@ defmodule Tips.Content.MediaSchemaTest do
 
       invalid_updates = [
         {image, %{tip_id: nil}},
-        {attached, %{expires_at: DateTime.add(attached.created_at, 3600)}},
+        {attached, %{expires_at: DateTime.add(attached.created_at, 49 * 3600)}},
         {attached, %{state: :processing}},
         {staged, %{expires_at: nil}},
         {cleanup, %{position: 0}},
@@ -267,8 +285,7 @@ defmodule Tips.Content.MediaSchemaTest do
     %{
       state: :ready,
       stream_uid: unique_stream_uid(),
-      duration_s: 12.5,
-      completed_at: DateTime.utc_now(:second)
+      duration_s: 12.5
     }
   end
 

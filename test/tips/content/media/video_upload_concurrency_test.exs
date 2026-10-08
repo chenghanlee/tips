@@ -80,10 +80,14 @@ defmodule Tips.Content.Media.VideoUploadConcurrencyTest do
 
     case change do
       # The deadline falls 300 ms from now: after the uid write starts, before this commits.
+      # One statement time keeps `media_deadline_chk`'s one-hour difference exact.
       :deadline ->
         query
         |> update(
-          set: [created_at: fragment("clock_timestamp() - interval '1 hour' + interval '300 ms'")]
+          set: [
+            created_at: fragment("statement_timestamp() - interval '1 hour' + interval '300 ms'"),
+            expires_at: fragment("statement_timestamp() + interval '300 ms'")
+          ]
         )
         |> Repo.update_all([])
 

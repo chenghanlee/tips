@@ -19,7 +19,6 @@ defmodule Tips.Content.Media.Asset do
     field :duration_s, :float
     field :target, Target
     field :position, :integer
-    field :completed_at, :utc_datetime
     field :expires_at, :utc_datetime
     field :reconcile_after, :utc_datetime
     field :cleanup_at, :utc_datetime
