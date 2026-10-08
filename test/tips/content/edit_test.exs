@@ -278,7 +278,7 @@ defmodule Tips.Content.EditTest do
       {[{:retained, video.id, nil}, {:retained, image.id, "Changed"}], [media_id: image.id]},
       {retained ++ [{:retained, other.id, nil}], [media_id: other.id]},
       {[{:staged_video, video.id}, {:retained, image.id, "Diagram"}], [media_id: video.id]},
-      {retained ++ [{:staged_video, staged.id}], [media_id: staged.id]},
+      {retained ++ [{:staged_video, video.id}], [media_id: video.id]},
       {retained ++ [{:image_file, "s1", %{path: "/tmp/x", filename: "x.png"}, nil}],
        [slot: "s1"]},
       {retained ++ [{:missing_image, "s2"}], [slot: "s2"]},
@@ -298,6 +298,16 @@ defmodule Tips.Content.EditTest do
       end
     end
 
+    assert {:error, {:upload_failed, [staged_id]}} =
+             Content.edit_tip(
+               scope(author),
+               tip.id,
+               2,
+               @tip_attrs,
+               retained ++ [{:staged_video, staged.id}]
+             )
+
+    assert staged_id == staged.id
     assert Repo.all(from a in Asset, order_by: a.id) == media
     assert %Tip{edit_version: 2, title: "Edited title"} = reload(tip)
 
