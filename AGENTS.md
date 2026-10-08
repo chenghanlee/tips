@@ -59,7 +59,7 @@ Before pushing, run the checks for each kind of file you changed:
 
 | Changed files | Run |
 |---|---|
-| Application code, tests or config | [Test changes](README.md#test-changes), including `mix credo --strict` |
+| Application code, tests or config | [Test changes](README.md#test-changes), including `mix credo --strict` and `mix dialyzer` |
 | `agent/teams` Python | [Harness checks](agent/teams/development.md#required-checks) |
 | Go, including carried patches | [Pinned lint profile](agent/lsp/dexter/patches/README.md#required-go-static-analysis) |
 | Markdown | `python3 scripts/check_docs.py` |
