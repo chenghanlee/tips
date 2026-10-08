@@ -30,7 +30,7 @@ defmodule TipsWeb.AuthReturnTest do
       conn: conn,
       tip: tip,
       review: review_fixture(tip),
-      tip_path: "/tips/#{tip.id}/pin-the-model-version"
+      tip_path: "/tips/#{TipsWeb.TipId.encode(tip.id)}/pin-the-model-version"
     }
   end
 
@@ -97,7 +97,7 @@ defmodule TipsWeb.AuthReturnTest do
     test "the destination shows what the newly signed-in account may see", %{conn: conn} do
       author = user_fixture()
       tip = tip_fixture(author, %{title: "Quietly removed"})
-      path = "/tips/#{tip.id}/quietly-removed"
+      path = "/tips/#{TipsWeb.TipId.encode(tip.id)}/quietly-removed"
       author_link = magic_link(author, path)
       other_link = magic_link(user_fixture(), path)
       # Moderation hides the tip after both links were sent.
@@ -112,9 +112,13 @@ defmodule TipsWeb.AuthReturnTest do
       # The same browser switches accounts; the carried destination still wins.
       switched = confirm(as_author, other_link)
       assert redirected_to(switched) == path
-      assert switched |> get(path) |> redirected_to() == "/tips/#{tip.id}/removed-tip"
 
-      html = switched |> get("/tips/#{tip.id}/removed-tip") |> html_response(200)
+      assert switched |> get(path) |> redirected_to() ==
+               "/tips/#{TipsWeb.TipId.encode(tip.id)}/removed-tip"
+
+      html =
+        switched |> get("/tips/#{TipsWeb.TipId.encode(tip.id)}/removed-tip") |> html_response(200)
+
       refute html =~ "Quietly removed"
     end
   end

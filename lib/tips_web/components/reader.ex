@@ -26,7 +26,7 @@ defmodule TipsWeb.Reader do
   ]
 
   @doc "The tip permalink from its projected id and slug, placeholders included."
-  def tip_path(%{id: id, slug: slug}), do: ~p"/tips/#{id}/#{slug}"
+  def tip_path(%{id: id, slug: slug}), do: ~p"/tips/#{TipsWeb.TipId.encode(id)}/#{slug}"
 
   @doc "The tip permalink with review-list URL parameters; `nil` values are left out."
   def tip_path(tip, params), do: tip_path(tip) <> query(params)

@@ -60,7 +60,7 @@ defmodule TipsWeb.SearchLive.IndexTest do
       row = "#tip-#{tip.id}"
 
       assert attr(html, "#{row} a", "Reproduce the flake first", "href") ==
-               "/tips/#{tip.id}/reproduce-the-flake-first",
+               "/tips/#{TipsWeb.TipId.encode(tip.id)}/reproduce-the-flake-first",
              render
 
       for label <- ["Workflow", "CLI"] do
