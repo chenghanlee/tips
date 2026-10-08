@@ -7,149 +7,22 @@ decisions, findings and blockers there. Use Herdr to notify the next agent.
 [AGENTS.md](../../AGENTS.md) owns repository boundaries, navigation, checks and skill
 routing. [Developing-software](../skills/developing-software/SKILL.md) owns design and
 testing rules; [reviewing-code](../skills/reviewing-code/SKILL.md) owns review methods.
-This document owns pair coordination. The user completes [setup](SETUP.md) once.
+This document owns shared coordination. Read it and your role procedure from the
+current worktree; retrieve linked detail before the action it governs. The user completes [setup](SETUP.md) once.
 
 | Role | Agent name | Responsibilities |
 |---|---|---|
 | User | n/a | Set product goals and constraints. Answer unresolved product, scope, purchase and credential questions. Start the dispatcher once; notify it when priorities or external facts change. |
-| Dispatcher | `dispatcher` | Act as the Tips technical program manager: prioritize work, prepare eligible tasks, update the board, start and stop pairs, and handle blockers. Do not write code or review changes. |
-| Developer | `team-N-dev` | Implement and verify the issue, open the PR, address findings and fix failed checks. |
-| Tester | `team-N-test` | Review the pushed PR head, run tests or the app, publish approval and confirm the merge. |
+| [Dispatcher](dispatcher.md) | `dispatcher` | Act as the Tips technical program manager: prioritize work, prepare eligible tasks, update the board, start and stop pairs, and handle blockers. Do not write code or review changes. |
+| [Developer](developer.md) | `team-N-dev` | Implement and verify the issue, open the PR, address findings and fix failed checks. |
+| [Tester](tester.md) | `team-N-test` | Review the pushed PR head, run tests or the app, publish approval and confirm the merge. |
 
-## Common path
+## Role procedures
 
-### 1. Dispatcher: select and start tasks
-
-At startup, after each `done` or `blocked` message, and when the user reports a
-board change:
-
-1. Read the Project 15 readme for milestone order and gates, the board and open
-   issues, open PRs, running pairs (`herdr workspace list`), worktrees
-   (`git worktree list`) and the latest `main` run. Read candidate issues, their
-   prerequisite links, relevant design sections and recent decisions before choosing.
-2. Set merged issues to Done. For an issue with a running pair, keep Blocked if
-   its question is unanswered; otherwise set Active. For other blocked issues,
-   check the recorded reason. Clear a dependency blocker only when its prerequisites
-   are complete; keep unanswered questions, missing access and explicit user holds.
-3. For each free slot, choose the eligible task with the highest value for the
-   current milestone. Follow explicit user priorities. Otherwise prioritize work
-   that unblocks the milestone gate or other tasks, completes a usable product
-   flow, or fixes a demonstrated regression. Use board order to break ties.
-   Prefer product progress over optional tooling. The slot limit is
-   `team.max_teams` in [config.toml](config.toml); do not fill slots with conflicting work.
-4. Consider Backlog as well as Ready. Ready means the dispatcher has checked that
-   the task can start; it does not require the user to select it. Before starting,
-   confirm prerequisites are complete, the issue has a bounded outcome and
-   acceptance scenarios, and no running pair or open PR already owns the work.
-   Defer a task if its issue body and an active issue's body name the same database
-   table, API or data rule. Package parents are summaries, not pair assignments.
-5. Fill in missing task details or split work into one-PR issues using the existing
-   design and decisions. Resolve technical sequencing yourself. Ask the user only
-   when a product or scope decision is not settled, or their access, purchase or
-   approval is required. Do not change requirements or waive gates to make work eligible.
-6. Record the selection decision and its reason on the issue, set Ready, and run
-   `agent/teams/team.py start <issue>`. After a successful start, set Status Active
-   and Agent on the Project item. Reassess the remaining candidates for each free slot.
-7. If no task is eligible, identify the prerequisite or decision that would unlock
-   the next useful task. Resolve it within your authority or report the specific
-   blocker and who must act. An empty Ready queue alone is not a reason to stop.
-8. End your turn after assigning work or reporting the blocker. Pairs notify you
-   when they finish or need help; no polling loop is required.
-
-### 2. Developer: implement and hand off
-
-1. Use the repository to fill in missing facts in the issue.
-2. Plan, implement and verify using [developing-software](../skills/developing-software/SKILL.md)
-   from this worktree, then push the change.
-3. Open the PR with `Closes #<issue>` and enable auto-merge:
-   `gh pr merge <pr> --auto --merge`.
-4. Run `agent/teams/team.py turn <pr> test`.
-5. After a successful handoff, stop using the worktree, build and database until
-   the tester returns the turn.
-
-### 3. Tester: review the pushed head
-
-1. Record the PR head SHA. Read [reviewing-code](../skills/reviewing-code/SKILL.md)
-   from this worktree to establish scope and review that head against the shared
-   design and testing standard. Run the tests. For UI tasks, also check acceptance
-   scenarios through [manual browser review](#manual-browser-review).
-2. If required review work stays blocked, follow the
-   [blocker procedure](#report-and-resolve-blockers).
-3. Confirm the worktree is clean and HEAD matches the reviewed SHA. Report every P0
-   and P1 in the first review. With findings: submit the review and run
-   `agent/teams/team.py turn <pr> dev`. Without: continue to approval.
-
-For fixes, check each repair and the scenarios it affects, and apply the skill to new
-behaviour or design.
-
-### 4. Developer and tester: address findings
-
-1. Developer: fix every P0 and P1. Address each P2 under the [severity rules](#severity).
-   Follow [Repair and refactor](../skills/developing-software/SKILL.md#repair-and-refactor).
-2. Developer: push and hand off to the tester.
-3. Tester: review the changes since the previous review, as step 3 says for fixes.
-   Resolve each thread that is fixed or declined with a reason.
-4. Repeat until the approval conditions are met.
-
-### 5. Tester: approve and confirm the merge
-
-Approve when no P0 or P1 remains and every thread is resolved. Submit and publish
-the [PR review record](#pr-review-record) without waiting for CI. Keep the turn.
-
-Auto-merge requires `checks`, `release`, `tips/independent-review` and resolved
-threads. A merge closes the issue, sets the Project item to Done and deletes the
-remote branch.
-
-Run this watch command once each time the turn reaches this step:
-
-```sh
-timeout "$TIPS_CHECK_TIMEOUT_SECONDS" gh pr checks <pr> --watch --required
-```
-
-Whether it passes, fails or times out, then run:
-
-```sh
-gh pr view <pr> --json state,mergedAt,mergeStateStatus,autoMergeRequest
-```
-
-Use the first matching outcome:
-
-| Outcome | Action |
-|---|---|
-| PR merged | Notify the dispatcher with `done`. |
-| PR not merged and a required check failed | Run `agent/teams/team.py turn <pr> dev`. |
-| Checks passed, PR open, auto-merge enabled, merge state neither `BLOCKED` nor `DIRTY` | Run the bounded merge wait below. |
-| Any other outcome | Report `blocked` to the dispatcher with the pending check or merge blocker. |
-
-GitHub may take several minutes to merge after checks pass. Run this once; it
-rechecks every 15 seconds and uses the existing check timeout as its ceiling:
-
-```sh
-timeout "$TIPS_CHECK_TIMEOUT_SECONDS" sh -c '
-  while :; do
-    result=$(gh pr view "$1" --json state,mergeStateStatus,autoMergeRequest \
-      --jq "[.state, .mergeStateStatus, (.autoMergeRequest != null)] | join(\" \")") || exit 1
-    case "$result" in
-      "MERGED "*) exit 0 ;;
-      "OPEN BLOCKED "*|"OPEN DIRTY "*) echo "$result"; exit 1 ;;
-      "OPEN "*" true") sleep 15 ;;
-      *) echo "Merge wait stopped: $result"; exit 1 ;;
-    esac
-  done
-' sh <pr>
-```
-
-After the wait exits or times out, read the PR state again. If merged, notify the
-dispatcher with `done`. Otherwise, return to the developer if a required check
-failed; report `blocked` for any other outcome, including an API error. Include
-the current merge state or exact error. Do not repeat either wait in this turn.
-
-### 6. Dispatcher: remove the pair and assign the next task
-
-Confirm the PR merged. If not, handle the message as blocked.
-
-Run `agent/teams/team.py stop <issue>`, then select another task for the free slot.
-Apply the selection process above, including Backlog and resolved blockers.
+Read your role procedure on launch or recovery. It owns your next action:
+[developer](developer.md), [tester](tester.md), or [dispatcher](dispatcher.md).
+Before manual browser work, read [browser review](browser-review.md); before posting
+a PR review, read the [PR review record](pr-review-record.md).
 
 ## Commands
 
@@ -173,7 +46,7 @@ turn. If sending fails, you still hold the turn: report `blocked` to the dispatc
 with the exact command and error using [the blocker procedure](#report-and-resolve-blockers).
 This reports the failure; the dispatcher must not deliver a denied handoff by
 another route. If the report is also denied, report both errors to the user in
-your pane. The only waits are the tester's bounded check and merge waits in step 5.
+your pane. The only waits are the tester's bounded check and merge waits in the [tester approval procedure](tester.md#approve-and-confirm-the-merge).
 
 ### Determine the turn after a restart
 
@@ -187,6 +60,44 @@ checks. Use the first matching condition:
 | The current head has reviews and the latest is not an LGTM | Developer: address the review. |
 | The current head has no reviews | Tester: review it. |
 | The current head is approved | Tester: complete approval publication and merge confirmation. |
+
+## Recover task context
+
+After restart or compaction, reread AGENTS, this shared workflow and your role file.
+Determine the turn using the table above before using the worktree. Read the issue,
+`git status`, `git diff`, `git log origin/main..HEAD`, and the PR and reviews when a
+PR exists. Reload each required skill before its next use, then retrieve the
+references needed for the next decision. These records establish the current task;
+do not reconstruct a prior plan from memory.
+
+For long work, an optional `tmp/dev-state.md` or `tmp/test-state.md` can preserve
+useful knowledge that is expensive to reconstruct. Use Goal, Progress, What worked,
+What did not, and Next steps to record only the useful current conclusions and
+sources, rejected approaches and reasons, expensive observations with output
+pointers, and unfinished scope. Include the HEAD at writing and any uncommitted
+changes affecting observations. Reuse an adequate task note; if it is elsewhere,
+put its path in the per-role file. No installed handoff skill is required. Keep
+scratch under `tmp/`, not a shared root `HANDOFF.md` that would dirty the checkout.
+
+Read the note if present, but check mutable facts against current records. It is
+fallible scratch, not ownership authority or a second product contract. Durable
+contract decisions belong in the existing issue or owning document. If a rationale
+or result cannot be recovered, disclose the gap rather than inventing it.
+
+Rerun checks whose relevant results are absent, invalidated or uncertain, and focused
+checks needed to settle a consequential doubt. A changed HEAD is a staleness cue,
+not automatic invalidation: consider changes to the tested code, configuration,
+dependencies, environment and workload. Existing pre-push checks, exact-head review
+and provider authorization still apply. Do not repeat costly or external work
+that reliable records already establish.
+
+Repeated investigations, unexplained contradictions, or uncertainty about ownership
+or verification are cues to reconcile the records. If that fails, report the
+concrete blocker and note location through the existing blocker procedure. At a
+safe boundary, saving useful state, using the client's native compaction, then
+following this recovery route is an option. A note alone does not remove context.
+The dispatcher can arrange [client recovery with the user](dispatcher.md#context-recovery).
+There is no checkpoint schedule, mandatory note, new handoff gate or automatic reset.
 
 ## Rules
 
@@ -202,6 +113,15 @@ Use the first matching severity:
 
 The developer must fix every P0 and P1. For P2s, fix them, decline them with a
 reason, or file one follow-up issue for all deferred P2s.
+
+### Address findings
+
+1. Developer: fix every P0 and P1. Address each P2 under the [severity rules](#severity).
+   Follow [Repair and refactor](../skills/developing-software/references/design-and-change.md#repair-and-refactor).
+2. Developer: push and hand off to the tester.
+3. Tester: review the changes since the previous review, as the [tester procedure](tester.md#review-the-pushed-head) says for fixes.
+   Resolve each thread that is fixed or declined with a reason.
+4. Repeat until the approval conditions are met.
 
 ### Messages between agents
 
@@ -231,28 +151,7 @@ The current turn holder must report `blocked` when:
   check. A rerun without a fix does not count as a fix.
 - A product or scope question arises. Report it immediately, whether or not a PR exists.
 
-Dispatcher actions:
-
-1. Set Status Blocked.
-2. Answer technical questions using the reported error and cited code. Ask the
-   user in your pane about product, scope or any question you cannot answer.
-   For a denied command, do not run it for the agent, deliver its message another
-   way or tell the agent to retry; ask the user.
-   Do not disable, re-arm or bypass auto-merge. If an approved PR with passing
-   required checks has not merged, report it to the user; GitHub may merge it late.
-3. Record the answer on the issue.
-4. Set Status Active and notify the agent named in the blocker comment.
-
-### Failed checks on main
-
-If a developer's failing check also fails on the latest `main` run:
-
-1. Developer: report `blocked` with both run links.
-2. Dispatcher: find the merge that broke `main` and open its revert with
-   `gh pr revert <pr>`.
-3. Dispatcher: enable auto-merge with `gh pr merge <revert pr> --auto --merge`
-   and ask the user for an owner waiver on the revert PR.
-4. Fix the underlying problem after the revert merges.
+The dispatcher follows [Resolve blockers](dispatcher.md#resolve-blockers).
 
 ### Worktree and provider constraints
 
@@ -267,92 +166,3 @@ If a developer's failing check also fails on the latest `main` run:
 - Read provider settings from the main checkout's `.env` through
   `TIPS_PROVIDER_ENV_FILE`. Never copy secrets into a worktree.
 - Real-provider tests require the user's authorization on the issue.
-
-### Manual browser review
-
-Clients launch with `MIX_ENV=test`, which runs tests but cannot serve a manual
-browser session. Wait for `mix test` to exit before starting the app: both use
-`$TIPS_TEST_PORT`. Start the app with:
-
-```sh
-MIX_ENV=dev unbuffer mix ecto.setup && MIX_ENV=dev PORT="$TIPS_TEST_PORT" unbuffer mix do assets.setup, assets.build, phx.server
-```
-
-Use `agent-browser` to test the app. Codex testers: start each browser session
-with this exact command, replacing only `<name>`:
-
-```sh
-agent-browser open about:blank --session <name>
-```
-
-Run it alone: no `&&`, no shell variables, nothing before `open`. Any other form
-can start Chrome inside the Codex sandbox and fail with `Chrome exited early`.
-After it succeeds, use any `agent-browser` command. Repeat it after `close`.
-
-Read mail at `/dev/mailbox`. The development
-app calls real providers; test those scenarios only with the user's authorization
-on the issue. Stop the server before handing off or notifying the dispatcher.
-
-#### Recover a failed browser launch
-
-If `open` fails with `Chrome exited early` or `without writing DevToolsActivePort`,
-the session may have a daemon started inside the Codex sandbox. Retrying `open`
-reuses that daemon. Close only your failed session, then reopen it and verify
-the connection. Replace `<name>` with the same session name throughout and run
-each command in a separate tool call:
-
-```sh
-agent-browser close --session <name>
-```
-
-```sh
-agent-browser open about:blank --session <name>
-```
-
-```sh
-agent-browser get url --session <name>
-```
-
-The last command should print `about:blank`. If recovery fails, retain the full
-error and follow the [browser setup diagnostics](SETUP.md#browser-access-for-the-tester).
-Do not disable Chrome's sandbox or switch to the user's personal browser profile.
-
-## PR review record
-
-These requirements apply to every PR, pair or solo.
-
-Agents share one GitHub identity, so native approval does not work. Submit one
-`COMMENT` review per pass on the exact PR head, with findings inline:
-
-```sh
-gh api "repos/{owner}/{repo}/pulls/$PR/reviews" --input tmp/review.json --jq .html_url
-```
-
-Use this structure for `tmp/review.json`:
-
-```json
-{
-  "commit_id": "<head SHA>",
-  "event": "COMMENT",
-  "body": "...",
-  "comments": [{"path": "...", "line": 12, "body": "..."}]
-}
-```
-
-For approval, put `LGTM` alone on the first line of the review body and the role
-and session on the second line. Then publish the status:
-
-```sh
-agent/teams/publish_review.py --pr <pr> --sha <sha> --record <review URL>
-```
-
-The command refuses a wrong head, a wrong record or unresolved threads.
-
-To read reviews and resolve threads:
-
-| Command | Effect |
-|---|---|
-| `agent/teams/pr_review.py list <pr>` | Print recent reviews and every unresolved thread. |
-| `agent/teams/pr_review.py resolve <thread>` | Resolve a thread. Only the reviewer who opened it may do this. |
-
-Use `--owner-waiver` only on the user's explicit instruction.

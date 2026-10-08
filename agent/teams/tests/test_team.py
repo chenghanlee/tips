@@ -742,11 +742,14 @@ class PairLifecycleTest(unittest.TestCase):
         dev_brief = dev["launch_argv"][-1]
         argv = test["launch_argv"]
         test_brief = argv[argv.index("--append-system-prompt") + 1]
-        assert dev_brief.startswith(
-            "You are team-1-dev, the developer for issue #29. Read agent/teams/README.md,"
-        )
+        assert dev_brief.startswith("You are team-1-dev, the developer for issue #29.")
         assert test_brief.startswith("You are team-1-test, the tester for issue #29.")
+        assert "agent/teams/developer.md" in dev_brief
+        assert "agent/teams/tester.md" in test_brief
         for text in (dev_brief, test_brief):
+            assert "from this worktree" in text
+            assert "agent/teams/README.md" in text
+            assert "agent/skills/dexter/SKILL.md" in text
             assert f"TIPS_DEXTER={wt / '.dexter/dexter.sh'}" in text
             assert "README restart rule" in text
             assert "roles/" not in text
@@ -1038,6 +1041,8 @@ class PairLifecycleTest(unittest.TestCase):
         assert ring[2] == "team-1-test"
         assert "https://github.com/o/r/pull/7" in ring[3]
         assert pushed in ring[3]
+        assert "agent/teams/tester.md" in ring[3]
+        assert "agent/teams/pr-review-record.md" in ring[3]
         assert "agent/skills/reviewing-code/SKILL.md from this worktree" in ring[3]
 
     def test_turn_to_developer_always_rings_and_reports_a_checkout_problem(self) -> None:
@@ -1048,6 +1053,8 @@ class PairLifecycleTest(unittest.TestCase):
         ring = self.events("agent", "prompt")[-1]
         assert ring[2] == "team-1-dev"
         assert "pr_review.py list 7" in ring[3]
+        assert "agent/teams/developer.md" in ring[3]
+        assert "references/design-and-change.md#repair-and-refactor" in ring[3]
         assert "agent/skills/developing-software/SKILL.md from this worktree" in ring[3]
         assert "Fix the checkout first" not in ring[3]
         # Only the developer can repair the tree, so a problem is reported, not refused.

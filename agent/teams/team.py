@@ -688,11 +688,14 @@ def brief(role: str, name: str, issue: str, wrapper: Path) -> str:
     # help is the contract a lagging checkout can still trust.
     return (
         f"You are {name}, the {ROLE_TITLES[role]} for issue #{issue}. "
-        f"Read agent/teams/README.md, then the issue with gh issue view {issue}. "
+        "Read agent/teams/README.md and "
+        f"agent/teams/{ROLE_TITLES[role]}.md from this worktree, "
+        f"then the issue with gh issue view {issue}. "
         "Find whose turn it is with the README restart rule. If it is yours, do your next "
-        "common-path step; otherwise end your turn and wait for your partner's ring. "
+        "role-procedure action; otherwise end your turn and wait for your partner's ring. "
         "Before reading Elixir code, load the skills AGENTS.md requires. "
-        "For Elixir navigation, follow the AGENTS.md Need/Use table and its use check. "
+        "Before Elixir navigation, read agent/skills/dexter/SKILL.md from this worktree "
+        "for its Need/Use table and use checks. "
         f"TIPS_DEXTER={wrapper} is bound to this worktree; run it via the shell. "
         'Read "$TIPS_DEXTER" query --help and "$TIPS_DEXTER" lookup --help once; '
         "their syntax and output take precedence over a lagging checkout guide. "
@@ -816,18 +819,22 @@ def turn(pr: str, recipient: str) -> None:
         if problem:
             raise RuntimeError(f"{problem} Commit and push, then hand over.")
         message = (
-            f"Your turn: review {url} at {head}. Follow README step 3; read and apply "
+            f"Your turn: review {url} at {head}. Follow agent/teams/tester.md "
+            "from this worktree; read and apply "
             "agent/skills/reviewing-code/SKILL.md from this worktree, using "
-            "agent/skills/developing-software/SKILL.md as the design and testing standard. "
-            "Follow AGENTS.md GitHub and the README PR review record. "
+            "agent/skills/developing-software/SKILL.md from this worktree as the design "
+            "and testing map; retrieve applicable references before review decisions. "
+            "Follow AGENTS.md GitHub and agent/teams/pr-review-record.md. "
             "With findings: submit them and run "
             f"agent/teams/team.py turn {pr} dev. Without: publish the approval without "
-            "waiting for CI, keep the turn and do README step 5."
+            "waiting for CI, keep the turn and follow the tester approval/merge procedure."
         )
     else:
         message = (
             f"Your turn on {url}: run agent/teams/pr_review.py list {pr} and "
-            f"gh pr checks {pr} --required. Repair the findings or failed checks as "
+            f"gh pr checks {pr} --required. Follow agent/teams/developer.md and "
+            "agent/skills/developing-software/references/design-and-change.md#repair-and-refactor "
+            "from this worktree. Repair the findings or failed checks as "
             "agent/skills/developing-software/SKILL.md from this worktree says, push and "
             "hand back; if stuck, follow the README blocker procedure."
         )

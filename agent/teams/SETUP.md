@@ -1,6 +1,7 @@
 # Agent pairs: setup
 
-For humans, from the repository root. Agents read the [pair workflow](README.md) instead.
+For humans, from the repository root. Agents read the [shared workflow](README.md) and their
+[role procedure](README.md#role-procedures) instead.
 
 ## How it runs
 
@@ -73,7 +74,7 @@ prefix_rule(pattern=["agent-browser", "open"], decision="allow")
 
 After changing permissions or rules, start a new tester session and run this
 preflight there, one command per call, in the
-[required form](README.md#manual-browser-review):
+[required form](browser-review.md):
 
 ```sh
 agent-browser open about:blank --session preflight
@@ -81,7 +82,7 @@ agent-browser close --session preflight
 ```
 
 If opening fails with `Chrome exited early` or `without writing DevToolsActivePort`,
-first follow the [close-and-reopen recovery](README.md#recover-a-failed-browser-launch).
+first follow the [close-and-reopen recovery](browser-review.md#recover-a-failed-browser-launch).
 A daemon started inside the sandbox can survive a failed launch, so retrying
 `open` alone can still fail even with the allow rule installed.
 

@@ -6,7 +6,7 @@ lines pass on revision
 with no tracked changes, on 2026-10-07.
 
 Machine: macOS 26.5, Elixir 1.20.4, OTP 29, the Compose database on port 5433,
-agent-browser 0.38.1. The dev app ran with the [manual browser review](../../agent/teams/README.md#manual-browser-review)
+agent-browser 0.38.1. The dev app ran with the [manual browser review](../../agent/teams/browser-review.md)
 command on its own database (`tips_dev_team1_dev`) and port 4110, with the dev mailbox,
 no Turnstile and real OpenRouter embeddings. Each `agent-browser --session` name is a
 separate browser.

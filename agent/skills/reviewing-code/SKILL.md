@@ -9,7 +9,8 @@ Review required behaviour independently of the code and its tests. Follow
 [AGENTS.md](../../../AGENTS.md), including the required language and framework skills.
 Repository rules take precedence over general language and framework skill advice.
 Read [developing-software](../developing-software/SKILL.md) as the shared design and
-testing standard; this skill adds review methods and probes, not a second rule set.
+testing map and retrieve applicable references before the review decisions they
+constrain; this skill adds review methods and probes, not a second rule set.
 Read repository files and skill references from the current worktree.
 
 ## Establish scope
@@ -17,7 +18,7 @@ Read repository files and skill references from the current worktree.
 Establish the reviewed commit or diff. Read the issue and acceptance scenarios, PR
 body, diff, changed files and their callers, existing tests, linked design sections
 and prior review threads. For a local review, use the user brief in place of absent
-issue or PR records. In a pair, [step 3](../../teams/README.md#3-tester-review-the-pushed-head)
+issue or PR records. In a pair, [the tester procedure](../../teams/tester.md#review-the-pushed-head)
 owns turn-taking and handoff; this section owns what to inspect.
 
 ## Review
@@ -32,14 +33,14 @@ line and the input, state or sequence that triggers it.
   feedback and recovery for each reachable state. For example, cover loading, empty,
   error, stale and conflict states, and check UI copy, focus, keyboard access and docs
   against the requirements and glossary.
-- State and data: Probe the [state and resource rules](../developing-software/SKILL.md#state-resources-and-delayed-work)
+- State and data: Probe the [state and resource rules](../developing-software/references/state-and-failure.md#state-resources-and-delayed-work)
   through duplicate or out-of-order updates across tabs, reconnects and timeouts;
   cancellation or restart after a write; and migrations on existing rows. Compare
   submitted, stored, retried and displayed values. For durable jobs, inspect serialized
   or stale inputs, repeated effects under retry, and whether the business write and
   job insertion must commit together.
-- Contracts: Trace both sides of [affected contracts](../developing-software/SKILL.md#trace-the-affected-contract)
-  and [fallible boundaries](../developing-software/SKILL.md#fallible-boundaries).
+- Contracts: Trace both sides of [affected contracts](../developing-software/references/design-and-change.md#trace-the-affected-contract)
+  and [fallible boundaries](../developing-software/references/state-and-failure.md#fallible-boundaries).
   For example, inspect callback mount, update and teardown; partial provider responses;
   command exit status, release configuration, migrations and readiness. Include
   browser storage, media parsers and uploads.
@@ -48,7 +49,7 @@ line and the input, state or sequence that triggers it.
   whitespace or malformed values; encoded identifiers and character versus byte limits;
   and duplicates, ordering and values just below, at and above limits.
 - Complexity and performance: Assess claims and costs against the
-  [performance guidance](../developing-software/SKILL.md#check-performance-claims-and-bounds).
+  [performance guidance](../developing-software/references/evidence.md#check-performance-claims-and-bounds).
   Vary input size, history, user count and arrival rate when they affect the claim.
   Look for work on records the user never sees, repeated work per render or event,
   and unbounded retention; use measurements when the conclusion depends on them.
@@ -58,14 +59,14 @@ line and the input, state or sequence that triggers it.
   example, trace untrusted content into HTML, URLs, provider destinations or commands,
   and check disclosure through output or logs. Include reads and effects in jobs,
   sockets and browser storage.
-- Tests: Apply the [test selection and evidence rules](../developing-software/SKILL.md#choose-and-maintain-tests)
+- Tests: Apply the [test selection and evidence rules](../developing-software/references/evidence.md#choose-and-maintain-tests)
   to changed and existing coverage. Identify which acceptance scenario a missing or
   redundant test affects. Probe isolation of shared state and browser elements retained
   across navigation. Check that assertions cover required order, timing and representation.
-- Simplicity: Apply [the simplest complete solution](../developing-software/SKILL.md#build-the-simplest-working-solution)
+- Simplicity: Apply [the simplest complete solution](../developing-software/references/design-and-change.md#build-the-simplest-working-solution)
   criterion. Compare the proposed removal or replacement against user effort, failure
   isolation and testability; check whether it merely moves costs elsewhere.
-- Idiom: Apply [reuse and conventions](../developing-software/SKILL.md#reuse-existing-mechanisms-and-follow-conventions)
+- Idiom: Apply [reuse and conventions](../developing-software/references/design-and-change.md#reuse-existing-mechanisms-and-follow-conventions)
   and the applicable language/framework skills. Compare queries and forms with the
   framework's DSL and validation facilities; stateful processes with plain functions;
   and lifecycle or job handling with LiveView, OTP or Oban. Check custom serializers,
@@ -78,11 +79,11 @@ Try to reproduce suspected defects. Say which results came from executed checks 
 which from reading code. Cite the contract supporting each finding.
 
 Use the [severity table](../../teams/README.md#severity). For a PR, follow the
-[PR review record](../../teams/README.md#pr-review-record). For a local review, return
+[PR review record](../../teams/pr-review-record.md). For a local review, return
 the findings in the requested output. This skill does not authorize publishing a
 review or merging.
 
-Use the finding format in [AGENTS.md](../../../AGENTS.md#github). Support each finding
+Use the finding format in [the PR review record](../../teams/pr-review-record.md#finding-format). Support each finding
 with the evidence appropriate to its type:
 
 - Behaviour: Give the input and the actual and expected results.
@@ -99,7 +100,7 @@ with the evidence appropriate to its type:
   requirement, and explain how the custom code differs, what it costs and what should
   replace it. For deviations from language or framework guidance, assess the stated
   justification and cite the guidance and consequence. If no explanation is given,
-  cite the [deviation rule](../developing-software/SKILL.md#reuse-existing-mechanisms-and-follow-conventions).
+  cite the [deviation rule](../developing-software/references/design-and-change.md#reuse-existing-mechanisms-and-follow-conventions).
   For a repository-rule violation, cite its owning document.
 
 Report what you reviewed and what remains unfinished or blocked. "No findings" is

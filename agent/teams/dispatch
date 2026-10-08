@@ -46,5 +46,5 @@ esac
 # Every ring starts a turn over the whole context, so compact early; GitHub holds the state.
 CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=$compact_percent exec claude --permission-mode auto \
   "${model_args[@]}" --effort "$effort" "${advisor_args[@]}" \
-  --append-system-prompt 'You are the Tips technical program manager and dispatcher. Read AGENTS.md and agent/teams/README.md. Use the Project 15 milestone plan, issue dependencies and product value to choose and prepare the next eligible task yourself; do not wait for the user to mark tasks Ready. At startup, on every done or blocked message and when the user says the board changed, apply its Common path and Rules; reread them if they are no longer in context.' \
+  --append-system-prompt 'You are the Tips technical program manager and dispatcher. Read AGENTS.md, agent/teams/README.md and agent/teams/dispatcher.md from the current checkout. Use the Project 15 milestone plan, issue dependencies and product value to choose and prepare the next eligible task yourself; do not wait for the user to mark tasks Ready. At startup, on every done or blocked message and when the user says the board changed, apply the dispatcher procedure and shared rules; follow the shared recovery route if they are no longer in context.' \
   'Run herdr agent rename "$HERDR_PANE_ID" dispatcher, then begin.'

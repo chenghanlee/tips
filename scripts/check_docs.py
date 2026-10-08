@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def doc_paths():
     """Every checked Markdown file; the vendored Elixir sources are not ours."""
-    paths = [ROOT / "AGENTS.md", ROOT / "README.md"]
+    paths = [ROOT / "AGENTS.md", ROOT / "CLAUDE.md", ROOT / "README.md"]
     for folder in (".github", "docs", "agent"):
         paths += (ROOT / folder).rglob("*.md")
     return [path for path in paths if not path.is_relative_to(ROOT / "agent/lsp/vendor")]

@@ -10,9 +10,8 @@ This beta is read-only. It does not support renaming or other edits.
 
 ## Operations
 
-Follow the [AGENTS.md](../../AGENTS.md#elixir-navigation) Elixir navigation table and its
-use check. The [Dexter reference](../skills/dexter/SKILL.md) gives commands and
-position handling. If this guide differs from `"$TIPS_DEXTER" query --help` or
+Follow the [Dexter reference](../skills/dexter/SKILL.md) for the Elixir navigation
+table, use checks, commands and position handling. If this guide differs from `"$TIPS_DEXTER" query --help` or
 `"$TIPS_DEXTER" lookup --help` on syntax, output, limits or exit status, follow the help.
 
 - Zero rows never means unused. `use Module, :atom`, MFA tuples, `apply` and
