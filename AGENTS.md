@@ -53,6 +53,22 @@ These five are user-maintained files outside version control ([setup](agent/team
 - An empty Dexter result does not prove absence: dynamic dispatch, macros and generated code hide uses. Check with `rg` before concluding that a function is unused.
 - After `mix deps.get` or a dependency change, run `"$TIPS_DEXTER" reindex`.
 
+## Repo explorer
+
+Claude agents delegate mechanical lookups to the `repo-explorer` subagent ([definition](.claude/agents/repo-explorer.md)). It runs the Dexter and `rg` rows above and returns raw output and verbatim excerpts with `path:line`. It never summarizes or judges.
+
+| Delegate | Keep |
+|---|---|
+| Locate a module, function, route, component, test, config key or string | Reading this file, the pair workflow, skills, the issue and review comments |
+| Outline a file or an area; find callers, callees and every use of a function | The exact lines you are about to edit |
+| Extract function bodies, design sections, glossary entries or comment bodies verbatim | Diffs, test output and other verification |
+| Collect `gh` fields for issues, PRs, checks or the board | Deciding what the evidence means |
+
+- Ask one question per call. Name the symbols, files, terms and sections you want and the fields to return. A vague term returns hit counts and ranges, not text.
+- Pass the question, not commands. The explorer chooses Dexter or `rg` and marks each hit with its source.
+- Read its "Left out" and "Not found" lines. Ask again for a listed range instead of reading the file yourself.
+- Before changing a function, still apply the rule above: Dexter `references` plus `rg`, both marked.
+
 ## Checks
 
 Before pushing, run the checks for each kind of file you changed:
