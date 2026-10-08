@@ -48,8 +48,9 @@ favored direct Opus. The task logs established no other win. Treat new uses as t
 
 ### Assign
 
-Send only the context needed, never your conversation history. Haiku's lower price
-tier ends at 100K prompt tokens, and it cannot reason over your history anyway.
+Send only inputs needed for the assigned steps. Do not copy or fork your full
+conversation history; the parent handles its interpretation. Haiku 5.5's
+[prices](https://platform.claude.com/docs/en/about-claude/pricing) increase above 100K prompt tokens.
 Use this contract:
 
 ```text
