@@ -619,9 +619,20 @@ class PairLifecycleTest(unittest.TestCase):
                 '#!/bin/sh\nprintf "%s\\n" "$*" >> "$DOCKER_LOG"\n'
                 'case "$*" in *SELECT*) cat "$DOCKER_DBS" 2>/dev/null;; esac\nexit 0\n'
             ),
-            # A stop-time write lands between the two cleanliness checks: ps runs only in stop().
+            # Stop-time events land after the first checks: ps runs only in stop(). A write
+            # dirties the worktree; a visitor pane joins a recorded workspace.
             "ps": (
-                '#!/bin/sh\n[ -n "$RACE_DIRTY_FILE" ] && echo raced > "$RACE_DIRTY_FILE"\nexit 0\n'
+                '#!/bin/sh\n[ -n "$RACE_DIRTY_FILE" ] && echo raced > "$RACE_DIRTY_FILE"\n'
+                "[ -n \"$RACE_VISITOR_WORKSPACE\" ] && python3 - <<'PY'\n"
+                "import json, os\n"
+                "path = os.environ['HERDR_FIXTURE']\n"
+                "workspace = os.environ['RACE_VISITOR_WORKSPACE']\n"
+                "state = json.load(open(path))\n"
+                "visitor = {'pane_id': workspace + ':p8', 'workspace_id': workspace, 'cwd': '/'}\n"
+                "if visitor not in state.get('strays', []):\n"
+                "    state['strays'] = state.get('strays', []) + [visitor]\n"
+                "json.dump(state, open(path, 'w'))\n"
+                "PY\nexit 0\n"
             ),
         }
         for name, body in fakes.items():
@@ -793,19 +804,15 @@ class PairLifecycleTest(unittest.TestCase):
         execute(["/bin/sh", wt / ".dexter/dexter.sh", *query], cwd=self.root, env=env, check=True)
         assert self.state()["events"][-1] == ["dexter", str(wt), *query]
         assert self.state()["dexter_stdlib"] == str(self.stdlib)
-        # The record names what was launched; restart and teardown read it.
+        # The record names the pair and each client's session; restart, handoff and
+        # teardown prove its use.
         record = self.record(1)
-        assert (record["brief"], record["implementer"], record["testers"]) == (
+        assert (record["brief"], record["implementer"], record["tester"]) == (
             "29",
             "impl",
-            ["tester"],
+            "tester",
         )
-        assert record["designers"] == ["critic"]
-        tester_allocation = record["agents"]["tester"]
-        assert tester_allocation["name"] == "team-1-tester"
-        assert (tester_allocation["db_suffix"], tester_allocation["port"]) == ("_t1r", 4111)
-        assert tester_allocation["pane"] == tester["pane_id"]
-        assert tester_allocation["session"] == "session-team-1-tester"
+        assert record["agents"]["tester"]["session"] == "session-team-1-tester"
 
     def test_brief_roster_is_validated_before_any_change(self) -> None:
         cases = {
@@ -873,18 +880,9 @@ class PairLifecycleTest(unittest.TestCase):
         assert "launched as codex; preserved" in self.team("start", "29", ok=False).stderr
         config.write_text(CONFIG.replace("[agents.tester]", "[agents.other]"))
         assert "not a configured entry" in self.team("start", "29", ok=False).stderr
-
-    def test_changed_reviewers_reconcile_and_a_changed_pair_is_refused(self) -> None:
-        self.team("start", "29")
-        head = self.push(self.worktree("29"))
-        # The lead adds a tester: rerunning start follows the brief; review then launches it.
-        self.update(issues={**self.state()["issues"], "29": WIDE})
-        self.team("start", "29")
-        assert self.record(1)["testers"] == ["tester", "second"]
-        self.team("review", "7", "second")
-        assert self.git("rev-parse", "HEAD", cwd=self.worktree("review-7-second")) == head
-        assert self.pane("team-1-second")["agent"] == "codex"
         # The pair cannot change hands while the checkout is theirs.
+        config.write_text(CONFIG)
+        starts = len(self.events("agent", "start"))
         for body in (
             "Implementer: impl\nRequired reviews: second, tester, critic\n",
             "Implementer: impl\nRequired reviews: second\n",
@@ -893,12 +891,24 @@ class PairLifecycleTest(unittest.TestCase):
                 self.update(issues={**self.state()["issues"], "29": body})
                 refused = self.team("start", "29", ok=False)
                 assert "changed its implementer or merge-confirming tester" in refused.stderr
-                assert self.record(1)["testers"] == ["tester", "second"]
+        assert len(self.events("agent", "start")) == starts
+        assert self.record(1)["tester"] == "tester"
 
     def test_each_brief_takes_its_own_slot_from_the_records_until_none_is_free(self) -> None:
         path = self.repo / "agent/teams/config.toml"
         path.write_text(CONFIG.replace("max_teams = 6", "max_teams = 2"))
         self.team("start", "29")
+        # A new allocation never takes a recorded database, port or partition of one,
+        # whatever config says now: slot 2's implementer would be a partition of _t1r.
+        path.write_text(
+            CONFIG.replace("max_teams = 6", "max_teams = 2")
+            .replace('db_suffix_prefix = "_t"', 'db_suffix_prefix = "_t1r"')
+            .replace("port_base = 4100", "port_base = 5100")
+        )
+        refused = self.team("start", "30", ok=False)
+        assert "database _t1r2 or port 5120 collides with team-1-tester's" in refused.stderr
+        assert not self.worktree("30").exists()
+        path.write_text(CONFIG.replace("max_teams = 6", "max_teams = 2"))
         self.team("start", "30")
         second = self.pane("team-2-impl")
         assert second["cwd"] == str(self.worktree("30"))
@@ -908,6 +918,19 @@ class PairLifecycleTest(unittest.TestCase):
         self.push(self.worktree("30"), pr="8", brief="30")
         self.team("review", "8", "critic")
         self.push(self.worktree("29"), pr="7", brief="29")
+        # Config moved the critic onto the running tester's resources: refused in its slot.
+        path.write_text(
+            CONFIG.replace("max_teams = 6", "max_teams = 2")
+            .replace('db_suffix = "r"', 'db_suffix = "z"')
+            .replace("port_offset = 1", "port_offset = 5")
+            .replace('db_suffix = "c"', 'db_suffix = "r"')
+            .replace("port_offset = 2", "port_offset = 1")
+        )
+        refused = self.team("review", "7", "critic", ok=False)
+        assert "database _t1r or port 4111 collides with team-1-tester's" in refused.stderr, (
+            refused.stderr
+        )
+        path.write_text(CONFIG.replace("max_teams = 6", "max_teams = 2"))
         self.team("review", "7", "critic")
         assert self.launch_env("team-1-critic") == ("_t1c", "4112")
         assert self.launch_env("team-2-critic") == ("_t2c", "4122")
@@ -973,12 +996,27 @@ class PairLifecycleTest(unittest.TestCase):
         assert not self.events("agent", "start")
 
     def test_client_started_blocked_or_in_another_root_is_reported(self) -> None:
-        for brief, flags in (("29", {"start_fails": True}), ("30", {"wrong_start_root": "/"})):
+        cases = (
+            ("29", {"start_fails": True}, "startup did not complete; inspect"),
+            ("30", {"wrong_start_root": "/"}, "runs in /, not its worktree; preserved"),
+        )
+        for brief, flags, rerun in cases:
             with self.subTest(flags=flags):
                 self.update(**{"start_fails": False, "wrong_start_root": "", **flags})
                 refused = self.team("start", brief, ok=False)
                 assert "unexpected state or root" in refused.stderr
                 assert len(self.events("agent", "start")) == 1
+                assert not self.events("agent", "prompt")
+                # The client is still there but its startup never completed: a rerun must
+                # not call it ready or start another; the operator exits it, then reruns.
+                refused = self.team("start", brief, ok=False)
+                assert rerun in refused.stderr, refused.stderr
+                assert len(self.events("agent", "start")) == 1
+                assert not self.events("agent", "prompt")
+                self.update(events=[], start_fails=False, wrong_start_root="")
+                self.clients_exit(int(brief) - 28)
+                self.team("start", brief)
+                assert len(self.events("agent", "start")) == 2
                 self.update(events=[])
 
     def test_invalid_config_refuses_before_herdr(self) -> None:
@@ -1174,8 +1212,8 @@ class PairLifecycleTest(unittest.TestCase):
         assert len(self.events("agent", "prompt")) == prompts
 
     def test_review_pins_the_reviewer_in_its_own_worktree_at_the_pr_head(self) -> None:
-        self.team("start", "30")
-        head = self.push(self.worktree("30"), brief="30")
+        self.team("start", "29")
+        head = self.push(self.worktree("29"))
         self.team("review", "7", "critic")
         wt = self.worktree("review-7-critic")
         assert self.git("rev-parse", "HEAD", cwd=wt) == head
@@ -1185,7 +1223,7 @@ class PairLifecycleTest(unittest.TestCase):
         assert self.launch_env("team-1-critic") == ("_t1c", "4112")
         assert critic["launch_env"]["TIPS_DEXTER"] == str(wt / ".dexter/dexter.sh")
         brief = self.system_prompt("team-1-critic")
-        assert brief.startswith("You are critic, the reviewing designer for brief #30;")
+        assert brief.startswith("You are critic, the reviewing designer for brief #29;")
         assert "Your persona: operations: failure and recovery paths." in brief
         assert (
             f"Review PR https://github.com/o/r/pull/7 from this worktree, pinned at {head}" in brief
@@ -1199,12 +1237,13 @@ class PairLifecycleTest(unittest.TestCase):
         allocation = self.record(1)["agents"]["critic"]
         assert (allocation["pr"], allocation["head"]) == ("7", head)
         assert allocation["session"] == "session-team-1-critic"
-        # A second tester is a Codex client with its own resources and the same duties.
+        # The lead adds a tester to the brief: it is a Codex client with its own resources.
+        self.update(issues={**self.state()["issues"], "29": WIDE})
         self.team("review", "7", "second")
         second = self.pane("team-1-second")
         assert second["agent"] == "codex"
         assert self.launch_env("team-1-second") == ("_t1s", "4113")
-        assert "the additional tester for brief #30" in second["launch_argv"][-1]
+        assert "the additional tester for brief #29" in second["launch_argv"][-1]
         assert self.workspaces() == [
             "team-1-impl",
             "team-1-tester",
@@ -1212,7 +1251,7 @@ class PairLifecycleTest(unittest.TestCase):
             "team-1-second",
         ]
         # A new head: a running reviewer keeps its head and its record says so.
-        moved = self.push(self.worktree("30"), "second push", brief="30")
+        moved = self.push(self.worktree("29"), "second push")
         starts = len(self.events("agent", "start"))
         assert (
             f"Already running: team-1-critic at {head}" in self.team("review", "7", "critic").stdout
@@ -1220,6 +1259,29 @@ class PairLifecycleTest(unittest.TestCase):
         assert self.git("rev-parse", "HEAD", cwd=wt) == head
         assert self.record(1)["agents"]["critic"]["head"] == head
         assert len(self.events("agent", "start")) == starts
+        # Another client in the reviewer's pane is not the reviewer, however it is named.
+        self.clients_exit(1)
+        state = self.state()
+        pane = next(x for x in state["panes"] if x.get("label") == "team-1-critic")
+        pane.update(agent="claude", name="team-1-critic", cwd=str(self.repo))
+        self.save(state)
+        refused = self.team("review", "7", "critic", ok=False)
+        assert "not its worktree; preserved" in refused.stderr, refused.stderr
+        pane.update(agent="codex", name="visitor", cwd=str(self.repo))
+        self.save(state)
+        assert (
+            "conflicting client; preserved" in self.team("review", "7", "critic", ok=False).stderr
+        )
+        assert len(self.events("agent", "start")) == starts
+        # A dropped reviewer is refused, running or not.
+        self.update(
+            issues={
+                **self.state()["issues"],
+                "29": "Implementer: impl\nRequired reviews: tester, second\n",
+            }
+        )
+        assert "not an additional reviewer" in self.team("review", "7", "critic", ok=False).stderr
+        self.update(issues={**self.state()["issues"], "29": WIDE})
         # A stopped reviewer moves to the new head when its worktree is clean, never when dirty.
         self.clients_exit(1)
         (wt / "notes.txt").write_text("in progress\n")
@@ -1274,6 +1336,16 @@ class PairLifecycleTest(unittest.TestCase):
         assert not (self.root / "docker-calls").exists()
         self.update(strays=[])
         assert "nothing removed" in self.team("stop", "99").stdout
+        # A pane arriving while clients are stopped is found at the close itself: its
+        # workspace stays open, nothing is removed, and the brief retires once it has gone.
+        self.env["RACE_VISITOR_WORKSPACE"] = self.record(1)["agents"]["impl"]["workspace"]
+        refused = self.team("stop", "29", ok=False)
+        assert "holds other panes ['w1:p8']" in refused.stderr, refused.stderr
+        assert "team-1-impl" in self.workspaces()
+        assert wt.exists()
+        assert not (self.root / "docker-calls").exists()
+        del self.env["RACE_VISITOR_WORKSPACE"]
+        self.update(strays=[])
         self.team("stop", "29")
         assert not wt.exists()
         assert not review.exists()

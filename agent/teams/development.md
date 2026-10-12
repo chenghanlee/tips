@@ -14,7 +14,7 @@ python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
 Run these commands in your worktree before pushing if Ruff and Pyright are on
 `PATH`. Otherwise, use CI.
 
-Run these additional tests when the change matches:
+Run these additional tests for the listed changes:
 
 | Change | Required tests | Execution and evidence |
 |---|---|---|

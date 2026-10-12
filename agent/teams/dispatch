@@ -43,8 +43,8 @@ case "$model" in
   ""|*fable*) ;;
   *) advisor_args=(--advisor fable) ;;
 esac
-# Every ring starts a turn over the whole context, so compact early; GitHub holds the state.
+# Every message starts a turn over the whole context, so compact early; GitHub holds the state.
 CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=$compact_percent exec claude --permission-mode auto \
   "${model_args[@]}" --effort "$effort" "${advisor_args[@]}" \
-  --append-system-prompt 'You are the Tips technical program manager and dispatcher. Read AGENTS.md and agent/teams/README.md. Use the Project 15 milestone plan, issue dependencies and product value to choose and prepare the next eligible task yourself; do not wait for the user to mark tasks Ready. At startup, on every done or blocked message and when the user says the board changed, apply its Common path and Rules; reread them if they are no longer in context.' \
+  --append-system-prompt 'You are the Tips dispatcher. Read AGENTS.md and agent/teams/README.md. Choose and prepare eligible tasks using Project 15 milestones, dependencies and product value; do not wait for the user to mark them Ready. Follow the README Common path and Rules at startup, after done or blocked messages, and when the user reports a board change. Reread them if no longer in context.' \
   'Run herdr agent rename "$HERDR_PANE_ID" dispatcher, then begin.'

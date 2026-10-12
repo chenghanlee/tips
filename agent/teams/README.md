@@ -4,10 +4,10 @@ GitHub stores workflow state in the issue, the PR reviews and checks, and
 [Project 15](https://github.com/users/chenghanlee/projects/15) (`--owner chenghanlee`).
 Read these records when assigned, after a restart and at each handoff. Record
 decisions, findings and blockers there. Use Herdr to notify the next agent.
-[AGENTS.md](../../AGENTS.md) owns repository boundaries, navigation, checks and skill
-routing. [Developing-software](../skills/developing-software/SKILL.md) owns design and
-testing rules; [reviewing-code](../skills/reviewing-code/SKILL.md) owns review methods.
-This document owns pair coordination. The user completes [setup](SETUP.md) once.
+Follow [AGENTS.md](../../AGENTS.md) for repository rules,
+[developing-software](../skills/developing-software/SKILL.md) for design and tests,
+and [reviewing-code](../skills/reviewing-code/SKILL.md) for reviews.
+This document defines pair coordination. The user completes [setup](SETUP.md) once.
 
 | Role | Agent name | Responsibilities |
 |---|---|---|
@@ -17,7 +17,7 @@ This document owns pair coordination. The user completes [setup](SETUP.md) once.
 | Implementer | `team-N-<entry>` | Implement and verify the brief, open the PR, address findings and fix failed checks. Design-tier duties: [roles/implementer.md](roles/implementer.md). |
 | Tester | `team-N-<entry>` | Review the pushed PR head, run tests or the app, publish approval and confirm the merge. Design-tier duties: [roles/tester.md](roles/tester.md). |
 
-Every swarm role also reads [roles/common.md](roles/common.md). Agents are
+Every agent also reads [roles/common.md](roles/common.md). Agents are
 `[agents.<entry>]` entries in [config.toml](config.toml). A brief issue names its
 agents: `Implementer: <entry>` and `Required reviews: <entry>, <entry>`, the reviewers
 whose LGTM the merge needs. The first tester in `Required reviews:` confirms the merge
@@ -69,14 +69,14 @@ board change:
 
 ### 2. Implementer: implement and hand off
 
-1. Use the repository to fill in missing facts in the brief.
+1. Read the repository to resolve missing facts in the brief.
 2. Plan, implement and verify using [developing-software](../skills/developing-software/SKILL.md)
    from this worktree, then push the change.
 3. Open the PR with `Closes #<brief>` and enable auto-merge:
    `gh pr merge <pr> --auto --merge`. The closing reference is how `review` and the
    publisher find the brief; keep it.
-4. Run `agent/teams/team.py turn <pr> <tester entry>`. The PR must close the brief and
-   the command runs from the pair checkout.
+4. Run `agent/teams/team.py turn <pr> <tester entry>`. Run it from the pair checkout.
+   The PR must close the brief.
 5. After a successful handoff, stop using the worktree, build and database until
    the tester returns the turn.
 
@@ -96,7 +96,7 @@ board change:
 
 Other reviewers (a second tester, the reviewing designer) review the same head from
 their own pinned worktrees, launched by the dispatcher with `team.py review`. They
-submit their review record, ring the merge-confirming tester by Herdr name with the
+submit their review record, notify the merge-confirming tester by Herdr name with the
 review URL, and end their turn. They never run `turn`. For a new head they fetch,
 check out the head detached, reindex and review the changes since their previous
 review.
@@ -116,12 +116,14 @@ behaviour or design.
 ### 5. Tester: approve and confirm the merge
 
 Approve when no P0 or P1 remains and every thread is resolved. Submit the
-[PR review record](#pr-review-record) without waiting for CI. Keep the turn. Then read
-each other required reviewer's latest review of this head: one with findings means
-`turn <pr> <implementer entry>`; one absent means ring that reviewer by Herdr name
-with the PR URL and head, or report `blocked` when it is not launched; all LGTM means
-publish with one `--record` per reviewer. The publisher refuses a missing,
-superseded, duplicate or wrong-head record.
+[PR review record](#pr-review-record) without waiting for CI. Keep the turn.
+Read each required reviewer's latest review of this head:
+
+- Any findings: run `team.py turn <pr> <implementer entry>`.
+- Missing review: notify that reviewer by Herdr name with the PR URL and head.
+  If the reviewer is not running, report `blocked`.
+- All LGTM: publish with one `--record` per reviewer. The publisher rejects missing,
+  superseded, duplicate or wrong-head records.
 
 Auto-merge requires `checks`, `release`, `tips/independent-review` and resolved
 threads. A merge closes the issue, sets the Project item to Done and deletes the
@@ -198,8 +200,10 @@ Run commands from the repository root of your checkout. The dispatcher runs
 `start` and `stop` take the brief number. `turn`, `review` and the review tools take
 the PR number. Rerunning `start` or `review` keeps a running client and relaunches a
 missing one from its record, with the database, port and client kind it was launched
-with. Rerunning `start` after the lead changes other reviewers updates the record; a
-changed implementer or merge-confirming tester is refused.
+with. A client whose startup did not complete is refused on rerun: inspect its pane,
+exit the client there if it is idle, then rerun. `review` and the tester's handoff read
+the brief's current `Required reviews:` line; a changed implementer or
+merge-confirming tester is refused.
 
 After sending a handoff, end your turn. The other agent's message starts a new
 turn. If sending fails, you still hold the turn: report `blocked` to the dispatcher
@@ -220,7 +224,7 @@ checks. Use the first matching condition:
 | The current head has reviews and the latest is not an LGTM | Implementer: address the review. |
 | A reviewer named in `Required reviews:` has a latest review of this head that is not an LGTM | Implementer: address it. |
 | The current head has no reviews | Tester: review it. |
-| The tester's latest review is an LGTM and a reviewer named in `Required reviews:` has not reviewed this head | Tester: keep the turn; ring that reviewer by Herdr name, or report `blocked` when it is not launched so the dispatcher runs `review`. |
+| The tester's latest review is an LGTM and a reviewer named in `Required reviews:` has not reviewed this head | Tester: keep the turn; notify that reviewer by Herdr name, or report `blocked` when it is not launched so the dispatcher runs `review`. |
 | The current head is approved | Tester: complete approval publication and merge confirmation. |
 
 ## Rules
@@ -247,7 +251,7 @@ Every message starts a turn using the recipient's full context. Send only:
 - `blocked` reports.
 - The dispatcher's answer to a blocker.
 - A reviewer's review URL to the merge-confirming tester, and the tester's new-head
-  ring to a reviewer.
+  notification to a reviewer.
 - The tester's request that the dispatcher launch reviewers.
 
 Do not send acknowledgments, progress or status updates, thanks, or replies that
@@ -386,15 +390,16 @@ to its first comma, matched exactly against the brief's `Required reviews:` name
 agent/teams/publish_review.py --pr <pr> --sha <sha> --record <review URL>
 ```
 
-The command refuses a wrong head, a wrong record or unresolved threads. When the
-PR's linked issue (GitHub's closing reference, any keyword) has a line
-`Required reviews: <name>, <name>`, every named reviewer's latest review of the head
-must be an LGTM attributed to that name, and every review of the head must be
-attributed to a named reviewer; repeat `--record` for each. The command refuses a
-missing, superseded, duplicate or unlisted record, an unattributed review, an empty
-or repeated name, and two linked issues that both name reviewers. This is a check at
-publication time through one shared account: it catches omission, stale heads and
-superseded decisions; it does not authenticate who wrote a review or an issue body.
+The publisher rejects a wrong head, invalid record or unresolved thread. It reads
+`Required reviews:` from the PR's linked issue, using GitHub's closing references
+for any closing keyword. Each named reviewer's latest review of the head must be
+an LGTM, and every review of the head must name a required reviewer. Pass one
+`--record` per reviewer.
+
+It also rejects missing, superseded, duplicate or unlisted records, missing
+attribution, empty or repeated names, and two linked issues that both name
+reviewers. These checks run at publication time. The shared account does not
+authenticate review or issue authors.
 
 To read reviews and resolve threads:
 

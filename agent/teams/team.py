@@ -2,9 +2,11 @@
 """Brief lifecycle in Herdr: start the pair, hand the checkout over, add reviewers, stop.
 
 Configured agents are `[agents.<entry>]` in config.toml. A launch allocates a slot and writes
-`agent/teams/allocations/<slot>.json`: every launched client with its live Herdr name,
-worktree, database suffix, port, pane and session. Restart, handoff and teardown read that
-record, never the current configuration.
+`agent/teams/allocations/<slot>.json`: the brief's implementer and merge-confirming tester,
+and every launched client with its live Herdr name, kind, worktree, database suffix, port,
+pane and session. Restart, handoff and teardown take those from the record; model, effort,
+advisor and persona come from the current configuration, and the brief's `Required
+reviews:` line names the other reviewers whenever a command needs them.
 """
 
 import json
@@ -74,8 +76,7 @@ class Record(TypedDict):
     brief: str
     worktree: str
     implementer: str
-    testers: list[str]
-    designers: list[str]
+    tester: str
     agents: dict[str, Allocation]
 
 
@@ -480,6 +481,13 @@ def validate_settings(path: Path, value: Config) -> None:
             raise RuntimeError(f"{path}: agents.{name}.advisor applies to Claude entries only")
 
 
+def overlapping(a: str, b: str) -> bool:
+    """Whether one database stem is the other or one of its numbered partitions."""
+    return bool(
+        re.fullmatch(re.escape(a) + r"[0-9]*", b) or re.fullmatch(re.escape(b) + r"[0-9]*", a)
+    )
+
+
 def validate_allocations(path: Path, value: Config) -> None:
     ports: set[int] = set()
     stems: list[str] = []
@@ -491,10 +499,7 @@ def validate_allocations(path: Path, value: Config) -> None:
             stem = value["team"]["db_suffix_prefix"] + str(n) + spec["db_suffix"]
             if port in ports or not 1 <= port <= 65535:
                 raise RuntimeError(f"{path}: overlapping or invalid test ports")
-            if any(
-                re.fullmatch(re.escape(a) + r"[0-9]*", b)
-                for a, b in [(stem, x) for x in stems] + [(x, stem) for x in stems]
-            ):
+            if any(overlapping(stem, other) for other in stems):
                 raise RuntimeError(f"{path}: overlapping database suffix/partition allocation")
             ports.add(port)
             stems.append(stem)
@@ -515,11 +520,8 @@ def record_path(slot: int) -> Path:
 def load_record(path: Path) -> Record:
     fields = object_fields(json.loads(path.read_text()), str(path))
     require_type(fields.get("slot"), int, f"{path}: slot")
-    for key in ("brief", "worktree", "implementer"):
+    for key in ("brief", "worktree", "implementer", "tester"):
         require_type(fields.get(key), str, f"{path}: {key}")
-    for key in ("testers", "designers"):
-        if not isinstance(fields.get(key), list):
-            raise ValueError(f"{path}: {key} must be a list")
     for entry, value in object_fields(fields.get("agents"), f"{path}: agents").items():
         allocation = object_fields(value, f"{path}: agents.{entry}")
         for key in ("entry", "role", "name", "kind", "worktree", "db_suffix", "workspace", "pane"):
@@ -569,14 +571,9 @@ def live_name(slot: int, entry: str) -> str:
     return f"team-{slot}-{entry}"
 
 
-def reserved(slot: int) -> set[tuple[str, int]]:
-    """Database suffixes and ports held by other slots' records, whatever config says now."""
-    return {
-        (a["db_suffix"], a["port"])
-        for n, record in records().items()
-        if n != slot
-        for a in record["agents"].values()
-    }
+def reserved() -> list[Allocation]:
+    """Every recorded allocation, whatever config says now."""
+    return [a for record in records().values() for a in record["agents"].values()]
 
 
 def reviewer_names(value: str) -> list[str]:
@@ -702,8 +699,12 @@ def allocate(record: Record, entry: str, role: str, worktree: Path) -> Allocatio
     """Reserve the entry's database and port in this slot; the record keeps them from now on."""
     slot = record["slot"]
     suffix, port = db_suffix(entry, slot), test_port(entry, slot)
-    if any(suffix == s or port == p for s, p in reserved(slot)):
-        raise RuntimeError(f"{entry}: database {suffix} or port {port} is held by another slot")
+    for held in reserved():
+        if overlapping(suffix, held["db_suffix"]) or port == held["port"]:
+            raise RuntimeError(
+                f"{entry}: database {suffix} or port {port} collides with {held['name']}'s "
+                f"allocation ({held['db_suffix']}, {held['port']})"
+            )
     allocation = Allocation(
         entry=entry,
         role=role,
@@ -879,18 +880,17 @@ def enter(pane: str, worktree: Path, env: dict[str, str]) -> None:
 
 def dexter_brief(wrapper: Path) -> str:
     # The binary is shared by every checkout and the guide is not, so the binary's own
-    # help is the contract a lagging checkout can still trust.
+    # help defines the current syntax even when checkout docs are outdated.
     return (
-        "Before reading Elixir code, load the skills AGENTS.md requires. "
-        "For Elixir navigation, follow the AGENTS.md Need/Use table and its use check. "
-        f"TIPS_DEXTER={wrapper} is bound to this worktree; run it via the shell. "
+        "Load the skills required by AGENTS.md before reading Elixir code. "
+        "Follow its navigation table and function-use checks. "
+        f"Run TIPS_DEXTER={wrapper} through the shell for this worktree. "
         'Read "$TIPS_DEXTER" query --help and "$TIPS_DEXTER" lookup --help once; '
-        "their syntax and output take precedence over a lagging checkout guide. "
+        "Their syntax and output override outdated checkout docs. "
         'After fetching or changing dependencies, run "$TIPS_DEXTER" reindex. '
-        "Do not start another Elixir language server. Freshness is unverified; "
-        "empty results are not proof of absence. Do not stop the shared daemon when "
-        "this agent exits, and do not run git clean -x: it deletes the bound command "
-        "and the index while the daemon may still run."
+        "Do not start another Elixir language server. The index may be outdated; "
+        "check empty results with rg. Leave the shared daemon running on exit. "
+        "Do not run git clean -x; it deletes the wrapper and index."
     )
 
 
@@ -905,13 +905,13 @@ def identity(record: Record, entry: str, duty: str) -> str:
 
 def pair_brief(record: Record, entry: str, duty: str, wrapper: Path) -> str:
     # A relaunched client gets this brief too, so it finds the turn instead of assuming it.
-    implementer, tester = record["implementer"], record["testers"][0]
+    implementer, tester = record["implementer"], record["tester"]
     partner = tester if entry == implementer else implementer
     return (
         identity(record, entry, duty)
         + f"Read agent/teams/README.md, then the brief with gh issue view {record['brief']}. "
-        "Find whose turn it is with the README restart rule. If it is yours, do your next "
-        "common-path step; otherwise end your turn and wait for your partner's ring. "
+        "Use the README restart rule to find whose turn it is. If yours, continue the "
+        "workflow; otherwise end your turn and wait for your partner's message. "
         f"Hand the checkout over with agent/teams/team.py turn <pr> {partner}. "
         f"Reviews you write are attributed to {entry} on their second line. "
         + dexter_brief(wrapper)
@@ -919,13 +919,13 @@ def pair_brief(record: Record, entry: str, duty: str, wrapper: Path) -> str:
 
 
 def reviewer_brief(record: Record, entry: str, duty: str, pr: str, head: str, wrapper: Path) -> str:
-    tester = live_name(record["slot"], record["testers"][0])
+    tester = live_name(record["slot"], record["tester"])
     return (
         identity(record, entry, duty)
         + f"Review PR {pr} from this worktree, pinned at {head}; never the pair checkout. "
         "Read agent/teams/README.md and follow its reviewer steps. Never run "
         "agent/teams/team.py turn. Submit the README review record with "
-        f"{entry} on its second line, then ring the merge-confirming tester with "
+        f"{entry} on its second line, then notify the merge-confirming tester with "
         f"herdr agent prompt {tester} '<your review URL>' and end your turn. A later head "
         "follows the README reviewer steps. " + dexter_brief(wrapper)
     )
@@ -969,15 +969,36 @@ def client_args(allocation: Allocation, prompt: str) -> list[str]:
     return args
 
 
+def running_client(allocation: Allocation) -> Entity | None:
+    """The recorded client if it is live in its pane; None if the pane is at the shell.
+
+    A live client with another name, kind or root is refused, and so is the recorded
+    client whose startup never completed: its first prompt may not have arrived, and
+    resending it blindly could double the work, so the operator inspects it.
+    """
+    name, pane = allocation["name"], allocation["pane"]
+    root, live = pane_occupant(pane)
+    if not live:
+        return None
+    agent = herdr("agent", "get", pane)["agent"]
+    if agent.get("name") != name or agent.get("agent") != allocation["kind"]:
+        raise RuntimeError(f"{pane}: conflicting client; preserved")
+    if root != Path(allocation["worktree"]):
+        raise RuntimeError(f"{pane}: {name} runs in {root}, not its worktree; preserved")
+    if not allocation["session"]:
+        raise RuntimeError(
+            f"{name} started but its startup did not complete; inspect {pane}. If it is idle, "
+            "exit the client there, then rerun this command to relaunch it from the record."
+        )
+    return agent
+
+
 def launch(record: Record, allocation: Allocation, prompt: str) -> None:
     """Start one client in its pane, or keep the one already running there."""
     name, pane = allocation["name"], allocation["pane"]
     kind, worktree = allocation["kind"], Path(allocation["worktree"])
-    root, live = pane_occupant(pane)
-    if live:
-        agent = herdr("agent", "get", pane)["agent"]
-        if agent.get("name") != name or agent.get("agent") != kind or root != worktree:
-            raise RuntimeError(f"{pane}: conflicting client; preserved")
+    agent = running_client(allocation)
+    if agent:
         print(f"Already running: {name} ({agent.get('agent_status')})")
         return
     enter(pane, worktree, agent_env(allocation))
@@ -1002,12 +1023,13 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
         or started.get("agent_status") in ("blocked", "unknown")
     ):
         raise RuntimeError(f"{name} started in an unexpected state or root; inspect {pane}")
-    allocation["session"] = session_id(started)
-    save_record(record)
     if kind == "claude":
         # Claude holds the brief as its system prompt and waits; Codex receives it as input.
         herdr("agent", "prompt", name, "Begin.")
-    print(f"Launched {name}: {kind} in {worktree}, session {allocation['session'] or 'unknown'}")
+    # Recorded only now: a session in the record means startup completed.
+    allocation["session"] = session_id(started) or "unknown"
+    save_record(record)
+    print(f"Launched {name}: {kind} in {worktree}, session {allocation['session']}")
 
 
 def require_main_checkout() -> None:
@@ -1019,7 +1041,8 @@ def require_main_checkout() -> None:
 def start(brief: str) -> None:
     """Launch the brief's implementer and merge-confirming tester in one prepared worktree."""
     require_main_checkout()
-    implementer, testers, designers = roster(brief)
+    implementer, testers, _ = roster(brief)
+    pair = [implementer, testers[0]]
     worktree = main / ".worktrees" / brief
     tools(worktree)  # missing tools refuse before a slot is reserved
     slot, record = find_slot(brief)
@@ -1028,24 +1051,17 @@ def start(brief: str) -> None:
             slot=slot,
             brief=brief,
             worktree=str(worktree),
-            implementer=implementer,
-            testers=testers,
-            designers=designers,
+            implementer=pair[0],
+            tester=pair[1],
             agents={},
         )
         save_record(record)  # the slot is reserved before anything is provisioned
-    elif (record["implementer"], record["testers"][0]) != (implementer, testers[0]):
+    elif (record["implementer"], record["tester"]) != (pair[0], pair[1]):
         raise RuntimeError(
             f"Brief #{brief} changed its implementer or merge-confirming tester since "
             "launch; the pair checkout cannot change hands. Stop the brief after its "
             "work is merged, or restore the brief."
         )
-    elif (record["testers"], record["designers"]) != (testers, designers):
-        # Other reviewers may be added or dropped by the lead; the record follows the brief.
-        record["testers"], record["designers"] = testers, designers
-        save_record(record)
-        print(f"Brief {brief}: reviewers are now {', '.join(testers + designers)}")
-    pair = [implementer, testers[0]]
     refuse_foreign_owner(worktree, [live_name(slot, entry) for entry in pair])
     duties = ("implementer", "merge-confirming tester")
     clients = [
@@ -1081,24 +1097,30 @@ def brief_record(pr: str, briefs: list[str]) -> Record:
     return found[0]
 
 
+def additional_reviewers(record: Record) -> tuple[list[str], list[str]]:
+    """The brief's current additional testers and designers; the brief is the only copy."""
+    _, testers, designers = roster(record["brief"])
+    return [t for t in testers if t != record["tester"]], designers
+
+
 def review(pr: str, entry: str) -> None:
     """Pin a required reviewer's own worktree at the PR head and launch it there."""
     require_main_checkout()
     url, head, briefs = pull_request(pr)
     record = brief_record(pr, briefs)
-    extra = record["testers"][1:] + record["designers"]
-    if entry not in extra:
+    testers, designers = additional_reviewers(record)
+    if entry not in testers + designers:
         raise RuntimeError(
             f"{entry} is not an additional reviewer of brief #{record['brief']} "
-            f"(additional reviewers: {', '.join(extra) or 'none'})"
+            f"(additional reviewers: {', '.join(testers + designers) or 'none'})"
         )
-    duty = "reviewing designer" if entry in record["designers"] else "additional tester"
+    duty = "reviewing designer" if entry in designers else "additional tester"
     worktree = main / ".worktrees" / f"review-{pr}-{entry}"
     refuse_foreign_owner(worktree, [live_name(record["slot"], entry)])
     allocation = record["agents"].get(entry) or allocate(record, entry, duty, worktree)
     allocation["pr"] = pr
     save_record(record)
-    if allocation["workspace"] in live_workspaces() and pane_occupant(allocation["pane"])[1]:
+    if allocation["workspace"] in live_workspaces() and running_client(allocation):
         # A running reviewer keeps the head it is on; its record says which.
         allocation["head"] = git("rev-parse", "HEAD", root=worktree)
         save_record(record)
@@ -1140,8 +1162,9 @@ def caller_record() -> tuple[Record, str]:
 
 
 def tester_message(record: Record, pr: str, url: str, head: str) -> str:
-    implementer, tester = record["implementer"], record["testers"][0]
-    others = record["testers"][1:] + record["designers"]
+    implementer, tester = record["implementer"], record["tester"]
+    testers, designers = additional_reviewers(record)
+    others = testers + designers
     pending = [e for e in others if e not in record["agents"]]
     message = f"Your turn: review {url} at {head}."
     if pending:
@@ -1152,19 +1175,18 @@ def tester_message(record: Record, pr: str, url: str, head: str) -> str:
             f"parallel: herdr agent prompt dispatcher '{url} review: run {commands}'."
         )
     message += (
-        " Follow README step 3; read and apply agent/skills/reviewing-code/SKILL.md from "
-        "this worktree, using agent/skills/developing-software/SKILL.md as the design and "
-        "testing standard. Follow AGENTS.md GitHub and the README PR review record, "
+        " Follow README step 3 and agent/skills/reviewing-code/SKILL.md from "
+        "this worktree. Follow AGENTS.md GitHub and the README PR review record, "
         f"attributed to {tester}. With findings: submit them and run "
         f"agent/teams/team.py turn {pr} {implementer}. Without: submit your LGTM"
     )
     if others:
         named = ", ".join(f"{e} ({live_name(record['slot'], e)})" for e in others)
         message += (
-            f", then read the latest review of this head from each other required "
-            f"reviewer: {named}. One with findings means turn {pr} {implementer}; one "
-            "absent means ring that reviewer by Herdr name with the PR URL and head, or "
-            "report blocked if it is not launched; all LGTM means publish with one "
+            f", then read each required reviewer's latest review of this head: {named}. "
+            f"Findings: run team.py turn {pr} {implementer}. Missing review: notify "
+            "that reviewer with the PR URL and head, or report blocked if not running. "
+            "All LGTM: publish with one "
             "--record per reviewer"
         )
     else:
@@ -1177,7 +1199,7 @@ def implementer_message(pr: str, url: str, problem: str | None) -> str:
         f"Your turn on {url}: run agent/teams/pr_review.py list {pr} and "
         f"gh pr checks {pr} --required. Repair the findings or failed checks as "
         "agent/skills/developing-software/SKILL.md from this worktree says, push and "
-        "hand back; if stuck, follow the README blocker procedure."
+        "return the turn to the tester. If blocked, follow the README blocker procedure."
     )
     if problem:
         # Handing back never refuses: only the implementer can repair the checkout.
@@ -1187,13 +1209,13 @@ def implementer_message(pr: str, url: str, problem: str | None) -> str:
 
 
 def turn(pr: str, recipient: str) -> None:
-    """Hand the pair checkout to the other pair agent and ring it."""
+    """Transfer the turn to the other pair agent and notify it."""
     record, me = caller_record()
-    pair = {record["implementer"], record["testers"][0]}
+    pair = {record["implementer"], record["tester"]}
     if me not in pair or recipient not in pair or recipient == me:
         raise RuntimeError(
             f"turn hands the pair checkout between {record['implementer']} and "
-            f"{record['testers'][0]}; this pane is {me}"
+            f"{record['tester']}; this pane is {me}"
         )
     if Path.cwd() != Path(record["worktree"]):
         raise RuntimeError(f"Run turn from the pair checkout: {record['worktree']}")
@@ -1212,11 +1234,11 @@ def turn(pr: str, recipient: str) -> None:
         message = tester_message(record, pr, url, head)
     partner = live_name(record["slot"], recipient)
     herdr("agent", "prompt", partner, message)
-    print(f"Rang {partner}. Stop using this worktree, build and database; end your turn now.")
+    print(f"Notified {partner}. Stop using this worktree, build and database; end your turn now.")
 
 
 def stop_brief(brief: str) -> None:
-    """Retire a brief whose work is clean and merged; preserve everything otherwise."""
+    """Remove a brief's resources only when its work is clean and merged."""
     record = record_for(brief)
     if record is None:
         print(f"Brief {brief}: no allocation record; nothing removed")
@@ -1224,13 +1246,7 @@ def stop_brief(brief: str) -> None:
     live = live_workspaces()
     present = {e: a for e, a in record["agents"].items() if a["workspace"] in live}
     for allocation in present.values():
-        # The workspace is closed whole: it must still hold only the recorded pane.
-        panes = herdr("pane", "list", "--workspace", allocation["workspace"])["panes"]
-        strangers = [p["pane_id"] for p in panes if p["pane_id"] != allocation["pane"]]
-        if strangers:
-            raise RuntimeError(
-                f"Workspace of {allocation['name']} holds other panes {strangers}; preserved"
-            )
+        require_sole_pane(allocation)
     roots = owned_worktrees(present)
     pair = Path(record["worktree"])
     if pair.is_dir():
@@ -1246,12 +1262,24 @@ def stop_brief(brief: str) -> None:
         stop(allocation["pane"], pane_occupant(allocation["pane"])[0])
     check_worktrees(roots)
     check_shared_owners(roots, present)
-    retire(roots, [a["db_suffix"] for a in record["agents"].values()])
     for allocation in present.values():
+        # Rechecked at the close itself: a pane may have arrived during the shutdown.
+        require_sole_pane(allocation)
         herdr("workspace", "close", allocation["workspace"])
+    retire(roots, [a["db_suffix"] for a in record["agents"].values()])
     record_path(record["slot"]).unlink()
     print(f"Brief {brief}: slot {record['slot']} retired; main checkout status follows")
     print(git("status", "--short") or "Main checkout clean")
+
+
+def require_sole_pane(allocation: Allocation) -> None:
+    """The workspace is closed whole, so it must hold only the recorded pane."""
+    panes = herdr("pane", "list", "--workspace", allocation["workspace"])["panes"]
+    strangers = [p["pane_id"] for p in panes if p["pane_id"] != allocation["pane"]]
+    if strangers:
+        raise RuntimeError(
+            f"Workspace of {allocation['name']} holds other panes {strangers}; preserved"
+        )
 
 
 def retire(roots: set[Path], suffixes: list[str]) -> None:
@@ -1277,7 +1305,7 @@ def retire(roots: set[Path], suffixes: list[str]) -> None:
 
 
 def check_shared_owners(roots: set[Path], present: dict[str, Allocation]) -> None:
-    """Do not retire a worktree still used by an agent outside this slot."""
+    """Do not remove a worktree used by an agent outside this slot."""
     owned_panes = {allocation["pane"] for allocation in present.values()}
     for agent in herdr("agent", "list")["agents"]:
         pane = agent["pane_id"]
