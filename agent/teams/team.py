@@ -821,8 +821,11 @@ def turn(pr: str, recipient: str) -> None:
             "agent/skills/developing-software/SKILL.md as the design and testing standard. "
             "Follow AGENTS.md GitHub and the README PR review record. "
             "With findings: submit them and run "
-            f"agent/teams/team.py turn {pr} dev. Without: publish the approval without "
-            "waiting for CI, keep the turn and do README step 5."
+            f"agent/teams/team.py turn {pr} dev. Without: submit your LGTM; if the issue "
+            "names Required reviews, hand back when a named reviewer's latest review has "
+            "findings and ring one that has not reviewed this head; when all are LGTM, "
+            "publish the approval without waiting for CI, keep the turn and do README "
+            "step 5."
         )
     else:
         message = (

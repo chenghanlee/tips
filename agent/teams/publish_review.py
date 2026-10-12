@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""Publish the tips/independent-review status for an approving review of the exact PR head.
+"""Publish the tips/independent-review status for the approving reviews of the exact PR head.
 
-The record is a submitted GitHub review of the head commit whose first line is `LGTM` and whose
-second line names the reviewer. Every review thread on the PR must be resolved.
+A record is a submitted GitHub review of the head commit whose first line is `LGTM` and whose
+second line is `<reviewer>, <session>`. Every review thread on the PR must be resolved. When
+the PR's linked issue names required reviewers (`Required reviews: name, name`), each of them
+must have an LGTM as their latest review of the head, every review of the head must be
+attributed to one of them, and the caller's records cannot replace that list. The check runs
+at publication time; it does not watch for later edits.
 """
 
 import argparse
@@ -13,7 +17,15 @@ import sys
 from typing import Any
 from urllib.parse import urlparse
 
-from pr_review import RefusalError, gh, place, pull_request, unresolved_threads
+from pr_review import (
+    REVIEW_FIELDS,
+    RefusalError,
+    connection,
+    gh,
+    place,
+    pull_request,
+    unresolved_threads,
+)
 
 CONTEXT = "tips/independent-review"
 
@@ -48,7 +60,11 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--pr", required=True, type=int)
     parser.add_argument("--sha", required=True, help="Exact reviewed head commit")
     source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--record", help="Link to the approving review (#pullrequestreview-id)")
+    source.add_argument(
+        "--record",
+        action="append",
+        help="Link to an approving review (#pullrequestreview-id); repeat for each reviewer",
+    )
     source.add_argument(
         "--owner-waiver",
         metavar="REASON",
@@ -84,20 +100,104 @@ def post_status(repo: str, sha: str, target: str, description: str) -> None:
     )
 
 
-def publish_record(number: int, sha: str, record: str) -> None:
-    path = review_api_path(record)
+def required_reviewers(number: int) -> list[str]:
+    """Reviewer names required by the PR's linked issue, from its `Required reviews:` line.
+
+    [] when no linked issue has the line (the single-record policy). A present but empty or
+    repetitive line, or lines on two linked issues, is refused rather than read as "none".
+    """
+    view: dict[str, Any] = json.loads(
+        gh("pr", "view", str(number), "--json", "closingIssuesReferences")
+    )
+    references: list[dict[str, Any]] = view.get("closingIssuesReferences") or []
+    linked = [str(issue["number"]) for issue in references]
+    found: dict[str, str] = {}
+    for issue in linked:
+        body = json.loads(gh("issue", "view", issue, "--json", "body")).get("body") or ""
+        line = re.search(r"^Required reviews:[ \t]*(.*?)[ \t]*$", body, re.MULTILINE)
+        if line:
+            found[issue] = line.group(1)
+    if not found:
+        return []
+    if len(found) > 1:
+        raise RefusalError(f"Linked issues #{' and #'.join(found)} both name required reviews.")
+    (issue, value), *_ = found.items()
+    names = [name.strip() for name in value.split(",")]
+    if not all(names) or len(set(names)) != len(names):
+        raise RefusalError(f"Issue #{issue} has an empty or repeated name in Required reviews.")
+    return names
+
+
+def attributed(body: str) -> str | None:
+    """The reviewer name of a review body, or None when the attribution line is malformed.
+
+    Line one is `LGTM` or the decision; line two is `<entry name>, <session>`, both nonempty.
+    """
+    lines = [line.strip() for line in body.splitlines() if line.strip()]
+    if len(lines) < 2 or "," not in lines[1]:
+        return None
+    name, session = (part.strip() for part in lines[1].split(",", 1))
+    return name if name and session else None
+
+
+def latest_records(repo: str, number: int, sha: str, names: list[str]) -> dict[str, str]:
+    """Each required reviewer's current LGTM link on `sha`.
+
+    Refuses a missing or superseded review, and any review of the head that is not
+    attributed to a required reviewer: an unreadable decision must not leave an earlier
+    approval standing.
+    """
+    reviews = [
+        review
+        for review in connection(repo, number, "reviews", REVIEW_FIELDS)
+        if review["commit"]["oid"] == sha and review["state"] != "PENDING"
+    ]
+    if not names:
+        return {}
+    by_name: dict[str, list[Any]] = {name: [] for name in names}
+    for review in reviews:
+        who = attributed(review["body"] or "")
+        if who not in by_name:
+            raise RefusalError(
+                f"Review {review['url']} on {sha} is not attributed to a required reviewer "
+                f"on its second line (got {who!r}; required: {', '.join(names)})."
+            )
+        by_name[who].append(review)
+    records: dict[str, str] = {}
+    for name, theirs in by_name.items():
+        if not theirs:
+            raise RefusalError(f"Required review from {name} is missing on {sha}.")
+        latest = theirs[-1]
+        shape = {"state": latest["state"], "commit_id": sha, "body": latest["body"]}
+        if approval_problem(shape, sha):
+            raise RefusalError(f"{name}'s latest review on {sha} is not an LGTM: {latest['url']}")
+        records[name] = latest["url"]
+    return records
+
+
+def publish_record(number: int, sha: str, records: list[str]) -> None:
+    if len(set(records)) != len(records):
+        raise RefusalError("The same record was given twice.")
+    paths = [review_api_path(record) for record in records]
     repo, url = verified_pr(number, sha)
-    if not record.startswith(url + "#"):
-        raise RefusalError(f"Record {record} does not belong to PR {url}.")
-    problem = approval_problem(json.loads(gh("api", path)), sha)
-    if problem:
-        raise RefusalError(problem)
+    for record, path in zip(records, paths, strict=True):
+        if not record.startswith(url + "#"):
+            raise RefusalError(f"Record {record} does not belong to PR {url}.")
+        problem = approval_problem(json.loads(gh("api", path)), sha)
+        if problem:
+            raise RefusalError(problem)
+    names = required_reviewers(number)
+    required = latest_records(repo, number, sha, names)
+    for record in records:
+        if names and record not in required.values():
+            raise RefusalError(f"Record {record} is not a required reviewer's current LGTM.")
     open_threads = unresolved_threads(repo, number)
     if open_threads:
         places = ", ".join(place(thread) for thread in open_threads)
         raise RefusalError(f"{len(open_threads)} unresolved review threads: {places}")
-    post_status(repo, sha, record, "LGTM on this head; review threads resolved")
-    print(f"Published {CONTEXT} on {sha} -> {record}")
+    who = f"LGTM from {', '.join(names)}" if names else "LGTM"
+    post_status(repo, sha, records[0], f"{who} on this head; review threads resolved")
+    print(f"Published {CONTEXT} on {sha} -> {records[0]}")
 
 
 def publish_waiver(number: int, sha: str, reason: str) -> None:
