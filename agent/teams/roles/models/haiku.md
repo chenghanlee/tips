@@ -8,8 +8,7 @@ testers verify the work. The user approved this on 2026-10-12.
   result or a plan.
 - Verify every change with the cheapest real check that exercises it, plus every
   check the repository requires. A command that failed to start is not verification.
-- Consult the advisor before making a design choice the brief does not settle. Also
-  consult the advisor if a check fails and you cannot explain why, and before reporting
-  that the work is done.
+- Ask the advisor before making a design choice the brief leaves open, when a check
+  fails and you cannot explain why, and before reporting that the work is done.
 - Report the brief's missing or conflicting instructions as a QUESTION; do not fill
   the gap yourself.

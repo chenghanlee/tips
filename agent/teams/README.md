@@ -39,7 +39,7 @@ Run them from the root of your checkout. The dispatcher runs `start`, `review` a
 | Command | Caller | Effect |
 |---|---|---|
 | `agent/teams/team.py start <brief>` | Dispatcher | Read `Implementer:` and `Required reviews:`. Create branch `task/<brief>` from `origin/main` and worktree `.worktrees/<brief>`. Set up dependencies and Dexter. Launch the implementer and merge-confirming tester in their own workspaces, write the allocation record, and post one EVENT per launch on the brief. |
-| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require a clean tree at the PR head, run from the pair checkout, and a PR that closes the brief. Notify the tester with the PR URL, SHA and the `review` commands for reviewers not yet launched. |
+| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Run from the pair checkout. Require a clean tree at the PR head and a PR that closes the brief. Notify the tester with the PR URL, SHA and the `review` commands for reviewers not yet launched. |
 | `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Notify the implementer even if the tree is dirty; the message includes any mismatch. |
 | `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create `.worktrees/review-<pr>-<entry>` detached at the PR head with its own database suffix, port, dependencies and Dexter, and launch the reviewer there. |
 | `agent/teams/team.py stop <brief>` | Dispatcher | Refuse dirty, unmerged or foreign-owned work. Stop every recorded client and Dexter, drop the slot's databases, remove its worktrees, branch and workspaces, delete the record. |
@@ -48,7 +48,7 @@ Run them from the root of your checkout. The dispatcher runs `start`, `review` a
 | `agent/teams/board.py usage <issue>...` | Dispatcher | Tokens per launched session and model, from the session logs. |
 | `agent/teams/pr_review.py list <pr>` | Any agent | Recent reviews and every unresolved thread. |
 | `agent/teams/pr_review.py resolve <thread>` | Thread opener | Resolve your own thread. |
-| `herdr agent prompt dispatcher "<URL> review: run <review commands>"` | Tester | Ask for the reviewers the handoff names as not launched. |
+| `herdr agent prompt dispatcher "<URL> review: run <review commands>"` | Tester | Ask the dispatcher to launch each reviewer the handoff lists as not launched. |
 | `herdr agent prompt team-<slot>-<entry> "<review URL>"` | Other reviewer | Tell the merge-confirming tester a review exists. |
 | `herdr agent prompt dispatcher "<URL> done"` | Tester | The PR merged. |
 | `herdr agent prompt dispatcher "<comment URL> blocked"` | Turn holder | A blocker is recorded. |
@@ -69,8 +69,8 @@ in the message or the linked record. After sending, end your turn. If sending fa
 you still hold the turn: report `blocked` with the exact command and error; nobody
 delivers a denied message another way.
 
-No label records whose turn it is. After a restart, determine the turn from the PR,
-its head reviews and the required checks. Take the first matching row:
+No label shows who has the turn. After a restart, read the PR, its head reviews and
+the required checks. Use the first matching row:
 
 | Condition | Turn |
 |---|---|
@@ -145,7 +145,8 @@ reports `blocked` with both run links. The dispatcher opens the revert with
 
 ## Constraints
 
-- One PR per issue. Out-of-scope findings become a new issue rather than expanding the current PR.
+- One PR per issue. Open a new issue for work outside the scope. Keep that work out of
+  the current PR.
 - The pair shares one worktree and takes turns; other reviewers have their own.
   Each client has its own database and test port from launch; keep them in every run.
 - Put temporary files in the worktree's `tmp/`. Make source changes in worktrees, never the
@@ -171,10 +172,11 @@ command, alone in its tool call, replacing only `<name>`:
 agent-browser open about:blank --session <name>
 ```
 
-Any other form can start Chrome inside the Codex sandbox and fail with
+Other forms of `agent-browser open` can start Chrome inside the Codex sandbox and fail with
 `Chrome exited early`. If `open` fails with that error or with
 `without writing DevToolsActivePort`, run `agent-browser close --session <name>`, then
-`open` again, then `agent-browser get url --session <name>`, each in its own tool call;
+`agent-browser open about:blank --session <name>` again, then
+`agent-browser get url --session <name>`, each in its own tool call;
 the last command prints `about:blank`. If this recovery fails, keep the full error and
 follow the [browser setup diagnostics](SETUP.md#browser-access-for-the-tester); do not disable
 Chrome's sandbox or use the user's browser profile. Read mail in `/dev/mailbox`. Stop

@@ -16,9 +16,9 @@ the [workflow](../README.md) and
 - Submit the [review record](../README.md#pr-review-record). If you find issues, run
   `agent/teams/team.py turn <pr> <implementer entry>`. If you find none, submit LGTM.
 - Merge-confirming tester: after your LGTM, read each required reviewer's latest
-  review of the head. If a review has findings, return the PR with `turn`. If a review
-  is missing, notify its reviewer with the PR URL and head; use `blocked` if that
-  reviewer is not running. When all required reviews are LGTM, follow the
+  review of the head. If a review has findings, use `turn` to return work to the
+  implementer. If a review is missing, notify its reviewer with the PR URL and head;
+  use `blocked` if that reviewer is not running. When all required reviews are LGTM, follow the
   [merge step](../README.md#merge), then notify the dispatcher with `done`.
 - Other tester: notify the merge-confirming tester with your review URL. Never run
   `team.py turn`.

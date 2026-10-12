@@ -75,7 +75,7 @@ Codex launches with approval policy `never`; denied actions cannot escalate, and
 
 In `~/.codex/config.toml`, append the absolute path to `~/.agent-browser` to the
 existing `[sandbox_workspace_write].writable_roots` list. Preserve its other
-entries. This setting allows the tester to write to `~/.agent-browser`, resolving the home-directory write denial. See the
+entries. This lets the tester write to `~/.agent-browser`. See the
 [Codex configuration reference](https://developers.openai.com/codex/config-reference/).
 
 Chrome cannot start inside the Codex sandbox. Add this rule to
@@ -99,10 +99,10 @@ first follow the close-and-reopen recovery in [manual browser review](README.md#
 A daemon started inside the sandbox can survive a failed launch, so retrying
 `open` alone can still fail even with the allow rule installed.
 
-If recovery fails or opening reports another error, retain the full error and
-run `agent-browser doctor` in that same tester. Doctor's launch test starts a
-separate browser. It can fail inside the Codex sandbox even when the approved
-`open` command works; the quick/offline doctor does not check browser launch. Resolve the
+If recovery fails or `agent-browser open` reports another error, keep the full error
+and run `agent-browser doctor` in the same tester session. Doctor's launch test starts
+a separate browser. It can fail inside the Codex sandbox even when the approved
+`open` command works; the quick/offline doctor does not check browser launch. Fix the
 browser launch failure before assigning manual browser review; do not disable Chrome's sandbox or
 silently switch to the user's personal browser profile. ChromeDriver for local
 Wallaby tests is a separate prerequisite in the
@@ -142,9 +142,9 @@ agent/teams/dispatch --new-pane
 ```
 
 This opens a sibling pane without changing focus and runs the dispatcher there.
-The calling agent keeps running. Check the new pane for startup or approval
-prompts; the command can return before the dispatcher is ready. Run the script in the
-main checkout.
+The agent that ran `dispatch --new-pane` keeps running. Check the new pane for startup
+or approval prompts; the command can return before the dispatcher is ready. Run the
+script in the main checkout.
 
 Start one dispatcher. Agents contact it using the name `dispatcher`. It chooses tasks
 from the backlog using milestone order, dependencies and product value; you do not
@@ -155,9 +155,9 @@ type `board changed` in its pane. Answer its product and scope questions there.
 Each message gives the dispatcher full context, so it compacts at the configured
 threshold (`dispatcher.compact_percent`) and reloads state from GitHub.
 
-It runs `team.py` from the main checkout. Handle each client's initial repository
-trust prompt. If an approval prompt stops launch, inspect it and follow the active
-approval policy.
+The dispatcher runs `team.py` from the main checkout. Handle each client's initial
+repository trust prompt. If an approval prompt stops launch, inspect it and follow
+the active approval policy.
 
 ## Configuration
 
@@ -182,7 +182,7 @@ A Claude entry launches with `--advisor <advisor>` when its `advisor` is set; th
 
 `timeouts.dexter_startup_seconds` bounds the Dexter warm-up at start, Elixir version detection and the daemon stop during cleanup. `TIPS_DEXTER_HOME` selects another shared Dexter build directory.
 
-Set database connection limits in [compose.yaml](../../compose.yaml), overridden by `TIPS_DB_MAX_CONNECTIONS`. Recreate the database service to apply changes. Do this only when no pairs are running.
+Set database connection limits in [compose.yaml](../../compose.yaml). `TIPS_DB_MAX_CONNECTIONS` overrides those limits. Recreate the database service to apply changes. Do this only when no pairs are running.
 
 ## Changing these scripts
 

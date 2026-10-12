@@ -281,7 +281,7 @@ def session_id(agent: Entity) -> str:
 
 
 def processes() -> ProcessRows:
-    # Parent links, not process groups: Expert engines can create their own groups.
+    # Find descendants through parent links. Expert engines may create their own process groups.
     rows: ProcessRows = {}
     for line in run("ps", "-axo", "pid=,ppid=,stat=,lstart=").splitlines():
         pid, parent, state, started = line.split(None, 3)
@@ -576,7 +576,7 @@ def reserved() -> list[Allocation]:
 
 
 def reviewer_names(value: str) -> list[str]:
-    """The names of a `Required reviews:` line; refuse an empty or repeated name."""
+    """Return names from `Required reviews:`. Reject empty or duplicate names."""
     names = [name.strip() for name in value.split(",")]
     if not all(names) or len(set(names)) != len(names):
         raise ValueError("empty or repeated name in Required reviews")
@@ -589,10 +589,10 @@ def issue_line(body: str, label: str) -> str | None:
 
 
 def roster(brief: str) -> tuple[str, list[str], list[str]]:
-    """The brief's implementer, testers and reviewing designers, each a configured entry.
+    """Read the brief's implementer, testers and reviewing designers from configured entries.
 
-    `Required reviews:` is the publisher's gate, so the launch set is read from the same
-    line: testers in the order written, the first confirming the merge, and designers.
+    Read reviewer names from `Required reviews:`. Keep testers in the listed order;
+    the first tester confirms the merge. Return testers and designers separately.
     """
     body = str(json.loads(run("gh", "issue", "view", brief, "--json", "body")).get("body") or "")
     implementer = issue_line(body, "Implementer")
@@ -644,7 +644,7 @@ def repository() -> str:
 
 
 def issue_comments(issue: str) -> list[dict[str, object]]:
-    """Every comment of an issue, oldest first: id, html_url, body, created_at."""
+    """Return issue comments oldest first, with id, html_url, body and created_at fields."""
     output = run(
         "gh", "api", "--paginate", "--slurp", f"repos/{repository()}/issues/{issue}/comments"
     )
@@ -657,7 +657,7 @@ def issue_comments(issue: str) -> list[dict[str, object]]:
 
 
 def post_comment(issue: str, text: str) -> str:
-    """Post a comment once: an identical comment already on the issue is reused, not repeated."""
+    """If the same comment exists, return its URL. Otherwise, post it."""
     for comment in issue_comments(issue):
         if comment.get("body") == text:
             return str(comment["html_url"])
@@ -689,7 +689,7 @@ def post_event(brief: str, allocation: Allocation, text: str) -> None:
 
 
 def bound_command(binary: Path, root: Path, sources: Path | str) -> str:
-    """The worktree's Dexter command: the one place naming binary, root and sources."""
+    """Build the worktree's Dexter wrapper with paths to the binary, root and Elixir sources."""
     return (
         "#!/bin/sh\n"
         f"export DEXTER_ELIXIR_LIB_ROOT={shlex.quote(str(sources))}\n"
@@ -699,7 +699,7 @@ def bound_command(binary: Path, root: Path, sources: Path | str) -> str:
 
 
 def warm_up_query(startup_seconds: int) -> list[str]:
-    """Bound-command arguments that start the daemon and wait for its index."""
+    """Return wrapper arguments that start the daemon and wait for its index."""
     return ["query", "workspace-symbols", "--raw", "--wait", f"{startup_seconds}s", "MixProject"]
 
 
@@ -744,7 +744,7 @@ def test_port(entry: str, slot: int) -> int:
 
 
 def agent_env(allocation: Allocation) -> dict[str, str]:
-    """One client's environment: its recorded database and port, its worktree's tools."""
+    """Build the client's environment from its recorded database, port and worktree tools."""
     config = Path(os.environ.get("TIPS_TEAM_CONFIG", main / "agent/teams/config.toml")).resolve()
     worktree = Path(allocation["worktree"])
     env = {
@@ -765,7 +765,7 @@ def agent_env(allocation: Allocation) -> dict[str, str]:
 
 
 def allocate(record: Record, entry: str, role: str, worktree: Path) -> Allocation:
-    """Reserve the entry's database and port in this slot; the record keeps them from now on."""
+    """Reserve the entry's database and port in this slot and save them in its allocation record."""
     slot = record["slot"]
     suffix, port = db_suffix(entry, slot), test_port(entry, slot)
     for held in reserved():
@@ -836,7 +836,7 @@ def link_skills(link: Path, shared: Path) -> None:
 
 
 def prepare_index(worktree: Path, wrapper: Path, env: dict[str, str], fetch: bool) -> None:
-    """Fetch a new checkout's locked dependencies, start Dexter and reconcile its index."""
+    """Fetch a new checkout's locked dependencies, start Dexter and update its index."""
     if fetch:
         # --check-locked never rewrites the lock. A reused worktree keeps its own dependency
         # state: it may hold an unfinished change that only its agent can resolve.
@@ -996,8 +996,8 @@ def reviewer_brief(record: Record, entry: str, duty: str, pr: str, head: str, wr
         "agent/teams/team.py turn. Submit the README review record with "
         f"{entry}, <session> on line 2; replace <session> with your session ID. "
         "Then notify the merge-confirming tester with "
-        f"herdr agent prompt {tester} '<your review URL>' and end your turn. A later head "
-        "follows the README reviewer steps. " + dexter_brief(wrapper)
+        f"herdr agent prompt {tester} '<your review URL>' and end your turn. "
+        "If the PR head changes, follow the README reviewer steps again. " + dexter_brief(wrapper)
     )
 
 
@@ -1118,7 +1118,7 @@ def require_main_checkout() -> None:
 
 
 def current_roster(record: Record) -> tuple[list[str], list[str]]:
-    """The brief's current additional testers and designers; the brief is the only copy.
+    """Read additional testers and designers from the brief; no separate list is stored.
 
     The pair owners are fixed in the record, so a brief that names another implementer
     or first tester is refused wherever it is read.
@@ -1371,7 +1371,7 @@ def stop_brief(brief: str) -> None:
 
 
 def require_sole_pane(allocation: Allocation) -> None:
-    """The workspace is closed whole, so it must hold only the recorded pane."""
+    """Require the recorded pane to be the only pane; closing the workspace closes every pane."""
     panes = herdr("pane", "list", "--workspace", allocation["workspace"])["panes"]
     strangers = [p["pane_id"] for p in panes if p["pane_id"] != allocation["pane"]]
     if strangers:
@@ -1478,7 +1478,10 @@ def configure() -> None:
 
 
 def stop_agent(pane: str, root: str | Path) -> None:
-    """Graceful client exit; raise on uncertainty. Caller must preserve the checkout."""
+    """Stop the client gracefully; raise an error if its exit is uncertain.
+
+    The caller must keep the checkout.
+    """
     configure()
     stop(pane, root)
 

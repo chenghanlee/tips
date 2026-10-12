@@ -8,9 +8,9 @@ Usage:
   agent/teams/board.py usage <issue>...
 
 post prints the comment URL. If the same comment already exists, it returns that URL
-instead of posting again. For a manually posted EVENT about a new occurrence, make the
-full comment differ from earlier ones. Relaunches differ through the new session ID in
-their header. Header format: `<TYPE> <role> <name> <session>`. The Herdr pane supplies
+instead of posting again. When you post an EVENT for a new occurrence, use different
+comment text. A relaunch already differs because its header has a new session ID.
+Header format: `<TYPE> <role> <name> <session>`. The Herdr pane supplies
 the name and session; the allocation record supplies the role. Use --role if no record
 names you, or --as to post for another agent (for example, a launch or takeover record).
 Above 800 words, the command warns; include the reason in the comment.
@@ -84,7 +84,7 @@ def post(args: argparse.Namespace) -> None:
     header = comment_header(args.type, role, name, session)
     body = sys.stdin.read().strip()
     if not body:
-        raise RuntimeError("No comment text received on stdin; the input is empty")
+        raise RuntimeError("Comment text on stdin is empty")
     words = len(body.split())
     if words > WORD_LIMIT:
         print(
@@ -123,7 +123,7 @@ def count(usage: dict[str, object], key: str) -> int:
 
 
 def claude_tokens(session: str) -> dict[str, list[int]]:
-    """Tokens per model from the session's own log and its subagents', one count per message."""
+    """Count tokens by model from session and subagent logs, once per assistant message."""
     home = Path.home() / ".claude/projects"
     files = list(home.glob(f"*/{session}.jsonl"))
     files += list(home.glob(f"*/{session}/subagents/*.jsonl"))
@@ -156,7 +156,7 @@ def claude_tokens(session: str) -> dict[str, list[int]]:
 
 
 def codex_tokens(session: str) -> dict[str, list[int]]:
-    """Tokens per model from the session's rollout log, one count per response."""
+    """Count tokens by model from the session's rollout log, once per response."""
     files = list((Path.home() / ".codex/sessions").glob(f"*/*/*/rollout-*-{session}.jsonl"))
     model = "codex"
     responses: dict[str, tuple[str, dict[str, object]]] = {}
@@ -180,7 +180,7 @@ def codex_tokens(session: str) -> dict[str, list[int]]:
 
 
 def launched_sessions(issues: list[str]) -> list[tuple[str, str, str]]:
-    """(name, role, session) of every launch EVENT on the issues, each once, in name order."""
+    """Return unique (name, role, session) tuples from launch EVENTs, sorted by name."""
     found: set[tuple[str, str, str]] = set()
     for issue in issues:
         for comment in issue_comments(issue):
@@ -203,7 +203,9 @@ def usage(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="The swarm board.")
+    parser = argparse.ArgumentParser(
+        description="Post and read issue comments; report session token counts."
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     poster = commands.add_parser("post")
     poster.add_argument("issue")

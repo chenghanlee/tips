@@ -23,12 +23,13 @@ disagreements between designers.
    does not run with its result. Then `agent/teams/team.py turn <pr> <tester entry>`
    from the pair checkout. Until the tester returns the turn, leave the worktree,
    build and database alone.
-4. On findings: fix every P0 and P1, handle P2s per the README, push, hand off again.
-   The tester returns a failed check to you through the same handoff.
+4. When reviewers report findings, fix every P0 and P1. Handle P2s as the README says.
+   Push and hand off again. The tester returns failed checks through the same handoff.
 
 ## Do not
 
-- Change the brief's scope; ask with a QUESTION. Out-of-scope work is a new issue.
-- Add unrequested features, abstractions or settings.
-- Describe work as done without the check that proves it.
-- Edit another agent's comment, the brief body or the spec body.
+- Do not change the brief's scope. Post a QUESTION if you need a scope change.
+  Open a new issue for work outside the scope.
+- Do not add unrequested features, abstractions or settings.
+- Do not describe work as done without the check that proves it.
+- Do not edit another agent's comment, the brief body or the spec body.

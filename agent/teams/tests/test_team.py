@@ -160,7 +160,7 @@ REAL_DEXTER = "opt-in real Dexter: TIPS_TEST_REAL_DEXTER and DEXTER_ELIXIR_LIB_R
 
 
 def real_bound_command(root: Path) -> Path:
-    """Write the production bound command for root over the real binary."""
+    """Write the production bound command for root using the real Dexter binary."""
     wrapper = root / ".dexter/dexter.sh"
     wrapper.parent.mkdir()
     wrapper.write_text(
@@ -331,7 +331,7 @@ while True: time.sleep(.05)
         (self.root / "state.json").write_text(json.dumps(state))
 
     def test_changed_owner_or_failed_clear_preserves_the_name(self) -> None:
-        """A replacement client, another kind at the shell or a real clear error keeps the name."""
+        """Keep the name if the client changes or clearing its name fails."""
         cases = (
             ({"replacement": True, "listed_kind": "codex"}, "occupied=True", False),
             ({"replacement": True, "listed_kind": None}, "leader_argv0='claude'", False),

@@ -1,7 +1,8 @@
 # Agent launch settings. Changes apply to newly started sessions.
 # An empty model uses the client's configured default.
 [team]
-# Current suffixes support at most nine teams; validation rejects partition collisions.
+# The current database suffix format supports up to 9 teams. Validation rejects
+# suffixes that overlap with numbered database partitions.
 max_teams = 4
 port_base = 4100
 port_stride = 10
@@ -26,11 +27,10 @@ model = "claude-fable-5-1"
 effort = "medium"
 compact_percent = 35
 
-# Configured agents. A brief names them: `Implementer: <entry>` and
-# `Required reviews: <entry>, <entry>`. Each launch allocates the entry a database
-# suffix and test port within the slot: db_suffix_prefix + slot + db_suffix, and
-# port_base + slot * port_stride + port_offset. `advisor` is Claude only; `persona`
-# is optional text the launch prompt carries.
+# Briefs name agents with `Implementer: <entry>` and `Required reviews: <entry>, <entry>`.
+# Each launch gets a database suffix (db_suffix_prefix + slot + db_suffix)
+# and a test port (port_base + slot * port_stride + port_offset).
+# `advisor` applies only to Claude entries. `persona` adds optional text to the launch prompt.
 [agents.opus-implementer]
 role = "implementer"
 kind = "claude"

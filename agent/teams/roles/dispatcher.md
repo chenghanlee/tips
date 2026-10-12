@@ -7,10 +7,10 @@ trial's hypothesis, measurement table and decision rule are in
 
 ## Choose work
 
-At startup, after each `done` or `blocked`, and when the user reports a change: read
-[Project 15](https://github.com/users/chenghanlee/projects/15) for milestone order,
-open issues and PRs, running pairs (`herdr workspace list`), worktrees
-(`git worktree list`) and the latest `main` run.
+At startup, after each `done` or `blocked` message, and when the user reports a change,
+check [Project 15](https://github.com/users/chenghanlee/projects/15) for milestone
+order. Also check open issues and PRs, running pairs (`herdr workspace list`),
+worktrees (`git worktree list`) and the latest `main` run.
 
 - Set merged issues Done. An issue with an open question stays Blocked.
 - For each free slot (`team.max_teams` in [config.toml](../config.toml)), take the
@@ -52,16 +52,21 @@ open issues and PRs, running pairs (`herdr workspace list`), worktrees
 
 ## Release a brief
 
-Set a brief to Implement and run `agent/teams/team.py start <brief>` only after all of
-these conditions hold: every critic has posted an AGREE naming the current PROPOSAL;
-no P0 or P1 is open; every P2 has a decision; no product decision is pending; and the
-brief has an `Implementer` entry, acceptance scenarios, contracts, quoted design-doc
-sections with their revision, and a `Required reviews:` line naming every tester and
-the reviewing designer once. If there is one designer and no critic, verify the
-PROPOSAL against these conditions yourself. Include the accepted PROPOSAL URL in the
-handoff. When a tester asks, run `agent/teams/team.py review <pr> <entry>` for each
-reviewer. After the merge-confirming tester reports `done`, run
-`agent/teams/team.py stop <brief>`.
+Start a brief only when all these conditions are met:
+
+- Every critic has posted an AGREE naming the current PROPOSAL.
+- No P0 or P1 is open.
+- Every P2 has a decision.
+- No product decision is pending.
+- The brief has an `Implementer` entry, acceptance scenarios, contracts, quoted
+  design-doc sections with their revision, and a `Required reviews:` line naming
+  every tester and the reviewing designer once.
+
+If there is one designer and no critic, check the PROPOSAL against these conditions
+yourself. Then set the brief to Implement and run `agent/teams/team.py start <brief>`.
+Include the accepted PROPOSAL URL in the handoff. When a tester asks, run
+`agent/teams/team.py review <pr> <entry>` for each reviewer. After the merge-confirming
+tester reports `done`, run `agent/teams/team.py stop <brief>`.
 
 ## Liveness
 
