@@ -15,7 +15,7 @@ import tomllib
 import uuid
 from collections.abc import Sequence
 from pathlib import Path
-from typing import NotRequired, TypedDict, cast
+from typing import IO, NotRequired, TypedDict, cast
 
 
 class Role(TypedDict):
@@ -124,9 +124,12 @@ def execute(
     timeout: float | None = None,
     check: bool = False,
     input_text: str | None = None,
+    output: IO[str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    """Run a resolved executable without a shell and capture its output."""
+    """Run a resolved executable without a shell; capture its output or stream it to `output`."""
     # Reviewed S603: callers pass fixed tool names; command_args resolves argv[0], no shell.
+    # With `output`, both streams go to that open file as they are produced; stdout and
+    # stderr of the result are then empty.
     return subprocess.run(  # noqa: S603
         command_args(args, path=env.get("PATH", os.defpath) if env is not None else None, cwd=cwd),
         cwd=cwd,
@@ -134,7 +137,9 @@ def execute(
         timeout=timeout,
         check=check,
         text=True,
-        capture_output=True,
+        capture_output=output is None,
+        stdout=output,
+        stderr=subprocess.STDOUT if output is not None else None,
         input=input_text,
     )
 
@@ -822,9 +827,10 @@ def turn(pr: str, recipient: str) -> None:
             "Follow AGENTS.md GitHub and the README PR review record. "
             "With findings: submit them and run "
             f"agent/teams/team.py turn {pr} dev. Without: submit your LGTM; if the issue "
-            "names Required reviews, wait for each named reviewer's LGTM on this head; "
-            "then publish the approval without waiting for CI, keep the turn and do "
-            "README step 5."
+            "names Required reviews, hand back when a named reviewer's latest review has "
+            "findings and ring one that has not reviewed this head; when all are LGTM, "
+            "publish the approval without waiting for CI, keep the turn and do README "
+            "step 5."
         )
     else:
         message = (

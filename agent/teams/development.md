@@ -30,9 +30,11 @@ Run these additional tests when the change matches:
 
 ## Lint exceptions
 
-The reviewed `# noqa: S603` exceptions apply only to `team.py:execute` and
-`StopAgentTest.client`. These calls use variable argument lists, no shell, a
-resolved executable, and fixed or test-owned arguments.
+The reviewed `# noqa: S603` exceptions apply only to `team.py:execute`,
+`StopAgentTest.client` and the two `CaptureTest` child launches. These calls use
+variable argument lists, no shell, a resolved executable, and fixed or test-owned
+arguments. `execute`'s optional `output` is a file the caller opened; the child's
+streams go there instead of being captured.
 
 When changing either call, review the executable selection and arguments for
 safety. Lint does not verify their safety. Do not suppress other warnings.

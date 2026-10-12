@@ -9,8 +9,9 @@ PROPOSAL URL and brief revision. If your model is Haiku, also read
 ## Q&A before code
 
 Post one comment on the brief: restated plan, assumptions, QUESTIONs. The lead
-answers. Start coding when the dispatcher releases the brief or the lead's ANSWER
-leaves no QUESTION open. You never arbitrate between designers.
+answers. Start coding only when the dispatcher has released the brief and the lead's
+ANSWER leaves none of your QUESTIONs open. If an answer changes a contract, wait for
+the lead's renewed release. You never arbitrate between designers.
 
 ## Evidence
 

@@ -37,9 +37,10 @@ Move a brief to Q&A only when all hold:
   brief revisions it covers.
 - No P0 or P1 objection is open; every P2 has a recorded disposition.
 - No product decision is unresolved.
-- The brief has an `Implementer` entry, a `Required reviews:` line naming the
-  merge-confirming tester and the reviewing designer, acceptance scenarios, contracts
-  and quoted design-doc sections with their revision.
+- The brief has an `Implementer` entry, acceptance scenarios, contracts and quoted
+  design-doc sections with their revision, and a `Required reviews:` line that names
+  every assigned tester and the reviewing designer from the spec's agent set, each
+  once. Check the line against the spec yourself; the publisher reads only the brief.
 
 With one designer and no critic, review the PROPOSAL against this list yourself and
 accept it or send it back once.
@@ -49,9 +50,12 @@ PROPOSAL URL and brief revision.
 
 ## Rounds and liveness
 
-- After delivering a round assignment, record a 30-minute checkpoint and run
-  `herdr agent wait <name> --timeout 1800000` in the background. An early return
-  without the round record re-arms the wait; a timeout is the checkpoint.
+- After delivering a round assignment, record the due time 30 minutes out on the
+  spec issue (a trial setting). The due time never moves. Until the trial shows that
+  a background `herdr agent wait <name> --timeout <ms>` returning wakes you, this is
+  an operator checkpoint: the user wakes you at the due time if no round record or
+  blocker arrived. If you use the wait, give it the remaining time to the due time,
+  and an early return without the round record only re-arms it for the remainder.
 - At the checkpoint, inspect delivery and agent state. A live agent gets one
   reasoned extension. Replace a dead session only after its activity stopped and its
   records are read; the replacement reviews the same PROPOSAL and inherited

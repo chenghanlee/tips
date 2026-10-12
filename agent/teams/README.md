@@ -100,9 +100,10 @@ behaviour or design.
 
 Approve when no P0 or P1 remains and every thread is resolved. Submit the
 [PR review record](#pr-review-record) without waiting for CI. Keep the turn. If the
-issue has a `Required reviews:` line, publish only when every named reviewer's latest
-review of this head is an LGTM; until then ring the missing reviewer and wait. The
-publisher refuses a missing, superseded, duplicate or wrong-head record.
+linked issue has a `Required reviews:` line, read each named reviewer's latest review
+of this head: one with findings means `turn <pr> dev`; one absent means ring that
+reviewer and wait; all LGTM means publish. The publisher refuses a missing,
+superseded, duplicate or wrong-head record.
 
 Auto-merge requires `checks`, `release`, `tips/independent-review` and resolved
 threads. A merge closes the issue, sets the Project item to Done and deletes the
@@ -193,8 +194,9 @@ checks. Use the first matching condition:
 | No PR exists | Developer: implement and open the PR. |
 | A required check failed | Developer: fix the failure. |
 | The current head has reviews and the latest is not an LGTM | Developer: address the review. |
+| A reviewer named in `Required reviews:` has a latest review of this head that is not an LGTM | Developer: address it. |
 | The current head has no reviews | Tester: review it. |
-| The tester's latest review is an LGTM and a reviewer named in `Required reviews:` has no LGTM on this head | Tester: keep the turn; ring the missing reviewer. |
+| The tester's latest review is an LGTM and a reviewer named in `Required reviews:` has not reviewed this head | Tester: keep the turn; ring that reviewer. |
 | The current head is approved | Tester: complete approval publication and merge confirmation. |
 
 ## Rules
@@ -348,18 +350,21 @@ Use this structure for `tmp/review.json`:
 }
 ```
 
-For approval, put `LGTM` alone on the first line of the review body and the role
-and session on the second line. Then publish the status:
+Every review body names its reviewer on the second line: role or agent name, then
+the session. The first line is `LGTM` alone for an approval, or the decision
+otherwise. Attribution reads the first two lines, so a review that omits the
+reviewer line does not count as that reviewer's. To approve, publish the status:
 
 ```sh
 agent/teams/publish_review.py --pr <pr> --sha <sha> --record <review URL>
 ```
 
 The command refuses a wrong head, a wrong record or unresolved threads. When the
-issue closed by the PR has a line `Required reviews: <name>, <name>`, every named
-reviewer's latest review of the head must be an LGTM whose second line starts with
-that name; repeat `--record` for each, and the command refuses a missing, superseded,
-duplicate or unlisted record.
+PR's linked issue (GitHub's closing reference, any keyword) has a line
+`Required reviews: <name>, <name>`, every named reviewer's latest review of the head
+must be an LGTM attributed to that name; repeat `--record` for each. The command
+refuses a missing, superseded, duplicate or unlisted record, an empty or repeated
+name, and two linked issues that both name reviewers.
 
 To read reviews and resolve threads:
 

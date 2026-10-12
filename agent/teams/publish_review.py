@@ -22,7 +22,6 @@ from pr_review import (
     gh,
     place,
     pull_request,
-    reviewer,
     unresolved_threads,
 )
 
@@ -100,21 +99,42 @@ def post_status(repo: str, sha: str, target: str, description: str) -> None:
 
 
 def required_reviewers(number: int) -> list[str]:
-    """Reviewer names the PR's issue requires, from its `Required reviews:` line; [] if none."""
-    body = json.loads(gh("pr", "view", str(number), "--json", "body")).get("body") or ""
-    closes = re.search(r"\bCloses #(\d+)\b", body)
-    if not closes:
+    """Reviewer names required by the PR's linked issue, from its `Required reviews:` line.
+
+    [] when no linked issue has the line (the single-record policy). A present but empty or
+    repetitive line, or lines on two linked issues, is refused rather than read as "none".
+    """
+    view: dict[str, Any] = json.loads(
+        gh("pr", "view", str(number), "--json", "closingIssuesReferences")
+    )
+    references: list[dict[str, Any]] = view.get("closingIssuesReferences") or []
+    linked = [str(issue["number"]) for issue in references]
+    found: dict[str, str] = {}
+    for issue in linked:
+        body = json.loads(gh("issue", "view", issue, "--json", "body")).get("body") or ""
+        line = re.search(r"^Required reviews:[ \t]*(.*?)[ \t]*$", body, re.MULTILINE)
+        if line:
+            found[issue] = line.group(1)
+    if not found:
         return []
-    issue = json.loads(gh("issue", "view", closes.group(1), "--json", "body")).get("body") or ""
-    line = re.search(r"^Required reviews:\s*(.+?)\s*$", issue, re.MULTILINE)
-    if not line:
-        return []
-    return [name.strip() for name in line.group(1).split(",") if name.strip()]
+    if len(found) > 1:
+        raise RefusalError(f"Linked issues #{' and #'.join(found)} both name required reviews.")
+    (issue, value), *_ = found.items()
+    names = [name.strip() for name in value.split(",")]
+    if not all(names) or len(set(names)) != len(names):
+        raise RefusalError(f"Issue #{issue} has an empty or repeated name in Required reviews.")
+    return names
 
 
 def named(body: str, name: str) -> bool:
-    """Whether the review's reviewer line is `name`, optionally followed by a session."""
-    return re.match(re.escape(name) + r"(?:[,\s]|$)", reviewer(body)) is not None
+    """Whether the review's reviewer line is `name`, optionally followed by a session.
+
+    The reviewer line is the first or second nonblank line, so a decision-first body
+    (`Changes required`, then the reviewer) attributes like an LGTM-first body does.
+    """
+    lines = [line.strip() for line in body.splitlines() if line.strip()][:2]
+    pattern = re.escape(name) + r"(?:[,\s]|$)"
+    return any(re.match(pattern, line) for line in lines)
 
 
 def latest_records(repo: str, number: int, sha: str, names: list[str]) -> dict[str, str]:

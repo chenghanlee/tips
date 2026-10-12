@@ -27,9 +27,10 @@ fake = json.loads(os.environ["FAKE_GH"])
 query = next((arg for arg in a if arg.startswith("query=")), "")
 if a[:2] == ["pr", "view"]:
     pr = {"headRefOid": fake["head"], "url": "https://github.com/o/tips/pull/7"}
-    print(json.dumps({**pr, "body": fake.get("pr_body", "")}))
+    linked = [{"number": n} for n in fake.get("linked", [])]
+    print(json.dumps({**pr, "closingIssuesReferences": linked}))
 elif a[:2] == ["issue", "view"]:
-    print(json.dumps({"body": fake.get("issue_body", "")}))
+    print(json.dumps({"body": fake["issues"][a[2]]}))
 elif a[:2] == ["pr", "comment"]:
     print("https://github.com/o/tips/pull/7#issuecomment-99")
 elif "resolveReviewThread" in query:
@@ -201,11 +202,11 @@ class PublishTest(unittest.TestCase):
 
 
 class RequiredReviewsTest(unittest.TestCase):
-    """The issue's `Required reviews:` line decides who must have an LGTM on the head."""
+    """The linked issue's `Required reviews:` line decides who must have an LGTM on the head."""
 
-    BRIEF: ClassVar[dict[str, str]] = {
-        "pr_body": "Closes #12\n",
-        "issue_body": "Required reviews: team-1-test, lead-fable\n",
+    BRIEF: ClassVar[dict[str, Any]] = {
+        "linked": [12],
+        "issues": {"12": "Implementer: opus\nRequired reviews: team-1-test, lead-fable\n"},
     }
     DESIGNER = PR + "#pullrequestreview-6"
 
@@ -218,60 +219,18 @@ class RequiredReviewsTest(unittest.TestCase):
             ]
         ]
 
+    def refused(self, expected: str, *source: str, **fake: Any) -> None:
+        result, calls = publish(*source, **{**self.BRIEF, **fake})
+        assert result.returncode != 0, expected
+        assert expected in result.stderr, (expected, result.stderr)
+        assert posts(calls) == [], expected
+
     def test_every_required_reviewer_current_lgtm_posts_once(self) -> None:
         result, calls = publish(**self.BRIEF, reviews=self.reviews())
         assert result.returncode == 0, result.stderr
         assert len(posts(calls)) == 1
         assert f"target_url={RECORD}" in posts(calls)[0]
         assert "LGTM from team-1-test, lead-fable" in posts(calls)[0][-1]
-
-    def test_missing_required_review_is_refused(self) -> None:
-        only_tester = [[listed(5, "COMMENTED", "LGTM\nteam-1-test, session t")]]
-        result, calls = publish(**self.BRIEF, reviews=only_tester)
-        assert result.returncode != 0
-        assert "Required review from lead-fable is missing" in result.stderr
-        assert posts(calls) == []
-
-    def test_review_on_another_head_does_not_count(self) -> None:
-        elsewhere = [
-            [
-                listed(5, "COMMENTED", "LGTM\nteam-1-test, session t"),
-                listed(6, "COMMENTED", "LGTM\nlead-fable, session l", "b" * 40),
-            ]
-        ]
-        result, calls = publish(**self.BRIEF, reviews=elsewhere)
-        assert result.returncode != 0
-        assert "lead-fable is missing" in result.stderr
-        assert posts(calls) == []
-
-    def test_superseded_lgtm_is_refused(self) -> None:
-        objection = listed(8, "COMMENTED", "lead-fable, session l\nP1: the lock order is wrong.")
-        result, calls = publish(**self.BRIEF, reviews=self.reviews(objection))
-        assert result.returncode != 0
-        assert "lead-fable's latest review" in result.stderr
-        assert "pullrequestreview-8" in result.stderr
-        assert posts(calls) == []
-
-    def test_duplicate_record_is_refused(self) -> None:
-        result, calls = publish("--record", RECORD, "--record", RECORD, **self.BRIEF)
-        assert result.returncode != 0
-        assert "same record" in result.stderr
-        assert calls == []
-
-    def test_record_from_an_unlisted_reviewer_is_refused(self) -> None:
-        stranger = listed(9, "COMMENTED", "team-2-test, session s\nLGTM")
-        stranger["body"] = "LGTM\nteam-2-test, session s"
-        record = PR + "#pullrequestreview-9"
-        result, calls = publish(
-            "--record",
-            record,
-            **self.BRIEF,
-            review=review(body="LGTM\nteam-2-test, session s"),
-            reviews=self.reviews(stranger),
-        )
-        assert result.returncode != 0
-        assert "not a required reviewer's current LGTM" in result.stderr
-        assert posts(calls) == []
 
     def test_two_records_from_both_reviewers_are_accepted(self) -> None:
         result, calls = publish(
@@ -280,8 +239,45 @@ class RequiredReviewsTest(unittest.TestCase):
         assert result.returncode == 0, result.stderr
         assert len(posts(calls)) == 1
 
-    def test_issue_without_the_line_keeps_the_single_record_path(self) -> None:
-        result, calls = publish(pr_body="Closes #12\n", issue_body="No reviewers named.")
+    def test_missing_required_review_is_refused(self) -> None:
+        only_tester = [[listed(5, "COMMENTED", "LGTM\nteam-1-test, session t")]]
+        self.refused("Required review from lead-fable is missing", reviews=only_tester)
+
+    def test_review_on_another_head_does_not_count(self) -> None:
+        elsewhere = listed(6, "COMMENTED", "LGTM\nlead-fable, session l", "b" * 40)
+        tester = listed(5, "COMMENTED", "LGTM\nteam-1-test, session t")
+        self.refused("lead-fable is missing", reviews=[[tester, elsewhere]])
+
+    def test_later_objection_supersedes_an_lgtm_whichever_line_names_the_reviewer(self) -> None:
+        name_first = listed(8, "COMMENTED", "lead-fable, session l\nP1: the lock order is wrong.")
+        self.refused("lead-fable's latest review", reviews=self.reviews(name_first))
+        decision_first = listed(8, "COMMENTED", "Changes required\nlead-fable, session l\nP1: x")
+        self.refused("pullrequestreview-8", reviews=self.reviews(decision_first))
+
+    def test_duplicate_record_is_refused(self) -> None:
+        self.refused("same record", "--record", RECORD, "--record", RECORD)
+
+    def test_record_from_an_unlisted_reviewer_is_refused(self) -> None:
+        stranger = listed(9, "COMMENTED", "LGTM\nteam-2-test, session s")
+        self.refused(
+            "not a required reviewer's current LGTM",
+            "--record",
+            PR + "#pullrequestreview-9",
+            review=review(body="LGTM\nteam-2-test, session s"),
+            reviews=self.reviews(stranger),
+        )
+
+    def test_empty_or_repeated_names_are_refused_not_read_as_none(self) -> None:
+        for value in (",", "", "team-1-test, team-1-test", "team-1-test,,lead-fable"):
+            issues = {"12": f"Required reviews: {value}\n"}
+            self.refused("empty or repeated name", issues=issues, reviews=self.reviews())
+
+    def test_two_linked_issues_naming_reviewers_are_refused(self) -> None:
+        issues = {"12": "Required reviews: team-1-test\n", "13": "Required reviews: lead-fable\n"}
+        self.refused("#12 and #13 both name", linked=[12, 13], issues=issues)
+
+    def test_linked_issue_without_the_line_keeps_the_single_record_path(self) -> None:
+        result, calls = publish(linked=[12], issues={"12": "No reviewers named."})
         assert result.returncode == 0, result.stderr
         assert "description=LGTM on this head; review threads resolved" in posts(calls)[0]
 

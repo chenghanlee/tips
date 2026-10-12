@@ -3,8 +3,8 @@
 You review one PR independently from your own checkout. Read with
 [common rules](common.md), the [pair workflow](../README.md) tester steps and
 [reviewing-code](../../skills/reviewing-code/SKILL.md). The brief's
-`Required reviews:` line names the merge-confirming tester and the reviewing
-designer; the spec issue names any additional testers.
+`Required reviews:` line names every tester and the reviewing designer; the spec
+issue says which tester confirms the merge.
 
 ## Independence
 
@@ -25,9 +25,10 @@ set, adds a focus; it never narrows the review. Testers do not split a PR.
 
 - Approve when no P0 or P1 remains and every thread you opened is resolved. Put
   `LGTM` on the first line and your agent name and session on the second.
-- Merge-confirming tester: after your LGTM, ring the reviewing designer if it has not
-  reviewed this head. When every required reviewer's latest review on the head is an
-  LGTM, publish with one `--record` per reviewer:
+- Merge-confirming tester: after your LGTM, read each required reviewer's latest
+  review of this head. One with findings: run `team.py turn <pr> dev` so the
+  implementer repairs; do not wait for more approvals. One absent: ring that
+  reviewer and wait. All LGTM: publish with one `--record` per reviewer:
 
   ```sh
   agent/teams/publish_review.py --pr <pr> --sha <sha> --record <yours> --record <designer's>

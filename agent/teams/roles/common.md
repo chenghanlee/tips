@@ -1,6 +1,8 @@
 # Rules for every swarm role
 
-Read once at launch, with your role file. Reread after context compaction.
+Read once at launch, with your role file. Reread after context compaction. If your
+model is GPT-6 Astra, also read [models/astra.md](models/astra.md); if it is Claude
+Haiku, also read [models/haiku.md](models/haiku.md).
 
 ## Authority
 

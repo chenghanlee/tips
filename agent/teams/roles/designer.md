@@ -18,7 +18,9 @@ follows the proposal's framing is the failure this tier exists to catch.
    Each brief holds: contracts, acceptance scenarios, open risks, quoted design-doc
    sections with their revision, the standing do-not list from
    [implementer.md](implementer.md) plus brief-specific additions, the `Implementer`
-   entry, and `Required reviews: <merge-confirming tester>, <reviewing designer>`.
+   entry, and `Required reviews:` naming every assigned tester and the reviewing
+   designer from the spec's agent set, each once. The publisher enforces exactly this
+   line, so an incomplete roster is an unenforced review.
    Record the alternatives you considered and rejected, with the reason.
 2. Post round N+1 only after every critic's round N comment exists. Revise the bodies,
    then post the PROPOSAL comment stating what changed and why. A substantive change
