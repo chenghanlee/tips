@@ -1001,6 +1001,9 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
     if agent:
         print(f"Already running: {name} ({agent.get('agent_status')})")
         return
+    # The pane is at the shell: the old session must not vouch for the replacement.
+    allocation["session"] = ""
+    save_record(record)
     enter(pane, worktree, agent_env(allocation))
     herdr(
         "agent",
@@ -1038,6 +1041,22 @@ def require_main_checkout() -> None:
     require_git_admin(main / ".git")
 
 
+def current_roster(record: Record) -> tuple[list[str], list[str]]:
+    """The brief's current additional testers and designers; the brief is the only copy.
+
+    The pair owners are fixed in the record, so a brief that names another implementer
+    or first tester is refused wherever it is read.
+    """
+    implementer, testers, designers = roster(record["brief"])
+    if (implementer, testers[0]) != (record["implementer"], record["tester"]):
+        raise RuntimeError(
+            f"Brief #{record['brief']} changed its implementer or merge-confirming tester "
+            "since launch; the pair checkout cannot change hands. Stop the brief after its "
+            "work is merged, or restore the brief."
+        )
+    return testers[1:], designers
+
+
 def start(brief: str) -> None:
     """Launch the brief's implementer and merge-confirming tester in one prepared worktree."""
     require_main_checkout()
@@ -1056,12 +1075,8 @@ def start(brief: str) -> None:
             agents={},
         )
         save_record(record)  # the slot is reserved before anything is provisioned
-    elif (record["implementer"], record["tester"]) != (pair[0], pair[1]):
-        raise RuntimeError(
-            f"Brief #{brief} changed its implementer or merge-confirming tester since "
-            "launch; the pair checkout cannot change hands. Stop the brief after its "
-            "work is merged, or restore the brief."
-        )
+    else:
+        current_roster(record)
     refuse_foreign_owner(worktree, [live_name(slot, entry) for entry in pair])
     duties = ("implementer", "merge-confirming tester")
     clients = [
@@ -1097,18 +1112,12 @@ def brief_record(pr: str, briefs: list[str]) -> Record:
     return found[0]
 
 
-def additional_reviewers(record: Record) -> tuple[list[str], list[str]]:
-    """The brief's current additional testers and designers; the brief is the only copy."""
-    _, testers, designers = roster(record["brief"])
-    return [t for t in testers if t != record["tester"]], designers
-
-
 def review(pr: str, entry: str) -> None:
     """Pin a required reviewer's own worktree at the PR head and launch it there."""
     require_main_checkout()
     url, head, briefs = pull_request(pr)
     record = brief_record(pr, briefs)
-    testers, designers = additional_reviewers(record)
+    testers, designers = current_roster(record)
     if entry not in testers + designers:
         raise RuntimeError(
             f"{entry} is not an additional reviewer of brief #{record['brief']} "
@@ -1163,7 +1172,7 @@ def caller_record() -> tuple[Record, str]:
 
 def tester_message(record: Record, pr: str, url: str, head: str) -> str:
     implementer, tester = record["implementer"], record["tester"]
-    testers, designers = additional_reviewers(record)
+    testers, designers = current_roster(record)
     others = testers + designers
     pending = [e for e in others if e not in record["agents"]]
     message = f"Your turn: review {url} at {head}."

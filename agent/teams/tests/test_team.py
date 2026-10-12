@@ -1017,7 +1017,14 @@ class PairLifecycleTest(unittest.TestCase):
                 self.clients_exit(int(brief) - 28)
                 self.team("start", brief)
                 assert len(self.events("agent", "start")) == 2
-                self.update(events=[])
+                # A replacement for a client that once ran gets the same treatment: the
+                # old session does not vouch for it.
+                self.clients_exit(int(brief) - 28)
+                self.update(events=[], **flags)
+                assert "unexpected state or root" in self.team("start", brief, ok=False).stderr
+                assert rerun in self.team("start", brief, ok=False).stderr
+                assert len(self.events("agent", "start")) == 1
+                self.update(events=[], start_fails=False, wrong_start_root="")
 
     def test_invalid_config_refuses_before_herdr(self) -> None:
         path = self.repo / "agent/teams/config.toml"
@@ -1155,6 +1162,14 @@ class PairLifecycleTest(unittest.TestCase):
         self.team("review", "7", "critic")
         self.team("turn", "7", "tester", cwd=wt, pane=impl)
         assert "herdr agent prompt dispatcher" not in self.events("agent", "prompt")[-1][3]
+        # The brief cannot move the merge-confirming tester under a running pair.
+        prompts = len(self.events("agent", "prompt"))
+        body = "Implementer: impl\nRequired reviews: second, critic\n"
+        self.update(issues={**self.state()["issues"], "29": body})
+        refused = self.team("turn", "7", "tester", cwd=wt, pane=impl, ok=False)
+        assert "changed its implementer or merge-confirming tester" in refused.stderr
+        assert len(self.events("agent", "prompt")) == prompts
+        self.update(issues={**self.state()["issues"], "29": BRIEF})
         # A brief with one reviewer publishes from the tester's own LGTM.
         self.team("start", "31")
         wt31, impl31 = self.worktree("31"), self.pane("team-2-impl")["pane_id"]
@@ -1273,7 +1288,7 @@ class PairLifecycleTest(unittest.TestCase):
             "conflicting client; preserved" in self.team("review", "7", "critic", ok=False).stderr
         )
         assert len(self.events("agent", "start")) == starts
-        # A dropped reviewer is refused, running or not.
+        # A dropped reviewer is refused, running or not; so is a brief that moved the pair.
         self.update(
             issues={
                 **self.state()["issues"],
@@ -1281,6 +1296,12 @@ class PairLifecycleTest(unittest.TestCase):
             }
         )
         assert "not an additional reviewer" in self.team("review", "7", "critic", ok=False).stderr
+        self.update(
+            issues={**self.state()["issues"], "29": "Implementer: impl\nRequired reviews: second\n"}
+        )
+        refused = self.team("review", "7", "second", ok=False)
+        assert "changed its implementer or merge-confirming tester" in refused.stderr
+        assert len(self.events("agent", "start")) == starts
         self.update(issues={**self.state()["issues"], "29": WIDE})
         # A stopped reviewer moves to the new head when its worktree is clean, never when dirty.
         self.clients_exit(1)
