@@ -23,22 +23,22 @@ defmodule Tips.Content.Media.CleanupRealTest do
     r2 = R2.client!(@real)
     expiry = DateTime.utc_now(:second) |> DateTime.add(600)
 
+    # Each object's cleanup is registered before the next fallible call and runs on its
+    # own, so one failure leaves nothing behind. Both deletes are repeat-safe.
     {:ok, %{uid: uid}} = CloudflareStream.reserve(stream, 1_000, expiry, "tips-test-67")
+    on_exit(fn -> :ok = CloudflareStream.delete(stream, uid) end)
+
     # The stored key shape `media_key_chk` requires.
     key = "media/#{Ecto.UUID.generate()}.png"
+    # Registered before the put, whose outcome can be unknown.
+    on_exit(fn -> :ok = R2.delete(r2, key) end)
     :ok = R2.put(r2, key, File.read!(@fixture), "image/png")
 
     envs = for module <- [CloudflareStream, R2], do: {module, Application.get_env(:tips, module)}
+    on_exit(fn -> for {module, env} <- envs, do: Application.put_env(:tips, module, env) end)
     test = self()
     Application.put_env(:tips, CloudflareStream, plug: &forward(&1, test))
     Application.put_env(:tips, R2, [])
-
-    on_exit(fn ->
-      for {module, env} <- envs, do: Application.put_env(:tips, module, env)
-      # Repeat-safe: both answer a missing object without an error.
-      :ok = CloudflareStream.delete(stream, uid)
-      :ok = R2.delete(r2, key)
-    end)
 
     %{stream: stream, r2: r2, uid: uid, key: key}
   end

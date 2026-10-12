@@ -84,14 +84,17 @@ defmodule Tips.Content.LifecycleTest do
     end
   end
 
-  test "rejected deletion changes no flags notifications or content" do
+  test "rejected deletion changes no flags notifications media jobs or content" do
     author = user_fixture()
     tip = tip_fixture(author)
     review = review_fixture(tip)
     flag = flag_fixture(user_fixture(), tip_id: tip.id)
     upvoted = notification_fixture(author, tip_id: tip.id, type: :tip_upvoted)
     reviewed = notification_fixture(author, review_id: review.id, type: :tip_reviewed)
-    snapshot = fn -> Enum.map([tip, review, flag, upvoted, reviewed], &Repo.reload/1) end
+    video = attached_video_fixture(tip, position: 0)
+    image = image_fixture(tip, position: 1)
+    rows = [tip, review, flag, upvoted, reviewed, video, image]
+    snapshot = fn -> Enum.map(rows, &Repo.reload/1) end
     before = snapshot.()
 
     # The last effect fails after the dependent writes; everything rolls back.
@@ -105,6 +108,7 @@ defmodule Tips.Content.LifecycleTest do
     assert log =~ "outcome unknown"
     {1, _} = Repo.update_all(where(Tip, id: ^tip.id), set: [edit_version: 1])
     assert snapshot.() == before
+    refute_enqueued(worker: CleanupMedia)
 
     {limit, _window_ms} = Application.fetch_env!(:tips, AdmissionLimiter)[:write]
     for _ <- 2..limit//1, do: assert(:ok = AdmissionLimiter.check_write(scope(author)))

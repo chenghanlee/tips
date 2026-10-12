@@ -64,19 +64,6 @@ defmodule Tips.Content.MediaCleanupTest do
       assert [%{args: %{"media_id" => id}}] = all_enqueued(worker: CleanupMedia)
       assert id == image.id
     end
-
-    test "a rolled-back transaction keeps the row and enqueues nothing" do
-      image = image_fixture(tip_fixture(user_fixture()))
-
-      assert {:error, :rolled_back} =
-               Repo.transact(fn ->
-                 :ok = Media.retire([image.id])
-                 {:error, :rolled_back}
-               end)
-
-      assert Repo.reload(image) == image
-      refute_enqueued(worker: CleanupMedia)
-    end
   end
 
   describe "enqueue_cleanup/1" do
