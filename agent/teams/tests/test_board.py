@@ -52,14 +52,12 @@ class BoardTest(Harness):
         self.team("start", "29")
         impl = self.pane("team-1-impl")["pane_id"]
         launches = self.bodies()
-        url = self.board("post", "29", "QUESTION", "--round", "1", pane=impl, body="Which port?\n")
+        url = self.board("post", "29", "QUESTION", pane=impl, body="Which port?\n")
         assert url.stdout.strip() == f"{ISSUE}#issuecomment-3"
-        question = "R1 QUESTION implementer team-1-impl session-team-1-impl\nWhich port?"
+        question = "QUESTION implementer team-1-impl session-team-1-impl\nWhich port?"
         assert self.bodies() == [*launches, question]
         # A repeat after an uncertain post returns the existing URL, for EVENTs too.
-        again = self.board(
-            "post", "29", "QUESTION", "--round", "1", pane=impl, body="Which port?\n"
-        )
+        again = self.board("post", "29", "QUESTION", pane=impl, body="Which port?\n")
         assert again.stdout == url.stdout
         launch = ("post", "29", "EVENT", "--as", "designer", "lead", "s-lead")
         first = self.board(*launch, body="launched codex by hand").stdout
@@ -67,30 +65,24 @@ class BoardTest(Harness):
         assert self.bodies()[-1] == "EVENT designer lead s-lead\nlaunched codex by hand"
         # A pane without a record needs --role; too long a body posts with a warning.
         self.update(strays=[{"pane_id": "wL:p1", "name": "lead", "agent": "codex", "cwd": "/"}])
-        refused = self.board(
-            "post", "29", "PROPOSAL", "--round", "1", pane="wL:p1", body="x", ok=False
-        )
+        refused = self.board("post", "29", "PROPOSAL", pane="wL:p1", body="x", ok=False)
         assert "No allocation record names lead; give --role" in refused.stderr
         long = self.board(
             "post",
             "29",
             "CRITIQUE",
-            "--round",
-            "2",
             "--role",
             "designer",
             pane="wL:p1",
             body="word " * 801,
         )
         assert "801 words, above 800" in long.stderr
-        assert self.bodies()[-1].startswith("R2 CRITIQUE designer lead unknown\nword ")
+        assert self.bodies()[-1].startswith("CRITIQUE designer lead unknown\nword ")
         count = len(self.bodies())
         for args, body, message in (
-            (("ANSWER", "--round", "1"), "x", "HERDR_PANE_ID is not set"),
-            (("EVENT", "--round", "1", "--as", "a", "b", "c"), "x", "EVENT has none"),
-            (("ANSWER", "--as", "a", "b", "c"), "x", "needs a round"),
-            (("NOTE", "--round", "1", "--as", "a", "b", "c"), "x", "must be one of"),
-            (("ANSWER", "--round", "1", "--as", "a", "b", "c"), "", "empty"),
+            (("ANSWER",), "x", "HERDR_PANE_ID is not set"),
+            (("NOTE", "--as", "a", "b", "c"), "x", "must be one of"),
+            (("ANSWER", "--as", "a", "b", "c"), "", "empty"),
         ):
             with self.subTest(args=args):
                 assert message in self.board("post", "29", *args, body=body, ok=False).stderr

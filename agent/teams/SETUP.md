@@ -5,22 +5,20 @@ For humans, from the repository root. Agents read the [pair workflow](README.md)
 ## How it runs
 
 ```
-USER         set goals and constraints · answer decisions · start the dispatcher once
-DISPATCHER   assess milestone → prioritize eligible work → set Ready → start pair → set Active
-IMPLEMENTER  code → push → PR with "Closes #<brief>" + auto-merge → team.py turn <pr> <tester>
-TESTER       ask the dispatcher to launch the other reviewers the brief names
+USER         set goals · answer product questions · start the dispatcher once
+DISPATCHER   open a feature → designers agree a spec and briefs → team.py start <brief>
+IMPLEMENTER  Q&A on the brief → code → push → PR "Closes #<brief>" → team.py turn <pr> <tester>
+TESTER       ask the dispatcher to launch the other reviewers → review the head
 DISPATCHER   team.py review <pr> <entry> for each
-TESTER       review → findings → team.py turn <pr> <implementer>   (loop until no P0 or P1)
 REVIEWERS    review from pinned worktrees → notify the tester with the review URL
-TESTER       all LGTM → publish_review.py --record per reviewer
-GITHUB       checks + status + resolved threads → merge → brief closes → Done
-TESTER       confirm the merge → notify the dispatcher "done"
+TESTER       findings → team.py turn <pr> <implementer>   (repeat until no P0 or P1)
+TESTER       every required review LGTM on the head · checks green → gh pr merge → "done"
 DISPATCHER   team.py stop <brief> → next
 ```
 
 ## One-time setup
 
-In GitHub: enable "Allow auto-merge" on the repository; in the ruleset "Reviewed main" turn off the strict up-to-date requirement and keep `checks`, `release`, `tips/independent-review` and resolved conversations; in Project 15 enable the workflow "Item closed" so a closed issue gets Status Done.
+In GitHub: in the ruleset "Reviewed main" require `checks`, `release` and resolved conversations, with the strict up-to-date requirement off and no `tips/independent-review` status; in Project 15 enable the workflow "Item closed" so a closed issue gets Status Done.
 
 The swarm board is [Project 16](https://github.com/users/chenghanlee/projects/16), holding the spec and brief issues. It was created on 2026-10-12 with these commands; a new owner repeats them and updates the project number in [roles/dispatcher.md](roles/dispatcher.md):
 
@@ -29,12 +27,10 @@ gh project create --owner <owner> --title "Tips swarm"
 gh project field-create <number> --owner <owner> --name Kind --data-type SINGLE_SELECT --single-select-options spec,brief
 gh project field-create <number> --owner <owner> --name Feature --data-type TEXT
 gh project field-create <number> --owner <owner> --name Phase --data-type SINGLE_SELECT --single-select-options "Design,Q&A,Implement,Review,Done"
-gh project field-create <number> --owner <owner> --name Round --data-type NUMBER
-gh project field-create <number> --owner <owner> --name "Waiting on" --data-type TEXT
 gh project field-create <number> --owner <owner> --name Implementer --data-type TEXT
 ```
 
-"Waiting on" is a text field holding a comma-separated list; Projects have no multi-select field. The dispatcher edits fields with `gh project item-edit`. The `gh` token needs the `project` scope.
+The dispatcher edits fields with `gh project item-edit`. The `gh` token needs the `project` scope.
 
 Install Python 3.12 and the [configured client CLIs](config.toml). Authenticate the clients and the GitHub CLI (`gh`) for this repository. Agents also need GNU `timeout` (macOS: `brew install coreutils`) and `unbuffer` (Expect): the Elixir skill requires it on Mix commands. Testers use `agent-browser` for manual browser review.
 
@@ -98,7 +94,7 @@ agent-browser close --session preflight
 ```
 
 If opening fails with `Chrome exited early` or `without writing DevToolsActivePort`,
-first follow the [close-and-reopen recovery](README.md#recover-a-failed-browser-launch).
+first follow the close-and-reopen recovery in [manual browser review](README.md#manual-browser-review).
 A daemon started inside the sandbox can survive a failed launch, so retrying
 `open` alone can still fail even with the allow rule installed.
 
@@ -119,10 +115,9 @@ is the only trusted repository or has no protected branches; retain that
 repository's other rules. Add this Tips-specific entry:
 
 > github.com/chenghanlee/tips is a trusted repository. Its main branch is protected
-> by Reviewed main: PRs, checks, release, tips/independent-review and resolved review
-> threads are required, with no bypass actors. A separate tester publishes
-> tips/independent-review for the exact PR head. Required approving reviews is 0
-> because the agents share one GitHub identity.
+> by Reviewed main: PRs, checks, release and resolved review threads are required,
+> with no bypass actors. Required approving reviews is 0 because the agents share one
+> GitHub identity; the merge-confirming tester merges after reading the LGTM reviews.
 
 Preserve other settings and rule lists. Do not add a merge or handoff allow rule.
 Run `claude auto-mode config` to check the effective context and

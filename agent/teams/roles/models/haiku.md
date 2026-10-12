@@ -4,11 +4,10 @@ Source: Anthropic, "Prompting Claude Haiku 5.5". Run at effort high. A Haiku PR 
 follows these rules instead of CLAUDE.md's delegation rules: the advisor and testers
 verify the work. The user approved this on 2026-10-12.
 
-- Keep working until the brief's acceptance scenarios pass through a captured check.
-  Do not stop at a partial result or a plan.
-- Verify every change with the cheapest real check that exercises it, through
-  `agent/teams/capture.py`, plus every check the repository requires. A command that
-  failed to start is not verification.
+- Keep working until the brief's acceptance scenarios pass. Do not stop at a partial
+  result or a plan.
+- Verify every change with the cheapest real check that exercises it, plus every
+  check the repository requires. A command that failed to start is not verification.
 - Consult the advisor before any design choice the brief does not settle, on any
   failing check you cannot explain, and before reporting done.
 - Report the brief's missing or conflicting instructions as a QUESTION; do not fill
