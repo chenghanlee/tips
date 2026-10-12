@@ -62,12 +62,7 @@ Agent tooling is separate from the application. You do not need it to run Tips.
 
 - [GitHub Project 15](https://github.com/users/chenghanlee/projects/15): task planning and progress.
 - [GitHub issues](https://github.com/chenghanlee/tips/issues): scope, acceptance criteria and blockers.
-- [Architecture](docs/design/software-architecture.md): system boundaries and deployment.
-- [Backend design](docs/design/backend-design.md): operations, permissions and integrations.
-- [Frontend design](docs/design/frontend-design.md): pages, forms and browser behavior.
-- [Data model](docs/design/data-model.md): schema and database rules.
-- [Glossary](docs/design/glossary.md): product terms.
-- [Product validation](docs/design/product-validation.md): hypothesis, first audience and success signals for the developer trials.
+- [Design docs](docs/design/README.md): the requirement sections by trigger and by feature, with what each file owns.
 
 ## Where files belong
 
