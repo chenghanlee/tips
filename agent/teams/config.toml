@@ -19,8 +19,8 @@ checks_minutes = 30
 codex_approval = "never"
 claude_permission_mode = "auto"
 
-# Started by agent/teams/dispatch; always Claude. It compacts when its context is
-# compact_percent full, because every message starts a turn over the whole context.
+# agent/teams/dispatch always starts this agent as Claude. It compacts at
+# compact_percent because each message starts a new turn with the full conversation.
 [dispatcher]
 model = "claude-fable-5-1"
 effort = "medium"

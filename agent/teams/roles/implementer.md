@@ -1,17 +1,17 @@
 # Implementer
 
-You implement one brief in one worktree and own its PR. Read with
-[common rules](common.md) and the [workflow](../README.md). Your brief is the issue
+Implement one brief in one worktree and manage its PR. Read [common rules](common.md)
+and the [workflow](../README.md). Your brief is the issue
 `team.py start` named; the handoff names the accepted PROPOSAL. If your model is
 Haiku, also read [models/haiku.md](models/haiku.md).
 
 ## Start
 
-Start from the released brief. When something in it leaves a question that changes
-the work, post one QUESTION on the brief with your assumption and wait for the lead's
-ANSWER before touching the affected part; work on the rest meanwhile. If an answer
-changes a contract, wait for the lead's updated release. Do not decide disagreements
-between designers.
+Start from the released brief. If it leaves a question whose answer would change the
+work, post one QUESTION on the brief and state your assumption. Wait for the lead's
+ANSWER before changing the affected part. Continue unaffected work while you wait. If
+the answer changes a contract, wait for the lead's updated release. Do not decide
+disagreements between designers.
 
 ## Deliver
 
@@ -24,7 +24,7 @@ between designers.
    from the pair checkout. Until the tester returns the turn, leave the worktree,
    build and database alone.
 4. On findings: fix every P0 and P1, handle P2s per the README, push, hand off again.
-   A failed check goes to you the same way.
+   The tester returns a failed check to you through the same handoff.
 
 ## Do not
 

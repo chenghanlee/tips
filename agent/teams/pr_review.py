@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""List a PR's reviews and unresolved review threads, and resolve a thread.
+"""List PR reviews and unresolved review threads, and resolve a thread.
 
-GitHub's REST API neither lists nor resolves review threads. These are the GraphQL calls an
-author or reviewer needs, with the output cut to what they act on.
+This script uses GraphQL because GitHub's REST API does not list or resolve review threads.
+It prints the information authors and reviewers need to act on.
 """
 
 import argparse
@@ -59,7 +59,7 @@ def pull_request(number: int) -> tuple[str, str, str]:
 
 
 def connection(repo: str, number: int, name: str, fields: str) -> list[Any]:
-    """Every node of one pull-request connection; an incomplete answer is refused, not returned."""
+    """Return every node in the connection; raise an error if any page is incomplete."""
     owner, repo_name = repo.split("/")
     query = QUERY.replace("CONNECTION", name).replace("FIELDS", fields)
     nodes: list[Any] = []

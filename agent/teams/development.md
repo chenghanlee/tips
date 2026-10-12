@@ -24,7 +24,8 @@ Run these additional tests for the listed changes:
 ## Dependencies and test isolation
 
 - Scripts use only the Python standard library.
-- Tests use disposable Git repositories, fake Herdr and child processes they own.
+- Tests use disposable Git repositories, a fake Herdr process, and child processes
+  that the tests start and own.
   Never use live pairs in tests.
 - Tests need permission to run `ps` and send signals to their own child processes.
 
@@ -41,5 +42,5 @@ Lint and type-check settings are in [pyproject.toml](pyproject.toml).
 
 ## Repeated failures
 
-If a pair fails the same way twice, fix the tool or its error message before
-adding a workflow rule.
+If the same failure occurs twice during a pair's work, fix the tool or its error
+message before adding a workflow rule.

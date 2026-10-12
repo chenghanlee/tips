@@ -174,7 +174,7 @@ def real_bound_command(root: Path) -> Path:
 
 
 def daemon_pid(root: Path) -> int | None:
-    """The real daemon serving root, found as Dexter finds it: by its arguments."""
+    """Find the real Dexter daemon for root by matching its arguments."""
     rows = execute(["ps", "-A", "-ww", "-o", "pid=,args="], check=True).stdout.splitlines()
     pids = [int(row.split()[0]) for row in rows if row.rstrip().endswith(f"dexter daemon {root}")]
     assert len(pids) <= 1, pids
@@ -802,7 +802,7 @@ class PairLifecycleTest(Harness):
         assert "team.py turn <pr> tester" in impl_brief
         assert tester_brief.startswith("You are tester, the merge-confirming tester for brief #29;")
         assert "team.py turn <pr> impl" in tester_brief
-        assert "attributed to tester" in tester_brief
+        assert "Put tester, <session> on line 2" in tester_brief
         assert "persona" not in tester_brief
         for text in (impl_brief, tester_brief):
             assert f"TIPS_DEXTER={wt / '.dexter/dexter.sh'}" in text
@@ -946,7 +946,7 @@ class PairLifecycleTest(Harness):
         path.write_text(CONFIG.replace("max_teams = 6", "max_teams = 2"))
         self.team("start", "29")
         # A new allocation never takes a recorded database, port or partition of one,
-        # whatever config says now: slot 2's implementer would be a partition of _t1r.
+        # even after configuration changes: slot 2's implementer would use a partition of _t1r.
         path.write_text(
             CONFIG.replace("max_teams = 6", "max_teams = 2")
             .replace('db_suffix_prefix = "_t"', 'db_suffix_prefix = "_t1r"')
@@ -1131,7 +1131,7 @@ class PairLifecycleTest(Harness):
         assert "elixir-lsp" not in {server["name"] for server in json.loads(result.stdout)}
 
     def use_real_dexter(self) -> None:
-        """Bind new worktrees to the real binary over a real Mix project."""
+        """Test new worktree setup with the real Dexter binary and a real Mix project."""
         self.env["TIPS_DEXTER_HOME"] = os.environ["TIPS_TEST_REAL_DEXTER"]
         self.env["DEXTER_ELIXIR_LIB_ROOT"] = os.environ["DEXTER_ELIXIR_LIB_ROOT"]
         self.env["DEXTER_DAEMON_IDLE_TIMEOUT"] = "5s"
@@ -1198,17 +1198,18 @@ class PairLifecycleTest(Harness):
         assert "https://github.com/o/r/pull/7" in ring[3]
         assert pushed in ring[3]
         assert "agent/skills/reviewing-code/SKILL.md from this worktree" in ring[3]
-        assert "attributed to tester" in ring[3]
+        assert "Put tester, <session> on line 2" in ring[3]
         assert "team.py turn 7 impl" in ring[3]
         # The tester asks the dispatcher for reviewers that are not launched, then reviews.
         assert "herdr agent prompt dispatcher" in ring[3]
         assert "agent/teams/team.py review 7 critic" in ring[3]
         assert "critic (team-1-critic)" in ring[3]
-        assert "All LGTM: merge per the README merge step" in ring[3]
+        assert "When every required reviewer's latest review of this head is LGTM" in ring[3]
+        assert "all threads are resolved and required checks pass" in ring[3]
         # Once the reviewer is launched, the handoff no longer asks for it.
         self.team("review", "7", "critic")
         self.team("turn", "7", "tester", cwd=wt, pane=impl)
-        assert "herdr agent prompt dispatcher" not in self.events("agent", "prompt")[-1][3]
+        assert "review: run" not in self.events("agent", "prompt")[-1][3]
         # The brief cannot move the merge-confirming tester under a running pair.
         prompts = len(self.events("agent", "prompt"))
         body = "Implementer: impl\nRequired reviews: second, critic\n"
@@ -1224,9 +1225,10 @@ class PairLifecycleTest(Harness):
         self.team("turn", "8", "tester", cwd=wt31, pane=impl31)
         ring = self.events("agent", "prompt")[-1]
         assert ring[2] == "team-2-tester"
-        assert "; merge per the README merge step" in ring[3]
+        assert "When your LGTM is the only required review" in ring[3]
+        assert "all threads are resolved and required checks pass" in ring[3]
         assert "latest review of this head" not in ring[3]
-        assert "dispatcher" not in ring[3]
+        assert "review: run" not in ring[3]
 
     def test_turn_to_implementer_always_rings_and_reports_a_checkout_problem(self) -> None:
         self.team("start", "29")
@@ -1290,6 +1292,7 @@ class PairLifecycleTest(Harness):
         assert (
             f"Review PR https://github.com/o/r/pull/7 from this worktree, pinned at {head}" in brief
         )
+        assert "critic, <session> on line 2" in brief
         assert "herdr agent prompt team-1-tester" in brief
         assert "Never run agent/teams/team.py turn" in brief
         assert "--advisor" not in critic["launch_argv"]

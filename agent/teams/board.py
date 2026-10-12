@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The swarm board: typed comments on the spec and brief issues of the swarm project.
+"""Post and read comments on spec and brief issues, and report token counts.
 
 Usage:
   agent/teams/board.py post <issue> <TYPE> [--role ROLE] [--as ROLE NAME SESSION]
@@ -7,25 +7,25 @@ Usage:
   agent/teams/board.py read <issue> [--after <comment URL>]
   agent/teams/board.py usage <issue>...
 
-post prints the comment URL. An identical comment already on the issue is reused, so a
-repeat after an uncertain post never doubles it; a hand-written EVENT for a new
-occurrence must read differently, which a relaunch does through its new session id. The
-header line is `<TYPE> <role> <name> <session>`. Name and
-session come from the calling Herdr pane and the role from the allocation records; give
---role when no record names you, or --as to post for another agent (a launch or takeover
-record). Above 800 words the command warns; state the reason in the comment. Link logs
-as gists made beforehand with `gh gist create <file>`.
+post prints the comment URL. If the same comment already exists, it returns that URL
+instead of posting again. For a manually posted EVENT about a new occurrence, make the
+full comment differ from earlier ones. Relaunches differ through the new session ID in
+their header. Header format: `<TYPE> <role> <name> <session>`. The Herdr pane supplies
+the name and session; the allocation record supplies the role. Use --role if no record
+names you, or --as to post for another agent (for example, a launch or takeover record).
+Above 800 words, the command warns; include the reason in the comment.
+Create a gist before linking a log:
+`gh gist create <file>`.
 
-read prints the current issue body, then every comment, or only those after the given
+read prints the current issue body and every comment, or only comments after the given
 comment.
 
-usage prints one Markdown table for the given spec and brief issues: tokens per model for
-every session a launch EVENT names (team.py posts one per launch; the dispatcher posts
-one for a hand launch), from the session's own logs: `~/.claude/projects` JSONL for
-Claude, with its advisor calls and subagent logs, and `~/.codex/sessions` for Codex.
-Input counts uncached input only; cache read and cache write are separate columns. A
-session's count is its whole life, so give a trial feature fresh sessions or take the
-table before and after.
+usage prints a Markdown table with token counts by model for each session named in a
+launch EVENT. team.py posts one EVENT per launch; the dispatcher posts one for a manual
+launch. The command reads Claude logs from `~/.claude/projects`, including advisor calls
+and subagents, and Codex logs from `~/.codex/sessions`. Input counts show uncached input;
+cache reads and writes have separate columns. Counts cover the session's full lifetime,
+so use fresh sessions for a trial or compare tables from before and after it.
 """
 
 import argparse
@@ -84,7 +84,7 @@ def post(args: argparse.Namespace) -> None:
     header = comment_header(args.type, role, name, session)
     body = sys.stdin.read().strip()
     if not body:
-        raise RuntimeError("The comment body comes on stdin and is empty")
+        raise RuntimeError("No comment text received on stdin; the input is empty")
     words = len(body.split())
     if words > WORD_LIMIT:
         print(
