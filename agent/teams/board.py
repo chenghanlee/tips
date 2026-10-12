@@ -2,7 +2,7 @@
 """The swarm board: typed comments on the spec and brief issues of the swarm project.
 
 Usage:
-  agent/teams/board.py post <issue> <TYPE> [--round N] [--role ROLE] [--as ROLE NAME SESSION]
+  agent/teams/board.py post <issue> <TYPE> [--role ROLE] [--as ROLE NAME SESSION]
                             (body on stdin)
   agent/teams/board.py read <issue> [--after <comment URL>]
   agent/teams/board.py usage <issue>...
@@ -10,7 +10,7 @@ Usage:
 post prints the comment URL. An identical comment already on the issue is reused, so a
 repeat after an uncertain post never doubles it; a hand-written EVENT for a new
 occurrence must read differently, which a relaunch does through its new session id. The
-header line is `R<round> <TYPE> <role> <name> <session>`; EVENT has no round. Name and
+header line is `<TYPE> <role> <name> <session>`. Name and
 session come from the calling Herdr pane and the role from the allocation records; give
 --role when no record names you, or --as to post for another agent (a launch or takeover
 record). Above 800 words the command warns; state the reason in the comment. Link logs
@@ -81,7 +81,7 @@ def identity(args: argparse.Namespace) -> tuple[str, str, str]:
 
 def post(args: argparse.Namespace) -> None:
     role, name, session = identity(args)
-    header = comment_header(args.type, role, name, session, args.round)
+    header = comment_header(args.type, role, name, session)
     body = sys.stdin.read().strip()
     if not body:
         raise RuntimeError("The comment body comes on stdin and is empty")
@@ -208,7 +208,6 @@ def main() -> None:
     poster = commands.add_parser("post")
     poster.add_argument("issue")
     poster.add_argument("type")
-    poster.add_argument("--round", type=int)
     poster.add_argument("--role")
     poster.add_argument("--as", dest="as_", nargs=3, metavar=("ROLE", "NAME", "SESSION"))
     poster.set_defaults(handler=post)

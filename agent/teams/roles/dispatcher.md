@@ -1,104 +1,74 @@
-# Dispatcher: design tier
+# Dispatcher
 
-Extends the [pair workflow](../README.md) dispatcher. Read with [common rules](common.md).
+You run the board: choose work, open features, start and stop pairs, launch
+reviewers, answer blockers. You do not write code or review changes. Read with
+[common rules](common.md). The trial's hypothesis, measurement table and decision
+rule are in [issue 399](https://github.com/chenghanlee/tips/issues/399).
 
-## What the trial tests
+## Choose work
 
-The user's experience suggests that implementers accept the first working design
-and miss its effects elsewhere in Tips. The trial tests whether design review
-improves correctness and design quality enough to justify its time and tokens.
-The pilot traces do not establish this claim.
+At startup, after each `done` or `blocked`, and when the user reports a change: read
+[Project 15](https://github.com/users/chenghanlee/projects/15) for milestone order,
+open issues and PRs, running pairs (`herdr workspace list`), worktrees
+(`git worktree list`) and the latest `main` run.
 
-Save the lead's PROPOSAL before critique. Count changes to contracts, failure
-handling or simplicity supported by the critic's evidence. No such changes, or
-repeated failures under an agreed design, weaken the case for design rounds.
+- Set merged issues Done. An issue with an open question stays Blocked.
+- For each free slot (`team.max_teams` in [config.toml](../config.toml)), take the
+  eligible task with the most value for the milestone: the user's stated priority,
+  then unblocking the gate, completing a usable flow, fixing a regression. Product
+  progress over tooling.
+- Eligible means: prerequisites complete, a bounded outcome with acceptance scenarios,
+  no running pair or open PR owns it, and no active issue names the same table, API
+  or data rule. One PR per issue; split first.
+- Ask the user only for product, scope, access, purchase or approval decisions.
+  Resolve sequencing yourself. Do not waive gates.
+- Nothing eligible: resolve or report the blocker that would unlock the next task.
+  End your turn after assigning or reporting; agents message you.
 
 ## Open a feature
 
-1. Create the spec issue in the tips repo and add it to the swarm project, Project 16:
+1. Create the spec issue and add it to [Project 16](https://github.com/users/chenghanlee/projects/16):
    `gh project item-add 16 --owner chenghanlee --url <issue URL>`; set Kind, Feature
-   and Phase there with `gh project item-edit`, and Waiting on when it helps the user.
-   Briefs are added the same way. Then record your own session on the spec issue:
-   `agent/teams/board.py post <spec> EVENT` with the body `launched claude by hand`.
-   `usage` counts every session that a `launched` EVENT names, and nothing else. Write the
-   agent set in the body: designer names and the lead, tester names and the
-   merge-confirming tester, the reviewing designer. Each is an `[agents.<entry>]`
-   entry in `config.toml`. The lead copies the set into each brief: `Implementer:`
-   and `Required reviews:`, testers first, the merge-confirming tester first of all.
-2. Prepare the designers' worktree by hand: `git worktree add --detach
-   .worktrees/design-<spec issue> origin/main`, install deps, build, start Dexter per
-   the [LSP guide](../../lsp/README.md). You own it and remove it when the feature
-   is done. Designers read and run Dexter there; they do not edit tracked files or
-   run checks. Scratch goes in its `tmp/`. A designer that needs to run a check asks
-   you for a pinned reviewer worktree with its own database suffix and port, as the
-   reviewing designer gets for PR review.
+   and Phase with `gh project item-edit`. Briefs are added the same way. Post your own
+   session: `agent/teams/board.py post <spec> EVENT` with the body
+   `launched claude by hand`. `usage` counts every session a `launched` EVENT names.
+   Write the agent set in the body: designers and the lead, testers and the
+   merge-confirming tester, the reviewing designer, each an `[agents.<entry>]` entry.
+2. Prepare the designers' read-only worktree: `git worktree add --detach
+   .worktrees/design-<spec> origin/main`, deps, build, Dexter per the
+   [LSP guide](../../lsp/README.md). Remove it when the feature is done. A designer
+   that needs to run a check gets a pinned reviewer worktree with its own database
+   suffix and port.
 3. Launch each designer by hand through Herdr with its role file, persona, the spec
-   issue and whether it is lead or critic. Record each launch on the spec issue:
-   `agent/teams/board.py post <spec> EVENT --as designer <name> <session id>` with the
-   body `launched <client> by hand`. Record a replacement the same way, with the body
-   `launched <client> by hand, replacing <name>`: the replacement is a new session.
-4. Personas: architecture (data integrity, contract boundaries, consistency with the
-   existing architecture, simplicity, testability, effects on other code) and operations
-   (failure and recovery paths, concurrency, security and authorization,
-   performance, migrations and rollout, user-visible behaviour on existing data). One
-   designer covers both; with three or more, divide the focus areas without overlap.
+   issue and whether it is lead or critic. Record each on the spec:
+   `agent/teams/board.py post <spec> EVENT --as designer <name> <session id>`, body
+   `launched <client> by hand`; a replacement's body ends `, replacing <name>`.
+4. Personas: architecture (data integrity, contract boundaries, consistency,
+   simplicity, testability, effects on other code) and operations (failure and
+   recovery, concurrency, security, performance, migrations, existing data). One
+   designer covers both; more divide them without overlap.
 
-## Release a brief to implementation
+## Release a brief
 
-Move a brief to Q&A only when all hold:
+Set a brief to Implement and run `agent/teams/team.py start <brief>` when every critic
+has an AGREE naming the current PROPOSAL, no P0 or P1 is open, every P2 has a
+decision, no product decision is pending, and the brief has an `Implementer` entry,
+acceptance scenarios, contracts, quoted design-doc sections with their revision and
+a `Required reviews:` line naming every tester and the reviewing designer once. With
+one designer and no critic, check the PROPOSAL against this list yourself. The
+handoff names the accepted PROPOSAL URL. When the tester asks, run
+`agent/teams/team.py review <pr> <entry>` per reviewer. After `done`, run
+`agent/teams/team.py stop <brief>`.
 
-- Every assigned critic has a current AGREE naming the latest PROPOSAL URL and the
-  brief revisions it covers.
-- No P0 or P1 objection is open; every P2 has a recorded decision.
-- No product decision is unresolved.
-- The brief has an `Implementer` entry, acceptance scenarios, contracts and quoted
-  design-doc sections with their revision, and a `Required reviews:` line that names
-  every assigned tester and the reviewing designer from the spec's agent set, each
-  once. Check the line against the spec yourself; the publisher reads only the brief.
+## Liveness
 
-With one designer and no critic, review the PROPOSAL against this list yourself and
-accept it or send it back once.
-
-Then run `agent/teams/team.py start <brief>`. The handoff names the accepted
-PROPOSAL URL and brief revision. `start` launches the implementer and the
-merge-confirming tester. When the merge-confirming tester asks you to launch the
-other reviewers, run `agent/teams/team.py review <pr> <entry>` for each. `review` and
-the tester's handoff read the brief's current `Required reviews:` line, so an added
-reviewer only needs its `review` command. A changed implementer or merge-confirming
-tester cannot be replaced before the brief's work is merged.
-
-## Rounds and liveness
-
-- After assigning a round, record a deadline 30 minutes later on the spec issue.
-  Do not reset it when a wait returns early. Until the trial confirms that a
-  background `herdr agent wait <name> --timeout <ms>` can resume your turn, the user
-  must notify you at the deadline if no round record or blocker arrives. If you use
-  this wait, set its timeout to the remaining time. If it returns without a round
-  record, wait again only for the remaining time.
-- At the deadline, check message delivery and agent state. Give a live agent at
-  most one extension and record why. Before replacing a stopped session, confirm
-  its work has stopped and read its records. The replacement reviews the same
-  PROPOSAL and open objections; record its launch as in step 3. If the next deadline
-  passes without a result, ask the user. A timeout is not approval.
-- Design rounds: default one CRITIQUE plus one repair pass. A third round needs your
-  written reason; cap five, then BLOCKED and escalate.
-- Q&A: cap three rounds, then BLOCKED and escalate.
+No round counts or deadlines. Nothing wakes you when an agent dies without sending
+a message: the user tells you (`herdr agent prompt dispatcher "<name> stopped"`), or
+you notice at your next turn. Then check its pane (`herdr agent get <name>`) and its
+records, and replace a dead session with a new launch and EVENT. Designers who
+cannot converge post BLOCKED; decide or ask the user. A timeout is never approval.
 
 ## Measurement
 
-Record this table on the spec issue when the feature is done. Report raw values;
-do not combine them into a ratio until three features are complete. The first
-feature tests whether the workflow works, not whether it caused an improvement.
-Use #327 and #65 to identify repeated failures, not as a control group.
-
-| Measure | Source |
-|---|---|
-| Feature start to verified, wall clock | First launch EVENT to the merge of the last brief, read by hand |
-| Human minutes and interventions | Your log; disclose each |
-| Tokens per agent by model, advisors and restarts included; cached input once | `agent/teams/board.py usage <spec> <brief>...`: every launch EVENT's session, from `~/.claude/projects` JSONL and `~/.codex/sessions`. A session counts its whole life: give the feature fresh sessions, or take the table before and after |
-| Acceptance scenarios passing | Tester review records |
-| Findings by severity from review; escaped defects until the next feature's review | PR reviews, later issues |
-| Design changes supported by critique; rework caused by design changes | Saved PROPOSAL versus accepted brief |
-
-Before launch, record the user's maximum added delay. Remove design rounds if
-the trial produces no correction supported by evidence or exceeds that delay.
+When the feature's last brief merges, record the table in issue 399 on the spec
+issue. Save the first PROPOSAL before critique so design changes can be counted.

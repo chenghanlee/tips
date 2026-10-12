@@ -1,6 +1,6 @@
 name: Dexter
-# Not a required status check (ruleset 'Reviewed main' requires checks, tips/independent-review
-# and release), so a path-skipped run leaves nothing pending. Elixir-only changes skip it.
+# Not a required status check (ruleset 'Reviewed main' requires checks and release),
+# so a path-skipped run leaves nothing pending. Elixir-only changes skip it.
 on:
   pull_request:
     paths:

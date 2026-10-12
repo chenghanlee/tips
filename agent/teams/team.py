@@ -630,19 +630,14 @@ COMMENT_TYPES = (
     "DONE",
     "EVENT",
 )
-HEADER = re.compile(
-    r"^(?:R(?P<round>\d+) )?(?P<type>[A-Z]+) (?P<role>\S+) (?P<name>\S+) (?P<session>\S+)$"
-)
+HEADER = re.compile(r"^(?P<type>[A-Z]+) (?P<role>\S+) (?P<name>\S+) (?P<session>\S+)$")
 
 
-def comment_header(kind: str, role: str, name: str, session: str, round_: int | None) -> str:
-    """The attribution line `R<round> <TYPE> <role> <name> <session>`; EVENT has no round."""
+def comment_header(kind: str, role: str, name: str, session: str) -> str:
+    """The attribution line `<TYPE> <role> <name> <session>`."""
     if kind not in COMMENT_TYPES:
         raise RuntimeError(f"Comment type must be one of {', '.join(COMMENT_TYPES)}")
-    if (round_ is None) != (kind == "EVENT"):
-        raise RuntimeError("Every comment type except EVENT needs a round; EVENT has none")
-    prefix = "" if round_ is None else f"R{round_} "
-    return f"{prefix}{kind} {role} {name} {session or 'unknown'}"
+    return f"{kind} {role} {name} {session or 'unknown'}"
 
 
 def repository() -> str:
@@ -681,7 +676,7 @@ def post_event(brief: str, allocation: Allocation, text: str) -> None:
     is an error after the launch itself succeeded; the message says how to post it.
     """
     header = comment_header(
-        "EVENT", event_role(allocation), allocation["name"], allocation["session"], None
+        "EVENT", event_role(allocation), allocation["name"], allocation["session"]
     )
     try:
         url = post_comment(brief, f"{header}\n{text}")
@@ -1265,8 +1260,8 @@ def tester_message(record: Record, pr: str, url: str, head: str) -> str:
             f"parallel: herdr agent prompt dispatcher '{url} review: run {commands}'."
         )
     message += (
-        " Follow README step 3 and agent/skills/reviewing-code/SKILL.md from "
-        "this worktree. Follow AGENTS.md GitHub and the README PR review record, "
+        " Follow agent/teams/roles/tester.md and agent/skills/reviewing-code/SKILL.md "
+        "from this worktree; the README PR review record, "
         f"attributed to {tester}. With findings: submit them and run "
         f"agent/teams/team.py turn {pr} {implementer}. Without: submit your LGTM"
     )
@@ -1276,12 +1271,11 @@ def tester_message(record: Record, pr: str, url: str, head: str) -> str:
             f", then read each required reviewer's latest review of this head: {named}. "
             f"Findings: run team.py turn {pr} {implementer}. Missing review: notify "
             "that reviewer with the PR URL and head, or report blocked if not running. "
-            "All LGTM: publish with one "
-            "--record per reviewer"
+            "All LGTM: merge"
         )
     else:
-        message += "; publish it"
-    return message + " without waiting for CI, keep the turn and do README step 5."
+        message += "; merge"
+    return message + " per the README merge step once the required checks pass, then done."
 
 
 def implementer_message(pr: str, url: str, problem: str | None) -> str:

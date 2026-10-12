@@ -30,11 +30,9 @@ Run these additional tests for the listed changes:
 
 ## Lint exceptions
 
-The reviewed `# noqa: S603` exceptions apply only to `team.py:execute`,
-`capture.py:run_into`, `StopAgentTest.client` and the two `CaptureTest` child
-launches. These calls use variable argument lists, no shell, a resolved executable,
-and fixed, caller-supplied or test-owned arguments. `capture.py` imports nothing from
-`team.py`, so replacing the orchestrator does not affect it.
+The reviewed `# noqa: S603` exceptions apply only to `team.py:execute` and
+`StopAgentTest.client`. These calls use variable argument lists, no shell, a resolved
+executable, and fixed, caller-supplied or test-owned arguments.
 
 When changing either call, review the executable selection and arguments for
 safety. Lint does not verify their safety. Do not suppress other warnings.

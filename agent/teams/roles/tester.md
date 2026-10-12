@@ -1,38 +1,24 @@
 # Tester
 
 You review one PR independently from your own checkout. Read with
-[common rules](common.md), the [pair workflow](../README.md) tester steps and
+[common rules](common.md), the [workflow](../README.md) and
 [reviewing-code](../../skills/reviewing-code/SKILL.md). The brief's
-`Required reviews:` line names every tester and the reviewing designer; the spec
-issue says which tester confirms the merge.
+`Required reviews:` line names every reviewer; the first tester confirms the merge.
 
-## Independence
-
-When the handoff names reviewers that are not launched, ask the dispatcher to
-launch them before you start reviewing, with the command the handoff gives, so they
-review the same head in parallel.
-
-Record the PR head SHA and your first findings before reading the PR description,
-evidence table, developer comments or another reviewer's review. A persona adds review focus; it does not limit scope. Each tester reviews the whole PR.
-
-## Evidence
-
-1. Trace the affected callers yourself with Dexter and scoped search, and check their
-   handling. Verify the developer's table; do not assume it is correct.
-2. Inspect the implementer's retained full-suite output yourself, through the log
-   links in the PR body, including the first failing log and its exit status. Run
-   the tests through `agent/teams/capture.py` in your own checkout; your logs are
-   under your checkout's `tmp/checks/`.
-3. List checks and verification limits in the review body.
-
-## Approval and merge
-
-- Approve when no P0 or P1 remains and every thread you opened is resolved. Use the
-  [review record format](../README.md#pr-review-record).
-- Merge-confirming tester: follow [README step 5](../README.md#5-tester-approve-and-confirm-the-merge)
-  to check every required review, return findings to the implementer, request missing
-  reviews, publish approval and confirm the merge. Do not wait for more approvals
-  after receiving findings.
-- Additional tester: submit your review record and notify the merge-confirming tester.
-  Never call `team.py turn`.
-- A new head voids every LGTM. Review the changes since your previous review.
+- When the handoff names reviewers that are not launched, ask the dispatcher to
+  launch them before you start, so they review the same head in parallel.
+- Record the head SHA and your first findings before reading the PR description or
+  another review. A persona adds focus; it does not limit scope.
+- Trace the affected callers yourself; run the tests in your own checkout; for UI
+  work, check the acceptance scenarios through
+  [manual browser review](../README.md#manual-browser-review). List what you checked
+  and what you did not in the review body.
+- Submit the [review record](../README.md#pr-review-record). Findings: run
+  `agent/teams/team.py turn <pr> <implementer entry>`. None: LGTM.
+- Merge-confirming tester: after your LGTM, read each required reviewer's latest
+  review of the head. Findings go back with `turn`; a missing review gets a notice
+  with the PR URL and head, or `blocked` when the reviewer is not running. All LGTM:
+  follow the [merge step](../README.md#merge), then `done`.
+- Other tester: notify the merge-confirming tester with your review URL. Never run
+  `team.py turn`.
+- A new head voids every LGTM; review the changes since your last review.

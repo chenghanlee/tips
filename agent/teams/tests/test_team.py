@@ -1204,7 +1204,7 @@ class PairLifecycleTest(Harness):
         assert "herdr agent prompt dispatcher" in ring[3]
         assert "agent/teams/team.py review 7 critic" in ring[3]
         assert "critic (team-1-critic)" in ring[3]
-        assert "one --record per reviewer" in ring[3]
+        assert "All LGTM: merge per the README merge step" in ring[3]
         # Once the reviewer is launched, the handoff no longer asks for it.
         self.team("review", "7", "critic")
         self.team("turn", "7", "tester", cwd=wt, pane=impl)
@@ -1217,15 +1217,15 @@ class PairLifecycleTest(Harness):
         assert "changed its implementer or merge-confirming tester" in refused.stderr
         assert len(self.events("agent", "prompt")) == prompts
         self.update(issues={**self.state()["issues"], "29": BRIEF})
-        # A brief with one reviewer publishes from the tester's own LGTM.
+        # A brief with one reviewer merges on the tester's own LGTM.
         self.team("start", "31")
         wt31, impl31 = self.worktree("31"), self.pane("team-2-impl")["pane_id"]
         self.push(wt31, pr="8", brief="31")
         self.team("turn", "8", "tester", cwd=wt31, pane=impl31)
         ring = self.events("agent", "prompt")[-1]
         assert ring[2] == "team-2-tester"
-        assert "publish it without waiting for CI" in ring[3]
-        assert "--record per reviewer" not in ring[3]
+        assert "; merge per the README merge step" in ring[3]
+        assert "latest review of this head" not in ring[3]
         assert "dispatcher" not in ring[3]
 
     def test_turn_to_implementer_always_rings_and_reports_a_checkout_problem(self) -> None:
