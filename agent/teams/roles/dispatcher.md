@@ -18,7 +18,9 @@ repeated failures under an agreed design, weaken the case for design rounds.
 1. Create the spec issue in the tips repo and add it to the swarm project, Project 16:
    `gh project item-add 16 --owner chenghanlee --url <issue URL>`; set Kind, Feature
    and Phase there with `gh project item-edit`, and Waiting on when it helps the user.
-   Briefs are added the same way. Write the
+   Briefs are added the same way. Then record your own session on the spec issue:
+   `agent/teams/board.py post <spec> EVENT` with the body `launched claude by hand`.
+   `usage` counts every session that a `launched` EVENT names, and nothing else. Write the
    agent set in the body: designer names and the lead, tester names and the
    merge-confirming tester, the reviewing designer. Each is an `[agents.<entry>]`
    entry in `config.toml`. The lead copies the set into each brief: `Implementer:`
@@ -33,8 +35,8 @@ repeated failures under an agreed design, weaken the case for design rounds.
 3. Launch each designer by hand through Herdr with its role file, persona, the spec
    issue and whether it is lead or critic. Record each launch on the spec issue:
    `agent/teams/board.py post <spec> EVENT --as designer <name> <session id>` with the
-   body `launched <client> by hand`. Record a replacement the same way with the body
-   `took over for <name>`.
+   body `launched <client> by hand`. Record a replacement the same way, with the body
+   `launched <client> by hand, replacing <name>`: the replacement is a new session.
 4. Personas: architecture (data integrity, contract boundaries, consistency with the
    existing architecture, simplicity, testability, effects on other code) and operations
    (failure and recovery paths, concurrency, security and authorization,
@@ -76,7 +78,7 @@ tester cannot be replaced before the brief's work is merged.
 - At the deadline, check message delivery and agent state. Give a live agent at
   most one extension and record why. Before replacing a stopped session, confirm
   its work has stopped and read its records. The replacement reviews the same
-  PROPOSAL and open objections, then posts EVENT "took over". If the next deadline
+  PROPOSAL and open objections; record its launch as in step 3. If the next deadline
   passes without a result, ask the user. A timeout is not approval.
 - Design rounds: default one CRITIQUE plus one repair pass. A third round needs your
   written reason; cap five, then BLOCKED and escalate.
@@ -91,10 +93,9 @@ Use #327 and #65 to identify repeated failures, not as a control group.
 
 | Measure | Source |
 |---|---|
-| Feature start to verified, wall clock | First EVENT to merge of the last brief |
-| Per-agent elapsed and checkout-holding time | `agent/teams/board.py usage <spec> <brief>...` from the EVENTs; waiting is elapsed minus holding, known only for pair agents |
+| Feature start to verified, wall clock | First launch EVENT to the merge of the last brief, read by hand |
 | Human minutes and interventions | Your log; disclose each |
-| Tokens per agent by model, advisors and restarts included; cached input once | The same `usage` table, from `~/.claude/projects` JSONL and `~/.codex/sessions` joined on the session id in each launch EVENT |
+| Tokens per agent by model, advisors and restarts included; cached input once | `agent/teams/board.py usage <spec> <brief>...`: every launch EVENT's session, from `~/.claude/projects` JSONL and `~/.codex/sessions`. A session counts its whole life: give the feature fresh sessions, or take the table before and after |
 | Acceptance scenarios passing | Tester review records |
 | Findings by severity from review; escaped defects until the next feature's review | PR reviews, later issues |
 | Design changes supported by critique; rework caused by design changes | Saved PROPOSAL versus accepted brief |

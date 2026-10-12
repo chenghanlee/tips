@@ -1205,16 +1205,6 @@ class PairLifecycleTest(Harness):
         assert "agent/teams/team.py review 7 critic" in ring[3]
         assert "critic (team-1-critic)" in ring[3]
         assert "one --record per reviewer" in ring[3]
-        handoff = self.comments("29")[-1]["body"]
-        assert handoff.startswith("EVENT implementer team-1-impl session-team-1-impl\nhandoff of ")
-        assert handoff.endswith(" to team-1-tester")
-        # A refused EVENT after a delivered prompt is a warning: the partner holds the turn.
-        self.update(comments_fail=True)
-        delivered = self.team("turn", "7", "tester", cwd=wt, pane=impl)
-        assert "Notified team-1-tester" in delivered.stdout
-        assert "Handoff delivered; do not rerun turn." in delivered.stderr
-        assert "board.py post 29 EVENT --as implementer team-1-impl" in delivered.stderr
-        self.update(comments_fail=False)
         # Once the reviewer is launched, the handoff no longer asks for it.
         self.team("review", "7", "critic")
         self.team("turn", "7", "tester", cwd=wt, pane=impl)
@@ -1431,7 +1421,6 @@ class PairLifecycleTest(Harness):
         assert self.workspaces() == ["team-2-impl", "team-2-tester"]
         assert not (self.repo / "agent/teams/allocations/1.json").exists()
         assert self.record(2)["brief"] == "30"
-        assert sum(c["body"].endswith("\nstopped") for c in self.comments("29")) == 3
         calls = (self.root / "docker-calls").read_text()
         for database in ("tips_test_t1", "tips_test_t1r", "tips_test_t1r2", "tips_test_t1c"):
             assert f'DROP DATABASE "{database}"' in calls

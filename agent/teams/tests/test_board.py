@@ -8,7 +8,6 @@ from team import execute
 from tests.test_team import Harness
 
 ISSUE = "https://github.com/o/r/issues/29"
-WT = "/wt/29"
 
 
 def comment(n: int, minute: int, body: str) -> dict[str, Any]:
@@ -57,15 +56,15 @@ class BoardTest(Harness):
         assert url.stdout.strip() == f"{ISSUE}#issuecomment-3"
         question = "R1 QUESTION implementer team-1-impl session-team-1-impl\nWhich port?"
         assert self.bodies() == [*launches, question]
-        # A repeat after an uncertain post returns the existing URL; an EVENT is an occurrence.
+        # A repeat after an uncertain post returns the existing URL, for EVENTs too.
         again = self.board(
             "post", "29", "QUESTION", "--round", "1", pane=impl, body="Which port?\n"
         )
         assert again.stdout == url.stdout
         launch = ("post", "29", "EVENT", "--as", "designer", "lead", "s-lead")
-        self.board(*launch, body="launched codex by hand")
-        self.board(*launch, body="launched codex by hand")
-        assert self.bodies()[-2:] == ["EVENT designer lead s-lead\nlaunched codex by hand"] * 2
+        first = self.board(*launch, body="launched codex by hand").stdout
+        assert self.board(*launch, body="launched codex by hand").stdout == first
+        assert self.bodies()[-1] == "EVENT designer lead s-lead\nlaunched codex by hand"
         # A pane without a record needs --role; too long a body posts with a warning.
         self.update(strays=[{"pane_id": "wL:p1", "name": "lead", "agent": "codex", "cwd": "/"}])
         refused = self.board(
@@ -108,47 +107,21 @@ class BoardTest(Harness):
         assert after.count("\n--- ") == count - 3
         assert "comment link" in self.board("read", "29", "--after", ISSUE, ok=False).stderr
 
-    def test_usage_joins_board_events_with_the_session_logs(self) -> None:
-        impl_a, impl_b = "s-impl-a", "s-impl-b"
-        pr = "https://github.com/o/r/pull/7 at abc"
+    def test_usage_counts_each_launched_session_from_its_own_logs(self) -> None:
         self.update(
             comments={
                 "29": [
                     comment(
-                        1, 0, event("implementer", "team-1-impl", impl_a, f"launched codex in {WT}")
+                        1, 0, event("implementer", "team-1-impl", "s-impl-a", "launched codex")
                     ),
+                    comment(2, 1, event("tester", "team-1-tester", "s-t", "launched claude")),
+                    # A relaunch is a new session under the old name; a hand launch counts too.
                     comment(
-                        2, 1, event("tester", "team-1-tester", "s-t", f"launched claude in {WT}")
+                        3, 2, event("implementer", "team-1-impl", "s-impl-b", "launched codex")
                     ),
-                    comment(
-                        3, 2, event("designer", "team-1-critic", "s-c", f"launched claude in {WT}")
-                    ),
-                    comment(
-                        4,
-                        3,
-                        event(
-                            "implementer",
-                            "team-1-impl",
-                            impl_a,
-                            f"handoff of {pr} to team-1-tester",
-                        ),
-                    ),
-                    # A reviewer's stop does not close the tester's turn.
-                    comment(5, 4, event("designer", "team-1-critic", "s-c", "stopped")),
-                    comment(
-                        6,
-                        5,
-                        event("tester", "team-1-tester", "s-t", f"handoff of {pr} to team-1-impl"),
-                    ),
-                    comment(7, 6, event("implementer", "team-1-impl", impl_a, "stopped")),
-                    # A relaunch is a new session under the old name, and holds the checkout.
-                    comment(
-                        8, 7, event("implementer", "team-1-impl", impl_b, f"launched codex in {WT}")
-                    ),
-                    comment(9, 8, event("tester", "team-1-tester", "s-t", "stopped")),
-                    comment(10, 9, event("designer", "lead", "s-lead", "launched codex by hand")),
-                    comment(11, 10, event("implementer", "team-1-impl", impl_b, "stopped")),
-                    comment(12, 11, "a comment without a header"),
+                    comment(4, 3, event("designer", "lead", "s-lead", "launched codex by hand")),
+                    comment(5, 4, event("dispatcher", "dispatcher", "s-d", "board changed")),
+                    comment(6, 5, "R1 PROPOSAL designer lead s-lead\nnot a launch"),
                 ]
             }
         )
@@ -162,22 +135,14 @@ class BoardTest(Harness):
             "cache_read_input_tokens": 100,
             "cache_creation_input_tokens": 20,
         }
-        advisor = {
-            "type": "advisor_message",
-            "model": "fixture-advisor",
-            "input_tokens": 47,
-            "output_tokens": 6,
+        advisor = {"type": "advisor_message", "model": "fixture-advisor", "input_tokens": 47}
+        iterations = [{"type": "message", **usage}, {**advisor, "output_tokens": 6}]
+        message = {
+            "id": "m1",
+            "model": "fixture-test",
+            "usage": {**usage, "iterations": iterations},
         }
-        line = json.dumps(
-            {
-                "type": "assistant",
-                "message": {
-                    "id": "m1",
-                    "model": "fixture-test",
-                    "usage": {**usage, "iterations": [{"type": "message", **usage}, advisor]},
-                },
-            }
-        )
+        line = json.dumps({"type": "assistant", "message": message})
         # A message appears once per content block and is counted once, with its advisor call.
         (claude / "s-t.jsonl").write_text(f"{line}\n{line}\nnot json\n")
         (claude / "s-t/subagents/agent-1.jsonl").write_text(
@@ -197,7 +162,7 @@ class BoardTest(Harness):
             "cache_write_input_tokens": 7,
             "output_tokens": 40,
         }
-        (codex / f"rollout-2026-10-12T10-00-00-{impl_a}.jsonl").write_text(
+        (codex / "rollout-2026-10-12T10-00-00-s-impl-a.jsonl").write_text(
             "\n".join(
                 json.dumps(e)
                 for e in (
@@ -219,16 +184,11 @@ class BoardTest(Harness):
             + "\n"
         )
         rows = self.board("usage", "29", env={"HOME": str(home)}).stdout.splitlines()
-        lead = [r for r in rows if r.startswith("| lead |")]
-        assert len(lead) == 1
-        assert lead[0].endswith("(running) |  | no logs found | 0 | 0 | 0 | 0 |")
-        tester = "| team-1-tester | tester | s-t | 0h07m | 0h02m | "
-        assert [r for r in rows[2:] if r not in lead] == [
-            "| team-1-critic | designer | s-c | 0h02m |  | no logs found | 0 | 0 | 0 | 0 |",
-            "| team-1-impl | implementer | s-impl-a | 0h06m | 0h04m | fixture-impl "
-            "| 200 | 80 | 400 | 14 |",
-            "| team-1-impl | implementer | s-impl-b | 0h03m | 0h03m | no logs found "
-            "| 0 | 0 | 0 | 0 |",
+        tester = "| team-1-tester | tester | s-t | "
+        assert rows[2:] == [
+            "| lead | designer | s-lead | no logs found | 0 | 0 | 0 | 0 |",
+            "| team-1-impl | implementer | s-impl-a | fixture-impl | 200 | 80 | 400 | 14 |",
+            "| team-1-impl | implementer | s-impl-b | no logs found | 0 | 0 | 0 | 0 |",
             tester + "claude-haiku | 10 | 5 | 100 | 20 |",
             tester + "fixture-advisor | 47 | 6 | 0 | 0 |",
             tester + "fixture-test | 10 | 5 | 100 | 20 |",

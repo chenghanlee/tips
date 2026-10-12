@@ -7,24 +7,25 @@ Usage:
   agent/teams/board.py read <issue> [--after <comment URL>]
   agent/teams/board.py usage <issue>...
 
-post prints the comment URL. An identical round comment already on the issue is reused,
-so a repeat after an uncertain post never doubles it; EVENTs are posted every time,
-because two handoffs of one head read the same. The header line is
-`R<round> <TYPE> <role> <name> <session>`; EVENT has no round. Name and session come
-from the calling Herdr pane and the role from the allocation records; give --role when
-no record names you, or --as to post for another agent (a launch or takeover record).
-Above 800 words the command warns; state the reason in the comment. Link logs as gists
-made beforehand with `gh gist create <file>`.
+post prints the comment URL. An identical comment already on the issue is reused, so a
+repeat after an uncertain post never doubles it; a hand-written EVENT for a new
+occurrence must read differently, which a relaunch does through its new session id. The
+header line is `R<round> <TYPE> <role> <name> <session>`; EVENT has no round. Name and
+session come from the calling Herdr pane and the role from the allocation records; give
+--role when no record names you, or --as to post for another agent (a launch or takeover
+record). Above 800 words the command warns; state the reason in the comment. Link logs
+as gists made beforehand with `gh gist create <file>`.
 
 read prints the current issue body, then every comment, or only those after the given
 comment.
 
-usage prints one Markdown table for the given spec and brief issues: per agent and
-session, elapsed time from its launch EVENT to its stop EVENT (or now), the time it
-held a pair checkout (from launch and handoff EVENTs; blank for agents that never held
-one), and tokens per model from its own session logs: `~/.claude/projects` JSONL for
+usage prints one Markdown table for the given spec and brief issues: tokens per model for
+every session a launch EVENT names (team.py posts one per launch; the dispatcher posts
+one for a hand launch), from the session's own logs: `~/.claude/projects` JSONL for
 Claude, with its advisor calls and subagent logs, and `~/.codex/sessions` for Codex.
-Input counts uncached input only; cache read and cache write are separate columns.
+Input counts uncached input only; cache read and cache write are separate columns. A
+session's count is its whole life, so give a trial feature fresh sessions or take the
+table before and after.
 """
 
 import argparse
@@ -34,9 +35,8 @@ import re
 import sys
 from collections import defaultdict
 from collections.abc import Iterator
-from datetime import UTC, datetime
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import cast
 
 import team
 from team import (
@@ -104,10 +104,6 @@ def read(args: argparse.Namespace) -> None:
     print(f"{view['url']}\n{view['body']}")
     for comment in comments:
         print(f"\n--- {comment['html_url']} {comment['created_at']}\n{comment['body']}")
-
-
-def when(text: object) -> datetime:
-    return datetime.fromisoformat(str(text))
 
 
 def log_entries(files: list[Path]) -> Iterator[dict[str, object]]:
@@ -183,97 +179,27 @@ def codex_tokens(session: str) -> dict[str, list[int]]:
     return totals
 
 
-def duration(seconds: float) -> str:
-    return f"{int(seconds // 3600)}h{int(seconds % 3600 // 60):02d}m"
-
-
-class Agent(TypedDict):
-    role: str
-    launch: datetime | None
-    stop: datetime | None
-
-
-Event = tuple[
-    datetime, str, str, str, str
-]  # time, issue, "launched"/"handoff"/"stopped", name, session
-
-
-def board_events(issues: list[str]) -> tuple[dict[tuple[str, str], Agent], list[Event]]:
-    """Every attributed poster, and the launch, handoff and stop EVENTs in time order.
-
-    A handoff names its recipient by live name; the recipient's session is resolved to
-    its latest launch on that issue, since a relaunch is a new session under the old name.
-    """
-    agents: dict[tuple[str, str], Agent] = {}
-    events: list[Event] = []
+def launched_sessions(issues: list[str]) -> list[tuple[str, str, str]]:
+    """(name, role, session) of every launch EVENT on the issues, each once, in name order."""
+    found: set[tuple[str, str, str]] = set()
     for issue in issues:
         for comment in issue_comments(issue):
             lines = str(comment.get("body") or "").splitlines()
             match = HEADER.match(lines[0]) if lines else None
-            if not match:
-                continue
-            at = when(comment["created_at"])
-            agent = agents.setdefault(
-                (match["name"], match["session"]), Agent(role=match["role"], launch=None, stop=None)
-            )
-            words = lines[1].split() if match["type"] == "EVENT" and len(lines) > 1 else []
-            if words[:1] == ["launched"]:
-                agent["launch"] = min(agent["launch"] or at, at)
-                events.append((at, issue, "launched", match["name"], match["session"]))
-            elif words[:1] == ["stopped"]:
-                agent["stop"] = at
-                events.append((at, issue, "stopped", match["name"], match["session"]))
-            elif words[:1] == ["handoff"]:
-                events.append((at, issue, "handoff", words[-1], ""))
-    return agents, sorted(events, key=lambda e: e[0])
-
-
-def working_time(
-    agents: dict[tuple[str, str], Agent], events: list[Event], now: datetime
-) -> dict[tuple[str, str], float]:
-    """Seconds each session held a pair checkout: from the EVENT giving it the turn to the next."""
-    working: dict[tuple[str, str], float] = {}
-    holder: dict[str, tuple[tuple[str, str], datetime]] = {}
-    current: dict[tuple[str, str], str] = {}  # (issue, name) -> latest launched session
-
-    def release(issue: str, at: datetime) -> None:
-        held = holder.pop(issue, None)
-        if held:
-            working[held[0]] = working.get(held[0], 0) + (at - held[1]).total_seconds()
-
-    for at, issue, kind, name, session in events:
-        if kind == "launched":
-            current[issue, name] = session
-            if agents[name, session]["role"] == "implementer":
-                release(issue, at)
-                holder[issue] = ((name, session), at)
-        elif kind == "handoff":
-            release(issue, at)
-            holder[issue] = ((name, current.get((issue, name), "")), at)
-        elif holder.get(issue, ((None, None), None))[0] == (name, session):
-            release(issue, at)
-    for key, since in holder.values():
-        working[key] = working.get(key, 0) + (now - since).total_seconds()
-    return working
+            launched = len(lines) > 1 and lines[1].split()[:1] == ["launched"]
+            if match and match["type"] == "EVENT" and launched:
+                found.add((match["name"], match["role"], match["session"]))
+    return sorted(found)
 
 
 def usage(args: argparse.Namespace) -> None:
-    now = datetime.now(UTC)
-    agents, events = board_events(args.issues)
-    working = working_time(agents, events, now)
-    columns = ("Agent", "Role", "Session", "Elapsed", "Working", "Model", *COUNTS)
+    columns = ("Agent", "Role", "Session", "Model", *COUNTS)
     print("| " + " | ".join(columns) + " |")
     print("|" + "---|" * len(columns))
-    for (name, session), agent in sorted(agents.items()):
-        launch, stop = agent["launch"], agent["stop"]
-        elapsed = duration(((stop or now) - launch).total_seconds()) if launch else ""
-        if launch and not stop:
-            elapsed += " (running)"
-        held = duration(working[name, session]) if (name, session) in working else ""
+    for name, role, session in launched_sessions(args.issues):
         tokens = claude_tokens(session) or codex_tokens(session) or {"no logs found": [0, 0, 0, 0]}
         for model, counts in sorted(tokens.items()):
-            cells = [name, agent["role"], session, elapsed, held, model, *map(str, counts)]
-            print("| " + " | ".join(cells) + " |")
+            print("| " + " | ".join([name, role, session, model, *map(str, counts)]) + " |")
 
 
 def main() -> None:
