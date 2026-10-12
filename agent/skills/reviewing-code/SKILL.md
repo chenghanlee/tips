@@ -17,7 +17,7 @@ Read repository files and skill references from the current worktree.
 Establish the reviewed commit or diff. Read the issue and acceptance scenarios, PR
 body, diff, changed files and their callers, existing tests, linked design sections
 and prior review threads. For a local review, use the user brief in place of absent
-issue or PR records. In a pair, [step 3](../../teams/README.md#3-tester-review-the-pushed-head)
+issue or PR records. In a pair, the [tester role](../../teams/roles/tester.md)
 owns turn-taking and handoff; this section owns what to inspect.
 
 ## Review

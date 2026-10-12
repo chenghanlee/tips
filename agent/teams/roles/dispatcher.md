@@ -50,7 +50,7 @@ open issues and PRs, running pairs (`herdr workspace list`), worktrees
 
 ## Release a brief
 
-Move a brief to Q&A and run `agent/teams/team.py start <brief>` when every critic
+Set a brief to Implement and run `agent/teams/team.py start <brief>` when every critic
 has an AGREE naming the current PROPOSAL, no P0 or P1 is open, every P2 has a
 decision, no product decision is pending, and the brief has an `Implementer` entry,
 acceptance scenarios, contracts, quoted design-doc sections with their revision and
@@ -62,10 +62,11 @@ handoff names the accepted PROPOSAL URL. When the tester asks, run
 
 ## Liveness
 
-No round counts or deadlines. When an agent goes quiet, check its pane
-(`herdr agent get <name>`) and its records. Replace a dead session with a new launch
-and EVENT. Designers who cannot converge post BLOCKED; decide or ask the user. A
-timeout is never approval.
+No round counts or deadlines. Nothing wakes you when an agent dies without sending
+a message: the user tells you (`herdr agent prompt dispatcher "<name> stopped"`), or
+you notice at your next turn. Then check its pane (`herdr agent get <name>`) and its
+records, and replace a dead session with a new launch and EVENT. Designers who
+cannot converge post BLOCKED; decide or ask the user. A timeout is never approval.
 
 ## Measurement
 

@@ -13,9 +13,9 @@ own: [dispatcher](roles/dispatcher.md), [designer](roles/designer.md),
 ## How it runs
 
 ```
-USER         set goals · answer product questions · start the dispatcher once
+USER         set goals · answer product questions · start the dispatcher once · report a dead pane
 DISPATCHER   open a feature → designers agree a spec and briefs → team.py start <brief>
-IMPLEMENTER  Q&A on the brief → code → push → PR "Closes #<brief>" → team.py turn <pr> <tester>
+IMPLEMENTER  ask only what changes the work → code → push → PR "Closes #<brief>" → team.py turn <pr> <tester>
 TESTER       ask the dispatcher to launch the other reviewers → review the head
 DISPATCHER   team.py review <pr> <entry> for each
 REVIEWERS    review from pinned worktrees → notify the tester with the review URL

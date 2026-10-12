@@ -25,7 +25,7 @@ their concerns before reading the lead's PROPOSAL.
    say so. Continue until every critic AGREEs or you post BLOCKED.
 3. Only you edit spec and brief bodies. If a shared contract changes, pause affected
    briefs until you update them.
-4. Q&A: answer the implementer's QUESTIONs. Involve critics only when an answer
+4. Answer the implementer's QUESTIONs. Involve critics only when an answer
    changes an agreed contract; post one joint ANSWER.
 5. Review a PR only when the reviewing designer and the implementer disagree with
    evidence on both sides.
@@ -37,7 +37,7 @@ their concerns before reading the lead's PROPOSAL.
    optional. Prefer the objection that removes a part over one that adds a part.
 2. AGREE when none of your P0 or P1 objections remains and each P2 has a decision.
    Name the PROPOSAL comment URL. AGREE approves proceeding.
-3. Q&A: answer only when the lead asks.
+3. Answer an implementer's QUESTION only when the lead asks.
 
 ## Haiku rule
 
