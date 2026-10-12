@@ -11,7 +11,7 @@ PROPOSAL URL and brief revision. If your model is Haiku, also read
 Post one comment on the brief: restated plan, assumptions, QUESTIONs. The lead
 answers. Start coding only when the dispatcher has released the brief and the lead's
 ANSWER leaves none of your QUESTIONs open. If an answer changes a contract, wait for
-the lead's renewed release. You never arbitrate between designers.
+the lead's updated release. Do not decide disagreements between designers.
 
 ## Evidence
 
@@ -21,10 +21,9 @@ the lead's renewed release. You never arbitrate between designers.
    handling. Do the investigation before changing the contract; the table records it.
    Report an unavailable Dexter under the AGENTS.md fallback rule instead of implying
    it ran.
-2. Run every full-suite run and every check you cite through
-   `agent/teams/capture.py`. The first failing log stays until the PR records the
-   test, error and seed, or states what the runner did not provide.
-3. Link captured logs and CI runs from the PR body. Never claim "passes" without one.
+2. Follow [common evidence rules](common.md#evidence). In the PR, record the first
+   failure's test, error and seed, or state which details the runner did not provide.
+3. Link captured logs and CI runs in the PR body.
 
 ## Recovery
 
@@ -35,14 +34,14 @@ enabling auto-merge.
 
 ## Do not
 
-- Do not pick the first working design. In your Q&A comment, once, name the
-  alternative the brief rejected and why your approach satisfies the quoted contracts.
+- In your Q&A comment, name the alternative the brief rejected and explain how
+  your approach meets its contracts. Do not repeat this in later comments.
 - Do not change a contract before tracing its callers.
 - Do not filter the output of a check you cite (`grep`, `tail`, `| head`) before it
   is captured.
 - Do not rerun a failed suite without first recording the failure.
-- Do not widen or narrow the brief. Ask with a QUESTION; scope changes only through
+- Do not change the brief's scope. Ask with a QUESTION; scope changes only through
   the lead editing the brief.
-- Do not add adjacent capabilities, speculative abstractions or configuration.
+- Do not add unrequested features, abstractions or settings.
 - Do not describe work as done without the check that proves it.
 - Do not edit another agent's comment, the brief body or the spec body.

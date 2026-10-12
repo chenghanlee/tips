@@ -7,12 +7,15 @@ For humans, from the repository root. Agents read the [pair workflow](README.md)
 ```
 USER         set goals and constraints · answer decisions · start the dispatcher once
 DISPATCHER   assess milestone → prioritize eligible work → set Ready → start pair → set Active
-DEVELOPER    code → push → PR with "Closes #<issue>" + auto-merge → team.py turn <pr> test
-TESTER       review → findings → team.py turn <pr> dev      (loop until no P0 or P1)
-TESTER       LGTM → publish_review.py
-GITHUB       checks + status + resolved threads → merge → issue closes → Done
-TESTER       confirm the merge → ring the dispatcher "done"
-DISPATCHER   team.py stop <issue> → next
+IMPLEMENTER  code → push → PR with "Closes #<brief>" + auto-merge → team.py turn <pr> <tester>
+TESTER       ask the dispatcher to launch the other reviewers the brief names
+DISPATCHER   team.py review <pr> <entry> for each
+TESTER       review → findings → team.py turn <pr> <implementer>   (loop until no P0 or P1)
+REVIEWERS    review from pinned worktrees → notify the tester with the review URL
+TESTER       all LGTM → publish_review.py --record per reviewer
+GITHUB       checks + status + resolved threads → merge → brief closes → Done
+TESTER       confirm the merge → notify the dispatcher "done"
+DISPATCHER   team.py stop <brief> → next
 ```
 
 ## One-time setup
@@ -28,7 +31,7 @@ The user maintains third-party skills in these Git-ignored directories in the ma
 
 Update matching copies together. `team.py start` links the main checkout's `.agents/skills/` into each worktree and checks only that the directory exists.
 
-The repository versions three skills: the [Dexter reference](../skills/dexter/SKILL.md), [developing-software](../skills/developing-software/SKILL.md) and [reviewing-code](../skills/reviewing-code/SKILL.md). Link them once into both locations from the main checkout:
+The repository tracks three skills: the [Dexter reference](../skills/dexter/SKILL.md), [developing-software](../skills/developing-software/SKILL.md) and [reviewing-code](../skills/reviewing-code/SKILL.md). Link them once into both locations from the main checkout:
 
 ```bash
 for skill in dexter developing-software reviewing-code; do
@@ -37,7 +40,7 @@ for skill in dexter developing-software reviewing-code; do
 done
 ```
 
-These links serve discovery in the main checkout. A pair developer or tester reads the versioned file and any linked skill references in its own worktree, as the pair workflow says, because the linked skills directory points at the main checkout's copy.
+These links support skill discovery in the main checkout. Agents must read tracked skills and their references from their own worktree; the linked directory points to the main checkout's copy.
 
 Install only the `mix-credo` plugin, for the clients you use:
 
@@ -133,20 +136,41 @@ The calling agent remains available. Inspect the new pane for startup or approva
 prompts; successful command submission does not mean the dispatcher is ready.
 Use the script in the main checkout.
 
-Start only one. Pairs notify it by the name `dispatcher`. It chooses and prepares the next task from the backlog using the milestone plan, dependencies and product value; you do not need to mark tasks Ready. Nothing watches GitHub: after changing priorities or external facts, type `board changed` in its pane. It asks unresolved product and scope questions in that pane; answer there. Every ring starts a turn over its whole context, so it compacts early (`dispatcher.compact_percent`); GitHub holds the state it needs. It starts and stops pairs with `team.py` from this checkout; each pair gets its own Herdr workspace. Handle each client's repository trust prompt the first time. An unexpected approval prompt stops a launch; inspect it and follow the active approval policy.
+Start one dispatcher. Agents notify it by the name `dispatcher`. It chooses tasks
+from the backlog using milestone order, dependencies and product value; you do not
+need to mark them Ready.
+
+The dispatcher does not watch GitHub. After changing priorities or external facts,
+type `board changed` in its pane. Answer its product and scope questions there.
+Each message starts a turn using the full context, so it compacts early
+(`dispatcher.compact_percent`) and reloads state from GitHub.
+
+It runs `team.py` from the main checkout. Handle each client's initial repository
+trust prompt. If an approval prompt stops launch, inspect it and follow the active
+approval policy.
 
 ## Configuration
 
-Edit [config.toml](config.toml): the number of pairs, client, model and effort per role, the dispatcher's model, effort and compaction point, port and database allocation, permissions and time budgets. Scripts read the main checkout's file; `TIPS_TEAM_CONFIG=/absolute/path` selects a staged one. Settings apply at the next launch.
+Edit [config.toml](config.toml) for slots, agent and dispatcher settings, resource
+allocation, permissions and time limits. Each `[agents.<entry>]` defines a role,
+client, model, effort, optional advisor and persona, database suffix and port offset.
+Briefs name entries in `Implementer:` and `Required reviews:`.
 
-Claude launches with `--advisor fable` when its configured model is nonempty and does not name Fable; this requires Fable access. Fable models and an empty model (the client default) leave the advisor setting to the client.
+A configured entry can run in several allocations. Each launch records its
+resources in `agent/teams/allocations/<slot>.json`; restart, handoff and cleanup
+read that record. Scripts use the main checkout's config unless
+`TIPS_TEAM_CONFIG=/absolute/path` selects another file. Settings apply at the next launch;
+a relaunched client keeps its recorded database, port and client kind and takes its
+model, effort, advisor and persona from the current file.
+
+A Claude entry launches with `--advisor <advisor>` when its `advisor` is set; this requires access to that model. Entries without one leave the advisor setting to the client. The dispatcher launches with `--advisor fable` when its model is nonempty and does not name Fable.
 
 | Allocation | Components |
 |---|---|
-| Database suffix | `team.db_suffix_prefix`, slot number, `roles.<role>.db_suffix` |
-| Test port | `team.port_base` + slot number × `team.port_stride` + role `port_offset` |
+| Database suffix | `team.db_suffix_prefix`, slot number, `agents.<entry>.db_suffix` |
+| Test port | `team.port_base` + slot number × `team.port_stride` + entry `port_offset` |
 
-`timeouts.dexter_startup_seconds` bounds the Dexter warm-up at start, Elixir version detection and the daemon stop at retirement. `TIPS_DEXTER_HOME` selects another shared Dexter build directory.
+`timeouts.dexter_startup_seconds` bounds the Dexter warm-up at start, Elixir version detection and the daemon stop during cleanup. `TIPS_DEXTER_HOME` selects another shared Dexter build directory.
 
 Set database connection limits in [compose.yaml](../../compose.yaml), overridden by `TIPS_DB_MAX_CONNECTIONS`. Recreate the database service to apply changes, only with no pairs running.
 

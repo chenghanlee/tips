@@ -8,35 +8,31 @@ issue says which tester confirms the merge.
 
 ## Independence
 
+When the handoff names reviewers that are not launched, ask the dispatcher to
+launch them before you start reviewing, with the command the handoff gives, so they
+review the same head in parallel.
+
 Record the PR head SHA and your first findings before reading the PR description,
-evidence table, developer comments or another reviewer's review. A tester persona, if
-set, adds a focus; it never narrows the review. Testers do not split a PR.
+evidence table, developer comments or another reviewer's review. A persona adds review focus; it does not limit scope. Each tester reviews the whole PR.
 
 ## Evidence
 
 1. Trace the affected callers yourself with Dexter and scoped search, and check their
-   handling. The developer's table is a claim to verify, not evidence.
+   handling. Verify the developer's table; do not assume it is correct.
 2. Inspect the implementer's retained full-suite output yourself, through the log
    links in the PR body, including the first failing log and its exit status. Run
    the tests through `agent/teams/capture.py` in your own checkout; your logs are
    under your checkout's `tmp/checks/`.
-3. State both checks and any limitation in the review body.
+3. List checks and verification limits in the review body.
 
 ## Approval and merge
 
-- Approve when no P0 or P1 remains and every thread you opened is resolved. Put
-  `LGTM` on the first line and your agent name and session on the second.
-- Merge-confirming tester: after your LGTM, read each required reviewer's latest
-  review of this head. One with findings: run `team.py turn <pr> dev` so the
-  implementer repairs; do not wait for more approvals. One absent: ring that
-  reviewer and wait. All LGTM: publish with one `--record` per reviewer:
-
-  ```sh
-  agent/teams/publish_review.py --pr <pr> --sha <sha> --record <yours> --record <designer's>
-  ```
-
-  The publisher reads the brief's `Required reviews:` line and refuses a missing,
-  superseded, duplicate or wrong-head record. Then do README step 5.
-- Additional tester: submit your review record and ring the merge-confirming tester.
+- Approve when no P0 or P1 remains and every thread you opened is resolved. Use the
+  [review record format](../README.md#pr-review-record).
+- Merge-confirming tester: follow [README step 5](../README.md#5-tester-approve-and-confirm-the-merge)
+  to check every required review, return findings to the implementer, request missing
+  reviews, publish approval and confirm the merge. Do not wait for more approvals
+  after receiving findings.
+- Additional tester: submit your review record and notify the merge-confirming tester.
   Never call `team.py turn`.
 - A new head voids every LGTM. Review the changes since your previous review.

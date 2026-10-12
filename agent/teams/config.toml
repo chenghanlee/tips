@@ -3,7 +3,6 @@
 [team]
 # Current suffixes support at most nine teams; validation rejects partition collisions.
 max_teams = 4
-workspace_prefix = "tips-team"
 port_base = 4100
 port_stride = 10
 postgres_port = 5433
@@ -21,22 +20,55 @@ codex_approval = "never"
 claude_permission_mode = "auto"
 
 # Started by agent/teams/dispatch; always Claude. It compacts when its context is
-# compact_percent full, because every ring starts a turn over the whole context.
+# compact_percent full, because every message starts a turn over the whole context.
 [dispatcher]
-model = "claude-opus-5-5"
+model = "claude-fable-5-1"
 effort = "medium"
 compact_percent = 35
 
-[roles.dev]
+# Configured agents. A brief names them: `Implementer: <entry>` and
+# `Required reviews: <entry>, <entry>`. Each launch allocates the entry a database
+# suffix and test port within the slot: db_suffix_prefix + slot + db_suffix, and
+# port_base + slot * port_stride + port_offset. `advisor` is Claude only; `persona`
+# is optional text the launch prompt carries.
+[agents.opus-implementer]
+role = "implementer"
 kind = "claude"
 model = "claude-opus-5-5"
 effort = "high"
-db_suffix = "_dev"
+advisor = "fable"
+db_suffix = "_opus"
 port_offset = 0
 
-[roles.test]
+[agents.haiku-implementer]
+role = "implementer"
+kind = "claude"
+model = "claude-haiku-5-5"
+effort = "high"
+advisor = "opus"
+db_suffix = "_haiku"
+port_offset = 1
+
+[agents.sol-tester]
+role = "tester"
 kind = "codex"
 model = "gpt-6.1-sol"
+effort = "xhigh"
+db_suffix = "_sol"
+port_offset = 2
+
+[agents.fable-designer]
+role = "designer"
+kind = "claude"
+model = "claude-fable-5-1"
 effort = "high"
-db_suffix = "_test"
-port_offset = 1
+db_suffix = "_fable"
+port_offset = 3
+
+[agents.astra-designer]
+role = "designer"
+kind = "codex"
+model = "gpt-6-astra"
+effort = "xhigh"
+db_suffix = "_astra"
+port_offset = 4

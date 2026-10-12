@@ -4,22 +4,28 @@ GitHub stores workflow state in the issue, the PR reviews and checks, and
 [Project 15](https://github.com/users/chenghanlee/projects/15) (`--owner chenghanlee`).
 Read these records when assigned, after a restart and at each handoff. Record
 decisions, findings and blockers there. Use Herdr to notify the next agent.
-[AGENTS.md](../../AGENTS.md) owns repository boundaries, navigation, checks and skill
-routing. [Developing-software](../skills/developing-software/SKILL.md) owns design and
-testing rules; [reviewing-code](../skills/reviewing-code/SKILL.md) owns review methods.
-This document owns pair coordination. The user completes [setup](SETUP.md) once.
+Follow [AGENTS.md](../../AGENTS.md) for repository rules,
+[developing-software](../skills/developing-software/SKILL.md) for design and tests,
+and [reviewing-code](../skills/reviewing-code/SKILL.md) for reviews.
+This document defines pair coordination. The user completes [setup](SETUP.md) once.
 
 | Role | Agent name | Responsibilities |
 |---|---|---|
 | User | n/a | Set product goals and constraints. Answer unresolved product, scope, purchase and credential questions. Start the dispatcher once; notify it when priorities or external facts change. |
-| Dispatcher | `dispatcher` | Act as the Tips technical program manager: prioritize work, prepare eligible tasks, update the board, start and stop pairs, and handle blockers. Do not write code or review changes. Design-tier duties: [roles/dispatcher.md](roles/dispatcher.md). |
-| Designer | configured entry name | Design one feature as lead or critic, then review its PRs: [roles/designer.md](roles/designer.md). Launched by hand in the trial. |
-| Developer | `team-N-dev` | Implement and verify the issue, open the PR, address findings and fix failed checks. Design-tier duties: [roles/implementer.md](roles/implementer.md). |
-| Tester | `team-N-test` | Review the pushed PR head, run tests or the app, publish approval and confirm the merge. Design-tier duties: [roles/tester.md](roles/tester.md). |
+| Dispatcher | `dispatcher` | Act as the Tips technical program manager: prioritize work, prepare eligible tasks, update the board, start and stop pairs, launch reviewers, and handle blockers. Do not write code or review changes. Design-tier duties: [roles/dispatcher.md](roles/dispatcher.md). |
+| Designer | `team-N-<entry>` | Design one feature as lead or critic, then review its PRs: [roles/designer.md](roles/designer.md). Design rounds are launched by hand in the trial; PR review through `team.py review`. |
+| Implementer | `team-N-<entry>` | Implement and verify the brief, open the PR, address findings and fix failed checks. Design-tier duties: [roles/implementer.md](roles/implementer.md). |
+| Tester | `team-N-<entry>` | Review the pushed PR head, run tests or the app, publish approval and confirm the merge. Design-tier duties: [roles/tester.md](roles/tester.md). |
 
-Every swarm role also reads [roles/common.md](roles/common.md). A feature run through
-the design tier starts from a brief issue; the brief's `Required reviews:` line names
-the reviewers whose LGTM the merge needs.
+Every agent also reads [roles/common.md](roles/common.md). Agents are
+`[agents.<entry>]` entries in [config.toml](config.toml). A brief issue names its
+agents: `Implementer: <entry>` and `Required reviews: <entry>, <entry>`, the reviewers
+whose LGTM the merge needs. The first tester in `Required reviews:` confirms the merge
+and shares the pair checkout with the implementer; every other tester and the
+reviewing designer reviews from its own worktree pinned at the PR head. A launched
+client's Herdr name is `team-<slot>-<entry>`; its reviews are attributed to the entry
+name. Launches are recorded in the main checkout's `agent/teams/allocations/<slot>.json`,
+which restart, handoff and teardown read.
 
 ## Common path
 
@@ -53,7 +59,7 @@ board change:
    when a product or scope decision is not settled, or their access, purchase or
    approval is required. Do not change requirements or waive gates to make work eligible.
 6. Record the selection decision and its reason on the issue, set Ready, and run
-   `agent/teams/team.py start <issue>`. After a successful start, set Status Active
+   `agent/teams/team.py start <brief>`. After a successful start, set Status Active
    and Agent on the Project item. Reassess the remaining candidates for each free slot.
 7. If no task is eligible, identify the prerequisite or decision that would unlock
    the next useful task. Resolve it within your authority or report the specific
@@ -61,20 +67,24 @@ board change:
 8. End your turn after assigning work or reporting the blocker. Pairs notify you
    when they finish or need help; no polling loop is required.
 
-### 2. Developer: implement and hand off
+### 2. Implementer: implement and hand off
 
-1. Use the repository to fill in missing facts in the issue.
+1. Read the repository to resolve missing facts in the brief.
 2. Plan, implement and verify using [developing-software](../skills/developing-software/SKILL.md)
    from this worktree, then push the change.
-3. Open the PR with `Closes #<issue>` and enable auto-merge:
-   `gh pr merge <pr> --auto --merge`.
-4. Run `agent/teams/team.py turn <pr> test`.
+3. Open the PR with `Closes #<brief>` and enable auto-merge:
+   `gh pr merge <pr> --auto --merge`. The closing reference is how `review` and the
+   publisher find the brief; keep it.
+4. Run `agent/teams/team.py turn <pr> <tester entry>`. Run it from the pair checkout.
+   The PR must close the brief.
 5. After a successful handoff, stop using the worktree, build and database until
    the tester returns the turn.
 
 ### 3. Tester: review the pushed head
 
-1. Record the PR head SHA. Read [reviewing-code](../skills/reviewing-code/SKILL.md)
+1. Record the PR head SHA. If the handoff names reviewers that are not launched, ask
+   the dispatcher to launch them first, with the `review` commands the handoff gives,
+   so they review the same head in parallel. Read [reviewing-code](../skills/reviewing-code/SKILL.md)
    from this worktree to establish scope and review that head against the shared
    design and testing standard. Run the tests. For UI tasks, also check acceptance
    scenarios through [manual browser review](#manual-browser-review).
@@ -82,16 +92,23 @@ board change:
    [blocker procedure](#report-and-resolve-blockers).
 3. Confirm the worktree is clean and HEAD matches the reviewed SHA. Report every P0
    and P1 in the first review. With findings: submit the review and run
-   `agent/teams/team.py turn <pr> dev`. Without: continue to approval.
+   `agent/teams/team.py turn <pr> <implementer entry>`. Without: continue to approval.
+
+Other reviewers (a second tester, the reviewing designer) review the same head from
+their own pinned worktrees, launched by the dispatcher with `team.py review`. They
+submit their review record, notify the merge-confirming tester by Herdr name with the
+review URL, and end their turn. They never run `turn`. For a new head they fetch,
+check out the head detached, reindex and review the changes since their previous
+review.
 
 For fixes, check each repair and the scenarios it affects, and apply the skill to new
 behaviour or design.
 
-### 4. Developer and tester: address findings
+### 4. Implementer and tester: address findings
 
-1. Developer: fix every P0 and P1. Address each P2 under the [severity rules](#severity).
+1. Implementer: fix every P0 and P1. Address each P2 under the [severity rules](#severity).
    Follow [Repair and refactor](../skills/developing-software/SKILL.md#repair-and-refactor).
-2. Developer: push and hand off to the tester.
+2. Implementer: push and hand off to the tester.
 3. Tester: review the changes since the previous review, as step 3 says for fixes.
    Resolve each thread that is fixed or declined with a reason.
 4. Repeat until the approval conditions are met.
@@ -99,11 +116,14 @@ behaviour or design.
 ### 5. Tester: approve and confirm the merge
 
 Approve when no P0 or P1 remains and every thread is resolved. Submit the
-[PR review record](#pr-review-record) without waiting for CI. Keep the turn. If the
-linked issue has a `Required reviews:` line, read each named reviewer's latest review
-of this head: one with findings means `turn <pr> dev`; one absent means ring that
-reviewer and wait; all LGTM means publish. The publisher refuses a missing,
-superseded, duplicate or wrong-head record.
+[PR review record](#pr-review-record) without waiting for CI. Keep the turn.
+Read each required reviewer's latest review of this head:
+
+- Any findings: run `team.py turn <pr> <implementer entry>`.
+- Missing review: notify that reviewer by Herdr name with the PR URL and head.
+  If the reviewer is not running, report `blocked`.
+- All LGTM: publish with one `--record` per reviewer. The publisher rejects missing,
+  superseded, duplicate or wrong-head records.
 
 Auto-merge requires `checks`, `release`, `tips/independent-review` and resolved
 threads. A merge closes the issue, sets the Project item to Done and deletes the
@@ -126,7 +146,7 @@ Use the first matching outcome:
 | Outcome | Action |
 |---|---|
 | PR merged | Notify the dispatcher with `done`. |
-| PR not merged and a required check failed | Run `agent/teams/team.py turn <pr> dev`. |
+| PR not merged and a required check failed | Run `agent/teams/team.py turn <pr> <implementer entry>`. |
 | Checks passed, PR open, auto-merge enabled, merge state neither `BLOCKED` nor `DIRTY` | Run the bounded merge wait below. |
 | Any other outcome | Report `blocked` to the dispatcher with the pending check or merge blocker. |
 
@@ -149,7 +169,7 @@ timeout "$TIPS_CHECK_TIMEOUT_SECONDS" sh -c '
 ```
 
 After the wait exits or times out, read the PR state again. If merged, notify the
-dispatcher with `done`. Otherwise, return to the developer if a required check
+dispatcher with `done`. Otherwise, return to the implementer if a required check
 failed; report `blocked` for any other outcome, including an API error. Include
 the current merge state or exact error. Do not repeat either wait in this turn.
 
@@ -157,7 +177,7 @@ the current merge state or exact error. Do not repeat either wait in this turn.
 
 Confirm the PR merged. If not, handle the message as blocked.
 
-Run `agent/teams/team.py stop <issue>`, then select another task for the free slot.
+Run `agent/teams/team.py stop <brief>`, then select another task for the free slot.
 Apply the selection process above, including Backlog and resolved blockers.
 
 ## Commands
@@ -167,15 +187,23 @@ Run commands from the repository root of your checkout. The dispatcher runs
 
 | Command | Caller | Effect |
 |---|---|---|
-| `agent/teams/team.py start <issue>` | Dispatcher | Create `task/<issue>` from `origin/main`, the `.worktrees/<issue>` worktree, dependencies, Dexter, and developer and tester clients. |
-| `agent/teams/team.py turn <pr> test` | Developer | Require a clean tree and HEAD matching the PR head. Notify the tester with the PR URL and SHA. |
-| `agent/teams/team.py turn <pr> dev` | Tester | Notify the developer even if the tree is dirty or HEAD differs. Include any mismatch in the message. |
-| `agent/teams/team.py stop <issue>` | Dispatcher | Refuse dirty, unmerged or foreign-owned work. Stop the clients and Dexter, drop the pair's databases, and remove its worktree and branch. |
+| `agent/teams/team.py start <brief>` | Dispatcher | Read the brief's `Implementer:` and `Required reviews:` lines. Create `task/<brief>` from `origin/main`, the `.worktrees/<brief>` worktree, dependencies and Dexter; launch the implementer and the merge-confirming tester, each in its own workspace; write the allocation record. |
+| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require a clean tree and HEAD matching the PR head, run from the pair checkout, and a PR that closes the brief. Notify the tester with the PR URL and SHA, and with the `review` commands for reviewers not yet launched. |
+| `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Notify the implementer even if the tree is dirty or HEAD differs. Include any mismatch in the message. |
+| `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer named in the brief other than the merge-confirming tester: create `.worktrees/review-<pr>-<entry>` detached at the PR head with its own database suffix, port, dependencies and Dexter, and launch the reviewer there. A stopped reviewer's clean worktree moves to the current head; a running one keeps its head. |
+| `herdr agent prompt dispatcher "<PR URL> review: run <review commands>"` | Tester | Ask the dispatcher to launch reviewers the handoff names as not launched. |
+| `agent/teams/team.py stop <brief>` | Dispatcher | Refuse dirty, unmerged or foreign-owned work. Stop every recorded client and Dexter, drop the slot's databases, remove its worktrees, branch and workspaces, and delete the record. |
 | `herdr agent prompt dispatcher "<issue or PR URL> done"` | Tester | Notify the dispatcher that the PR merged. |
 | `herdr agent prompt dispatcher "<blocker comment URL> blocked"` | Current turn holder | Notify the dispatcher of a recorded blocker. |
+| `herdr agent prompt team-<slot>-<entry> "<review URL>"` | Other reviewer | Tell the merge-confirming tester that a review record exists. |
 
-`start` and `stop` take the issue number. `turn` and the review tools take the PR
-number. Rerunning `start` keeps a running client and relaunches a missing one.
+`start` and `stop` take the brief number. `turn`, `review` and the review tools take
+the PR number. Rerunning `start` or `review` keeps a running client and relaunches a
+missing one from its record, with the database, port and client kind it was launched
+with. A client whose startup did not complete is refused on rerun: inspect its pane,
+exit the client there if it is idle, then rerun. `review` and the tester's handoff read
+the brief's current `Required reviews:` line; a changed implementer or
+merge-confirming tester is refused.
 
 After sending a handoff, end your turn. The other agent's message starts a new
 turn. If sending fails, you still hold the turn: report `blocked` to the dispatcher
@@ -191,12 +219,12 @@ checks. Use the first matching condition:
 
 | Condition | Turn holder and action |
 |---|---|
-| No PR exists | Developer: implement and open the PR. |
-| A required check failed | Developer: fix the failure. |
-| The current head has reviews and the latest is not an LGTM | Developer: address the review. |
-| A reviewer named in `Required reviews:` has a latest review of this head that is not an LGTM | Developer: address it. |
+| No PR exists | Implementer: implement and open the PR. |
+| A required check failed | Implementer: fix the failure. |
+| The current head has reviews and the latest is not an LGTM | Implementer: address the review. |
+| A reviewer named in `Required reviews:` has a latest review of this head that is not an LGTM | Implementer: address it. |
 | The current head has no reviews | Tester: review it. |
-| The tester's latest review is an LGTM and a reviewer named in `Required reviews:` has not reviewed this head | Tester: keep the turn; ring that reviewer. |
+| The tester's latest review is an LGTM and a reviewer named in `Required reviews:` has not reviewed this head | Tester: keep the turn; notify that reviewer by Herdr name, or report `blocked` when it is not launched so the dispatcher runs `review`. |
 | The current head is approved | Tester: complete approval publication and merge confirmation. |
 
 ## Rules
@@ -211,7 +239,7 @@ Use the first matching severity:
 | P1 | An acceptance scenario fails, a required test or check is missing or failing, or the change significantly harms the user's experience. |
 | P2 | Any other finding. |
 
-The developer must fix every P0 and P1. For P2s, fix them, decline them with a
+The implementer must fix every P0 and P1. For P2s, fix them, decline them with a
 reason, or file one follow-up issue for all deferred P2s.
 
 ### Messages between agents
@@ -222,6 +250,9 @@ Every message starts a turn using the recipient's full context. Send only:
 - `done` notifications.
 - `blocked` reports.
 - The dispatcher's answer to a blocker.
+- A reviewer's review URL to the merge-confirming tester, and the tester's new-head
+  notification to a reviewer.
+- The tester's request that the dispatcher launch reviewers.
 
 Do not send acknowledgments, progress or status updates, thanks, or replies that
 only confirm receipt. Include everything the recipient needs in one message or
@@ -256,9 +287,9 @@ Dispatcher actions:
 
 ### Failed checks on main
 
-If a developer's failing check also fails on the latest `main` run:
+If an implementer's failing check also fails on the latest `main` run:
 
-1. Developer: report `blocked` with both run links.
+1. Implementer: report `blocked` with both run links.
 2. Dispatcher: find the merge that broke `main` and open its revert with
    `gh pr revert <pr>`.
 3. Dispatcher: enable auto-merge with `gh pr merge <revert pr> --auto --merge`
@@ -269,8 +300,9 @@ If a developer's failing check also fails on the latest `main` run:
 
 - Use one PR per issue. If an issue needs multiple PRs, report `blocked` and ask
   for the issue to be split.
-- The pair shares one worktree and takes turns. Each client has its own database
-  and test port, set at launch. Preserve these settings in every test run.
+- The pair shares one worktree and takes turns. Other reviewers have their own
+  worktrees. Each client has its own database and test port, set at launch. Preserve
+  these settings in every test run.
 - Put scratch files only in the worktree's `tmp/` directory.
 - Never rewrite published commits. Merge `origin/main` when needed; do not rebase
   or force-push.
@@ -351,22 +383,23 @@ Use this structure for `tmp/review.json`:
 ```
 
 Every review body has the same two first lines: `LGTM` alone for an approval, or the
-decision otherwise; then `<agent name>, <session>`. Attribution is the second line up
-to its first comma, matched exactly. To approve, publish the status:
+decision otherwise; then `<entry name>, <session>`. Attribution is the second line up
+to its first comma, matched exactly against the brief's `Required reviews:` names. To approve, publish the status:
 
 ```sh
 agent/teams/publish_review.py --pr <pr> --sha <sha> --record <review URL>
 ```
 
-The command refuses a wrong head, a wrong record or unresolved threads. When the
-PR's linked issue (GitHub's closing reference, any keyword) has a line
-`Required reviews: <name>, <name>`, every named reviewer's latest review of the head
-must be an LGTM attributed to that name, and every review of the head must be
-attributed to a named reviewer; repeat `--record` for each. The command refuses a
-missing, superseded, duplicate or unlisted record, an unattributed review, an empty
-or repeated name, and two linked issues that both name reviewers. This is a check at
-publication time through one shared account: it catches omission, stale heads and
-superseded decisions; it does not authenticate who wrote a review or an issue body.
+The publisher rejects a wrong head, invalid record or unresolved thread. It reads
+`Required reviews:` from the PR's linked issue, using GitHub's closing references
+for any closing keyword. Each named reviewer's latest review of the head must be
+an LGTM, and every review of the head must name a required reviewer. Pass one
+`--record` per reviewer.
+
+It also rejects missing, superseded, duplicate or unlisted records, missing
+attribution, empty or repeated names, and two linked issues that both name
+reviewers. These checks run at publication time. The shared account does not
+authenticate review or issue authors.
 
 To read reviews and resolve threads:
 

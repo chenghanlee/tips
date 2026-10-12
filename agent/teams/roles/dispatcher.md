@@ -2,22 +2,24 @@
 
 Extends the [pair workflow](../README.md) dispatcher. Read with [common rules](common.md).
 
-## Hypothesis under test
+## What the trial tests
 
-From the user's experience, not from the pilot traces: implementers lock onto the
-first working design and miss first- and second-order effects on the rest of Tips, so
-a design round before implementation raises correctness and design quality per unit
-of time and tokens. Falsifier: the lead's PROPOSAL is saved before critique; count
-the critic's evidenced changes to contracts, failure handling or simplicity. None
-across the trial weakens the case. Recurring application failures under an agreed
-design count against the claim that the tier fixes them.
+The user's experience suggests that implementers accept the first working design
+and miss its effects elsewhere in Tips. The trial tests whether design review
+improves correctness and design quality enough to justify its time and tokens.
+The pilot traces do not establish this claim.
+
+Save the lead's PROPOSAL before critique. Count changes to contracts, failure
+handling or simplicity supported by the critic's evidence. No such changes, or
+repeated failures under an agreed design, weaken the case for design rounds.
 
 ## Open a feature
 
 1. Create the spec issue in the tips repo and add it to the swarm project. Write the
    agent set in the body: designer names and the lead, tester names and the
-   merge-confirming tester, the reviewing designer. Each is an entry in
-   `config.toml`.
+   merge-confirming tester, the reviewing designer. Each is an `[agents.<entry>]`
+   entry in `config.toml`. The lead copies the set into each brief: `Implementer:`
+   and `Required reviews:`, testers first, the merge-confirming tester first of all.
 2. Prepare the designers' worktree by hand: `git worktree add --detach
    .worktrees/design-<spec issue> origin/main`, install deps, build, start Dexter per
    the [LSP guide](../../lsp/README.md). You own it and remove it when the feature
@@ -29,10 +31,10 @@ design count against the claim that the tier fixes them.
    issue and whether it is lead or critic. Record each launch as an EVENT comment on
    the spec issue with the agent name and session id.
 4. Personas: architecture (data integrity, contract boundaries, consistency with the
-   existing architecture, simplicity, testability, blast radius) and operations
+   existing architecture, simplicity, testability, effects on other code) and operations
    (failure and recovery paths, concurrency, security and authorization,
    performance, migrations and rollout, user-visible behaviour on existing data). One
-   designer carries both; three or more split them so no two share a persona.
+   designer covers both; with three or more, divide the focus areas without overlap.
 
 ## Release a brief to implementation
 
@@ -40,7 +42,7 @@ Move a brief to Q&A only when all hold:
 
 - Every assigned critic has a current AGREE naming the latest PROPOSAL URL and the
   brief revisions it covers.
-- No P0 or P1 objection is open; every P2 has a recorded disposition.
+- No P0 or P1 objection is open; every P2 has a recorded decision.
 - No product decision is unresolved.
 - The brief has an `Implementer` entry, acceptance scenarios, contracts and quoted
   design-doc sections with their revision, and a `Required reviews:` line that names
@@ -51,30 +53,36 @@ With one designer and no critic, review the PROPOSAL against this list yourself 
 accept it or send it back once.
 
 Then run `agent/teams/team.py start <brief>`. The handoff names the accepted
-PROPOSAL URL and brief revision.
+PROPOSAL URL and brief revision. `start` launches the implementer and the
+merge-confirming tester. When the merge-confirming tester asks you to launch the
+other reviewers, run `agent/teams/team.py review <pr> <entry>` for each. `review` and
+the tester's handoff read the brief's current `Required reviews:` line, so an added
+reviewer only needs its `review` command. A changed implementer or merge-confirming
+tester cannot be replaced before the brief's work is merged.
 
 ## Rounds and liveness
 
-- After delivering a round assignment, record the due time 30 minutes out on the
-  spec issue (a trial setting). The due time never moves. Until the trial shows that
-  a background `herdr agent wait <name> --timeout <ms>` returning wakes you, this is
-  an operator checkpoint: the user wakes you at the due time if no round record or
-  blocker arrived. If you use the wait, give it the remaining time to the due time,
-  and an early return without the round record only re-arms it for the remainder.
-- At the checkpoint, inspect delivery and agent state. A live agent gets one
-  reasoned extension. Replace a dead session only after its activity stopped and its
-  records are read; the replacement reviews the same PROPOSAL and inherited
-  objections and posts EVENT "took over". A second unresolved checkpoint goes to the
-  user. No approval by timeout.
+- After assigning a round, record a deadline 30 minutes later on the spec issue.
+  Do not reset it when a wait returns early. Until the trial confirms that a
+  background `herdr agent wait <name> --timeout <ms>` can resume your turn, the user
+  must notify you at the deadline if no round record or blocker arrives. If you use
+  this wait, set its timeout to the remaining time. If it returns without a round
+  record, wait again only for the remaining time.
+- At the deadline, check message delivery and agent state. Give a live agent at
+  most one extension and record why. Before replacing a stopped session, confirm
+  its work has stopped and read its records. The replacement reviews the same
+  PROPOSAL and open objections, then posts EVENT "took over". If the next deadline
+  passes without a result, ask the user. A timeout is not approval.
 - Design rounds: default one CRITIQUE plus one repair pass. A third round needs your
   written reason; cap five, then BLOCKED and escalate.
 - Q&A: cap three rounds, then BLOCKED and escalate.
 
 ## Measurement
 
-Record this table on the spec issue when the feature is done. Raw numbers only; no
-collapsed ratio until three features. The first feature is a feasibility test, not a
-causal comparison; #327 and #65 are recurrence evidence, not a control group.
+Record this table on the spec issue when the feature is done. Report raw values;
+do not combine them into a ratio until three features are complete. The first
+feature tests whether the workflow works, not whether it caused an improvement.
+Use #327 and #65 to identify repeated failures, not as a control group.
 
 | Measure | Source |
 |---|---|
@@ -84,7 +92,7 @@ causal comparison; #327 and #65 are recurrence evidence, not a control group.
 | Tokens per agent by model, advisors and restarts included; cached input once | `~/.claude/projects` JSONL, `~/.codex/sessions`, joined on session id |
 | Acceptance scenarios passing | Tester review records |
 | Findings by severity from review; escaped defects until the next feature's review | PR reviews, later issues |
-| Evidenced design changes from critique; rework caused by design changes | Saved PROPOSAL versus accepted brief |
+| Design changes supported by critique; rework caused by design changes | Saved PROPOSAL versus accepted brief |
 
-Pre-registered removal criterion for the design round: no evidenced correction in
-the trial, or added delay above a number the user sets before launch.
+Before launch, record the user's maximum added delay. Remove design rounds if
+the trial produces no correction supported by evidence or exceeds that delay.

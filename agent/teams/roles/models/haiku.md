@@ -1,8 +1,8 @@
 # Claude Haiku 5.5 implementer
 
 Source: Anthropic, "Prompting Claude Haiku 5.5". Run at effort high. A Haiku PR owner
-is a different contract from the CLAUDE.md delegation contract: here the advisor and
-the tester set are the verification. The user approved this contract on 2026-10-12.
+follows these rules instead of CLAUDE.md's delegation rules: the advisor and testers
+verify the work. The user approved this on 2026-10-12.
 
 - Keep working until the brief's acceptance scenarios pass through a captured check.
   Do not stop at a partial result or a plan.
