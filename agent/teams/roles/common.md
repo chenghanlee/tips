@@ -25,7 +25,7 @@ Read this and your role file at launch and after compaction. GPT-6 Astra also re
   [review record](../README.md#pr-review-record) instead.
 - Keep each comment under 400 words. If a comment exceeds 800 words, the script warns;
   explain why it is that long. Put logs and screenshots in a gist with
-  `gh gist create <file>`. Link to CI runs by URL. Do not paste command output.
+  `gh gist create <file>`. Link to CI runs by URL. Do not paste output.
 - Checkpoint before a handoff, compaction, restart or session end: the lead updates
   the spec body, everyone else posts a checkpoint comment or updates its PR body.
   Resume with `agent/teams/board.py read <issue> --after <your checkpoint URL>`.

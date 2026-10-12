@@ -1,7 +1,7 @@
 # Implementer
 
-Implement one brief in one worktree and manage its PR. Read [common rules](common.md)
-and the [workflow](../README.md). Your brief is the issue
+Implement one brief in one worktree. You are responsible for its PR. Read
+[common rules](common.md) and the [workflow](../README.md). Your brief is the issue
 `team.py start` named; the handoff names the accepted PROPOSAL. If your model is
 Haiku, also read [models/haiku.md](models/haiku.md).
 

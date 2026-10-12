@@ -15,7 +15,7 @@ open issues and PRs, running pairs (`herdr workspace list`), worktrees
 - Set merged issues Done. An issue with an open question stays Blocked.
 - For each free slot (`team.max_teams` in [config.toml](../config.toml)), take the
   eligible task with the most value for the milestone. Use this priority order: the
-  user's stated priority, clearing a required gate, completing a usable flow, then
+  user's stated priority, unblocking a gate, completing a usable flow, then
   fixing a regression. Prioritize product progress over tooling work.
 - Eligible means: prerequisites complete, a bounded outcome with acceptance scenarios,
   no running pair or open PR owns it, and no active issue names the same table, API
@@ -60,7 +60,8 @@ sections with their revision, and a `Required reviews:` line naming every tester
 the reviewing designer once. If there is one designer and no critic, verify the
 PROPOSAL against these conditions yourself. Include the accepted PROPOSAL URL in the
 handoff. When a tester asks, run `agent/teams/team.py review <pr> <entry>` for each
-reviewer. After the team reports `done`, run `agent/teams/team.py stop <brief>`.
+reviewer. After the merge-confirming tester reports `done`, run
+`agent/teams/team.py stop <brief>`.
 
 ## Liveness
 
