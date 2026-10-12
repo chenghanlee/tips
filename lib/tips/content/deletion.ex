@@ -4,7 +4,8 @@ defmodule Tips.Content.Deletion do
   shares with moderator liveness changes.
 
   See "Deletion and moderation" in `Tips.Content`. One transaction locks the
-  acting account, then the tip, then the review, then writes the dependents
+  acting account, then the tip, then the review, then retires the row's own
+  media through `Tips.Content.Media.retire/1`, writes the other dependents
   and finally the content row. A review always locks its parent tip first,
   whatever the parent's state, because the review-count trigger writes it.
   """
@@ -14,6 +15,7 @@ defmodule Tips.Content.Deletion do
   alias Tips.Accounts
   alias Tips.Accounts.{Scope, User}
   alias Tips.Content.{Flag, Notification, Publication, Review, Tip}
+  alias Tips.Content.Media
   alias Tips.Content.Media.Asset
   alias Tips.Repo
 
@@ -54,20 +56,22 @@ defmodule Tips.Content.Deletion do
   defp delete_row(_kind, %{deleted_at: %DateTime{}} = row), do: {:ok, {:unchanged, row}}
 
   defp delete_row(kind, row) do
-    if attached_media?(kind, row.id) do
-      {:error, :media_cleanup_required}
-    else
-      # Dependents first, then the row itself; any failure rolls all of them back.
-      resolve_flags(kind, row.id)
-      delete_notifications(kind, row.id)
-      {:ok, {:changed, update_row!(kind, row.id, set: [deleted_at: now()])}}
-    end
+    # Dependents first, then the row itself; any failure rolls all of them back.
+    :ok = Media.retire(live_media(kind, row.id))
+    resolve_flags(kind, row.id)
+    delete_notifications(kind, row.id)
+    {:ok, {:changed, update_row!(kind, row.id, set: [deleted_at: now()])}}
   end
 
-  # Until media cleanup is transactional, deletion refuses rows with media of their own.
-  defp attached_media?(kind, id),
+  # The row's own attached media; a tip's reviews keep theirs.
+  defp live_media(kind, id),
     do:
-      Repo.exists?(from(a in Asset, where: field(a, ^key(kind)) == ^id and is_nil(a.cleanup_at)))
+      Repo.all(
+        from(a in Asset,
+          where: field(a, ^key(kind)) == ^id and is_nil(a.cleanup_at),
+          select: a.id
+        )
+      )
 
   defp resolve_flags(kind, id) do
     Repo.update_all(

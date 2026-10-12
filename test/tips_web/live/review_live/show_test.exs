@@ -201,24 +201,6 @@ defmodule TipsWeb.ReviewLive.ShowTest do
     refute html =~ "Own review body"
   end
 
-  test "a review with attachments is not deleted and says why", %{conn: conn} do
-    author = user_fixture()
-    review = review_fixture(tip_fixture(), %{user_id: author.id})
-    Tips.MediaFixtures.image_fixture(review)
-    {:ok, lv, _html} = live(as(conn, author), "/reviews/#{review.id}")
-
-    lv |> element("#review-#{review.id}-delete") |> render_click()
-
-    html =
-      lv
-      |> element("#review-#{review.id}-delete-confirm button", "Delete review")
-      |> render_click()
-
-    assert text(html, "#flash-error") =~ "with attachments can't be deleted yet"
-    assert has_element?(lv, "#review-#{review.id}")
-    assert Tips.Repo.reload!(review).deleted_at == nil
-  end
-
   test "unknown and malformed review ids are not found, with no tip context", %{conn: conn} do
     tip = tip_fixture(user_fixture(), %{title: @title})
     missing = review_fixture(tip).id + 1_000_000

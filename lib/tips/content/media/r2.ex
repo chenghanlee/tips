@@ -88,10 +88,14 @@ defmodule Tips.Content.Media.R2 do
     |> result()
   end
 
-  @doc "Deletes the object at `key`. Deleting a missing object succeeds."
+  @doc "Deletes the object at `key`. Deleting a missing object, 204 or 404, succeeds."
   @spec delete(Req.Request.t(), String.t()) :: :ok | {:error, error()}
-  def delete(client, key),
-    do: client |> bounded(fn -> Req.delete(client, url: "/" <> key) end) |> result()
+  def delete(client, key) do
+    case bounded(client, fn -> Req.delete(client, url: "/" <> key) end) do
+      {:ok, %Req.Response{status: 404}} -> :ok
+      response -> result(response)
+    end
+  end
 
   @doc """
   Lists up to ten objects under `prefix` in key order, continuing after the

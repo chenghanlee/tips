@@ -100,6 +100,22 @@ defmodule Tips.Content.Media do
   staged video stays reusable. On success each claimed video gets its parent
   and position and loses its expiry and cooldown; retained rows move to their
   new positions under deferred slot constraints.
+
+  ## Cleanup
+
+  `retire/1` is the media participant of a transaction that removes media,
+  such as author deletion. It runs after the caller's account and content
+  locks and locks the rows in ascending id with `FOR NO KEY UPDATE`, as
+  `claim/2` does. A row already in cleanup is left alone. A row with a `key`
+  or `stream_uid` gets `cleanup_at`, loses its position and expiry cooldown,
+  and gets one `Tips.Workers.CleanupMedia` job in the same transaction. A
+  video without a uid has nothing to delete at the provider: its row is
+  deleted, with no job. No provider call runs inside the transaction.
+
+  The cleanup row is the durable record: it keeps its provider and parent
+  identifiers until the job has deleted both provider objects. If pruning
+  removed the job, `enqueue_cleanup/1` re-creates it from the row, for
+  example from `bin/tips rpc`.
   """
 
   import Ecto.Changeset
@@ -112,6 +128,7 @@ defmodule Tips.Content.Media do
   alias Tips.Content.Media.{Asset, CloudflareStream, ImageParser, R2, Target}
   alias Tips.Content.{Publication, Review, Tip}
   alias Tips.Repo
+  alias Tips.Workers.CleanupMedia
 
   require Logger
 
@@ -643,6 +660,60 @@ defmodule Tips.Content.Media do
 
   defp parent_key(%Tip{}), do: :tip_id
   defp parent_key(%Review{}), do: :review_id
+
+  @doc """
+  Retires the media rows `ids` inside the caller's transaction, after its
+  account and content locks; the caller chooses and authorizes the ids. See
+  "Cleanup" in the module documentation.
+  """
+  @spec retire([Content.media_id()]) :: :ok
+  def retire([]), do: :ok
+
+  def retire(ids) do
+    Repo.all(
+      from(a in Asset,
+        where: a.id in ^ids,
+        order_by: a.id,
+        lock: "FOR NO KEY UPDATE",
+        select: a.id
+      )
+    )
+
+    live = from(a in Asset, where: a.id in ^ids and is_nil(a.cleanup_at))
+
+    {_count, retired} =
+      Repo.update_all(
+        from(a in live, where: not is_nil(a.key) or not is_nil(a.stream_uid), select: a.id),
+        set: [cleanup_at: DateTime.utc_now(:second), position: nil, reconcile_after: nil]
+      )
+
+    Repo.delete_all(from(a in live, where: a.kind == :video and is_nil(a.stream_uid)))
+    enqueue_cleanup(retired)
+  end
+
+  @doc """
+  Inserts one `Tips.Workers.CleanupMedia` job for each of `ids` in cleanup,
+  unless it already has an incomplete one. Re-creates jobs that pruning
+  removed; other ids are skipped.
+  """
+  @spec enqueue_cleanup([Content.media_id()]) :: :ok
+  def enqueue_cleanup(ids) do
+    Repo.all(
+      from(a in Asset,
+        where: a.id in ^ids and not is_nil(a.cleanup_at),
+        order_by: a.id,
+        select: a.id
+      )
+    )
+    |> Enum.each(&insert_cleanup/1)
+  end
+
+  defp insert_cleanup(id) do
+    case Oban.insert(CleanupMedia.new(%{media_id: id})) do
+      # A unique insert that cannot take Oban's advisory lock returns an unsaved job; raise instead.
+      {:ok, %Oban.Job{id: job_id}} when is_integer(job_id) -> :ok
+    end
+  end
 
   @doc """
   Validates and stores the new image files in `selection`. See the module
