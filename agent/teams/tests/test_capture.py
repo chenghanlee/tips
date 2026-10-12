@@ -74,6 +74,14 @@ class CaptureTest(unittest.TestCase):
                 process.kill()
             assert "partial" in logs[0].read_text().splitlines()
 
+    def test_last_line_without_newline_is_printed(self) -> None:
+        program = "import sys; sys.stdout.write('last diagnostic'); sys.exit(3)"
+        with tempfile.TemporaryDirectory() as tmp:
+            command = [sys.executable, str(TEAMS / "capture.py"), "nl", "--", sys.executable]
+            result = execute([*command, "-c", program], cwd=tmp, env=dict(os.environ))
+        assert result.returncode == 3
+        assert result.stdout == "last diagnostic\n"
+
     def test_long_output_is_tailed_but_fully_logged(self) -> None:
         program = "print('\\n'.join(f'row {n}' for n in range(100)))"
         with tempfile.TemporaryDirectory() as tmp:

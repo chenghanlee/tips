@@ -65,7 +65,9 @@ def capture(label: str, command: list[str]) -> int:
         log.write(f"\n# exit {status} after {elapsed:.0f}s\n")
         path = Path(log.name)
     lines = path.read_text(encoding="utf-8").splitlines()
-    body = lines[4:-2]
+    body = lines[4:-1]  # drop the four header lines and the exit footer
+    if body and body[-1] == "":
+        body.pop()  # the footer's leading newline, unless the child's last line had none
     if len(body) > TAIL:
         print(f"... {len(body) - TAIL} earlier lines in {path}")
     print("\n".join(body[-TAIL:]))

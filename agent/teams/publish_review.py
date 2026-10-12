@@ -129,15 +129,15 @@ def required_reviewers(number: int) -> list[str]:
 
 
 def attributed(body: str) -> str | None:
-    """The reviewer name of a review body: the second nonblank line up to its first comma.
+    """The reviewer name of a review body, or None when the attribution line is malformed.
 
-    Line one is `LGTM` or the decision; line two is `<entry name>, <session>`. A body without
-    a second line has no attribution.
+    Line one is `LGTM` or the decision; line two is `<entry name>, <session>`, both nonempty.
     """
     lines = [line.strip() for line in body.splitlines() if line.strip()]
-    if len(lines) < 2:
+    if len(lines) < 2 or "," not in lines[1]:
         return None
-    return lines[1].split(",", 1)[0].strip() or None
+    name, session = (part.strip() for part in lines[1].split(",", 1))
+    return name if name and session else None
 
 
 def latest_records(repo: str, number: int, sha: str, names: list[str]) -> dict[str, str]:

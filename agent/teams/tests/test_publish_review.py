@@ -254,7 +254,15 @@ class RequiredReviewsTest(unittest.TestCase):
         self.refused("pullrequestreview-8", reviews=self.reviews(objection))
 
     def test_review_without_a_recognised_second_line_is_refused(self) -> None:
-        for body in ("lead-fable, session l\nP1: wrong lock order.", "LGTM", "P1: x\nsomeone"):
+        bodies = (
+            "lead-fable, session l\nP1: wrong lock order.",
+            "LGTM",
+            "P1: x\nsomeone",
+            "LGTM\nlead-fable",
+            "LGTM\nlead-fable,",
+            "LGTM\n, session l",
+        )
+        for body in bodies:
             stray = listed(8, "COMMENTED", body)
             self.refused("not attributed to a required reviewer", reviews=self.reviews(stray))
 

@@ -28,10 +28,10 @@ the lead's renewed release. You never arbitrate between designers.
 
 ## Recovery
 
-Before a PR exists, post an append-only checkpoint comment on the brief whenever your
-recoverable state changes materially: discoveries, failed checks, uncommitted
-decisions. Once a PR exists, keep its body current instead. A draft PR is permitted,
-never required; opening it is separate from enabling auto-merge.
+The [common rules](common.md#comments) say when to checkpoint. Before a PR exists,
+the checkpoint is an append-only comment on the brief; once a PR exists, keep its body
+current instead. A draft PR is permitted, never required; opening it is separate from
+enabling auto-merge.
 
 ## Do not
 
