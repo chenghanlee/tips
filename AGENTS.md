@@ -2,7 +2,7 @@
 
 | When | Read or do |
 |---|---|
-| Every task | Read the issue or the user's brief and its linked design sections |
+| Every task | Read the issue or the user's brief and its linked design sections; the [design index](docs/design/README.md) names the sections to read for a trigger or feature |
 | On pair or dispatcher launch | Read the [pair workflow](agent/teams/README.md) |
 | Changing the repository alone | Use an isolated worktree and a PR; the [checks](#checks) and [review](agent/teams/README.md#pr-review-record) still apply. Merge only with the user's authorization. Read-only reviews and disposable output in ignored `tmp/` need neither |
 | After context compaction | If paired or dispatching, reread the pair workflow. Reload each required skill before its next use |
