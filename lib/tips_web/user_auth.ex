@@ -332,13 +332,16 @@ defmodule TipsWeb.UserAuth do
     |> LiveView.redirect(to: ~p"/users/log-in")
   end
 
-  # Positive bigint ids, as the routes take them, and `Tips.Content.Projection` slugs.
+  # Positive bigint ids, as the review and editor routes take them, and
+  # `Tips.Content.Projection` slugs.
   @id "[1-9]\\d{0,18}"
   @slug "(?=[a-z0-9-]{1,80}\\z)[a-z0-9]+(-[a-z0-9]+)*"
 
-  # The root, settings, the public tip and review pages, and the editor routes of
-  # the frontend design.
-  @return_to ~r"\A/(users/settings|tips/#{@id}/#{@slug}|reviews/#{@id}|editor/(tips/new|tips/#{@id}/edit|tips/#{@id}/reviews/new|reviews/#{@id}/edit))?\z"
+  # The root, settings, the review page, and the editor routes of the frontend design.
+  @return_to ~r"\A/(users/settings|reviews/#{@id}|editor/(tips/new|tips/#{@id}/edit|tips/#{@id}/reviews/new|reviews/#{@id}/edit))?\z"
+
+  # The public tip page; `TipsWeb.TipId` judges its base36 id.
+  @tip_return_to ~r"\A/tips/([^/]+)/#{@slug}\z"
 
   @doc """
   Returns `path` if it is an allowed local return destination, otherwise `nil`.
@@ -350,10 +353,17 @@ defmodule TipsWeb.UserAuth do
   """
   @spec allowed_return_to(term()) :: String.t() | nil
   def allowed_return_to(path) when is_binary(path) do
-    if path =~ @return_to, do: path
+    if path =~ @return_to or tip_return_to?(path), do: path
   end
 
   def allowed_return_to(_path), do: nil
+
+  defp tip_return_to?(path) do
+    case Regex.run(@tip_return_to, path, capture: :all_but_first) do
+      [id | _slug_groups] -> match?({:ok, _id}, TipsWeb.TipId.decode(id))
+      nil -> false
+    end
+  end
 
   @doc """
   Picks the destination to carry or redirect to: `explicit` if allowed,

@@ -62,20 +62,29 @@ defmodule TipsWeb.TipLive.ShowTest do
 
     test "wrong or stale slug redirects to the projected slug", %{conn: conn} do
       tip = tip_fixture(user_fixture(), %{title: "Old title"})
-      stale = "/tips/#{tip.id}/old-title"
+      stale = "/tips/#{TipsWeb.TipId.encode(tip.id)}/old-title"
 
       tip = tip |> Ecto.Changeset.change(title: @title) |> Tips.Repo.update!()
-      expected = "/tips/#{tip.id}/#{@slug}"
+      expected = "/tips/#{TipsWeb.TipId.encode(tip.id)}/#{@slug}"
 
-      for path <- [stale, "/tips/#{tip.id}/wrong", "/tips/#{tip.id}/deleted-tip"] do
+      for path <- [
+            stale,
+            "/tips/#{TipsWeb.TipId.encode(tip.id)}/wrong",
+            "/tips/#{TipsWeb.TipId.encode(tip.id)}/deleted-tip"
+          ] do
         assert_redirects_to(conn, path, expected)
       end
 
       deleted = put_marker!(tip, :deleted)
-      assert_redirects_to(conn, expected, "/tips/#{deleted.id}/deleted-tip")
+      assert_redirects_to(conn, expected, "/tips/#{TipsWeb.TipId.encode(deleted.id)}/deleted-tip")
 
       hidden = put_marker!(tip_fixture(user_fixture(), %{title: @title}), :hidden)
-      assert_redirects_to(conn, "/tips/#{hidden.id}/#{@slug}", "/tips/#{hidden.id}/removed-tip")
+
+      assert_redirects_to(
+        conn,
+        "/tips/#{TipsWeb.TipId.encode(hidden.id)}/#{@slug}",
+        "/tips/#{TipsWeb.TipId.encode(hidden.id)}/removed-tip"
+      )
     end
   end
 
@@ -87,7 +96,8 @@ defmodule TipsWeb.TipLive.ShowTest do
       put_marker!(tip, :deleted)
 
       for viewer <- [nil, user_fixture(), author, moderator!(user_fixture())],
-          {render, html, title} <- renders(as(conn, viewer), "/tips/#{tip.id}/deleted-tip") do
+          {render, html, title} <-
+            renders(as(conn, viewer), "/tips/#{TipsWeb.TipId.encode(tip.id)}/deleted-tip") do
         label = {render, viewer && viewer.id}
 
         assert text(html, "h1") == "Deleted tip", inspect(label)
@@ -113,7 +123,8 @@ defmodule TipsWeb.TipLive.ShowTest do
       put_marker!(tip, :hidden)
 
       for viewer <- [nil, user_fixture()],
-          {render, html, title} <- renders(as(conn, viewer), "/tips/#{tip.id}/removed-tip") do
+          {render, html, title} <-
+            renders(as(conn, viewer), "/tips/#{TipsWeb.TipId.encode(tip.id)}/removed-tip") do
         label = {render, viewer && viewer.id}
 
         assert text(html, "h1") == "Removed tip", inspect(label)
@@ -122,7 +133,7 @@ defmodule TipsWeb.TipLive.ShowTest do
         refute html =~ "Removed by moderation", inspect(label)
       end
 
-      author_path = "/tips/#{tip.id}/secret-plan-title"
+      author_path = "/tips/#{TipsWeb.TipId.encode(tip.id)}/secret-plan-title"
 
       for {render, html, title} <- renders(as(conn, author), author_path) do
         assert text(html, "h1") == "Secret plan title", render
@@ -174,7 +185,7 @@ defmodule TipsWeb.TipLive.ShowTest do
 
       for marker <- [:hidden, :deleted] do
         tip = put_marker!(tip, marker)
-        path = "/tips/#{tip.id}/#{placeholder_slug(marker)}"
+        path = "/tips/#{TipsWeb.TipId.encode(tip.id)}/#{placeholder_slug(marker)}"
 
         for viewer <- [nil, user_fixture()],
             {render, html, _title} <- renders(as(conn, viewer), path) do
@@ -208,7 +219,7 @@ defmodule TipsWeb.TipLive.ShowTest do
         conn = as(conn, owner)
 
         for {render, html, _title} <-
-              renders(conn, "/tips/#{tip.id}/#{placeholder_slug(marker)}") do
+              renders(conn, "/tips/#{TipsWeb.TipId.encode(tip.id)}/#{placeholder_slug(marker)}") do
           assert attr(html, "#contribution-control a", "Your review", "href") ==
                    "/reviews/#{review.id}",
                  inspect({marker, render})
@@ -357,7 +368,8 @@ defmodule TipsWeb.TipLive.ShowTest do
 
       put_marker!(tip, :hidden)
 
-      for {render, html, _title} <- renders(conn, "/tips/#{tip.id}/removed-tip") do
+      for {render, html, _title} <-
+            renders(conn, "/tips/#{TipsWeb.TipId.encode(tip.id)}/removed-tip") do
         refute has?(html, "#earlier-reviews-note"), render
         assert has?(html, "#review-#{earlier.id}"), render
       end
@@ -404,10 +416,27 @@ defmodule TipsWeb.TipLive.ShowTest do
     end
   end
 
-  test "unknown and malformed tip ids are not found", %{conn: conn} do
-    missing = tip_fixture().id + 1_000_000
+  test "the permalink carries the base36 id, read in either letter case", %{conn: conn} do
+    # Above the sequence's ids, where base36 and decimal differ.
+    tip = tip_fixture(user_fixture(), %{id: 9_223_372_036_854_775_807, title: @title})
+    path = "/tips/1y2p0ij32e8e7/#{@slug}"
 
-    for id <- [missing, "abc", "0", "-1", "1.5", "99999999999999999999"],
+    for path <- [path, String.replace(path, "1y2p0ij32e8e7", "1Y2P0IJ32E8E7")],
+        {render, html, _title} <- renders(conn, path) do
+      assert text(html, "h1") == @title, render
+
+      assert attr(html, "#tip-header a", "Sign in to review", "href") =~
+               "return_to=%2Ftips%2F1y2p0ij32e8e7%2F#{@slug}",
+             render
+    end
+
+    assert_error_sent 404, fn -> get(conn, "/tips/#{tip.id}/#{@slug}") end
+  end
+
+  test "unknown and malformed tip ids are not found", %{conn: conn} do
+    missing = TipsWeb.TipId.encode(tip_fixture().id + 1_000_000)
+
+    for id <- [missing, "0", "00", "-1", "+c", "c.5", "c-", "%E2%84%AA", "1y2p0ij32e8e8"],
         conn <- [conn, log_in_user(conn, user_fixture())] do
       assert_error_sent 404, fn -> get(conn, "/tips/#{id}/a-slug") end
       assert_error_sent 404, fn -> live(conn, "/tips/#{id}/a-slug") end
@@ -433,7 +462,7 @@ defmodule TipsWeb.TipLive.ShowTest do
   defp placeholder_slug(:hidden), do: "removed-tip"
   defp placeholder_slug(:deleted), do: "deleted-tip"
 
-  defp tip_path(tip), do: "/tips/#{tip.id}/#{@slug}"
+  defp tip_path(tip), do: "/tips/#{TipsWeb.TipId.encode(tip.id)}/#{@slug}"
 
   defp ids(cards) do
     Enum.map(cards, fn card ->

@@ -19,7 +19,7 @@ defmodule TipsWeb.TipPageFeatureTest do
       })
     end
 
-    %{path: "/tips/#{tip.id}/plan-first"}
+    %{path: "/tips/#{TipsWeb.TipId.encode(tip.id)}/plan-first"}
   end
 
   feature "a thirty-review page keeps focus on changed selects; Back restores the filtered list",

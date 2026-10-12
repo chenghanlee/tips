@@ -464,7 +464,7 @@ defmodule TipsWeb.UI do
   text. `vote` holds the `vote_control/1` attrs; without it the row has no
   vote control.
 
-      <TipsWeb.UI.tip_row tip={tip} vote={%{target: "tip-12", return: "/tips/12/plan", selected: nil}}>
+      <TipsWeb.UI.tip_row tip={tip} vote={%{target: "tip-12", return: "/tips/c/plan", selected: nil}}>
         <:excerpt source="Review" href={tip.href}>{excerpt}</:excerpt>
       </TipsWeb.UI.tip_row>
   """

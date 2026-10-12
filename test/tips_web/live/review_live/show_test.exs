@@ -33,7 +33,7 @@ defmodule TipsWeb.ReviewLive.ShowTest do
 
     vote_fixture(review, %{value: 1})
     review_fixture(tip, %{body: "Competitor body"})
-    tip_path = "/tips/#{tip.id}/#{@tip_path_suffix}"
+    tip_path = "/tips/#{TipsWeb.TipId.encode(tip.id)}/#{@tip_path_suffix}"
 
     for {render, html, title} <- renders(conn, "/reviews/#{review.id}") do
       assert attr(html, "h1 a", @title, "href") == tip_path, render
@@ -83,7 +83,7 @@ defmodule TipsWeb.ReviewLive.ShowTest do
       tip = tip_fixture(user_fixture(), %{title: "Secret plan title", body: "Secret body"})
       review = review_fixture(tip, %{body: "Readable review body"})
       put_marker!(tip, marker)
-      tip_path = "/tips/#{tip.id}/#{slug}"
+      tip_path = "/tips/#{TipsWeb.TipId.encode(tip.id)}/#{slug}"
 
       for viewer <- [nil, user_fixture()],
           {render, html, title} <- renders(as(conn, viewer), "/reviews/#{review.id}") do
@@ -103,7 +103,7 @@ defmodule TipsWeb.ReviewLive.ShowTest do
        %{conn: conn} do
     tip = tip_fixture(user_fixture(), %{title: @title})
     review_fixture(tip, %{body: "Competitor body"})
-    tip_path = "/tips/#{tip.id}/#{@tip_path_suffix}"
+    tip_path = "/tips/#{TipsWeb.TipId.encode(tip.id)}/#{@tip_path_suffix}"
 
     for {marker, line} <- [
           deleted: "Review deleted by author",

@@ -360,7 +360,7 @@ defmodule TipsWeb.Editor do
   defp destination(socket, %{kind: :tip, id: id}) do
     case Content.get_tip_page(UserAuth.viewer(socket), id) do
       {:ok, %{tip: tip}} -> Reader.tip_path(tip)
-      {:error, _reason} -> ~p"/tips/#{id}/tip"
+      {:error, _reason} -> Reader.tip_path(%{id: id, slug: "tip"})
     end
   end
 

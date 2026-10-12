@@ -24,13 +24,15 @@ defmodule TipsWeb.UserAuthTest do
   end
 
   describe "allowed_return_to/1" do
-    test "admits the root, settings, public tip and review pages and the four editor shapes" do
+    test "admits the root, settings, base36 tip and decimal review pages and the four editor shapes" do
       for path <- [
             "/",
             "/users/settings",
             "/tips/1/a",
-            "/tips/9223372036854775807/a-useful-technique",
-            "/tips/42/" <> String.duplicate("a", 80),
+            "/tips/1y2p0ij32e8e7/a-useful-technique",
+            "/tips/1Y2P0IJ32E8E7/a-useful-technique",
+            "/tips/0c/a",
+            "/tips/c/" <> String.duplicate("a", 80),
             "/tips/7/removed-tip",
             "/reviews/9",
             "/editor/tips/new",
@@ -58,13 +60,21 @@ defmodule TipsWeb.UserAuthTest do
             "/users/log-in",
             "/tips/1",
             "/tips/0/a",
-            "/tips/01/a",
-            "/tips/12345678901234567890/a",
+            "/tips/00/a",
+            "/tips/1y2p0ij32e8e8/a",
+            "/tips/9223372036854775807/a",
+            "/tips/-1/a",
+            "/tips/+c/a",
+            "/tips/c.5/a",
+            "/tips/\u212A/a",
+            "/tips/c\n/a",
             "/tips/1/A",
             "/tips/1/a-",
             "/tips/1/a--b",
             "/tips/1/" <> String.duplicate("a", 81),
             "/reviews/9/edit",
+            "/reviews/c",
+            "/editor/tips/c/edit",
             "/editor/reviews/09/edit"
           ] do
         assert UserAuth.allowed_return_to(path) == nil, "admitted #{inspect(path)}"
