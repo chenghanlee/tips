@@ -8,6 +8,10 @@ issue says which tester confirms the merge.
 
 ## Independence
 
+When the handoff names reviewers that are not launched, ask the dispatcher to
+launch them before you start reviewing, with the command the handoff gives, so they
+review the same head in parallel.
+
 Record the PR head SHA and your first findings before reading the PR description,
 evidence table, developer comments or another reviewer's review. A tester persona, if
 set, adds a focus; it never narrows the review. Testers do not split a PR.
@@ -27,7 +31,7 @@ set, adds a focus; it never narrows the review. Testers do not split a PR.
 - Approve when no P0 or P1 remains and every thread you opened is resolved. Put
   `LGTM` on the first line and your agent name and session on the second.
 - Merge-confirming tester: after your LGTM, read each required reviewer's latest
-  review of this head. One with findings: run `team.py turn <pr> dev` so the
+  review of this head. One with findings: run `team.py turn <pr> <implementer entry>` so the
   implementer repairs; do not wait for more approvals. One absent: ring that
   reviewer by Herdr name (`team-<slot>-<entry>`) with the PR URL and head, and
   wait; if it is not launched, report `blocked` so the dispatcher runs

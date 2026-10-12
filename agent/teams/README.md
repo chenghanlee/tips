@@ -75,14 +75,16 @@ board change:
 3. Open the PR with `Closes #<brief>` and enable auto-merge:
    `gh pr merge <pr> --auto --merge`. The closing reference is how `review` and the
    publisher find the brief; keep it.
-4. Run `agent/teams/team.py turn <pr> <tester entry>`. When the brief names reviewers
-   that are not launched yet, the command also asks the dispatcher to launch them.
+4. Run `agent/teams/team.py turn <pr> <tester entry>`. The PR must close the brief and
+   the command runs from the pair checkout.
 5. After a successful handoff, stop using the worktree, build and database until
    the tester returns the turn.
 
 ### 3. Tester: review the pushed head
 
-1. Record the PR head SHA. Read [reviewing-code](../skills/reviewing-code/SKILL.md)
+1. Record the PR head SHA. If the handoff names reviewers that are not launched, ask
+   the dispatcher to launch them first, with the `review` commands the handoff gives,
+   so they review the same head in parallel. Read [reviewing-code](../skills/reviewing-code/SKILL.md)
    from this worktree to establish scope and review that head against the shared
    design and testing standard. Run the tests. For UI tasks, also check acceptance
    scenarios through [manual browser review](#manual-browser-review).
@@ -184,9 +186,10 @@ Run commands from the repository root of your checkout. The dispatcher runs
 | Command | Caller | Effect |
 |---|---|---|
 | `agent/teams/team.py start <brief>` | Dispatcher | Read the brief's `Implementer:` and `Required reviews:` lines. Create `task/<brief>` from `origin/main`, the `.worktrees/<brief>` worktree, dependencies and Dexter; launch the implementer and the merge-confirming tester, each in its own workspace; write the allocation record. |
-| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require a clean tree and HEAD matching the PR head. Notify the tester with the PR URL and SHA. Ask the dispatcher to launch reviewers not yet launched. |
+| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require a clean tree and HEAD matching the PR head, run from the pair checkout, and a PR that closes the brief. Notify the tester with the PR URL and SHA, and with the `review` commands for reviewers not yet launched. |
 | `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Notify the implementer even if the tree is dirty or HEAD differs. Include any mismatch in the message. |
-| `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer named in the brief other than the merge-confirming tester: create `.worktrees/review-<pr>-<entry>` detached at the PR head with its own database suffix, port, dependencies and Dexter, and launch the reviewer there. |
+| `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer named in the brief other than the merge-confirming tester: create `.worktrees/review-<pr>-<entry>` detached at the PR head with its own database suffix, port, dependencies and Dexter, and launch the reviewer there. A stopped reviewer's clean worktree moves to the current head; a running one keeps its head. |
+| `herdr agent prompt dispatcher "<PR URL> review: run <review commands>"` | Tester | Ask the dispatcher to launch reviewers the handoff names as not launched. |
 | `agent/teams/team.py stop <brief>` | Dispatcher | Refuse dirty, unmerged or foreign-owned work. Stop every recorded client and Dexter, drop the slot's databases, remove its worktrees, branch and workspaces, and delete the record. |
 | `herdr agent prompt dispatcher "<issue or PR URL> done"` | Tester | Notify the dispatcher that the PR merged. |
 | `herdr agent prompt dispatcher "<blocker comment URL> blocked"` | Current turn holder | Notify the dispatcher of a recorded blocker. |
@@ -194,7 +197,9 @@ Run commands from the repository root of your checkout. The dispatcher runs
 
 `start` and `stop` take the brief number. `turn`, `review` and the review tools take
 the PR number. Rerunning `start` or `review` keeps a running client and relaunches a
-missing one from the record; a brief whose roster changed must be stopped first.
+missing one from its record, with the database, port and client kind it was launched
+with. Rerunning `start` after the lead changes other reviewers updates the record; a
+changed implementer or merge-confirming tester is refused.
 
 After sending a handoff, end your turn. The other agent's message starts a new
 turn. If sending fails, you still hold the turn: report `blocked` to the dispatcher
@@ -243,7 +248,7 @@ Every message starts a turn using the recipient's full context. Send only:
 - The dispatcher's answer to a blocker.
 - A reviewer's review URL to the merge-confirming tester, and the tester's new-head
   ring to a reviewer.
-- `turn`'s request that the dispatcher launch reviewers.
+- The tester's request that the dispatcher launch reviewers.
 
 Do not send acknowledgments, progress or status updates, thanks, or replies that
 only confirm receipt. Include everything the recipient needs in one message or

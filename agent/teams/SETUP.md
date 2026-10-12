@@ -8,7 +8,8 @@ For humans, from the repository root. Agents read the [pair workflow](README.md)
 USER         set goals and constraints · answer decisions · start the dispatcher once
 DISPATCHER   assess milestone → prioritize eligible work → set Ready → start pair → set Active
 IMPLEMENTER  code → push → PR with "Closes #<brief>" + auto-merge → team.py turn <pr> <tester>
-DISPATCHER   team.py review <pr> <entry> for each other reviewer the brief names
+TESTER       ask the dispatcher to launch the other reviewers the brief names
+DISPATCHER   team.py review <pr> <entry> for each
 TESTER       review → findings → team.py turn <pr> <implementer>   (loop until no P0 or P1)
 REVIEWERS    review from pinned worktrees → ring the tester with the review URL
 TESTER       all LGTM → publish_review.py --record per reviewer

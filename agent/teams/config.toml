@@ -3,7 +3,6 @@
 [team]
 # Current suffixes support at most nine teams; validation rejects partition collisions.
 max_teams = 4
-workspace_prefix = "tips-team"
 port_base = 4100
 port_stride = 10
 postgres_port = 5433

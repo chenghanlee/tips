@@ -53,9 +53,11 @@ accept it or send it back once.
 
 Then run `agent/teams/team.py start <brief>`. The handoff names the accepted
 PROPOSAL URL and brief revision. `start` launches the implementer and the
-merge-confirming tester. When the implementer's first handoff asks you to launch the
-other reviewers, run `agent/teams/team.py review <pr> <entry>` for each; a tester's
-`blocked` report about an unlaunched reviewer means the same.
+merge-confirming tester. When the merge-confirming tester asks you to launch the
+other reviewers, run `agent/teams/team.py review <pr> <entry>` for each. When the lead
+adds or drops a reviewer other than the merge-confirming tester, rerun `start <brief>`:
+it updates the record to the brief's `Required reviews:` line. A changed implementer
+or merge-confirming tester cannot be reconciled while the brief's work is unmerged.
 
 ## Rounds and liveness
 
