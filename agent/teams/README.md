@@ -196,8 +196,8 @@ Run commands from the repository root of your checkout. The dispatcher runs
 | `herdr agent prompt dispatcher "<issue or PR URL> done"` | Tester | Notify the dispatcher that the PR merged. |
 | `herdr agent prompt dispatcher "<blocker comment URL> blocked"` | Current turn holder | Notify the dispatcher of a recorded blocker. |
 | `herdr agent prompt team-<slot>-<entry> "<review URL>"` | Other reviewer | Tell the merge-confirming tester that a review record exists. |
-| `agent/teams/board.py post <issue> <TYPE> --round <n>` | Any agent | Post a board comment with the attribution header, body on stdin; print its URL. An identical round comment is reused, never doubled. |
-| `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body and comments, or only the comments after a checkpoint. |
+| `agent/teams/board.py post <issue> <TYPE> --round <n>` | Any agent | Post a board comment with the attribution header, body on stdin; print its URL. An identical comment already on the issue is reused, never doubled. |
+| `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the current issue body, then every comment or only those after a checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | The token table: per launched session and model, from the session logs. |
 
 `start` and `stop` take the brief number. `turn`, `review` and the review tools take
