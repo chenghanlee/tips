@@ -19,16 +19,20 @@ Haiku, also read [models/haiku.md](models/haiku.md).
 
 - Comments are append-only. Never edit or delete one. Only the lead designer edits a
   spec or brief body; only the implementer edits its PR body.
-- Every comment starts with one header line:
+- Every spec or brief comment starts with one header line:
   `R<round> <TYPE> <role> <agent name> <session id>`. Types: PROPOSAL, CRITIQUE,
   QUESTION, ANSWER, AGREE, FINDING, BLOCKED, DONE, EVENT. The line is attribution;
-  every agent posts through one GitHub account.
-- Soft limit 400 words, hard limit 800 words per round comment. Put logs and
-  screenshots in a gist and link it; link CI by run URL. Never paste output.
-- Before compaction, restart or session end, write your checkpoint first: the lead
-  updates the spec body's current-state section; everyone else posts a checkpoint
-  comment or updates its PR body. A waking agent reads the body, then comments after
-  the last checkpoint URL it holds, never the whole thread.
+  every agent posts through one GitHub account. PR reviews use the
+  [review record](../README.md#pr-review-record) format instead.
+- Target 400 words per round comment; above 800 the board script warns and you state
+  the reason in the comment. Put logs and screenshots in a gist and link it; link CI
+  by run URL. Never paste output.
+- Write a checkpoint before a handoff, compaction, restart or session end, and when
+  a material fact would otherwise be lost: the lead updates the spec body's
+  current-state section; everyone else posts a checkpoint comment or updates its PR
+  body. Facts already in a commit or captured log need no checkpoint. A waking agent
+  reads the body, then comments after the last checkpoint URL it holds, never the
+  whole thread.
 - Post a comment and send the Herdr prompt as two separate steps. A failed prompt is
   reported as `blocked`, never rerouted. Before repeating an uncertain post, list
   recent comments and reuse the URL if the message landed.
@@ -37,9 +41,10 @@ Haiku, also read [models/haiku.md](models/haiku.md).
 
 - Any "passes", "verified" or "exists" claim links a captured log, a CI run or
   `path:line`, or says it is unverified. A design assumption is stated as one.
-- Run every check through `agent/teams/capture.py <label> -- <command>`; it keeps the
-  complete output and exit status under `tmp/checks/`. Never delete a failing log
-  until the PR records the test, error and seed. A passing rerun never replaces
-  failed evidence.
+- Run every full-suite run, and every check you cite as evidence, through
+  `agent/teams/capture.py <label> -- <command>`; it keeps the complete output and exit
+  status under `tmp/checks/` and prints the tail. Exploratory commands need no
+  capture. Never delete a failing log until the PR records the test, error and seed.
+  A passing rerun never replaces failed evidence.
 - Severity follows the [README scale](../README.md#severity). A designer P1 blocks
   like a tester P1.

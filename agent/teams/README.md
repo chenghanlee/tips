@@ -350,10 +350,9 @@ Use this structure for `tmp/review.json`:
 }
 ```
 
-Every review body names its reviewer on the second line: role or agent name, then
-the session. The first line is `LGTM` alone for an approval, or the decision
-otherwise. Attribution reads the first two lines, so a review that omits the
-reviewer line does not count as that reviewer's. To approve, publish the status:
+Every review body has the same two first lines: `LGTM` alone for an approval, or the
+decision otherwise; then `<agent name>, <session>`. Attribution is the second line up
+to its first comma, matched exactly. To approve, publish the status:
 
 ```sh
 agent/teams/publish_review.py --pr <pr> --sha <sha> --record <review URL>
@@ -362,9 +361,12 @@ agent/teams/publish_review.py --pr <pr> --sha <sha> --record <review URL>
 The command refuses a wrong head, a wrong record or unresolved threads. When the
 PR's linked issue (GitHub's closing reference, any keyword) has a line
 `Required reviews: <name>, <name>`, every named reviewer's latest review of the head
-must be an LGTM attributed to that name; repeat `--record` for each. The command
-refuses a missing, superseded, duplicate or unlisted record, an empty or repeated
-name, and two linked issues that both name reviewers.
+must be an LGTM attributed to that name, and every review of the head must be
+attributed to a named reviewer; repeat `--record` for each. The command refuses a
+missing, superseded, duplicate or unlisted record, an unattributed review, an empty
+or repeated name, and two linked issues that both name reviewers. This is a check at
+publication time through one shared account: it catches omission, stale heads and
+superseded decisions; it does not authenticate who wrote a review or an issue body.
 
 To read reviews and resolve threads:
 

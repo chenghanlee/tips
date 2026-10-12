@@ -26,6 +26,7 @@ class CaptureTest(unittest.TestCase):
         assert second.returncode == 3
         assert "line 1" in first.stdout
         assert "oops" in first.stdout
+        assert "# command" not in first.stdout
         named = [log for log in logs if f"capture: tmp/checks/{log.name} exit 3" in first.stderr]
         assert len(named) == 1, first.stderr
         assert len(logs) == 2, logs
@@ -72,6 +73,18 @@ class CaptureTest(unittest.TestCase):
                     self.fail("child output never reached the log")
                 process.kill()
             assert "partial" in logs[0].read_text().splitlines()
+
+    def test_long_output_is_tailed_but_fully_logged(self) -> None:
+        program = "print('\\n'.join(f'row {n}' for n in range(100)))"
+        with tempfile.TemporaryDirectory() as tmp:
+            command = [sys.executable, str(TEAMS / "capture.py"), "long", "--", sys.executable]
+            result = execute([*command, "-c", program], cwd=tmp, env=dict(os.environ))
+            text = next(Path(tmp, "tmp/checks").iterdir()).read_text()
+        assert result.returncode == 0
+        assert "row 0\n" in text
+        assert "row 0\n" not in result.stdout
+        assert "row 99" in result.stdout
+        assert "earlier lines in tmp/checks/" in result.stdout
 
     def test_usage_error_without_separator(self) -> None:
         result = execute([sys.executable, str(TEAMS / "capture.py"), "label", "echo"])

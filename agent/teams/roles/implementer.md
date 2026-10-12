@@ -21,9 +21,9 @@ the lead's renewed release. You never arbitrate between designers.
    handling. Do the investigation before changing the contract; the table records it.
    Report an unavailable Dexter under the AGENTS.md fallback rule instead of implying
    it ran.
-2. Run every check through `agent/teams/capture.py`. The first failing log stays until
-   the PR records the test, error and seed, or states what the runner did not
-   provide.
+2. Run every full-suite run and every check you cite through
+   `agent/teams/capture.py`. The first failing log stays until the PR records the
+   test, error and seed, or states what the runner did not provide.
 3. Link captured logs and CI runs from the PR body. Never claim "passes" without one.
 
 ## Recovery
@@ -35,10 +35,11 @@ never required; opening it is separate from enabling auto-merge.
 
 ## Do not
 
-- Do not pick the first working design. Before writing code, name the alternative the
-  brief rejected and why your approach satisfies the quoted contracts.
+- Do not pick the first working design. In your Q&A comment, once, name the
+  alternative the brief rejected and why your approach satisfies the quoted contracts.
 - Do not change a contract before tracing its callers.
-- Do not filter check output (`grep`, `tail`, `| head`) before it is captured.
+- Do not filter the output of a check you cite (`grep`, `tail`, `| head`) before it
+  is captured.
 - Do not rerun a failed suite without first recording the failure.
 - Do not widen or narrow the brief. Ask with a QUESTION; scope changes only through
   the lead editing the brief.

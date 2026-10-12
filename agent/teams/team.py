@@ -15,7 +15,7 @@ import tomllib
 import uuid
 from collections.abc import Sequence
 from pathlib import Path
-from typing import IO, NotRequired, TypedDict, cast
+from typing import NotRequired, TypedDict, cast
 
 
 class Role(TypedDict):
@@ -124,12 +124,9 @@ def execute(
     timeout: float | None = None,
     check: bool = False,
     input_text: str | None = None,
-    output: IO[str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    """Run a resolved executable without a shell; capture its output or stream it to `output`."""
+    """Run a resolved executable without a shell and capture its output."""
     # Reviewed S603: callers pass fixed tool names; command_args resolves argv[0], no shell.
-    # With `output`, both streams go to that open file as they are produced; stdout and
-    # stderr of the result are then empty.
     return subprocess.run(  # noqa: S603
         command_args(args, path=env.get("PATH", os.defpath) if env is not None else None, cwd=cwd),
         cwd=cwd,
@@ -137,9 +134,7 @@ def execute(
         timeout=timeout,
         check=check,
         text=True,
-        capture_output=output is None,
-        stdout=output,
-        stderr=subprocess.STDOUT if output is not None else None,
+        capture_output=True,
         input=input_text,
     )
 

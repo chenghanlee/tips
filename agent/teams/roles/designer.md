@@ -16,7 +16,7 @@ follows the proposal's framing is the failure this tier exists to catch.
 1. PROPOSAL, round 1: the spec body plus one brief issue per PR. The spec body holds
    the dependency-ordered index of briefs, the shared contracts and the agent set.
    Each brief holds: contracts, acceptance scenarios, open risks, quoted design-doc
-   sections with their revision, the standing do-not list from
+   sections with their revision, a link to the standing do-not list in
    [implementer.md](implementer.md) plus brief-specific additions, the `Implementer`
    entry, and `Required reviews:` naming every assigned tester and the reviewing
    designer from the spec's agent set, each once. The publisher enforces exactly this

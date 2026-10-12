@@ -248,11 +248,15 @@ class RequiredReviewsTest(unittest.TestCase):
         tester = listed(5, "COMMENTED", "LGTM\nteam-1-test, session t")
         self.refused("lead-fable is missing", reviews=[[tester, elsewhere]])
 
-    def test_later_objection_supersedes_an_lgtm_whichever_line_names_the_reviewer(self) -> None:
-        name_first = listed(8, "COMMENTED", "lead-fable, session l\nP1: the lock order is wrong.")
-        self.refused("lead-fable's latest review", reviews=self.reviews(name_first))
-        decision_first = listed(8, "COMMENTED", "Changes required\nlead-fable, session l\nP1: x")
-        self.refused("pullrequestreview-8", reviews=self.reviews(decision_first))
+    def test_later_objection_supersedes_an_lgtm(self) -> None:
+        objection = listed(8, "COMMENTED", "Changes required\nlead-fable, session l\nP1: x")
+        self.refused("lead-fable's latest review", reviews=self.reviews(objection))
+        self.refused("pullrequestreview-8", reviews=self.reviews(objection))
+
+    def test_review_without_a_recognised_second_line_is_refused(self) -> None:
+        for body in ("lead-fable, session l\nP1: wrong lock order.", "LGTM", "P1: x\nsomeone"):
+            stray = listed(8, "COMMENTED", body)
+            self.refused("not attributed to a required reviewer", reviews=self.reviews(stray))
 
     def test_duplicate_record_is_refused(self) -> None:
         self.refused("same record", "--record", RECORD, "--record", RECORD)
@@ -260,7 +264,7 @@ class RequiredReviewsTest(unittest.TestCase):
     def test_record_from_an_unlisted_reviewer_is_refused(self) -> None:
         stranger = listed(9, "COMMENTED", "LGTM\nteam-2-test, session s")
         self.refused(
-            "not a required reviewer's current LGTM",
+            "not attributed to a required reviewer",
             "--record",
             PR + "#pullrequestreview-9",
             review=review(body="LGTM\nteam-2-test, session s"),

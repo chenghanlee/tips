@@ -18,8 +18,13 @@ design count against the claim that the tier fixes them.
    agent set in the body: designer names and the lead, tester names and the
    merge-confirming tester, the reviewing designer. Each is an entry in
    `config.toml`.
-2. Prepare one shared read-only worktree at `main` HEAD with compiled deps and
-   Dexter for the designers.
+2. Prepare the designers' worktree by hand: `git worktree add --detach
+   .worktrees/design-<spec issue> origin/main`, install deps, build, start Dexter per
+   the [LSP guide](../../lsp/README.md). You own it and remove it when the feature
+   is done. Designers read and run Dexter there; they do not edit tracked files or
+   run checks. Scratch goes in its `tmp/`. A designer that needs to run a check asks
+   you for a pinned reviewer worktree with its own database suffix and port, as the
+   reviewing designer gets for PR review.
 3. Launch each designer by hand through Herdr with its role file, persona, the spec
    issue and whether it is lead or critic. Record each launch as an EVENT comment on
    the spec issue with the agent name and session id.

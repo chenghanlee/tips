@@ -16,9 +16,10 @@ set, adds a focus; it never narrows the review. Testers do not split a PR.
 
 1. Trace the affected callers yourself with Dexter and scoped search, and check their
    handling. The developer's table is a claim to verify, not evidence.
-2. Inspect the retained full-suite output under `tmp/checks/` yourself, including the
-   first failing log and its exit status. Run the tests through
-   `agent/teams/capture.py` in your own checkout.
+2. Inspect the implementer's retained full-suite output yourself, through the log
+   links in the PR body, including the first failing log and its exit status. Run
+   the tests through `agent/teams/capture.py` in your own checkout; your logs are
+   under your checkout's `tmp/checks/`.
 3. State both checks and any limitation in the review body.
 
 ## Approval and merge

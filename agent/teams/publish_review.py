@@ -2,9 +2,11 @@
 """Publish the tips/independent-review status for the approving reviews of the exact PR head.
 
 A record is a submitted GitHub review of the head commit whose first line is `LGTM` and whose
-second line names the reviewer. Every review thread on the PR must be resolved. When the PR's
-issue names required reviewers (`Required reviews: name, name`), each of them must have an LGTM
-as their latest review of the head; the caller's records cannot replace that list.
+second line is `<reviewer>, <session>`. Every review thread on the PR must be resolved. When
+the PR's linked issue names required reviewers (`Required reviews: name, name`), each of them
+must have an LGTM as their latest review of the head, every review of the head must be
+attributed to one of them, and the caller's records cannot replace that list. The check runs
+at publication time; it does not watch for later edits.
 """
 
 import argparse
@@ -126,27 +128,43 @@ def required_reviewers(number: int) -> list[str]:
     return names
 
 
-def named(body: str, name: str) -> bool:
-    """Whether the review's reviewer line is `name`, optionally followed by a session.
+def attributed(body: str) -> str | None:
+    """The reviewer name of a review body: the second nonblank line up to its first comma.
 
-    The reviewer line is the first or second nonblank line, so a decision-first body
-    (`Changes required`, then the reviewer) attributes like an LGTM-first body does.
+    Line one is `LGTM` or the decision; line two is `<entry name>, <session>`. A body without
+    a second line has no attribution.
     """
-    lines = [line.strip() for line in body.splitlines() if line.strip()][:2]
-    pattern = re.escape(name) + r"(?:[,\s]|$)"
-    return any(re.match(pattern, line) for line in lines)
+    lines = [line.strip() for line in body.splitlines() if line.strip()]
+    if len(lines) < 2:
+        return None
+    return lines[1].split(",", 1)[0].strip() or None
 
 
 def latest_records(repo: str, number: int, sha: str, names: list[str]) -> dict[str, str]:
-    """Each required reviewer's current LGTM link on `sha`; refuse a missing or superseded one."""
+    """Each required reviewer's current LGTM link on `sha`.
+
+    Refuses a missing or superseded review, and any review of the head that is not
+    attributed to a required reviewer: an unreadable decision must not leave an earlier
+    approval standing.
+    """
     reviews = [
         review
         for review in connection(repo, number, "reviews", REVIEW_FIELDS)
         if review["commit"]["oid"] == sha and review["state"] != "PENDING"
     ]
+    if not names:
+        return {}
+    by_name: dict[str, list[Any]] = {name: [] for name in names}
+    for review in reviews:
+        who = attributed(review["body"] or "")
+        if who not in by_name:
+            raise RefusalError(
+                f"Review {review['url']} on {sha} is not attributed to a required reviewer "
+                f"on its second line (got {who!r}; required: {', '.join(names)})."
+            )
+        by_name[who].append(review)
     records: dict[str, str] = {}
-    for name in names:
-        theirs = [review for review in reviews if named(review["body"] or "", name)]
+    for name, theirs in by_name.items():
         if not theirs:
             raise RefusalError(f"Required review from {name} is missing on {sha}.")
         latest = theirs[-1]
