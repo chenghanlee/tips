@@ -64,12 +64,14 @@ class CaptureTest(unittest.TestCase):
                 logs: list[Path] = []
                 while time.monotonic() < deadline:
                     logs = list(Path(tmp, "tmp/checks").glob("*.log"))
-                    if logs and "partial" in logs[0].read_text():
+                    # The header echoes the command, so wait for the child's own line.
+                    if logs and "partial" in logs[0].read_text().splitlines():
                         break
                     time.sleep(0.1)
+                else:
+                    self.fail("child output never reached the log")
                 process.kill()
-            assert logs
-            assert "partial\n" in logs[0].read_text()
+            assert "partial" in logs[0].read_text().splitlines()
 
     def test_usage_error_without_separator(self) -> None:
         result = execute([sys.executable, str(TEAMS / "capture.py"), "label", "echo"])
