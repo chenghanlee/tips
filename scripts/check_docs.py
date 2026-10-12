@@ -39,7 +39,21 @@ def check_fragments():
             assert fragment in slugs, f"{path.relative_to(ROOT)}: broken fragment #{fragment}"
 
 
+def check_design_index():
+    """Every section of a design doc has a link in docs/design/README.md."""
+    folder = ROOT / "docs/design"
+    index = (folder / "README.md").read_text()
+    for path in sorted(folder.glob("*.md")):
+        if path.name == "README.md":
+            continue
+        for heading in re.findall(r"^#{2,3} (.+)$", path.read_text(), re.M):
+            slug = re.sub(r"[^a-z0-9 -]", "", heading.lower()).replace(" ", "-")
+            link = f"({path.name}#{slug})"
+            assert link in index, f"docs/design/README.md: add a row linking {path.name}#{slug}"
+
+
 if __name__ == "__main__":
     check_local_links()
     check_fragments()
+    check_design_index()
     print("PASS: local documentation links valid")

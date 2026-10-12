@@ -7,7 +7,9 @@ dispatcher's launch prompt says which you are and your persona.
 ## Before the first round
 
 Read the feature's issue on Project 15, its linked design sections and the affected
-code in the shared read-only worktree. Critics do this before reading the lead's
+code in the shared read-only worktree. Find the sections for the feature and its
+cross-cutting triggers in the [design index](../../../docs/design/README.md); quote
+them in briefs with their revision. Critics do this before reading the lead's
 PROPOSAL. Record concerns independently before reading it.
 
 ## Lead
