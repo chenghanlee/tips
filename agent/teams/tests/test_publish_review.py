@@ -7,7 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from pr_review import RefusalError
 from publish_review import approval_problem, review_api_path
@@ -26,7 +26,10 @@ with Path(os.environ["FAKE_GH_LOG"]).open("a") as stream:
 fake = json.loads(os.environ["FAKE_GH"])
 query = next((arg for arg in a if arg.startswith("query=")), "")
 if a[:2] == ["pr", "view"]:
-    print(json.dumps({"headRefOid": fake["head"], "url": "https://github.com/o/tips/pull/7"}))
+    pr = {"headRefOid": fake["head"], "url": "https://github.com/o/tips/pull/7"}
+    print(json.dumps({**pr, "body": fake.get("pr_body", "")}))
+elif a[:2] == ["issue", "view"]:
+    print(json.dumps({"body": fake.get("issue_body", "")}))
 elif a[:2] == ["pr", "comment"]:
     print("https://github.com/o/tips/pull/7#issuecomment-99")
 elif "resolveReviewThread" in query:
@@ -195,6 +198,92 @@ class PublishTest(unittest.TestCase):
         assert result.returncode != 0
         assert "PR head" in result.stderr
         assert not any(call[:2] == ["pr", "comment"] for call in calls)
+
+
+class RequiredReviewsTest(unittest.TestCase):
+    """The issue's `Required reviews:` line decides who must have an LGTM on the head."""
+
+    BRIEF: ClassVar[dict[str, str]] = {
+        "pr_body": "Closes #12\n",
+        "issue_body": "Required reviews: team-1-test, lead-fable\n",
+    }
+    DESIGNER = PR + "#pullrequestreview-6"
+
+    def reviews(self, *extra: dict[str, Any]) -> list[list[dict[str, Any]]]:
+        return [
+            [
+                listed(5, "COMMENTED", "LGTM\nteam-1-test, session t"),
+                listed(6, "COMMENTED", "LGTM\nlead-fable, session l"),
+                *extra,
+            ]
+        ]
+
+    def test_every_required_reviewer_current_lgtm_posts_once(self) -> None:
+        result, calls = publish(**self.BRIEF, reviews=self.reviews())
+        assert result.returncode == 0, result.stderr
+        assert len(posts(calls)) == 1
+        assert f"target_url={RECORD}" in posts(calls)[0]
+        assert "LGTM from team-1-test, lead-fable" in posts(calls)[0][-1]
+
+    def test_missing_required_review_is_refused(self) -> None:
+        only_tester = [[listed(5, "COMMENTED", "LGTM\nteam-1-test, session t")]]
+        result, calls = publish(**self.BRIEF, reviews=only_tester)
+        assert result.returncode != 0
+        assert "Required review from lead-fable is missing" in result.stderr
+        assert posts(calls) == []
+
+    def test_review_on_another_head_does_not_count(self) -> None:
+        elsewhere = [
+            [
+                listed(5, "COMMENTED", "LGTM\nteam-1-test, session t"),
+                listed(6, "COMMENTED", "LGTM\nlead-fable, session l", "b" * 40),
+            ]
+        ]
+        result, calls = publish(**self.BRIEF, reviews=elsewhere)
+        assert result.returncode != 0
+        assert "lead-fable is missing" in result.stderr
+        assert posts(calls) == []
+
+    def test_superseded_lgtm_is_refused(self) -> None:
+        objection = listed(8, "COMMENTED", "lead-fable, session l\nP1: the lock order is wrong.")
+        result, calls = publish(**self.BRIEF, reviews=self.reviews(objection))
+        assert result.returncode != 0
+        assert "lead-fable's latest review" in result.stderr
+        assert "pullrequestreview-8" in result.stderr
+        assert posts(calls) == []
+
+    def test_duplicate_record_is_refused(self) -> None:
+        result, calls = publish("--record", RECORD, "--record", RECORD, **self.BRIEF)
+        assert result.returncode != 0
+        assert "same record" in result.stderr
+        assert calls == []
+
+    def test_record_from_an_unlisted_reviewer_is_refused(self) -> None:
+        stranger = listed(9, "COMMENTED", "team-2-test, session s\nLGTM")
+        stranger["body"] = "LGTM\nteam-2-test, session s"
+        record = PR + "#pullrequestreview-9"
+        result, calls = publish(
+            "--record",
+            record,
+            **self.BRIEF,
+            review=review(body="LGTM\nteam-2-test, session s"),
+            reviews=self.reviews(stranger),
+        )
+        assert result.returncode != 0
+        assert "not a required reviewer's current LGTM" in result.stderr
+        assert posts(calls) == []
+
+    def test_two_records_from_both_reviewers_are_accepted(self) -> None:
+        result, calls = publish(
+            "--record", RECORD, "--record", self.DESIGNER, **self.BRIEF, reviews=self.reviews()
+        )
+        assert result.returncode == 0, result.stderr
+        assert len(posts(calls)) == 1
+
+    def test_issue_without_the_line_keeps_the_single_record_path(self) -> None:
+        result, calls = publish(pr_body="Closes #12\n", issue_body="No reviewers named.")
+        assert result.returncode == 0, result.stderr
+        assert "description=LGTM on this head; review threads resolved" in posts(calls)[0]
 
 
 class ThreadReadTest(unittest.TestCase):

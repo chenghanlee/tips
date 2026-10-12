@@ -12,9 +12,14 @@ This document owns pair coordination. The user completes [setup](SETUP.md) once.
 | Role | Agent name | Responsibilities |
 |---|---|---|
 | User | n/a | Set product goals and constraints. Answer unresolved product, scope, purchase and credential questions. Start the dispatcher once; notify it when priorities or external facts change. |
-| Dispatcher | `dispatcher` | Act as the Tips technical program manager: prioritize work, prepare eligible tasks, update the board, start and stop pairs, and handle blockers. Do not write code or review changes. |
-| Developer | `team-N-dev` | Implement and verify the issue, open the PR, address findings and fix failed checks. |
-| Tester | `team-N-test` | Review the pushed PR head, run tests or the app, publish approval and confirm the merge. |
+| Dispatcher | `dispatcher` | Act as the Tips technical program manager: prioritize work, prepare eligible tasks, update the board, start and stop pairs, and handle blockers. Do not write code or review changes. Design-tier duties: [roles/dispatcher.md](roles/dispatcher.md). |
+| Designer | configured entry name | Design one feature as lead or critic, then review its PRs: [roles/designer.md](roles/designer.md). Launched by hand in the trial. |
+| Developer | `team-N-dev` | Implement and verify the issue, open the PR, address findings and fix failed checks. Design-tier duties: [roles/implementer.md](roles/implementer.md). |
+| Tester | `team-N-test` | Review the pushed PR head, run tests or the app, publish approval and confirm the merge. Design-tier duties: [roles/tester.md](roles/tester.md). |
+
+Every swarm role also reads [roles/common.md](roles/common.md). A feature run through
+the design tier starts from a brief issue; the brief's `Required reviews:` line names
+the reviewers whose LGTM the merge needs.
 
 ## Common path
 
@@ -93,8 +98,11 @@ behaviour or design.
 
 ### 5. Tester: approve and confirm the merge
 
-Approve when no P0 or P1 remains and every thread is resolved. Submit and publish
-the [PR review record](#pr-review-record) without waiting for CI. Keep the turn.
+Approve when no P0 or P1 remains and every thread is resolved. Submit the
+[PR review record](#pr-review-record) without waiting for CI. Keep the turn. If the
+issue has a `Required reviews:` line, publish only when every named reviewer's latest
+review of this head is an LGTM; until then ring the missing reviewer and wait. The
+publisher refuses a missing, superseded, duplicate or wrong-head record.
 
 Auto-merge requires `checks`, `release`, `tips/independent-review` and resolved
 threads. A merge closes the issue, sets the Project item to Done and deletes the
@@ -186,6 +194,7 @@ checks. Use the first matching condition:
 | A required check failed | Developer: fix the failure. |
 | The current head has reviews and the latest is not an LGTM | Developer: address the review. |
 | The current head has no reviews | Tester: review it. |
+| The tester's latest review is an LGTM and a reviewer named in `Required reviews:` has no LGTM on this head | Tester: keep the turn; ring the missing reviewer. |
 | The current head is approved | Tester: complete approval publication and merge confirmation. |
 
 ## Rules
@@ -346,7 +355,11 @@ and session on the second line. Then publish the status:
 agent/teams/publish_review.py --pr <pr> --sha <sha> --record <review URL>
 ```
 
-The command refuses a wrong head, a wrong record or unresolved threads.
+The command refuses a wrong head, a wrong record or unresolved threads. When the
+issue closed by the PR has a line `Required reviews: <name>, <name>`, every named
+reviewer's latest review of the head must be an LGTM whose second line starts with
+that name; repeat `--record` for each, and the command refuses a missing, superseded,
+duplicate or unlisted record.
 
 To read reviews and resolve threads:
 
