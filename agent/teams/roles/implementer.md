@@ -1,17 +1,17 @@
 # Implementer
 
-You implement one brief in one worktree and own its PR. Read with
+Implement one brief in one worktree. You are responsible for its PR. Read
 [common rules](common.md) and the [workflow](../README.md). Your brief is the issue
 `team.py start` named; the handoff names the accepted PROPOSAL. If your model is
 Haiku, also read [models/haiku.md](models/haiku.md).
 
 ## Start
 
-Start from the released brief. When something in it leaves a question that changes
-the work, post one QUESTION on the brief with your assumption and wait for the lead's
-ANSWER before touching the affected part; work on the rest meanwhile. If an answer
-changes a contract, wait for the lead's updated release. Do not decide disagreements
-between designers.
+Start from the released brief. If it leaves a question whose answer would change the
+work, post one QUESTION on the brief and state your assumption. Wait for the lead's
+ANSWER before changing the affected part. Continue unaffected work while you wait. If
+the answer changes a contract, wait for the lead's updated release. Do not decide
+disagreements between designers.
 
 ## Deliver
 
@@ -23,12 +23,13 @@ between designers.
    does not run with its result. Then `agent/teams/team.py turn <pr> <tester entry>`
    from the pair checkout. Until the tester returns the turn, leave the worktree,
    build and database alone.
-4. On findings: fix every P0 and P1, handle P2s per the README, push, hand off again.
-   A failed check goes to you the same way.
+4. When reviewers report findings, fix every P0 and P1. Handle P2s as the README says.
+   Push and hand off again. The tester returns failed checks through the same handoff.
 
 ## Do not
 
-- Change the brief's scope; ask with a QUESTION. Out-of-scope work is a new issue.
-- Add unrequested features, abstractions or settings.
-- Describe work as done without the check that proves it.
-- Edit another agent's comment, the brief body or the spec body.
+- Do not change the brief's scope. Post a QUESTION if you need a scope change.
+  Open a new issue for work outside the scope.
+- Do not add unrequested features, abstractions or settings.
+- Do not describe work as done without the check that proves it.
+- Do not edit another agent's comment, the brief body or the spec body.

@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Brief lifecycle in Herdr: start the pair, hand the checkout over, add reviewers, stop.
+"""Manage brief teams in Herdr: start the pair, hand off the checkout, launch reviewers, stop.
 
-Configured agents are `[agents.<entry>]` in config.toml. A launch allocates a slot and writes
-`agent/teams/allocations/<slot>.json`: the brief's implementer and merge-confirming tester,
-and every launched client with its live Herdr name, kind, worktree, database suffix, port,
-pane and session. Restart, handoff and teardown take those from the record; model, effort,
-advisor and persona come from the current configuration, and the brief's `Required
-reviews:` line names the other reviewers whenever a command needs them.
+Configured agents are `[agents.<entry>]` in config.toml. Each launch writes an allocation
+record to `agent/teams/allocations/<slot>.json` with the implementer, merge-confirming tester,
+and every launched client's Herdr name, kind, worktree, database suffix, port, pane and session.
+Restart, handoff and teardown use that record. Model, effort, advisor and persona come from
+the current configuration. The brief's `Required reviews:` line names any additional reviewers.
 """
 
 import json
@@ -193,9 +192,9 @@ def run(
 
 
 def require_git_admin(common: Path) -> None:
-    """Refuse before Git administration when this process cannot write main's .git.
+    """Check write access to main's .git before running Git administration.
 
-    Create a file to probe: mode bits do not show a client sandbox's write denial.
+    Probe by creating a temporary file; mode bits may not reveal a sandbox write denial.
     """
     try:
         with tempfile.TemporaryFile(dir=common):
@@ -282,7 +281,7 @@ def session_id(agent: Entity) -> str:
 
 
 def processes() -> ProcessRows:
-    # Parent links, not process groups: Expert engines can create their own groups.
+    # Find descendants through parent links. Expert engines may create their own process groups.
     rows: ProcessRows = {}
     for line in run("ps", "-axo", "pid=,ppid=,stat=,lstart=").splitlines():
         pid, parent, state, started = line.split(None, 3)
@@ -572,12 +571,12 @@ def live_name(slot: int, entry: str) -> str:
 
 
 def reserved() -> list[Allocation]:
-    """Every recorded allocation, whatever config says now."""
+    """Return saved allocations, even if the current configuration has changed."""
     return [a for record in records().values() for a in record["agents"].values()]
 
 
 def reviewer_names(value: str) -> list[str]:
-    """The names of a `Required reviews:` line; refuse an empty or repeated name."""
+    """Return names from `Required reviews:`. Reject empty or duplicate names."""
     names = [name.strip() for name in value.split(",")]
     if not all(names) or len(set(names)) != len(names):
         raise ValueError("empty or repeated name in Required reviews")
@@ -590,10 +589,10 @@ def issue_line(body: str, label: str) -> str | None:
 
 
 def roster(brief: str) -> tuple[str, list[str], list[str]]:
-    """The brief's implementer, testers and reviewing designers, each a configured entry.
+    """Read the brief's implementer, testers and reviewing designers from configured entries.
 
-    `Required reviews:` is the publisher's gate, so the launch set is read from the same
-    line: testers in the order written, the first confirming the merge, and designers.
+    Read reviewer names from `Required reviews:`. Keep testers in the listed order;
+    the first tester confirms the merge. Return testers and designers separately.
     """
     body = str(json.loads(run("gh", "issue", "view", brief, "--json", "body")).get("body") or "")
     implementer = issue_line(body, "Implementer")
@@ -645,7 +644,7 @@ def repository() -> str:
 
 
 def issue_comments(issue: str) -> list[dict[str, object]]:
-    """Every comment of an issue, oldest first: id, html_url, body, created_at."""
+    """Return issue comments oldest first, with id, html_url, body and created_at fields."""
     output = run(
         "gh", "api", "--paginate", "--slurp", f"repos/{repository()}/issues/{issue}/comments"
     )
@@ -658,7 +657,7 @@ def issue_comments(issue: str) -> list[dict[str, object]]:
 
 
 def post_comment(issue: str, text: str) -> str:
-    """Post a comment once: an identical comment already on the issue is reused, not repeated."""
+    """If the same comment exists, return its URL. Otherwise, post it."""
     for comment in issue_comments(issue):
         if comment.get("body") == text:
             return str(comment["html_url"])
@@ -670,10 +669,10 @@ def event_role(allocation: Allocation) -> str:
 
 
 def post_event(brief: str, allocation: Allocation, text: str) -> None:
-    """Record a launch on the brief as the launched client, with its session id.
+    """Record a launch on the brief as the launched client, with its session ID.
 
-    This EVENT is the join between an agent name and its session logs, so a failed post
-    is an error after the launch itself succeeded; the message says how to post it.
+    Usage reports match agent names to session logs through this EVENT. If posting fails
+    after the launch succeeds, the error includes the command needed to record the EVENT.
     """
     header = comment_header(
         "EVENT", event_role(allocation), allocation["name"], allocation["session"]
@@ -690,7 +689,7 @@ def post_event(brief: str, allocation: Allocation, text: str) -> None:
 
 
 def bound_command(binary: Path, root: Path, sources: Path | str) -> str:
-    """The worktree's Dexter command: the one place naming binary, root and sources."""
+    """Build the worktree's Dexter wrapper with paths to the binary, root and Elixir sources."""
     return (
         "#!/bin/sh\n"
         f"export DEXTER_ELIXIR_LIB_ROOT={shlex.quote(str(sources))}\n"
@@ -700,7 +699,7 @@ def bound_command(binary: Path, root: Path, sources: Path | str) -> str:
 
 
 def warm_up_query(startup_seconds: int) -> list[str]:
-    """Bound-command arguments that start the daemon and wait for its index."""
+    """Return wrapper arguments that start the daemon and wait for its index."""
     return ["query", "workspace-symbols", "--raw", "--wait", f"{startup_seconds}s", "MixProject"]
 
 
@@ -745,7 +744,7 @@ def test_port(entry: str, slot: int) -> int:
 
 
 def agent_env(allocation: Allocation) -> dict[str, str]:
-    """One client's environment: its recorded database and port, its worktree's tools."""
+    """Build the client's environment from its recorded database, port and worktree tools."""
     config = Path(os.environ.get("TIPS_TEAM_CONFIG", main / "agent/teams/config.toml")).resolve()
     worktree = Path(allocation["worktree"])
     env = {
@@ -766,7 +765,7 @@ def agent_env(allocation: Allocation) -> dict[str, str]:
 
 
 def allocate(record: Record, entry: str, role: str, worktree: Path) -> Allocation:
-    """Reserve the entry's database and port in this slot; the record keeps them from now on."""
+    """Reserve the entry's database and port in this slot and save them in its allocation record."""
     slot = record["slot"]
     suffix, port = db_suffix(entry, slot), test_port(entry, slot)
     for held in reserved():
@@ -837,7 +836,7 @@ def link_skills(link: Path, shared: Path) -> None:
 
 
 def prepare_index(worktree: Path, wrapper: Path, env: dict[str, str], fetch: bool) -> None:
-    """Fetch a new checkout's locked dependencies, start Dexter and reconcile its index."""
+    """Fetch a new checkout's locked dependencies, start Dexter and update its index."""
     if fetch:
         # --check-locked never rewrites the lock. A reused worktree keeps its own dependency
         # state: it may hold an unfinished change that only its agent can resolve.
@@ -865,7 +864,7 @@ def prepare_index(worktree: Path, wrapper: Path, env: dict[str, str], fetch: boo
 
 
 def tools(worktree: Path) -> tuple[Path, Path, Path]:
-    """The Dexter binary, shared skills and Elixir sources; refuse before any change."""
+    """Check the required tools before changing the worktree; return their paths."""
     binary, skills = dexter_binary(), main / ".agents/skills"
     if not skills.is_dir():
         raise RuntimeError("Shared skills directory is missing.")
@@ -983,8 +982,8 @@ def pair_brief(record: Record, entry: str, duty: str, wrapper: Path) -> str:
         "Use the README restart rule to find whose turn it is. If yours, continue the "
         "workflow; otherwise end your turn and wait for your partner's message. "
         f"Hand the checkout over with agent/teams/team.py turn <pr> {partner}. "
-        f"Reviews you write are attributed to {entry} on their second line. "
-        + dexter_brief(wrapper)
+        f"Put {entry}, <session> on line 2 of each review record; "
+        "replace <session> with your session ID. " + dexter_brief(wrapper)
     )
 
 
@@ -995,9 +994,10 @@ def reviewer_brief(record: Record, entry: str, duty: str, pr: str, head: str, wr
         + f"Review PR {pr} from this worktree, pinned at {head}; never the pair checkout. "
         "Read agent/teams/README.md and follow its reviewer steps. Never run "
         "agent/teams/team.py turn. Submit the README review record with "
-        f"{entry} on its second line, then notify the merge-confirming tester with "
-        f"herdr agent prompt {tester} '<your review URL>' and end your turn. A later head "
-        "follows the README reviewer steps. " + dexter_brief(wrapper)
+        f"{entry}, <session> on line 2; replace <session> with your session ID. "
+        "Then notify the merge-confirming tester with "
+        f"herdr agent prompt {tester} '<your review URL>' and end your turn. "
+        "If the PR head changes, follow the README reviewer steps again. " + dexter_brief(wrapper)
     )
 
 
@@ -1118,7 +1118,7 @@ def require_main_checkout() -> None:
 
 
 def current_roster(record: Record) -> tuple[list[str], list[str]]:
-    """The brief's current additional testers and designers; the brief is the only copy.
+    """Read additional testers and designers from the brief; no separate list is stored.
 
     The pair owners are fixed in the record, so a brief that names another implementer
     or first tester is refused wherever it is read.
@@ -1256,34 +1256,45 @@ def tester_message(record: Record, pr: str, url: str, head: str) -> str:
         # Reviewer worktrees need Git administration, so the dispatcher provisions them.
         commands = "; ".join(f"agent/teams/team.py review {pr} {e}" for e in pending)
         message += (
-            f" First ask the dispatcher to launch the other reviewers so they review in "
-            f"parallel: herdr agent prompt dispatcher '{url} review: run {commands}'."
+            f" Before you review, ask the dispatcher to launch the other reviewers for "
+            f"parallel review: herdr agent prompt dispatcher '{url} review: run {commands}'."
         )
     message += (
         " Follow agent/teams/roles/tester.md and agent/skills/reviewing-code/SKILL.md "
-        "from this worktree; the README PR review record, "
-        f"attributed to {tester}. With findings: submit them and run "
-        f"agent/teams/team.py turn {pr} {implementer}. Without: submit your LGTM"
+        "from this worktree and use the README PR review record. "
+        f"Put {tester}, <session> on line 2; replace <session> with your session ID. "
+        f"If you find issues, submit your review and run "
+        f"agent/teams/team.py turn {pr} {implementer}. "
+        "If you find no issues, submit LGTM."
     )
     if others:
         named = ", ".join(f"{e} ({live_name(record['slot'], e)})" for e in others)
         message += (
-            f", then read each required reviewer's latest review of this head: {named}. "
-            f"Findings: run team.py turn {pr} {implementer}. Missing review: notify "
-            "that reviewer with the PR URL and head, or report blocked if not running. "
-            "All LGTM: merge"
+            f" After your LGTM, read each required reviewer's latest review of this head: {named}. "
+            f"If a review has findings, run agent/teams/team.py turn {pr} {implementer}. "
+            "If a review is missing, notify that reviewer with the PR URL and head, or "
+            "report blocked if they are not running. When every required reviewer's latest "
+            "review of this head is LGTM, "
+            "follow the README merge step: confirm all threads are resolved and required "
+            "checks pass, then merge."
         )
     else:
-        message += "; merge"
-    return message + " per the README merge step once the required checks pass, then done."
+        message += (
+            " When your LGTM is the only required review, follow the README merge step: "
+            "confirm all threads are resolved and required checks pass, then merge."
+        )
+    return (
+        message + " After the merge, notify the dispatcher with "
+        f"herdr agent prompt dispatcher '{url} done'."
+    )
 
 
 def implementer_message(pr: str, url: str, problem: str | None) -> str:
     message = (
         f"Your turn on {url}: run agent/teams/pr_review.py list {pr} and "
-        f"gh pr checks {pr} --required. Repair the findings or failed checks as "
-        "agent/skills/developing-software/SKILL.md from this worktree says, push and "
-        "return the turn to the tester. If blocked, follow the README blocker procedure."
+        f"gh pr checks {pr} --required. Fix review findings and failed checks following "
+        "agent/skills/developing-software/SKILL.md from this worktree. Push your changes, "
+        "then hand the turn back to the tester. If blocked, follow the README blocker procedure."
     )
     if problem:
         # Handing back never refuses: only the implementer can repair the checkout.
@@ -1318,7 +1329,10 @@ def turn(pr: str, recipient: str) -> None:
         message = tester_message(record, pr, url, head)
     partner = live_name(record["slot"], recipient)
     herdr("agent", "prompt", partner, message)
-    print(f"Notified {partner}. Stop using this worktree, build and database; end your turn now.")
+    print(
+        f"Notified {partner}. Stop using this worktree, build processes and files, "
+        "and database; end your turn now."
+    )
 
 
 def stop_brief(brief: str) -> None:
@@ -1357,7 +1371,7 @@ def stop_brief(brief: str) -> None:
 
 
 def require_sole_pane(allocation: Allocation) -> None:
-    """The workspace is closed whole, so it must hold only the recorded pane."""
+    """Require the recorded pane to be the only pane; closing the workspace closes every pane."""
     panes = herdr("pane", "list", "--workspace", allocation["workspace"])["panes"]
     strangers = [p["pane_id"] for p in panes if p["pane_id"] != allocation["pane"]]
     if strangers:
@@ -1464,7 +1478,10 @@ def configure() -> None:
 
 
 def stop_agent(pane: str, root: str | Path) -> None:
-    """Graceful client exit; raise on uncertainty. Caller must preserve the checkout."""
+    """Stop the client gracefully; raise an error if its exit is uncertain.
+
+    The caller must keep the checkout.
+    """
     configure()
     stop(pane, root)
 
