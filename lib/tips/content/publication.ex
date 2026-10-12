@@ -1,16 +1,18 @@
 defmodule Tips.Content.Publication do
   @moduledoc """
-  Publishes new text tips and reviews and reconciles submission keys for
+  Publishes new tips and reviews and reconciles submission keys for
   `Tips.Content`.
 
   See "Publication" and "Transaction participants" in `Tips.Content`. A key
   lookup runs first and answers for an existing key without validation, write
   admission or eligibility. Only an absent key is admitted, validated and
   written: one transaction locks the author, then a review's live parent, then
-  share-locks the selected curated choices while active, and inserts the
-  content, its search text, its self-vote and a review's notification. Any
-  rejection in the transaction rolls the attempt back; the key is then looked
-  up again in a fresh statement before the rejection is returned.
+  share-locks the selected curated choices while active, inserts the content,
+  claims its selected staged videos (`Tips.Content.Media.claim/2`, which locks
+  the media rows after those), and writes its search text, its self-vote and a
+  review's notification. Any rejection in the transaction rolls the attempt
+  back; the key is then looked up again in a fresh statement before the
+  rejection is returned.
   """
 
   import Ecto.Changeset
@@ -34,6 +36,7 @@ defmodule Tips.Content.Publication do
     Vote
   }
 
+  alias Tips.Content.Media
   alias Tips.Content.Media.Asset
   alias Tips.Repo
 
@@ -43,6 +46,9 @@ defmodule Tips.Content.Publication do
     tip: [:title, :body, :tag_id, :model_id, :model_other, :environment_id, :prompt, :output],
     review: [:body, :model_id, :model_other, :environment_id, :prompt, :output]
   }
+
+  # Positive bigint ids; anything else cannot name a row.
+  @row_ids 1..9_223_372_036_854_775_807
 
   # Curated choices a new write must select while active.
   @choices %{
@@ -70,7 +76,7 @@ defmodule Tips.Content.Publication do
            {:ok, parent_id} <- parent_id(kind),
            {:ok, changeset} <- validate(kind, user, key, parent_id, attrs, uploads) do
         kind
-        |> insert(user, parent_id, changeset)
+        |> insert(user, parent_id, changeset, uploads)
         |> settle(scope, kind, key, intent)
       end
     end)
@@ -122,7 +128,7 @@ defmodule Tips.Content.Publication do
 
   defp parent_id(:tip), do: {:ok, nil}
 
-  defp parent_id({:review, id}) when id in 1..9_223_372_036_854_775_807//1, do: {:ok, id}
+  defp parent_id({:review, id}) when id in @row_ids, do: {:ok, id}
   defp parent_id({:review, _id}), do: {:error, :not_found}
 
   ## Key lookup
@@ -228,14 +234,17 @@ defmodule Tips.Content.Publication do
     end)
   end
 
-  # Text publication accepts only an empty selection. Errors keep selection order.
+  # A new publication selects only staged videos. Errors keep selection order.
   defp validate_uploads(changeset, uploads) when is_list(uploads) do
     uploads
     |> Enum.reverse()
     |> Enum.reduce(changeset, fn upload, changeset ->
-      {message, keys} = upload_error(upload)
-      add_error(changeset, :uploads, message, keys)
+      case upload_error(upload) do
+        nil -> changeset
+        {message, keys} -> add_error(changeset, :uploads, message, keys)
+      end
     end)
+    |> Media.validate_selection(uploads)
   end
 
   defp validate_uploads(changeset, _uploads), do: add_error(changeset, :uploads, "is invalid")
@@ -245,19 +254,20 @@ defmodule Tips.Content.Publication do
   defp upload_error({:retained, media_id, _description}),
     do: {"cannot be kept in a new publication", media_id: media_id}
 
-  defp upload_error({:staged_video, media_id}), do: {"is not supported yet", media_id: media_id}
+  defp upload_error({:staged_video, media_id}) when media_id in @row_ids, do: nil
 
   defp upload_error({:image_file, slot, _file, _description}),
     do: {"is not supported yet", slot: slot}
 
   defp upload_error(_malformed), do: {"is invalid", []}
 
-  defp insert(kind, user, parent_id, changeset) do
+  defp insert(kind, user, parent_id, changeset, uploads) do
     Repo.transact(fn ->
       with :ok <- lock_author(user.id),
            {:ok, parent_author_id} <- lock_parent(parent_id),
            :ok <- lock_choices(changeset, base_kind(kind)),
            {:ok, row} <- Repo.insert(changeset),
+           :ok <- Media.claim(row, uploads),
            :ok <- write_dependents(base_kind(kind), row, parent_author_id) do
         {:ok, row}
       end

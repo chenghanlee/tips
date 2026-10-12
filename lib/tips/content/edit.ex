@@ -9,9 +9,12 @@ defmodule Tips.Content.Edit do
   An edit is admitted, then checked for complete intent and a supported
   selection. One transaction locks the author, then the content row, and
   checks eligibility, ownership, deletion and the expected version before it
-  compares intent. Only text changes are saved: the retained attachments must
-  be submitted unchanged. A failed guard rolls back; fresh reads then report
-  the current eligibility, access or version conflict.
+  compares intent. Text changes and staged-video claims are saved: the
+  retained attachments must be submitted complete, in their saved relative
+  order and with their descriptions. Staged videos may sit anywhere among
+  them; `Tips.Content.Media.claim/2` locks the media rows after the content row, claims the
+  videos and places the whole selection. A failed guard rolls back; fresh
+  reads then report the current eligibility, access or version conflict.
   """
 
   import Ecto.Changeset
@@ -20,7 +23,7 @@ defmodule Tips.Content.Edit do
   alias Ecto.Changeset
   alias Tips.Accounts
   alias Tips.Accounts.{Scope, User}
-  alias Tips.Content.{Intent, Projection, Publication, Review, Search, Tip}
+  alias Tips.Content.{Intent, Media, Projection, Publication, Review, Search, Tip}
   alias Tips.Content.Media.Asset
   alias Tips.Repo
 
@@ -149,8 +152,8 @@ defmodule Tips.Content.Edit do
   defp validate_version(changeset, _version),
     do: add_error(changeset, :edit_version, "is invalid")
 
-  # Text edits keep the saved selection. Anything that would add an attachment
-  # is rejected here; the comparator would treat a staged video id as retained.
+  # Edits keep the saved selection and may add staged videos. Image files and
+  # missing images are rejected here.
   defp validate_selection(changeset, uploads) when is_list(uploads) do
     uploads
     |> Enum.reverse()
@@ -160,6 +163,7 @@ defmodule Tips.Content.Edit do
         {message, keys} -> add_error(changeset, :uploads, message, keys)
       end
     end)
+    |> Media.validate_selection(uploads)
   end
 
   defp validate_selection(changeset, _uploads), do: add_error(changeset, :uploads, "is invalid")
@@ -168,7 +172,7 @@ defmodule Tips.Content.Edit do
        when is_integer(id) and (is_binary(description) or is_nil(description)),
        do: nil
 
-  defp selection_error({:staged_video, id}), do: {"is not supported yet", media_id: id}
+  defp selection_error({:staged_video, id}) when id in @row_ids, do: nil
 
   defp selection_error({:image_file, slot, _file, _description}),
     do: {"is not supported yet", slot: slot}
@@ -200,7 +204,7 @@ defmodule Tips.Content.Edit do
       |> content_changeset(attrs)
       |> validate_retained(current, uploads)
       |> Map.put(:action, :update)
-      |> write(kind)
+      |> write(kind, uploads)
     end
   end
 
@@ -235,9 +239,12 @@ defmodule Tips.Content.Edit do
   defp content_changeset(%Tip{} = tip, attrs), do: Tip.changeset(tip, attrs)
   defp content_changeset(%Review{} = review, attrs), do: Review.changeset(review, attrs)
 
-  # Under the content lock and after the version check, the submitted
-  # selection must be the complete saved one: same ids, order and descriptions.
+  # Under the content lock and after the version check, the submitted retained
+  # entries must be the complete saved selection: same ids, relative order and
+  # descriptions. Staged videos between them are checked by the claim.
   defp validate_retained(changeset, current, uploads) do
+    uploads = for {:retained, _id, _description} = upload <- uploads, do: upload
+
     if normalize(current) == normalize(uploads) do
       changeset
     else
@@ -275,15 +282,16 @@ defmodule Tips.Content.Edit do
 
   # Equality with the locked row's version is already proven, so this is the
   # single compare-and-increment.
-  defp write(%Changeset{valid?: false} = changeset, _kind), do: {:error, changeset}
+  defp write(%Changeset{valid?: false} = changeset, _kind, _uploads), do: {:error, changeset}
 
-  defp write(changeset, kind) do
+  defp write(changeset, kind, uploads) do
     with :ok <- Publication.lock_active_choices(changeset, kind),
          {:ok, row} <-
            changeset
            |> optimistic_lock(:edit_version)
            |> put_change(:edited_at, DateTime.utc_now(:second))
            |> Repo.update(stale_error_field: :edit_version),
+         :ok <- Media.claim(row, uploads),
          :ok <- write_search(kind, row.id) do
       {:ok, {:updated, row}}
     end
@@ -314,6 +322,10 @@ defmodule Tips.Content.Edit do
   end
 
   defp settle({:error, {:too_long, _words}} = too_long, _kind, _user_id, _id), do: too_long
+
+  defp settle({:error, {upload, _ids}} = rejected, _kind, _user_id, _id)
+       when upload in [:upload_failed, :upload_pending],
+       do: rejected
 
   defp stale?(changeset),
     do: Enum.any?(changeset.errors, fn {_field, {_message, keys}} -> keys[:stale] end)
