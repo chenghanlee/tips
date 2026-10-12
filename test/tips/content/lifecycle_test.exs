@@ -1,5 +1,6 @@
 defmodule Tips.Content.LifecycleTest do
   use Tips.DataCase, async: true
+  use Oban.Testing, repo: Tips.Repo
 
   # Moderation cases read in a repeatable-read transaction; the sandbox's
   # outer transaction must already use that level.
@@ -17,6 +18,8 @@ defmodule Tips.Content.LifecycleTest do
   alias Tips.AdmissionLimiter
   alias Tips.Content
   alias Tips.Content.{Flag, Notification, Review, Tip}
+  alias Tips.Content.Media.Asset
+  alias Tips.Workers.CleanupMedia
 
   @review_attrs %{
     body: "Edited review",
@@ -184,28 +187,31 @@ defmodule Tips.Content.LifecycleTest do
     assert %Tip{review_count: 0} = reload(tip)
   end
 
-  test "own attached media requires real cleanup" do
+  test "deletion retires the item's own media and enqueues its cleanup" do
     author = user_fixture()
     tip = tip_fixture(author)
-    image = image_fixture(tip)
-    review = review_fixture(tip_fixture(), user_id: author.id)
-    video = attached_video_fixture(review)
-    flag = flag_fixture(user_fixture(), tip_id: tip.id)
+    video = attached_video_fixture(tip, position: 0)
+    image = image_fixture(tip, position: 1)
+    in_cleanup = cleanup_media_fixture(tip, position: 2)
+    staged = staged_video_fixture(author, target: {:edit_tip, tip.id})
+    review = review_fixture(tip, user_id: user_fixture().id)
+    review_image = image_fixture(review)
 
-    assert {:error, :media_cleanup_required} = Content.delete_content(scope(author), :tip, tip.id)
+    assert {:ok, %{state: :deleted, outcome: :changed}} =
+             Content.delete_content(scope(author), :tip, tip.id)
 
-    assert {:error, :media_cleanup_required} =
-             Content.delete_content(scope(author), :review, review.id)
+    for row <- [video, image] do
+      assert %{cleanup_at: %DateTime{}, position: nil, tip_id: tip_id} = Repo.reload(row)
+      assert tip_id == tip.id
+      assert_enqueued(worker: CleanupMedia, args: %{media_id: row.id})
+    end
 
-    assert Enum.map([tip, review, image, video, flag], &Repo.reload/1) ==
-             [tip, review, image, video, flag]
+    assert [] == Repo.all(from(a in Asset, where: a.tip_id == ^tip.id and is_nil(a.cleanup_at)))
+    assert [_video, _image] = all_enqueued(worker: CleanupMedia)
 
-    # Media already marked for cleanup and an unattached staged edit video do not block.
-    plain = tip_fixture(author)
-    cleanup_media_fixture(plain)
-    staged_video_fixture(author, target: {:edit_tip, plain.id})
-
-    assert {:ok, %{outcome: :changed}} = Content.delete_content(scope(author), :tip, plain.id)
+    # Media already in cleanup, a staged edit video and the reviews' media stay as they were.
+    assert Enum.map([in_cleanup, staged, review_image], &Repo.reload/1) ==
+             [in_cleanup, staged, review_image]
   end
 
   for kind <- [:tip, :review] do

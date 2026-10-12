@@ -1,6 +1,6 @@
 defmodule Tips.Content.Media.CloudflareStream do
   @moduledoc """
-  Video reservations and status reads in Cloudflare Stream, through its API.
+  Video reservations, status reads and deletions in Cloudflare Stream, through its API.
 
   Each call is one bounded request: 5-second connect and receive timeouts, no
   retries or redirects. Errors carry a status or `:transport`, never a URL,
@@ -141,4 +141,17 @@ defmodule Tips.Content.Media.CloudflareStream do
 
   defp video_status({:ok, %Req.Response{status: status}}), do: {:error, {:http, status}}
   defp video_status({:error, _exception}), do: {:error, :transport}
+
+  @doc """
+  Deletes the video `uid`. A video Stream no longer has (404) counts as deleted.
+  `:transport` leaves the outcome unknown.
+  """
+  @spec delete(Req.Request.t(), String.t()) :: :ok | {:error, error()}
+  def delete(client, uid) do
+    case Req.delete(client, url: "/" <> URI.encode(uid, &URI.char_unreserved?/1)) do
+      {:ok, %Req.Response{status: status}} when status in [200, 404] -> :ok
+      {:ok, %Req.Response{status: status}} -> {:error, {:http, status}}
+      {:error, _exception} -> {:error, :transport}
+    end
+  end
 end

@@ -66,9 +66,14 @@ defmodule Tips.Content.Media.R2 do
     |> result()
   end
 
-  @doc "Deletes the object at `key`. Deleting a missing object succeeds."
+  @doc "Deletes the object at `key`. Deleting a missing object, 204 or 404, succeeds."
   @spec delete(Req.Request.t(), String.t()) :: :ok | {:error, error()}
-  def delete(client, key), do: client |> Req.delete(url: "/" <> key) |> result()
+  def delete(client, key) do
+    case Req.delete(client, url: "/" <> key) do
+      {:ok, %Req.Response{status: 404}} -> :ok
+      response -> result(response)
+    end
+  end
 
   defp result({:ok, %Req.Response{status: status}}) when status in 200..299, do: :ok
   defp result({:ok, %Req.Response{status: status}}), do: {:error, {:http, status}}

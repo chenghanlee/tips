@@ -380,15 +380,14 @@ defmodule Tips.Content do
 
   Deletion uses `:delete_own_content`, so unconfirmed and fully banned authors
   may delete. Another author's or a missing row is `:not_found`; an owned,
-  already-deleted row is `:unchanged` with no further effects. A row with its
-  own attached media (not yet marked for cleanup) is
-  `{:error, :media_cleanup_required}` with no writes: media cleanup is not
-  transactional yet. Media of a tip's reviews do not block the tip. A real
+  already-deleted row is `:unchanged` with no further effects. A real
   deletion sets `deleted_at` and advances `edit_version` once, keeping
-  `dead_at` and author dates; resolves the target's open reports with no
-  resolver; and removes, read or unread, a review's notifications, or a tip's
-  `tip_upvoted` notifications and the `tip_reviewed` notifications of its
-  reviews. Reviews, their media and review-upvote notifications stay.
+  `dead_at` and author dates; marks the row's own attached media for cleanup
+  and enqueues its provider deletion (`Tips.Content.Media.retire/1`); resolves
+  the target's open reports with no resolver; and removes, read or unread, a
+  review's notifications, or a tip's `tip_upvoted` notifications and the
+  `tip_reviewed` notifications of its reviews. Reviews, their media and
+  review-upvote notifications stay.
   Errors: `t:delete_error/0`.
 
   The case read readmits the session and requires the moderator role only: a
@@ -713,7 +712,6 @@ defmodule Tips.Content do
   @type delete_error ::
           :unauthenticated
           | :not_found
-          | :media_cleanup_required
           | {:rate_limited | :capacity, retry_after_seconds :: pos_integer()}
           | :outcome_unknown
 

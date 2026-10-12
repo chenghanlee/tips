@@ -61,9 +61,6 @@ defmodule TipsWeb.ReviewActions do
       {:halt,
        socket |> put_flash(kind, message) |> push_navigate(to: socket.assigns.path, replace: true)}
 
-  defp refusal(:media_cleanup_required),
-    do: "Reviews with attachments can't be deleted yet, so nothing was deleted."
-
   defp refusal({:rate_limited, seconds}),
     do:
       "Too many attempts, so nothing was deleted. Try again in #{AuthMailAdmission.retry_in(seconds)}."
