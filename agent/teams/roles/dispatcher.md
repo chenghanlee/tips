@@ -16,8 +16,9 @@ design count against the claim that the tier fixes them.
 
 1. Create the spec issue in the tips repo and add it to the swarm project. Write the
    agent set in the body: designer names and the lead, tester names and the
-   merge-confirming tester, the reviewing designer. Each is an entry in
-   `config.toml`.
+   merge-confirming tester, the reviewing designer. Each is an `[agents.<entry>]`
+   entry in `config.toml`. The lead copies the set into each brief: `Implementer:`
+   and `Required reviews:`, testers first, the merge-confirming tester first of all.
 2. Prepare the designers' worktree by hand: `git worktree add --detach
    .worktrees/design-<spec issue> origin/main`, install deps, build, start Dexter per
    the [LSP guide](../../lsp/README.md). You own it and remove it when the feature
@@ -51,7 +52,10 @@ With one designer and no critic, review the PROPOSAL against this list yourself 
 accept it or send it back once.
 
 Then run `agent/teams/team.py start <brief>`. The handoff names the accepted
-PROPOSAL URL and brief revision.
+PROPOSAL URL and brief revision. `start` launches the implementer and the
+merge-confirming tester. When the implementer's first handoff asks you to launch the
+other reviewers, run `agent/teams/team.py review <pr> <entry>` for each; a tester's
+`blocked` report about an unlaunched reviewer means the same.
 
 ## Rounds and liveness
 

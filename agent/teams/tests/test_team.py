@@ -1,4 +1,4 @@
-"""Pair lifecycle tests: real Git and process trees, fake Herdr; never a live pane or client."""
+"""Brief lifecycle tests: real Git and process trees, fake Herdr; never a live pane or client."""
 
 import contextlib
 import json
@@ -39,21 +39,42 @@ checks_minutes = 30
 codex_approval = "never"
 claude_permission_mode = "bypassPermissions"
 
-[roles.dev]
+[agents.impl]
+role = "implementer"
 kind = "codex"
-model = "fixture-dev"
+model = "fixture-impl"
 effort = "xhigh"
 db_suffix = ""
 port_offset = 0
 
-[roles.test]
+[agents.tester]
+role = "tester"
 kind = "claude"
 model = "fixture-test"
 effort = "xhigh"
+advisor = "fixture-advisor"
 db_suffix = "r"
 port_offset = 1
 
+[agents.critic]
+role = "designer"
+kind = "claude"
+model = "fixture-critic"
+effort = "high"
+persona = "operations: failure and recovery paths"
+db_suffix = "c"
+port_offset = 2
+
+[agents.second]
+role = "tester"
+kind = "codex"
+model = "fixture-second"
+effort = "high"
+db_suffix = "s"
+port_offset = 3
+
 """
+BRIEF = "Implementer: impl\nRequired reviews: tester, critic\n"
 # A 40-column pane: "recent" keeps soft wraps; "recent-unwrapped" rejoins each wrapped
 # line, dropping whitespace at wrap points as the worst case for echo protection.
 PANE_SCREEN = r"""
@@ -452,11 +473,24 @@ if state.get('mix_fails'):
 Path('deps').mkdir(exist_ok=True)
 """
 
-FAKE_GH = (
-    "#!/bin/sh\n"
-    'printf \'{"headRefOid":"%s","url":"https://github.com/o/r/pull/%s"}\\n\''
-    ' "$(cat "$GH_HEAD")" "$3"\n'
-)
+FAKE_GH = r"""#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+s = json.loads(Path(os.environ["HERDR_FIXTURE"]).read_text())
+a = sys.argv[1:]
+if a[:2] == ["issue", "view"]:
+    print(json.dumps({"body": s.get("issues", {}).get(a[2], "")}))
+elif a[:2] == ["pr", "view"]:
+    briefs = [{"number": int(n)} for n in s.get("pr_briefs", {}).get(a[2], [])]
+    view = {
+        "headRefOid": s.get("pr_head", ""),
+        "url": "https://github.com/o/r/pull/" + a[2],
+        "closingIssuesReferences": briefs,
+    }
+    print(json.dumps({key: view[key] for key in a[a.index("--json") + 1].split(",")}))
+else:
+    sys.exit("Unexpected gh call: " + repr(a))
+"""
 
 # One pane model for every pair: a pane with an agent has a client leading its foreground
 # group; a bare pane is its shell. `pane run` really executes the setup and keeps the result.
@@ -569,6 +603,7 @@ elif a[:2] == ["agent", "get"]:
 elif a[:2] == ["agent", "start"]:
     x = pane(opt("--pane"))
     x.update(agent=opt("--kind"), name=a[2], launch_argv=a, launch_env=x.get("env", {}))
+    x["agent_session"] = {"kind": "id", "value": "session-" + a[2]}
     x["agent_status"] = "blocked" if s.get("start_fails") else "idle"
     if s.get("wrong_start_root"):
         x["cwd"] = s["wrong_start_root"]
@@ -602,7 +637,6 @@ class PairLifecycleTest(unittest.TestCase):
             HERDR_FIXTURE=str(self.state_path),
             DOCKER_LOG=str(self.root / "docker-calls"),
             DOCKER_DBS=str(self.root / "databases"),
-            GH_HEAD=str(self.root / "pr-head"),
             DEXTER_ELIXIR_LIB_ROOT=str(self.stdlib),
             PATH=str(self.bin) + os.pathsep + os.environ["PATH"],
         )
@@ -646,7 +680,8 @@ class PairLifecycleTest(unittest.TestCase):
             (self.bin / name).chmod(0o755)
         execute(["git", "init", "-q", "-b", "main", str(self.repo)], env=self.env, check=True)
         (self.repo / ".gitignore").write_text(
-            ".codex/\n.agents/\n.dexter/\n.worktrees/\nagent/lsp/dexter/vendor/\ndeps/\ntmp/\n"
+            ".codex/\n.agents/\n.dexter/\n.worktrees/\nagent/lsp/dexter/vendor/\n"
+            "agent/teams/allocations/\ndeps/\ntmp/\n"
         )
         (self.repo / "agent/teams/team.py").write_text(SCRIPT.read_text())
         (self.repo / "agent/teams/config.toml").write_text(CONFIG)
@@ -657,7 +692,8 @@ class PairLifecycleTest(unittest.TestCase):
         self.commit("base")
         self.git("remote", "add", "origin", str(self.repo))
         self.git("update-ref", "refs/remotes/origin/main", "HEAD")
-        self.save({"workspaces": [], "panes": [], "events": []})
+        issues = {"29": BRIEF, "30": BRIEF, "31": "Implementer: impl\nRequired reviews: tester\n"}
+        self.save({"workspaces": [], "panes": [], "events": [], "issues": issues})
 
     def git(self, *args: str | Path, cwd: Path | None = None) -> str:
         return execute(
@@ -684,12 +720,18 @@ class PairLifecycleTest(unittest.TestCase):
     def pane(self, label: str) -> dict[str, Any]:
         return next(pane for pane in self.state()["panes"] if pane.get("label") == label)
 
+    def workspaces(self) -> list[str]:
+        return [w["label"] for w in self.state()["workspaces"]]
+
+    def record(self, slot: int) -> dict[str, Any]:
+        return json.loads((self.repo / f"agent/teams/allocations/{slot}.json").read_text())
+
     def clients_exit(self, slot: int) -> None:
-        """The pair's clients have exited: their panes are back at the shell."""
+        """The slot's clients have exited: their panes are back at the shell."""
         state = self.state()
         for pane in state["panes"]:
             if str(pane.get("label", "")).startswith(f"team-{slot}-"):
-                for key in ("agent", "name", "agent_status"):
+                for key in ("agent", "name", "agent_status", "agent_session"):
                     pane.pop(key, None)
         self.save(state)
 
@@ -706,17 +748,25 @@ class PairLifecycleTest(unittest.TestCase):
         assert (result.returncode == 0) == ok, result.stdout + result.stderr
         return result
 
-    def worktree(self, issue: str) -> Path:
-        return self.repo / ".worktrees" / issue
+    def worktree(self, name: str) -> Path:
+        return self.repo / ".worktrees" / name
 
-    def test_start_launches_developer_and_tester_in_one_prepared_worktree(self) -> None:
+    def push(self, wt: Path, message: str = "work", pr: str = "7", brief: str = "29") -> str:
+        """Commit in the worktree and report that head as the PR's pushed head."""
+        (wt / "tracked.txt").write_text(message + "\n")
+        head = self.commit(message, cwd=wt)
+        self.update(pr_head=head, pr_briefs={pr: [brief]})
+        return head
+
+    def test_start_launches_the_pair_in_one_prepared_worktree_and_records_it(self) -> None:
         self.team("start", "29")
         wt = self.worktree("29")
         assert self.git("branch", "--show-current", cwd=wt) == "task/29"
-        assert [w["label"] for w in self.state()["workspaces"]] == ["tips-team-1-29"]
-        dev, test = self.pane("team-1-dev"), self.pane("team-1-test")
-        assert (dev["agent"], test["agent"]) == ("codex", "claude")
-        assert dev["cwd"] == test["cwd"] == str(wt)
+        # One single-pane workspace per client, labelled with its live name.
+        assert self.workspaces() == ["team-1-impl", "team-1-tester"]
+        impl, tester = self.pane("team-1-impl"), self.pane("team-1-tester")
+        assert (impl["agent"], tester["agent"]) == ("codex", "claude")
+        assert impl["cwd"] == tester["cwd"] == str(wt)
         # Each client has its own database and port; both use the worktree's one Dexter.
         shared = {
             "PGPORT": "5433",
@@ -726,36 +776,45 @@ class PairLifecycleTest(unittest.TestCase):
             "TIPS_PROVIDER_ENV_FILE": str(self.repo / ".env"),
             "TIPS_DEXTER": str(wt / ".dexter/dexter.sh"),
         }
-        assert dev["launch_env"] == {
+        assert impl["launch_env"] == {
             **shared,
             "TIPS_DB_SUFFIX": "_t1",
             "TIPS_TEST_PORT": "4110",
             # Codex's sandbox cannot write the shared Hex cache; Claude keeps the default.
             "HEX_HOME": str(wt / "tmp/hex"),
         }
-        assert test["launch_env"] == {
+        assert tester["launch_env"] == {
             **shared,
             "TIPS_DB_SUFFIX": "_t1r",
             "TIPS_TEST_PORT": "4111",
             "HEX_HOME": None,
         }
-        dev_brief = dev["launch_argv"][-1]
-        argv = test["launch_argv"]
-        test_brief = argv[argv.index("--append-system-prompt") + 1]
-        assert dev_brief.startswith(
-            "You are team-1-dev, the developer for issue #29. Read agent/teams/README.md,"
+        impl_brief = impl["launch_argv"][-1]
+        argv = tester["launch_argv"]
+        tester_brief = argv[argv.index("--append-system-prompt") + 1]
+        assert impl_brief.startswith(
+            "You are impl, the implementer for brief #29; your Herdr name is team-1-impl. "
+            "Read agent/teams/README.md,"
         )
-        assert test_brief.startswith("You are team-1-test, the tester for issue #29.")
-        for text in (dev_brief, test_brief):
+        assert tester_brief.startswith(
+            "You are tester, the merge-confirming tester for brief #29; your Herdr name is "
+            "team-1-tester."
+        )
+        assert "team.py turn <pr> tester" in impl_brief
+        assert "team.py turn <pr> impl" in tester_brief
+        assert "attributed to tester on their second line" in tester_brief
+        for text in (impl_brief, tester_brief):
             assert f"TIPS_DEXTER={wt / '.dexter/dexter.sh'}" in text
             assert "README restart rule" in text
             assert "roles/" not in text
+            assert "persona" not in text
         # Claude holds its brief as a system prompt, so it alone needs a first message.
-        assert self.events("agent", "prompt") == [["agent", "prompt", "team-1-test", "Begin."]]
-        assert {"fixture-dev", "never"} <= set(dev["launch_argv"])
+        assert self.events("agent", "prompt") == [["agent", "prompt", "team-1-tester", "Begin."]]
+        assert {"fixture-impl", "never"} <= set(impl["launch_argv"])
         assert "fixture-test" in argv
-        assert argv[argv.index("--advisor") + 1] == "fable"
-        assert "--advisor" not in dev["launch_argv"]
+        # The advisor is the entry's own setting, not derived from the model name.
+        assert argv[argv.index("--advisor") + 1] == "fixture-advisor"
+        assert "--advisor" not in impl["launch_argv"]
         plugins = json.loads(argv[argv.index("--settings") + 1])["enabledPlugins"]
         assert plugins == {
             "mix-credo@elixir-agent-tools": True,
@@ -768,6 +827,47 @@ class PairLifecycleTest(unittest.TestCase):
         first_launch = self.state()["events"].index(self.events("agent", "start")[0])
         assert self.state()["events"].index(self.events("dexter")[-1]) < first_launch
         assert self.git("status", "--porcelain", cwd=wt) == ""
+        # The record holds what was launched: restart, handoff and teardown read it.
+        record = self.record(1)
+        assert {k: v for k, v in record.items() if k != "agents"} == {
+            "slot": 1,
+            "brief": "29",
+            "worktree": str(wt),
+            "implementer": "impl",
+            "testers": ["tester"],
+            "designers": ["critic"],
+        }
+        assert record["agents"]["tester"] == {
+            "entry": "tester",
+            "role": "merge-confirming tester",
+            "name": "team-1-tester",
+            "kind": "claude",
+            "worktree": str(wt),
+            "db_suffix": "_t1r",
+            "port": 4111,
+            "workspace": tester["workspace_id"],
+            "pane": tester["pane_id"],
+            "session": "session-team-1-tester",
+        }
+        assert set(record["agents"]) == {"impl", "tester"}
+
+    def test_brief_roster_is_validated_before_any_change(self) -> None:
+        cases = {
+            "40": ("Required reviews: tester\n", "needs an Implementer: and a Required reviews"),
+            "41": ("Implementer: impl\n", "needs an Implementer: and a Required reviews"),
+            "42": ("Implementer: impl\nRequired reviews: tester, ghost\n", "not a configured"),
+            "43": ("Implementer: tester\nRequired reviews: critic\n", "not an implementer"),
+            "44": ("Implementer: impl\nRequired reviews: critic\n", "names no tester"),
+            "45": ("Implementer: impl\nRequired reviews: tester, impl\n", "cannot review"),
+            "46": ("Implementer: impl\nRequired reviews: tester, tester\n", "repeated name"),
+        }
+        self.update(issues={**self.state()["issues"], **{k: v[0] for k, v in cases.items()}})
+        for brief, (_, message) in cases.items():
+            with self.subTest(brief=brief):
+                assert message in self.team("start", brief, ok=False).stderr
+                assert not self.worktree(brief).exists()
+        assert not self.state()["workspaces"]
+        assert not (self.repo / "agent/teams/allocations").exists()
 
     def test_repeated_start_keeps_the_running_pair(self) -> None:
         self.team("start", "29")
@@ -777,44 +877,66 @@ class PairLifecycleTest(unittest.TestCase):
         later = self.state()["events"][before:]
         assert not any(e[:2] in (["agent", "start"], ["pane", "run"]) for e in later)
         assert not any(e[0] == "mix" for e in later)
-        assert len(self.state()["workspaces"]) == 1
+        assert self.workspaces() == ["team-1-impl", "team-1-tester"]
+
+    def test_changed_roster_refuses_a_relaunch_until_the_brief_is_stopped(self) -> None:
+        self.team("start", "29")
+        shrunk = "Implementer: impl\nRequired reviews: tester\n"
+        self.update(issues={**self.state()["issues"], "29": shrunk})
+        refused = self.team("start", "29", ok=False)
+        assert "roster changed since launch" in refused.stderr
+        assert self.record(1)["designers"] == ["critic"]
 
     def test_missing_client_is_relaunched_with_unfinished_work_untouched(self) -> None:
         self.team("start", "29")
         wt = self.worktree("29")
         (wt / "tracked.txt").write_text("unfinished work\n")
-        for model in ("claude-fable-5-1", ""):
-            with self.subTest(model=model):
-                config = self.repo / "agent/teams/config.toml"
-                config.write_text(CONFIG.replace('model = "fixture-test"', f'model = "{model}"'))
-                state = self.state()
-                tester = next(pane for pane in state["panes"] if pane["label"] == "team-1-test")
-                for key in ("agent", "name", "agent_status"):
-                    del tester[key]
-                self.save(state)
-                before = len(self.events("agent", "start"))
-                self.team("start", "29")
-                assert self.events("agent", "start")[before:][0][2] == "team-1-test"
-                assert len(self.events("agent", "start")) == before + 1
-                assert "--advisor" not in self.pane("team-1-test")["launch_argv"]
-                assert (wt / "tracked.txt").read_text() == "unfinished work\n"
-                # A reused worktree keeps its own dependency state.
-                assert len(self.events("mix")) == 1
+        state = self.state()
+        tester = next(pane for pane in state["panes"] if pane["label"] == "team-1-tester")
+        for key in ("agent", "name", "agent_status", "agent_session"):
+            del tester[key]
+        self.save(state)
+        before = len(self.events("agent", "start"))
+        self.team("start", "29")
+        assert self.events("agent", "start")[before:][0][2] == "team-1-tester"
+        assert len(self.events("agent", "start")) == before + 1
+        assert (wt / "tracked.txt").read_text() == "unfinished work\n"
+        # A reused worktree keeps its own dependency state; the pane is reused too.
+        assert len(self.events("mix")) == 1
+        assert self.workspaces() == ["team-1-impl", "team-1-tester"]
 
-    def test_each_issue_takes_its_own_slot_until_none_is_free(self) -> None:
+    def test_vanished_workspace_gets_a_new_pane_recorded_in_place(self) -> None:
+        self.team("start", "29")
+        old = self.record(1)["agents"]["impl"]
+        state = self.state()
+        state["workspaces"] = [w for w in state["workspaces"] if w["label"] != "team-1-impl"]
+        state["panes"] = [p for p in state["panes"] if p.get("label") != "team-1-impl"]
+        self.save(state)
+        self.team("start", "29")
+        new = self.record(1)["agents"]["impl"]
+        assert new["workspace"] != old["workspace"]
+        assert self.pane("team-1-impl")["pane_id"] == new["pane"]
+        assert self.workspaces() == ["team-1-tester", "team-1-impl"]
+        assert len(self.events("agent", "start")) == 3
+
+    def test_each_brief_takes_its_own_slot_from_the_records_until_none_is_free(self) -> None:
         path = self.repo / "agent/teams/config.toml"
         path.write_text(CONFIG.replace("max_teams = 6", "max_teams = 2"))
         self.team("start", "29")
         self.team("start", "30")
-        second = self.pane("team-2-dev")
+        second = self.pane("team-2-impl")
         assert second["cwd"] == str(self.worktree("30"))
         assert second["launch_env"]["TIPS_DB_SUFFIX"] == "_t2"
         assert second["launch_env"]["TIPS_TEST_PORT"] == "4120"
-        assert self.pane("team-1-dev")["cwd"] == str(self.worktree("29"))
-        refused = self.team("start", "31", ok=False)
+        assert self.pane("team-1-impl")["cwd"] == str(self.worktree("29"))
+        self.update(issues={**self.state()["issues"], "32": BRIEF})
+        refused = self.team("start", "32", ok=False)
         assert "No free slot" in refused.stderr
-        assert not self.worktree("31").exists()
-        assert len(self.state()["workspaces"]) == 2
+        assert not self.worktree("32").exists()
+        assert len(self.state()["workspaces"]) == 4
+        # Slots come from the records, so a slot whose workspaces are gone is still taken.
+        self.update(workspaces=[], panes=[])
+        assert "No free slot" in self.team("start", "32", ok=False).stderr
 
     def test_foreign_client_in_the_task_worktree_refuses_before_any_change(self) -> None:
         stray = {
@@ -842,17 +964,18 @@ class PairLifecycleTest(unittest.TestCase):
     def test_failed_preparation_never_launches_a_client(self) -> None:
         failures = (
             ("31", {"mix_fails": True}, "fixture mix failed"),
-            ("32", {"dexter_fails": True}, "fixture Dexter failed"),
-            ("33", {"dexter_empty": True}, "no MixProject"),
+            ("30", {"dexter_fails": True}, "fixture Dexter failed"),
+            ("29", {"dexter_empty": True}, "no MixProject"),
         )
         healthy = {"mix_fails": False, "dexter_fails": False, "dexter_empty": False}
-        for issue, flags, message in failures:
+        for brief, flags, message in failures:
             with self.subTest(flags=flags):
                 self.update(**{**healthy, **flags})
-                assert message in self.team("start", issue, ok=False).stderr
+                assert message in self.team("start", brief, ok=False).stderr
         self.update(**healthy)
         # Missing tools are refused before a worktree exists.
         self.env["DEXTER_ELIXIR_LIB_ROOT"] = str(self.root / "no-sources")
+        self.update(issues={**self.state()["issues"], "34": BRIEF})
         assert "sources are missing" in self.team("start", "34", ok=False).stderr
         self.env["DEXTER_ELIXIR_LIB_ROOT"] = str(self.stdlib)
         (self.repo / "agent/lsp/dexter/vendor/dexter").unlink()
@@ -860,6 +983,7 @@ class PairLifecycleTest(unittest.TestCase):
         assert not self.worktree("34").exists()
         assert not self.events("agent", "start")
         assert not self.state()["workspaces"]
+        assert not (self.repo / "agent/teams/allocations").exists()
 
     def test_failed_dependency_fetch_is_retried_on_the_next_start(self) -> None:
         self.update(mix_fails=True)
@@ -885,10 +1009,10 @@ class PairLifecycleTest(unittest.TestCase):
         assert not self.events("agent", "start")
 
     def test_client_started_blocked_or_in_another_root_is_reported(self) -> None:
-        for issue, flags in (("29", {"start_fails": True}), ("30", {"wrong_start_root": "/"})):
+        for brief, flags in (("29", {"start_fails": True}), ("30", {"wrong_start_root": "/"})):
             with self.subTest(flags=flags):
                 self.update(**{"start_fails": False, "wrong_start_root": "", **flags})
-                refused = self.team("start", issue, ok=False)
+                refused = self.team("start", brief, ok=False)
                 assert "unexpected state or root" in refused.stderr
                 assert len(self.events("agent", "start")) == 1
                 self.update(events=[])
@@ -898,6 +1022,12 @@ class PairLifecycleTest(unittest.TestCase):
         path.write_text(CONFIG.replace("port_base = 4100", 'port_base = "wrong"'))
         refused = self.team("start", "29", ok=False)
         assert "team.port_base must be int; received 'wrong'" in refused.stderr
+        path.write_text(CONFIG.replace('role = "designer"', 'role = "architect"'))
+        assert "agents.critic.role must be one of" in self.team("start", "29", ok=False).stderr
+        path.write_text(CONFIG.replace('advisor = "fixture-advisor"', 'adviser = "x"'))
+        assert "unknown keys ['adviser']" in self.team("start", "29", ok=False).stderr
+        path.write_text(CONFIG.replace('model = "fixture-impl"', 'model = "x"\nadvisor = "y"'))
+        assert "advisor applies to Claude" in self.team("start", "29", ok=False).stderr
         # Slot 10's databases would match slot 1's stem: refuse before any database access.
         path.write_text(CONFIG.replace("max_teams = 6", "max_teams = 10"))
         assert "overlapping database" in self.team("stop", "29", ok=False).stderr
@@ -926,7 +1056,7 @@ class PairLifecycleTest(unittest.TestCase):
         config = tomllib.loads((self.worktree("29") / ".codex/config.toml").read_text())
         assert set(config) == {"plugins"}
         assert config["plugins"]["mix-credo@elixir-agent-tools"]["enabled"] is True
-        assert not any("mcp_servers" in arg for arg in self.pane("team-1-dev")["launch_argv"])
+        assert not any("mcp_servers" in arg for arg in self.pane("team-1-impl")["launch_argv"])
 
     @unittest.skipUnless(
         os.environ.get("TIPS_TEST_REAL_CODEX"), "opt-in installed Codex config check"
@@ -937,7 +1067,7 @@ class PairLifecycleTest(unittest.TestCase):
         legacy.write_text('[mcp_servers.elixir-lsp]\ncommand = "/usr/bin/false"\n')
         self.team("start", "29")
         wt = self.worktree("29")
-        launch = self.pane("team-1-dev")["launch_argv"]
+        launch = self.pane("team-1-impl")["launch_argv"]
         args = launch[launch.index("--") + 1 : -1]
         config = tomllib.loads((wt / ".codex/config.toml").read_text())
         # A CLI trust override does not prove project-file loading. Parse the
@@ -978,9 +1108,9 @@ class PairLifecycleTest(unittest.TestCase):
         self.commit("mix fixture")
 
     @unittest.skipUnless(os.environ.get("TIPS_TEST_REAL_DEXTER"), REAL_DEXTER)
-    def test_two_pairs_use_isolated_real_daemons(self) -> None:
+    def test_two_briefs_use_isolated_real_daemons(self) -> None:
         self.use_real_dexter()
-        roots = [self.worktree("31"), self.worktree("32")]
+        roots = [self.worktree("29"), self.worktree("30")]
         for root in roots:
             self.addCleanup(execute, ["/bin/sh", root / ".dexter/dexter.sh", "stop", "--force"])
             self.team("start", root.name)
@@ -1013,84 +1143,178 @@ class PairLifecycleTest(unittest.TestCase):
         wait_until_stopped(wt)
         assert not wt.exists()
 
-    def push(self, wt: Path, message: str = "work") -> str:
-        """Commit in the worktree and report that head as the PR's pushed head."""
-        (wt / "tracked.txt").write_text(message + "\n")
-        head = self.commit(message, cwd=wt)
-        (self.root / "pr-head").write_text(head)
-        return head
-
     def test_turn_to_tester_needs_the_clean_pushed_head_then_rings_with_it(self) -> None:
         self.team("start", "29")
-        wt, dev = self.worktree("29"), self.pane("team-1-dev")["pane_id"]
+        wt, impl = self.worktree("29"), self.pane("team-1-impl")["pane_id"]
         pushed = self.push(wt)
         (wt / "scratch.txt").write_text("not committed\n")
-        refused = self.team("turn", "7", "test", cwd=wt, pane=dev, ok=False)
+        refused = self.team("turn", "7", "tester", cwd=wt, pane=impl, ok=False)
         assert "uncommitted or untracked files" in refused.stderr
         (wt / "scratch.txt").unlink()
-        (self.root / "pr-head").write_text("0" * 40)
-        refused = self.team("turn", "7", "test", cwd=wt, pane=dev, ok=False)
+        self.update(pr_head="0" * 40)
+        refused = self.team("turn", "7", "tester", cwd=wt, pane=impl, ok=False)
         assert f"HEAD is {pushed}, not the PR head" in refused.stderr
-        assert not self.events("agent", "prompt", "team-1-test", "Your turn")
-        (self.root / "pr-head").write_text(pushed)
-        self.team("turn", "7", "test", cwd=wt, pane=dev)
-        ring = self.events("agent", "prompt")[-1]
-        assert ring[2] == "team-1-test"
+        assert not self.events("agent", "prompt", "team-1-tester", "Your turn")
+        self.update(pr_head=pushed)
+        # The reviewing designer is not launched yet: the dispatcher must provision it.
+        unreached = self.team("turn", "7", "tester", cwd=wt, pane=impl, ok=False)
+        assert "Rang team-1-tester" in unreached.stdout
+        assert "dispatcher was not reached to launch critic" in unreached.stderr
+        assert "Report blocked" in unreached.stderr
+        dispatcher = {"pane_id": "wD:p1", "name": "dispatcher", "agent": "claude"}
+        self.update(strays=[{**dispatcher, "cwd": str(self.repo)}])
+        self.team("turn", "7", "tester", cwd=wt, pane=impl)
+        ring, ask = self.events("agent", "prompt")[-2:]
+        assert ring[2] == "team-1-tester"
         assert "https://github.com/o/r/pull/7" in ring[3]
         assert pushed in ring[3]
         assert "agent/skills/reviewing-code/SKILL.md from this worktree" in ring[3]
+        assert "attributed to tester" in ring[3]
+        assert "team.py turn 7 impl" in ring[3]
+        assert "critic (team-1-critic)" in ring[3]
+        assert "one --record per reviewer" in ring[3]
+        assert ask[2:] == [
+            "dispatcher",
+            "https://github.com/o/r/pull/7 review: run agent/teams/team.py review 7 critic",
+        ]
 
-    def test_turn_to_developer_always_rings_and_reports_a_checkout_problem(self) -> None:
-        self.team("start", "29")
-        wt, tester = self.worktree("29"), self.pane("team-1-test")["pane_id"]
-        self.push(wt)
-        self.team("turn", "7", "dev", cwd=wt, pane=tester)
+    def test_turn_to_tester_without_other_reviewers_asks_nobody_else(self) -> None:
+        self.team("start", "31")
+        wt, impl = self.worktree("31"), self.pane("team-1-impl")["pane_id"]
+        self.push(wt, brief="31")
+        self.team("turn", "7", "tester", cwd=wt, pane=impl)
         ring = self.events("agent", "prompt")[-1]
-        assert ring[2] == "team-1-dev"
+        assert ring[2] == "team-1-tester"
+        assert "publish it without waiting for CI" in ring[3]
+        assert "--record per reviewer" not in ring[3]
+        assert not self.events("agent", "prompt", "dispatcher")
+
+    def test_turn_to_implementer_always_rings_and_reports_a_checkout_problem(self) -> None:
+        self.team("start", "29")
+        wt, tester = self.worktree("29"), self.pane("team-1-tester")["pane_id"]
+        self.push(wt)
+        self.team("turn", "7", "impl", cwd=wt, pane=tester)
+        ring = self.events("agent", "prompt")[-1]
+        assert ring[2] == "team-1-impl"
         assert "pr_review.py list 7" in ring[3]
         assert "agent/skills/developing-software/SKILL.md from this worktree" in ring[3]
         assert "Fix the checkout first" not in ring[3]
-        # Only the developer can repair the tree, so a problem is reported, not refused.
+        assert not self.events("agent", "prompt", "dispatcher")
+        # Only the implementer can repair the tree, so a problem is reported, not refused.
         (wt / "scratch.txt").write_text("left behind\n")
-        self.team("turn", "7", "dev", cwd=wt, pane=tester)
+        self.team("turn", "7", "impl", cwd=wt, pane=tester)
         assert "Fix the checkout first" in self.events("agent", "prompt")[-1][3]
 
-    def test_turn_refuses_its_own_role_and_a_pane_outside_the_pair(self) -> None:
+    def test_turn_refuses_its_own_entry_a_reviewer_and_a_pane_outside_the_pair(self) -> None:
         self.team("start", "29")
-        wt, dev = self.worktree("29"), self.pane("team-1-dev")["pane_id"]
+        wt, impl = self.worktree("29"), self.pane("team-1-impl")["pane_id"]
         self.push(wt)
         before = len(self.events("agent", "prompt"))
-        own = self.team("turn", "7", "dev", cwd=wt, pane=dev, ok=False)
-        assert "this pane is team-1-dev" in own.stderr
-        unnamed = self.team("turn", "7", "test", cwd=wt, ok=False)
+        own = self.team("turn", "7", "impl", cwd=wt, pane=impl, ok=False)
+        assert "this pane is impl" in own.stderr
+        # Reviewers never hold the pair checkout: they are rung by name, not by turn.
+        critic = self.team("turn", "7", "critic", cwd=wt, pane=impl, ok=False)
+        assert "between impl and tester" in critic.stderr
+        unnamed = self.team("turn", "7", "tester", cwd=wt, ok=False)
         assert "HERDR_PANE_ID is not set" in unnamed.stderr
-        assert "Usage:" in self.team("turn", "7", "lead", cwd=wt, pane=dev, ok=False).stderr
+        assert "Usage:" in self.team("turn", "7", "Lead", cwd=wt, pane=impl, ok=False).stderr
         assert len(self.events("agent", "prompt")) == before
 
-    def test_stop_retires_a_clean_merged_pair_and_leaves_the_other_pair_alone(self) -> None:
+    def test_review_pins_the_reviewer_in_its_own_worktree_at_the_pr_head(self) -> None:
+        self.team("start", "29")
+        head = self.push(self.worktree("29"))
+        self.team("review", "7", "critic")
+        wt = self.worktree("review-7-critic")
+        assert self.git("rev-parse", "HEAD", cwd=wt) == head
+        assert self.git("branch", "--show-current", cwd=wt) == ""
+        critic = self.pane("team-1-critic")
+        assert critic["cwd"] == str(wt)
+        assert critic["launch_env"]["TIPS_DB_SUFFIX"] == "_t1c"
+        assert critic["launch_env"]["TIPS_TEST_PORT"] == "4112"
+        assert critic["launch_env"]["TIPS_DEXTER"] == str(wt / ".dexter/dexter.sh")
+        argv = critic["launch_argv"]
+        brief = argv[argv.index("--append-system-prompt") + 1]
+        assert brief.startswith(
+            "You are critic, the reviewing designer for brief #29; your Herdr name is "
+            "team-1-critic. Your persona: operations: failure and recovery paths. "
+            f"Review PR https://github.com/o/r/pull/7 from this worktree, pinned at {head};"
+        )
+        assert "herdr agent prompt team-1-tester" in brief
+        assert "Never run agent/teams/team.py turn" in brief
+        assert "--advisor" not in argv
+        assert self.workspaces() == ["team-1-impl", "team-1-tester", "team-1-critic"]
+        # The reviewer's worktree is prepared like the pair's, for one client.
+        assert ["mix", str(wt), "deps.get", "--check-locked"] in self.events("mix")
+        assert ["dexter", str(wt), "reindex"] in self.events("dexter")
+        allocation = self.record(1)["agents"]["critic"]
+        assert (allocation["pr"], allocation["head"]) == ("7", head)
+        assert allocation["worktree"] == str(wt)
+        assert allocation["session"] == "session-team-1-critic"
+        # A rerun keeps the running reviewer and its worktree.
+        before = len(self.state()["events"])
+        assert "Already running" in self.team("review", "7", "critic").stdout
+        assert not any(e[:2] == ["agent", "start"] for e in self.state()["events"][before:])
+
+    def test_review_refuses_pair_entries_unknown_reviewers_and_unlinked_prs(self) -> None:
+        self.team("start", "29")
+        head = self.push(self.worktree("29"))
+        for entry, message in (
+            ("tester", "not an additional reviewer"),
+            ("impl", "not an additional reviewer"),
+            ("second", "not an additional reviewer"),
+        ):
+            with self.subTest(entry=entry):
+                assert message in self.team("review", "7", entry, ok=False).stderr
+        self.update(pr_briefs={"7": []})
+        assert "exactly one started brief" in self.team("review", "7", "critic", ok=False).stderr
+        self.update(pr_briefs={"7": ["29"]}, pr_head="0" * 40)
+        assert "not on origin" in self.team("review", "7", "critic", ok=False).stderr
+        assert not self.worktree("review-7-critic").exists()
+        assert self.workspaces() == ["team-1-impl", "team-1-tester"]
+        assert head  # the pushed head stayed unused
+
+    def test_stop_retires_a_clean_merged_brief_with_its_reviewer_and_leaves_the_other(self) -> None:
         self.team("start", "29")
         self.team("start", "30")
         wt = self.worktree("29")
         self.push(wt)
+        self.team("review", "7", "critic")
+        review = self.worktree("review-7-critic")
         self.git("merge", "-q", "--ff-only", "task/29")
         (self.root / "databases").write_text(
-            "tips_test_t1\ntips_test_t1r\ntips_test_t1r2\ntips_test_t2\ntips_test_t2r\n"
-            "tips_dev_t1r\ntips_dev_t2r\n"
+            "tips_test_t1\ntips_test_t1r\ntips_test_t1r2\ntips_test_t1c\ntips_test_t2\n"
+            "tips_test_t2r\ntips_dev_t1r\ntips_dev_t2r\n"
         )
         self.clients_exit(1)
         self.team("stop", "29")
         assert not wt.exists()
+        assert not review.exists()
         assert self.git("branch", "--list", "task/29") == ""
-        assert [w["label"] for w in self.state()["workspaces"]] == ["tips-team-2-30"]
+        assert self.workspaces() == ["team-2-impl", "team-2-tester"]
+        assert not (self.repo / "agent/teams/allocations/1.json").exists()
+        assert self.record(2)["brief"] == "30"
         calls = (self.root / "docker-calls").read_text()
-        for database in ("tips_test_t1", "tips_test_t1r", "tips_test_t1r2", "tips_dev_t1r"):
+        for database in ("tips_test_t1", "tips_test_t1r", "tips_test_t1r2", "tips_test_t1c"):
             assert f'DROP DATABASE "{database}"' in calls
+        assert 'DROP DATABASE "tips_dev_t1r"' in calls
         assert "_t2" not in calls.replace("tips_test_t1r2", "")
-        # The shared worktree's daemon is stopped once, before the checkout is removed.
-        assert [e[1:] for e in self.events("dexter") if e[-1] == "stop"] == [[str(wt), "stop"]]
+        # Each worktree's daemon is stopped once, before the checkout is removed.
+        stops = sorted(e[1] for e in self.events("dexter") if e[-1] == "stop")
+        assert stops == sorted([str(wt), str(review)])
         assert self.worktree("30").is_dir()
         assert self.git("branch", "--list", "task/30") != ""
-        assert self.pane("team-2-dev")["agent"] == "codex"
+        assert self.pane("team-2-impl")["agent"] == "codex"
+
+    def test_stop_after_herdr_lost_the_workspaces_retires_from_the_record(self) -> None:
+        self.team("start", "29")
+        wt = self.worktree("29")
+        self.push(wt)
+        self.git("merge", "-q", "--ff-only", "task/29")
+        self.update(workspaces=[], panes=[])
+        self.team("stop", "29")
+        assert not wt.exists()
+        assert not (self.repo / "agent/teams/allocations/1.json").exists()
+        assert not any(e[:2] == ["pane", "get"] for e in self.state()["events"])
 
     def test_stop_preserves_dirty_and_unmerged_work(self) -> None:
         self.team("start", "29")
@@ -1107,6 +1331,7 @@ class PairLifecycleTest(unittest.TestCase):
         assert (wt / "uncommitted").read_text() == "keep"
         assert self.git("branch", "--list", "task/29") != ""
         assert self.state()["workspaces"]
+        assert self.record(1)["brief"] == "29"
 
     def test_worktree_dirtied_during_shutdown_is_preserved_after_clients_exit(self) -> None:
         self.team("start", "29")
@@ -1120,7 +1345,7 @@ class PairLifecycleTest(unittest.TestCase):
         assert self.state()["workspaces"]
         assert not (self.root / "docker-calls").exists()
 
-    def test_failed_daemon_stop_preserves_the_pair_until_it_succeeds(self) -> None:
+    def test_failed_daemon_stop_preserves_the_brief_until_it_succeeds(self) -> None:
         self.team("start", "29")
         wt = self.worktree("29")
         self.clients_exit(1)
@@ -1132,12 +1357,13 @@ class PairLifecycleTest(unittest.TestCase):
         self.team("stop", "29", ok=False)
         assert wt.exists()
         assert not (self.root / "docker-calls").exists()
+        assert self.record(1)["brief"] == "29"
         self.env["DEXTER_STOP_FAIL"] = "0"
         self.team("stop", "29")
         assert log.read_text() == "stop\nstop\n"
         assert not wt.exists()
 
-    def test_stop_of_an_unknown_issue_removes_nothing(self) -> None:
+    def test_stop_of_an_unknown_brief_removes_nothing(self) -> None:
         self.team("start", "29")
         result = self.team("stop", "99")
         assert "nothing removed" in result.stdout

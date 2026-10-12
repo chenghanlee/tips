@@ -7,12 +7,14 @@ For humans, from the repository root. Agents read the [pair workflow](README.md)
 ```
 USER         set goals and constraints · answer decisions · start the dispatcher once
 DISPATCHER   assess milestone → prioritize eligible work → set Ready → start pair → set Active
-DEVELOPER    code → push → PR with "Closes #<issue>" + auto-merge → team.py turn <pr> test
-TESTER       review → findings → team.py turn <pr> dev      (loop until no P0 or P1)
-TESTER       LGTM → publish_review.py
-GITHUB       checks + status + resolved threads → merge → issue closes → Done
+IMPLEMENTER  code → push → PR with "Closes #<brief>" + auto-merge → team.py turn <pr> <tester>
+DISPATCHER   team.py review <pr> <entry> for each other reviewer the brief names
+TESTER       review → findings → team.py turn <pr> <implementer>   (loop until no P0 or P1)
+REVIEWERS    review from pinned worktrees → ring the tester with the review URL
+TESTER       all LGTM → publish_review.py --record per reviewer
+GITHUB       checks + status + resolved threads → merge → brief closes → Done
 TESTER       confirm the merge → ring the dispatcher "done"
-DISPATCHER   team.py stop <issue> → next
+DISPATCHER   team.py stop <brief> → next
 ```
 
 ## One-time setup
@@ -137,14 +139,14 @@ Start only one. Pairs notify it by the name `dispatcher`. It chooses and prepare
 
 ## Configuration
 
-Edit [config.toml](config.toml): the number of pairs, client, model and effort per role, the dispatcher's model, effort and compaction point, port and database allocation, permissions and time budgets. Scripts read the main checkout's file; `TIPS_TEAM_CONFIG=/absolute/path` selects a staged one. Settings apply at the next launch.
+Edit [config.toml](config.toml): the number of slots, the `[agents.<entry>]` registry (role, client, model, effort, optional advisor and persona, database suffix and port offset per entry), the dispatcher's model, effort and compaction point, port and database allocation, permissions and time budgets. A brief names entries in its `Implementer:` and `Required reviews:` lines. Configured entries are not live instances: each launch writes `agent/teams/allocations/<slot>.json`, and restart, handoff and teardown read that record. Scripts read the main checkout's file; `TIPS_TEAM_CONFIG=/absolute/path` selects a staged one. Settings apply at the next launch.
 
-Claude launches with `--advisor fable` when its configured model is nonempty and does not name Fable; this requires Fable access. Fable models and an empty model (the client default) leave the advisor setting to the client.
+A Claude entry launches with `--advisor <advisor>` when its `advisor` is set; this requires access to that model. Entries without one leave the advisor setting to the client. The dispatcher launches with `--advisor fable` when its model is nonempty and does not name Fable.
 
 | Allocation | Components |
 |---|---|
-| Database suffix | `team.db_suffix_prefix`, slot number, `roles.<role>.db_suffix` |
-| Test port | `team.port_base` + slot number × `team.port_stride` + role `port_offset` |
+| Database suffix | `team.db_suffix_prefix`, slot number, `agents.<entry>.db_suffix` |
+| Test port | `team.port_base` + slot number × `team.port_stride` + entry `port_offset` |
 
 `timeouts.dexter_startup_seconds` bounds the Dexter warm-up at start, Elixir version detection and the daemon stop at retirement. `TIPS_DEXTER_HOME` selects another shared Dexter build directory.
 

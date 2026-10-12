@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Pair lifecycle in Herdr: start, hand over and stop one developer-tester pair per issue."""
+"""Brief lifecycle in Herdr: start the pair, hand the checkout over, add reviewers, stop.
+
+Configured agents are `[agents.<entry>]` in config.toml. A launch allocates a slot and writes
+`agent/teams/allocations/<slot>.json`: every launched client with its live Herdr name,
+worktree, database suffix, port, pane and session. Restart, handoff and teardown read that
+record, never the current configuration.
+"""
 
 import json
 import os
@@ -18,10 +24,13 @@ from pathlib import Path
 from typing import NotRequired, TypedDict, cast
 
 
-class Role(TypedDict):
+class AgentSpec(TypedDict):
+    role: str
     kind: str
     model: str
     effort: str
+    advisor: NotRequired[str]
+    persona: NotRequired[str]
     port_offset: int
     db_suffix: str
 
@@ -39,7 +48,36 @@ class Config(TypedDict):
     team: TeamSettings
     timeouts: dict[str, int]
     launch: dict[str, str]
-    roles: dict[str, Role]
+    agents: dict[str, AgentSpec]
+
+
+class Allocation(TypedDict):
+    """One launched client. `pr` and `head` are set for reviewers of a pushed PR."""
+
+    entry: str
+    role: str
+    name: str
+    kind: str
+    worktree: str
+    db_suffix: str
+    port: int
+    workspace: str
+    pane: str
+    session: str
+    pr: NotRequired[str]
+    head: NotRequired[str]
+
+
+class Record(TypedDict):
+    """A slot's allocation record: the brief, its roster and every launched client."""
+
+    slot: int
+    brief: str
+    worktree: str
+    implementer: str
+    testers: list[str]
+    designers: list[str]
+    agents: dict[str, Allocation]
 
 
 class Process(TypedDict):
@@ -64,6 +102,7 @@ class Entity(TypedDict):
     agent_status: str
     cwd: str
     foreground_cwd: str
+    agent_session: dict[str, object]
 
 
 class HerdrResult(TypedDict):
@@ -78,8 +117,11 @@ class HerdrResult(TypedDict):
 
 
 ProcessRows = dict[int, tuple[int, str]]
-ROLES = ("dev", "test")
-ROLE_TITLES = {"dev": "developer", "test": "tester"}
+ROLES = ("designer", "implementer", "tester")
+ENTRY = r"[a-z0-9][a-z0-9-]*"
+# The live name of a launched client; the entry may be allocated in several slots.
+LIVE_NAME = re.compile(r"team-([0-9]+)-(" + ENTRY + ")")
+AGENT_FIELDS = {"role", "kind", "model", "effort", "advisor", "persona", "port_offset", "db_suffix"}
 # Dexter's query gives up this long after --wait: its allowance to reach the daemon.
 DEXTER_CONNECT_SECONDS = 30
 # A cold Hex cache downloads every package; anything slower is a hung fetch.
@@ -184,9 +226,12 @@ def require_type(value: object, expected: type[str] | type[int], label: str) -> 
 
 def entity_fields(value: object, label: str) -> None:
     fields = object_fields(value, label)
-    for key in Entity.__annotations__:
+    for key, annotation in Entity.__annotations__.items():
         if key in fields and fields[key] is not None:
-            require_type(fields[key], str, f"{label}.{key}")
+            if annotation is str:
+                require_type(fields[key], str, f"{label}.{key}")
+            else:
+                object_fields(fields[key], f"{label}.{key}")
 
 
 def object_list(value: object, label: str) -> list[dict[str, object]]:
@@ -229,6 +274,13 @@ def herdr(*args: str) -> HerdrResult:
     if args[:2] == ("pane", "run"):
         return cast(HerdrResult, {})  # pane run succeeds with empty stdout.
     return parse_herdr(output)
+
+
+def session_id(agent: Entity) -> str:
+    """The client's own session id as Herdr reports it; empty when Herdr has none yet."""
+    session = agent.get("agent_session")
+    value = session.get("value") if session else None
+    return value if isinstance(value, str) else ""
 
 
 def processes() -> ProcessRows:
@@ -389,12 +441,26 @@ def validate_config_fields(path: Path, value: Config) -> None:
     policies = object_fields(fields.get("launch"), f"{path}: launch")
     for key in ("codex_approval", "claude_permission_mode"):
         require_type(policies.get(key), str, f"{path}: launch.{key}")
-    roles = object_fields(fields.get("roles"), f"{path}: roles")
-    for name in ROLES:
-        role = object_fields(roles.get(name), f"{path}: roles.{name}")
-        for key in ("kind", "model", "effort", "db_suffix"):
-            require_type(role.get(key), str, f"{path}: roles.{name}.{key}")
-        require_type(role.get("port_offset"), int, f"{path}: roles.{name}.port_offset")
+    agents = object_fields(fields.get("agents"), f"{path}: agents")
+    if not agents:
+        raise RuntimeError(f"{path}: agents must name at least one entry")
+    for name, entry in agents.items():
+        validate_agent_fields(f"{path}: agents.{name}", name, entry)
+
+
+def validate_agent_fields(label: str, name: str, entry: object) -> None:
+    if not re.fullmatch(ENTRY, name):
+        raise RuntimeError(f"{label} must match {ENTRY}")
+    spec = object_fields(entry, label)
+    unknown = set(spec) - AGENT_FIELDS
+    if unknown:
+        raise RuntimeError(f"{label} has unknown keys {sorted(unknown)}")
+    for key in ("role", "kind", "model", "effort", "db_suffix"):
+        require_type(spec.get(key), str, f"{label}.{key}")
+    for key in ("advisor", "persona"):
+        if key in spec:
+            require_type(spec[key], str, f"{label}.{key}")
+    require_type(spec.get("port_offset"), int, f"{label}.port_offset")
 
 
 def validate_settings(path: Path, value: Config) -> None:
@@ -409,17 +475,20 @@ def validate_settings(path: Path, value: Config) -> None:
             raise RuntimeError(f"{path}: timeouts.{key} must be a positive integer")
     if value["team"]["max_teams"] < 1:
         raise RuntimeError(f"{path}: team.max_teams must be positive")
-    for name in ROLES:
-        if value["roles"][name]["kind"] not in ("codex", "claude"):
-            raise RuntimeError(f"{path}: invalid role {name}")
+    for name, spec in value["agents"].items():
+        if spec["role"] not in ROLES:
+            raise RuntimeError(f"{path}: agents.{name}.role must be one of {', '.join(ROLES)}")
+        if spec["kind"] not in ("codex", "claude"):
+            raise RuntimeError(f"{path}: agents.{name}.kind must be claude or codex")
+        if spec.get("advisor") and spec["kind"] != "claude":
+            raise RuntimeError(f"{path}: agents.{name}.advisor applies to Claude entries only")
 
 
 def validate_allocations(path: Path, value: Config) -> None:
     ports: set[int] = set()
     stems: list[str] = []
     for n in range(1, value["team"]["max_teams"] + 1):
-        for role in ROLES:
-            spec = value["roles"][role]
+        for spec in value["agents"].values():
             port = (
                 value["team"]["port_base"] + n * value["team"]["port_stride"] + spec["port_offset"]
             )
@@ -435,45 +504,113 @@ def validate_allocations(path: Path, value: Config) -> None:
             stems.append(stem)
 
 
-def pane_roles(workspace: Entity, names: list[str]) -> dict[str, Entity]:
-    result: dict[str, Entity] = {}
-    for pane in herdr("pane", "list", "--workspace", workspace["workspace_id"])["panes"]:
-        label = pane.get("label")
-        if label not in names or label in result:
-            raise RuntimeError(f"Unexpected or duplicate pane {pane['pane_id']}; preserved")
-        result[label] = pane
-    return result
-
-
 def git(*args: str | Path, root: Path | None = None) -> str:
     return run("git", "-C", root or main, *args)
 
 
-def pair_workspaces() -> dict[int, tuple[str, Entity]]:
-    """Live pair workspaces by slot; each label names its slot and issue."""
-    pattern = re.escape(cfg["team"]["workspace_prefix"]) + r"-([0-9]+)-([0-9]+)"
-    pairs: dict[int, tuple[str, Entity]] = {}
-    for workspace in herdr("workspace", "list")["workspaces"]:
-        match = re.fullmatch(pattern, workspace.get("label") or "")
-        if not match:
-            continue
-        slot = int(match.group(1))
-        if slot in pairs:
-            raise RuntimeError(f"Ambiguous workspaces for slot {slot}; preserved")
-        pairs[slot] = (match.group(2), workspace)
-    return pairs
+def records_dir() -> Path:
+    return main / "agent/teams/allocations"
 
 
-def find_slot(issue: str) -> tuple[int, Entity | None]:
-    """The slot already holding this issue, else the first free one."""
-    pairs = pair_workspaces()
-    for slot, (owner, workspace) in pairs.items():
-        if owner == issue:
-            return slot, workspace
+def record_path(slot: int) -> Path:
+    return records_dir() / f"{slot}.json"
+
+
+def load_record(path: Path) -> Record:
+    fields = object_fields(json.loads(path.read_text()), str(path))
+    require_type(fields.get("slot"), int, f"{path}: slot")
+    for key in ("brief", "worktree", "implementer"):
+        require_type(fields.get(key), str, f"{path}: {key}")
+    for key in ("testers", "designers"):
+        if not isinstance(fields.get(key), list):
+            raise ValueError(f"{path}: {key} must be a list")
+    for entry, value in object_fields(fields.get("agents"), f"{path}: agents").items():
+        allocation = object_fields(value, f"{path}: agents.{entry}")
+        for key in ("entry", "role", "name", "kind", "worktree", "db_suffix", "workspace", "pane"):
+            require_type(allocation.get(key), str, f"{path}: agents.{entry}.{key}")
+        require_type(allocation.get("port"), int, f"{path}: agents.{entry}.port")
+    return cast(Record, fields)
+
+
+def save_record(record: Record) -> None:
+    path = record_path(record["slot"])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+
+
+def records() -> dict[int, Record]:
+    """Every slot's allocation record; slot discovery reads these, not Herdr."""
+    found: dict[int, Record] = {}
+    if records_dir().is_dir():
+        for path in sorted(records_dir().glob("*.json")):
+            record = load_record(path)
+            if path.stem != str(record["slot"]):
+                raise RuntimeError(f"{path}: file name does not match slot {record['slot']}")
+            found[record["slot"]] = record
+    return found
+
+
+def record_for(brief: str) -> Record | None:
+    return next((r for r in records().values() if r["brief"] == brief), None)
+
+
+def find_slot(brief: str) -> tuple[int, Record | None]:
+    """The slot already holding this brief, else the first free one."""
+    taken = records()
+    for slot, record in taken.items():
+        if record["brief"] == brief:
+            return slot, record
     for slot in range(1, cfg["team"]["max_teams"] + 1):
-        if slot not in pairs:
+        if slot not in taken:
             return slot, None
     raise RuntimeError(f"No free slot: team.max_teams is {cfg['team']['max_teams']}")
+
+
+def live_name(slot: int, entry: str) -> str:
+    return f"team-{slot}-{entry}"
+
+
+def reviewer_names(value: str) -> list[str]:
+    """The names of a `Required reviews:` line; refuse an empty or repeated name."""
+    names = [name.strip() for name in value.split(",")]
+    if not all(names) or len(set(names)) != len(names):
+        raise ValueError("empty or repeated name in Required reviews")
+    return names
+
+
+def issue_line(body: str, label: str) -> str | None:
+    match = re.search(rf"^{re.escape(label)}:[ \t]*(.*?)[ \t]*$", body, re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def roster(brief: str) -> tuple[str, list[str], list[str]]:
+    """The brief's implementer, testers and reviewing designers, each a configured entry.
+
+    `Required reviews:` is the publisher's gate, so the launch set is read from the same
+    line: testers in the order written, the first confirming the merge, and designers.
+    """
+    body = str(json.loads(run("gh", "issue", "view", brief, "--json", "body")).get("body") or "")
+    implementer = issue_line(body, "Implementer")
+    reviews = issue_line(body, "Required reviews")
+    if implementer is None or reviews is None:
+        raise RuntimeError(f"Brief #{brief} needs an Implementer: and a Required reviews: line")
+    try:
+        names = reviewer_names(reviews)
+    except ValueError as error:
+        raise RuntimeError(f"Brief #{brief}: {error}") from error
+    for name in (implementer, *names):
+        if name not in cfg["agents"]:
+            raise RuntimeError(f"Brief #{brief} names {name!r}, which is not a configured entry")
+    if cfg["agents"][implementer]["role"] != "implementer":
+        raise RuntimeError(f"Brief #{brief}: Implementer {implementer} is not an implementer entry")
+    if implementer in names:
+        raise RuntimeError(f"Brief #{brief}: implementer {implementer} cannot review its own PR")
+    by_role = {role: [n for n in names if cfg["agents"][n]["role"] == role] for role in ROLES}
+    if by_role["implementer"]:
+        raise RuntimeError(f"Brief #{brief}: Required reviews names implementer entries")
+    if not by_role["tester"]:
+        raise RuntimeError(f"Brief #{brief}: Required reviews names no tester")
+    return implementer, by_role["tester"], by_role["designer"]
 
 
 def bound_command(binary: Path, root: Path, sources: Path | str) -> str:
@@ -522,14 +659,22 @@ def elixir_sources(cwd: Path) -> Path:
     return sources.resolve()
 
 
-def role_env(role: str, slot: int, worktree: Path) -> dict[str, str]:
-    """One client's environment: its own database and port, the pair's worktree tools."""
-    spec, team = cfg["roles"][role], cfg["team"]
+def db_suffix(entry: str, slot: int) -> str:
+    return cfg["team"]["db_suffix_prefix"] + str(slot) + cfg["agents"][entry]["db_suffix"]
+
+
+def test_port(entry: str, slot: int) -> int:
+    team = cfg["team"]
+    return team["port_base"] + team["port_stride"] * slot + cfg["agents"][entry]["port_offset"]
+
+
+def agent_env(entry: str, slot: int, worktree: Path) -> dict[str, str]:
+    """One client's environment: its own database and port, its worktree's tools."""
     config = Path(os.environ.get("TIPS_TEAM_CONFIG", main / "agent/teams/config.toml")).resolve()
     env = {
-        "PGPORT": str(team["postgres_port"]),
-        "TIPS_DB_SUFFIX": team["db_suffix_prefix"] + str(slot) + spec["db_suffix"],
-        "TIPS_TEST_PORT": str(team["port_base"] + team["port_stride"] * slot + spec["port_offset"]),
+        "PGPORT": str(cfg["team"]["postgres_port"]),
+        "TIPS_DB_SUFFIX": db_suffix(entry, slot),
+        "TIPS_TEST_PORT": str(test_port(entry, slot)),
         "MIX_ENV": "test",
         "TIPS_CHECK_TIMEOUT_SECONDS": str(cfg["timeouts"]["checks_minutes"] * 60),
         "TIPS_TEAM_CONFIG": str(config),
@@ -537,27 +682,34 @@ def role_env(role: str, slot: int, worktree: Path) -> dict[str, str]:
         "TIPS_PROVIDER_ENV_FILE": str(main / ".env"),
         "TIPS_DEXTER": str(worktree / ".dexter/dexter.sh"),
     }
-    if spec["kind"] == "codex":
+    if cfg["agents"][entry]["kind"] == "codex":
         # Codex's sandbox cannot write the shared Hex cache in the home directory.
         env["HEX_HOME"] = str(worktree / "tmp/hex")
     return env
 
 
-def checkout(issue: str, worktree: Path) -> bool:
-    """Add the task worktree from fetched origin/main; return whether it is new."""
-    branch = "task/" + issue
+def checkout(worktree: Path, branch: str | None, commit: str | None) -> bool:
+    """Add the worktree on `branch` from fetched origin/main, or detached at `commit`.
+
+    Return whether it is new. An existing worktree is kept as it is: its agent may hold
+    unfinished work, or a reviewer may still be on the head it was pinned to.
+    """
     if worktree.exists():
-        if (
-            Path(git("rev-parse", "--show-toplevel", root=worktree)) != worktree
-            or git("branch", "--show-current", root=worktree) != branch
+        if Path(git("rev-parse", "--show-toplevel", root=worktree)) != worktree or (
+            branch and git("branch", "--show-current", root=worktree) != branch
         ):
-            raise RuntimeError(f"Not a worktree on {branch}: {worktree}")
+            raise RuntimeError(f"Not the expected worktree: {worktree}")
         return False
     git("fetch", "origin")
-    if git("branch", "--list", branch):
-        git("worktree", "add", worktree, branch)
+    if branch:
+        if git("branch", "--list", branch):
+            git("worktree", "add", worktree, branch)
+        else:
+            git("worktree", "add", "--no-track", "-b", branch, worktree, "origin/main")
     else:
-        git("worktree", "add", "--no-track", "-b", branch, worktree, "origin/main")
+        if execute(["git", "-C", main, "cat-file", "-e", f"{commit}^{{commit}}"]).returncode:
+            raise RuntimeError(f"Commit {commit} is not on origin; push it first")
+        git("worktree", "add", "--detach", worktree, str(commit))
     return True
 
 
@@ -571,11 +723,8 @@ def link_skills(link: Path, shared: Path) -> None:
     link.symlink_to(shared)
 
 
-def prepare_index(worktree: Path, wrapper: Path, slot: int, fetch: bool) -> None:
+def prepare_index(worktree: Path, wrapper: Path, env: dict[str, str], fetch: bool) -> None:
     """Fetch a new checkout's locked dependencies, start Dexter and reconcile its index."""
-    # A Codex role's environment wins: its sandbox needs the Hex cache inside the worktree.
-    role = next((r for r in ROLES if cfg["roles"][r]["kind"] == "codex"), ROLES[0])
-    env = {**os.environ, **role_env(role, slot, worktree)}
     if fetch:
         # --check-locked never rewrites the lock. A reused worktree keeps its own dependency
         # state: it may hold an unfinished change that only its agent can resolve.
@@ -602,57 +751,71 @@ def prepare_index(worktree: Path, wrapper: Path, slot: int, fetch: bool) -> None
     print(f"Dexter index ready for {worktree}")
 
 
-def prepare_worktree(issue: str, worktree: Path, slot: int) -> None:
-    """Create or reuse the pair's worktree and prepare it once for both clients."""
+def prepare_worktree(
+    worktree: Path, slot: int, entries: list[str], branch: str | None, commit: str | None
+) -> None:
+    """Create or reuse a worktree and prepare it once for the clients that will use it."""
     # Preflight before any change: a refusal here leaves no worktree behind.
     binary, skills = dexter_binary(), main / ".agents/skills"
     if not skills.is_dir():
         raise RuntimeError("Shared skills directory is missing.")
     sources = elixir_sources(worktree if worktree.is_dir() else main)
-    new = checkout(issue, worktree)
+    new = checkout(worktree, branch, commit)
     wrapper = worktree / ".dexter/dexter.sh"
     files = {
         wrapper: bound_command(binary, worktree, sources),
         worktree / ".dexter/.gitignore": "*\n",
+        worktree / ".codex/config.toml": CODEX_CONFIG,
     }
-    if any(cfg["roles"][role]["kind"] == "codex" for role in ROLES):
-        files[worktree / ".codex/config.toml"] = CODEX_CONFIG
     for path, content in files.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         if not path.is_file() or path.read_text() != content:
             path.write_text(content)
     wrapper.chmod(0o755)
     link_skills(worktree / ".agents/skills", skills)
+    # A Codex client's environment wins: its sandbox needs the Hex cache inside the worktree.
+    owner = next((e for e in entries if cfg["agents"][e]["kind"] == "codex"), entries[0])
+    env = {**os.environ, **agent_env(owner, slot, worktree)}
     # A fetch that failed last time left no dependencies: fetch again.
-    prepare_index(worktree, wrapper, slot, fetch=new or not (worktree / "deps").is_dir())
+    prepare_index(worktree, wrapper, env, fetch=new or not (worktree / "deps").is_dir())
 
 
 def refuse_foreign_owner(worktree: Path, names: list[str]) -> None:
-    """Only the assigned pair may work in the task worktree."""
+    """Only the assigned clients may work in a worktree."""
     for agent in herdr("agent", "list")["agents"]:
         if agent.get("name") not in names and pane_occupant(agent["pane_id"])[0] == worktree:
             owner = agent.get("name") or agent["pane_id"]
             raise RuntimeError(f"Conflicting live agent in {worktree}: {owner}")
 
 
-def open_panes(label: str, workspace: Entity | None, names: list[str]) -> dict[str, Entity]:
-    """Reuse the pair's workspace or create it, with one labelled shell pane per role."""
-    if workspace:
-        panes = pane_roles(workspace, names)
-    else:
-        created = herdr("workspace", "create", "--cwd", str(main), "--label", label, "--no-focus")
-        first = created["root_pane"]
-        herdr("pane", "rename", first["pane_id"], names[0])
-        panes = {names[0]: first}
-    for name in names:
-        if name not in panes:
-            beside = next(iter(panes.values()))["pane_id"]
-            pane = herdr(
-                "pane", "split", beside, "--direction", "right", "--cwd", str(main), "--no-focus"
-            )["pane"]
-            herdr("pane", "rename", pane["pane_id"], name)
-            panes[name] = pane
-    return panes
+def live_workspaces() -> set[str]:
+    return {w["workspace_id"] for w in herdr("workspace", "list")["workspaces"]}
+
+
+def open_pane(record: Record, entry: str, role: str, worktree: Path) -> Allocation:
+    """The client's recorded pane, or a new single-pane workspace labelled with its name."""
+    allocation = record["agents"].get(entry)
+    if allocation and allocation["workspace"] in live_workspaces():
+        return allocation
+    name = live_name(record["slot"], entry)
+    created = herdr("workspace", "create", "--cwd", str(main), "--label", name, "--no-focus")
+    pane = created["root_pane"]["pane_id"]
+    herdr("pane", "rename", pane, name)
+    allocation = Allocation(
+        entry=entry,
+        role=role,
+        name=name,
+        kind=cfg["agents"][entry]["kind"],
+        worktree=str(worktree),
+        db_suffix=db_suffix(entry, record["slot"]),
+        port=test_port(entry, record["slot"]),
+        workspace=created["workspace"]["workspace_id"],
+        pane=pane,
+        session="",
+    )
+    record["agents"][entry] = allocation
+    save_record(record)
+    return allocation
 
 
 def enter(pane: str, worktree: Path, env: dict[str, str]) -> None:
@@ -682,15 +845,10 @@ def enter(pane: str, worktree: Path, env: dict[str, str]) -> None:
     )
 
 
-def brief(role: str, name: str, issue: str, wrapper: Path) -> str:
-    # A relaunched client gets this brief too, so it finds the turn instead of assuming it.
+def dexter_brief(wrapper: Path) -> str:
     # The binary is shared by every checkout and the guide is not, so the binary's own
     # help is the contract a lagging checkout can still trust.
     return (
-        f"You are {name}, the {ROLE_TITLES[role]} for issue #{issue}. "
-        f"Read agent/teams/README.md, then the issue with gh issue view {issue}. "
-        "Find whose turn it is with the README restart rule. If it is yours, do your next "
-        "common-path step; otherwise end your turn and wait for your partner's ring. "
         "Before reading Elixir code, load the skills AGENTS.md requires. "
         "For Elixir navigation, follow the AGENTS.md Need/Use table and its use check. "
         f"TIPS_DEXTER={wrapper} is bound to this worktree; run it via the shell. "
@@ -704,8 +862,47 @@ def brief(role: str, name: str, issue: str, wrapper: Path) -> str:
     )
 
 
-def client_args(role: str, prompt: str, worktree: Path) -> list[str]:
-    spec, policies = cfg["roles"][role], cfg["launch"]
+def identity(record: Record, entry: str, duty: str) -> str:
+    persona = cfg["agents"][entry].get("persona")
+    text = f"You are {entry}, the {duty} for brief #{record['brief']}; your Herdr name is "
+    text += f"{live_name(record['slot'], entry)}. "
+    if persona:
+        text += f"Your persona: {persona}. "
+    return text
+
+
+def pair_brief(record: Record, entry: str, duty: str, wrapper: Path) -> str:
+    # A relaunched client gets this brief too, so it finds the turn instead of assuming it.
+    implementer, tester = record["implementer"], record["testers"][0]
+    partner = tester if entry == implementer else implementer
+    return (
+        identity(record, entry, duty)
+        + f"Read agent/teams/README.md, then the brief with gh issue view {record['brief']}. "
+        "Find whose turn it is with the README restart rule. If it is yours, do your next "
+        "common-path step; otherwise end your turn and wait for your partner's ring. "
+        f"Hand the checkout over with agent/teams/team.py turn <pr> {partner}. "
+        f"Reviews you write are attributed to {entry} on their second line. "
+        + dexter_brief(wrapper)
+    )
+
+
+def reviewer_brief(record: Record, entry: str, duty: str, pr: str, head: str, wrapper: Path) -> str:
+    tester = live_name(record["slot"], record["testers"][0])
+    return (
+        identity(record, entry, duty)
+        + f"Review PR {pr} from this worktree, pinned at {head}; never the pair checkout. "
+        "Read agent/teams/README.md and follow its reviewer steps. Never run "
+        "agent/teams/team.py turn. Submit the README review record with "
+        f"{entry} on its second line, then ring the merge-confirming tester with "
+        f"herdr agent prompt {tester} '<your review URL>' and end your turn. "
+        "When that tester rings you with a new head: git fetch origin, git checkout "
+        '--detach <head>, "$TIPS_DEXTER" reindex, then review the changes since your '
+        "previous review. " + dexter_brief(wrapper)
+    )
+
+
+def client_args(entry: str, prompt: str, worktree: Path) -> list[str]:
+    spec, policies = cfg["agents"][entry], cfg["launch"]
     if spec["kind"] == "codex":
         args = ["-a", policies["codex_approval"], "-C", str(worktree)]
         if spec["model"]:
@@ -726,14 +923,16 @@ def client_args(role: str, prompt: str, worktree: Path) -> list[str]:
     ]
     if spec["model"]:
         args += ["--model", spec["model"]]
-        if "fable" not in spec["model"]:
-            args += ["--advisor", "fable"]
+    advisor = spec.get("advisor")
+    if advisor:
+        args += ["--advisor", advisor]
     return args
 
 
-def launch(role: str, name: str, pane: str, issue: str, worktree: Path, slot: int) -> None:
+def launch(record: Record, allocation: Allocation, prompt: str) -> None:
     """Start one client in its pane, or keep the one already running there."""
-    kind = cfg["roles"][role]["kind"]
+    entry, name, pane = allocation["entry"], allocation["name"], allocation["pane"]
+    kind, worktree = allocation["kind"], Path(allocation["worktree"])
     root, live = pane_occupant(pane)
     if live:
         agent = herdr("agent", "get", pane)["agent"]
@@ -741,8 +940,7 @@ def launch(role: str, name: str, pane: str, issue: str, worktree: Path, slot: in
             raise RuntimeError(f"{pane}: conflicting client; preserved")
         print(f"Already running: {name} ({agent.get('agent_status')})")
         return
-    enter(pane, worktree, role_env(role, slot, worktree))
-    prompt = brief(role, name, issue, worktree / ".dexter/dexter.sh")
+    enter(pane, worktree, agent_env(entry, record["slot"], worktree))
     herdr(
         "agent",
         "start",
@@ -754,7 +952,7 @@ def launch(role: str, name: str, pane: str, issue: str, worktree: Path, slot: in
         "--timeout",
         str(cfg["timeouts"]["launch_seconds"] * 1000),
         "--",
-        *client_args(role, prompt, worktree),
+        *client_args(entry, prompt, worktree),
     )
     started = herdr("agent", "get", pane)["agent"]
     if (
@@ -764,27 +962,89 @@ def launch(role: str, name: str, pane: str, issue: str, worktree: Path, slot: in
         or started.get("agent_status") in ("blocked", "unknown")
     ):
         raise RuntimeError(f"{name} started in an unexpected state or root; inspect {pane}")
+    allocation["session"] = session_id(started)
+    save_record(record)
     if kind == "claude":
         # Claude holds the brief as its system prompt and waits; Codex receives it as input.
         herdr("agent", "prompt", name, "Begin.")
-    print(f"Launched {name}: {kind} in {worktree}")
+    print(f"Launched {name}: {kind} in {worktree}, session {allocation['session'] or 'unknown'}")
 
 
-def start(issue: str) -> None:
-    """Launch a developer and a tester for one issue in one prepared worktree."""
+def require_main_checkout() -> None:
     if Path.cwd() != main:
         raise RuntimeError(f"Run from the main checkout: {main}")
     require_git_admin(main / ".git")
-    slot, workspace = find_slot(issue)
-    names = [f"team-{slot}-{role}" for role in ROLES]
-    worktree = main / ".worktrees" / issue
-    refuse_foreign_owner(worktree, names)
-    prepare_worktree(issue, worktree, slot)
-    label = f"{cfg['team']['workspace_prefix']}-{slot}-{issue}"
-    panes = open_panes(label, workspace, names)
-    for role, name in zip(ROLES, names, strict=True):
-        launch(role, name, panes[name]["pane_id"], issue, worktree, slot)
-    print(f"Issue {issue}: pair in slot {slot}, {worktree}")
+
+
+def start(brief: str) -> None:
+    """Launch the brief's implementer and merge-confirming tester in one prepared worktree."""
+    require_main_checkout()
+    implementer, testers, designers = roster(brief)
+    slot, record = find_slot(brief)
+    worktree = main / ".worktrees" / brief
+    if record is None:
+        record = Record(
+            slot=slot,
+            brief=brief,
+            worktree=str(worktree),
+            implementer=implementer,
+            testers=testers,
+            designers=designers,
+            agents={},
+        )
+    elif (record["implementer"], record["testers"], record["designers"]) != (
+        implementer,
+        testers,
+        designers,
+    ):
+        # The launched set must stay the publisher's roster; a changed brief needs a restart.
+        raise RuntimeError(
+            f"Brief #{brief} roster changed since launch; stop it, then start it again"
+        )
+    pair = [implementer, testers[0]]
+    refuse_foreign_owner(worktree, [live_name(slot, entry) for entry in pair])
+    prepare_worktree(worktree, slot, pair, f"task/{brief}", None)
+    for entry, duty in zip(pair, ("implementer", "merge-confirming tester"), strict=True):
+        allocation = open_pane(record, entry, duty, worktree)
+        launch(record, allocation, pair_brief(record, entry, duty, worktree / ".dexter/dexter.sh"))
+    print(f"Brief {brief}: pair in slot {slot}, {worktree}")
+
+
+def pull_request(pr: str) -> tuple[str, str, list[str]]:
+    """The PR's URL, head commit and closing-reference issue numbers."""
+    view = object_fields(
+        json.loads(run("gh", "pr", "view", pr, "--json", "headRefOid,url,closingIssuesReferences")),
+        f"PR {pr}",
+    )
+    references = object_list(view.get("closingIssuesReferences") or [], f"PR {pr} closing issues")
+    briefs = [str(issue.get("number")) for issue in references]
+    return str(view.get("url")), str(view.get("headRefOid")), briefs
+
+
+def review(pr: str, entry: str) -> None:
+    """Pin a required reviewer's own worktree at the PR head and launch it there."""
+    require_main_checkout()
+    url, head, briefs = pull_request(pr)
+    found = [r for brief in briefs if (r := record_for(brief))]
+    if len(found) != 1:
+        raise RuntimeError(f"PR {pr} must close exactly one started brief; closes {briefs}")
+    record = found[0]
+    extra = record["testers"][1:] + record["designers"]
+    if entry not in extra:
+        raise RuntimeError(
+            f"{entry} is not an additional reviewer of brief #{record['brief']} "
+            f"(additional reviewers: {', '.join(extra) or 'none'})"
+        )
+    duty = "reviewing designer" if entry in record["designers"] else "additional tester"
+    worktree = main / ".worktrees" / f"review-{pr}-{entry}"
+    refuse_foreign_owner(worktree, [live_name(record["slot"], entry)])
+    prepare_worktree(worktree, record["slot"], [entry], None, head)
+    allocation = open_pane(record, entry, duty, worktree)
+    allocation["pr"], allocation["head"] = pr, head
+    save_record(record)
+    wrapper = worktree / ".dexter/dexter.sh"
+    launch(record, allocation, reviewer_brief(record, entry, duty, url, head, wrapper))
+    print(f"PR {pr}: {entry} reviews from {worktree}")
 
 
 def checkout_problem(head: str) -> str | None:
@@ -798,80 +1058,125 @@ def checkout_problem(head: str) -> str | None:
     return None
 
 
-def turn(pr: str, recipient: str) -> None:
-    """Hand the shared worktree to the partner and ring it."""
+def caller_record() -> tuple[Record, str]:
+    """The allocation record of the calling pane and the entry it runs."""
     pane = os.environ.get("HERDR_PANE_ID")
     if not pane:
         raise RuntimeError("HERDR_PANE_ID is not set; run turn from your own pair pane")
     me = herdr("agent", "get", pane)["agent"].get("name") or ""
-    match = re.fullmatch(r"team-([0-9]+)-(dev|test)", me)
-    if not match or match.group(2) == recipient:
-        raise RuntimeError(
-            f"turn hands over to the other pair agent; this pane is {me or 'unnamed'}"
-        )
-    view = json.loads(run("gh", "pr", "view", pr, "--json", "headRefOid,url"))
-    head, url = str(view["headRefOid"]), str(view["url"])
-    problem = checkout_problem(head)
-    if recipient == "test":
-        if problem:
-            raise RuntimeError(f"{problem} Commit and push, then hand over.")
-        message = (
-            f"Your turn: review {url} at {head}. Follow README step 3; read and apply "
-            "agent/skills/reviewing-code/SKILL.md from this worktree, using "
-            "agent/skills/developing-software/SKILL.md as the design and testing standard. "
-            "Follow AGENTS.md GitHub and the README PR review record. "
-            "With findings: submit them and run "
-            f"agent/teams/team.py turn {pr} dev. Without: submit your LGTM; if the issue "
-            "names Required reviews, hand back when a named reviewer's latest review has "
-            "findings and ring one that has not reviewed this head; when all are LGTM, "
-            "publish the approval without waiting for CI, keep the turn and do README "
-            "step 5."
+    match = LIVE_NAME.fullmatch(me)
+    record = records().get(int(match.group(1))) if match else None
+    if not match or record is None or match.group(2) not in record["agents"]:
+        raise RuntimeError(f"This pane is {me or 'unnamed'}, not a launched client")
+    return record, match.group(2)
+
+
+def tester_message(record: Record, pr: str, url: str, head: str) -> str:
+    implementer, tester = record["implementer"], record["testers"][0]
+    others = record["testers"][1:] + record["designers"]
+    message = (
+        f"Your turn: review {url} at {head}. Follow README step 3; read and apply "
+        "agent/skills/reviewing-code/SKILL.md from this worktree, using "
+        "agent/skills/developing-software/SKILL.md as the design and testing standard. "
+        "Follow AGENTS.md GitHub and the README PR review record, attributed to "
+        f"{tester}. With findings: submit them and run agent/teams/team.py turn {pr} "
+        f"{implementer}. Without: submit your LGTM"
+    )
+    if others:
+        named = ", ".join(f"{e} ({live_name(record['slot'], e)})" for e in others)
+        message += (
+            f", then read the latest review of this head from each other required "
+            f"reviewer: {named}. One with findings means turn {pr} {implementer}; one "
+            "absent means ring that reviewer by Herdr name with the PR URL and head, or "
+            "report blocked if it is not launched; all LGTM means publish with one "
+            "--record per reviewer"
         )
     else:
-        message = (
-            f"Your turn on {url}: run agent/teams/pr_review.py list {pr} and "
-            f"gh pr checks {pr} --required. Repair the findings or failed checks as "
-            "agent/skills/developing-software/SKILL.md from this worktree says, push and "
-            "hand back; if stuck, follow the README blocker procedure."
+        message += "; publish it"
+    return message + " without waiting for CI, keep the turn and do README step 5."
+
+
+def implementer_message(pr: str, url: str, problem: str | None) -> str:
+    message = (
+        f"Your turn on {url}: run agent/teams/pr_review.py list {pr} and "
+        f"gh pr checks {pr} --required. Repair the findings or failed checks as "
+        "agent/skills/developing-software/SKILL.md from this worktree says, push and "
+        "hand back; if stuck, follow the README blocker procedure."
+    )
+    if problem:
+        # Handing back never refuses: only the implementer can repair the checkout.
+        message += f" Fix the checkout first: {problem}"
+        print(f"Reported to the implementer: {problem}")
+    return message
+
+
+def turn(pr: str, recipient: str) -> None:
+    """Hand the pair checkout to the other pair agent and ring it."""
+    record, me = caller_record()
+    pair = {record["implementer"], record["testers"][0]}
+    if me not in pair or recipient not in pair or recipient == me:
+        raise RuntimeError(
+            f"turn hands the pair checkout between {record['implementer']} and "
+            f"{record['testers'][0]}; this pane is {me}"
         )
-        if problem:
-            # Handing back never refuses: only the developer can repair the checkout.
-            message += f" Fix the checkout first: {problem}"
-            print(f"Reported to the developer: {problem}")
-    partner = f"team-{match.group(1)}-{recipient}"
+    url, head, _ = pull_request(pr)
+    problem = checkout_problem(head)
+    if recipient == record["implementer"]:
+        message = implementer_message(pr, url, problem)
+    elif problem:
+        raise RuntimeError(f"{problem} Commit and push, then hand over.")
+    else:
+        message = tester_message(record, pr, url, head)
+    partner = live_name(record["slot"], recipient)
     herdr("agent", "prompt", partner, message)
     print(f"Rang {partner}. Stop using this worktree, build and database; end your turn now.")
+    pending = [e for e in record["testers"][1:] + record["designers"] if e not in record["agents"]]
+    if recipient != record["implementer"] and pending:
+        # Reviewer worktrees need Git administration, so the dispatcher provisions them.
+        commands = "; ".join(f"agent/teams/team.py review {pr} {e}" for e in pending)
+        try:
+            herdr("agent", "prompt", "dispatcher", f"{url} review: run {commands}")
+        except RuntimeError as error:
+            raise RuntimeError(
+                f"Handoff sent, but the dispatcher was not reached to launch "
+                f"{', '.join(pending)}: {error}. Report blocked with this message."
+            ) from error
+        print(f"Asked the dispatcher to launch {', '.join(pending)}")
 
 
-def stop_pair(issue: str) -> None:
-    """Retire a pair whose work is clean and merged; preserve everything otherwise."""
-    found = [(slot, ws) for slot, (owner, ws) in pair_workspaces().items() if owner == issue]
-    if not found:
-        print(f"Issue {issue}: no pair workspace; nothing removed")
+def stop_brief(brief: str) -> None:
+    """Retire a brief whose work is clean and merged; preserve everything otherwise."""
+    record = record_for(brief)
+    if record is None:
+        print(f"Brief {brief}: no allocation record; nothing removed")
         return
-    slot, workspace = found[0]
-    panes = pane_roles(workspace, [f"team-{slot}-{role}" for role in ROLES])
-    roots = owned_worktrees(panes)
-    worktree = main / ".worktrees" / issue
-    if worktree.is_dir():
-        roots.add(worktree)
-    check_shared_owners(roots, panes)
+    live = live_workspaces()
+    present = {e: a for e, a in record["agents"].items() if a["workspace"] in live}
+    roots = owned_worktrees(present)
+    pair = Path(record["worktree"])
+    if pair.is_dir():
+        roots.add(pair)
+    recorded = {Path(a["worktree"]) for a in record["agents"].values()}
+    roots |= {root for root in recorded if root.is_dir()}
+    check_shared_owners(roots, present)
     if roots:
         require_git_admin(main / ".git")
         git("fetch", "origin")
     check_worktrees(roots)
-    for pane in panes.values():
-        stop(pane["pane_id"], pane_occupant(pane["pane_id"])[0])
+    for allocation in present.values():
+        stop(allocation["pane"], pane_occupant(allocation["pane"])[0])
     check_worktrees(roots)
-    check_shared_owners(roots, panes)
-    retire(roots, slot)
-    herdr("workspace", "close", workspace["workspace_id"])
-    print(f"Issue {issue}: pair retired; main checkout status follows")
+    check_shared_owners(roots, present)
+    retire(roots, [a["db_suffix"] for a in record["agents"].values()])
+    for allocation in present.values():
+        herdr("workspace", "close", allocation["workspace"])
+    record_path(record["slot"]).unlink()
+    print(f"Brief {brief}: slot {record['slot']} retired; main checkout status follows")
     print(git("status", "--short") or "Main checkout clean")
 
 
-def retire(roots: set[Path], slot: int) -> None:
-    """Stop each worktree's daemon, drop the pair's databases, remove worktrees and branches."""
+def retire(roots: set[Path], suffixes: list[str]) -> None:
+    """Stop each worktree's daemon, drop the slot's databases, remove worktrees and branches."""
     for root in sorted(roots):
         wrapper = root / ".dexter/dexter.sh"
         if wrapper.is_file():
@@ -882,7 +1187,7 @@ def retire(roots: set[Path], slot: int) -> None:
             )
             if result.returncode:
                 raise RuntimeError(result.stderr or result.stdout)
-    drop_databases(slot)
+    drop_databases(suffixes)
     for root in sorted(roots):
         branch = git("branch", "--show-current", root=root)
         git("worktree", "remove", root)
@@ -892,20 +1197,21 @@ def retire(roots: set[Path], slot: int) -> None:
             git("branch", "-D", branch)
 
 
-def check_shared_owners(roots: set[Path], panes: dict[str, Entity]) -> None:
-    """Do not retire a worktree still used by an agent outside this pair."""
-    owned_panes = {pane["pane_id"] for pane in panes.values()}
+def check_shared_owners(roots: set[Path], present: dict[str, Allocation]) -> None:
+    """Do not retire a worktree still used by an agent outside this slot."""
+    owned_panes = {allocation["pane"] for allocation in present.values()}
     for agent in herdr("agent", "list")["agents"]:
         pane = agent["pane_id"]
         if pane not in owned_panes and pane_occupant(pane)[0] in roots:
             raise RuntimeError(f"Worktree still shared with {agent.get('name') or pane}; preserved")
 
 
-def owned_worktrees(panes: dict[str, Entity]) -> set[Path]:
+def owned_worktrees(present: dict[str, Allocation]) -> set[Path]:
     roots: set[Path] = set()
     # Validate every pane before stopping any client.
-    for name, pane in panes.items():
-        root = pane_occupant(pane["pane_id"])[0]
+    for allocation in present.values():
+        pane = allocation["pane"]
+        root = pane_occupant(pane)[0]
         if root != main and (
             root.parent != main / ".worktrees"
             or Path(
@@ -913,14 +1219,13 @@ def owned_worktrees(panes: dict[str, Entity]) -> set[Path]:
             ).resolve()
             != main / ".git"
         ):
-            raise RuntimeError(f"{pane['pane_id']}: unexpected worktree {root}; preserved")
-        if pane.get("agent"):
-            agent = herdr("agent", "get", pane["pane_id"])["agent"]
-            if agent.get("name") != name:
-                raise RuntimeError(f"{pane['pane_id']}: conflicting owner; preserved")
+            raise RuntimeError(f"{pane}: unexpected worktree {root}; preserved")
+        if pane_occupant(pane)[1]:
+            agent = herdr("agent", "get", pane)["agent"]
+            if agent.get("name") != allocation["name"]:
+                raise RuntimeError(f"{pane}: conflicting owner; preserved")
         if root != main:
             roots.add(root)
-
     return roots
 
 
@@ -937,9 +1242,7 @@ def check_worktrees(roots: set[Path]) -> None:
             ) from error
 
 
-def drop_databases(slot: int) -> None:
-    prefix = cfg["team"]["db_suffix_prefix"] + str(slot)
-    suffixes = [prefix + cfg["roles"][role]["db_suffix"] for role in ROLES]
+def drop_databases(suffixes: list[str]) -> None:
     stems = [base + suffix for base in ("tips_test", "tips_dev") for suffix in suffixes]
     psql = [
         "docker",
@@ -978,15 +1281,21 @@ def stop_agent(pane: str, root: str | Path) -> None:
 def cli() -> None:
     configure()
     args = sys.argv[1:]
-    usage = "Usage: agent/teams/team.py start <issue> | turn <pr> dev|test | stop <issue>"
+    usage = (
+        "Usage: agent/teams/team.py start <brief> | turn <pr> <entry> | "
+        "review <pr> <entry> | stop <brief>"
+    )
     if len(args) < 2 or not args[1].isdecimal():
         raise RuntimeError(usage)
+    named = len(args) == 3 and re.fullmatch(ENTRY, args[2]) is not None
     if args[0] == "start" and len(args) == 2:
         start(args[1])
     elif args[0] == "stop" and len(args) == 2:
-        stop_pair(args[1])
-    elif args[0] == "turn" and len(args) == 3 and args[2] in ROLES:
+        stop_brief(args[1])
+    elif args[0] == "turn" and named:
         turn(args[1], args[2])
+    elif args[0] == "review" and named:
+        review(args[1], args[2])
     else:
         raise RuntimeError(usage)
 

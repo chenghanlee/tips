@@ -9,6 +9,7 @@
 /agent/lsp/vendor/
 /agent/elixir-agent-tools/
 .worktrees/
+/agent/teams/allocations/
 __pycache__/
 *.pyc
 docs/implementation/communication/

@@ -55,8 +55,10 @@ shape a feature to produce a Haiku-eligible brief.
 
 ## Reviewing designer
 
-When the PR is up, the merge-confirming tester rings you. Review from your own pinned
-worktree at the PR head, never the pair checkout. Record first findings before
+The dispatcher launches you with `team.py review <pr> <entry>` in your own worktree
+pinned at the PR head, never the pair checkout. For a later head the merge-confirming
+tester rings you: fetch, check out that head detached, reindex, and review the changes
+since your previous review. Record first findings before
 reading the PR description, evidence table or developer comments. Review design,
 trade-offs, performance, maintainability, idioms, code and architecture smells against
 the brief and [developing-software](../../skills/developing-software/SKILL.md). Submit

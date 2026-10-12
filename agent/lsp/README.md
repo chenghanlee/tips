@@ -122,7 +122,7 @@ This beta does not support an application in a subdirectory or monorepo.
 
 ## Pair provisioning
 
-`agent/teams/team.py start` writes, per worktree:
+`agent/teams/team.py start` and `review` write, per worktree:
 
 - `.dexter/dexter.sh`: `exec vendor/dexter --root <worktree> "$@"` with the
   selected sources exported. Its absolute path is `TIPS_DEXTER` in the session.

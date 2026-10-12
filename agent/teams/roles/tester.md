@@ -29,7 +29,9 @@ set, adds a focus; it never narrows the review. Testers do not split a PR.
 - Merge-confirming tester: after your LGTM, read each required reviewer's latest
   review of this head. One with findings: run `team.py turn <pr> dev` so the
   implementer repairs; do not wait for more approvals. One absent: ring that
-  reviewer and wait. All LGTM: publish with one `--record` per reviewer:
+  reviewer by Herdr name (`team-<slot>-<entry>`) with the PR URL and head, and
+  wait; if it is not launched, report `blocked` so the dispatcher runs
+  `team.py review`. All LGTM: publish with one `--record` per reviewer:
 
   ```sh
   agent/teams/publish_review.py --pr <pr> --sha <sha> --record <yours> --record <designer's>

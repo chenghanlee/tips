@@ -26,6 +26,7 @@ from pr_review import (
     pull_request,
     unresolved_threads,
 )
+from team import reviewer_names
 
 CONTEXT = "tips/independent-review"
 
@@ -122,10 +123,10 @@ def required_reviewers(number: int) -> list[str]:
     if len(found) > 1:
         raise RefusalError(f"Linked issues #{' and #'.join(found)} both name required reviews.")
     (issue, value), *_ = found.items()
-    names = [name.strip() for name in value.split(",")]
-    if not all(names) or len(set(names)) != len(names):
-        raise RefusalError(f"Issue #{issue} has an empty or repeated name in Required reviews.")
-    return names
+    try:
+        return reviewer_names(value)
+    except ValueError as error:
+        raise RefusalError(f"Issue #{issue} has an {error}.") from error
 
 
 def attributed(body: str) -> str | None:
