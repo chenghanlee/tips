@@ -22,7 +22,7 @@ DISPATCHER   team.py stop <brief> → next
 
 In GitHub: enable "Allow auto-merge" on the repository; in the ruleset "Reviewed main" turn off the strict up-to-date requirement and keep `checks`, `release`, `tips/independent-review` and resolved conversations; in Project 15 enable the workflow "Item closed" so a closed issue gets Status Done.
 
-The swarm board is a second project, `board.project` in [config.toml](config.toml), holding the spec and brief issues. Project 16 was created on 2026-10-12 with these commands; a new owner repeats them and sets `board.project` and `board.owner`:
+The swarm board is [Project 16](https://github.com/users/chenghanlee/projects/16), holding the spec and brief issues. It was created on 2026-10-12 with these commands; a new owner repeats them and updates the project number in [roles/dispatcher.md](roles/dispatcher.md):
 
 ```bash
 gh project create --owner <owner> --title "Tips swarm"
@@ -34,7 +34,7 @@ gh project field-create <number> --owner <owner> --name "Waiting on" --data-type
 gh project field-create <number> --owner <owner> --name Implementer --data-type TEXT
 ```
 
-"Waiting on" is a text field holding a comma-separated list; Projects have no multi-select field. The `gh` token needs the `project` scope.
+"Waiting on" is a text field holding a comma-separated list; Projects have no multi-select field. The dispatcher edits fields with `gh project item-edit`. The `gh` token needs the `project` scope.
 
 Install Python 3.12 and the [configured client CLIs](config.toml). Authenticate the clients and the GitHub CLI (`gh`) for this repository. Agents also need GNU `timeout` (macOS: `brew install coreutils`) and `unbuffer` (Expect): the Elixir skill requires it on Mix commands. Testers use `agent-browser` for manual browser review.
 
@@ -165,8 +165,8 @@ approval policy.
 
 ## Configuration
 
-Edit [config.toml](config.toml) for slots, agent, dispatcher and board settings,
-resource allocation, permissions and time limits. Each `[agents.<entry>]` defines a role,
+Edit [config.toml](config.toml) for slots, agent and dispatcher settings, resource
+allocation, permissions and time limits. Each `[agents.<entry>]` defines a role,
 client, model, effort, optional advisor and persona, database suffix and port offset.
 Briefs name entries in `Implementer:` and `Required reviews:`.
 

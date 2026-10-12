@@ -3,27 +3,28 @@
 
 Usage:
   agent/teams/board.py post <issue> <TYPE> [--round N] [--role ROLE] [--as ROLE NAME SESSION]
-                            [--waiting NAME,...] [--attach FILE]...   (body on stdin)
+                            (body on stdin)
   agent/teams/board.py read <issue> [--after <comment URL>]
   agent/teams/board.py usage <issue>...
 
-post prints the comment URL. An identical comment already on the issue is reused, so a
-repeat after an uncertain post never doubles it. The header line is
+post prints the comment URL. An identical round comment already on the issue is reused,
+so a repeat after an uncertain post never doubles it; EVENTs are posted every time,
+because two handoffs of one head read the same. The header line is
 `R<round> <TYPE> <role> <name> <session>`; EVENT has no round. Name and session come
 from the calling Herdr pane and the role from the allocation records; give --role when
 no record names you, or --as to post for another agent (a launch or takeover record).
---waiting writes the project's "Waiting on" field for the issue. Each --attach file
-becomes a gist linked at the end. Above 800 words the command warns; state the reason
-in the comment.
+Above 800 words the command warns; state the reason in the comment. Link logs as gists
+made beforehand with `gh gist create <file>`.
 
-read prints the issue body, then every comment, or only those after the given comment.
+read prints the current issue body, then every comment, or only those after the given
+comment.
 
 usage prints one Markdown table for the given spec and brief issues: per agent and
 session, elapsed time from its launch EVENT to its stop EVENT (or now), the time it
 held a pair checkout (from launch and handoff EVENTs; blank for agents that never held
 one), and tokens per model from its own session logs: `~/.claude/projects` JSONL for
-Claude, with subagent logs, and `~/.codex/sessions` for Codex. Input counts uncached
-input only; cache read and cache write are separate columns.
+Claude, with its advisor calls and subagent logs, and `~/.codex/sessions` for Codex.
+Input counts uncached input only; cache read and cache write are separate columns.
 """
 
 import argparse
@@ -45,9 +46,9 @@ from team import (
     herdr,
     issue_comments,
     object_fields,
+    object_list,
     post_comment,
     records,
-    repository,
     run,
     session_id,
 )
@@ -78,48 +79,6 @@ def identity(args: argparse.Namespace) -> tuple[str, str, str]:
     return role, name, session_id(agent)
 
 
-def set_waiting(issue: str, names: str) -> None:
-    board = team.cfg["board"]
-    project, owner = str(board["project"]), board["owner"]
-    view = json.loads(run("gh", "project", "view", project, "--owner", owner, "--format", "json"))
-    fields = json.loads(
-        run("gh", "project", "field-list", project, "--owner", owner, "--format", "json")
-    )["fields"]
-    field = next((f for f in fields if f["name"] == "Waiting on"), None)
-    if field is None:
-        raise RuntimeError(f"Project {project} has no 'Waiting on' field")
-    items = json.loads(
-        run(
-            "gh",
-            "project",
-            "item-list",
-            project,
-            "--owner",
-            owner,
-            "--format",
-            "json",
-            "--limit",
-            "1000",
-        )
-    )["items"]
-    repo = repository()
-    item = next(
-        (
-            i
-            for i in items
-            if i.get("content", {}).get("number") == int(issue)
-            and i.get("content", {}).get("repository") == repo
-        ),
-        None,
-    )
-    if item is None:
-        raise RuntimeError(f"Issue #{issue} is not in project {project}")
-    run(
-        "gh", "project", "item-edit", "--project-id", view["id"], "--id", item["id"],
-        "--field-id", field["id"], "--text", ", ".join(n.strip() for n in names.split(",")),
-    )  # fmt: skip
-
-
 def post(args: argparse.Namespace) -> None:
     role, name, session = identity(args)
     header = comment_header(args.type, role, name, session, args.round)
@@ -131,13 +90,7 @@ def post(args: argparse.Namespace) -> None:
         print(
             f"{words} words, above {WORD_LIMIT}: state the reason in the comment", file=sys.stderr
         )
-    if args.attach:
-        links = [run("gh", "gist", "create", path) for path in args.attach]
-        body += "\n\nAttachments: " + ", ".join(links)
-    url = post_comment(args.issue, f"{header}\n{body}")
-    if args.waiting:
-        set_waiting(args.issue, args.waiting)
-    print(url)
+    print(post_comment(args.issue, f"{header}\n{body}"))
 
 
 def read(args: argparse.Namespace) -> None:
@@ -148,8 +101,7 @@ def read(args: argparse.Namespace) -> None:
         if not match:
             raise RuntimeError("--after takes a comment link (#issuecomment-id)")
         comments = [c for c in comments if int(str(c["id"])) > int(match.group(1))]
-    else:
-        print(f"{view['url']}\n{view['body']}")
+    print(f"{view['url']}\n{view['body']}")
     for comment in comments:
         print(f"\n--- {comment['html_url']} {comment['created_at']}\n{comment['body']}")
 
@@ -197,6 +149,13 @@ def claude_tokens(session: str) -> dict[str, list[int]]:
     for model, usage in messages.values():
         for i, key in enumerate(keys):
             totals[model][i] += count(usage, key)
+        # The outer totals exclude advisor calls; each is its own iteration with its model.
+        iterations = usage.get("iterations")
+        calls = object_list(iterations, "iterations") if iterations is not None else []
+        for call in calls:
+            if call.get("type") == "advisor_message":
+                for i, key in enumerate(keys):
+                    totals[str(call.get("model"))][i] += count(call, key)
     return totals
 
 
@@ -234,11 +193,17 @@ class Agent(TypedDict):
     stop: datetime | None
 
 
-Event = tuple[datetime, str, str, str]  # time, issue, "hold" or "stop", agent name
+Event = tuple[
+    datetime, str, str, str, str
+]  # time, issue, "launched"/"handoff"/"stopped", name, session
 
 
 def board_events(issues: list[str]) -> tuple[dict[tuple[str, str], Agent], list[Event]]:
-    """Every attributed poster, and the launch, handoff and stop EVENTs in time order."""
+    """Every attributed poster, and the launch, handoff and stop EVENTs in time order.
+
+    A handoff names its recipient by live name; the recipient's session is resolved to
+    its latest launch on that issue, since a relaunch is a new session under the old name.
+    """
     agents: dict[tuple[str, str], Agent] = {}
     events: list[Event] = []
     for issue in issues:
@@ -254,35 +219,48 @@ def board_events(issues: list[str]) -> tuple[dict[tuple[str, str], Agent], list[
             words = lines[1].split() if match["type"] == "EVENT" and len(lines) > 1 else []
             if words[:1] == ["launched"]:
                 agent["launch"] = min(agent["launch"] or at, at)
-                if match["role"] == "implementer":
-                    events.append((at, issue, "hold", match["name"]))
+                events.append((at, issue, "launched", match["name"], match["session"]))
             elif words[:1] == ["stopped"]:
                 agent["stop"] = at
-                events.append((at, issue, "stop", match["name"]))
+                events.append((at, issue, "stopped", match["name"], match["session"]))
             elif words[:1] == ["handoff"]:
-                events.append((at, issue, "hold", words[-1]))
+                events.append((at, issue, "handoff", words[-1], ""))
     return agents, sorted(events, key=lambda e: e[0])
 
 
-def working_time(events: list[Event], now: datetime) -> dict[str, float]:
-    """Seconds each agent held a pair checkout: from the EVENT giving it the turn to the next."""
-    working: dict[str, float] = {}
-    holder: dict[str, tuple[str, datetime]] = {}
-    for at, issue, kind, name in events:
+def working_time(
+    agents: dict[tuple[str, str], Agent], events: list[Event], now: datetime
+) -> dict[tuple[str, str], float]:
+    """Seconds each session held a pair checkout: from the EVENT giving it the turn to the next."""
+    working: dict[tuple[str, str], float] = {}
+    holder: dict[str, tuple[tuple[str, str], datetime]] = {}
+    current: dict[tuple[str, str], str] = {}  # (issue, name) -> latest launched session
+
+    def release(issue: str, at: datetime) -> None:
         held = holder.pop(issue, None)
         if held:
             working[held[0]] = working.get(held[0], 0) + (at - held[1]).total_seconds()
-        if kind == "hold":
-            holder[issue] = (name, at)
-    for name, since in holder.values():
-        working[name] = working.get(name, 0) + (now - since).total_seconds()
+
+    for at, issue, kind, name, session in events:
+        if kind == "launched":
+            current[issue, name] = session
+            if agents[name, session]["role"] == "implementer":
+                release(issue, at)
+                holder[issue] = ((name, session), at)
+        elif kind == "handoff":
+            release(issue, at)
+            holder[issue] = ((name, current.get((issue, name), "")), at)
+        elif holder.get(issue, ((None, None), None))[0] == (name, session):
+            release(issue, at)
+    for key, since in holder.values():
+        working[key] = working.get(key, 0) + (now - since).total_seconds()
     return working
 
 
 def usage(args: argparse.Namespace) -> None:
     now = datetime.now(UTC)
     agents, events = board_events(args.issues)
-    working = working_time(events, now)
+    working = working_time(agents, events, now)
     columns = ("Agent", "Role", "Session", "Elapsed", "Working", "Model", *COUNTS)
     print("| " + " | ".join(columns) + " |")
     print("|" + "---|" * len(columns))
@@ -291,7 +269,7 @@ def usage(args: argparse.Namespace) -> None:
         elapsed = duration(((stop or now) - launch).total_seconds()) if launch else ""
         if launch and not stop:
             elapsed += " (running)"
-        held = duration(working[name]) if name in working else ""
+        held = duration(working[name, session]) if (name, session) in working else ""
         tokens = claude_tokens(session) or codex_tokens(session) or {"no logs found": [0, 0, 0, 0]}
         for model, counts in sorted(tokens.items()):
             cells = [name, agent["role"], session, elapsed, held, model, *map(str, counts)]
@@ -307,8 +285,6 @@ def main() -> None:
     poster.add_argument("--round", type=int)
     poster.add_argument("--role")
     poster.add_argument("--as", dest="as_", nargs=3, metavar=("ROLE", "NAME", "SESSION"))
-    poster.add_argument("--waiting")
-    poster.add_argument("--attach", action="append", default=[])
     poster.set_defaults(handler=post)
     reader = commands.add_parser("read")
     reader.add_argument("issue")

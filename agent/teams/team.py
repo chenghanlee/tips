@@ -45,16 +45,10 @@ class TeamSettings(TypedDict):
     db_suffix_prefix: str
 
 
-class BoardSettings(TypedDict):
-    project: int
-    owner: str
-
-
 class Config(TypedDict):
     team: TeamSettings
     timeouts: dict[str, int]
     launch: dict[str, str]
-    board: BoardSettings
     agents: dict[str, AgentSpec]
 
 
@@ -444,9 +438,6 @@ def validate_config_fields(path: Path, value: Config) -> None:
     policies = object_fields(fields.get("launch"), f"{path}: launch")
     for key in ("codex_approval", "claude_permission_mode"):
         require_type(policies.get(key), str, f"{path}: launch.{key}")
-    board = object_fields(fields.get("board"), f"{path}: board")
-    require_type(board.get("project"), int, f"{path}: board.project")
-    require_type(board.get("owner"), str, f"{path}: board.owner")
     agents = object_fields(fields.get("agents"), f"{path}: agents")
     if not agents:
         raise RuntimeError(f"{path}: agents must name at least one entry")
@@ -672,10 +663,14 @@ def issue_comments(issue: str) -> list[dict[str, object]]:
 
 
 def post_comment(issue: str, text: str) -> str:
-    """Post a comment once: an identical comment already on the issue is reused, not repeated."""
-    for comment in issue_comments(issue):
-        if comment.get("body") == text:
-            return str(comment["html_url"])
+    """Post a round comment once: an identical comment already on the issue is reused.
+
+    EVENTs are exempt: two handoffs of one head read the same, and each is an occurrence.
+    """
+    if not text.startswith("EVENT "):
+        for comment in issue_comments(issue):
+            if comment.get("body") == text:
+                return str(comment["html_url"])
     return run("gh", "issue", "comment", issue, "--body-file", "-", input_text=text)
 
 
@@ -687,7 +682,8 @@ def post_event(brief: str, allocation: Allocation, text: str) -> None:
     """Record a launch, handoff or stop on the brief as the client it concerns.
 
     The launch EVENT is the join between an agent name and its session logs, so a failed
-    post is an error after the launch itself succeeded; the message says how to post it.
+    post is an error after the launch itself succeeded; the message says how to post it
+    after checking the issue's latest comments, since EVENTs are never deduplicated.
     """
     header = comment_header(
         "EVENT", event_role(allocation), allocation["name"], allocation["session"], None
@@ -696,9 +692,9 @@ def post_event(brief: str, allocation: Allocation, text: str) -> None:
         url = post_comment(brief, f"{header}\n{text}")
     except (RuntimeError, OSError, ValueError, KeyError) as error:
         raise RuntimeError(
-            f"EVENT not recorded on #{brief}: {error}. Post it: agent/teams/board.py post "
-            f"{brief} EVENT --as {event_role(allocation)} {allocation['name']} "
-            f"{allocation['session'] or 'unknown'} <<< {shlex.quote(text)}"
+            f"EVENT not recorded on #{brief}: {error}. If its latest comments lack it, post "
+            f"it: agent/teams/board.py post {brief} EVENT --as {event_role(allocation)} "
+            f"{allocation['name']} {allocation['session'] or 'unknown'} <<< {shlex.quote(text)}"
         ) from error
     print(f"Recorded on #{brief}: {url}")
 
@@ -1334,7 +1330,13 @@ def turn(pr: str, recipient: str) -> None:
     partner = live_name(record["slot"], recipient)
     herdr("agent", "prompt", partner, message)
     print(f"Notified {partner}. Stop using this worktree, build and database; end your turn now.")
-    post_event(record["brief"], record["agents"][me], f"handoff of {url} at {head} to {partner}")
+    try:
+        post_event(
+            record["brief"], record["agents"][me], f"handoff of {url} at {head} to {partner}"
+        )
+    except RuntimeError as error:
+        # The handoff is delivered: the partner holds the checkout, so turn must not fail.
+        print(f"Handoff delivered; do not rerun turn. {error}", file=sys.stderr)
 
 
 def stop_brief(brief: str) -> None:

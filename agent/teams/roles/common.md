@@ -26,8 +26,8 @@ Haiku, also read [models/haiku.md](models/haiku.md).
   one GitHub account. PR reviews use the [review record](../README.md#pr-review-record)
   format instead.
 - Target 400 words per round comment; above 800 the board script warns and you state
-  the reason in the comment. Put logs and screenshots in a gist and link it
-  (`--attach <file>`); link CI by run URL. Never paste output.
+  the reason in the comment. Put logs and screenshots in a gist (`gh gist create
+  <file>`) and link it; link CI by run URL. Never paste output.
 - Write a checkpoint before a handoff, compaction, restart or session end, and when
   a material fact would otherwise be lost: the lead updates the spec body's
   current-state section; everyone else posts a checkpoint comment or updates its PR

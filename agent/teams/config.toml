@@ -19,12 +19,6 @@ checks_minutes = 30
 codex_approval = "never"
 claude_permission_mode = "auto"
 
-# The swarm board: the GitHub project holding spec and brief issues. board.py and the
-# EVENT posts from team.py write there.
-[board]
-project = 16
-owner = "chenghanlee"
-
 # Started by agent/teams/dispatch; always Claude. It compacts when its context is
 # compact_percent full, because every message starts a turn over the whole context.
 [dispatcher]

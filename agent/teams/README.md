@@ -196,7 +196,7 @@ Run commands from the repository root of your checkout. The dispatcher runs
 | `herdr agent prompt dispatcher "<issue or PR URL> done"` | Tester | Notify the dispatcher that the PR merged. |
 | `herdr agent prompt dispatcher "<blocker comment URL> blocked"` | Current turn holder | Notify the dispatcher of a recorded blocker. |
 | `herdr agent prompt team-<slot>-<entry> "<review URL>"` | Other reviewer | Tell the merge-confirming tester that a review record exists. |
-| `agent/teams/board.py post <issue> <TYPE> --round <n>` | Any agent | Post a board comment with the attribution header, body on stdin; print its URL. An identical comment is reused, never doubled. `--waiting` sets the project's "Waiting on"; `--attach` links a file as a gist. |
+| `agent/teams/board.py post <issue> <TYPE> --round <n>` | Any agent | Post a board comment with the attribution header, body on stdin; print its URL. An identical round comment is reused, never doubled. |
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body and comments, or only the comments after a checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | The measurement table: per agent and session, elapsed and checkout-holding time from EVENTs, and tokens per model from the session logs. |
 

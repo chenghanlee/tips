@@ -15,9 +15,10 @@ repeated failures under an agreed design, weaken the case for design rounds.
 
 ## Open a feature
 
-1. Create the spec issue in the tips repo and add it to the swarm project:
-   `gh project item-add <board.project> --owner <board.owner> --url <issue URL>`; set
-   Kind, Feature and Phase there. Briefs are added the same way. Write the
+1. Create the spec issue in the tips repo and add it to the swarm project, Project 16:
+   `gh project item-add 16 --owner chenghanlee --url <issue URL>`; set Kind, Feature
+   and Phase there with `gh project item-edit`, and Waiting on when it helps the user.
+   Briefs are added the same way. Write the
    agent set in the body: designer names and the lead, tester names and the
    merge-confirming tester, the reviewing designer. Each is an `[agents.<entry>]`
    entry in `config.toml`. The lead copies the set into each brief: `Implementer:`
