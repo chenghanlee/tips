@@ -187,7 +187,7 @@ Run commands from the repository root of your checkout. The dispatcher runs
 
 | Command | Caller | Effect |
 |---|---|---|
-| `agent/teams/team.py start <brief>` | Dispatcher | Read the brief's `Implementer:` and `Required reviews:` lines. Create `task/<brief>` from `origin/main`, the `.worktrees/<brief>` worktree, dependencies and Dexter; launch the implementer and the merge-confirming tester, each in its own workspace; write the allocation record. |
+| `agent/teams/team.py start <brief>` | Dispatcher | Read the brief's `Implementer:` and `Required reviews:` lines. Create `task/<brief>` from `origin/main`, the `.worktrees/<brief>` worktree, dependencies and Dexter; launch the implementer and the merge-confirming tester, each in its own workspace; write the allocation record. Each launch, handoff and stop is also an EVENT comment on the brief, as the client it concerns, with its session id. |
 | `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require a clean tree and HEAD matching the PR head, run from the pair checkout, and a PR that closes the brief. Notify the tester with the PR URL and SHA, and with the `review` commands for reviewers not yet launched. |
 | `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Notify the implementer even if the tree is dirty or HEAD differs. Include any mismatch in the message. |
 | `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer named in the brief other than the merge-confirming tester: create `.worktrees/review-<pr>-<entry>` detached at the PR head with its own database suffix, port, dependencies and Dexter, and launch the reviewer there. A stopped reviewer's clean worktree moves to the current head; a running one keeps its head. |
@@ -196,6 +196,9 @@ Run commands from the repository root of your checkout. The dispatcher runs
 | `herdr agent prompt dispatcher "<issue or PR URL> done"` | Tester | Notify the dispatcher that the PR merged. |
 | `herdr agent prompt dispatcher "<blocker comment URL> blocked"` | Current turn holder | Notify the dispatcher of a recorded blocker. |
 | `herdr agent prompt team-<slot>-<entry> "<review URL>"` | Other reviewer | Tell the merge-confirming tester that a review record exists. |
+| `agent/teams/board.py post <issue> <TYPE> --round <n>` | Any agent | Post a board comment with the attribution header, body on stdin; print its URL. An identical comment is reused, never doubled. `--waiting` sets the project's "Waiting on"; `--attach` links a file as a gist. |
+| `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body and comments, or only the comments after a checkpoint. |
+| `agent/teams/board.py usage <issue>...` | Dispatcher | The measurement table: per agent and session, elapsed and checkout-holding time from EVENTs, and tokens per model from the session logs. |
 
 `start` and `stop` take the brief number. `turn`, `review` and the review tools take
 the PR number. Rerunning `start` or `review` keeps a running client and relaunches a

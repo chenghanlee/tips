@@ -15,7 +15,9 @@ repeated failures under an agreed design, weaken the case for design rounds.
 
 ## Open a feature
 
-1. Create the spec issue in the tips repo and add it to the swarm project. Write the
+1. Create the spec issue in the tips repo and add it to the swarm project:
+   `gh project item-add <board.project> --owner <board.owner> --url <issue URL>`; set
+   Kind, Feature and Phase there. Briefs are added the same way. Write the
    agent set in the body: designer names and the lead, tester names and the
    merge-confirming tester, the reviewing designer. Each is an `[agents.<entry>]`
    entry in `config.toml`. The lead copies the set into each brief: `Implementer:`
@@ -28,8 +30,10 @@ repeated failures under an agreed design, weaken the case for design rounds.
    you for a pinned reviewer worktree with its own database suffix and port, as the
    reviewing designer gets for PR review.
 3. Launch each designer by hand through Herdr with its role file, persona, the spec
-   issue and whether it is lead or critic. Record each launch as an EVENT comment on
-   the spec issue with the agent name and session id.
+   issue and whether it is lead or critic. Record each launch on the spec issue:
+   `agent/teams/board.py post <spec> EVENT --as designer <name> <session id>` with the
+   body `launched <client> by hand`. Record a replacement the same way with the body
+   `took over for <name>`.
 4. Personas: architecture (data integrity, contract boundaries, consistency with the
    existing architecture, simplicity, testability, effects on other code) and operations
    (failure and recovery paths, concurrency, security and authorization,
@@ -87,9 +91,9 @@ Use #327 and #65 to identify repeated failures, not as a control group.
 | Measure | Source |
 |---|---|
 | Feature start to verified, wall clock | First EVENT to merge of the last brief |
-| Per-agent working and waiting time | EVENT and comment timestamps |
+| Per-agent elapsed and checkout-holding time | `agent/teams/board.py usage <spec> <brief>...` from the EVENTs; waiting is elapsed minus holding, known only for pair agents |
 | Human minutes and interventions | Your log; disclose each |
-| Tokens per agent by model, advisors and restarts included; cached input once | `~/.claude/projects` JSONL, `~/.codex/sessions`, joined on session id |
+| Tokens per agent by model, advisors and restarts included; cached input once | The same `usage` table, from `~/.claude/projects` JSONL and `~/.codex/sessions` joined on the session id in each launch EVENT |
 | Acceptance scenarios passing | Tester review records |
 | Findings by severity from review; escaped defects until the next feature's review | PR reviews, later issues |
 | Design changes supported by critique; rework caused by design changes | Saved PROPOSAL versus accepted brief |
