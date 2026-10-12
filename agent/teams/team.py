@@ -619,6 +619,81 @@ def roster(brief: str) -> tuple[str, list[str], list[str]]:
     return implementer, by_role["tester"], by_role["designer"]
 
 
+COMMENT_TYPES = (
+    "PROPOSAL",
+    "CRITIQUE",
+    "QUESTION",
+    "ANSWER",
+    "AGREE",
+    "FINDING",
+    "BLOCKED",
+    "DONE",
+    "EVENT",
+)
+HEADER = re.compile(
+    r"^(?:R(?P<round>\d+) )?(?P<type>[A-Z]+) (?P<role>\S+) (?P<name>\S+) (?P<session>\S+)$"
+)
+
+
+def comment_header(kind: str, role: str, name: str, session: str, round_: int | None) -> str:
+    """The attribution line `R<round> <TYPE> <role> <name> <session>`; EVENT has no round."""
+    if kind not in COMMENT_TYPES:
+        raise RuntimeError(f"Comment type must be one of {', '.join(COMMENT_TYPES)}")
+    if (round_ is None) != (kind == "EVENT"):
+        raise RuntimeError("Every comment type except EVENT needs a round; EVENT has none")
+    prefix = "" if round_ is None else f"R{round_} "
+    return f"{prefix}{kind} {role} {name} {session or 'unknown'}"
+
+
+def repository() -> str:
+    return str(json.loads(run("gh", "repo", "view", "--json", "nameWithOwner"))["nameWithOwner"])
+
+
+def issue_comments(issue: str) -> list[dict[str, object]]:
+    """Every comment of an issue, oldest first: id, html_url, body, created_at."""
+    output = run(
+        "gh", "api", "--paginate", "--slurp", f"repos/{repository()}/issues/{issue}/comments"
+    )
+    pages = json.loads(output)
+    if not isinstance(pages, list):
+        raise RuntimeError(f"issue #{issue} comments: expected pages, received {pages!r}")
+    return [
+        c for page in cast(list[object], pages) for c in object_list(page, f"#{issue} comments")
+    ]
+
+
+def post_comment(issue: str, text: str) -> str:
+    """Post a comment once: an identical comment already on the issue is reused, not repeated."""
+    for comment in issue_comments(issue):
+        if comment.get("body") == text:
+            return str(comment["html_url"])
+    return run("gh", "issue", "comment", issue, "--body-file", "-", input_text=text)
+
+
+def event_role(allocation: Allocation) -> str:
+    return allocation["role"].split()[-1]
+
+
+def post_event(brief: str, allocation: Allocation, text: str) -> None:
+    """Record a launch on the brief as the launched client, with its session id.
+
+    This EVENT is the join between an agent name and its session logs, so a failed post
+    is an error after the launch itself succeeded; the message says how to post it.
+    """
+    header = comment_header(
+        "EVENT", event_role(allocation), allocation["name"], allocation["session"], None
+    )
+    try:
+        url = post_comment(brief, f"{header}\n{text}")
+    except (RuntimeError, OSError, ValueError, KeyError) as error:
+        raise RuntimeError(
+            f"EVENT not recorded on #{brief}: {error}. Post it: agent/teams/board.py post "
+            f"{brief} EVENT --as {event_role(allocation)} {allocation['name']} "
+            f"{allocation['session'] or 'unknown'} <<< {shlex.quote(text)}"
+        ) from error
+    print(f"Recorded on #{brief}: {url}")
+
+
 def bound_command(binary: Path, root: Path, sources: Path | str) -> str:
     """The worktree's Dexter command: the one place naming binary, root and sources."""
     return (
@@ -1033,6 +1108,12 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
     allocation["session"] = session_id(started) or "unknown"
     save_record(record)
     print(f"Launched {name}: {kind} in {worktree}, session {allocation['session']}")
+    post_event(
+        record["brief"],
+        allocation,
+        f"launched {kind} in {worktree}; database suffix {allocation['db_suffix']}; "
+        f"port {allocation['port']}",
+    )
 
 
 def require_main_checkout() -> None:

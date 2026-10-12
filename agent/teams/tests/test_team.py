@@ -427,13 +427,30 @@ if state.get('mix_fails'):
 Path('deps').mkdir(exist_ok=True)
 """
 
+# Issues, PRs, comments and the project live in the fixture state. Each posted comment
+# gets the next id and a time one minute after the previous one.
 FAKE_GH = r"""#!/usr/bin/env python3
-import json, os, sys
+import datetime, json, os, sys
 from pathlib import Path
-s = json.loads(Path(os.environ["HERDR_FIXTURE"]).read_text())
+path = Path(os.environ["HERDR_FIXTURE"])
+s = json.loads(path.read_text())
 a = sys.argv[1:]
+s.setdefault("events", []).append(["gh", *a])
+comments = s.setdefault("comments", {})
 if a[:2] == ["issue", "view"]:
-    print(json.dumps({"body": s.get("issues", {}).get(a[2], "")}))
+    body = s.get("issues", {}).get(a[2], "")
+    view = {"body": body, "url": "https://github.com/o/r/issues/" + a[2]}
+    print(json.dumps({key: view[key] for key in a[a.index("--json") + 1].split(",")}))
+elif a[:2] == ["issue", "comment"]:
+    if s.get("comments_fail"):
+        sys.exit("fixture GitHub refused the comment")
+    n = sum(len(c) for c in comments.values()) + 1
+    at = datetime.datetime(2026, 10, 12, 10, n, tzinfo=datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    url = "https://github.com/o/r/issues/%s#issuecomment-%d" % (a[2], n)
+    comments.setdefault(a[2], []).append(
+        {"id": n, "html_url": url, "body": sys.stdin.read(), "created_at": at}
+    )
+    print(url)
 elif a[:2] == ["pr", "view"]:
     briefs = [{"number": int(n)} for n in s.get("pr_briefs", {}).get(a[2], [])]
     view = {
@@ -442,8 +459,13 @@ elif a[:2] == ["pr", "view"]:
         "closingIssuesReferences": briefs,
     }
     print(json.dumps({key: view[key] for key in a[a.index("--json") + 1].split(",")}))
+elif a[:2] == ["repo", "view"]:
+    print(json.dumps({"nameWithOwner": "o/r"}))
+elif a[:3] == ["api", "--paginate", "--slurp"]:
+    print(json.dumps([comments.get(a[3].rsplit("/", 2)[1], [])]))
 else:
     sys.exit("Unexpected gh call: " + repr(a))
+path.write_text(json.dumps(s))
 """
 
 # One pane model for every pair: a pane with an agent has a client leading its foreground
@@ -570,7 +592,9 @@ finish()
 IDENTITY = ["-c", "user.name=Test", "-c", "user.email=test@example.invalid"]
 
 
-class PairLifecycleTest(unittest.TestCase):
+class Harness(unittest.TestCase):
+    """A disposable repository with fake Herdr, gh, Mix, Docker and Dexter on PATH."""
+
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory(prefix="tips pair ")
         self.addCleanup(self.tmp.cleanup)
@@ -643,7 +667,8 @@ class PairLifecycleTest(unittest.TestCase):
             ".codex/\n.agents/\n.dexter/\n.worktrees/\nagent/lsp/dexter/vendor/\n"
             "agent/teams/allocations/\ndeps/\ntmp/\n"
         )
-        (self.repo / "agent/teams/team.py").write_text(SCRIPT.read_text())
+        for script in ("team.py", "board.py"):
+            (self.repo / "agent/teams" / script).write_text((SCRIPT.parent / script).read_text())
         (self.repo / "agent/teams/config.toml").write_text(CONFIG)
         (self.repo / "tracked.txt").write_text("base\n")
         binary = self.repo / "agent/lsp/dexter/vendor/dexter"
@@ -730,6 +755,11 @@ class PairLifecycleTest(unittest.TestCase):
         argv = self.pane(label)["launch_argv"]
         return argv[argv.index("--append-system-prompt") + 1]
 
+    def comments(self, issue: str) -> list[dict[str, Any]]:
+        return self.state().get("comments", {}).get(issue, [])
+
+
+class PairLifecycleTest(Harness):
     def test_start_launches_the_pair_in_one_prepared_worktree(self) -> None:
         # origin/main moves on and the launcher's checkout is dirty: neither leaks in.
         (self.repo / "AGENTS.md").write_text("Committed instructions.\n")
@@ -813,6 +843,23 @@ class PairLifecycleTest(unittest.TestCase):
             "tester",
         )
         assert record["agents"]["tester"]["session"] == "session-team-1-tester"
+        # Each launch is recorded on the brief as the launched client, with its allocation.
+        assert [c["body"] for c in self.comments("29")] == [
+            f"EVENT implementer team-1-impl session-team-1-impl\nlaunched codex in {wt}; "
+            "database suffix _t1; port 4110",
+            f"EVENT tester team-1-tester session-team-1-tester\nlaunched claude in {wt}; "
+            "database suffix _t1r; port 4111",
+        ]
+        # A refused post is an error after the launch itself: the record stands and the
+        # message says how to post the EVENT by hand.
+        self.update(comments_fail=True)
+        refused = self.team("start", "31", ok=False)
+        assert "EVENT not recorded on #31" in refused.stderr
+        assert (
+            "board.py post 31 EVENT --as implementer team-2-impl session-team-2-impl"
+            in refused.stderr
+        )
+        assert self.record(2)["agents"]["impl"]["session"] == "session-team-2-impl"
 
     def test_brief_roster_is_validated_before_any_change(self) -> None:
         cases = {

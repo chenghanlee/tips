@@ -18,22 +18,25 @@ Haiku, also read [models/haiku.md](models/haiku.md).
 
 - Comments are append-only. Never edit or delete one. Only the lead designer edits a
   spec or brief body; only the implementer edits its PR body.
-- Every spec or brief comment starts with one header line:
-  `R<round> <TYPE> <role> <agent name> <session id>`. Types: PROPOSAL, CRITIQUE,
-  QUESTION, ANSWER, AGREE, FINDING, BLOCKED, DONE, EVENT. The line is attribution;
-  every agent posts through one GitHub account. PR reviews use the
-  [review record](../README.md#pr-review-record) format instead.
+- Post spec and brief comments with `agent/teams/board.py post <issue> <TYPE>
+  --round <n>`, body on stdin. It writes the header line
+  `R<round> <TYPE> <role> <agent name> <session id>` from your pane and allocation
+  record (EVENT has no round). Types: PROPOSAL, CRITIQUE, QUESTION, ANSWER, AGREE,
+  FINDING, BLOCKED, DONE, EVENT. The line is attribution; every agent posts through
+  one GitHub account. PR reviews use the [review record](../README.md#pr-review-record)
+  format instead.
 - Target 400 words per round comment; above 800 the board script warns and you state
-  the reason in the comment. Put logs and screenshots in a gist and link it; link CI
-  by run URL. Never paste output.
+  the reason in the comment. Put logs and screenshots in a gist (`gh gist create
+  <file>`) and link it; link CI by run URL. Never paste output.
 - Write a checkpoint before a handoff, compaction, restart or session end, and when
   a material fact would otherwise be lost: the lead updates the spec body's
   current-state section; everyone else posts a checkpoint comment or updates its PR
   body. Do not repeat facts in a commit or captured log. When resuming, read the body
-  and comments after your last checkpoint URL, not the whole thread.
+  and comments after your last checkpoint URL with
+  `agent/teams/board.py read <issue> --after <URL>`, not the whole thread.
 - Post a comment and send the Herdr prompt as two separate steps. A failed prompt is
-  reported as `blocked`, never rerouted. Before repeating an uncertain post, list
-  recent comments and reuse the URL if the post succeeded.
+  reported as `blocked`, never rerouted. Repeating a post after an uncertain result
+  is safe: the script returns the existing comment's URL instead of posting again.
 
 ## Evidence
 
