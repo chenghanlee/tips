@@ -72,7 +72,8 @@ config :tips, Oban,
     crontab: [
       {"* * * * *", Tips.Workers.ExpireRegistrations},
       {"* * * * *", Tips.Workers.EmbedSearch},
-      {"0 4 * * 1", Tips.Workers.SweepOrphanImages}
+      {"0 4 * * 1", Tips.Workers.SweepOrphanImages},
+      {"* * * * *", Tips.Workers.ExpireMedia}
     ]
   ],
   # Terminal jobs stay seven days for investigation; the minute job would otherwise grow the table.
