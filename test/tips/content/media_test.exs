@@ -34,9 +34,15 @@ defmodule Tips.Content.MediaTest do
 
       case reply.(conn.method, key) do
         :timeout -> Req.Test.transport_error(conn, :timeout)
+        :block -> block(test)
         status -> Plug.Conn.send_resp(conn, status, "")
       end
     end)
+  end
+
+  defp block(test) do
+    send(test, {:blocked, self()})
+    Process.sleep(:infinity)
   end
 
   defp requests do
@@ -118,9 +124,16 @@ defmodule Tips.Content.MediaTest do
   end
 
   test "a later put failure deletes only the objects known to be stored", %{tmp_dir: dir} do
+    # Each request runs in its own process; count the puts across them.
+    puts = :counters.new(1, [])
+
     stub_r2(fn
-      "PUT", _key -> if Process.put(:put, true), do: :timeout, else: 200
-      "DELETE", _key -> 204
+      "PUT", _key ->
+        :counters.add(puts, 1, 1)
+        if :counters.get(puts, 1) == 1, do: 200, else: :timeout
+
+      "DELETE", _key ->
+        204
     end)
 
     selection =
@@ -130,6 +143,20 @@ defmodule Tips.Content.MediaTest do
     assert [{"PUT", stored, _, _}, {"PUT", unknown, _, _}, {"DELETE", deleted, _, _}] = requests()
     assert deleted == stored
     refute unknown == stored
+  end
+
+  test "a put that outlives the call bound fails the attempt and leaves no request running",
+       %{tmp_dir: dir} do
+    stub_r2(fn
+      "PUT", _key -> :block
+      "DELETE", _key -> 204
+    end)
+
+    selection = [{:image_file, "a", file(dir, "static.png", "a.png"), nil}]
+
+    assert {:error, {:upload_failed, ["a"]}} = Media.store_images(selection, call_timeout: 100)
+    assert_received {:blocked, request}
+    refute Process.alive?(request)
   end
 
   @tag :real_provider

@@ -128,6 +128,8 @@ defmodule Tips.Content.Media do
   @status_concurrency 3
   # Each read has 5-second connect and receive timeouts; this ends one that outlives both.
   @status_timeout_ms 11_000
+  # Objects younger than this are never orphan candidates.
+  @orphan_grace_seconds 3600
 
   @types %{
     png: {"png", "image/png"},
@@ -645,6 +647,12 @@ defmodule Tips.Content.Media do
   @doc """
   Validates and stores the new image files in `selection`. See the module
   documentation. `opts` are passed to `R2.client!/1`.
+
+  An attempt ends within 12.5 minutes, well inside the orphan sweep's
+  one-hour grace: at most ten parser queue waits of 10 s, ten 5 s parses, ten
+  puts and ten cleanup deletes, each R2 call bounded at 30 s. The content
+  transaction follows in the same event, each statement and lock wait bounded
+  by the Repo's 2 s timeout.
   """
   @spec store_images([Content.attachment()], keyword()) ::
           {:ok, [stored_image()]} | {:error, error()}
@@ -668,6 +676,63 @@ defmodule Tips.Content.Media do
 
   defp delete(client, images) do
     for %{key: key} <- images, R2.delete(client, key) != :ok, do: key
+  end
+
+  @doc """
+  Deletes old image objects that no media row references, one listing page
+  per call. Run by `Tips.Workers.SweepOrphanImages`.
+
+  Lists at most ten objects under the prefix after `token` (from the start
+  when `nil`). A candidate is a key `<prefix><uuid>.<png|jpg|webp|gif>` last
+  modified before the cutoff. One query finds the candidates any media row
+  references, cleanup rows included; each other candidate is deleted. A failed
+  or timed-out delete is counted and logged, and left for the next weekly run.
+
+  Returns `{:continue, token}` when the listing has more pages, otherwise
+  `{:ok, %{deleted: n, failed: n}}` for this page. A listing error returns
+  `{:error, reason}` and deletes nothing.
+
+  The cutoff, one hour ago by default, exceeds the bound on an active attempt
+  (see `store_images/2`), so no attempt's objects are candidates. One call
+  makes at most eleven R2 calls of 30 s and one query of 2 s.
+
+  `opts`: `:prefix` (default `"media/"`) and `:cutoff`, for tests; the rest
+  are passed to `R2.client!/1`.
+  """
+  @spec sweep_orphans(String.t() | nil, keyword()) ::
+          {:continue, String.t()}
+          | {:ok, %{deleted: non_neg_integer(), failed: non_neg_integer()}}
+          | {:error, R2.error()}
+  def sweep_orphans(token, opts \\ []) do
+    {prefix, opts} = Keyword.pop(opts, :prefix, "media/")
+
+    {cutoff, opts} =
+      Keyword.pop_lazy(opts, :cutoff, fn ->
+        DateTime.add(DateTime.utc_now(), -@orphan_grace_seconds)
+      end)
+
+    client = R2.client!(opts)
+    pattern = Regex.compile!("^#{Regex.escape(prefix)}[0-9a-f-]{36}\\.(png|jpg|webp|gif)$")
+
+    with {:ok, %{objects: objects, next: next}} <- R2.list(client, prefix, token) do
+      candidates =
+        for %{key: key, last_modified: at} <- objects,
+            key =~ pattern and DateTime.before?(at, cutoff),
+            do: key
+
+      referenced = Repo.all(from(a in Asset, where: a.key in ^candidates, select: a.key))
+      orphans = candidates -- referenced
+      failed = for key <- orphans, R2.delete(client, key) != :ok, do: key
+
+      if failed != [] do
+        Logger.warning("Orphan sweep left #{length(failed)} objects: #{Enum.join(failed, ", ")}")
+      end
+
+      case next do
+        nil -> {:ok, %{deleted: length(orphans) - length(failed), failed: length(failed)}}
+        token -> {:continue, token}
+      end
+    end
   end
 
   defp check_count(selection) when length(selection) > @max_attachments,
