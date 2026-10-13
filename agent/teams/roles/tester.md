@@ -1,8 +1,8 @@
 # Tester
 
 Review one PR for correctness. The first tester on the brief's `Required reviews:` line
-confirms the merge and works in the pair worktree. Every other tester works in a
-separate worktree checked out at the PR head.
+confirms the merge and works in the pair worktree. Every other tester works in its own
+clone checked out at the PR head.
 
 ## Read
 
@@ -32,7 +32,7 @@ separate worktree checked out at the PR head.
 - Launch request to the dispatcher for missing reviewers.
 - `team.py turn <pr> <implementer entry>` when the head has findings.
 - Review URL to the merge-confirming tester, if you are not it.
-- New-head notice to each reviewer, if you confirm the merge.
+- New-head notice to a reviewer the handoff could not reach, if you confirm the merge.
 - `done` or `blocked` to the dispatcher.
 
 ## Do not

@@ -49,14 +49,14 @@ persona.
 
 ## Steps: reviewing designer
 
-1. The dispatcher launches you with `team.py review <pr> <entry>` in a worktree checked
-   out at the PR head.
+1. The dispatcher launches you with `team.py review <pr> <entry>` in your own clone
+   checked out at the PR head.
 2. Read the brief, then the diff, then the [PR body](../README.md#pr-body). Follow
    [review-software-design](../../skills/review-software-design/SKILL.md).
 3. Submit the [review record](../README.md#pr-review-record). Resolve only your own
    threads. Send the review URL to the merge-confirming tester.
-4. When notified of a new head, fetch it. Check it out detached. Reindex. Review the
-   changes since your last review.
+4. The implementer's handoff notifies you of each new head. Fetch it into your clone.
+   Check it out detached. Reindex. Review the changes since your last review.
 
 ## Messages you send
 

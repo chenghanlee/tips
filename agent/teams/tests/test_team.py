@@ -797,6 +797,16 @@ class Harness(unittest.TestCase):
 
 
 class PairLifecycleTest(Harness):
+    def test_start_points_a_browser_brief_at_the_guide(self) -> None:
+        self.team("start", "29")
+        guide = "docs/development/local-development.md#browser-tests-and-ci"
+        assert guide not in self.pane("team-1-impl")["launch_argv"][-1]
+        self.update(issues={**self.state()["issues"], "30": WIDE + "\nScenario 2: browser flow\n"})
+        self.team("start", "30")
+        prompt = self.pane("team-2-impl")["launch_argv"][-1]
+        assert f"Browser tests run locally; follow {guide}." in prompt
+        assert "report the exact command that failed" in prompt
+
     def test_start_launches_the_pair_in_one_prepared_worktree(self) -> None:
         # origin/main moves on and the launcher's checkout is dirty: neither leaks in.
         (self.repo / "AGENTS.md").write_text("Committed instructions.\n")
@@ -1269,10 +1279,23 @@ class PairLifecycleTest(Harness):
         assert "critic (team-1-critic)" in ring[3]
         assert "When every required reviewer's latest review of this head is LGTM" in ring[3]
         assert "all threads are resolved and required checks pass" in ring[3]
-        # Once the reviewer is launched, the handoff no longer asks for it.
+        # Once the reviewer is launched, the handoff no longer asks for it: the handoff
+        # itself tells the reviewer about the head, without waiting for the tester's LGTM.
         self.team("review", "7", "critic")
+        moved = self.push(wt, "second push")
         self.team("turn", "7", "tester", cwd=wt, pane=impl)
-        assert "review: run" not in self.events("agent", "prompt")[-1][3]
+        tester_ring, critic_ring = self.events("agent", "prompt")[-2:]
+        assert tester_ring[2] == "team-1-tester"
+        assert "review: run" not in tester_ring[3]
+        assert critic_ring[2] == "team-1-critic"
+        assert f"New head {moved} on https://github.com/o/r/pull/7" in critic_ring[3]
+        assert f"git fetch origin {moved}" in critic_ring[3]
+        # Handing back to the implementer notifies nobody else.
+        prompts = len(self.events("agent", "prompt"))
+        tester = self.pane("team-1-tester")["pane_id"]
+        self.team("turn", "7", "impl", cwd=wt, pane=tester)
+        assert len(self.events("agent", "prompt")) == prompts + 1
+        assert self.events("agent", "prompt")[-1][2] == "team-1-impl"
         # The brief cannot move the merge-confirming tester under a running pair.
         prompts = len(self.events("agent", "prompt"))
         body = "Implementer: impl\nRequired reviews: second, critic\n"
@@ -1345,6 +1368,12 @@ class PairLifecycleTest(Harness):
         wt = self.worktree("review-7-critic")
         assert self.git("rev-parse", "HEAD", cwd=wt) == head
         assert self.git("branch", "--show-current", cwd=wt) == ""
+        # A shared clone: its own .git for fetches, the main checkout's objects behind it.
+        assert (wt / ".git").is_dir()
+        alternates = (wt / ".git/objects/info/alternates").read_text().strip()
+        assert Path(alternates).resolve() == (self.repo / ".git/objects").resolve()
+        assert self.git("remote", "get-url", "origin", cwd=wt) == str(self.repo)
+        assert self.git("worktree", "list", "--porcelain").count("worktree ") == 2
         critic = self.pane("team-1-critic")
         assert critic["cwd"] == str(wt)
         assert self.launch_env("team-1-critic") == ("_t1c", "4112")
@@ -1390,6 +1419,12 @@ class PairLifecycleTest(Harness):
         assert self.git("rev-parse", "HEAD", cwd=wt) == head
         assert self.record(1)["agents"]["critic"]["head"] == head
         assert len(self.events("agent", "start")) == starts
+        # The reviewer fetches the new head itself, into its own .git, and can go back.
+        self.git("fetch", "-q", "origin", "task/29", cwd=wt)
+        self.git("checkout", "-q", "--detach", moved, cwd=wt)
+        assert self.git("rev-parse", "HEAD", cwd=wt) == moved
+        assert (wt / ".git/FETCH_HEAD").is_file()
+        self.git("checkout", "-q", "--detach", head, cwd=wt)
         # Another client in the reviewer's pane is not the reviewer, however it is named.
         self.clients_exit(1)
         state = self.state()
@@ -1526,6 +1561,22 @@ class PairLifecycleTest(Harness):
         assert self.git("branch", "--list", "task/29") != ""
         assert self.state()["workspaces"]
         assert self.record(1)["brief"] == "29"
+        # A reviewer clone is judged against the main checkout's fetched origin/main, not
+        # its own stale copy; its own unmerged commit is still preserved.
+        self.git("merge", "-q", "--ff-only", "task/29")
+        self.push(wt)
+        self.team("review", "7", "critic")
+        self.git("merge", "-q", "--ff-only", "task/29")
+        review = self.worktree("review-7-critic")
+        self.clients_exit(1)
+        (review / "tracked.txt").write_text("stray\n")
+        stray = self.commit("stray in clone", cwd=review)
+        refused = self.team("stop", "29", ok=False)
+        assert f"Unmerged worktree {review}" in refused.stderr, refused.stderr
+        assert self.git("rev-parse", "HEAD", cwd=review) == stray
+        self.git("checkout", "-q", "--detach", "HEAD~1", cwd=review)
+        self.team("stop", "29")
+        assert not review.exists()
 
     def test_worktree_dirtied_during_shutdown_is_preserved_after_clients_exit(self) -> None:
         self.team("start", "29")

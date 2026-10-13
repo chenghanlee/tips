@@ -804,11 +804,14 @@ def allocate(record: Record, entry: str, role: str, worktree: Path) -> Allocatio
 
 
 def checkout(worktree: Path, branch: str | None, commit: str | None) -> bool:
-    """Add the worktree on `branch` from fetched origin/main, or detached at `commit`.
+    """Add the pair worktree on `branch` from fetched origin/main, or a reviewer's shared
+    clone detached at `commit`.
 
     Return whether it is new. An existing pair worktree is kept as it is: its agent may
-    hold unfinished work. An existing reviewer worktree moves to `commit` when clean,
-    so a relaunched reviewer sees the head its brief names.
+    hold unfinished work. An existing reviewer clone moves to `commit` when clean,
+    so a relaunched reviewer sees the head its brief names. A clone has its own `.git`,
+    so a sandboxed reviewer can fetch later heads into it; a linked worktree writes its
+    fetch into the main checkout's `.git`, which the sandbox denies (#426).
     """
     git("fetch", "origin")
     if worktree.exists():
@@ -829,8 +832,26 @@ def checkout(worktree: Path, branch: str | None, commit: str | None) -> bool:
             git("worktree", "add", "--no-track", "-b", branch, worktree, "origin/main")
     else:
         require_commit(str(commit))
-        git("worktree", "add", "--detach", worktree, str(commit))
+        git("clone", "--quiet", "--shared", "--no-checkout", main, worktree)
+        git("remote", "set-url", "origin", git("remote", "get-url", "origin"), root=worktree)
+        git("checkout", "--detach", "-q", str(commit), root=worktree)
     return True
+
+
+def own_repository(root: Path) -> bool:
+    """Whether `root` is a reviewer's shared clone of the main checkout rather than one
+    of its linked worktrees. Any other checkout is refused."""
+    common = Path(git("rev-parse", "--path-format=absolute", "--git-common-dir", root=root))
+    if common.resolve() == (main / ".git").resolve():
+        return False
+    alternates = root / ".git/objects/info/alternates"
+    if (
+        common.resolve() == (root / ".git").resolve()
+        and alternates.is_file()
+        and Path(alternates.read_text().strip()).resolve() == (main / ".git/objects").resolve()
+    ):
+        return True
+    raise RuntimeError(f"unexpected checkout {root}")
 
 
 def require_commit(commit: str) -> None:
@@ -1042,10 +1063,22 @@ def identity(record: Record, entry: str, duty: str) -> str:
     return text
 
 
-def pair_brief(record: Record, entry: str, duty: str, wrapper: Path) -> str:
+BROWSER_GUIDE = "docs/development/local-development.md#browser-tests-and-ci"
+
+
+def pair_brief(record: Record, entry: str, duty: str, wrapper: Path, browser: bool) -> str:
     # A relaunched client gets this brief too, so it finds the turn instead of assuming it.
     implementer, tester = record["implementer"], record["tester"]
     partner = tester if entry == implementer else implementer
+    guide = ""
+    if browser:
+        # #82: "no ChromeDriver" became "CI-only" without reading the guide.
+        guide = (
+            "The brief names a browser scenario. Browser tests run locally; follow "
+            f"{BROWSER_GUIDE}. "
+            "Before calling any scenario CI-only, read that section and report the exact "
+            "command that failed. "
+        )
     return (
         identity(record, entry, duty)
         + f"Read agent/teams/README.md, then the brief with gh issue view {record['brief']}. "
@@ -1053,8 +1086,14 @@ def pair_brief(record: Record, entry: str, duty: str, wrapper: Path) -> str:
         "workflow; otherwise end your turn and wait for your partner's message. "
         f"Hand the checkout over with agent/teams/team.py turn <pr> {partner}. "
         f"Put {entry}, <session> on line 2 of each review record; "
-        "replace <session> with your session ID. " + dexter_brief(wrapper)
+        "replace <session> with your session ID. " + guide + dexter_brief(wrapper)
     )
+
+
+def names_browser(brief: str) -> bool:
+    """Whether the brief's body mentions a browser scenario."""
+    body = str(json.loads(run("gh", "issue", "view", brief, "--json", "body")).get("body") or "")
+    return re.search(r"\bbrowser\b", body, re.IGNORECASE) is not None
 
 
 def reviewer_brief(record: Record, entry: str, duty: str, pr: str, head: str, wrapper: Path) -> str:
@@ -1067,7 +1106,9 @@ def reviewer_brief(record: Record, entry: str, duty: str, pr: str, head: str, wr
         f"{entry}, <session> on line 2; replace <session> with your session ID. "
         "Then notify the merge-confirming tester with "
         f"herdr agent prompt {tester} '<your review URL>' and end your turn. "
-        "If the PR head changes, follow the README reviewer steps again. " + dexter_brief(wrapper)
+        "The implementer's handoff notifies you of each new head: fetch it into this "
+        "checkout, check it out detached, reindex and review the changes since your last "
+        "review. " + dexter_brief(wrapper)
     )
 
 
@@ -1233,12 +1274,12 @@ def start(brief: str) -> None:
     ]
     save_record(record)
     prepare_worktree(worktree, clients, f"task/{brief}", None)
+    browser = names_browser(brief)
     for allocation in clients:
         open_pane(record, allocation)
         wrapper = worktree / ".dexter/dexter.sh"
-        launch(
-            record, allocation, pair_brief(record, allocation["entry"], allocation["role"], wrapper)
-        )
+        prompt = pair_brief(record, allocation["entry"], allocation["role"], wrapper, browser)
+        launch(record, allocation, prompt)
     print(f"Brief {brief}: pair in slot {slot}, {worktree}")
 
 
@@ -1376,6 +1417,25 @@ def implementer_message(pr: str, url: str, problem: str | None) -> str:
     return message
 
 
+def notify_reviewers(record: Record, pr: str, url: str, head: str) -> None:
+    """Tell each launched, currently required reviewer of this PR about the new head, so
+    none waits for the tester's LGTM. A reviewer that cannot be reached is reported."""
+    testers, designers = current_roster(record)
+    for entry in testers + designers:
+        allocation = record["agents"].get(entry)
+        if allocation is None or allocation.get("pr") != pr:
+            continue
+        notice = (
+            f"New head {head} on {url}: run git fetch origin {head} in your checkout, "
+            "check it out detached, reindex, and review the changes since your last review."
+        )
+        try:
+            herdr("agent", "prompt", allocation["name"], notice)
+            print(f"Notified {allocation['name']} of {head}")
+        except RuntimeError as error:
+            print(f"Could not notify {allocation['name']}: {error}")
+
+
 def turn(pr: str, recipient: str) -> None:
     """Transfer the turn to the other pair agent and notify it."""
     record, me = caller_record()
@@ -1402,6 +1462,8 @@ def turn(pr: str, recipient: str) -> None:
         message = tester_message(record, pr, url, head)
     partner = live_name(record["slot"], recipient)
     herdr("agent", "prompt", partner, message)
+    if recipient == record["tester"]:
+        notify_reviewers(record, pr, url, head)
     print(
         f"Notified {partner}. Stop using this worktree, build processes and files, "
         "and database; end your turn now."
@@ -1427,10 +1489,13 @@ def stop_brief(brief: str) -> None:
     if roots:
         require_git_admin(main / ".git")
         git("fetch", "origin")
-    check_worktrees(roots)
+    # A clone's own origin/main is stale; the main checkout's is fetched and its objects
+    # are visible from the clone.
+    merged = git("rev-parse", "origin/main")
+    check_worktrees(roots, merged)
     for allocation in present.values():
         stop(allocation["pane"], pane_occupant(allocation["pane"])[0])
-    check_worktrees(roots)
+    check_worktrees(roots, merged)
     check_shared_owners(roots, present)
     # Rechecked at the close itself: a pane may have arrived during the shutdown.
     if require_only_recorded_panes(record):
@@ -1468,6 +1533,9 @@ def retire(roots: set[Path], suffixes: list[str]) -> None:
                 raise RuntimeError(result.stderr or result.stdout)
     drop_databases(suffixes)
     for root in sorted(roots):
+        if own_repository(root):
+            shutil.rmtree(root)
+            continue
         branch = git("branch", "--show-current", root=root)
         git("worktree", "remove", root)
         # check_worktrees proved the branch merged into fetched origin/main; -d would
@@ -1491,14 +1559,13 @@ def owned_worktrees(present: dict[str, Allocation]) -> set[Path]:
     for allocation in present.values():
         pane = allocation["pane"]
         root = pane_occupant(pane)[0]
-        if root != main and (
-            root.parent != main / ".worktrees"
-            or Path(
-                git("rev-parse", "--path-format=absolute", "--git-common-dir", root=root)
-            ).resolve()
-            != main / ".git"
-        ):
-            raise RuntimeError(f"{pane}: unexpected worktree {root}; preserved")
+        if root != main:
+            try:
+                if root.parent != main / ".worktrees":
+                    raise RuntimeError(f"unexpected checkout {root}")
+                own_repository(root)
+            except RuntimeError as error:
+                raise RuntimeError(f"{pane}: {error}; preserved") from error
         if pane_occupant(pane)[1]:
             agent = herdr("agent", "get", pane)["agent"]
             if agent.get("name") != allocation["name"]:
@@ -1508,13 +1575,13 @@ def owned_worktrees(present: dict[str, Allocation]) -> set[Path]:
     return roots
 
 
-def check_worktrees(roots: set[Path]) -> None:
+def check_worktrees(roots: set[Path], merged: str) -> None:
     for root in sorted(roots):
         if git("status", "--porcelain", "--untracked-files=all", root=root):
             raise RuntimeError(f"Dirty worktree {root}; remaining resources preserved")
         # Merged HEAD also proves all local commits reached origin/main.
         try:
-            git("merge-base", "--is-ancestor", "HEAD", "origin/main", root=root)
+            git("merge-base", "--is-ancestor", "HEAD", merged, root=root)
         except RuntimeError as error:
             raise RuntimeError(
                 f"Unmerged worktree {root}; remaining resources preserved"

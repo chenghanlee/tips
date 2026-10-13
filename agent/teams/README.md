@@ -3,7 +3,7 @@
 GitHub issues, PRs and reviews store the workflow state. Herdr messages start turns. One
 dispatcher chooses work, opens features, starts pairs and launches reviewers. An
 implementer and a merge-confirming tester share one worktree and take turns. Every other
-reviewer uses a separate worktree checked out at the PR head. Follow
+reviewer uses its own clone checked out at the PR head. Follow
 [AGENTS.md](../../AGENTS.md) and the skill for your task:
 [design-software](../skills/design-software/SKILL.md),
 [implement-software](../skills/implement-software/SKILL.md),
@@ -22,8 +22,9 @@ DISPATCHER   open a feature → designers agree on a spec and briefs → team.py
 IMPLEMENTER  ask questions only when answers affect the work → code → push → PR "Closes #<brief>" → team.py turn <pr> <tester>
 TESTER       ask the dispatcher to launch the other reviewers → review the head
 DISPATCHER   team.py review <pr> <entry> for each
-REVIEWERS    review from pinned worktrees → notify the tester with the review URL
+REVIEWERS    review from pinned clones → notify the tester with the review URL
 TESTER       findings → team.py turn <pr> <implementer>   (repeat until no P0 or P1)
+IMPLEMENTER  fix → push → team.py turn <pr> <tester> notifies the tester and every launched reviewer
 TESTER       every required review LGTM on the head · required checks pass → gh pr merge → "done"
 DISPATCHER   team.py stop <brief> → next
 ```
@@ -43,10 +44,10 @@ Run them from the root of your checkout. The dispatcher runs `start`, `review` a
 | Command | Caller | Effect |
 |---|---|---|
 | `agent/teams/team.py start <brief>` | Dispatcher | Read `Implementer:` and `Required reviews:`. Create branch `task/<brief>` from `origin/main` and worktree `.worktrees/<brief>`. Set up dependencies and Dexter. Launch the implementer and merge-confirming tester in the team's workspace (see [Herdr layout](#herdr-layout)), write the allocation record, and post one EVENT per launch on the brief. |
-| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Run from the pair checkout. Require a clean tree at the PR head and a PR that closes the brief. Notify the tester with the PR URL, SHA and the `review` commands for reviewers not yet launched. |
+| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Run from the pair checkout. Require a clean tree at the PR head and a PR that closes the brief. Notify the tester with the PR URL, SHA and the `review` commands for reviewers not yet launched. Notify each launched required reviewer of the new head. |
 | `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Notify the implementer even if the tree has uncommitted changes. Include any mismatch in the message. |
-| `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create `.worktrees/review-<pr>-<entry>` detached at the PR head with its own database suffix, port, dependencies and Dexter, and launch the reviewer there, in the team's workspace. |
-| `agent/teams/team.py stop <brief>` | Dispatcher | Refuse dirty, unmerged or foreign-owned work. Stop every recorded client and Dexter, drop the slot's databases, remove its worktrees, branch and workspace, delete the record. |
+| `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create `.worktrees/review-<pr>-<entry>`, a clone sharing the main checkout's objects, detached at the PR head with its own database suffix, port, dependencies and Dexter, and launch the reviewer there, in the team's workspace. |
+| `agent/teams/team.py stop <brief>` | Dispatcher | Refuse dirty, unmerged or foreign-owned work. Stop every recorded client and Dexter, drop the slot's databases, remove its worktree, clones, branch and workspace, delete the record. |
 | `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. |
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment or only those after a checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | Tokens per launched session and model, from the session logs. |
@@ -198,7 +199,8 @@ reports `blocked` with both run links. The dispatcher opens the revert with `gh 
 
 - One PR per issue. Open a new issue for work outside the scope. Keep that work out of
   the current PR.
-- The pair shares one worktree and takes turns; other reviewers have their own. Keep
+- The pair shares one worktree and takes turns; other reviewers have their own clone,
+  so a sandboxed reviewer fetches new heads itself. Keep
   each client's assigned database and test port in every run.
 - Put temporary files in the worktree's `tmp/`. Make source changes in worktrees, never
   the main checkout.

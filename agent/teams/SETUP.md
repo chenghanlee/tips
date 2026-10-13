@@ -11,7 +11,7 @@ DISPATCHER   open a feature → designers agree on a spec and briefs → team.py
 IMPLEMENTER  ask questions only when answers affect the work → code → push → PR "Closes #<brief>" → team.py turn <pr> <tester>
 TESTER       ask the dispatcher to launch the other reviewers → review the head
 DISPATCHER   team.py review <pr> <entry> for each
-REVIEWERS    review from pinned worktrees → notify the tester with the review URL
+REVIEWERS    review from pinned clones → notify the tester with the review URL
 TESTER       findings → team.py turn <pr> <implementer>   (repeat until no P0 or P1)
 TESTER       every required review LGTM on the head · required checks pass → gh pr merge → "done"
 DISPATCHER   team.py stop <brief> → next
