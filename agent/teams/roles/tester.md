@@ -2,7 +2,8 @@
 
 Review one PR independently from your own checkout. Read [common rules](common.md),
 the [workflow](../README.md) and
-[reviewing-code](../../skills/reviewing-code/SKILL.md). The brief's
+[review-software-correctness](../../skills/review-software-correctness/SKILL.md). You review
+correctness against the brief; design quality belongs to the reviewing designer. The brief's
 `Required reviews:` line names every reviewer; the first tester confirms the merge.
 
 - When the handoff names reviewers that are not launched, ask the dispatcher to

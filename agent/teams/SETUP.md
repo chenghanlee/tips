@@ -42,10 +42,10 @@ The user maintains third-party skills in these Git-ignored directories in the ma
 
 Keep the Codex and Claude skill copies in sync. `team.py start` links the main checkout's `.agents/skills/` into each worktree and checks only that the directory exists.
 
-The repository tracks three skills: the [Dexter reference](../skills/dexter/SKILL.md), [developing-software](../skills/developing-software/SKILL.md) and [reviewing-code](../skills/reviewing-code/SKILL.md). Link them once into both locations from the main checkout:
+The repository tracks five skills: the [Dexter reference](../skills/dexter/SKILL.md), [design-software](../skills/design-software/SKILL.md), [implement-software](../skills/implement-software/SKILL.md) and [review-software-correctness](../skills/review-software-correctness/SKILL.md). Link them once into both locations from the main checkout:
 
 ```bash
-for skill in dexter developing-software reviewing-code; do
+for skill in dexter design-software implement-software review-software-correctness review-software-design; do
   ln -s ../../agent/skills/$skill .agents/skills/$skill
   ln -s ../../agent/skills/$skill .claude/skills/$skill
 done

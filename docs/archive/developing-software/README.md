@@ -1,13 +1,13 @@
-# Archived developing-software brainstorm
+# Archived implement-software brainstorm
 
 Historical record of the brainstorm promoted in [PR #385](https://github.com/chenghanlee/tips/pull/385).
 This archive is not agent instructions.
 
 The revised instructions now live in the active
-[developing-software skill](../../../agent/skills/developing-software/SKILL.md), with
-[performance measurement](../../../agent/skills/developing-software/references/performance-measurement.md)
+[implement-software skill](../../../agent/skills/implement-software/SKILL.md), with
+[performance measurement](../../../agent/skills/implement-software/references/performance-measurement.md)
 loaded when needed. Edit those sources rather than maintaining a second copy here.
-The [last brainstorm draft](https://github.com/chenghanlee/tips/blob/988e174/docs/brainstorm/developing-software-skill.md)
+The [last brainstorm draft](https://github.com/chenghanlee/tips/blob/988e174/docs/brainstorm/implement-software-skill.md)
 and its [measurement reference](https://github.com/chenghanlee/tips/blob/988e174/docs/brainstorm/performance-measurement.md)
 preserve the pre-promotion text in Git history. Both remain reachable through main
 without retaining the merged branch or worktree.

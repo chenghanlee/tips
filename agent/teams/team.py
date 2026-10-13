@@ -1260,7 +1260,7 @@ def tester_message(record: Record, pr: str, url: str, head: str) -> str:
             f"parallel review: herdr agent prompt dispatcher '{url} review: run {commands}'."
         )
     message += (
-        " Follow agent/teams/roles/tester.md and agent/skills/reviewing-code/SKILL.md "
+        " Follow agent/teams/roles/tester.md and agent/skills/review-software-correctness/SKILL.md "
         "from this worktree and use the README PR review record. "
         f"Put {tester}, <session> on line 2; replace <session> with your session ID. "
         f"If you find issues, submit your review and run "
@@ -1293,7 +1293,7 @@ def implementer_message(pr: str, url: str, problem: str | None) -> str:
     message = (
         f"Your turn on {url}: run agent/teams/pr_review.py list {pr} and "
         f"gh pr checks {pr} --required. Fix review findings and failed checks following "
-        "agent/skills/developing-software/SKILL.md from this worktree. Push your changes, "
+        "agent/skills/implement-software/SKILL.md from this worktree. Push your changes, "
         "then hand the turn back to the tester. If blocked, follow the README blocker procedure."
     )
     if problem:

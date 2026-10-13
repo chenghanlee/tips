@@ -4,8 +4,9 @@ GitHub issues, PRs and reviews store the workflow state. Herdr messages start tu
 dispatcher chooses work, opens features, starts pairs and launches reviewers. An
 implementer and a merge-confirming tester share one worktree and take turns; every
 other reviewer works from its own worktree pinned at the PR head. Follow
-[AGENTS.md](../../AGENTS.md), [developing-software](../skills/developing-software/SKILL.md)
-and [reviewing-code](../skills/reviewing-code/SKILL.md). Your role file lists your
+[AGENTS.md](../../AGENTS.md) and the skill for your task: [design-software](../skills/design-software/SKILL.md),
+[implement-software](../skills/implement-software/SKILL.md), [review-software-correctness](../skills/review-software-correctness/SKILL.md)
+or [review-software-design](../skills/review-software-design/SKILL.md). Your role file lists your
 responsibilities: [dispatcher](roles/dispatcher.md), [designer](roles/designer.md),
 [implementer](roles/implementer.md), [tester](roles/tester.md). Everyone reads
 [common rules](roles/common.md). The user completes [setup](SETUP.md) once.

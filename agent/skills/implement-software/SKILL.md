@@ -1,9 +1,9 @@
 ---
-name: developing-software
-description: Guides implementation planning, features, fixes, refactors and tests in the tips Phoenix/Elixir repository. Applies when designing a code change, implementing required behavior or choosing tests. Code reviews use reviewing-code, which references this skill's design and testing rules.
+name: implement-software
+description: Guides implementation planning, features, fixes, refactors and tests in the tips Phoenix/Elixir repository. Applies when designing a code change, implementing required behavior or choosing tests. Code reviews use review-software-correctness and review-software-design, which reference this skill's contract, state and testing rules.
 ---
 
-# Developing software
+# Implement software
 
 Use general guidance throughout the task; apply checks marked **Trigger** or **When**
 when their conditions occur. These are decision cues, not sequential gates. Follow
@@ -164,6 +164,17 @@ another implementation that satisfies the same contract.
 
 Cover acceptance scenarios and reported regressions with the smallest set of test
 changes. Do not add tests merely because functions, branches or inputs changed.
+The repository already has more test lines than application lines; the brief's
+scenarios and contracts are the test list and its test budget is the limit.
+
+- A test that maps to no scenario or contract line needs a one-line reason in the PR.
+- Banned by default: combination grids over inputs, one test per error tuple, tests
+  of private helpers, tests that restate a pattern match, tests of a constraint the
+  database already enforces, tests of cases that cannot happen.
+- Allowed without a brief line: one regression test per fixed bug; a race or property
+  test where the brief names a concurrency contract.
+- Two tests that fail for the same bug: keep one. When the change replaces behaviour,
+  delete the old tests in the same PR.
 Read existing tests first. Leave adequate coverage unchanged; update assertions for
 changed requirements; extend an existing test when it can cover the missing scenario
 with the same setup and action. Add a test only when none can cover the required

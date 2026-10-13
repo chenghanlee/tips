@@ -21,7 +21,7 @@
 
 ## Skills
 
-Before planning an implementation, changing code or writing tests, read [developing-software](agent/skills/developing-software/SKILL.md) from the current worktree. It owns software design and testing rules; apply its conditional checks when their triggers occur. When assigned a PR, diff or commit review, read [reviewing-code](agent/skills/reviewing-code/SKILL.md) from the current worktree and apply it. The language and framework skills below still apply.
+Read the skill for your task from the current worktree and apply it: [design-software](agent/skills/design-software/SKILL.md) when designing a feature, writing a spec or brief, or critiquing one; [implement-software](agent/skills/implement-software/SKILL.md) before planning an implementation, changing code or writing tests; [review-software-correctness](agent/skills/review-software-correctness/SKILL.md) when reviewing a PR, diff or commit for correctness against its brief; [review-software-design](agent/skills/review-software-design/SKILL.md) when reviewing one for design. A solo review applies both review skills. The language and framework skills below still apply.
 
 Before reading, editing or reviewing Elixir code, load `elixir` and each skill that applies:
 

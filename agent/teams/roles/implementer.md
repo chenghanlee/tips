@@ -15,10 +15,11 @@ disagreements between designers.
 
 ## Deliver
 
-1. Implement and verify with [developing-software](../../skills/developing-software/SKILL.md)
+1. Implement and verify with [implement-software](../../skills/implement-software/SKILL.md)
    from this worktree. Before changing a contract, trace its callers per AGENTS.md.
-2. Review your own diff with [reviewing-code](../../skills/reviewing-code/SKILL.md)
-   before the handoff; fix what you find.
+2. Review your own diff with [review-software-correctness](../../skills/review-software-correctness/SKILL.md)
+   and the test-value section of [review-software-design](../../skills/review-software-design/SKILL.md#test-value)
+   before the handoff; fix what you find. Stay inside the brief's test budget.
 3. Push, open the PR with `Closes #<brief>`, link the CI run, and state any check CI
    does not run with its result. Then `agent/teams/team.py turn <pr> <tester entry>`
    from the pair checkout. Until the tester returns the turn, leave the worktree,

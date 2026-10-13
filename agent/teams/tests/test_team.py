@@ -1197,7 +1197,7 @@ class PairLifecycleTest(Harness):
         assert ring[2] == "team-1-tester"
         assert "https://github.com/o/r/pull/7" in ring[3]
         assert pushed in ring[3]
-        assert "agent/skills/reviewing-code/SKILL.md from this worktree" in ring[3]
+        assert "agent/skills/review-software-correctness/SKILL.md from this worktree" in ring[3]
         assert "Put tester, <session> on line 2" in ring[3]
         assert "team.py turn 7 impl" in ring[3]
         # The tester asks the dispatcher for reviewers that are not launched, then reviews.
@@ -1238,7 +1238,7 @@ class PairLifecycleTest(Harness):
         ring = self.events("agent", "prompt")[-1]
         assert ring[2] == "team-1-impl"
         assert "pr_review.py list 7" in ring[3]
-        assert "agent/skills/developing-software/SKILL.md from this worktree" in ring[3]
+        assert "agent/skills/implement-software/SKILL.md from this worktree" in ring[3]
         assert "Fix the checkout first" not in ring[3]
         # Only the implementer can repair the tree, so a problem is reported, not refused.
         (wt / "scratch.txt").write_text("left behind\n")

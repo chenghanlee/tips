@@ -1,6 +1,6 @@
 # Developing software revision: authoring checks and evaluations
 
-Authoring notes for the [promoted revision](../../../agent/skills/developing-software/SKILL.md), assessed
+Authoring notes for the [promoted revision](../../../agent/skills/implement-software/SKILL.md), assessed
 against the supplied [Skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).
 This plan is retained with the [archived brainstorm](README.md). Its evaluations
 remain pending; archiving the design discussion does not mark them complete. This
@@ -38,7 +38,7 @@ file is not an instruction file to load during implementation.
 
 ## Comparison method
 
-Start with the existing [replay scenarios](../../../agent/skills/developing-software/evals.json):
+Start with the existing [replay scenarios](../../../agent/skills/implement-software/evals.json):
 three scenario definitions across two historical tasks (issue 78 and issue 62,
 including replacement of the issue 244 probe). They pin base and first-review heads
 and provide a manual replay/grading protocol; they are not an executable harness.
@@ -52,7 +52,7 @@ exact brief and instruction versions used; if historical requirements cannot be
 recovered, report that limit rather than claiming an equivalent replay.
 
 Use fresh sessions with the same task, checkout, tools and model settings in each arm:
-(1) repository instructions without developing-software, (2) the previous skill at
+(1) repository instructions without implement-software, (2) the previous skill at
 `988e174`, and (3) the promoted revision, pinned to its exact commit when running.
 Preserve design and test requirements in every arm: the first two retain their
 AGENTS.md copies; the revised arm uses the skill as their owner. Keep all other
@@ -101,7 +101,7 @@ First-review head: `b460b23dd43f13b1a4a619d28439ea3ef1a9ee94`.
 Use the issue body and linked requirements as of 2026-10-07 as the developer request,
 not the later repair instructions below. Historical brief recovery and replay setup
 remain pending. The [pair workflow at that head](https://github.com/chenghanlee/tips/blob/b460b23dd43f13b1a4a619d28439ea3ef1a9ee94/agent/teams/README.md#2-developer-implement-and-hand-off)
-required loading developing-software. Actual loading has not been verified from the
+required loading implement-software. Actual loading has not been verified from the
 session trace, so do not classify that head as a controlled active-skill or no-skill
 run.
 
