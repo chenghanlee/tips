@@ -62,6 +62,7 @@ class Allocation(TypedDict):
     db_suffix: str
     port: int
     workspace: str
+    tab: str
     pane: str
     session: str
     pr: NotRequired[str]
@@ -69,13 +70,16 @@ class Allocation(TypedDict):
 
 
 class Record(TypedDict):
-    """A slot's allocation record: the brief, its roster and every launched client."""
+    """A slot's allocation record: the brief, its roster, its Herdr workspace and tabs, and
+    every launched client."""
 
     slot: int
     brief: str
     worktree: str
     implementer: str
     tester: str
+    workspace: str
+    tabs: dict[str, str]
     agents: dict[str, Allocation]
 
 
@@ -94,6 +98,7 @@ class ProcessInfo(TypedDict):
 # Herdr commands return different subsets. Callers access only the requested fields.
 class Entity(TypedDict):
     pane_id: str
+    tab_id: str
     workspace_id: str
     label: str
     name: str
@@ -108,6 +113,7 @@ class HerdrResult(TypedDict):
     pane: Entity
     root_pane: Entity
     workspace: Entity
+    tab: Entity
     agent: Entity
     panes: list[Entity]
     workspaces: list[Entity]
@@ -117,6 +123,8 @@ class HerdrResult(TypedDict):
 
 ProcessRows = dict[int, tuple[int, str]]
 ROLES = ("designer", "implementer", "tester")
+# A team's workspace holds one tab per role; every client of that role is a pane in it.
+TABS = {"designer": "designers", "implementer": "implementers", "tester": "reviewers"}
 ENTRY = r"[a-z0-9][a-z0-9-]*"
 AGENT_FIELDS = {"role", "kind", "model", "effort", "advisor", "persona", "port_offset", "db_suffix"}
 # Dexter's query gives up this long after --wait: its allowance to reach the daemon.
@@ -242,7 +250,7 @@ def parse_herdr(output: str) -> HerdrResult:
     if "error" in envelope:
         raise RuntimeError(str(envelope["error"]))
     result = object_fields(envelope.get("result"), "Herdr result")
-    for key in ("agent", "pane", "root_pane", "workspace"):
+    for key in ("agent", "pane", "root_pane", "workspace", "tab"):
         if key in result:
             entity_fields(result[key], f"Herdr {key}")
     for key in ("agents", "panes", "workspaces"):
@@ -519,11 +527,15 @@ def record_path(slot: int) -> Path:
 def load_record(path: Path) -> Record:
     fields = object_fields(json.loads(path.read_text()), str(path))
     require_type(fields.get("slot"), int, f"{path}: slot")
-    for key in ("brief", "worktree", "implementer", "tester"):
+    for key in ("brief", "worktree", "implementer", "tester", "workspace"):
         require_type(fields.get(key), str, f"{path}: {key}")
+    for label, tab in object_fields(fields.get("tabs"), f"{path}: tabs").items():
+        require_type(tab, str, f"{path}: tabs.{label}")
     for entry, value in object_fields(fields.get("agents"), f"{path}: agents").items():
         allocation = object_fields(value, f"{path}: agents.{entry}")
-        for key in ("entry", "role", "name", "kind", "worktree", "db_suffix", "workspace", "pane"):
+        for key in (
+            "entry", "role", "name", "kind", "worktree", "db_suffix", "workspace", "tab", "pane"
+        ):
             require_type(allocation.get(key), str, f"{path}: agents.{entry}.{key}")
         require_type(allocation.get("port"), int, f"{path}: agents.{entry}.port")
     return cast(Record, fields)
@@ -783,6 +795,7 @@ def allocate(record: Record, entry: str, role: str, worktree: Path) -> Allocatio
         db_suffix=suffix,
         port=port,
         workspace="",
+        tab="",
         pane="",
         session="",
     )
@@ -908,16 +921,73 @@ def live_workspaces() -> set[str]:
     return {w["workspace_id"] for w in herdr("workspace", "list")["workspaces"]}
 
 
+def live_panes(workspace: str) -> list[Entity]:
+    """The panes of a recorded workspace; none when Herdr no longer has it."""
+    if not workspace or workspace not in live_workspaces():
+        return []
+    return herdr("pane", "list", "--workspace", workspace)["panes"]
+
+
 def open_pane(record: Record, allocation: Allocation) -> None:
-    """Keep the client's recorded pane, or create a single-pane workspace with its name."""
-    if allocation["workspace"] and allocation["workspace"] in live_workspaces():
+    """Keep the client's recorded pane, or open one in its team's workspace and role tab.
+
+    The team shares one workspace, labelled after its slot and brief. Each role has one
+    tab; a second client of the role is a split of the tab's last pane.
+    """
+    label = TABS[cfg["agents"][allocation["entry"]]["role"]]
+    panes = live_panes(record["workspace"])
+    if allocation["pane"] in {p["pane_id"] for p in panes}:
         return
-    name = allocation["name"]
-    created = herdr("workspace", "create", "--cwd", str(main), "--label", name, "--no-focus")
-    allocation["workspace"] = created["workspace"]["workspace_id"]
-    allocation["pane"] = created["root_pane"]["pane_id"]
-    save_record(record)  # the workspace exists now; a failure below must still find it
-    herdr("pane", "rename", allocation["pane"], name)
+    if not panes:
+        created = herdr(
+            "workspace",
+            "create",
+            "--cwd",
+            str(main),
+            "--label",
+            f"team-{record['slot']}-{record['brief']}",
+            "--no-focus",
+        )
+        # The workspace exists now; a failure below must still find it.
+        record["workspace"] = created["workspace"]["workspace_id"]
+        record["tabs"] = {label: created["tab"]["tab_id"]}
+        save_record(record)
+        herdr("tab", "rename", created["tab"]["tab_id"], label)
+        pane = created["root_pane"]
+    else:
+        tab = record["tabs"].get(label, "")
+        siblings = [p for p in panes if p["tab_id"] == tab]
+        if siblings:
+            direction = "right" if len(siblings) == 1 else "down"
+            pane = herdr(
+                "pane",
+                "split",
+                siblings[-1]["pane_id"],
+                "--direction",
+                direction,
+                "--cwd",
+                str(main),
+                "--no-focus",
+            )["pane"]
+        else:
+            created = herdr(
+                "tab",
+                "create",
+                "--workspace",
+                record["workspace"],
+                "--cwd",
+                str(main),
+                "--label",
+                label,
+                "--no-focus",
+            )
+            record["tabs"][label] = created["tab"]["tab_id"]
+            pane = created["root_pane"]
+    allocation["workspace"] = record["workspace"]
+    allocation["tab"] = record["tabs"][label]
+    allocation["pane"] = pane["pane_id"]
+    save_record(record)
+    herdr("pane", "rename", allocation["pane"], allocation["name"])
 
 
 def enter(pane: str, worktree: Path, env: dict[str, str]) -> None:
@@ -1148,6 +1218,8 @@ def start(brief: str) -> None:
             worktree=str(worktree),
             implementer=pair[0],
             tester=pair[1],
+            workspace="",
+            tabs={},
             agents={},
         )
         save_record(record)  # the slot is reserved before anything is provisioned
@@ -1205,7 +1277,8 @@ def review(pr: str, entry: str) -> None:
     allocation = record["agents"].get(entry) or allocate(record, entry, duty, worktree)
     allocation["pr"] = pr
     save_record(record)
-    if allocation["workspace"] in live_workspaces() and running_client(allocation):
+    live = {p["pane_id"] for p in live_panes(record["workspace"])}
+    if allocation["pane"] in live and running_client(allocation):
         # A running reviewer keeps the head it is on; its record says which.
         allocation["head"] = git("rev-parse", "HEAD", root=worktree)
         save_record(record)
@@ -1341,10 +1414,9 @@ def stop_brief(brief: str) -> None:
     if record is None:
         print(f"Brief {brief}: no allocation record; nothing removed")
         return
-    live = live_workspaces()
-    present = {e: a for e, a in record["agents"].items() if a["workspace"] in live}
-    for allocation in present.values():
-        require_sole_pane(allocation)
+    live = {p["pane_id"] for p in live_panes(record["workspace"])}
+    present = {e: a for e, a in record["agents"].items() if a["pane"] in live}
+    require_only_recorded_panes(record)
     roots = owned_worktrees(present)
     pair = Path(record["worktree"])
     if pair.is_dir():
@@ -1360,24 +1432,26 @@ def stop_brief(brief: str) -> None:
         stop(allocation["pane"], pane_occupant(allocation["pane"])[0])
     check_worktrees(roots)
     check_shared_owners(roots, present)
-    for allocation in present.values():
-        # Rechecked at the close itself: a pane may have arrived during the shutdown.
-        require_sole_pane(allocation)
-        herdr("workspace", "close", allocation["workspace"])
+    # Rechecked at the close itself: a pane may have arrived during the shutdown.
+    if require_only_recorded_panes(record):
+        herdr("workspace", "close", record["workspace"])
     retire(roots, [a["db_suffix"] for a in record["agents"].values()])
     record_path(record["slot"]).unlink()
     print(f"Brief {brief}: slot {record['slot']} retired; main checkout status follows")
     print(git("status", "--short") or "Main checkout clean")
 
 
-def require_sole_pane(allocation: Allocation) -> None:
-    """Require the recorded pane to be the only pane; closing the workspace closes every pane."""
-    panes = herdr("pane", "list", "--workspace", allocation["workspace"])["panes"]
-    strangers = [p["pane_id"] for p in panes if p["pane_id"] != allocation["pane"]]
+def require_only_recorded_panes(record: Record) -> bool:
+    """Require every pane of the team's workspace to be recorded; closing the workspace
+    closes them all. Return whether the workspace is live."""
+    panes = live_panes(record["workspace"])
+    recorded = {a["pane"] for a in record["agents"].values()}
+    strangers = [p["pane_id"] for p in panes if p["pane_id"] not in recorded]
     if strangers:
         raise RuntimeError(
-            f"Workspace of {allocation['name']} holds other panes {strangers}; preserved"
+            f"Workspace of brief #{record['brief']} holds other panes {strangers}; preserved"
         )
+    return bool(panes)
 
 
 def retire(roots: set[Path], suffixes: list[str]) -> None:

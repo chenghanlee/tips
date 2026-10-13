@@ -514,14 +514,41 @@ if a[:2] == ["workspace", "list"]:
 elif a[:2] == ["workspace", "create"]:
     s["count"] = s.get("count", 0) + 1
     w = {"workspace_id": "w%d" % s["count"], "label": opt("--label")}
-    x = {"pane_id": w["workspace_id"] + ":p1", "workspace_id": w["workspace_id"]}
+    t = {"tab_id": w["workspace_id"] + ":t1", "workspace_id": w["workspace_id"], "label": "1"}
+    x = {"pane_id": w["workspace_id"] + ":p1", "tab_id": t["tab_id"]}
+    x["workspace_id"] = w["workspace_id"]
     x["cwd"] = opt("--cwd")
     s["workspaces"].append(w)
+    s.setdefault("tabs", []).append(t)
     s["panes"].append(x)
-    result = {"workspace": w, "root_pane": x}
+    result = {"workspace": w, "tab": t, "root_pane": x}
 elif a[:2] == ["workspace", "close"]:
     s["workspaces"] = [w for w in s["workspaces"] if w["workspace_id"] != a[2]]
+    s["tabs"] = [t for t in s.get("tabs", []) if t["workspace_id"] != a[2]]
     s["panes"] = [x for x in s["panes"] if x["workspace_id"] != a[2]]
+elif a[:2] == ["tab", "create"]:
+    w = opt("--workspace")
+    s["count"] = s.get("count", 0) + 1
+    t = {"tab_id": "%s:t%d" % (w, s["count"]), "workspace_id": w, "label": opt("--label")}
+    x = {"pane_id": "%s:p%d" % (w, s["count"]), "tab_id": t["tab_id"], "workspace_id": w}
+    x["cwd"] = opt("--cwd")
+    s.setdefault("tabs", []).append(t)
+    s["panes"].append(x)
+    result = {"tab": t, "root_pane": x}
+elif a[:2] == ["tab", "rename"]:
+    next(t for t in s["tabs"] if t["tab_id"] == a[2])["label"] = a[3]
+elif a[:2] == ["pane", "split"]:
+    y = pane(a[2])
+    s["count"] = s.get("count", 0) + 1
+    x = {
+        "pane_id": "%s:p%d" % (y["workspace_id"], s["count"]),
+        "tab_id": y["tab_id"],
+        "workspace_id": y["workspace_id"],
+        "cwd": opt("--cwd"),
+        "split": opt("--direction"),
+    }
+    s["panes"].append(x)
+    result = {"pane": x}
 elif a[:2] == ["pane", "list"]:
     every = s["panes"] + s.get("strays", [])
     result = {"panes": [x for x in every if x.get("workspace_id") == opt("--workspace")]}
@@ -708,6 +735,16 @@ class Harness(unittest.TestCase):
     def workspaces(self) -> list[str]:
         return [w["label"] for w in self.state()["workspaces"]]
 
+    def tabs(self, workspace: str) -> dict[str, list[str]]:
+        """Each tab label of the workspace with the labels of its panes."""
+        state = self.state()
+        panes = state["panes"]
+        return {
+            tab["label"]: [str(p.get("label", "")) for p in panes if p["tab_id"] == tab["tab_id"]]
+            for tab in state.get("tabs", [])
+            if tab["workspace_id"] == workspace
+        }
+
     def record(self, slot: int) -> dict[str, Any]:
         return json.loads((self.repo / f"agent/teams/allocations/{slot}.json").read_text())
 
@@ -770,9 +807,15 @@ class PairLifecycleTest(Harness):
         assert self.git("branch", "--show-current", cwd=wt) == "task/29"
         assert self.git("rev-parse", "HEAD", cwd=wt) == release
         assert (wt / "AGENTS.md").read_text() == "Committed instructions.\n"
-        assert self.workspaces() == ["team-1-impl", "team-1-tester"]
+        assert self.workspaces() == ["team-1-29"]
+        assert self.tabs("w1") == {
+            "implementers": ["team-1-impl"],
+            "reviewers": ["team-1-tester"],
+        }
+        assert self.record(1)["tabs"] == {"implementers": "w1:t1", "reviewers": "w1:t2"}
         impl, tester = self.pane("team-1-impl"), self.pane("team-1-tester")
         assert (impl["agent"], tester["agent"]) == ("codex", "claude")
+        assert (impl["tab_id"], tester["tab_id"]) == ("w1:t1", "w1:t2")
         assert impl["cwd"] == tester["cwd"] == str(wt)
         # Each client has its own database and port; both use the worktree's one Dexter.
         shared = {
@@ -904,18 +947,38 @@ class PairLifecycleTest(Harness):
         assert self.launch_env("team-1-tester") == ("_t1r", "4111")
         assert (wt / "tracked.txt").read_text() == "unfinished work\n"
         assert len(self.events("mix")) == 1
-        assert self.workspaces() == ["team-1-impl", "team-1-tester"]
-        # A vanished workspace gets a new pane; the allocation keeps its resources.
+        assert self.workspaces() == ["team-1-29"]
+        # A closed pane is reopened in its role's tab; the allocation keeps its resources.
+        # Herdr closes a tab with its last pane, so the role gets a new tab too.
         old = self.record(1)["agents"]["impl"]
         state = self.state()
-        state["workspaces"] = [w for w in state["workspaces"] if w["label"] != "team-1-impl"]
         state["panes"] = [x for x in state["panes"] if x.get("label") != "team-1-impl"]
+        state["tabs"] = [t for t in state["tabs"] if t["tab_id"] != old["tab"]]
         self.save(state)
+        self.clients_exit(1)
         self.team("start", "29")
         new = self.record(1)["agents"]["impl"]
-        assert new["workspace"] != old["workspace"]
+        assert new["pane"] != old["pane"]
+        assert new["workspace"] == old["workspace"]
+        assert new["tab"] != old["tab"]
+        assert self.record(1)["tabs"]["implementers"] == new["tab"]
         assert (new["db_suffix"], new["port"]) == (old["db_suffix"], old["port"])
         assert self.pane("team-1-impl")["pane_id"] == new["pane"]
+        assert self.launch_env("team-1-impl") == ("_t1", "4110")
+        assert self.tabs("w1") == {
+            "reviewers": ["team-1-tester"],
+            "implementers": ["team-1-impl"],
+        }
+        # A vanished workspace is recreated with both clients in their tabs.
+        self.update(workspaces=[], tabs=[], panes=[])
+        self.team("start", "29")
+        assert self.workspaces() == ["team-1-29"]
+        workspace = self.record(1)["workspace"]
+        assert workspace != old["workspace"]
+        assert self.tabs(workspace) == {
+            "implementers": ["team-1-impl"],
+            "reviewers": ["team-1-tester"],
+        }
         assert self.launch_env("team-1-impl") == ("_t1", "4110")
         # A client cannot change kind or disappear from config while it is allocated.
         self.clients_exit(1)
@@ -986,7 +1049,7 @@ class PairLifecycleTest(Harness):
         assert "No free slot" in refused.stderr
         assert not self.worktree("32").exists()
         # Slots come from the records, so a slot whose workspaces are gone is still taken.
-        self.update(workspaces=[], panes=[])
+        self.update(workspaces=[], tabs=[], panes=[])
         assert "No free slot" in self.team("start", "32", ok=False).stderr
 
     def test_foreign_client_in_the_task_worktree_refuses_before_any_change(self) -> None:
@@ -1309,12 +1372,15 @@ class PairLifecycleTest(Harness):
         assert second["agent"] == "codex"
         assert self.launch_env("team-1-second") == ("_t1s", "4113")
         assert "the additional tester for brief #29" in second["launch_argv"][-1]
-        assert self.workspaces() == [
-            "team-1-impl",
-            "team-1-tester",
-            "team-1-critic",
-            "team-1-second",
-        ]
+        # Every reviewer is a pane in the team's workspace: designers in their own tab,
+        # the second tester split off the merge-confirming tester's pane.
+        assert self.workspaces() == ["team-1-29"]
+        assert self.tabs("w1") == {
+            "implementers": ["team-1-impl"],
+            "reviewers": ["team-1-tester", "team-1-second"],
+            "designers": ["team-1-critic"],
+        }
+        assert second["split"] == "right"
         # A new head: a running reviewer keeps its head and its record says so.
         moved = self.push(self.worktree("29"), "second push")
         starts = len(self.events("agent", "start"))
@@ -1377,7 +1443,7 @@ class PairLifecycleTest(Harness):
         self.update(pr_briefs={"7": ["29"]}, pr_head="0" * 40)
         assert "not on origin" in self.team("review", "7", "critic", ok=False).stderr
         assert not self.worktree("review-7-critic").exists()
-        assert self.workspaces() == ["team-1-impl", "team-1-tester"]
+        assert self.workspaces() == ["team-1-29"]
 
     def test_stop_retires_a_merged_brief_with_its_reviewer_and_leaves_the_other(self) -> None:
         self.team("start", "29")
@@ -1395,7 +1461,8 @@ class PairLifecycleTest(Harness):
         # An unrecorded pane in a recorded workspace is preserved: nothing is closed.
         visitor = {
             "pane_id": "w1:p9",
-            "workspace_id": self.record(1)["agents"]["impl"]["workspace"],
+            "workspace_id": self.record(1)["workspace"],
+            "tab_id": "w1:t9",
             "name": "visitor",
             "agent": "codex",
             "cwd": str(self.repo),
@@ -1409,10 +1476,10 @@ class PairLifecycleTest(Harness):
         assert "nothing removed" in self.team("stop", "99").stdout
         # A pane arriving while clients are stopped is found at the close itself: its
         # workspace stays open, nothing is removed, and the brief retires once it has gone.
-        self.env["RACE_VISITOR_WORKSPACE"] = self.record(1)["agents"]["impl"]["workspace"]
+        self.env["RACE_VISITOR_WORKSPACE"] = self.record(1)["workspace"]
         refused = self.team("stop", "29", ok=False)
         assert "holds other panes ['w1:p8']" in refused.stderr, refused.stderr
-        assert "team-1-impl" in self.workspaces()
+        assert "team-1-29" in self.workspaces()
         assert wt.exists()
         assert not (self.root / "docker-calls").exists()
         del self.env["RACE_VISITOR_WORKSPACE"]
@@ -1421,7 +1488,7 @@ class PairLifecycleTest(Harness):
         assert not wt.exists()
         assert not review.exists()
         assert self.git("branch", "--list", "task/29") == ""
-        assert self.workspaces() == ["team-2-impl", "team-2-tester"]
+        assert self.workspaces() == ["team-2-30"]
         assert not (self.repo / "agent/teams/allocations/1.json").exists()
         assert self.record(2)["brief"] == "30"
         calls = (self.root / "docker-calls").read_text()
@@ -1438,7 +1505,7 @@ class PairLifecycleTest(Harness):
         assert "nothing removed" in self.team("stop", "29").stdout
         self.push(self.worktree("30"), pr="8", brief="30")
         self.git("merge", "-q", "--no-ff", "-m", "merge 30", "task/30")
-        self.update(workspaces=[], panes=[])
+        self.update(workspaces=[], tabs=[], panes=[])
         self.team("stop", "30")
         assert not self.worktree("30").exists()
         assert not list((self.repo / "agent/teams/allocations").glob("*.json"))

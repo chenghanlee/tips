@@ -42,11 +42,11 @@ Run them from the root of your checkout. The dispatcher runs `start`, `review` a
 
 | Command | Caller | Effect |
 |---|---|---|
-| `agent/teams/team.py start <brief>` | Dispatcher | Read `Implementer:` and `Required reviews:`. Create branch `task/<brief>` from `origin/main` and worktree `.worktrees/<brief>`. Set up dependencies and Dexter. Launch the implementer and merge-confirming tester in their own workspaces, write the allocation record, and post one EVENT per launch on the brief. |
+| `agent/teams/team.py start <brief>` | Dispatcher | Read `Implementer:` and `Required reviews:`. Create branch `task/<brief>` from `origin/main` and worktree `.worktrees/<brief>`. Set up dependencies and Dexter. Launch the implementer and merge-confirming tester in the team's workspace (see [Herdr layout](#herdr-layout)), write the allocation record, and post one EVENT per launch on the brief. |
 | `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Run from the pair checkout. Require a clean tree at the PR head and a PR that closes the brief. Notify the tester with the PR URL, SHA and the `review` commands for reviewers not yet launched. |
 | `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Notify the implementer even if the tree has uncommitted changes. Include any mismatch in the message. |
-| `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create `.worktrees/review-<pr>-<entry>` detached at the PR head with its own database suffix, port, dependencies and Dexter, and launch the reviewer there. |
-| `agent/teams/team.py stop <brief>` | Dispatcher | Refuse dirty, unmerged or foreign-owned work. Stop every recorded client and Dexter, drop the slot's databases, remove its worktrees, branch and workspaces, delete the record. |
+| `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create `.worktrees/review-<pr>-<entry>` detached at the PR head with its own database suffix, port, dependencies and Dexter, and launch the reviewer there, in the team's workspace. |
+| `agent/teams/team.py stop <brief>` | Dispatcher | Refuse dirty, unmerged or foreign-owned work. Stop every recorded client and Dexter, drop the slot's databases, remove its worktrees, branch and workspace, delete the record. |
 | `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. |
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment or only those after a checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | Tokens per launched session and model, from the session logs. |
@@ -56,6 +56,16 @@ Run them from the root of your checkout. The dispatcher runs `start`, `review` a
 | `herdr agent prompt team-<slot>-<entry> "<review URL>"` | Other reviewer | Tell the merge-confirming tester a review exists. |
 | `herdr agent prompt dispatcher "<URL> done"` | Tester | The PR merged. |
 | `herdr agent prompt dispatcher "<comment URL> blocked"` | Turn holder | A blocker is recorded. |
+
+### Herdr layout
+
+Each team has one Herdr workspace, labelled `team-<slot>-<brief>`. It has one tab per
+role: `designers`, `implementers` and `reviewers`. The merge-confirming tester and
+additional testers share `reviewers`. Each client is a pane in its role's tab, named
+after the client; a second client of a role is split off the tab's last pane. A tab
+opens with its first client. `start` and `review` reopen a closed pane in the same
+workspace and tab; `stop` refuses a workspace that holds a pane the record does not
+name, and otherwise closes the whole workspace.
 
 Rerunning `start` or `review` keeps a running client and relaunches a missing one from
 its record. The command refuses a client whose startup did not complete. Inspect its
