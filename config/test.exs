@@ -109,5 +109,16 @@ config :tips, Tips.Content.Media.CloudflareStream,
   plug: {Req.Test, Tips.Content.Media.CloudflareStream},
   settings: %{account_id: "synthetic-account", api_token: "synthetic-stream-token"}
 
+# Signed playback uses a synthetic RSA key, encoded as CLOUDFLARE_STREAM_SIGNING_KEY is.
+# Only `:real_provider` tests override it to sign with the development account's key.
+config :tips, Tips.Content.Media.StreamSigner,
+  settings: %{
+    customer_code: "synthetic-code",
+    signing_key:
+      Base.encode64(
+        File.read!(Path.expand("../test/support/fixtures/stream_signing_key.json", __DIR__))
+      )
+  }
+
 # Saturation tests wait for capacity; keep each wait short.
 config :tips, Tips.Content.Search.ProviderCapacity, size: 8, queue_wait: 200

@@ -64,6 +64,48 @@ defmodule Tips.Content.Read do
   end
 
   @doc false
+  # The first matching row of the media-access table in `Tips.Content`. Only a
+  # privileged branch (hidden or deleted parent, staged row) readmits the viewer.
+  def get_media_access(viewer, media_id) do
+    with {:ok, id} <- row_id(media_id),
+         {%Asset{} = asset, tip, review} <- playable_video(id),
+         :ok <- media_access(viewer, asset, review || tip) do
+      {:ok, %{stream_uid: asset.stream_uid}}
+    else
+      _denied -> {:error, :not_found}
+    end
+  end
+
+  # A ready, uncleaned video with its tip or review, if attached. Attached rows
+  # have no deadline; a staged row's deadline must not have passed.
+  defp playable_video(id) do
+    Repo.one(
+      from a in Asset,
+        left_join: t in assoc(a, :tip),
+        left_join: r in assoc(a, :review),
+        where:
+          a.id == ^id and a.kind == :video and a.state == :ready and is_nil(a.cleanup_at) and
+            (is_nil(a.expires_at) or a.expires_at > fragment("clock_timestamp()")),
+        select: {a, t, r}
+    )
+  end
+
+  # Staged: only its author.
+  defp media_access(viewer, %Asset{user_id: user_id}, nil) do
+    with {:ok, %Scope{user: %User{id: ^user_id}}} <- admit(viewer), do: :ok
+  end
+
+  # Attached: anyone while the parent is live; otherwise the parent's decision
+  # for the readmitted viewer.
+  defp media_access(viewer, _asset, parent) do
+    if readable?(nil, parent) do
+      :ok
+    else
+      with {:ok, scope} <- admit(viewer), true <- readable?(scope, parent), do: :ok
+    end
+  end
+
+  @doc false
   # Projects one loaded row for a moderation case, with the same hydration and
   # deletion-first masking as the pages. A review sees its parent as a link.
   def project(scope, %Tip{} = tip),

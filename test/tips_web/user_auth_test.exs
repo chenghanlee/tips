@@ -297,6 +297,11 @@ defmodule TipsWeb.UserAuthTest do
                token_row(user_token).authenticated_at
 
       assert get_session(conn, :user_token) == user_token
+
+      assert UserAuth.viewer(conn) == %SessionRef{
+               token_id: Repo.get_by!(UserToken, token: user_token, context: "session").id,
+               user_id: user.id
+             }
     end
 
     test "authenticates user from cookies", %{conn: conn, user: user} do

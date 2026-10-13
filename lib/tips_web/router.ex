@@ -85,4 +85,11 @@ defmodule TipsWeb.Router do
     post "/users/log-in", UserSessionController, :create
     delete "/users/log-out", UserSessionController, :delete
   end
+
+  scope "/media", TipsWeb do
+    pipe_through [:browser]
+
+    get "/:id/watch", MediaController, :watch
+    get "/:id/thumbnail", MediaController, :thumbnail
+  end
 end
