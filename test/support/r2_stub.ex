@@ -9,6 +9,9 @@ defmodule Tips.R2Stub do
   request is reported to the test process as
   `{:list, query_params, pid}` or `{:delete, key, pid}`, and each blocked
   request as `{:blocked, pid}`.
+
+  `record/1` stubs image puts and deletes for content attempts instead; see
+  `requests/0`.
   """
 
   alias Tips.Content.Media.R2
@@ -31,6 +34,40 @@ defmodule Tips.R2Stub do
           status -> Plug.Conn.send_resp(conn, status, "")
         end
     end)
+  end
+
+  @doc """
+  Answers each PUT or DELETE of an object with `reply.(method, key)`, a status
+  or `:timeout`, and reports it to the test process as `{:r2, method, key}`.
+  """
+  def record(reply \\ fn _method, _key -> 200 end) do
+    test = self()
+
+    Req.Test.stub(R2, fn %{request_path: "/tips-test/" <> key} = conn ->
+      send(test, {:r2, conn.method, key})
+
+      case reply.(conn.method, key) do
+        :timeout -> Req.Test.transport_error(conn, :timeout)
+        status -> Plug.Conn.send_resp(conn, status, "")
+      end
+    end)
+  end
+
+  @doc "The `{method, key}` of each request `record/1` answered since the last call, in order."
+  def requests do
+    receive do
+      {:r2, method, key} -> [{method, key} | requests()]
+    after
+      0 -> []
+    end
+  end
+
+  @doc "Copies an image fixture to `dir` under a fresh name, as a page-owned file."
+  def image_file(dir, fixture \\ "static.png") do
+    filename = "#{System.unique_integer([:positive])}-#{fixture}"
+    path = Path.join(dir, filename)
+    File.cp!(Path.expand("../fixtures/images/#{fixture}", __DIR__), path)
+    %{path: path, filename: filename}
   end
 
   @doc "The keys deleted since the last call, in request order."

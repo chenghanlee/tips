@@ -11,6 +11,7 @@ defmodule Tips.Content.MediaClaimTest do
   alias Tips.Content
   alias Tips.Content.Media.Asset
   alias Tips.Content.{Review, Tip}
+  alias Tips.R2Stub
 
   @tip_attrs %{
     title: "Record the failing run",
@@ -187,6 +188,38 @@ defmodule Tips.Content.MediaClaimTest do
                Content.publish_tip(scope(author), key, @tip_attrs, [{:staged_video, video.id}])
 
       assert [%Asset{tip_id: ^id}] = attached(:tip_id, id)
+    end
+
+    @tag :tmp_dir
+    test "a new image is inserted at its slot beside a claimed staged video", %{tmp_dir: dir} do
+      R2Stub.record()
+      author = user_fixture()
+      key = Ecto.UUID.generate()
+      video = ready_video(author, {:new_tip, key})
+
+      selection = [
+        {:image_file, "s1", R2Stub.image_file(dir, "animated.gif"), "Loop"},
+        {:staged_video, video.id}
+      ]
+
+      assert {:ok, %{outcome: :created, id: id}} =
+               Content.publish_tip(scope(author), key, @tip_attrs, selection)
+
+      assert [{"PUT", stored}] = R2Stub.requests()
+      {video_id, author_id} = {video.id, author.id}
+
+      assert [
+               %Asset{
+                 kind: :image,
+                 user_id: ^author_id,
+                 key: ^stored,
+                 position: 0,
+                 is_animated: true,
+                 description: "Loop",
+                 target: nil
+               },
+               %Asset{id: ^video_id, kind: :video, position: 1, expires_at: nil}
+             ] = attached(:tip_id, id)
     end
 
     test "a duplicate or an eleventh slot is a changeset error before any write" do

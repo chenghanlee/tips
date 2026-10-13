@@ -91,8 +91,8 @@ defmodule Tips.Content do
   Publication exists for text: `publish_tip/4`, `publish_review/5` and
   `get_publication/4`. Text edits exist: `get_edit_form/3`, `edit_tip/5` and
   `edit_review/5`. Editors check typed text with `change_content/2`, which
-  writes nothing. Publications and edits claim staged videos; image files
-  are not supported yet. Inputs and results are the types below. The
+  writes nothing. Publications and edits claim staged videos and attach new
+  image files. Inputs and results are the types below. The
   comparator is `compare_intents/3`.
 
     * `publish_tip(scope, submission_key, attrs, uploads)` returns
@@ -136,9 +136,18 @@ defmodule Tips.Content do
       error with `media_id: media_id` in its metadata;
     * a selection over ten slots gets an `:uploads` error, and a media id
       selected more than once gets one naming it;
-    * each `{:image_file, slot, _, _}` gets an `:uploads` error naming its
-      slot until image publication exists (#82). Attachments are never
+    * a malformed entry gets an `:uploads` error. Attachments are never
       dropped silently.
+
+  Each `{:image_file, slot, image_file, description}` is then stored by
+  `Tips.Content.Media.store_images/2`, after admission and validation and
+  before the transaction. A file it rejects or cannot store is an `:uploads`
+  error with `slot: slot` in its metadata: larger than 10 MB, not a PNG,
+  JPEG, WebP or GIF, unreadable as an image, a failed upload, or no parser
+  free; new files over 50 MB together name the first image slot. A
+  transaction known to have rolled back deletes the images its attempt
+  stored; `{:error, :outcome_unknown}` deletes nothing and leaves them to the
+  orphan sweep. A retry stores the page's files again under new keys.
 
   An image file's temporary path is valid only during the page attempt that
   owns it. Content uploads images with `Tips.Content.Media.store_images/2` and
@@ -256,13 +265,15 @@ defmodule Tips.Content do
   like a new publication: every attempt, including an invalid, no-op or
   conflicting one, spends one write and is not refunded. It then checks
   complete intent (see above) and a positive integer `expected_version`
-  (otherwise an `:edit_version` error). Edits keep the saved selection and
-  may add staged videos: the `{:retained, id, description}` entries of
-  `uploads` must be the complete current list in its order, with staged
-  videos anywhere among them, or `[]` when there are none. An image file or
-  missing image is an `:uploads` error before the transaction; a removed,
-  reordered or redescribed attachment, or a retained id not attached here, is
-  an `:uploads` error naming its media id where one exists. A staged video
+  (otherwise an `:edit_version` error). Edits may keep, remove and add
+  attachments: the `{:retained, id, description}` entries of `uploads` must
+  keep the current list's relative order and descriptions, with staged videos
+  and image files anywhere among them. A current attachment left out, or all
+  of them with `[]`, is removed: the edit retires it with
+  `Tips.Content.Media.retire/1` after the version write and before the claim.
+  A missing image is an `:uploads` error before the transaction; a reordered
+  or redescribed attachment, or a retained id not attached here, is an
+  `:uploads` error naming its media id where one exists. A staged video
   that is not claimable rejects the edit (see "Staged video claims"). Only a
   newly selected curated choice must be active; a saved retired choice may
   stay.

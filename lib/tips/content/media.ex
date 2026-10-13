@@ -98,9 +98,10 @@ defmodule Tips.Content.Media do
   ## Claims
 
   `claim/2` is the content transaction's media participant: it attaches the
-  selected staged videos to the saved tip or review and places the whole
-  ordered selection. `validate_selection/2` checks the selection's shape
-  before that transaction.
+  selected staged videos to the saved tip or review, inserts the rows of its
+  stored new images and places the whole ordered selection.
+  `validate_selection/2` checks the selection's shape before that
+  transaction.
 
   Lock order. A content transaction locks the account, then content rows
   (a parent tip before its review), then curated choices, and media rows
@@ -129,7 +130,8 @@ defmodule Tips.Content.Media do
   which wins. A rejection writes nothing; the caller rolls back and every
   staged video stays reusable. On success each claimed video gets its parent
   and position and loses its expiry and cooldown; retained rows move to their
-  new positions under deferred slot constraints.
+  new positions under deferred slot constraints; each `t:new_image/0` becomes
+  an attached image row at its index.
 
   ## Cleanup
 
@@ -198,6 +200,12 @@ defmodule Tips.Content.Media do
           is_animated: boolean(),
           description: String.t() | nil
         }
+
+  @typedoc """
+  A stored new image in a selection, built inside Content from the result of
+  `store_images/2`; never a caller's input.
+  """
+  @type new_image :: {:new_image, stored_image()}
 
   @type error ::
           :too_many_attachments
@@ -728,12 +736,13 @@ defmodule Tips.Content.Media do
 
   @doc """
   Claims the staged videos in `selection` for `content`, the tip or review
-  the caller's transaction saved, and places every selected row at its index.
-  `selection` holds only `{:retained, id, description}` and
-  `{:staged_video, id}`. Run it inside that transaction, after the account,
-  content and curated-choice locks. See "Claims" in the module documentation.
+  the caller's transaction saved, inserts its stored new images and places
+  every selected row at its index. `selection` holds only
+  `{:retained, id, description}`, `{:staged_video, id}` and `t:new_image/0`.
+  Run it inside that transaction, after the account, content and
+  curated-choice locks. See "Claims" in the module documentation.
   """
-  @spec claim(Ecto.Schema.t(), [Content.attachment()]) ::
+  @spec claim(Ecto.Schema.t(), [Content.attachment() | new_image()]) ::
           :ok | {:error, {:upload_failed | :upload_pending, [Content.media_id()]}}
   def claim(_content, []), do: :ok
 
@@ -786,6 +795,7 @@ defmodule Tips.Content.Media do
     end
   end
 
+  defp check({:new_image, _image}, nil, _content), do: :insert
   defp check(_upload, _missing_or_ineligible, _content), do: :failed
 
   # The item's own edit target, or the exact publication it was created by.
@@ -821,6 +831,22 @@ defmodule Tips.Content.Media do
     Enum.each(writes, fn {id, changes} ->
       {1, _} = Repo.update_all(from(a in Asset, where: a.id == ^id), set: changes)
     end)
+
+    for {{{:new_image, image}, :insert}, position} <- Enum.with_index(checks) do
+      Repo.insert!(
+        struct!(Asset, [
+          {parent, content.id},
+          user_id: content.user_id,
+          kind: :image,
+          key: image.key,
+          is_animated: image.is_animated,
+          description: image.description,
+          position: position
+        ])
+      )
+    end
+
+    :ok
   end
 
   defp parent_key(%Tip{}), do: :tip_id

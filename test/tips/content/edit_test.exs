@@ -1,5 +1,6 @@
 defmodule Tips.Content.EditTest do
   use Tips.DataCase, async: true
+  use Oban.Testing, repo: Tips.Repo
 
   import Ecto.Query
   import Tips.AccountsFixtures
@@ -13,6 +14,8 @@ defmodule Tips.Content.EditTest do
   alias Tips.Content
   alias Tips.Content.Media.Asset
   alias Tips.Content.{Model, Notification, Review, Search, Tip}
+  alias Tips.R2Stub
+  alias Tips.Workers.CleanupMedia
 
   @tip_attrs %{
     title: "Pin the dependency first",
@@ -258,7 +261,7 @@ defmodule Tips.Content.EditTest do
     assert %Review{edit_version: 3, model_id: nil} = reload(review)
   end
 
-  test "retained media survives and media changes fail" do
+  test "retained media survives; reorder and description changes fail" do
     author = user_fixture()
     tip = tip_fixture(author, @tip_attrs)
     video = attached_video_fixture(tip, position: 0)
@@ -273,14 +276,9 @@ defmodule Tips.Content.EditTest do
 
     rejected = [
       {[{:retained, image.id, "Diagram"}, {:retained, video.id, nil}], []},
-      {[{:retained, video.id, nil}], [media_id: image.id]},
-      {[], [media_id: video.id, media_id: image.id]},
       {[{:retained, video.id, nil}, {:retained, image.id, "Changed"}], [media_id: image.id]},
       {retained ++ [{:retained, other.id, nil}], [media_id: other.id]},
-      {[{:staged_video, video.id}, {:retained, image.id, "Diagram"}], [media_id: video.id]},
       {retained ++ [{:staged_video, video.id}], [media_id: video.id]},
-      {retained ++ [{:image_file, "s1", %{path: "/tmp/x", filename: "x.png"}, nil}],
-       [slot: "s1"]},
       {retained ++ [{:missing_image, "s2"}], [slot: "s2"]},
       {retained ++ [:bogus], []},
       {nil, []}
@@ -313,6 +311,122 @@ defmodule Tips.Content.EditTest do
 
     # A selection change on a stale version is a conflict first.
     assert {:error, :conflict} = Content.edit_tip(scope(author), tip.id, 1, @tip_attrs, [])
+  end
+
+  describe "image edits" do
+    @describetag :tmp_dir
+
+    test "an image replaces a removed one; a stale edit deletes its stored object",
+         %{tmp_dir: dir} do
+      R2Stub.record()
+      author = user_fixture()
+      tip = tip_fixture(author, @tip_attrs)
+      replaced = image_fixture(tip, position: 0)
+      video = attached_video_fixture(tip, position: 1)
+      selection = [{:image_file, "s1", R2Stub.image_file(dir), nil}, {:retained, video.id, nil}]
+
+      assert {:ok, %{outcome: :updated, edit_version: 2}} =
+               Content.edit_tip(scope(author), tip.id, 1, @tip_attrs, selection)
+
+      assert [{"PUT", stored}] = R2Stub.requests()
+      assert %Asset{cleanup_at: %DateTime{}, position: nil} = Repo.reload!(replaced)
+      assert [%{args: %{"media_id" => replaced_id}}] = all_enqueued(worker: CleanupMedia)
+      assert replaced_id == replaced.id
+      video_id = video.id
+
+      assert [%Asset{kind: :image, key: ^stored, position: 0}, %Asset{id: ^video_id, position: 1}] =
+               attached(tip)
+
+      stale = [{:image_file, "s1", R2Stub.image_file(dir), nil}, {:retained, video.id, nil}]
+
+      assert {:error, :conflict} = Content.edit_tip(scope(author), tip.id, 1, @tip_attrs, stale)
+      assert [{"PUT", lost}, {"DELETE", deleted}] = R2Stub.requests()
+      assert deleted == lost
+
+      assert [%Asset{key: ^stored}, %Asset{id: ^video_id}] = attached(tip)
+      assert [_replaced_job] = all_enqueued(worker: CleanupMedia)
+      assert %Tip{edit_version: 2} = reload(tip)
+    end
+
+    test "a left-out attachment is removed; a new image goes after the kept ones",
+         %{tmp_dir: dir} do
+      R2Stub.record()
+      author = user_fixture()
+      tip = tip_fixture(author, @tip_attrs)
+      removed = image_fixture(tip, position: 0)
+      video = attached_video_fixture(tip, position: 1)
+      video_id = video.id
+
+      assert {:ok, %{outcome: :updated, edit_version: 2}} =
+               Content.edit_tip(scope(author), tip.id, 1, @tip_attrs, [
+                 {:retained, video.id, nil}
+               ])
+
+      assert %Asset{cleanup_at: %DateTime{}, position: nil} = Repo.reload!(removed)
+      assert [%{args: %{"media_id" => removed_id}}] = all_enqueued(worker: CleanupMedia)
+      assert removed_id == removed.id
+      assert [%Asset{id: ^video_id, position: 0}] = attached(tip)
+
+      selection = [
+        {:retained, video.id, nil},
+        {:image_file, "s1", R2Stub.image_file(dir), "Chart"}
+      ]
+
+      assert {:ok, %{outcome: :updated, edit_version: 3}} =
+               Content.edit_tip(scope(author), tip.id, 2, @tip_attrs, selection)
+
+      assert [{"PUT", stored}] = R2Stub.requests()
+
+      assert [
+               %Asset{id: ^video_id, position: 0},
+               %Asset{kind: :image, key: ^stored, position: 1, description: "Chart"}
+             ] = attached(tip)
+    end
+
+    test "a rejected edit with an image writes nothing and deletes what it stored",
+         %{tmp_dir: dir} do
+      R2Stub.record()
+      author = user_fixture()
+      tip = tip_fixture(author, @tip_attrs)
+      first = image_fixture(tip, position: 0)
+      second = attached_video_fixture(tip, position: 1)
+      media = Repo.all(from a in Asset, order_by: a.id)
+      new_image = {:image_file, "s1", R2Stub.image_file(dir), nil}
+
+      stored = %{
+        slot: "s9",
+        key: "media/#{Ecto.UUID.generate()}.png",
+        content_type: "image/png",
+        is_animated: false,
+        description: nil
+      }
+
+      # Rejected before storing.
+      for {uploads, error} <- [
+            {[new_image, {:missing_image, "s2"}], {"must be selected again", [slot: "s2"]}},
+            {[new_image, {:new_image, stored}], {"is invalid", []}}
+          ] do
+        assert {:error, changeset} =
+                 Content.edit_tip(scope(author), tip.id, 1, @tip_attrs, uploads)
+
+        assert [uploads: ^error] = changeset.errors
+      end
+
+      assert R2Stub.requests() == []
+
+      # Rejected under the lock, after storing.
+      reordered = [{:retained, second.id, nil}, {:retained, first.id, nil}, new_image]
+
+      assert {:error, changeset} =
+               Content.edit_tip(scope(author), tip.id, 1, @tip_attrs, reordered)
+
+      assert [uploads: {"cannot be reordered yet", []}] = changeset.errors
+      assert [{"PUT", lost}, {"DELETE", deleted}] = R2Stub.requests()
+      assert deleted == lost
+      assert Repo.all(from a in Asset, order_by: a.id) == media
+      assert all_enqueued(worker: CleanupMedia) == []
+      assert %Tip{edit_version: 1} = reload(tip)
+    end
   end
 
   for kind <- [:tip, :review] do
@@ -492,6 +606,14 @@ defmodule Tips.Content.EditTest do
   defp tip_id(%Review{tip_id: id}), do: id
 
   defp reload(%module{id: id}), do: Repo.get!(module, id)
+
+  defp attached(%Tip{id: id}),
+    do:
+      Repo.all(
+        from a in Asset,
+          where: a.tip_id == ^id and is_nil(a.cleanup_at),
+          order_by: a.position
+      )
 
   defp scope(user), do: Scope.for_user(user)
 
