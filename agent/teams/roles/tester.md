@@ -17,6 +17,13 @@ separate worktree checked out at the PR head.
 2. Record the head SHA and your first concerns before reading the PR body or another
    review.
 3. Follow the skill with your own database and port: affected code, scenarios, mutation check, entry points, data, checks.
+   Browser tests (`TIPS_BROWSER=1`, `test/tips_web/features`): a Codex client cannot
+   start Chrome; the macOS sandbox denies it and each attempt leaves a crash dialog
+   ([#432](https://github.com/chenghanlee/tips/issues/432)). If you are a Codex client,
+   do not run them. Read the implementer's retained log named in the PR body under
+   "Checks not run by CI": check the command, the `exit=` line and the failure list, and
+   write "browser run by <implementer entry>, log verified" in your review. If the PR
+   body names no log, send `turn` to the implementer asking for one.
 4. Submit the [review record](../README.md#pr-review-record). Without findings, submit
    LGTM. With findings: the merge-confirming tester runs `agent/teams/team.py turn <pr> <implementer entry>`; any other tester sends its review URL to the merge-confirming
    tester.
@@ -42,3 +49,4 @@ separate worktree checked out at the PR head.
 - Do not ask for tests beyond the brief's scenarios.
 - Do not run `team.py turn` unless you confirm the merge.
 - Do not merge with an unresolved thread, a missing LGTM or a failed check.
+- Codex client: do not run `mix test` with `TIPS_BROWSER=1`, `agent-browser`, or any Chrome launch.
