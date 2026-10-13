@@ -37,7 +37,7 @@ separate worktree checked out at the PR head.
 
 ## Do not
 
-- Do not review design, warning signs or test value. The reviewing designer is
+- Do not review design, smells or test value. The reviewing designer is
   responsible for them.
 - Do not ask for tests beyond the brief's scenarios.
 - Do not run `team.py turn` unless you confirm the merge.

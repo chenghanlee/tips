@@ -1,6 +1,6 @@
 ---
 name: review-software-correctness
-description: Guides the tester's review of a tips PR for correctness against its brief. Covers affected code, running the scenarios, a mutation check, data checks, the proof standard for findings, severity and the review record. Design quality, warning signs and test value belong to review-software-design.
+description: Guides the tester's review of a tips PR for correctness against its brief. Covers affected code, running the scenarios, a mutation check, data checks, the proof standard for findings, severity and the review record. Design quality, smells and test value belong to review-software-design.
 ---
 
 # Review software correctness
@@ -10,7 +10,7 @@ conclusion.
 
 Scope limits:
 
-- Do not review design, warning signs, conventions or test value. Those reviews use
+- Do not review design, smells, conventions or test value. Those reviews use
   [review-software-design](../review-software-design/SKILL.md).
 - Ask for a test only for a scenario, or for an existing contract the affected code
   reaches that no surviving test proves (step 5).

@@ -195,14 +195,19 @@ Rules:
 
 ## Performance
 
-Trigger: the brief states a limit, or the change adds work that grows with data: a query
-in a loop, a new preload, a result set with no limit, a transaction around an external
-call, work that outlives the caller.
+Trigger: the change adds or alters work, waiting, memory or storage, including an
+existing operation.
 
-Name what grows and with what workload. Fix it with a filter, index, page or limit.
-Measure only when the brief states a limit or the cost could change the design. Before
-measuring, read [performance measurement](references/performance-measurement.md). Do not
-measure when there is no stated limit and no growth.
+Apply the [performance principles](../design-software/SKILL.md#performance-principles)
+at the expected MVP workload. Link the brief's relevant limits and assumptions.
+Record new evidence and any implementation trade-off or discovery that affects the
+design in the PR body. If it changes an agreed contract, return it to the design lead
+for a brief update.
+
+Measure only when a limit is stated or the cost could change the design. Before
+measuring, read [performance measurement](references/performance-measurement.md).
+Support a performance claim with the operation, the workload and the code, contract
+or measurement evidence. Say whether a number is an estimate or a measurement.
 
 ## Deferrals
 
