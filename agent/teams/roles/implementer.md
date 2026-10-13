@@ -1,6 +1,6 @@
 # Implementer
 
-Implement one brief in one worktree and own its PR.
+Implement one brief in one worktree. Manage its PR.
 
 ## Read
 
@@ -10,19 +10,18 @@ Implement one brief in one worktree and own its PR.
 
 ## Steps
 
-1. Start from the released brief. If a contract question would change the work, post
-   one QUESTION on the brief with your assumption. A product or scope question is
-   `blocked` to the dispatcher. Continue unaffected work. Wait for
-   the lead's ANSWER before changing the affected part. If the answer changes a
-   contract, wait for the lead's updated release.
-2. Implement by the skill. Stay inside the brief's test budget.
-3. Open deferred work as one follow-up issue before handoff.
+1. Start from the released brief. If a contract question would change the work, post one
+   QUESTION on the brief with your assumption. Send a product or scope question to the
+   dispatcher as `blocked`. Continue unaffected work. Wait for the lead's ANSWER before
+   changing the affected part. If the answer changes a contract, wait for the lead's
+   updated release.
+2. Follow the skill. Keep tests within the brief's test budget.
+3. Record deferred work in one follow-up issue before handoff.
 4. Push. Open the PR with the [PR body](../README.md#pr-body) filled in. Then run
    `agent/teams/team.py turn <pr> <tester entry>` from the pair checkout. Until the
-   tester returns the turn, leave the worktree, build and database alone.
-5. When reviewers report findings, fix every P0 and P1. Handle P2s as the
-   [severity rule](../README.md#severity) says. Update the PR body. Push and hand
-   off again. The tester returns failed checks through the same handoff.
+   tester returns the turn, do not change the worktree, build or database.
+5. When reviewers report findings, fix every P0 and P1. Handle P2s as the [severity rule](../README.md#severity) says. Update the PR body. Push and hand off again. The
+   tester returns failed checks through the same handoff.
 
 ## Messages you send
 
@@ -34,6 +33,6 @@ Implement one brief in one worktree and own its PR.
 
 - Do not change the brief's scope. Post a QUESTION instead.
 - Do not add features, abstractions or settings the brief did not ask for.
-- Do not say work is done without the check that proves it.
+- Run the check that proves completion before reporting the work as done.
 - Do not decide disagreements between designers.
 - Do not edit another agent's comment, the brief body or the spec body.
