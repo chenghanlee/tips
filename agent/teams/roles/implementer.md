@@ -35,6 +35,10 @@ one to save a tool call.
    `tail -n 10 tmp/<name>.log` and stop. On any other exit, run
    `grep -n -E 'failure|error|seed|\*\*' tmp/<name>.log | head -n 40`, then
    `sed -n` at most 60 lines around the first failure. Never `cat` or Read the whole log.
+   Run the browser suite yourself: `TIPS_BROWSER=1 mix test test/tips_web/features`
+   with the same logging. Keep that log; name its path, command and `exit=` line in the
+   PR body under "Checks not run by CI". A Codex tester cannot run browsers and verifies
+   your log instead ([#432](https://github.com/chenghanlee/tips/issues/432)).
 2. **Edits.** With the client's edit tool, replace only the lines that must change plus
    the context needed to match them. Do not resend a whole function or file. If the
    client has no edit tool, apply a unified diff with `patch -p1`; a quoted heredoc may

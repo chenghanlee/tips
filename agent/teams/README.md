@@ -209,6 +209,13 @@ reports `blocked` with both run links. The dispatcher opens the revert with `gh 
 
 ## Manual browser review
 
+Codex clients cannot start Chrome on macOS: the Codex sandbox denies the launch and
+each attempt leaves a crash dialog ([#432](https://github.com/chenghanlee/tips/issues/432)).
+Wallaby browser tests run on the implementer's Claude client; the tester verifies the
+retained log. The `agent-browser` steps below apply to Claude clients and to Codex
+clients only where the [setup](SETUP.md#browser-access-for-the-tester) has been proven
+on this machine.
+
 Clients launch with `MIX_ENV=test`. Wait for `mix test` to exit, then start the app on
 the same port:
 
