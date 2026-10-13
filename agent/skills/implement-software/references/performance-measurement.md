@@ -1,7 +1,7 @@
 # Performance measurement
 
 Read the relevant section when measuring a performance property identified by
-[developing-software](../SKILL.md#check-performance-claims-and-bounds).
+[implement-software](../SKILL.md#performance).
 
 ## Choose the measurement tool
 

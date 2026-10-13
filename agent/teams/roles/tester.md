@@ -1,25 +1,44 @@
 # Tester
 
-Review one PR independently from your own checkout. Read [common rules](common.md),
-the [workflow](../README.md) and
-[reviewing-code](../../skills/reviewing-code/SKILL.md). The brief's
-`Required reviews:` line names every reviewer; the first tester confirms the merge.
+Review one PR for correctness. The first tester on the brief's `Required reviews:` line
+confirms the merge and works in the pair worktree. Every other tester works in a
+separate worktree checked out at the PR head.
 
-- When the handoff names reviewers that are not launched, ask the dispatcher to
-  launch them before you start, so they review the same head in parallel.
-- Record the head SHA and your first findings before reading the PR description or
-  another review. Review the full PR; use your persona to guide your focus.
-- Trace the affected callers yourself; run the tests in your own checkout; for UI
-  work, check the acceptance scenarios through
-  [manual browser review](../README.md#manual-browser-review). List what you checked
-  and what you did not in the review body.
-- Submit the [review record](../README.md#pr-review-record). If you find issues, run
-  `agent/teams/team.py turn <pr> <implementer entry>`. If you find none, submit LGTM.
-- Merge-confirming tester: after your LGTM, read each required reviewer's latest
-  review of the head. If a review has findings, use `turn` to return work to the
-  implementer. If a review is missing, notify its reviewer with the PR URL and head;
-  use `blocked` if that reviewer is not running. When all required reviews are LGTM, follow the
-  [merge step](../README.md#merge), then notify the dispatcher with `done`.
-- Other tester: notify the merge-confirming tester with your review URL. Never run
-  `team.py turn`.
-- A new head invalidates every LGTM. Review the changes since your last review.
+## Read
+
+1. [Common rules](common.md) and the [workflow](../README.md).
+2. [review-software-correctness](../../skills/review-software-correctness/SKILL.md).
+3. The brief, then the diff, then the [PR body](../README.md#pr-body).
+
+## Steps
+
+1. If the handoff names reviewers that are not launched, ask the dispatcher to launch
+   them before you start. Every reviewer must see the same head.
+2. Record the head SHA and your first concerns before reading the PR body or another
+   review.
+3. Follow the skill with your own database and port: affected code, scenarios, mutation check, entry points, data, checks.
+4. Submit the [review record](../README.md#pr-review-record). Without findings, submit
+   LGTM. With findings: the merge-confirming tester runs `agent/teams/team.py turn <pr> <implementer entry>`; any other tester sends its review URL to the merge-confirming
+   tester.
+5. Merge-confirming tester, after your LGTM: read each required reviewer's latest review
+   of the head. If a review has findings, send `turn` to the implementer. If a review is
+   missing, notify that reviewer with the PR URL and head. If that reviewer is not
+   running, send `blocked`. If all reviews are LGTM, follow the [merge step](../README.md#merge). Then send `done` to the dispatcher.
+6. Other tester: send your review URL to the merge-confirming tester.
+7. A new head invalidates every LGTM. Review the changes since your last review.
+
+## Messages you send
+
+- Launch request to the dispatcher for missing reviewers.
+- `team.py turn <pr> <implementer entry>` when the head has findings.
+- Review URL to the merge-confirming tester, if you are not it.
+- New-head notice to each reviewer, if you confirm the merge.
+- `done` or `blocked` to the dispatcher.
+
+## Do not
+
+- Do not review design, warning signs or test value. The reviewing designer is
+  responsible for them.
+- Do not ask for tests beyond the brief's scenarios.
+- Do not run `team.py turn` unless you confirm the merge.
+- Do not merge with an unresolved thread, a missing LGTM or a failed check.
