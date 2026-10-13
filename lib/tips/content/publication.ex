@@ -6,13 +6,16 @@ defmodule Tips.Content.Publication do
   See "Publication" and "Transaction participants" in `Tips.Content`. A key
   lookup runs first and answers for an existing key without validation, write
   admission or eligibility. Only an absent key is admitted, validated and
-  written: one transaction locks the author, then a review's live parent, then
-  share-locks the selected curated choices while active, inserts the content,
-  claims its selected staged videos (`Tips.Content.Media.claim/2`, which locks
-  the media rows after those), and writes its search text, its self-vote and a
-  review's notification. Any rejection in the transaction rolls the attempt
-  back; the key is then looked up again in a fresh statement before the
-  rejection is returned.
+  written. New image files are stored in R2 first, outside any transaction
+  (`store/2`). Then one transaction locks the author, then a review's live
+  parent, then share-locks the selected curated choices while active, inserts
+  the content, claims its selected staged videos and inserts its new image
+  rows (`Tips.Content.Media.claim/2`, which locks the media rows after those),
+  and writes its search text, its self-vote and a review's notification. Any
+  rejection in the transaction rolls the attempt back and deletes the images
+  it stored; the key is then looked up again in a fresh statement before the
+  rejection is returned. A database error leaves the outcome unknown and
+  deletes nothing.
   """
 
   import Ecto.Changeset
@@ -74,9 +77,11 @@ defmodule Tips.Content.Publication do
            nil <- find(scope, kind, key, intent),
            :ok <- admit(scope),
            {:ok, parent_id} <- parent_id(kind),
-           {:ok, changeset} <- validate(kind, user, key, parent_id, attrs, uploads) do
+           {:ok, changeset} <- validate(kind, user, key, parent_id, attrs, uploads),
+           {:ok, selection, images} <- store(changeset, uploads) do
         kind
-        |> insert(user, parent_id, changeset, uploads)
+        |> insert(user, parent_id, changeset, selection)
+        |> discard_images(images, "Submission #{key}")
         |> settle(scope, kind, key, intent)
       end
     end)
@@ -217,7 +222,8 @@ defmodule Tips.Content.Publication do
       |> validate_intent(@fields[kind], attrs)
       |> validate_uploads(uploads)
 
-    if changeset.valid?, do: {:ok, changeset}, else: {:error, %{changeset | action: :insert}}
+    changeset = %{changeset | action: :insert}
+    if changeset.valid?, do: {:ok, changeset}, else: {:error, changeset}
   end
 
   defp content_changeset(:tip, user, params),
@@ -234,7 +240,8 @@ defmodule Tips.Content.Publication do
     end)
   end
 
-  # A new publication selects only staged videos. Errors keep selection order.
+  # A new publication selects staged videos and new image files. Errors keep
+  # selection order.
   defp validate_uploads(changeset, uploads) when is_list(uploads) do
     uploads
     |> Enum.reverse()
@@ -256,18 +263,88 @@ defmodule Tips.Content.Publication do
 
   defp upload_error({:staged_video, media_id}) when media_id in @row_ids, do: nil
 
-  defp upload_error({:image_file, slot, _file, _description}),
-    do: {"is not supported yet", slot: slot}
+  defp upload_error(upload) do
+    if image_file?(upload), do: nil, else: {"is invalid", []}
+  end
 
-  defp upload_error(_malformed), do: {"is invalid", []}
+  @doc false
+  # Shared with `Tips.Content.Edit`: the shape of a new image file entry.
+  def image_file?({:image_file, slot, %{path: path, filename: filename}, description})
+      when is_binary(slot) and is_binary(path) and is_binary(filename),
+      do: is_nil(description) or is_binary(description)
 
-  defp insert(kind, user, parent_id, changeset, uploads) do
+  def image_file?(_upload), do: false
+
+  @rejected %{
+    too_large: "is larger than 10 MB",
+    unsupported: "is not a PNG, JPEG, WebP or GIF",
+    invalid: "could not be read as an image"
+  }
+
+  @doc false
+  # Shared with `Tips.Content.Edit`: stores the new image files of a valid
+  # selection before its transaction. Returns the selection with each file
+  # replaced by its stored image, and the stored images. A store error is a
+  # set of `:uploads` errors on `changeset`, keyed by slot.
+  def store(changeset, uploads) do
+    case Media.store_images(uploads) do
+      {:ok, images} ->
+        {selection, []} = Enum.map_reduce(uploads, images, &stored/2)
+        {:ok, selection, images}
+
+      {:error, error} ->
+        {:error,
+         error
+         |> store_errors(uploads)
+         |> Enum.reduce(changeset, fn {message, keys}, changeset ->
+           add_error(changeset, :uploads, message, keys)
+         end)}
+    end
+  end
+
+  # Images come back in selection order, one per file.
+  defp stored({:image_file, slot, _file, _description}, [%{slot: slot} = image | images]),
+    do: {{:new_image, image}, images}
+
+  defp stored(upload, images), do: {upload, images}
+
+  defp store_errors({:rejected_images, rejected}, _uploads),
+    do: for({slot, reason} <- rejected, do: {@rejected[reason], slot: slot})
+
+  defp store_errors({:upload_failed, slots}, _uploads),
+    do: for(slot <- slots, do: {"could not be uploaded, try again", slot: slot})
+
+  defp store_errors(:too_many_new_bytes, uploads),
+    do: [{"exceed 50 MB together", slot: first_image_slot(uploads)}]
+
+  defp store_errors(:busy, uploads),
+    do: [{"could not be checked, try again", slot: first_image_slot(uploads)}]
+
+  defp first_image_slot(uploads),
+    do: Enum.find_value(uploads, fn upload -> image_file?(upload) && elem(upload, 1) end)
+
+  @doc false
+  # Shared with `Tips.Content.Edit`: a returned error is a transaction known
+  # to have rolled back, so the attempt's stored images are deleted. A
+  # database error raises past this: its outcome is unknown, and the orphan
+  # sweep removes its objects.
+  def discard_images({:error, _reason} = rolled_back, [_ | _] = images, attempt) do
+    for key <- Media.delete_images(images) do
+      Logger.warning("#{attempt} rolled back; image #{key} is left to the orphan sweep")
+    end
+
+    rolled_back
+  end
+
+  def discard_images(result, _images, _attempt), do: result
+
+  defp insert(kind, user, parent_id, changeset, selection) do
     Repo.transact(fn ->
       with :ok <- lock_author(user.id),
            {:ok, parent_author_id} <- lock_parent(parent_id),
            :ok <- lock_choices(changeset, base_kind(kind)),
            {:ok, row} <- Repo.insert(changeset),
-           :ok <- Media.claim(row, uploads),
+           :ok <- Media.claim(row, selection),
            :ok <- write_dependents(base_kind(kind), row, parent_author_id) do
         {:ok, row}
       end

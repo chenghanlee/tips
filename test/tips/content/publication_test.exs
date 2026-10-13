@@ -4,9 +4,12 @@ defmodule Tips.Content.PublicationTest do
   alias Tips.Accounts.Scope
   alias Tips.AdmissionLimiter
   alias Tips.Content
+  alias Tips.Content.Media.Asset
   alias Tips.Content.{Notification, Review, Tag, Tip, Vote}
   alias Tips.Content.Search.Embeddings
+  alias Tips.R2Stub
 
+  import ExUnit.CaptureLog
   import Tips.AccountsFixtures
   import Tips.ContentFixtures
   import Tips.MediaFixtures
@@ -365,7 +368,6 @@ defmodule Tips.Content.PublicationTest do
       assert [
                {"must be selected again", [slot: "slot-1"]},
                {"cannot be kept in a new publication", [media_id: 5]},
-               {"is not supported yet", [slot: "slot-2"]},
                {"is invalid", []}
              ] = for({:uploads, error} <- changeset.errors, do: error)
 
@@ -536,6 +538,193 @@ defmodule Tips.Content.PublicationTest do
              Content.get_publication(scope, :tip, key, nil)
 
     assert [%Tip{id: ^id}] = Repo.all_by(Tip, user_id: scope.user.id)
+  end
+
+  describe "image publication" do
+    @describetag :tmp_dir
+
+    test "a tip or a review stores its image once and attaches it at its slot", %{tmp_dir: dir} do
+      R2Stub.record()
+      author = user_fixture()
+      selection = [{:image_file, "s1", R2Stub.image_file(dir), "Diagram"}]
+
+      assert {:ok, %{outcome: :created, id: tip_id}} =
+               Content.publish_tip(scope(author), key(), @tip_attrs, selection)
+
+      assert [{"PUT", tip_key}] = R2Stub.requests()
+
+      parent = tip_fixture()
+      selection = [{:image_file, "s1", R2Stub.image_file(dir), "Diagram"}]
+
+      assert {:ok, %{outcome: :created, kind: :review, id: review_id}} =
+               Content.publish_review(scope(author), parent.id, key(), @review_attrs, selection)
+
+      assert [{"PUT", review_key}] = R2Stub.requests()
+      author_id = author.id
+
+      assert [
+               %Asset{tip_id: ^tip_id, review_id: nil, key: ^tip_key} = tip_image,
+               %Asset{tip_id: nil, review_id: ^review_id, key: ^review_key} = review_image
+             ] = Repo.all(from(a in Asset, order_by: a.id))
+
+      for image <- [tip_image, review_image] do
+        assert %Asset{
+                 user_id: ^author_id,
+                 kind: :image,
+                 position: 0,
+                 is_animated: false,
+                 description: "Diagram",
+                 expires_at: nil,
+                 cleanup_at: nil
+               } = image
+
+        assert image.key =~ ~r{^media/.+\.png$}
+      end
+    end
+
+    test "a rejection before storing puts nothing; the same key then publishes once",
+         %{tmp_dir: dir} do
+      R2Stub.record()
+      scope = scope(user_fixture())
+      key = key()
+      image = R2Stub.image_file(dir)
+      File.write!(Path.join(dir, "notes.png"), "plain text")
+      text = %{path: Path.join(dir, "notes.png"), filename: "notes.png"}
+
+      assert {:error, changeset} =
+               Content.publish_tip(scope, key, %{@tip_attrs | title: " "}, [
+                 {:image_file, "s1", image, nil}
+               ])
+
+      assert %{title: ["can't be blank"]} = errors_on(changeset)
+
+      assert {:error, changeset} =
+               Content.publish_tip(scope, key, @tip_attrs, [{:image_file, "s1", text, nil}])
+
+      assert [uploads: {"is not a PNG, JPEG, WebP or GIF", [slot: "s1"]}] = changeset.errors
+
+      # Another author's write budget is spent.
+      {limit, _window_ms} = Application.fetch_env!(:tips, AdmissionLimiter)[:write]
+      limited = scope(user_fixture())
+      for _ <- 1..limit, do: assert(:ok = AdmissionLimiter.check_write(limited))
+
+      assert {:error, {:rate_limited, _seconds}} =
+               Content.publish_tip(limited, key(), @tip_attrs, [{:image_file, "s1", image, nil}])
+
+      assert R2Stub.requests() == []
+      assert Repo.all(Asset) == []
+      assert_no_writes()
+
+      assert {:ok, %{outcome: :created, id: id}} =
+               Content.publish_tip(scope, key, @tip_attrs, [{:image_file, "s1", image, nil}])
+
+      assert [{"PUT", stored}] = R2Stub.requests()
+      assert [%Asset{tip_id: ^id, key: ^stored}] = Repo.all(Asset)
+    end
+
+    test "a known rollback after storing deletes the attempt's object", %{tmp_dir: dir} do
+      R2Stub.record(fn _method, _key -> 200 end)
+      parent = put_marker!(tip_fixture(), :hidden)
+      selection = [{:image_file, "s1", R2Stub.image_file(dir), nil}]
+
+      assert {:error, :not_found} =
+               Content.publish_review(
+                 scope(user_fixture()),
+                 parent.id,
+                 key(),
+                 @review_attrs,
+                 selection
+               )
+
+      assert [{"PUT", stored}, {"DELETE", stored}] = R2Stub.requests()
+      assert Repo.all(Asset) == []
+    end
+
+    test "an unknown outcome keeps the object for the orphan sweep", %{tmp_dir: dir} do
+      R2Stub.record()
+      parent = tip_fixture()
+
+      Repo.update_all(from(t in Tip, where: t.id == ^parent.id),
+        set: [review_count: 2_147_483_647]
+      )
+
+      selection = [{:image_file, "s1", R2Stub.image_file(dir), nil}]
+
+      capture_log(fn ->
+        assert {:error, :outcome_unknown} =
+                 Content.publish_review(
+                   scope(user_fixture()),
+                   parent.id,
+                   key(),
+                   @review_attrs,
+                   selection
+                 )
+      end)
+
+      assert [{"PUT", _stored}] = R2Stub.requests()
+      assert Repo.all(Asset) == []
+    end
+
+    test "a later file's failed put deletes only the earlier object; a retry stores both anew",
+         %{tmp_dir: dir} do
+      # Each request runs in its own process; count the puts across them.
+      puts = :counters.new(1, [])
+
+      R2Stub.record(fn
+        "PUT", _key ->
+          :counters.add(puts, 1, 1)
+          if :counters.get(puts, 1) == 2, do: :timeout, else: 200
+
+        "DELETE", _key ->
+          204
+      end)
+
+      scope = scope(user_fixture())
+      key = key()
+
+      selection = [
+        {:image_file, "s1", R2Stub.image_file(dir), nil},
+        {:image_file, "s2", R2Stub.image_file(dir, "animated.gif"), nil}
+      ]
+
+      assert {:error, changeset} = Content.publish_tip(scope, key, @tip_attrs, selection)
+      assert [uploads: {"could not be uploaded, try again", [slot: "s2"]}] = changeset.errors
+      assert [{"PUT", first}, {"PUT", second}, {"DELETE", deleted}] = R2Stub.requests()
+      assert deleted == first
+      assert Repo.all(Asset) == []
+
+      assert {:ok, %{outcome: :created, id: id}} =
+               Content.publish_tip(scope, key, @tip_attrs, selection)
+
+      assert [{"PUT", retry_first}, {"PUT", retry_second}] = R2Stub.requests()
+
+      assert MapSet.disjoint?(
+               MapSet.new([retry_first, retry_second]),
+               MapSet.new([first, second])
+             )
+
+      assert [
+               %Asset{tip_id: ^id, key: ^retry_first, position: 0, is_animated: false},
+               %Asset{tip_id: ^id, key: ^retry_second, position: 1, is_animated: true}
+             ] = Repo.all(from(a in Asset, order_by: a.position))
+    end
+  end
+
+  test "a stored image from the caller is an invalid selection" do
+    image = %{
+      slot: "s1",
+      key: "media/#{Ecto.UUID.generate()}.png",
+      content_type: "image/png",
+      is_animated: false,
+      description: nil
+    }
+
+    assert {:error, changeset} =
+             Content.publish_tip(scope(user_fixture()), key(), @tip_attrs, [{:new_image, image}])
+
+    assert [uploads: {"is invalid", []}] = changeset.errors
+    assert Repo.all(Asset) == []
+    assert_no_writes()
   end
 
   defp scope(user), do: Scope.for_user(user)

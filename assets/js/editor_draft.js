@@ -20,6 +20,14 @@
 // ignored.
 // Autosave starts once recovery settles.
 //
+// The page renders the current attachment selection in data-editor-record on
+// every change. A save writes the selection rendered at that moment, and a
+// rendered selection that differs from the last one schedules a save like
+// typing does. One that arrives while LiveView is submitting the form waits
+// until it stops, so it cannot replace the revision a confirmed receipt
+// clears; it is saved if the draft stays, as after a refusal or a submit
+// LiveView cancels in the browser.
+//
 // After a submit fails validation (editor:refused), the hook opens the
 // evidence disclosure when it holds an invalid field and focuses the error
 // summary. A summary link focuses its field.
@@ -85,7 +93,11 @@ export const EditorDraft = {
     this.destination = null
     // A submission whose outcome the page has not settled.
     this.unsettled = false
+    // A selection change that waits for a submit to end.
+    this.deferred = false
     this.typed = !sameAttrs(readAttrs(this.el, this.kind), this.record.intent.attrs, this.kind)
+    // The selection last rendered by the page, as JSON.
+    this.uploads = renderedUploads(this.el)
     this.onInput = () => {
       this.typed = true
       this.schedule()
@@ -101,8 +113,26 @@ export const EditorDraft = {
     this.handleEvent(EDITOR_EVENTS.clear, (request) => this.clearSubmitted(request))
     this.handleEvent(EDITOR_EVENTS.settled, ({unresolved}) => {
       this.unsettled = unresolved
+      this.saveDeferred()
     })
     load(this.record.storage).then((result) => this.settleRead(result))
+  },
+
+  // A new selection is input. The record a restore renders is not.
+  updated() {
+    const uploads = renderedUploads(this.el)
+    if (uploads !== this.uploads && this.phase !== "restoring") {
+      this.typed = true
+      this.deferred = true
+    }
+    this.uploads = uploads
+    this.saveDeferred()
+  },
+
+  saveDeferred() {
+    if (!this.deferred || submitting(this.el)) return
+    this.deferred = false
+    this.schedule()
   },
 
   disconnected() {
@@ -263,7 +293,8 @@ export const EditorDraft = {
   // Creates the slot's draft at revision 0, then saves under the pair it holds.
   async write(attrs) {
     const draft = this.expected ?? {draft_id: this.record.draft.draft_id, revision: 0}
-    const record = {...this.record, draft, intent: {attrs, uploads: this.record.intent.uploads}}
+    const uploads = JSON.parse(renderedUploads(this.el))
+    const record = {...this.record, draft, intent: {attrs, uploads}}
     const result =
       this.expected === null ? await create(record) : await save(record.storage, this.expected, record)
     if (this.phase === "destroyed") return result
@@ -331,8 +362,9 @@ export const EditorDraft = {
       return
     }
     this.phase = "cleared"
+    // A navigation across live sessions reloads the page and answers null.
     this.pushEvent(EDITOR_EVENTS.cleared, {status}).then(
-      ({left}) => left || this.leave(),
+      (reply) => reply?.left || this.leave(),
       () => this.leave(),
     )
   },
@@ -393,6 +425,12 @@ function readAttrs(form, kind) {
     ? {...attrs, model_id: null, model_other: attrs.model_other ?? ""}
     : {...attrs, model_other: null}
 }
+
+// LiveView marks the form from the push of a submit until its reply, or
+// until it cancels the submit in the browser.
+const submitting = (form) => form.classList.contains("phx-submit-loading")
+
+const renderedUploads = (form) => JSON.stringify(JSON.parse(form.dataset.editorRecord).intent.uploads)
 
 // The form renders null as an empty field.
 const sameAttrs = (a, b, kind) => FIELDS[kind].every((field) => (a[field] ?? "") === (b[field] ?? ""))

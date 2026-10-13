@@ -45,7 +45,14 @@ defmodule TipsWeb.TipLive.Editor do
               ]}
             />
             <Editor.setup_fields form={@form} choices={@choices} />
-            <Editor.evidence_fields form={@form} id={"#{Editor.form_id(@identity)}-evidence"} />
+            <Editor.evidence_fields
+              form={@form}
+              id={"#{Editor.form_id(@identity)}-evidence"}
+              upload={@uploads.images}
+              selection={@record.intent.uploads}
+              images={@images}
+              attached={@attached}
+            />
           </fieldset>
         </fieldset>
         <Editor.saved_version identity={@identity} saved={@saved} choices={@choices} />

@@ -9,18 +9,27 @@ defmodule TipsWeb.EditorTest do
   `TipsWeb.EditorLookupTest`.
   """
   use TipsWeb.ConnCase, async: true
+  use Oban.Testing, repo: Tips.Repo
 
   import Ecto.Query
   import Phoenix.LiveViewTest
   import Tips.AccountsFixtures
   import Tips.ContentFixtures
+  import Tips.MediaFixtures
   import Tips.VisibilityFixtures
   import TipsWeb.ReaderPageHelpers
 
+  alias Phoenix.LiveView.{UploadConfig, UploadEntry}
   alias Tips.Accounts.{Scope, UserToken}
   alias Tips.Content
+  alias Tips.Content.Media.{Asset, R2}
   alias Tips.Content.{Review, Tip}
+  alias Tips.R2Stub
   alias Tips.Repo
+  alias Tips.Workers.CleanupMedia
+  alias TipsWeb.Editor
+
+  @png Path.expand("../../fixtures/images/static.png", __DIR__)
 
   setup :register_and_log_in_user
 
@@ -430,6 +439,241 @@ defmodule TipsWeb.EditorTest do
     html = lv |> form(form_id, review: %{body: "My proposal"}) |> render_submit()
     assert text(html, "#{form_id}-refusal") =~ "This review changed after you opened it"
     assert %Review{body: "Saved elsewhere", edit_version: 2} = Repo.get!(Review, review.id)
+  end
+
+  describe "image selection" do
+    test "a refused publish keeps the selected file; the corrected publish consumes it",
+         %{conn: conn, user: user} do
+      R2Stub.record()
+      form_id = "#editor-#{user.id}-tip"
+      {:ok, lv, _html} = live(conn, "/editor/tips/new")
+      Req.Test.allow(R2, self(), lv.pid)
+      select_image(lv, form_id)
+
+      values = %{title: "", body: "Plan before you prompt.", tag_id: "other"}
+      html = lv |> form(form_id, tip: values) |> render_submit()
+
+      assert_push_event(lv, "editor:refused", %{})
+      assert summary_links(html, form_id) == ["#tip_title"]
+      assert [_ref] = done_refs(html)
+      assert R2Stub.requests() == []
+
+      lv |> form(form_id, tip: %{values | title: "Plan first"}) |> render_submit()
+
+      assert_push_event(lv, "editor:clear", %{})
+      assert [{"PUT", key}] = R2Stub.requests()
+      assert %Tip{id: id} = Repo.get_by!(Tip, title: "Plan first")
+      assert [%Asset{tip_id: ^id, key: ^key, position: 0}] = Repo.all(Asset)
+      assert_consumed(lv)
+    end
+
+    test "a review refused after storing keeps its file; the retry stores it anew",
+         %{conn: conn, user: user} do
+      R2Stub.record()
+      tip = tip_fixture(user_fixture())
+      form_id = "#editor-#{user.id}-review"
+      {:ok, lv, html} = live(conn, "/editor/tips/#{tip.id}/reviews/new")
+      Req.Test.allow(R2, self(), lv.pid)
+      key = record(html, form_id)["submission_key"]
+      select_image(lv, form_id)
+
+      # A moderator hides the tip after the page loaded.
+      Repo.update_all(from(t in Tip, where: t.id == ^tip.id), set: [dead_at: DateTime.utc_now()])
+      html = lv |> form(form_id, review: %{body: "Worked on a rename."}) |> render_submit()
+
+      assert text(html, "#{form_id}-refusal") =~ "This tip is no longer open for reviews."
+      assert [_ref] = done_refs(html)
+      assert [{"PUT", first}, {"DELETE", deleted}] = R2Stub.requests()
+      assert deleted == first
+
+      Repo.update_all(from(t in Tip, where: t.id == ^tip.id), set: [dead_at: nil])
+      lv |> form(form_id, review: %{body: "Worked on a rename."}) |> render_submit()
+
+      assert_push_event(lv, "editor:clear", %{draft_id: ^key})
+      assert [{"PUT", second}] = R2Stub.requests()
+      refute second == first
+      assert %Review{id: id} = Repo.get_by!(Review, submission_key: key)
+      assert [%Asset{review_id: ^id, key: ^second}] = Repo.all(Asset)
+      assert_consumed(lv)
+    end
+
+    test "a restored image slot must be selected again and keeps its description",
+         %{conn: conn, user: user} do
+      R2Stub.record()
+      form_id = "#editor-#{user.id}-tip"
+      {:ok, lv, html} = live(conn, "/editor/tips/new")
+      Req.Test.allow(R2, self(), lv.pid)
+
+      slot = %{
+        "tag" => "missing_image",
+        "slot" => "s1",
+        "filename" => "plan.png",
+        "type" => "image/png",
+        "size" => 2048,
+        "description" => "The plan in the terminal"
+      }
+
+      saved =
+        html
+        |> record(form_id)
+        |> put_in(["intent", "uploads"], [slot])
+        |> put_in(["intent", "attrs"], %{
+          "title" => "Plan first",
+          "body" => "Plan before you prompt.",
+          "tag_id" => "other"
+        })
+
+      render_hook(lv, "editor:restore", %{
+        "identity" => identity(html, form_id),
+        "record" => saved
+      })
+
+      assert_reply(lv, %{status: "restored"})
+
+      html = lv |> form(form_id) |> render_submit()
+
+      assert_push_event(lv, "editor:refused", %{})
+      assert text(html, "#{form_id}-errors") =~ "Attachments: must be selected again"
+      assert text(html, "#{form_id}-evidence-image-s1") =~ "plan.png must be selected again."
+      assert R2Stub.requests() == []
+
+      select_image(lv, form_id)
+      assert [%{"slot" => "s1"}] = record(render(lv), form_id)["intent"]["uploads"]
+      lv |> form(form_id) |> render_submit()
+
+      assert_push_event(lv, "editor:clear", %{})
+      assert [{"PUT", key}] = R2Stub.requests()
+      assert [%Asset{key: ^key, description: "The plan in the terminal"}] = Repo.all(Asset)
+    end
+
+    test "an edit removes a saved image and saves its replacement, or saves the removal alone",
+         %{conn: conn, user: user} do
+      R2Stub.record()
+      form_id = "#editor-#{user.id}-tip"
+
+      for replace? <- [true, false] do
+        tip = tip_fixture(user)
+        saved = image_fixture(tip, position: 0)
+        {:ok, lv, _html} = live(conn, "/editor/tips/#{tip.id}/edit")
+        Req.Test.allow(R2, self(), lv.pid)
+
+        lv
+        |> element("#{form_id}-evidence-media-#{saved.id} button", "Remove")
+        |> render_click()
+
+        if replace?, do: select_image(lv, form_id)
+        lv |> form(form_id) |> render_submit()
+
+        assert_push_event(lv, "editor:clear", %{})
+        assert %Tip{edit_version: 2} = Repo.get!(Tip, tip.id)
+        assert %Asset{cleanup_at: %DateTime{}, position: nil} = Repo.reload!(saved)
+        assert_enqueued(worker: CleanupMedia, args: %{media_id: saved.id})
+        attached = Repo.all(from(a in Asset, where: a.tip_id == ^tip.id and is_nil(a.cleanup_at)))
+
+        if replace? do
+          assert [{"PUT", key}] = R2Stub.requests()
+          assert [%Asset{key: ^key, position: 0}] = attached
+        else
+          assert R2Stub.requests() == []
+          assert attached == []
+        end
+      end
+    end
+
+    test "a lost reply with an image is published earlier; the file stays selected",
+         %{conn: conn, user: user} do
+      R2Stub.record()
+      form_id = "#editor-#{user.id}-tip"
+
+      values = %{
+        "title" => "Plan first",
+        "body" => "Plan before you prompt.",
+        "tag_id" => "other"
+      }
+
+      {:ok, lv, html} = live(conn, "/editor/tips/new")
+      key = record(html, form_id)["submission_key"]
+      select_image(lv, form_id)
+      lv |> form(form_id, tip: values) |> render_change()
+
+      # The publish committed with this file, but its reply was lost.
+      attrs = atoms(Map.merge(record(html, form_id)["intent"]["attrs"], values))
+      image = %{path: @png, filename: "plan.png"}
+
+      {:ok, %{outcome: :created}} =
+        Content.publish_tip(Scope.for_user(user), key, attrs, [{:image_file, "s1", image, nil}])
+
+      html = render_hook(lv, "editor:reconcile", %{})
+
+      refute_push_event(lv, "editor:clear", _)
+      assert text(html, "#{form_id}-refusal") =~ "This draft was published earlier"
+      # A consumed entry leaves on its upload process's report, which is queued
+      # during the event and handled before the next render.
+      assert [_ref] = done_refs(render(lv))
+      assert [{"PUT", stored}] = R2Stub.requests()
+      assert [%Asset{key: ^stored}] = Repo.all(Asset)
+    end
+  end
+
+  test "a file whose upload could not be written shows its error beside its slot" do
+    entry = %UploadEntry{
+      ref: "0",
+      upload_ref: "phx-images",
+      upload_config: :images,
+      client_name: "plan.png",
+      client_size: 2048,
+      client_type: "image/png"
+    }
+
+    upload = %UploadConfig{
+      name: :images,
+      ref: "phx-images",
+      entries: [entry],
+      errors: [{"0", {:writer_failure, :enospc}}]
+    }
+
+    html =
+      render_component(&Editor.evidence_fields/1,
+        form: Phoenix.Component.to_form(%{}, as: :tip),
+        id: "evidence",
+        upload: upload,
+        selection: [{:missing_image, "s1", %{filename: "plan.png", size: 2048, description: nil}}],
+        images: %{"s1" => "0"},
+        attached: %{}
+      )
+
+    assert text(html, "#evidence-image-s1") =~
+             "plan.png could not be uploaded. Remove it and select it again."
+  end
+
+  defp select_image(lv, form_id) do
+    lv
+    |> file_input(form_id, :images, [
+      %{name: "plan.png", content: File.read!(@png), type: "image/png"}
+    ])
+    |> render_upload("plan.png")
+  end
+
+  defp done_refs(html) do
+    case html |> find("input[type=file]") |> LazyHTML.attribute("data-phx-done-refs") do
+      [""] -> []
+      [refs] -> String.split(refs, ",")
+    end
+  end
+
+  # Consumed entries leave the page once their upload processes stop.
+  defp assert_consumed(lv, attempts \\ 50) do
+    cond do
+      done_refs(render(lv)) == [] ->
+        :ok
+
+      attempts > 0 ->
+        Process.sleep(10)
+        assert_consumed(lv, attempts - 1)
+
+      true ->
+        flunk("the selected file was not consumed")
+    end
   end
 
   # What LiveView sends after a reconnect: the old page's hidden inputs with

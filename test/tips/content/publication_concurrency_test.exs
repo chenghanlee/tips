@@ -10,7 +10,9 @@ defmodule Tips.Content.PublicationConcurrencyTest do
 
   alias Tips.Accounts.{Scope, User}
   alias Tips.Content
+  alias Tips.Content.Media.Asset
   alias Tips.Content.{Model, Notification, Review, Tag, Tip, Vote}
+  alias Tips.R2Stub
   alias Tips.Repo
 
   @attrs %{
@@ -107,6 +109,32 @@ defmodule Tips.Content.PublicationConcurrencyTest do
       assert constraint == "#{kind}s_submission_unique"
       unboxed(fn -> assert_one_effect_set(kind, data, key) end)
     end
+  end
+
+  @tag :tmp_dir
+  test "a same-key loser that stored an image deletes it; one row and one object remain",
+       %{tmp_dir: dir} = data do
+    R2Stub.record()
+    key = Ecto.UUID.generate()
+    publish = fn -> Content.publish_tip(data.scope, key, @attrs.tip, image(dir)) end
+    winner = open(data.supervisor)
+
+    assert {:ok, %{outcome: :created, id: id}} = run(winner, publish)
+    assert [{"PUT", kept}] = R2Stub.requests()
+
+    racer = call(data.supervisor, publish)
+    await_blocked(racer, winner)
+    commit(winner)
+
+    # A file never proves saved bytes, so the loser's comparison is unknown.
+    assert {:ok, %{outcome: :existing_unknown, id: ^id}} = finish(racer)
+    assert [{"PUT", lost}, {"DELETE", deleted}] = R2Stub.requests()
+    assert deleted == lost and lost != kept
+
+    unboxed(fn ->
+      assert_one_effect_set(:tip, data, key)
+      assert [%Asset{tip_id: ^id, key: ^kept}] = Repo.all_by(Asset, user_id: data.author.id)
+    end)
   end
 
   describe "review uniqueness race reconciles the key before already reviewed" do
@@ -383,6 +411,8 @@ defmodule Tips.Content.PublicationConcurrencyTest do
   defp publish(:review, data, key, attrs),
     do: Content.publish_review(data.scope, data.parent.id, key, attrs, [])
 
+  defp image(dir), do: [{:image_file, "s1", R2Stub.image_file(dir), nil}]
+
   defp delete!(:tip, id),
     do: Repo.update_all(from(t in Tip, where: t.id == ^id), set: [deleted_at: now()])
 
@@ -452,6 +482,7 @@ defmodule Tips.Content.PublicationConcurrencyTest do
         from(r in Review, where: r.user_id in ^user_ids or r.tip_id in ^tip_ids, select: r.id)
       )
 
+    Repo.delete_all(from(a in Asset, where: a.user_id in ^user_ids))
     Repo.delete_all(from(n in Notification, where: n.user_id in ^user_ids))
     Repo.delete_all(from(v in Vote, where: v.tip_id in ^tip_ids or v.review_id in ^review_ids))
     Repo.delete_all(from(s in "review_search", where: s.review_id in ^review_ids))

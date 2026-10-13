@@ -19,6 +19,7 @@ defmodule TipsWeb.EditorDraftTest do
   @moduletag :browser
 
   @store_source Path.expand("../../../assets/js/editor_draft_store.js", __DIR__)
+  @png Path.expand("../../fixtures/images/static.png", __DIR__)
   @paused "Autosave is paused so it doesn't replace a draft saved earlier in this browser."
 
   setup %{session: session} do
@@ -27,8 +28,10 @@ defmodule TipsWeb.EditorDraftTest do
     %{user: user, status: "#editor-#{user.id}-tip-status"}
   end
 
-  feature "a saved draft restores into a pristine form and autosave continues under its pair",
-          %{session: session, status: status} do
+  @tag :tmp_dir
+  feature "a saved draft restores into a pristine form and autosave continues under its pair, " <>
+            "its image selection included",
+          %{session: session, status: status, tmp_dir: tmp_dir} do
     seeded = session |> open_editor("/editor/tips/new") |> seed("Saved title", "Saved body")
 
     session
@@ -47,6 +50,88 @@ defmodule TipsWeb.EditorDraftTest do
              saved(session, seeded["storage"], "Saved body, then more")
 
     assert draft_id == seeded["draft"]["draft_id"] and revision > 0
+
+    # A selected image is saved as a slot to select again.
+    storage = seeded["storage"]
+
+    session
+    |> click(css("summary", text: "Prompt and result"))
+    |> attach_file(file_field("Add an image (optional)"), path: @png)
+
+    assert [%{"tag" => "missing_image", "filename" => "static.png", "description" => nil}] =
+             stored_uploads(session, storage, &match?([%{"filename" => "static.png"}], &1))
+
+    # The page's patch lands after the typing's debounced save, which held the old selection.
+    run(session, "window.liveSocket.enableLatencySim(1000)")
+    fill_in(session, text_field("Image description (optional)"), with: "The plan")
+
+    assert [%{"filename" => "static.png", "description" => "The plan"}] =
+             stored_uploads(session, storage, &match?([%{"description" => "The plan"}], &1))
+
+    run(session, "window.liveSocket.disableLatencySim()")
+
+    session
+    |> open_editor("/editor/tips/new")
+    |> assert_has(css(status, text: "Recovered your draft from this browser."))
+    |> click(css("summary", text: "Prompt and result"))
+    |> assert_has(css("li", text: "static.png"))
+    |> assert_value("input[name^='image_descriptions']", "The plan")
+    |> click(css("#tip_tag_id option[value='other']"))
+    |> click(button("Publish"))
+    |> assert_has(css("li", text: "static.png must be selected again."))
+
+    refute Tips.Repo.exists?(Tips.Content.Tip)
+
+    # Remove alone saves the empty selection.
+    click(session, button("Remove"))
+    assert [] = stored_uploads(session, storage, &(&1 == []))
+
+    # So it does after a submit LiveView cancels in the browser, as for too large a file.
+    large = Path.join(tmp_dir, "large.png")
+    File.write!(large, :binary.copy(<<0>>, 10_000_001))
+
+    session
+    |> attach_file(file_field("Add an image (optional)"), path: large)
+    |> assert_has(css("li", text: "large.png is larger than 10 MB."))
+
+    assert [%{"filename" => "large.png"}] =
+             stored_uploads(session, storage, &match?([%{"filename" => "large.png"}], &1))
+
+    session
+    |> click(button("Publish"))
+    |> click(button("Remove"))
+
+    assert [] = stored_uploads(session, storage, &(&1 == []))
+
+    session
+    |> open_editor("/editor/tips/new")
+    |> assert_has(css(status, text: "Recovered your draft from this browser."))
+
+    assert run(
+             session,
+             ~s|return document.querySelector("[id$='-evidence-attachments']") === null|
+           )
+
+    # Remove while the selection's save waits on storage: the later save lands last.
+    editor_tab = window_handle(session)
+    blocker_tab = open_tab(session)
+    %{"draft" => %{"revision" => before}} = stored(session, storage)
+    hold_store(session, blocker_tab)
+    focus_window(session, editor_tab)
+    count_writes(session)
+
+    session
+    |> click(css("summary", text: "Prompt and result"))
+    |> attach_file(file_field("Add an image (optional)"), path: @png)
+
+    await_writes(session, 1)
+    click(session, button("Remove"))
+    release_store(session, blocker_tab)
+    focus_window(session, editor_tab)
+
+    # Both saves landed, the selection's first.
+    assert %{"intent" => %{"uploads" => []}} =
+             stored_until(session, storage, &(&1["draft"]["revision"] >= before + 2))
   end
 
   feature "typing before the hook mounts stays until the author reloads the saved draft",
@@ -255,6 +340,54 @@ defmodule TipsWeb.EditorDraftTest do
       }
       """,
       [storage, body]
+    )
+  end
+
+  # The stored draft's selection once `done?` accepts it.
+  defp stored_uploads(session, storage, done?) do
+    stored_until(session, storage, &done?.(&1["intent"]["uploads"]))["intent"]["uploads"]
+  end
+
+  # The stored draft once `done?` accepts it, within five seconds.
+  defp stored_until(session, storage, done?, deadline \\ nil) do
+    deadline = deadline || System.monotonic_time(:millisecond) + 5000
+    record = stored(session, storage)
+
+    cond do
+      done?.(record) ->
+        record
+
+      System.monotonic_time(:millisecond) < deadline ->
+        stored_until(session, storage, done?, deadline)
+
+      true ->
+        flunk("stored draft: #{inspect(record)}")
+    end
+  end
+
+  # Counts the page's storage writes in `window.draftWrites`.
+  defp count_writes(session) do
+    run(session, """
+    window.draftWrites = 0
+    const transaction = IDBDatabase.prototype.transaction
+    IDBDatabase.prototype.transaction = function (store, mode) {
+      if (mode === "readwrite") window.draftWrites += 1
+      return transaction.apply(this, arguments)
+    }
+    """)
+  end
+
+  defp await_writes(session, count) do
+    run(
+      session,
+      """
+      const deadline = Date.now() + 5000
+      while (window.draftWrites < args[0]) {
+        if (Date.now() > deadline) throw new Error(`${window.draftWrites} storage writes`)
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+      """,
+      [count]
     )
   end
 
