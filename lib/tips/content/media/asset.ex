@@ -17,6 +17,9 @@ defmodule Tips.Content.Media.Asset do
     field :stream_uid, :string
     field :state, Ecto.Enum, values: [:uploading, :processing, :ready, :failed]
     field :duration_s, :float
+    field :upload_length, :integer
+    # The tus endpoint is a bearer capability.
+    field :upload_url, :string, redact: true
     field :target, Target
     field :position, :integer
     field :expires_at, :utc_datetime

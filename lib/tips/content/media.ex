@@ -52,6 +52,14 @@ defmodule Tips.Content.Media do
   response, or one the guard refuses, leaves the uid NULL: no browser has the
   URL, and `expire_due/1` retires the row locally at its deadline.
 
+  The row keeps the declared `upload_length` from insert and stores the
+  `upload_url` with the uid, so `resume_video_upload/3` can return the same
+  endpoint to a reloaded editor. Leaving `uploading` and entering cleanup
+  clear the URL. Statements that bind it run with `log: false`.
+
+  `discard_video_upload/2` is a standalone media operation: it locks the
+  author's unattached row and calls `retire/1`.
+
   ## Video status
 
   `get_video_uploads/3` reads Stream only for owned, unattached, known-uid rows
@@ -255,7 +263,7 @@ defmodule Tips.Content.Media do
            client = CloudflareStream.client!(opts),
            :ok <- unpublished(scope, target),
            :ok <- admit_upload(scope),
-           {:ok, asset} <- insert_upload(user, target) do
+           {:ok, asset} <- insert_upload(user, target, size) do
         provision(client, asset, size)
       end
     end)
@@ -294,7 +302,7 @@ defmodule Tips.Content.Media do
     end
   end
 
-  defp insert_upload(user, target) do
+  defp insert_upload(user, target, size) do
     Repo.transact(fn ->
       with :ok <- Publication.lock_author(user.id),
            :ok <- lock_target(user.id, target) do
@@ -305,6 +313,7 @@ defmodule Tips.Content.Media do
           kind: :video,
           state: :uploading,
           target: target,
+          upload_length: size,
           created_at: created_at,
           expires_at: DateTime.add(created_at, @upload_seconds)
         })
@@ -368,7 +377,8 @@ defmodule Tips.Content.Media do
             )
         )
 
-      case Repo.update_all(reservable, set: [stream_uid: uid]) do
+      # The URL is a bearer capability: the statement binding it is never logged.
+      case Repo.update_all(reservable, [set: [stream_uid: uid, upload_url: url]], log: false) do
         {1, _} -> {:ok, %{media_id: asset.id, upload_url: url, expires_at: asset.expires_at}}
         {0, _} -> {:error, {:upload_failed, [asset.id]}}
       end
@@ -387,6 +397,74 @@ defmodule Tips.Content.Media do
         a.id == ^id and a.state == :uploading and is_nil(a.stream_uid) and is_nil(a.cleanup_at)
     )
   end
+
+  @doc "See `Tips.Content.resume_video_upload/3`."
+  @spec resume_video_upload(Scope.t() | nil, term(), term()) ::
+          {:ok, video_upload()} | {:error, Content.video_resume_error()}
+  def resume_video_upload(scope, media_id, file_attrs) do
+    unknown_on_database_error(fn ->
+      with {:ok, user} <- author(scope),
+           {:ok, %{media_id: id, size: size}} <- validate_resume(media_id, file_attrs),
+           :ok <- admit_upload(scope),
+           :ok <- readmit(user),
+           %Asset{} = asset <- Repo.one(resumable(user.id, id, size), log: false),
+           :ok <- live_target(user.id, asset.target) do
+        {:ok, %{media_id: asset.id, upload_url: asset.upload_url, expires_at: asset.expires_at}}
+      else
+        nil -> {:error, :not_found}
+        {:error, _reason} = error -> error
+      end
+    end)
+  end
+
+  defp validate_resume(media_id, file_attrs) do
+    size = if is_map(file_attrs), do: Map.get(file_attrs, :size)
+
+    {%{}, %{media_id: :integer, size: :integer}}
+    |> cast(%{media_id: media_id, size: size}, [:media_id, :size])
+    |> validate_required([:media_id, :size])
+    |> validate_number(:media_id, greater_than: 0, less_than_or_equal_to: @max_id)
+    |> validate_number(:size, greater_than: 0, less_than_or_equal_to: @max_video_bytes)
+    |> apply_action(:validate)
+  end
+
+  # The author's released, unfinished upload of `size` bytes, before its deadline by
+  # wall time. Resuming never moves the deadline.
+  defp resumable(user_id, id, size) do
+    from(a in Asset,
+      where:
+        a.id == ^id and a.user_id == ^user_id and a.kind == :video and a.state == :uploading and
+          not is_nil(a.stream_uid) and is_nil(a.cleanup_at) and not is_nil(a.upload_url) and
+          a.upload_length == ^size and a.expires_at > fragment("clock_timestamp()")
+    )
+  end
+
+  @doc "See `Tips.Content.discard_video_upload/2`."
+  @spec discard_video_upload(Scope.t() | nil, term()) ::
+          :ok | {:error, :unauthenticated | :not_found | :outcome_unknown}
+  def discard_video_upload(scope, media_id) do
+    unknown_on_database_error(fn ->
+      with {:ok, user} <- author(scope),
+           {:ok, :ok} <- Repo.transact(fn -> discard(user.id, media_id) end),
+           do: :ok
+    end)
+  end
+
+  # Locks the row, then rechecks it; an attached video needs its content's edit.
+  defp discard(user_id, id) when id in 1..@max_id//1 do
+    Repo.all(from(a in Asset, where: a.id == ^id, select: a.id, lock: "FOR NO KEY UPDATE"))
+
+    discardable =
+      from(a in Asset,
+        where:
+          a.id == ^id and a.user_id == ^user_id and a.kind == :video and is_nil(a.tip_id) and
+            is_nil(a.review_id) and is_nil(a.cleanup_at)
+      )
+
+    if Repo.exists?(discardable), do: {:ok, retire([id])}, else: {:error, :not_found}
+  end
+
+  defp discard(_user_id, _id), do: {:error, :not_found}
 
   @doc "See `Tips.Content.get_video_uploads/2`. `opts` are passed to `CloudflareStream.client!/1`."
   @spec get_video_uploads(Scope.t() | nil, term(), keyword()) ::
@@ -548,6 +626,7 @@ defmodule Tips.Content.Media do
             state: ^state,
             duration_s: ^duration_s,
             reconcile_after: nil,
+            upload_url: nil,
             expires_at: fragment("? + ? * interval '1 second'", a.created_at, ^@recovery_seconds)
           ]
         ]
@@ -875,7 +954,12 @@ defmodule Tips.Content.Media do
     {_count, retired} =
       Repo.update_all(
         from(a in live, where: not is_nil(a.key) or not is_nil(a.stream_uid), select: a.id),
-        set: [cleanup_at: DateTime.utc_now(:second), position: nil, reconcile_after: nil]
+        set: [
+          cleanup_at: DateTime.utc_now(:second),
+          position: nil,
+          reconcile_after: nil,
+          upload_url: nil
+        ]
       )
 
     Repo.delete_all(from(a in live, where: a.kind == :video and is_nil(a.stream_uid)))

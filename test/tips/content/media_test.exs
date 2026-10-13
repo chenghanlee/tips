@@ -1,8 +1,16 @@
 defmodule Tips.Content.MediaTest do
-  use ExUnit.Case, async: true
+  use Tips.DataCase, async: true
+  use Oban.Testing, repo: Tips.Repo
 
+  import Tips.AccountsFixtures
+  import Tips.ContentFixtures
+  import Tips.MediaFixtures
+
+  alias Tips.Accounts.Scope
+  alias Tips.Content
   alias Tips.Content.Media
-  alias Tips.Content.Media.R2
+  alias Tips.Content.Media.{Asset, CloudflareStream, R2}
+  alias Tips.Workers.CleanupMedia
 
   @moduletag :tmp_dir
   @fixtures Path.expand("../../fixtures/images", __DIR__)
@@ -157,6 +165,79 @@ defmodule Tips.Content.MediaTest do
     assert {:error, {:upload_failed, ["a"]}} = Media.store_images(selection, call_timeout: 100)
     assert_received {:blocked, request}
     refute Process.alive?(request)
+  end
+
+  describe "discarding a staged video" do
+    setup do
+      user = user_fixture()
+      %{user: user, scope: Scope.for_user(user)}
+    end
+
+    defp released(user) do
+      uid = "uid#{System.unique_integer([:positive])}"
+
+      staged_video_fixture(user, %{
+        stream_uid: uid,
+        upload_length: 1,
+        upload_url: "https://upload.test/tus/#{uid}"
+      })
+    end
+
+    test "retires only the author's unattached row: a job for a uid, a delete without one",
+         data do
+      Req.Test.stub(CloudflareStream, &flunk("unexpected #{&1.method} #{&1.request_path}"))
+      tip = tip_fixture(data.user)
+      released = released(data.user)
+      unreleased = staged_video_fixture(data.user)
+      attached = attached_video_fixture(tip)
+      foreign = released(user_fixture())
+
+      assert Content.discard_video_upload(data.scope, released.id) == :ok
+      assert %Asset{cleanup_at: %DateTime{}, upload_url: nil} = Repo.reload!(released)
+      assert_enqueued(worker: CleanupMedia, args: %{media_id: released.id})
+
+      assert Content.discard_video_upload(data.scope, unreleased.id) == :ok
+      assert Repo.reload(unreleased) == nil
+
+      # Already retired, attached, foreign, missing or signed out: nothing changes.
+      for id <- [released.id, attached.id, foreign.id, 9_000_000_000] do
+        assert Content.discard_video_upload(data.scope, id) == {:error, :not_found}
+      end
+
+      assert Content.discard_video_upload(nil, foreign.id) == {:error, :unauthenticated}
+      assert Repo.reload!(attached) == attached
+      assert Repo.reload!(foreign) == foreign
+      assert [_one] = all_enqueued(worker: CleanupMedia)
+    end
+
+    test "a status read in flight during a discard cannot revive the row", data do
+      row = released(data.user)
+      test = self()
+
+      Req.Test.stub(CloudflareStream, fn conn ->
+        send(test, {:discarded, Content.discard_video_upload(data.scope, row.id)})
+
+        body = %{
+          "result" => %{
+            "status" => %{"state" => "ready"},
+            "readyToStream" => true,
+            "duration" => 2
+          }
+        }
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(200, JSON.encode!(body))
+      end)
+
+      assert {:ok, [%{media_id: id, state: :removed}]} =
+               Content.get_video_uploads(data.scope, [row.id])
+
+      assert id == row.id
+      assert_received {:discarded, :ok}
+      assert %Asset{state: :uploading, cleanup_at: %DateTime{}} = Repo.reload!(row)
+      assert_enqueued(worker: CleanupMedia, args: %{media_id: row.id})
+    end
   end
 
   @tag :real_provider

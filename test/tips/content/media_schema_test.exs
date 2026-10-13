@@ -69,6 +69,40 @@ defmodule Tips.Content.MediaSchemaTest do
       end
     end
 
+    test "upload columns stay NULL on existing rows; an endpoint lives only on an unfinished transfer" do
+      user = user_fixture()
+      image = image_fixture(tip_fixture())
+      ready = staged_video_fixture(user, ready_video_attrs())
+      uploading = staged_video_fixture(user, %{stream_uid: unique_stream_uid()})
+
+      assert [{nil, nil}, {nil, nil}, {nil, nil}] =
+               Repo.all(
+                 from(a in Tips.Content.Media.Asset,
+                   where: a.id in ^[image.id, ready.id, uploading.id],
+                   select: {a.upload_length, a.upload_url}
+                 )
+               )
+
+      url = "https://upload.test/tus/#{uploading.stream_uid}"
+      uploading |> change(upload_length: 1, upload_url: url) |> Repo.update!()
+
+      for {row, attrs} <- [
+            {ready, %{upload_url: url}},
+            {uploading, %{cleanup_at: DateTime.utc_now(:second)}},
+            {staged_video_fixture(user), %{upload_url: url}}
+          ] do
+        assert_raise Ecto.ConstraintError, ~r/media_upload_url_chk/, fn ->
+          row |> change(attrs) |> Repo.update!()
+        end
+      end
+
+      for {row, length} <- [{image, 1}, {ready, 0}, {ready, 1_000_000_001}] do
+        assert_raise Ecto.ConstraintError, ~r/media_upload_length_chk/, fn ->
+          row |> change(upload_length: length) |> Repo.update!()
+        end
+      end
+    end
+
     test "media_lifecycle_chk rejects invalid attachment and cleanup shapes" do
       tip = tip_fixture()
       attached = attached_video_fixture(tip)
