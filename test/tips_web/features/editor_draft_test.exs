@@ -88,7 +88,11 @@ defmodule TipsWeb.EditorDraftTest do
     session
     |> open_editor("/editor/tips/new")
     |> assert_has(css(status, text: "Recovered your draft from this browser."))
-    |> refute_has(css("[id$='-evidence-attachments']"))
+
+    assert run(
+             session,
+             ~s|return document.querySelector("[id$='-evidence-attachments']") === null|
+           )
 
     # Remove while the selection's save waits on storage: the later save lands last.
     editor_tab = window_handle(session)
