@@ -34,13 +34,16 @@ defmodule TipsWeb.Editor do
       entry of each video this page is transferring. The browser sends the
       bytes to Stream by tus (`assets/js/video_uploader.js`); the page never
       consumes a video entry.
-    * `:video_cycle` is the status cycle: its generation and current delay.
-      One `Tips.Content.get_video_uploads/2` read runs at a time for the
-      pending videos, the next one a delay after it completes: the configured
-      `status_delay_ms`, doubling up to `status_max_delay_ms` after an
-      uncertain or rate-limited read. Preflight, restore, recover and Remove
-      start a new generation; a message from an older one is ignored. The
-      cycle stops when nothing is pending or the account can no longer read.
+    * `:video_cycle` is the status cycle: its generation, current delay and
+      whether a read is in flight. One `Tips.Content.get_video_uploads/2`
+      read runs at a time for the pending videos, the next one a delay after
+      it completes: the configured `status_delay_ms`, doubling up to
+      `status_max_delay_ms` after an uncertain or rate-limited read.
+      Preflight, restore, recover and Remove start a new generation; a
+      message from an older one is ignored. A read in flight then is not
+      killed, which would drop its database connection mid-query: its result
+      is dropped and the new generation reads at once. The cycle stops when
+      nothing is pending or the account can no longer read.
 
   A submit validates the whole form with `Tips.Content.change_content/2`,
   readmits the session, then publishes or saves with each slot's uploaded
@@ -150,7 +153,7 @@ defmodule TipsWeb.Editor do
       images: %{},
       video_states: %{},
       video_refs: %{},
-      video_cycle: %{generation: 0, delay_ms: @status_delay_ms}
+      video_cycle: %{generation: 0, delay_ms: @status_delay_ms, reading: false}
     )
   end
 
@@ -545,35 +548,48 @@ defmodule TipsWeb.Editor do
     end
   end
 
-  @doc "Applies a `:video_status` read of the current cycle generation."
+  @doc """
+  Applies a `:video_status` read of the current cycle generation. A read of
+  an earlier generation is dropped, and the current one reads at once.
+  """
   @spec handle_async(atom(), term(), LiveView.Socket.t()) :: {:noreply, LiveView.Socket.t()}
-  def handle_async(:video_status, {:ok, {generation, ids, result}}, socket) do
-    case socket.assigns.video_cycle do
-      %{generation: ^generation} -> {:noreply, cycled(socket, ids, result)}
-      _stale -> {:noreply, socket}
+  def handle_async(:video_status, result, socket) do
+    socket = update(socket, :video_cycle, &%{&1 | reading: false})
+    generation = socket.assigns.video_cycle.generation
+
+    case result do
+      {:ok, {^generation, ids, result}} ->
+        {:noreply, cycled(socket, ids, result)}
+
+      {:ok, _stale} ->
+        {:noreply, run_cycle(socket)}
+
+      {:exit, reason} ->
+        {:noreply, retry(socket, pending_videos(socket.assigns), {:exit, reason})}
     end
   end
 
-  # A read cancelled by a new generation.
-  def handle_async(:video_status, {:exit, {:shutdown, :cancel}}, socket), do: {:noreply, socket}
-
-  def handle_async(:video_status, {:exit, reason}, socket),
-    do: {:noreply, retry(socket, pending_videos(socket.assigns), {:exit, reason})}
-
   defp start_cycle(socket) do
     socket
-    |> LiveView.cancel_async(:video_status)
     |> update(:video_cycle, &%{&1 | generation: &1.generation + 1, delay_ms: @status_delay_ms})
     |> run_cycle()
   end
 
-  # Readmits the session, then reads the pending videos outside the page process.
+  # Readmits the session, then reads the pending videos outside the page
+  # process. A read in flight runs the next one when it completes.
+  defp run_cycle(%{assigns: %{video_cycle: %{reading: true}}} = socket), do: socket
+
   defp run_cycle(socket) do
     with [_ | _] = ids <- pending_videos(socket.assigns),
          {:ok, socket} <- UserAuth.readmit(socket) do
       %{current_scope: scope, video_cycle: %{generation: generation}} = socket.assigns
 
-      LiveView.start_async(socket, :video_status, fn ->
+      socket
+      |> update(:video_cycle, &%{&1 | reading: true})
+      |> LiveView.start_async(:video_status, fn ->
+        # A closed page lets the bounded read finish rather than kill it mid-query,
+        # which would drop its database connection. Nothing schedules another.
+        Process.flag(:trap_exit, true)
         {generation, ids, Content.get_video_uploads(scope, ids)}
       end)
     else

@@ -277,10 +277,11 @@ defmodule TipsWeb.EditorVideoTest do
     GenServer.stop(lv.pid, :normal)
     assert_receive {:DOWN, ^ref, :process, _pid, _reason}
 
+    # A read in flight at the exit completes; none follows it.
     receive do
       {:read, ^uid} -> :ok
     after
-      0 -> :ok
+      200 -> :ok
     end
 
     refute_receive {:read, ^uid}, 400

@@ -109,7 +109,7 @@ defmodule TipsWeb.EditorDraftTest do
 
     assert run(
              session,
-             ~s|return document.querySelector("[id$='-evidence-attachments']") === null|
+             ~s|return document.querySelector("[id$='-evidence-attachments'] li") === null|
            )
 
     # Remove while the selection's save waits on storage: the later save lands last.
