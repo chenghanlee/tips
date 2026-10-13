@@ -57,7 +57,8 @@ same application and Repo with `media`, `embeddings`, and `maintenance` queues,
 each with concurrency 1. Cron runs `Tips.Workers.ExpireRegistrations` every
 minute on `maintenance` and `Tips.Workers.EmbedSearch` every minute on
 `embeddings`. Without `OPENROUTER_API_KEY`, each `EmbedSearch` run fails while
-any tip or review lacks a vector. `Tips.Workers.SweepOrphanImages` runs Mondays at
+any tip or review lacks a vector. `Tips.Workers.ExpireMedia` runs every minute on
+`media` and retires expired staged videos. `Tips.Workers.SweepOrphanImages` runs Mondays at
 04:00 UTC on `maintenance`; without the R2 settings it fails. The pruner keeps
 finished jobs for seven days.
 Tests use Oban's manual testing mode.

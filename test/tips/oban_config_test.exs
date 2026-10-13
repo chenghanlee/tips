@@ -1,9 +1,9 @@
 defmodule Tips.ObanConfigTest do
   use ExUnit.Case, async: true
 
-  alias Tips.Workers.{EmbedSearch, ExpireRegistrations, SweepOrphanImages}
+  alias Tips.Workers.{EmbedSearch, ExpireMedia, ExpireRegistrations, SweepOrphanImages}
 
-  test "registration expiry and the embedding scan run every minute; the orphan sweep weekly" do
+  test "registration and media expiry and the embedding scan run every minute; the orphan sweep weekly" do
     # Tests run Oban in manual mode, which starts no plugins; build the config as other
     # environments do. `Oban.Config.new/1` also validates the crontab.
     config = Keyword.put(Application.fetch_env!(:tips, Oban), :testing, :disabled)
@@ -14,7 +14,8 @@ defmodule Tips.ObanConfigTest do
             crontab: [
               {"* * * * *", ExpireRegistrations},
               {"* * * * *", EmbedSearch},
-              {"0 4 * * 1", SweepOrphanImages}
+              {"0 4 * * 1", SweepOrphanImages},
+              {"* * * * *", ExpireMedia}
             ]} = List.keyfind(plugins, Oban.Cron, 0)
 
     assert {Oban.Pruner, max_age: {7, :days}} = List.keyfind(plugins, Oban.Pruner, 0)
@@ -36,5 +37,10 @@ defmodule Tips.ObanConfigTest do
            } = SweepOrphanImages.new(%{}).changes
 
     assert MapSet.new(sweep_states) == MapSet.new(states)
+
+    assert %{queue: "media", max_attempts: 1, unique: %{period: :infinity, states: expiry_states}} =
+             ExpireMedia.new(%{}).changes
+
+    assert MapSet.new(expiry_states) == MapSet.new(states)
   end
 end

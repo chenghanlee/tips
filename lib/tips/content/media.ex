@@ -50,7 +50,7 @@ defmodule Tips.Content.Media do
   No reservation is retried on the same row; a fresh upload gets a new row.
   A response that rejects the reservation marks the row `failed`. A lost
   response, or one the guard refuses, leaves the uid NULL: no browser has the
-  URL, and the expiry worker (#66) retires the row locally at its deadline.
+  URL, and `expire_due/1` retires the row locally at its deadline.
 
   ## Video status
 
@@ -58,12 +58,42 @@ defmodule Tips.Content.Media do
   that are `uploading` or `processing` and not in cleanup, including rows past
   their upload deadline. At most three reads run at once, outside any
   transaction. Each result goes through `transition_video/3`, the guarded
-  transition the expiry worker (#66) shares: one conditional `UPDATE` whose
+  transition `expire_due/1` shares: one conditional `UPDATE` whose
   `WHERE` Postgres re-evaluates on the current row after any lock wait, so a
   late result cannot change a row that has since moved on, been attached or
   entered cleanup. The first state after `pendingupload` sets the fixed
   recovery deadline, `created_at` plus 49 hours, whenever it is observed. A
   `pendingupload` result, a timeout, an error or a rate limit writes nothing.
+
+  ## Expiry
+
+  `expire_due/1` follows the worker table in "Video states and deadlines". It
+  selects at most fifty due rows without a lock: unattached videos not in
+  cleanup whose `expires_at` has passed and whose `reconcile_after` is NULL or
+  has passed, oldest deadline first, through the `media_expiry` index.
+
+    * A NULL uid is retired locally: no provider call, no job.
+    * A known uid that left `uploading` has reached its recovery deadline and
+      is retired with a `Tips.Workers.CleanupMedia` job.
+    * A known uid still `uploading` is read from Stream as editors' refreshes
+      are, at most three at once with each read bounded at 11 seconds. Any
+      completion goes through `transition_video/3`. `pendingupload` retires the
+      row only when the read started at least ten minutes after the upload
+      deadline, by the application's wall clock at the start of the read, not
+      at the response; an earlier `pendingupload` sets `reconcile_after` to the
+      end of that margin. An uncertain read sets it to ten minutes after the
+      attempt, so later rows make progress.
+
+  A retirement locks the row, then rechecks the due predicate and the row's
+  uid and state in a later statement, which reads the wall clock after any
+  lock wait, and calls `retire/1`. A uid released after the selection, or a
+  claim or refresh committed during the read, fails that recheck and nothing
+  is written. A cooldown is one guarded `UPDATE` of the unattached
+  `uploading` row with that uid, outside cleanup. `expires_at` changes only
+  through `transition_video/3`.
+
+  Fifty reads three at a time take about three minutes at worst; the worker's
+  uniqueness keeps ticks from stacking.
 
   ## Claims
 
@@ -145,6 +175,11 @@ defmodule Tips.Content.Media do
   @status_concurrency 3
   # Each read has 5-second connect and receive timeouts; this ends one that outlives both.
   @status_timeout_ms 11_000
+  # Due rows handled per expiry run.
+  @expiry_batch 50
+  # The margin after the upload deadline before `pendingupload` is definitive, and the
+  # cooldown after an uncertain read.
+  @margin_seconds 600
   # Objects younger than this are never orphan candidates.
   @orphan_grace_seconds 3600
 
@@ -192,6 +227,15 @@ defmodule Tips.Content.Media do
 
   @typedoc "A trusted Stream result that completes an upload or its processing."
   @type observation :: :processing | {:ready, duration_s :: float()} | :failed
+
+  @typedoc "Rows each expiry outcome wrote in one run, and the run's duration."
+  @type expiry_summary :: %{
+          retired: non_neg_integer(),
+          transitioned: non_neg_integer(),
+          deferred: non_neg_integer(),
+          uncertain: non_neg_integer(),
+          duration_ms: non_neg_integer()
+        }
 
   @doc "See `Tips.Content.begin_video_upload/3`."
   @spec begin_video_upload(Scope.t() | nil, term(), term(), keyword()) ::
@@ -409,23 +453,31 @@ defmodule Tips.Content.Media do
 
   defp pending?(_asset), do: false
 
-  # Provider reads run in tasks; every write runs here, after the reads.
-  defp refresh([], _opts), do: %{}
-
+  # Every write runs here, after the reads.
   defp refresh(assets, opts) do
+    assets
+    |> read_statuses(opts)
+    |> Map.new(fn {asset, result} -> {asset.id, apply_read(asset, result)} end)
+  end
+
+  # Provider reads run in tasks, outside any transaction. Each result carries the wall
+  # time its read started.
+  defp read_statuses([], _opts), do: []
+
+  defp read_statuses(assets, opts) do
     client = CloudflareStream.client!(opts)
 
     assets
-    |> Task.async_stream(&CloudflareStream.status(client, &1.stream_uid),
+    |> Task.async_stream(
+      &{DateTime.utc_now(), CloudflareStream.status(client, &1.stream_uid)},
       max_concurrency: @status_concurrency,
       timeout: @status_timeout_ms,
       on_timeout: :kill_task
     )
-    |> Enum.zip(assets)
-    |> Map.new(fn {result, asset} -> {asset.id, apply_read(asset, result)} end)
+    |> Enum.zip_with(assets, &{&2, &1})
   end
 
-  defp apply_read(asset, {:ok, {:ok, status}}) do
+  defp apply_read(asset, {:ok, {_started_at, {:ok, status}}}) do
     case observe(status) do
       nil ->
         :ok
@@ -436,7 +488,7 @@ defmodule Tips.Content.Media do
     end
   end
 
-  defp apply_read(_asset, {:ok, {:error, {:http, 429}}}), do: :rate_limited
+  defp apply_read(_asset, {:ok, {_started_at, {:error, {:http, 429}}}}), do: :rate_limited
   defp apply_read(_asset, _uncertain), do: :uncertain
 
   # Ready means playable within the duration limit. `pendingupload` is no completion.
@@ -462,7 +514,7 @@ defmodule Tips.Content.Media do
     end
   end
 
-  # The expiry worker may delete a never-released row between the reads.
+  # Expiry may delete a never-released row between the reads.
   defp committed(nil), do: {:removed, nil}
   defp committed(%Asset{cleanup_at: nil} = asset), do: {asset.state, asset.expires_at}
   defp committed(%Asset{} = asset), do: {:removed, asset.expires_at}
@@ -510,6 +562,119 @@ defmodule Tips.Content.Media do
         a.id == ^id and a.stream_uid == ^uid and is_nil(a.cleanup_at) and is_nil(a.tip_id) and
           is_nil(a.review_id)
     )
+  end
+
+  @doc """
+  Expires at most fifty due unattached videos and returns `{:ok, summary}`
+  with the rows each outcome wrote. A row whose recheck fails, or whose guarded
+  update matches nothing, is not counted. See "Expiry" in the module
+  documentation. `opts` are passed to `CloudflareStream.client!/1`.
+  """
+  @spec expire_due(keyword()) :: {:ok, expiry_summary()}
+  def expire_due(opts \\ []) do
+    started = System.monotonic_time(:millisecond)
+
+    {reads, local} =
+      from(a in due(), order_by: [a.expires_at, a.id], limit: @expiry_batch)
+      |> Repo.all()
+      |> Enum.split_with(&(&1.state == :uploading and is_binary(&1.stream_uid)))
+
+    outcomes =
+      Enum.map(local, &expire_local/1) ++
+        Enum.map(read_statuses(reads, opts), &expire_read/1)
+
+    counts =
+      Map.merge(
+        %{retired: 0, transitioned: 0, deferred: 0, uncertain: 0},
+        Map.delete(Enum.frequencies(outcomes), :unchanged)
+      )
+
+    {:ok, Map.put(counts, :duration_ms, System.monotonic_time(:millisecond) - started)}
+  end
+
+  # Matches the `media_expiry` index; the wall-clock checks stay out of its predicate.
+  defp due do
+    from(a in Asset,
+      where:
+        a.kind == :video and is_nil(a.cleanup_at) and is_nil(a.tip_id) and is_nil(a.review_id) and
+          a.expires_at <= fragment("clock_timestamp()") and
+          (is_nil(a.reconcile_after) or a.reconcile_after <= fragment("clock_timestamp()"))
+    )
+  end
+
+  defp expire_local(%Asset{stream_uid: nil} = asset),
+    do: retire_due(asset.id, dynamic([a], is_nil(a.stream_uid)))
+
+  defp expire_local(%Asset{stream_uid: uid} = asset) do
+    retire_due(
+      asset.id,
+      dynamic([a], a.stream_uid == ^uid and a.state in ^[:processing, :ready, :failed])
+    )
+  end
+
+  defp expire_read({asset, {:ok, {started_at, {:ok, status}}}}) do
+    case observe(status) do
+      nil -> expire_pending(asset, started_at)
+      observation -> transitioned(transition_video(asset.id, asset.stream_uid, observation))
+    end
+  end
+
+  defp expire_read({asset, _uncertain}) do
+    asset
+    |> cooldown()
+    |> update(
+      set: [
+        reconcile_after: fragment("clock_timestamp() + ? * interval '1 second'", ^@margin_seconds)
+      ]
+    )
+    |> written(:uncertain)
+  end
+
+  defp transitioned(:applied), do: :transitioned
+  defp transitioned(:unchanged), do: :unchanged
+
+  defp expire_pending(asset, started_at) do
+    if DateTime.compare(started_at, DateTime.add(asset.expires_at, @margin_seconds)) == :lt do
+      asset
+      |> cooldown()
+      |> update([a],
+        set: [
+          reconcile_after: fragment("? + ? * interval '1 second'", a.expires_at, ^@margin_seconds)
+        ]
+      )
+      |> written(:deferred)
+    else
+      uid = asset.stream_uid
+      retire_due(asset.id, dynamic([a], a.stream_uid == ^uid and a.state == :uploading))
+    end
+  end
+
+  defp cooldown(asset),
+    do: from(a in unattached(asset.id, asset.stream_uid), where: a.state == :uploading)
+
+  defp written(query, outcome) do
+    case Repo.update_all(query, []) do
+      {1, _} -> outcome
+      {0, _} -> :unchanged
+    end
+  end
+
+  # Locks the row, then rechecks it in a later statement, which reads the wall clock
+  # after any lock wait.
+  defp retire_due(id, recheck) do
+    {:ok, outcome} =
+      Repo.transact(fn ->
+        Repo.all(from(a in Asset, where: a.id == ^id, select: a.id, lock: "FOR NO KEY UPDATE"))
+
+        if Repo.exists?(from(a in due(), where: a.id == ^id, where: ^recheck)) do
+          retire([id])
+          {:ok, :retired}
+        else
+          {:ok, :unchanged}
+        end
+      end)
+
+    outcome
   end
 
   # A database error or lost connection leaves the outcome unknown: no URL is returned.
