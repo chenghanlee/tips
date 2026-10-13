@@ -9,7 +9,7 @@ trial's hypothesis, measurement table and decision rule are in
 
 At startup, after each `done` or `blocked` message, and when the user reports a change,
 check [Project 15](https://github.com/users/chenghanlee/projects/15) for milestone
-order. Also check open issues and PRs, running pairs (`herdr workspace list`),
+order. Also check open issues and PRs, running teams (`herdr workspace list`, one workspace per team),
 worktrees (`git worktree list`) and the latest `main` run.
 
 - Set merged issues Done. An issue with an open question stays Blocked.

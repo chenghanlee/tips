@@ -167,8 +167,8 @@ client, model, effort, optional advisor and persona, database suffix and port of
 Briefs name entries in `Implementer:` and `Required reviews:`.
 
 A configured entry can run in several allocations. Each launch records its
-resources in `agent/teams/allocations/<slot>.json`; restart, handoff and cleanup
-read that record. Scripts use the main checkout's config unless
+resources, and the team's Herdr workspace and tabs, in
+`agent/teams/allocations/<slot>.json`; restart, handoff and cleanup read that record. Scripts use the main checkout's config unless
 `TIPS_TEAM_CONFIG=/absolute/path` selects another file. Settings apply at the next launch;
 a relaunched client keeps its recorded database, port and client kind and takes its
 model, effort, advisor and persona from the current file.
