@@ -32,7 +32,8 @@ defmodule TipsWeb.EditorVideoTest do
   end
 
   # Reservations answer with a fresh uid. Status reads report their uid to the test and
-  # answer with the next of `replies`, then `pendingupload`.
+  # answer with the next of `replies`, then `pendingupload`; a `:hold` reply waits for
+  # `:continue`. Returns the replies' queue.
   defp stub_stream(replies \\ []) do
     test = self()
     {:ok, queue} = Agent.start_link(fn -> replies end)
@@ -50,8 +51,24 @@ defmodule TipsWeb.EditorVideoTest do
       %{method: "GET"} = conn ->
         "/client/v4/accounts/synthetic-account/stream/" <> uid = conn.request_path
         send(test, {:read, uid})
-        reply(conn, Agent.get_and_update(queue, &next/1))
+
+        case Agent.get_and_update(queue, &next/1) do
+          :hold -> hold(conn, test)
+          next -> reply(conn, next)
+        end
     end)
+
+    queue
+  end
+
+  defp hold(conn, test) do
+    send(test, {:held, self()})
+
+    receive do
+      :continue -> reply(conn, "pendingupload")
+    after
+      5000 -> raise "the held read was not released"
+    end
   end
 
   defp next([reply | rest]), do: {reply, rest}
@@ -319,7 +336,7 @@ defmodule TipsWeb.EditorVideoTest do
 
   test "failed and expired videos keep their place with Replace and Remove and hold Publish",
        %{conn: conn, user: user, form: form, evidence: evidence} do
-    stub_stream()
+    queue = stub_stream()
     failed = staged_video_fixture(user, %{state: :failed})
     past = DateTime.add(DateTime.utc_now(:second), -50 * 3600)
 
@@ -331,17 +348,19 @@ defmodule TipsWeb.EditorVideoTest do
         created_at: past
       })
 
-    # Ready, with its 49-hour deadline two seconds away and no read due before it.
-    expiring =
-      staged_video_fixture(user, %{
-        state: :ready,
-        stream_uid: "uid#{System.unique_integer([:positive])}",
-        duration_s: 2.0,
-        created_at: DateTime.add(DateTime.utc_now(:second), -49 * 3600 + 2)
-      })
+    # Ready, with their 49-hour deadlines two and four seconds away.
+    [expiring, late] =
+      for seconds <- [2, 4] do
+        staged_video_fixture(user, %{
+          state: :ready,
+          stream_uid: "uid#{System.unique_integer([:positive])}",
+          duration_s: 2.0,
+          created_at: DateTime.add(DateTime.utc_now(:second), -49 * 3600 + seconds)
+        })
+      end
 
     {:ok, lv, html} = live(conn, ~p"/editor/tips/new")
-    restore(lv, html, form, [failed.id, expired.id, expiring.id])
+    restore(lv, html, form, [failed.id, expired.id, expiring.id, late.id])
 
     eventually(fn -> slot(lv, evidence, expired.id) =~ "This upload expired." end)
     assert slot(lv, evidence, expiring.id) =~ "Ready. Publish by"
@@ -365,8 +384,10 @@ defmodule TipsWeb.EditorVideoTest do
     assert_push_event(lv, "editor:abort_video", %{media_id: ^expired_id})
     assert %Asset{cleanup_at: %DateTime{}} = Repo.reload!(expired)
     assert_enqueued(worker: CleanupMedia, args: %{media_id: expired.id})
-    assert [{:staged_video, failed_id}, {:staged_video, expiring_id}] = uploads(render(lv), form)
-    assert {failed_id, expiring_id} == {failed.id, expiring.id}
+
+    assert uploads(render(lv), form) ==
+             Enum.map([failed, expiring, late], &{:staged_video, &1.id})
+
     refute publish_disabled?(lv)
 
     # The deadline passes with the page open and no status read.
@@ -374,7 +395,24 @@ defmodule TipsWeb.EditorVideoTest do
     assert slot(lv, evidence, expiring.id) =~ "Replace"
     assert wait(lv, user) == "This video expired. Replace or remove it."
     assert publish_disabled?(lv)
+
+    # A pending video's read is applied after the later deadline passed, before its timer.
+    pending = released(user)
+    restore(lv, html, form, [failed.id, expiring.id, late.id, pending.id])
+    Agent.update(queue, &[:hold | &1])
+    assert_receive {:held, reader}, 1000
+    assert DateTime.after?(late.expires_at, DateTime.utc_now())
+    :sys.suspend(lv.pid)
+    send(reader, :continue)
+    eventually(fn -> Enum.any?(mailbox(lv), &match?({_, :async_result, _}, &1)) end, 100)
+    eventually(fn -> :video_deadline in mailbox(lv) end, 100)
+    :sys.resume(lv.pid)
+
+    assert slot(lv, evidence, late.id) =~ "This upload expired."
+    assert wait(lv, user) == "This video expired. Replace or remove it."
   end
+
+  defp mailbox(lv), do: elem(Process.info(lv.pid, :messages), 1)
 
   test "reloading a saved draft without the video aborts its transfer",
        %{conn: conn, form: form, evidence: evidence} do

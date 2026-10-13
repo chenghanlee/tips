@@ -578,8 +578,7 @@ defmodule TipsWeb.Editor do
     end
   end
 
-  def handle_info(:video_deadline, socket),
-    do: {:noreply, put_video_states(socket, Map.values(socket.assigns.video_states))}
+  def handle_info(:video_deadline, socket), do: {:noreply, put_video_states(socket, [])}
 
   @doc """
   Applies a `:video_status` read of the current cycle generation. A read of
@@ -692,14 +691,20 @@ defmodule TipsWeb.Editor do
     socket
   end
 
-  # Marks each status expired by the clock now, then arms one timer for the
-  # next deadline among the selected videos.
+  # Puts the statuses, marks every known status expired by one clock reading,
+  # then arms one timer for the next deadline among the selected videos. A
+  # deadline that passed before its timer ran is marked here, never scheduled.
   defp put_video_states(socket, statuses) do
     now = DateTime.utc_now()
-    marked = Map.new(statuses, &{&1.media_id, Map.put(&1, :expired, past?(&1.expires_at, now))})
 
     socket
-    |> update(:video_states, &Map.merge(&1, marked))
+    |> update(:video_states, fn states ->
+      states
+      |> Map.merge(Map.new(statuses, &{&1.media_id, &1}))
+      |> Map.new(fn {id, status} ->
+        {id, Map.put(status, :expired, past?(status.expires_at, now))}
+      end)
+    end)
     |> arm_deadline(now)
   end
 
