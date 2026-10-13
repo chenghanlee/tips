@@ -109,5 +109,8 @@ config :tips, Tips.Content.Media.CloudflareStream,
   plug: {Req.Test, Tips.Content.Media.CloudflareStream},
   settings: %{account_id: "synthetic-account", api_token: "synthetic-stream-token"}
 
+# Status cycles repeat quickly in tests.
+config :tips, TipsWeb.Editor, status_delay_ms: 50, status_max_delay_ms: 200
+
 # Saturation tests wait for capacity; keep each wait short.
 config :tips, Tips.Content.Search.ProviderCapacity, size: 8, queue_wait: 200

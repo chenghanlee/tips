@@ -639,7 +639,10 @@ defmodule TipsWeb.EditorTest do
         upload: upload,
         selection: [{:missing_image, "s1", %{filename: "plan.png", size: 2048, description: nil}}],
         images: %{"s1" => "0"},
-        attached: %{}
+        attached: %{},
+        video_upload: %UploadConfig{name: :videos, ref: "phx-videos"},
+        video_states: %{},
+        video_refs: %{}
       )
 
     assert text(html, "#evidence-image-s1") =~
@@ -655,7 +658,9 @@ defmodule TipsWeb.EditorTest do
   end
 
   defp done_refs(html) do
-    case html |> find("input[type=file]") |> LazyHTML.attribute("data-phx-done-refs") do
+    case html
+         |> find("input[type=file][name=images]")
+         |> LazyHTML.attribute("data-phx-done-refs") do
       [""] -> []
       [refs] -> String.split(refs, ",")
     end

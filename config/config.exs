@@ -65,6 +65,10 @@ config :tips, Tips.Content.Media.ImageParser,
   size: 2,
   queue_wait: 10_000
 
+# The editor's video status cycle: the delay after a plain result, and the ceiling
+# the delay doubles to after an uncertain or rate-limited one.
+config :tips, TipsWeb.Editor, status_delay_ms: 5_000, status_max_delay_ms: 60_000
+
 config :tips, Oban,
   repo: Tips.Repo,
   queues: [media: 1, embeddings: 1, maintenance: 1],
