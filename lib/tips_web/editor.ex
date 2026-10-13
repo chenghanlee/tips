@@ -30,7 +30,8 @@ defmodule TipsWeb.Editor do
     * `:refusal` explains a refused or unconfirmed save and `:outcome` a save
       whose browser draft was kept.
     * `:video_states` holds the last committed state of each staged video
-      (`t:Tips.Content.Media.video_status/0`), and `:video_refs` the upload
+      (`t:Tips.Content.Media.video_status/0`) with `expired`, from the
+      page's clock, and `:video_refs` the upload
       entry of each video this page is transferring. The browser sends the
       bytes to Stream by tus (`assets/js/video_uploader.js`); the page never
       consumes a video entry.
@@ -43,7 +44,9 @@ defmodule TipsWeb.Editor do
       message from an older one is ignored. A read in flight then is not
       killed, which would drop its database connection mid-query: its result
       is dropped and the new generation reads at once. The cycle stops when
-      nothing is pending or the account can no longer read.
+      nothing is pending or the account can no longer read. One timer for
+      the next deadline among the selected videos marks a video expired
+      when it passes, ready ones included, without a read.
 
   A submit validates the whole form with `Tips.Content.change_content/2`,
   readmits the session, then publishes or saves with each slot's uploaded
@@ -153,7 +156,7 @@ defmodule TipsWeb.Editor do
       images: %{},
       video_states: %{},
       video_refs: %{},
-      video_cycle: %{generation: 0, delay_ms: @status_delay_ms, reading: false}
+      video_cycle: %{generation: 0, delay_ms: @status_delay_ms, reading: false, deadline: nil}
     )
   end
 
@@ -246,8 +249,9 @@ defmodule TipsWeb.Editor do
   def handle_event("remove_attachment", params, socket), do: {:noreply, remove(socket, params)}
 
   def handle_event("editor:restore", params, socket) do
-    {reply, socket} = restore(socket, params)
-    {:reply, reply, socket |> start_cycle() |> settle()}
+    {reply, restored} = restore(socket, params)
+    selected = staged_videos(socket.assigns.record)
+    {:reply, reply, restored |> deselect_videos(selected) |> start_cycle() |> settle()}
   end
 
   def handle_event("editor:recover", params, socket),
@@ -425,10 +429,9 @@ defmodule TipsWeb.Editor do
     socket =
       socket
       |> update(:video_refs, &Map.put(&1, id, entry.ref))
-      |> update(
-        :video_states,
-        &Map.put(&1, id, %{media_id: id, state: :uploading, expires_at: expires_at, refresh: :ok})
-      )
+      |> put_video_states([
+        %{media_id: id, state: :uploading, expires_at: expires_at, refresh: :ok}
+      ])
 
     case mode do
       :begin ->
@@ -536,6 +539,25 @@ defmodule TipsWeb.Editor do
     end
   end
 
+  # A restored record replaced the selection: the videos it dropped lose
+  # their entry and their transfer. Content keeps each row until it expires.
+  defp deselect_videos(socket, selected) do
+    Enum.reduce(selected -- staged_videos(socket.assigns.record), socket, fn id, socket ->
+      socket
+      |> cancel_video_entry(id)
+      |> update(:video_refs, &Map.delete(&1, id))
+      |> update(:video_states, &Map.delete(&1, id))
+      |> LiveView.push_event("editor:abort_video", %{media_id: id})
+    end)
+  end
+
+  defp cancel_video_entry(socket, id) do
+    case live_video_entry(socket.assigns.uploads.videos, socket.assigns.video_refs, id) do
+      %{ref: ref} -> LiveView.cancel_upload(socket, :videos, ref)
+      nil -> socket
+    end
+  end
+
   # One video per editor: its entry, or a rejected selection, goes with it.
   defp cancel_video_entries(socket) do
     Enum.reduce(socket.assigns.uploads.videos.entries, socket, fn entry, socket ->
@@ -544,8 +566,9 @@ defmodule TipsWeb.Editor do
   end
 
   @doc """
-  Handles the video status cycle's scheduled `{:refresh_videos, generation}`;
-  a message from an earlier generation is ignored.
+  Handles the video status cycle's scheduled `{:refresh_videos, generation}`,
+  ignoring one from an earlier generation, and `:video_deadline`, which marks
+  the videos whose deadline passed.
   """
   @spec handle_info(term(), LiveView.Socket.t()) :: {:noreply, LiveView.Socket.t()}
   def handle_info({:refresh_videos, generation}, socket) do
@@ -554,6 +577,9 @@ defmodule TipsWeb.Editor do
       _stale -> {:noreply, socket}
     end
   end
+
+  def handle_info(:video_deadline, socket),
+    do: {:noreply, put_video_states(socket, Map.values(socket.assigns.video_states))}
 
   @doc """
   Applies a `:video_status` read of the current cycle generation. A read of
@@ -616,13 +642,7 @@ defmodule TipsWeb.Editor do
   defp cycled(socket, ids, {:ok, statuses}) do
     selected = staged_videos(socket.assigns.record)
     statuses = Enum.filter(statuses, &(&1.media_id in selected))
-
-    socket =
-      update(
-        socket,
-        :video_states,
-        &Map.merge(&1, Map.new(statuses, fn s -> {s.media_id, s} end))
-      )
+    socket = put_video_states(socket, statuses)
 
     case Enum.find(statuses, &(&1.refresh != :ok)) do
       nil -> schedule(socket, @status_delay_ms)
@@ -631,8 +651,10 @@ defmodule TipsWeb.Editor do
   end
 
   defp cycled(socket, ids, {:error, :not_found}) do
-    removed = Map.new(ids, &{&1, %{media_id: &1, state: :removed, expires_at: nil, refresh: :ok}})
-    update(socket, :video_states, &Map.merge(&1, removed))
+    put_video_states(
+      socket,
+      Enum.map(ids, &%{media_id: &1, state: :removed, expires_at: nil, refresh: :ok})
+    )
   end
 
   defp cycled(socket, _ids, {:error, reason})
@@ -670,10 +692,40 @@ defmodule TipsWeb.Editor do
     socket
   end
 
-  defp expired?(%{expires_at: %DateTime{} = expires_at}),
-    do: DateTime.compare(expires_at, DateTime.utc_now()) != :gt
+  # Marks each status expired by the clock now, then arms one timer for the
+  # next deadline among the selected videos.
+  defp put_video_states(socket, statuses) do
+    now = DateTime.utc_now()
+    marked = Map.new(statuses, &{&1.media_id, Map.put(&1, :expired, past?(&1.expires_at, now))})
 
-  defp expired?(_status), do: false
+    socket
+    |> update(:video_states, &Map.merge(&1, marked))
+    |> arm_deadline(now)
+  end
+
+  defp past?(%DateTime{} = deadline, now), do: DateTime.compare(deadline, now) != :gt
+  defp past?(nil, _now), do: false
+
+  defp arm_deadline(socket, now) do
+    %{record: record, video_states: states, video_cycle: cycle} = socket.assigns
+    if cycle.deadline, do: Process.cancel_timer(cycle.deadline)
+
+    deadlines =
+      for id <- staged_videos(record),
+          %{expired: false, expires_at: %DateTime{} = deadline} <- [states[id]],
+          do: deadline
+
+    timer =
+      if deadlines != [] do
+        delay = DateTime.diff(Enum.min(deadlines, DateTime), now, :millisecond) + 1
+        Process.send_after(self(), :video_deadline, delay)
+      end
+
+    update(socket, :video_cycle, &%{&1 | deadline: timer})
+  end
+
+  defp expired?(%{expired: expired}), do: expired
+  defp expired?(nil), do: false
 
   @doc """
   Why Publish waits: `:expired` while a selected video's committed deadline

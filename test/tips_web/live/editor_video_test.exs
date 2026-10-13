@@ -116,12 +116,12 @@ defmodule TipsWeb.EditorVideoTest do
     render(lv) |> find("button[type=submit]") |> LazyHTML.attribute("disabled") != []
   end
 
-  # Re-renders until `fun` returns a truthy value, for up to 2 s.
-  defp eventually(fun, tries \\ 40) do
+  # Re-renders until `fun` returns a truthy value, `tries` times `every` ms apart.
+  defp eventually(fun, tries \\ 40, every \\ 50) do
     case fun.() do
       falsy when falsy in [nil, false] and tries > 1 ->
-        Process.sleep(50)
-        eventually(fun, tries - 1)
+        Process.sleep(every)
+        eventually(fun, tries - 1, every)
 
       result ->
         assert result
@@ -260,18 +260,23 @@ defmodule TipsWeb.EditorVideoTest do
   end
 
   test "a stale cycle message is ignored and a closed page reads no more",
-       %{conn: conn, user: user, form: form} do
-    stub_stream()
+       %{conn: conn, user: user, form: form, evidence: evidence} do
+    stub_stream([:rate_limited])
     row = released(user)
     uid = row.stream_uid
     {:ok, lv, html} = live(conn, ~p"/editor/tips/new")
-    restore(lv, html, form, [row.id])
-    assert_receive {:read, ^uid}, 1000
-    assert_receive {:read, ^uid}, 1000
 
-    # The restore started generation 1; nothing scheduled the generations before it.
-    send(lv.pid, {:refresh_videos, 0})
-    render(lv)
+    capture_log(fn ->
+      restore(lv, html, form, [row.id])
+      assert_receive {:read, ^uid}, 1000
+      # The rate-limited read schedules the next one 100 ms after its result.
+      eventually(fn -> slot(lv, evidence, row.id) =~ "Still checking" end, 200, 2)
+
+      # The restore started generation 1; nothing scheduled the generations before it.
+      send(lv.pid, {:refresh_videos, 0})
+      refute_receive {:read, ^uid}, 50
+      assert_receive {:read, ^uid}, 1000
+    end)
 
     ref = Process.monitor(lv.pid)
     GenServer.stop(lv.pid, :normal)
@@ -326,10 +331,20 @@ defmodule TipsWeb.EditorVideoTest do
         created_at: past
       })
 
+    # Ready, with its 49-hour deadline two seconds away and no read due before it.
+    expiring =
+      staged_video_fixture(user, %{
+        state: :ready,
+        stream_uid: "uid#{System.unique_integer([:positive])}",
+        duration_s: 2.0,
+        created_at: DateTime.add(DateTime.utc_now(:second), -49 * 3600 + 2)
+      })
+
     {:ok, lv, html} = live(conn, ~p"/editor/tips/new")
-    restore(lv, html, form, [failed.id, expired.id])
+    restore(lv, html, form, [failed.id, expired.id, expiring.id])
 
     eventually(fn -> slot(lv, evidence, expired.id) =~ "This upload expired." end)
+    assert slot(lv, evidence, expiring.id) =~ "Ready. Publish by"
 
     assert slot(lv, evidence, failed.id) =~
              "Couldn't be processed. Videos must be under 3 minutes."
@@ -350,9 +365,35 @@ defmodule TipsWeb.EditorVideoTest do
     assert_push_event(lv, "editor:abort_video", %{media_id: ^expired_id})
     assert %Asset{cleanup_at: %DateTime{}} = Repo.reload!(expired)
     assert_enqueued(worker: CleanupMedia, args: %{media_id: expired.id})
-    assert [{:staged_video, failed_id}] = uploads(render(lv), form)
-    assert failed_id == failed.id
+    assert [{:staged_video, failed_id}, {:staged_video, expiring_id}] = uploads(render(lv), form)
+    assert {failed_id, expiring_id} == {failed.id, expiring.id}
     refute publish_disabled?(lv)
+
+    # The deadline passes with the page open and no status read.
+    eventually(fn -> slot(lv, evidence, expiring.id) =~ "This upload expired." end, 60)
+    assert slot(lv, evidence, expiring.id) =~ "Replace"
+    assert wait(lv, user) == "This video expired. Replace or remove it."
+    assert publish_disabled?(lv)
+  end
+
+  test "reloading a saved draft without the video aborts its transfer",
+       %{conn: conn, form: form, evidence: evidence} do
+    stub_stream()
+    {:ok, lv, html} = live(conn, ~p"/editor/tips/new")
+    assert {:ok, %{entries: entries}} = select_video(lv, form)
+    assert [%{media_id: id}] = Map.values(entries)
+
+    # Another tab saved the draft without the video; the author reloads it.
+    restore(lv, html, form, [])
+
+    assert_push_event(lv, "editor:abort_video", %{media_id: ^id})
+    assert uploads(render(lv), form) == []
+    refute has_element?(lv, "##{evidence}-video-#{id}")
+    # Its entry is cancelled: the one video entry is free for another file.
+    assert {:ok, %{entries: entries, errors: errors}} = select_video(lv, form)
+    assert errors == %{}
+    assert [%{media_id: another}] = Map.values(entries)
+    assert another != id
   end
 
   defp unconfirm(user),
