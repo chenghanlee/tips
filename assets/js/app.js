@@ -26,12 +26,14 @@ import {hooks as colocatedHooks} from "phoenix-colocated/tips"
 import topbar from "../vendor/topbar"
 import {EDITOR_HOOK} from "./editor_contract"
 import {EditorDraft} from "./editor_draft"
+import {tusUploader, VideoTransfers} from "./video_uploader"
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, [EDITOR_HOOK]: EditorDraft},
+  hooks: {...colocatedHooks, [EDITOR_HOOK]: EditorDraft, VideoTransfers},
+  uploaders: {Tus: tusUploader},
 })
 
 // Show progress bar on live navigation and form submits

@@ -88,6 +88,8 @@ defmodule Tips.Content.Media.VideoUploadTest do
              state: :uploading,
              stream_uid: "abc123",
              target: {:new_tip, ^key},
+             upload_length: @size,
+             upload_url: ^url,
              created_at: created_at,
              expires_at: ^expires_at,
              tip_id: nil,

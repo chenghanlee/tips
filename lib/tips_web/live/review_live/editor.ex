@@ -5,7 +5,7 @@ defmodule TipsWeb.ReviewLive.Editor do
 
   Mounts the draft form, its `EditorDraft` hook, browser draft restore,
   reconnect recovery, submit-time validation, publishing or saving, outcome
-  reconciliation and draft clearing (`TipsWeb.Editor`). A fresh review form
+  reconciliation, draft clearing and the video status cycle (`TipsWeb.Editor`). A fresh review form
   starts with the tip's model and environment; a restored, recovered or saved
   review keeps its own values, blanks included.
   """
@@ -42,6 +42,9 @@ defmodule TipsWeb.ReviewLive.Editor do
               selection={@record.intent.uploads}
               images={@images}
               attached={@attached}
+              video_upload={@uploads.videos}
+              video_states={@video_states}
+              video_refs={@video_refs}
             />
             <Editor.setup_fields
               form={@form}
@@ -57,6 +60,7 @@ defmodule TipsWeb.ReviewLive.Editor do
           refusal={@refusal}
           outcome={@outcome}
           pending={@pending}
+          wait={Editor.publish_wait(@record, @video_states)}
         />
       </.form>
     </Layouts.app>
@@ -122,4 +126,10 @@ defmodule TipsWeb.ReviewLive.Editor do
 
   @impl true
   def handle_event(event, params, socket), do: Editor.handle_event(event, params, socket)
+
+  @impl true
+  def handle_info(message, socket), do: Editor.handle_info(message, socket)
+
+  @impl true
+  def handle_async(name, result, socket), do: Editor.handle_async(name, result, socket)
 end

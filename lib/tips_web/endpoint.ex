@@ -3,6 +3,8 @@ defmodule TipsWeb.Endpoint do
 
   if Application.compile_env(:tips, :sql_sandbox, false) do
     plug Phoenix.Ecto.SQL.Sandbox
+    # Browser tests' tus endpoint, before Plug.Parsers so it reads each chunk itself.
+    plug Tips.TusStub
   end
 
   # The session will be stored in the cookie and signed,

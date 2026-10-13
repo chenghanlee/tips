@@ -4,7 +4,7 @@ defmodule TipsWeb.TipLive.Editor do
 
   Mounts the draft form, its `EditorDraft` hook, browser draft restore,
   reconnect recovery, submit-time validation, publishing or saving, outcome
-  reconciliation and draft clearing (`TipsWeb.Editor`).
+  reconciliation, draft clearing and the video status cycle (`TipsWeb.Editor`).
   """
   use TipsWeb, :live_view
 
@@ -52,6 +52,9 @@ defmodule TipsWeb.TipLive.Editor do
               selection={@record.intent.uploads}
               images={@images}
               attached={@attached}
+              video_upload={@uploads.videos}
+              video_states={@video_states}
+              video_refs={@video_refs}
             />
           </fieldset>
         </fieldset>
@@ -62,6 +65,7 @@ defmodule TipsWeb.TipLive.Editor do
           refusal={@refusal}
           outcome={@outcome}
           pending={@pending}
+          wait={Editor.publish_wait(@record, @video_states)}
         />
       </.form>
     </Layouts.app>
@@ -99,4 +103,10 @@ defmodule TipsWeb.TipLive.Editor do
 
   @impl true
   def handle_event(event, params, socket), do: Editor.handle_event(event, params, socket)
+
+  @impl true
+  def handle_info(message, socket), do: Editor.handle_info(message, socket)
+
+  @impl true
+  def handle_async(name, result, socket), do: Editor.handle_async(name, result, socket)
 end

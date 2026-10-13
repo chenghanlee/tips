@@ -109,6 +109,9 @@ config :tips, Tips.Content.Media.CloudflareStream,
   plug: {Req.Test, Tips.Content.Media.CloudflareStream},
   settings: %{account_id: "synthetic-account", api_token: "synthetic-stream-token"}
 
+# Status cycles repeat quickly in tests.
+config :tips, TipsWeb.Editor, status_delay_ms: 50, status_max_delay_ms: 200
+
 # Signed playback uses a synthetic RSA key, encoded as CLOUDFLARE_STREAM_SIGNING_KEY is.
 # Only `:real_provider` tests override it to sign with the development account's key.
 config :tips, Tips.Content.Media.StreamSigner,

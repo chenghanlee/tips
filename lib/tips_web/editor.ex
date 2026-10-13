@@ -6,8 +6,9 @@ defmodule TipsWeb.Editor do
   `assets/js/editor_draft.js`.
 
   The page assigns `:identity`, `:record`, `:attrs`, `:form`, `:check`,
-  `:pending`, `:receipt`, `:saved`, `:refusal`, `:outcome`, `:images` and
-  `:attached`, and allows the `:images` upload:
+  `:pending`, `:receipt`, `:saved`, `:refusal`, `:outcome`, `:images`,
+  `:attached`, `:video_states`, `:video_refs` and `:video_cycle`, and allows
+  the `:images` and `:videos` uploads:
 
     * `:record` is the draft the page was mounted, restored or recovered with.
       It holds the submission key, the edit base and expected version, and
@@ -28,6 +29,24 @@ defmodule TipsWeb.Editor do
       `:to`, whose draft the hook is clearing. `:saved` is the current saved edit after an unknown outcome.
     * `:refusal` explains a refused or unconfirmed save and `:outcome` a save
       whose browser draft was kept.
+    * `:video_states` holds the last committed state of each staged video
+      (`t:Tips.Content.Media.video_status/0`) with `expired`, from the
+      page's clock, and `:video_refs` the upload
+      entry of each video this page is transferring. The browser sends the
+      bytes to Stream by tus (`assets/js/video_uploader.js`); the page never
+      consumes a video entry.
+    * `:video_cycle` is the status cycle: its generation, current delay and
+      whether a read is in flight. One `Tips.Content.get_video_uploads/2`
+      read runs at a time for the pending videos, the next one a delay after
+      it completes: the configured `status_delay_ms`, doubling up to
+      `status_max_delay_ms` after an uncertain or rate-limited read.
+      Preflight, restore, recover and Remove start a new generation; a
+      message from an older one is ignored. A read in flight then is not
+      killed, which would drop its database connection mid-query: its result
+      is dropped and the new generation reads at once. The cycle stops when
+      nothing is pending or the account can no longer read. One timer for
+      the next deadline among the selected videos marks a video expired
+      when it passes, ready ones included, without a read.
 
   A submit validates the whole form with `Tips.Content.change_content/2`,
   readmits the session, then publishes or saves with each slot's uploaded
@@ -52,10 +71,16 @@ defmodule TipsWeb.Editor do
   require Logger
 
   alias Phoenix.LiveView
+  require Phoenix.LiveView
   alias Tips.Content
   alias TipsWeb.{AuthMailAdmission, CoreComponents, EditorContract, Reader, UserAuth}
 
   @kinds %{"tip" => :tip, "review" => :review}
+
+  @status_delay_ms Application.compile_env!(:tips, [__MODULE__, :status_delay_ms])
+  @status_max_delay_ms Application.compile_env!(:tips, [__MODULE__, :status_max_delay_ms])
+  # `Tips.Content.get_video_uploads/2` reads at most ten ids.
+  @max_status_ids 10
 
   @fields %{
     tip: ~w(title body tag_id model_id model_other environment_id prompt output)a,
@@ -80,6 +105,7 @@ defmodule TipsWeb.Editor do
     |> assign_identity(target)
     |> assign(:attached, %{})
     |> allow_images()
+    |> allow_videos()
     |> assign_record(%{
       storage: %{account_id: account_id(socket), slot: target},
       draft: %{draft_id: key, revision: 0},
@@ -105,6 +131,7 @@ defmodule TipsWeb.Editor do
     |> assign_identity(target)
     |> assign(:attached, Map.new(form.media, &{&1.id, &1.kind}))
     |> allow_images()
+    |> allow_videos()
     |> assign_record(%{
       storage: %{account_id: account_id(socket), slot: target},
       draft: %{draft_id: Ecto.UUID.generate(), revision: 0},
@@ -126,7 +153,10 @@ defmodule TipsWeb.Editor do
       saved: nil,
       refusal: nil,
       outcome: nil,
-      images: %{}
+      images: %{},
+      video_states: %{},
+      video_refs: %{},
+      video_cycle: %{generation: 0, delay_ms: @status_delay_ms, reading: false, deadline: nil}
     )
   end
 
@@ -152,6 +182,17 @@ defmodule TipsWeb.Editor do
     end
 
     {:noreply, socket}
+  end
+
+  # One video per editor. The browser sends it to Stream while the author writes.
+  defp allow_videos(socket) do
+    LiveView.allow_upload(socket, :videos,
+      accept: ~w(.mp4 .mov .webm),
+      max_entries: 1,
+      max_file_size: 1_000_000_000,
+      auto_upload: true,
+      external: &preflight_video/2
+    )
   end
 
   defp assign_record(socket, record) do
@@ -190,7 +231,8 @@ defmodule TipsWeb.Editor do
       files; it validates changed fields only after a submit failed
       validation.
     * `"remove_attachment"` drops an image slot (`"slot"`), cancelling its
-      file, or a saved attachment (`"media_id"`) from the selection.
+      file, a saved attachment (`"media_id"`), or a staged video
+      (`"video"`), which it discards and whose transfer it aborts.
     * `"submit"` publishes or saves (see the module documentation).
     * `"editor:restore"` applies the record the hook read, replying
       `restored`, `published` (its publication was already confirmed, so the
@@ -207,11 +249,13 @@ defmodule TipsWeb.Editor do
   def handle_event("remove_attachment", params, socket), do: {:noreply, remove(socket, params)}
 
   def handle_event("editor:restore", params, socket) do
-    {reply, socket} = restore(socket, params)
-    {:reply, reply, settle(socket)}
+    {reply, restored} = restore(socket, params)
+    selected = staged_videos(socket.assigns.record)
+    {:reply, reply, restored |> deselect_videos(selected) |> start_cycle() |> settle()}
   end
 
-  def handle_event("editor:recover", params, socket), do: {:noreply, recover(socket, params)}
+  def handle_event("editor:recover", params, socket),
+    do: {:noreply, socket |> recover(params) |> start_cycle()}
 
   def handle_event("editor:reconcile", _params, socket) do
     {:noreply,
@@ -317,10 +361,394 @@ defmodule TipsWeb.Editor do
     end)
   end
 
+  defp remove(socket, %{"video" => value}) do
+    case Enum.find(staged_videos(socket.assigns.record), &(Integer.to_string(&1) == value)) do
+      nil -> socket
+      id -> discard_video(socket, id)
+    end
+  end
+
   defp drop_upload(socket, removed?) do
     update(socket, :record, fn record ->
       update_in(record.intent.uploads, &Enum.reject(&1, removed?))
     end)
+  end
+
+  ## Videos
+
+  # Reserves the selected video, or resumes the interrupted one from the same
+  # file. Each preflight readmits the session first.
+  defp preflight_video(entry, socket) do
+    with {:ok, socket} <- UserAuth.readmit(socket),
+         {mode, {:ok, upload}} <- reserve_video(socket, entry) do
+      meta = %{
+        uploader: "Tus",
+        media_id: upload.media_id,
+        upload_url: upload.upload_url,
+        expires_at: upload.expires_at
+      }
+
+      {:ok, meta, socket |> stage_video(mode, entry, upload) |> start_cycle()}
+    else
+      {:error, :unauthenticated} ->
+        {:error, %{reason: video_error(:unauthenticated, entry, socket)}, socket}
+
+      {mode, {:error, reason}} ->
+        {:error, %{reason: video_error({mode, reason}, entry, socket)},
+         video_refused(socket, reason)}
+    end
+  end
+
+  defp reserve_video(socket, entry) do
+    %{current_scope: scope, record: record} = socket.assigns
+    file = %{size: entry.client_size}
+
+    case record.intent.uploads && staged_videos(record) do
+      [] ->
+        {:begin, Content.begin_video_upload(scope, upload_target(record), file)}
+
+      [id] ->
+        if interrupted?(socket.assigns, id),
+          do: {:resume, Content.resume_video_upload(scope, id, file)},
+          else: {:begin, {:error, :one_video}}
+
+      _several_or_unknown ->
+        {:begin, {:error, :one_video}}
+    end
+  end
+
+  defp upload_target(%{target: :new_tip, submission_key: key}), do: {:new_tip, key}
+
+  defp upload_target(%{target: {:new_review, tip_id}, submission_key: key}),
+    do: {:new_review, tip_id, key}
+
+  defp upload_target(%{target: {:edit, :tip, id}}), do: {:edit_tip, id}
+  defp upload_target(%{target: {:edit, :review, id}}), do: {:edit_review, id}
+
+  defp stage_video(socket, mode, entry, %{media_id: id, expires_at: expires_at}) do
+    socket =
+      socket
+      |> update(:video_refs, &Map.put(&1, id, entry.ref))
+      |> put_video_states([
+        %{media_id: id, state: :uploading, expires_at: expires_at, refresh: :ok}
+      ])
+
+    case mode do
+      :begin ->
+        update(
+          socket,
+          :record,
+          &update_in(&1.intent.uploads, fn u -> u ++ [{:staged_video, id}] end)
+        )
+
+      :resume ->
+        socket
+    end
+  end
+
+  defp staged_videos(%{intent: %{uploads: uploads}}),
+    do: for({:staged_video, id} <- uploads || [], do: id)
+
+  # A staged upload this page is not transferring, not known to have finished
+  # or expired. Only Content decides whether it resumes.
+  defp interrupted?(assigns, id) do
+    live_video_entry(assigns.uploads.videos, assigns.video_refs, id) == nil and
+      case assigns.video_states[id] do
+        nil -> true
+        %{state: :uploading} = status -> not expired?(status)
+        _other -> false
+      end
+  end
+
+  defp live_video_entry(upload, refs, id) do
+    ref = refs[id]
+    Enum.find(upload.entries, &(&1.ref == ref))
+  end
+
+  # The publication behind a published key, as a submit shows it.
+  defp video_refused(socket, {:published, receipt}),
+    do:
+      refuse(
+        socket,
+        :published_earlier,
+        receipt.state != :deleted && destination(socket, receipt)
+      )
+
+  defp video_refused(socket, _reason), do: socket
+
+  defp video_error(:unauthenticated, _entry, _socket),
+    do:
+      "Your sign-in has expired, so the video wasn't added. Sign in again, then select it again."
+
+  defp video_error({_mode, :unauthenticated}, entry, socket),
+    do: video_error(:unauthenticated, entry, socket)
+
+  defp video_error({_mode, :unconfirmed}, _entry, _socket),
+    do: "Confirm your email address before you add a video."
+
+  defp video_error({_mode, :forbidden}, _entry, _socket), do: "This account can't add videos."
+
+  defp video_error({_mode, {:rate_limited, seconds}}, _entry, _socket),
+    do: "Too many uploads. Try again in #{AuthMailAdmission.retry_in(seconds)}."
+
+  defp video_error({_mode, {:capacity, seconds}}, _entry, _socket),
+    do: "Tips is busy. Try again in #{AuthMailAdmission.retry_in(seconds)}."
+
+  defp video_error({:resume, :not_found}, entry, _socket),
+    do: "#{entry.client_name} isn't the same file as the interrupted upload."
+
+  defp video_error({:begin, :not_found}, _entry, socket) do
+    %{target: target} = socket.assigns.identity
+    refusal(:not_found, kind(target), verb(target))
+  end
+
+  defp video_error({:begin, :one_video}, _entry, _socket),
+    do: "Remove the selected video before adding another."
+
+  defp video_error({:begin, {:published, _receipt}}, entry, _socket),
+    do: "#{entry.client_name} wasn't added, because this draft was published earlier."
+
+  defp video_error({:begin, :conflict}, _entry, _socket), do: "This draft belongs to another tip."
+
+  # No URL was released, the outcome is unknown, or the size is out of range.
+  defp video_error({mode, {:upload_failed, _ids}}, entry, socket),
+    do: video_error({mode, :outcome_unknown}, entry, socket)
+
+  defp video_error({mode, %Ecto.Changeset{}}, entry, socket),
+    do: video_error({mode, :outcome_unknown}, entry, socket)
+
+  defp video_error({_mode, :outcome_unknown}, entry, _socket),
+    do: "#{entry.client_name} couldn't be uploaded. Select it again."
+
+  # Discards the staged upload, drops its slot and aborts its transfer. An
+  # upload Content no longer has is dropped too.
+  defp discard_video(socket, id) do
+    with {:ok, socket} <- UserAuth.readmit(socket),
+         result when result in [:ok, {:error, :not_found}] <-
+           Content.discard_video_upload(socket.assigns.current_scope, id) do
+      socket
+      |> cancel_video_entries()
+      |> update(:video_refs, &Map.delete(&1, id))
+      |> update(:video_states, &Map.delete(&1, id))
+      |> drop_upload(&(&1 == {:staged_video, id}))
+      |> LiveView.push_event("editor:abort_video", %{media_id: id})
+      |> start_cycle()
+    else
+      {:error, :unauthenticated} -> refuse(socket, :unauthenticated)
+      {:error, :outcome_unknown} -> refuse(socket, :video_remove_unknown)
+    end
+  end
+
+  # A restored record replaced the selection: the videos it dropped lose
+  # their entry and their transfer. Content keeps each row until it expires.
+  defp deselect_videos(socket, selected) do
+    Enum.reduce(selected -- staged_videos(socket.assigns.record), socket, fn id, socket ->
+      socket
+      |> cancel_video_entry(id)
+      |> update(:video_refs, &Map.delete(&1, id))
+      |> update(:video_states, &Map.delete(&1, id))
+      |> LiveView.push_event("editor:abort_video", %{media_id: id})
+    end)
+  end
+
+  defp cancel_video_entry(socket, id) do
+    case live_video_entry(socket.assigns.uploads.videos, socket.assigns.video_refs, id) do
+      %{ref: ref} -> LiveView.cancel_upload(socket, :videos, ref)
+      nil -> socket
+    end
+  end
+
+  # One video per editor: its entry, or a rejected selection, goes with it.
+  defp cancel_video_entries(socket) do
+    Enum.reduce(socket.assigns.uploads.videos.entries, socket, fn entry, socket ->
+      LiveView.cancel_upload(socket, :videos, entry.ref)
+    end)
+  end
+
+  @doc """
+  Handles the video status cycle's scheduled `{:refresh_videos, generation}`,
+  ignoring one from an earlier generation, and `:video_deadline`, which marks
+  the videos whose deadline passed.
+  """
+  @spec handle_info(term(), LiveView.Socket.t()) :: {:noreply, LiveView.Socket.t()}
+  def handle_info({:refresh_videos, generation}, socket) do
+    case socket.assigns.video_cycle do
+      %{generation: ^generation} -> {:noreply, run_cycle(socket)}
+      _stale -> {:noreply, socket}
+    end
+  end
+
+  def handle_info(:video_deadline, socket), do: {:noreply, put_video_states(socket, [])}
+
+  @doc """
+  Applies a `:video_status` read of the current cycle generation. A read of
+  an earlier generation is dropped, and the current one reads at once.
+  """
+  @spec handle_async(atom(), term(), LiveView.Socket.t()) :: {:noreply, LiveView.Socket.t()}
+  def handle_async(:video_status, result, socket) do
+    socket = update(socket, :video_cycle, &%{&1 | reading: false})
+    generation = socket.assigns.video_cycle.generation
+
+    case result do
+      {:ok, {^generation, ids, result}} ->
+        {:noreply, cycled(socket, ids, result)}
+
+      {:ok, _stale} ->
+        {:noreply, run_cycle(socket)}
+
+      {:exit, reason} ->
+        {:noreply, retry(socket, pending_videos(socket.assigns), {:exit, reason})}
+    end
+  end
+
+  # The selection changed: the deadline timer follows it before any read,
+  # which may never succeed.
+  defp start_cycle(socket) do
+    socket
+    |> update(:video_cycle, &%{&1 | generation: &1.generation + 1, delay_ms: @status_delay_ms})
+    |> put_video_states([])
+    |> run_cycle()
+  end
+
+  # Readmits the session, then reads the pending videos outside the page
+  # process. A read in flight runs the next one when it completes.
+  defp run_cycle(%{assigns: %{video_cycle: %{reading: true}}} = socket), do: socket
+
+  defp run_cycle(socket) do
+    with [_ | _] = ids <- pending_videos(socket.assigns),
+         {:ok, socket} <- UserAuth.readmit(socket) do
+      %{current_scope: scope, video_cycle: %{generation: generation}} = socket.assigns
+
+      socket
+      |> update(:video_cycle, &%{&1 | reading: true})
+      |> LiveView.start_async(:video_status, fn ->
+        # A closed page lets the bounded read finish rather than kill it mid-query,
+        # which would drop its database connection. Nothing schedules another.
+        Process.flag(:trap_exit, true)
+        {generation, ids, Content.get_video_uploads(scope, ids)}
+      end)
+    else
+      [] -> socket
+      {:error, :unauthenticated} -> refuse(socket, :unauthenticated)
+    end
+  end
+
+  # Selected videos not known to be ready, failed or removed.
+  defp pending_videos(assigns) do
+    assigns.record
+    |> staged_videos()
+    |> Enum.reject(&(assigns.video_states[&1][:state] in [:ready, :failed, :removed]))
+    |> Enum.take(@max_status_ids)
+  end
+
+  defp cycled(socket, ids, {:ok, statuses}) do
+    selected = staged_videos(socket.assigns.record)
+    statuses = Enum.filter(statuses, &(&1.media_id in selected))
+    socket = put_video_states(socket, statuses)
+
+    case Enum.find(statuses, &(&1.refresh != :ok)) do
+      nil -> schedule(socket, @status_delay_ms)
+      %{refresh: reason} -> retry(socket, ids, reason)
+    end
+  end
+
+  defp cycled(socket, ids, {:error, :not_found}) do
+    put_video_states(
+      socket,
+      Enum.map(ids, &%{media_id: &1, state: :removed, expires_at: nil, refresh: :ok})
+    )
+  end
+
+  defp cycled(socket, _ids, {:error, reason})
+       when reason in [:unauthenticated, :forbidden, :unconfirmed],
+       do: refuse(socket, reason)
+
+  defp cycled(socket, ids, {:error, %Ecto.Changeset{}}) do
+    Logger.error("Video status stopped: media=#{inspect(ids)} reason=invalid_ids")
+    socket
+  end
+
+  defp cycled(socket, ids, {:error, :outcome_unknown}), do: retry(socket, ids, :outcome_unknown)
+
+  defp retry(socket, ids, reason) do
+    delay = min(socket.assigns.video_cycle.delay_ms * 2, @status_max_delay_ms)
+
+    Logger.warning(
+      "Video status retry: media=#{inspect(ids)} reason=#{inspect(reason, limit: 5)} next_ms=#{delay}"
+    )
+
+    schedule(socket, delay)
+  end
+
+  defp schedule(socket, delay) do
+    socket = update(socket, :video_cycle, &%{&1 | delay_ms: delay})
+
+    if pending_videos(socket.assigns) != [],
+      do:
+        Process.send_after(
+          self(),
+          {:refresh_videos, socket.assigns.video_cycle.generation},
+          delay
+        )
+
+    socket
+  end
+
+  # Puts the statuses, marks every known status expired by one clock reading,
+  # then arms one timer for the next deadline among the selected videos. A
+  # deadline that passed before its timer ran is marked here, never scheduled.
+  defp put_video_states(socket, statuses) do
+    now = DateTime.utc_now()
+
+    socket
+    |> update(:video_states, fn states ->
+      states
+      |> Map.merge(Map.new(statuses, &{&1.media_id, &1}))
+      |> Map.new(fn {id, status} ->
+        {id, Map.put(status, :expired, past?(status.expires_at, now))}
+      end)
+    end)
+    |> arm_deadline(now)
+  end
+
+  defp past?(%DateTime{} = deadline, now), do: DateTime.compare(deadline, now) != :gt
+  defp past?(nil, _now), do: false
+
+  defp arm_deadline(socket, now) do
+    %{record: record, video_states: states, video_cycle: cycle} = socket.assigns
+    if cycle.deadline, do: Process.cancel_timer(cycle.deadline)
+
+    deadlines =
+      for id <- staged_videos(record),
+          %{expired: false, expires_at: %DateTime{} = deadline} <- [states[id]],
+          do: deadline
+
+    timer =
+      if deadlines != [] do
+        delay = DateTime.diff(Enum.min(deadlines, DateTime), now, :millisecond) + 1
+        Process.send_after(self(), :video_deadline, delay)
+      end
+
+    update(socket, :video_cycle, &%{&1 | deadline: timer})
+  end
+
+  defp expired?(%{expired: expired}), do: expired
+  defp expired?(nil), do: false
+
+  @doc """
+  Why Publish waits: `:expired` while a selected video's committed deadline
+  has passed, else `:pending` while one is uploading, processing or not yet
+  read; `nil` when nothing holds it.
+  """
+  @spec publish_wait(map(), map()) :: :expired | :pending | nil
+  def publish_wait(record, video_states) do
+    statuses = Enum.map(staged_videos(record), &video_states[&1])
+
+    cond do
+      Enum.any?(statuses, &expired?/1) -> :expired
+      Enum.any?(statuses, &(&1 == nil or &1.state in [:uploading, :processing])) -> :pending
+      true -> nil
+    end
   end
 
   # Validates every field, including untouched ones, then readmits the session
@@ -597,6 +1025,9 @@ defmodule TipsWeb.Editor do
   defp refusal({upload, _refs}, _kind, verb) when upload in [:upload_failed, :upload_pending],
     do: "An attachment isn't ready, so nothing was #{past(verb)}."
 
+  defp refusal(:video_remove_unknown, _kind, _verb),
+    do: "We couldn't confirm that the video was removed. Remove it again."
+
   defp past("publish"), do: "published"
   defp past("save"), do: "saved"
 
@@ -773,8 +1204,11 @@ defmodule TipsWeb.Editor do
   selected. The `EditorDraft` hook opens it when a restored draft has
   evidence. Each selected or restored image shows its file name and size, its
   description and Remove; a slot without a file asks for it again. Saved
-  attachments of an edit show Remove. Errors of the last refused submit and
-  of a rejected file show beside their item.
+  attachments of an edit show Remove. A staged video shows its state from
+  the last status read and this page's transfer, with Resume, Replace or
+  Remove as the state allows; the `VideoTransfers` hook on the list paints
+  the browser's transfer progress. Errors of the last refused submit and of
+  a rejected file show beside their item.
   """
   attr :form, Phoenix.HTML.Form, required: true
   attr :id, :string, required: true
@@ -782,19 +1216,21 @@ defmodule TipsWeb.Editor do
   attr :selection, :list, required: true, doc: "the record's selection; `nil` when unknown"
   attr :images, :map, required: true, doc: "image slot to upload entry ref"
   attr :attached, :map, required: true, doc: "saved attachment id to kind"
+  attr :video_upload, Phoenix.LiveView.UploadConfig, required: true
+  attr :video_states, :map, required: true, doc: "staged video id to its last status"
+  attr :video_refs, :map, required: true, doc: "staged video id to its upload entry ref"
 
   def evidence_fields(assigns) do
     entries = Map.new(assigns.upload.entries, &{&1.ref, &1})
     selection = assigns.selection || []
-
-    items =
-      for upload <- selection,
-          item = attachment_item(upload, assigns, entries),
-          do: item
+    video_errors = video_errors(assigns.video_upload)
+    staged? = Enum.any?(selection, &match?({:staged_video, _id}, &1))
 
     assigns =
       assign(assigns,
-        items: items,
+        items: Enum.map(selection, &attachment_item(&1, assigns, entries, video_errors)),
+        video_errors: if(staged?, do: [], else: video_errors),
+        staged: staged?,
         open:
           selection != [] or
             Enum.any?([:prompt, :output], &(assigns.form[&1].value not in [nil, ""])),
@@ -818,13 +1254,42 @@ defmodule TipsWeb.Editor do
         label="Result text (optional)"
         helper="Up to 10,000 characters. Shown exactly as you type it."
       />
-      <ol :if={@items != []} id={"#{@id}-attachments"} aria-label="Attachments" class="grid gap-3">
-        <li :for={item <- @items} id={item.id} class="grid gap-2 rounded-md border p-3">
+      <%!-- Always rendered: the hook keeps the browser's transfers while the list empties. --%>
+      <ol
+        id={"#{@id}-attachments"}
+        phx-hook="VideoTransfers"
+        hidden={@items == []}
+        aria-label="Attachments"
+        class="grid gap-3"
+      >
+        <li
+          :for={item <- @items}
+          id={item.id}
+          data-media-id={item.video && item.video.media_id}
+          class="grid gap-2 rounded-md border p-3"
+        >
           <p class="text-sm">
             <strong id={"#{item.id}-name"}>{item.name}</strong>
             <span :if={item.size}>· {item.size}</span>
           </p>
-          <p :if={item.note} class="text-sm text-muted-foreground">{item.note}</p>
+          <p
+            :if={item.note}
+            id={"#{item.id}-note"}
+            data-video-interrupted={item.video && item.video.resume}
+            class="text-sm text-muted-foreground"
+          >
+            {item.note}
+          </p>
+          <span
+            :if={item.video}
+            id={"#{item.id}-transfer"}
+            phx-update="ignore"
+            data-video-transfer={item.video.media_id}
+            class="text-sm"
+          ></span>
+          <p :if={item.video && item.video.checking} class="text-sm text-muted-foreground">
+            Still checking
+          </p>
           <p :for={error <- item.errors} class="text-sm font-medium text-destructive">{error}</p>
           <div :if={item.slot} class="grid gap-1">
             <label for={"#{item.id}-description"} class="text-sm font-medium">
@@ -841,7 +1306,26 @@ defmodule TipsWeb.Editor do
           <p :if={!item.slot && item.description} class="text-sm">
             Description: {item.description}
           </p>
-          <div>
+          <div class="flex flex-wrap gap-2">
+            <TipsWeb.UI.button
+              :if={item.video && item.video.resume}
+              type="button"
+              variant="outline"
+              data-video-resume={item.video.media_id}
+              aria-describedby={"#{item.id}-note"}
+            >
+              Resume
+            </TipsWeb.UI.button>
+            <TipsWeb.UI.button
+              :if={item.video && item.video.replace}
+              type="button"
+              variant="outline"
+              phx-click="remove_attachment"
+              {item.remove}
+              aria-describedby={"#{item.id}-name"}
+            >
+              Replace
+            </TipsWeb.UI.button>
             <TipsWeb.UI.button
               type="button"
               variant="outline"
@@ -872,6 +1356,19 @@ defmodule TipsWeb.Editor do
           {file_error(error)}
         </p>
       </div>
+      <%!-- Stays in the page while a video is selected: Resume reopens it. --%>
+      <div id={"#{@id}-video-input"} class="grid gap-1" hidden={@staged}>
+        <label for={@video_upload.ref} class="text-sm font-medium">Add a video (optional)</label>
+        <.live_file_input
+          upload={@video_upload}
+          aria-describedby={"#{@id}-video-help"}
+          class="text-sm"
+        />
+        <p id={"#{@id}-video-help"} class="text-sm text-muted-foreground">
+          MP4, MOV or WebM up to 1 GB and 3 minutes. It uploads while you write.
+        </p>
+        <p :for={error <- @video_errors} class="text-sm font-medium text-destructive">{error}</p>
+      </div>
     </TipsWeb.UI.disclosure>
     """
   end
@@ -880,7 +1377,7 @@ defmodule TipsWeb.Editor do
   defp summary(1), do: "Prompt and result · 1 attachment"
   defp summary(count), do: "Prompt and result · #{count} attachments"
 
-  defp attachment_item({:missing_image, slot, image}, assigns, entries) do
+  defp attachment_item({:missing_image, slot, image}, assigns, entries, _video_errors) do
     entry = entries[assigns.images[slot]]
     id = "#{assigns.id}-image-#{slot}"
 
@@ -894,11 +1391,12 @@ defmodule TipsWeb.Editor do
       errors:
         Enum.map(entry_errors(assigns.upload, entry), &"#{image.filename} #{file_error(&1)}.") ++
           submit_errors(assigns.form, image.filename, slot: slot),
-      remove: ["phx-value-slot": slot]
+      remove: ["phx-value-slot": slot],
+      video: nil
     }
   end
 
-  defp attachment_item({:retained, media_id, description}, assigns, _entries) do
+  defp attachment_item({:retained, media_id, description}, assigns, _entries, _video_errors) do
     name =
       case assigns.attached[media_id] do
         :image -> "Saved image"
@@ -914,12 +1412,78 @@ defmodule TipsWeb.Editor do
       description: description,
       note: nil,
       errors: submit_errors(assigns.form, name, media_id: media_id),
-      remove: ["phx-value-media_id": media_id]
+      remove: ["phx-value-media_id": media_id],
+      video: nil
     }
   end
 
-  # The editor selects no staged videos yet.
-  defp attachment_item(_upload, _assigns, _entries), do: nil
+  # A rejected selection, such as a resume with another file, shows at the slot.
+  defp attachment_item({:staged_video, media_id}, assigns, _entries, video_errors) do
+    status = assigns.video_states[media_id]
+    live? = live_video_entry(assigns.video_upload, assigns.video_refs, media_id) != nil
+    {note, actions} = video_slot(status, live?)
+
+    %{
+      id: "#{assigns.id}-video-#{media_id}",
+      slot: nil,
+      name: "Video",
+      size: nil,
+      description: nil,
+      note: note,
+      errors: video_errors ++ submit_errors(assigns.form, "Video", media_id: media_id),
+      remove: ["phx-value-video": media_id],
+      video: %{
+        media_id: media_id,
+        resume: :resume in actions,
+        replace: :replace in actions,
+        checking: status != nil and status.refresh in [:uncertain, :rate_limited]
+      }
+    }
+  end
+
+  # The slot's note and actions besides Remove, from the committed state and
+  # whether this page is transferring the file.
+  defp video_slot(nil, _live?), do: {"Checking this video.", []}
+
+  defp video_slot(%{state: :removed}, _live?),
+    do: {"This video is no longer available.", [:replace]}
+
+  defp video_slot(status, live?) do
+    if expired?(status),
+      do: {"This upload expired.", [:replace]},
+      else: committed_slot(status, live?)
+  end
+
+  defp committed_slot(%{state: :uploading}, true), do: {nil, []}
+
+  defp committed_slot(%{state: :uploading}, false),
+    do: {"Upload interrupted. Select the same file to resume.", [:resume]}
+
+  defp committed_slot(%{state: :processing}, _live?), do: {"Processing", []}
+  defp committed_slot(%{state: :ready, expires_at: nil}, _live?), do: {"Ready", []}
+
+  defp committed_slot(%{state: :ready, expires_at: expires_at}, _live?),
+    do: {"Ready. Publish by #{deadline(expires_at)}.", []}
+
+  defp committed_slot(%{state: :failed}, _live?),
+    do: {"Couldn't be processed. Videos must be under 3 minutes.", [:replace]}
+
+  defp deadline(expires_at), do: Calendar.strftime(expires_at, "%-d %b %Y, %H:%M UTC")
+
+  defp video_errors(upload) do
+    for error <-
+          upload_errors(upload) ++ Enum.flat_map(upload.entries, &upload_errors(upload, &1)) do
+      video_file_error(error)
+    end
+  end
+
+  defp video_file_error({:external_metadata_failure, %{reason: message}}), do: message
+  defp video_file_error(:too_large), do: "The video is larger than 1 GB."
+  defp video_file_error(:not_accepted), do: "The video is not an MP4, MOV or WebM file."
+  defp video_file_error(:too_many_files), do: "Remove the selected video before adding another."
+
+  defp video_file_error(:external_client_failure),
+    do: "The video couldn't be uploaded. Select it again."
 
   defp entry_errors(_upload, nil), do: []
   defp entry_errors(upload, entry), do: upload_errors(upload, entry)
@@ -1042,13 +1606,15 @@ defmodule TipsWeb.Editor do
   draft" button the hook shows while autosave is paused, the refusal or
   confirmation of the last submit, and the submit button. While a
   submission is unresolved, the button retries it or is disabled until it
-  is checked again.
+  is checked again. While a selected video holds it (`publish_wait/2`), the
+  button is disabled with the reason beside it.
   """
   attr :identity, :map, required: true
   attr :submit, :string, required: true
   attr :refusal, :map, default: nil
   attr :outcome, :string, default: nil
   attr :pending, :atom, default: nil
+  attr :wait, :atom, default: nil, doc: "`publish_wait/2`"
 
   def editor_bar(assigns) do
     ~H"""
@@ -1088,14 +1654,27 @@ defmodule TipsWeb.Editor do
       <p id={"#{form_id(@identity)}-outcome"} role="status" class="text-sm font-medium">
         {@outcome}
       </p>
-      <div>
-        <TipsWeb.UI.button type="submit" size="lg" disabled={@pending in [:unchecked, :signed_out]}>
-          {if @pending == :absent, do: "Retry", else: @submit}
-        </TipsWeb.UI.button>
+      <div class="grid gap-2">
+        <div>
+          <TipsWeb.UI.button
+            type="submit"
+            size="lg"
+            disabled={@pending in [:unchecked, :signed_out] or @wait != nil}
+            aria-describedby={@wait && "#{form_id(@identity)}-wait"}
+          >
+            {if @pending == :absent, do: "Retry", else: @submit}
+          </TipsWeb.UI.button>
+        </div>
+        <p :if={@wait} id={"#{form_id(@identity)}-wait"} class="text-sm text-muted-foreground">
+          {wait(@wait)}
+        </p>
       </div>
     </div>
     """
   end
+
+  defp wait(:pending), do: "Waiting for your video to be ready"
+  defp wait(:expired), do: "This video expired. Replace or remove it."
 
   defp kind(:new_tip), do: :tip
   defp kind({:new_review, _tip_id}), do: :review

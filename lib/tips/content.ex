@@ -364,6 +364,23 @@ defmodule Tips.Content do
   was, with `refresh: :uncertain`: still checking, not failed. A database
   error is `:outcome_unknown`.
 
+  ### Video resume and discard
+
+  `resume_video_upload(scope, media_id, %{size: size})` returns the stored
+  `t:Tips.Content.Media.video_upload/0` of the author's own `uploading`
+  video, so a reloaded editor can resume the same reservation from the same
+  file. It runs `begin_video_upload/3`'s caller, input, admission and
+  eligibility checks in that order, then needs a released row (uid and
+  endpoint) of exactly `size` bytes, not in cleanup, before its upload
+  deadline, whose target is still valid. Anything else is `:not_found`. It
+  writes nothing, calls no provider and never extends the deadline.
+
+  `discard_video_upload(scope, media_id)` retires the author's unattached
+  video under its row lock (`Tips.Content.Media.retire/1`): a released
+  upload enters cleanup with its deletion job, and an unreleased one is
+  deleted. A missing, foreign, attached or already retired row is
+  `:not_found`; an attached video is removed by editing its content.
+
   ### Staged video handoff
 
   A publication-to-edit handoff may attach an owned, ready, unattached,
@@ -665,6 +682,16 @@ defmodule Tips.Content do
           | {:upload_failed, [media_id()]}
           | :outcome_unknown
 
+  @typedoc "Why no upload URL was returned for a resume. See \"Video resume and discard\"."
+  @type video_resume_error ::
+          :unauthenticated
+          | :unconfirmed
+          | :forbidden
+          | :not_found
+          | {:rate_limited | :capacity, retry_after_seconds :: pos_integer()}
+          | Ecto.Changeset.t()
+          | :outcome_unknown
+
   @typedoc "Why no upload states were returned. See \"Video status\"."
   @type video_status_error :: Accounts.operation_error() | :outcome_unknown
 
@@ -910,6 +937,21 @@ defmodule Tips.Content do
           {:ok, Media.video_upload()} | {:error, video_upload_error()}
   def begin_video_upload(scope, target, file_attrs),
     do: Media.begin_video_upload(scope, target, file_attrs)
+
+  @doc """
+  Returns the stored upload of the author's interrupted video transfer. See
+  "Video resume and discard" above.
+  """
+  @spec resume_video_upload(Scope.t() | nil, media_id(), %{size: pos_integer()}) ::
+          {:ok, Media.video_upload()} | {:error, video_resume_error()}
+  defdelegate resume_video_upload(scope, media_id, file_attrs), to: Media
+
+  @doc """
+  Retires the author's unattached video upload. See "Video resume and discard" above.
+  """
+  @spec discard_video_upload(Scope.t() | nil, media_id()) ::
+          :ok | {:error, :unauthenticated | :not_found | :outcome_unknown}
+  defdelegate discard_video_upload(scope, media_id), to: Media
 
   @doc """
   Refreshes the author's selected video uploads. See "Video status" above.
