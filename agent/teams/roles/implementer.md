@@ -33,11 +33,17 @@ call. These rules keep it out.
    `grep -n` for the failing test name, the error line and the seed. Do not run
    `mix test` with its output in the conversation.
 2. **Edits.** Change one block per edit with the client's edit tool, or with `sed -i` or
-   `patch` when the client has none. Do not rewrite blocks with Python or shell heredocs.
-3. **Reads.** Before reading an Elixir file over 300 lines, run Dexter `symbols` on it.
-   Read the whole file at most once. After that, read ranges with `sed -n <from>,<to>p`
-   at the lines `symbols` gave. In `deps/`, find the function with Dexter `definition`
-   and read only its lines.
+   `patch` if the client does not have an edit tool. Do not rewrite blocks with Python
+   or shell heredocs.
+3. **Reads.** For an Elixir file over 300 lines:
+   - First run `"$TIPS_DEXTER" query symbols <file>` to get the function list with line
+     numbers.
+   - Read the whole file at most once per session.
+   - For every later read of that file, read one function at a time with
+     `sed -n <from>,<to>p <file>`, using the line numbers from `symbols`.
+   - For a file in `deps/`, do not read the file. Run `"$TIPS_DEXTER" query definition`
+     on the call site to get the function's file and line, then `sed -n` that function
+     only.
 
 ## Messages you send
 
