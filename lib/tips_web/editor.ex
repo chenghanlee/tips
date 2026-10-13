@@ -507,7 +507,14 @@ defmodule TipsWeb.Editor do
 
   defp video_error({:begin, :conflict}, _entry, _socket), do: "This draft belongs to another tip."
 
-  defp video_error({_mode, _failed}, entry, _socket),
+  # No URL was released, the outcome is unknown, or the size is out of range.
+  defp video_error({mode, {:upload_failed, _ids}}, entry, socket),
+    do: video_error({mode, :outcome_unknown}, entry, socket)
+
+  defp video_error({mode, %Ecto.Changeset{}}, entry, socket),
+    do: video_error({mode, :outcome_unknown}, entry, socket)
+
+  defp video_error({_mode, :outcome_unknown}, entry, _socket),
     do: "#{entry.client_name} couldn't be uploaded. Select it again."
 
   # Discards the staged upload, drops its slot and aborts its transfer. An
@@ -1376,36 +1383,30 @@ defmodule TipsWeb.Editor do
 
   # The slot's note and actions besides Remove, from the committed state and
   # whether this page is transferring the file.
+  defp video_slot(nil, _live?), do: {"Checking this video.", []}
+
+  defp video_slot(%{state: :removed}, _live?),
+    do: {"This video is no longer available.", [:replace]}
+
   defp video_slot(status, live?) do
-    cond do
-      status == nil ->
-        {"Checking this video.", []}
-
-      status.state == :removed ->
-        {"This video is no longer available.", [:replace]}
-
-      expired?(status) ->
-        {"This upload expired.", [:replace]}
-
-      status.state == :uploading and live? ->
-        {nil, []}
-
-      status.state == :uploading ->
-        {"Upload interrupted. Select the same file to resume.", [:resume]}
-
-      status.state == :processing ->
-        {"Processing", []}
-
-      status.state == :ready and status.expires_at == nil ->
-        {"Ready", []}
-
-      status.state == :ready ->
-        {"Ready. Publish by #{deadline(status.expires_at)}.", []}
-
-      status.state == :failed ->
-        {"Couldn't be processed. Videos must be under 3 minutes.", [:replace]}
-    end
+    if expired?(status),
+      do: {"This upload expired.", [:replace]},
+      else: committed_slot(status, live?)
   end
+
+  defp committed_slot(%{state: :uploading}, true), do: {nil, []}
+
+  defp committed_slot(%{state: :uploading}, false),
+    do: {"Upload interrupted. Select the same file to resume.", [:resume]}
+
+  defp committed_slot(%{state: :processing}, _live?), do: {"Processing", []}
+  defp committed_slot(%{state: :ready, expires_at: nil}, _live?), do: {"Ready", []}
+
+  defp committed_slot(%{state: :ready, expires_at: expires_at}, _live?),
+    do: {"Ready. Publish by #{deadline(expires_at)}.", []}
+
+  defp committed_slot(%{state: :failed}, _live?),
+    do: {"Couldn't be processed. Videos must be under 3 minutes.", [:replace]}
 
   defp deadline(expires_at), do: Calendar.strftime(expires_at, "%-d %b %Y, %H:%M UTC")
 

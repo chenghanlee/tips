@@ -442,12 +442,13 @@ defmodule Tips.Content.Media do
   @doc "See `Tips.Content.discard_video_upload/2`."
   @spec discard_video_upload(Scope.t() | nil, term()) ::
           :ok | {:error, :unauthenticated | :not_found | :outcome_unknown}
-  def discard_video_upload(scope, media_id) do
-    unknown_on_database_error(fn ->
-      with {:ok, user} <- author(scope),
-           {:ok, :ok} <- Repo.transact(fn -> discard(user.id, media_id) end),
-           do: :ok
-    end)
+  def discard_video_upload(scope, media_id),
+    do: unknown_on_database_error(fn -> discard_owned(scope, media_id) end)
+
+  defp discard_owned(scope, media_id) do
+    with {:ok, user} <- author(scope),
+         {:ok, :ok} <- Repo.transact(fn -> discard(user.id, media_id) end),
+         do: :ok
   end
 
   # Locks the row, then rechecks it; an attached video needs its content's edit.
