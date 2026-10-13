@@ -191,10 +191,16 @@ defmodule TipsWeb.MediaControllerTest do
     test "watch and thumbnail answer 500, never a redirect, and log the variable",
          %{conn: conn, settings: settings} do
       video = attached_video_fixture(tip_fixture())
+      key = JSON.decode!(File.read!(@key_path))
+      rsa_key = &%{settings | signing_key: &1 |> JSON.encode!() |> Base.encode64()}
 
       broken = [
         {"CLOUDFLARE_STREAM_SIGNING_KEY", %{settings | signing_key: " "}},
         {"CLOUDFLARE_STREAM_SIGNING_KEY", %{settings | signing_key: Base.encode64("{\"kty\"")}},
+        # Decodes to an RSA private record that cannot sign.
+        {"CLOUDFLARE_STREAM_SIGNING_KEY", rsa_key.(Map.delete(key, "n"))},
+        # Has every member, but signing fails.
+        {"CLOUDFLARE_STREAM_SIGNING_KEY", rsa_key.(%{key | "n" => "AA"})},
         {"CLOUDFLARE_STREAM_CUSTOMER_CODE", %{settings | customer_code: ""}}
       ]
 
@@ -210,6 +216,7 @@ defmodule TipsWeb.MediaControllerTest do
                  "Media #{video.id}: signing unavailable: #{variable} is missing or malformed"
 
         refute log =~ video.stream_uid
+        refute log =~ key["d"]
       end
     end
   end

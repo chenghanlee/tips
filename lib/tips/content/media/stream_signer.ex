@@ -17,6 +17,13 @@ defmodule Tips.Content.Media.StreamSigner do
   # A DNS label: it becomes part of the `customer-<code>` host.
   @customer_code ~r/\A[a-z0-9]+(-[a-z0-9]+)*\z/
 
+  # Every member of an RSA private JWK (RFC 7518, section 6.3), as Stream's key carries them.
+  @rsa_private_members ~w(n e d p q dp dq qi)
+
+  # What JOSE and OTP raise for a key they cannot use. Their messages and stack
+  # arguments can quote the key, so none of them is kept or logged.
+  @key_errors [ArgumentError, CaseClauseError, FunctionClauseError, MatchError, ErlangError]
+
   defmodule ConfigError do
     @moduledoc "Signing settings are missing or malformed. The message names the variable only."
     defexception [:message]
@@ -40,8 +47,18 @@ defmodule Tips.Content.Media.StreamSigner do
       "downloadable" => false
     }
 
+    case sign(jwk, claims) do
+      {:ok, token} -> "https://customer-#{code}.cloudflarestream.com/#{token}/#{path(kind)}"
+      :error -> raise ConfigError, invalid(@key_variable)
+    end
+  end
+
+  # A key can decode yet fail to sign, such as a zero modulus.
+  defp sign(jwk, claims) do
     {_modules, token} = jwk |> JOSE.JWT.sign(%{"alg" => "RS256"}, claims) |> JOSE.JWS.compact()
-    "https://customer-#{code}.cloudflarestream.com/#{token}/#{path(kind)}"
+    {:ok, token}
+  rescue
+    _error in @key_errors -> :error
   end
 
   defp path(:iframe), do: "iframe"
@@ -89,13 +106,13 @@ defmodule Tips.Content.Media.StreamSigner do
     end
   end
 
-  # Decoding errors can quote the key, so none of them is kept or logged.
   defp decode_signing_key(encoded) do
     with true <- is_binary(encoded),
          {:ok, json} <- Base.decode64(String.trim(encoded), padding: false),
-         {:ok, %{"kty" => "RSA", "d" => _, "kid" => kid} = map} when is_binary(kid) <-
+         {:ok, %{"kty" => "RSA", "kid" => kid} = map} when is_binary(kid) <-
            JSON.decode(json),
          false <- String.trim(kid) == "",
+         true <- Enum.all?(@rsa_private_members, &(is_binary(map[&1]) and map[&1] != "")),
          %JOSE.JWK{kty: {:jose_jwk_kty_rsa, private_key}} = jwk
          when elem(private_key, 0) == :RSAPrivateKey <- JOSE.JWK.from_map(map) do
       {:ok, kid, jwk}
@@ -103,8 +120,7 @@ defmodule Tips.Content.Media.StreamSigner do
       _invalid -> :error
     end
   rescue
-    _error in [ArgumentError, CaseClauseError, FunctionClauseError, MatchError, ErlangError] ->
-      :error
+    _error in @key_errors -> :error
   end
 
   defp invalid(name), do: "#{name} is missing or malformed"
