@@ -28,9 +28,10 @@ defmodule TipsWeb.EditorDraftTest do
     %{user: user, status: "#editor-#{user.id}-tip-status"}
   end
 
+  @tag :tmp_dir
   feature "a saved draft restores into a pristine form and autosave continues under its pair, " <>
             "its image selection included",
-          %{session: session, status: status} do
+          %{session: session, status: status, tmp_dir: tmp_dir} do
     seeded = session |> open_editor("/editor/tips/new") |> seed("Saved title", "Saved body")
 
     session
@@ -83,6 +84,23 @@ defmodule TipsWeb.EditorDraftTest do
 
     # Remove alone saves the empty selection.
     click(session, button("Remove"))
+    assert [] = stored_uploads(session, storage, &(&1 == []))
+
+    # So it does after a submit LiveView cancels in the browser, as for too large a file.
+    large = Path.join(tmp_dir, "large.png")
+    File.write!(large, :binary.copy(<<0>>, 10_000_001))
+
+    session
+    |> attach_file(file_field("Add an image (optional)"), path: large)
+    |> assert_has(css("li", text: "large.png is larger than 10 MB."))
+
+    assert [%{"filename" => "large.png"}] =
+             stored_uploads(session, storage, &match?([%{"filename" => "large.png"}], &1))
+
+    session
+    |> click(button("Publish"))
+    |> click(button("Remove"))
+
     assert [] = stored_uploads(session, storage, &(&1 == []))
 
     session
