@@ -149,8 +149,6 @@ Schema and stored data are expensive to reverse.
   cursor and a stated page size.
 - Delete from storage only when a scenario in the brief requires it.
 - Name the contract that writes each new column or table in the brief.
-- Add the index the brief names for each new query. Add an index for each new foreign
-  key and for each column a filter or order uses. Put it in the same migration.
 
 ## Tests
 
@@ -197,18 +195,19 @@ Rules:
 
 ## Performance
 
-Trigger: the brief states a limit, or the change adds work that grows with data: a query
-in a loop, a new preload, a result set with no limit, a transaction around an external
-call, work that outlives the caller.
+Trigger: the change adds or alters work, waiting, memory or storage, including an
+existing operation.
 
-For each new or changed query, run `EXPLAIN` against a database with data and confirm
-it uses an index for its filter and order. A sequential scan on a table that grows
-with users or content is a defect; add the index.
+Apply the [performance principles](../design-software/SKILL.md#performance-principles)
+at the expected MVP workload. Link the brief's relevant limits and assumptions.
+Record new evidence and any implementation trade-off or discovery that affects the
+design in the PR body. If it changes an agreed contract, return it to the design lead
+for a brief update.
 
-Name what grows and with what workload. Fix it with a filter, index, page or limit.
-Measure only when the brief states a limit or the cost could change the design. Before
-measuring, read [performance measurement](references/performance-measurement.md). Do not
-measure when there is no stated limit and no growth.
+Measure only when a limit is stated or the cost could change the design. Before
+measuring, read [performance measurement](references/performance-measurement.md).
+Support a performance claim with the operation, the workload and the code, contract
+or measurement evidence. Say whether a number is an estimate or a measurement.
 
 ## Deferrals
 

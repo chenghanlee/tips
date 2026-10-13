@@ -1,6 +1,6 @@
 ---
 name: design-software
-description: Guides the design lead and the design critic of a tips feature. Covers reading, candidate designs, the choice, the spec and brief format, the required rules and the additional rules, the test budget, critique and the choice of implementer. Code reviews use review-software-design.
+description: Guides the design lead and the design critic of a tips feature. Covers reading, candidate designs, the choice, the spec and brief format, the required rules, the additional rules, the performance principles, the test budget, critique and the choice of implementer. Code reviews use review-software-design.
 ---
 
 # Design software
@@ -85,8 +85,8 @@ independently. Sections, in order:
 3. **Contracts.** Give the `path:line` each contract applies to. For new code, name the
    module and function. List limits, states and transitions. Name which module writes
    each fact.
-   For each new table or query, name the filter and order it uses and the index that
-   serves them.
+   State required performance limits and workload assumptions that affect the design,
+   and link any existing contract that defines them.
 4. **Acceptance scenarios.** Numbered. Each names the input, the action and the
    observable result. These are the test list.
 5. **Test budget.** The expected net test change: tests added, one to two per scenario,
@@ -128,10 +128,6 @@ Classify a violation as P2 and record a decision.
   commit. Keep query filters, database constraints and guarded writes. Repeat a check
   only for a distinct trust boundary or state that may have changed. Problem example:
   the same check in the LiveView, the context and the query with no reason.
-- **Indexed access paths.** Every query that runs per request or per job has an index
-  that serves its filter and order. Every foreign key has an index. Every new table
-  names its indexes in the brief. Problem example: a table with only a primary key,
-  queried by a foreign key.
 - **Simplest mechanism.** Choose the simplest mechanism that meets the contract's
   lifetime, durability and consistency needs. Use existing facilities first. State the
   workload or failure that justifies each new mechanism. Problem example: a scheduler,
@@ -149,6 +145,38 @@ Classify a violation as P2 and record a decision.
   example: an `opts` list with five keys.
 
 Follow the language and framework conventions in the stack skills listed in AGENTS.md.
+
+## Performance principles
+
+Apply these to each operation a feature adds or changes, at the expected MVP
+workload. A finding names the operation, the workload, the consequence and the
+change. Severity follows the [severity table](../../teams/README.md#severity).
+
+1. **Know what cost grows with.** Name what time, memory, storage and waiting grow
+   with: input size, users, content, request rate, concurrency. Include fixed costs
+   and device and network conditions.
+2. **Count the whole operation.** Count through to the required result: work done,
+   data transferred, calls to other systems, repeated work, waits. A limit on output
+   is not a limit on work.
+3. **Do less work.** Fetch, compute, render and send only what helps produce the
+   required result.
+4. **Choose where work runs.** Compare the processing, transfer and waiting cost of
+   each place it could run. Keep access rules and required behaviour.
+5. **Keep the user's wait short.** Defer work the result does not need now. Keep
+   completion and failure handling.
+6. **Bound what grows.** Apply the Bounded work rule, including work moved to a
+   background job.
+7. **Choose for the operations you have.** Pick algorithms, data structures, storage
+   layouts and indexes for the required reads and writes at the expected workload,
+   not for an empty database or a general case.
+8. **A copy has a cost.** Compare the time a cache, denormalized value or precomputed
+   result saves with the memory, storage and update work it needs, including the
+   work to keep it correct. Keep existing data and transaction contracts.
+9. **Evidence fits the decision.** The brief records the limits and assumptions that
+   affect the design. Measure only for a stated limit or a cost that could change
+   the design, with the
+   [measurement reference](../implement-software/references/performance-measurement.md).
+   Say whether a number is an estimate or a measurement.
 
 ## Test budget
 
