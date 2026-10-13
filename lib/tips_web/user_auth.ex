@@ -17,7 +17,7 @@ defmodule TipsWeb.UserAuth do
   alias Tips.Accounts
   alias Tips.Accounts.{Scope, SessionRef, UserToken}
 
-  # Socket private key of the mounted `Tips.Accounts.SessionRef`.
+  # Socket and conn private key of the admitting `Tips.Accounts.SessionRef`.
   @session_ref :tips_session_ref
 
   # The remember me cookie lives as long as the session token it carries.
@@ -75,10 +75,12 @@ defmodule TipsWeb.UserAuth do
   """
   def fetch_current_scope_for_user(conn, _opts) do
     with {token, conn} <- ensure_user_token(conn),
-         {:ok, %Scope{user: user} = scope, _session_ref, token_inserted_at} <-
+         {:ok, %Scope{user: user} = scope, session_ref, token_inserted_at} <-
            Accounts.get_scope_by_session_token(token),
          {:ok, conn} <- maybe_renew_user_session_token(conn, user, token, token_inserted_at) do
-      assign(conn, :current_scope, scope)
+      conn
+      |> assign(:current_scope, scope)
+      |> put_private(@session_ref, session_ref)
     else
       nil -> assign(conn, :current_scope, nil)
       {:error, :unauthenticated} -> assign(conn, :current_scope, nil)
@@ -277,13 +279,15 @@ defmodule TipsWeb.UserAuth do
   end
 
   @doc """
-  Returns the viewer the mount hook admitted: its `Tips.Accounts.SessionRef`,
-  or `nil` when anonymous. Pass it to the `Tips.Content` reads that take a
-  viewer; they readmit it. It is the same on the disconnected and connected
-  mounts. Keep it out of assigns and templates.
+  Returns the viewer the mount hook, or `fetch_current_scope_for_user/2` for a
+  request, admitted: its `Tips.Accounts.SessionRef`, or `nil` when anonymous.
+  Pass it to the `Tips.Content` reads that take a viewer; they readmit it. It
+  is the same on the disconnected and connected mounts. Keep it out of assigns
+  and templates.
   """
-  @spec viewer(LiveView.Socket.t()) :: SessionRef.t() | nil
+  @spec viewer(LiveView.Socket.t() | Plug.Conn.t()) :: SessionRef.t() | nil
   def viewer(%LiveView.Socket{private: private}), do: private[@session_ref]
+  def viewer(%Plug.Conn{private: private}), do: private[@session_ref]
 
   @doc """
   Admits a mounted LiveView socket again, from its private session reference.

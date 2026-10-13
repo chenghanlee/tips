@@ -1005,6 +1005,24 @@ defmodule Tips.Content do
   defdelegate get_review_page(viewer, review_id), to: Read
 
   @doc """
+  Decides from current rows whether `viewer` may play the video `media_id`
+  now, and returns its Stream uid. It writes nothing. First matching row:
+
+  | Video | Result |
+  |---|---|
+  | Missing, not a video, cleanup-marked or not `:ready` | `:not_found` |
+  | Attached; the tip or review is visible to everyone | ok, no token query |
+  | Attached; parent hidden or deleted | ok if the readmitted viewer may read the parent (`Tips.Content.Visibility`) |
+  | Staged | ok if the readmitted viewer is its author and its deadline has not passed |
+  | Anything else, including a failed readmission | `:not_found` |
+
+  A review's decision ignores its tip.
+  """
+  @spec get_media_access(viewer(), term()) ::
+          {:ok, %{stream_uid: String.t()}} | {:error, :not_found}
+  defdelegate get_media_access(viewer, media_id), to: Read
+
+  @doc """
   Searches live tips for `query` within one time budget, falling back to
   keyword ranking when meaning-based ranking is unavailable. A failure is an
   error, never an empty page. See `Tips.Content.Search` ("Search requests").
