@@ -656,9 +656,13 @@ class Harness(unittest.TestCase):
             self.stdlib / "elixir/lib",
             self.repo / "agent/teams",
             self.repo / "agent/lsp/dexter/vendor",
-            self.repo / ".agents/skills",
+            self.repo / ".agents/skills/elixir",
+            self.repo / ".claude/skills",
+            self.repo / "agent/skills/dexter",
         ):
             directory.mkdir(parents=True)
+        for client_dir in (".agents/skills", ".claude/skills"):
+            (self.repo / client_dir / "dexter").symlink_to("../../agent/skills/dexter")
         (self.stdlib / "elixir/lib/enum.ex").write_text("defmodule Enum do\nend\n")
         (self.stdlib.parent / "VERSION").write_text("1.2.3\n")
         fakes = {
@@ -691,7 +695,8 @@ class Harness(unittest.TestCase):
             (self.bin / name).chmod(0o755)
         execute(["git", "init", "-q", "-b", "main", str(self.repo)], env=self.env, check=True)
         (self.repo / ".gitignore").write_text(
-            ".codex/\n.agents/\n.dexter/\n.worktrees/\nagent/lsp/dexter/vendor/\n"
+            ".codex/\n.agents/skills/elixir\n.claude/skills/elixir\n.dexter/\n.worktrees/\n"
+            "agent/lsp/dexter/vendor/\n"
             "agent/teams/allocations/\ndeps/\ntmp/\n"
         )
         for script in ("team.py", "board.py"):
@@ -812,6 +817,12 @@ class PairLifecycleTest(Harness):
             "implementers": ["team-1-impl"],
             "reviewers": ["team-1-tester"],
         }
+        # Third-party skills are linked per entry into both client directories; the
+        # worktree's own tracked skill links are kept.
+        for client_dir in (".agents/skills", ".claude/skills"):
+            linked = os.readlink(wt / client_dir / "elixir")
+            assert linked == str(self.repo / ".agents/skills/elixir")
+            assert os.readlink(wt / client_dir / "dexter") == "../../agent/skills/dexter"
         assert self.record(1)["tabs"] == {"implementers": "w1:t1", "reviewers": "w1:t2"}
         impl, tester = self.pane("team-1-impl"), self.pane("team-1-tester")
         assert (impl["agent"], tester["agent"]) == ("codex", "claude")

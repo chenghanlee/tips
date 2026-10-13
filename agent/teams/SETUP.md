@@ -40,18 +40,16 @@ The user maintains third-party skills in these Git-ignored directories in the ma
 - `.agents/skills/`: `elixir`, `phoenix`, `ecto`, `otp`, `oban` and `herdr`, for Codex.
 - `.claude/skills/`: the same five Elixir skills, for Claude.
 
-Keep the Codex and Claude skill copies in sync. `team.py start` links the main checkout's `.agents/skills/` into each worktree and checks only that the directory exists.
+Keep the Codex and Claude skill copies in sync. `team.py start` and `review` link each of
+the main checkout's `.agents/skills/` entries that a worktree lacks into that worktree's
+`.agents/skills/` and `.claude/skills/`.
 
-The repository tracks five skills: the [Dexter reference](../skills/dexter/SKILL.md), [design-software](../skills/design-software/SKILL.md), [implement-software](../skills/implement-software/SKILL.md) and [review-software-correctness](../skills/review-software-correctness/SKILL.md). Link them once into both locations from the main checkout:
-
-```bash
-for skill in dexter design-software implement-software review-software-correctness review-software-design; do
-  ln -s ../../agent/skills/$skill .agents/skills/$skill
-  ln -s ../../agent/skills/$skill .claude/skills/$skill
-done
-```
-
-These links let clients discover skills from the main checkout. Agents must read tracked skills and their references from their own worktree, because the linked directory points to the main checkout's copy.
+The repository tracks five skills under `agent/skills/`: [dexter](../skills/dexter/SKILL.md),
+[design-software](../skills/design-software/SKILL.md), [implement-software](../skills/implement-software/SKILL.md),
+[review-software-correctness](../skills/review-software-correctness/SKILL.md) and
+[review-software-design](../skills/review-software-design/SKILL.md). Their links in
+`.agents/skills/` and `.claude/skills/` are tracked, so every checkout and worktree
+discovers them by name and resolves them to its own copy. No manual link is needed.
 
 Install only the `mix-credo` plugin, for the clients you use:
 

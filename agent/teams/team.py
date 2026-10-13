@@ -838,14 +838,23 @@ def require_commit(commit: str) -> None:
         raise RuntimeError(f"Commit {commit} is not on origin; push it first")
 
 
-def link_skills(link: Path, shared: Path) -> None:
-    if link.is_symlink() and os.readlink(link) == str(shared):
-        return
-    if link.exists() and not link.is_symlink():
-        raise RuntimeError(f"Refusing to replace existing skills: {link}")
-    link.parent.mkdir(parents=True, exist_ok=True)
-    link.unlink(missing_ok=True)
-    link.symlink_to(shared)
+def link_skills(worktree: Path, shared: Path) -> None:
+    """Link each of the main checkout's third-party skills into the worktree.
+
+    The repository's own skills are tracked links under `.claude/skills` and
+    `.agents/skills`, so each worktree resolves them to its own copy; those entries are
+    kept. Only entries the worktree lacks are linked, into both client directories.
+    """
+    for client_dir in (".agents/skills", ".claude/skills"):
+        target = worktree / client_dir
+        target.mkdir(parents=True, exist_ok=True)
+        for skill in sorted(shared.iterdir()):
+            link = target / skill.name
+            if link.is_symlink() and os.readlink(link) == str(skill):
+                continue
+            if link.exists() or link.is_symlink():
+                continue  # tracked or user-placed; never replaced
+            link.symlink_to(skill)
 
 
 def prepare_index(worktree: Path, wrapper: Path, env: dict[str, str], fetch: bool) -> None:
@@ -901,7 +910,7 @@ def prepare_worktree(
         if not path.is_file() or path.read_text() != content:
             path.write_text(content)
     wrapper.chmod(0o755)
-    link_skills(worktree / ".agents/skills", skills)
+    link_skills(worktree, skills)
     # A Codex client's environment wins: its sandbox needs the Hex cache inside the worktree.
     owner = next((c for c in clients if c["kind"] == "codex"), clients[0])
     env = {**os.environ, **agent_env(owner)}

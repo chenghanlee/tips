@@ -1,7 +1,22 @@
 .DS_Store
-.claude/
+# Tracked: the repository's own skills, linked for Claude and Codex. Everything else is local.
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/dexter
+!.claude/skills/design-software
+!.claude/skills/implement-software
+!.claude/skills/review-software-correctness
+!.claude/skills/review-software-design
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/dexter
+!.agents/skills/design-software
+!.agents/skills/implement-software
+!.agents/skills/review-software-correctness
+!.agents/skills/review-software-design
 .codex/
-.agents/
 .env
 .env.*
 !.env.example
