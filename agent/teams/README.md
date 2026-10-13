@@ -102,16 +102,53 @@ Put either `LGTM` alone or the review decision on the first line of the body. Pu
 the PR description or another review. The reviewer who opened a thread resolves it.
 A new head invalidates every LGTM. Review the changes since your last review.
 
+### PR body
+
+The PR body is the implementer's handoff to every reviewer. Only the implementer
+edits it. Sections, in this order:
+
+```markdown
+Closes #<brief>
+
+## Outcome
+One paragraph: what works now.
+
+## Scenarios
+| Scenario | Test | Run |
+|---|---|---|
+| 1 <title> | test/path_test.exs:"name" | CI run URL or local command |
+
+## Blast radius
+Changed public functions, schemas, changesets, migrations, config, PubSub topics,
+Oban workers, shared fixtures; the callers and entry points each reaches.
+
+## Tests without a scenario line
+Test name and one-line reason, or "none".
+
+## Decisions
+Choices a reviewer could question, one line each, with the reason.
+
+## Follow-up
+Issue URL for deferred work, or "none".
+
+## Checks not run by CI
+Command and result, or "none".
+```
+
+Reviewers read the brief and the diff before the PR body, then verify the body's
+claims instead of redoing them.
+
 ### Severity
 
 | Severity | Condition |
 |---|---|
 | P0 | A feature cannot complete, an unauthorized action succeeds, or stored data is lost or corrupted. |
-| P1 | An acceptance scenario fails, a required test or check is missing or failing, or the change significantly harms the user's experience. |
+| P1 | An acceptance scenario fails or is unproven, a required test or check is missing or failing, the change violates an [always-rule](../skills/design-software/SKILL.md#always-rules), an error on an affected path is swallowed, or the change significantly harms the user's experience. |
 | P2 | Any other finding. |
 
 The implementer fixes every P0 and P1. For P2s, fix them, decline them with a reason,
-or defer them in one follow-up issue.
+or defer them in one follow-up issue linked from the PR body. A deferral in the brief's
+decisions table or in a linked issue is not a finding unless it breaks a scenario.
 
 ### Merge
 

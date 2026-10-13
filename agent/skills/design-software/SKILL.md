@@ -1,180 +1,186 @@
 ---
 name: design-software
-description: Guides the design lead and the design critic of a tips feature. Covers exploring candidate designs before choosing one, writing the spec and briefs, what well-designed software looks like at MVP stage, critique and agreement rules, test budgets and the choice of implementer. Code reviews use review-software-design.
+description: Guides the design lead and the design critic of a tips feature. Covers reading, candidate designs, the choice, the spec and brief format, the always-rules and the when-it-matters rules, test budgets, critique, agreement and the choice of implementer. Code reviews use review-software-design.
 ---
 
 # Design software
 
 The lead writes the spec and briefs. The critic objects from a different persona.
-Turn order and messages are in the [designer role](../../teams/roles/designer.md);
-this skill owns the craft. Read the contract-tracing and state-and-failure sections of
-[implement-software](../implement-software/SKILL.md#trace-the-affected-contract)
-before designing; they apply to designs as much as to code.
+The [designer role](../../teams/roles/designer.md) owns turns and messages. This
+skill owns what to write and how to judge it.
 
-Tips is a greenfield MVP looking for product-market fit. Prefer a smaller correct
-thing shipped today over a complete thing next week. Correct means the contract
-holds; complete is a product choice the user makes.
+Tips is a greenfield MVP looking for product-market fit. Design the smallest correct
+thing that can ship today. Correct means the contract holds. Complete is a product
+choice the user makes.
 
-## Read before designing
+Scope limits:
 
-Read the feature's issue on Project 15, the design sections the
-[design index](../../../docs/design/README.md) names for it, the affected code and
-the mechanisms the repository already has for the same job: existing modules, Oban
-features, Ecto patterns, provider clients. A design that reinvents one of them must
-say what it tried and why it fell short.
+- Three critique rounds after `Choice`. Then AGREE with the open P2s recorded as
+  decisions, or BLOCKED.
+- P1 only as the [severity table](../../teams/README.md#severity) defines it.
+  Performance and maintainability are P2 with a decision.
+- Prefer an objection that removes a part over one that adds a part.
 
-Write down the product question the feature answers and the signal that would say
-the answer is wrong. Design for that signal, not for completeness.
+## Step 1: Read
 
-## Explore before you choose
+1. The feature's issue on Project 15.
+2. The design sections the [design index](../../../docs/design/README.md) names.
+3. The affected code and the mechanisms the repository already has for the same job:
+   modules, Oban features, Ecto patterns, provider clients.
+4. The contract and failure sections of
+   [implement-software](../implement-software/SKILL.md#trace-the-affected-contract).
 
-Agents converge on the first working design. Two personas exist to widen the search
-before narrowing it.
+Write two lines before anything else: the product question this feature answers,
+and the signal that would show the answer is wrong. Design for that signal.
 
-1. **Candidates.** Before any PROPOSAL, the lead posts two or three candidate designs,
-   each under 150 words: the mechanism, what it adds, what it leaves out, which
-   always-rule below it strains. One candidate must be the no-new-mechanism option.
-   The critic posts its own candidates from its persona before reading the lead's.
-   One candidate from the lead is a P1 against the lead.
-2. **Choice.** Lead and critic each rank the candidates with one reason per rank.
-   The lead chooses and says why the others lost. Disagreement here is cheap.
-3. **Hill-climb.** PROPOSAL and CRITIQUE refine the chosen candidate only. The critic
-   may reopen the choice only for an always-rule violation.
+## Step 2: Candidates
 
-Exploration ends when a candidate survives both persona question lists, not when
-the critic runs out of objections.
+Agents converge on the first design that works. The candidates step widens the
+search before the critique narrows it.
 
-### Persona questions
+Lead:
 
-Each persona asks its questions of every candidate. Two personas must not share a
+1. Post two or three candidates, each under 150 words: the mechanism, what it adds,
+   what it leaves out, which always-rule it strains.
+2. One candidate must add no new mechanism.
+3. Posting one candidate is a P1 against the lead.
+
+Critic:
+
+1. Post your own candidates from your persona before reading the lead's.
+2. Rank all candidates, one reason per rank.
+
+Each persona asks its own questions of every candidate. Two personas never share a
 list.
 
-- Architecture: who owns each fact; where is the boundary that validates and
-  authorizes; what else changes when this changes; what is the smallest mechanism;
-  how does a test prove the contract.
-- Operations: what fails and how do we notice; what races with what; what grows
-  without bound; what migrates and what happens to existing rows; what an attacker
-  sends.
+- Architecture: who owns each fact; where the boundary validates and authorizes; what
+  else changes when this changes; what the smallest mechanism is; how a test proves
+  the contract.
+- Operations: what fails and how we notice; what races with what; what grows without
+  bound; what migrates and what happens to existing rows; what an attacker sends.
 
-## Spec
+## Step 3: Choice
 
-One spec per feature. It lists the briefs in dependency order, the shared contracts
-that more than one brief depends on, the product question and signal, the agents,
-and a decisions-and-deferrals table (below). The lead edits the body; everyone else
-comments.
+The lead ranks the candidates, names the choice and says why each other candidate
+lost. Later PROPOSALs refine the chosen candidate only. The critic reopens the choice
+only for an always-rule violation.
 
-## Brief
+## Step 4: Spec
 
-One brief per PR. Sections, in order:
+One spec per feature. Sections:
 
-- **Outcome.** One paragraph. What a user or operator can do afterwards.
-- **Implementer and Required reviews.** `Implementer: <entry>` and
-  `Required reviews: <entries>`, testers first.
-- **Contracts.** Each with `path:line` of the code it binds, or the module and
-  function when new. Limits, states, transitions, who writes which fact.
-- **Acceptance scenarios.** Numbered. Each names the input, the action and the
-  observable result. These are the test list.
-- **Test budget.** The expected number of new tests, one to two per scenario, and
-  which existing tests this brief replaces or deletes.
-- **Decisions and deferrals.** A table with three columns: decision, reversible
-  (cheap: code, config, jobs) or expensive (schema, public URLs, provider contracts,
-  stored data), revisit trigger. Deferred requirements go here with the trigger that
-  revives them, so nobody re-litigates them.
-- **Smallest version.** What this brief leaves out and why that is safe.
-- **Restrictions.** Files or behaviour the implementer must not touch.
-- **Design sections.** Links to the design-doc sections, quoting only the sentence a
-  contract depends on, with the doc revision.
+1. Product question and signal.
+2. Briefs in dependency order, each with its agents.
+3. Shared contracts that more than one brief depends on.
+4. Decisions and deferrals table: decision; cheap or expensive to reverse; revisit
+   trigger. Cheap: code, config, jobs, queries. Expensive: schema, stored data,
+   public URLs, provider contracts, new dependencies.
 
-Keep a brief under 900 words. A brief that needs more is two briefs.
+The lead edits the body. Everyone else comments.
 
-## What well-designed software looks like
+## Step 5: Briefs
 
-Each rule pairs with the smell that violates it. The first four are **always** rules:
-a violation is a P1 for the critic and the design reviewer. The rest are
-**when-it-matters** rules: a violation is a P2 with a decision.
+One brief per PR, under 900 words. A longer brief is two briefs. Sections, in order:
 
-Always:
+1. **Outcome.** One paragraph: what a user or operator can do afterwards.
+2. **Implementer and Required reviews.** `Implementer: <entry>` and
+   `Required reviews: <entries>`, testers first.
+3. **Contracts.** Each with the `path:line` it binds, or the module and function when
+   new. Limits, states, transitions, who writes which fact.
+4. **Acceptance scenarios.** Numbered. Each names the input, the action and the
+   observable result. These are the test list.
+5. **Test budget.** New tests expected, one to two per scenario. Existing tests this
+   brief replaces or deletes, by name.
+6. **Decisions and deferrals.** The rows of the spec table that apply to this brief.
+7. **Smallest version.** What this brief leaves out and why that is safe.
+8. **Restrictions.** Files or behaviour the implementer must not touch.
+9. **Design sections.** Links, quoting only the sentence a contract depends on, with
+   the doc revision.
 
-- **One owner per fact.** Each rule, counter or state has one module that writes it
-  and one place that defines it. Smell: the same predicate in two queries; two modules
-  that both update `cleanup_at`.
-- **Explicit state, explicit transitions.** States are named values with a
-  transition table; illegal transitions are unrepresentable or rejected in one guard.
-  Smell: boolean flags that combine into states nobody listed.
-- **Failure paths are named.** Every fallible call says what happens on timeout,
-  duplicate, and crash between steps, and what makes the retry safe. Smell: a happy
-  path with errors handled later.
-- **Bounded work.** Every loop, scan, queue and job has a size, time or page bound
-  and a stated continuation. Smell: process all rows.
+## Always-rules
 
-When it matters:
+A violation is a P1 for the critic and for every reviewer. Each rule has the smell
+that breaks it.
 
-- **Contracts at the boundary.** Validation, authorization and deadlines happen where
-  a request enters; inside, functions trust their arguments. Smell: the same check at
+1. **One owner per fact.** One module writes each rule, counter or state; one place
+   defines it. Smell: the same predicate in two queries; two modules that update
+   `cleanup_at`.
+2. **Explicit state and transitions.** States are named values with a transition
+   table. Illegal transitions are unrepresentable or rejected in one guard. Smell:
+   boolean flags that combine into states nobody listed.
+3. **Named failure paths.** Every fallible call says what happens on timeout,
+   duplicate and crash between steps, and what makes the retry safe. Smell: a happy
+   path with errors handled later.
+4. **Bounded work.** Every loop, scan, queue and job has a size, time or page bound
+   and a stated continuation. Smell: process all rows.
+5. **Breaks visible.** Every rescue, retry and fallback logs the record id and the
+   reason. No swallowed error, no default that hides a failure. Smell: `_ -> :ok`.
+
+## When-it-matters rules
+
+A violation is a P2 with a decision.
+
+- **Contracts at the boundary.** Validate, authorize and set deadlines where a
+  request enters. Inside, functions trust their arguments. Smell: the same check at
   every layer.
 - **Smallest mechanism.** A query before a process, a process before a job, a job
-  before a table. A new mechanism names the load or failure that justifies it; below
-  that, use the simpler thing even if it is slower. Smell: a scheduler, cache or
-  abstraction with one user.
-- **Reuse before invention.** Existing modules, Oban and Ecto facilities first.
-  Smell: a custom wrapper where the dependency has the feature.
-- **Testable by construction.** Side effects behind a function a test can replace;
-  time and randomness injected. Smell: tests that need sleeps or a real provider to
-  check logic.
-- **Change stays local.** A feature touches its own module and its callers, not
-  shared config or unrelated tests. Smell: merge conflicts in `config/config.exs`.
+  before a table. A new mechanism names the load or failure that justifies it. Smell:
+  a scheduler, cache or abstraction with one user.
+- **Reuse before invention.** Existing modules, Oban and Ecto first. Smell: a wrapper
+  where the dependency has the feature.
+- **Testable by construction.** Side effects behind a function a test can replace.
+  Time and randomness injected. Smell: tests that need sleeps or a real provider.
+- **Change stays local.** A feature touches its module and its callers, not shared
+  config or unrelated tests. Smell: merge conflicts in `config/config.exs`.
 - **Readable at the call site.** Names say what, arguments say which, no flags that
   change behaviour. Smell: an `opts` list with five keys.
 
-Language and framework idiom comes from the stack skills in AGENTS.md, not from
-this list.
+Language and framework idiom comes from the stack skills in AGENTS.md.
 
-## Tests are part of the design
+## Test budget
 
 The repository has more test lines than application lines. The brief controls this.
 
-- The acceptance scenarios and contracts are the test list. A test that maps to no
-  line in the brief needs a one-line reason in the PR.
-- Budget one to two tests per scenario and write the number in the brief.
+- The scenarios and contracts are the test list. One to two tests per scenario.
 - Banned by default: combination grids over inputs, one test per error tuple, tests
   of private helpers, tests that restate a pattern match, tests of a constraint the
-  database already enforces, tests of cases that cannot happen.
-- Allowed without a brief line: one regression test per fixed bug; a race or property
-  test where the brief names a concurrency contract.
+  database enforces, tests of cases that cannot happen.
+- Allowed without a brief line: one regression test per fixed bug; one race or
+  property test where the brief names a concurrency contract.
 - When a feature replaces behaviour, the brief names the tests to delete.
 - A critic adds a scenario only by naming the contract it proves and the scenario it
   replaces.
 
-## Critique
+## Step 6: Critique
 
-Record your concerns before reading the PROPOSAL, so the lead's framing does not
-narrow them. Then, for each objection:
+Critic, for each PROPOSAL:
 
-- One objection per `path:line`, trace, run or quoted requirement.
-- P1 only for a violation of an always rule, data loss, an unauthorized action, a
-  security hole, or an acceptance scenario that cannot pass. Everything else,
-  including performance and maintainability, is P2 with a decision.
-- Prefer an objection that removes a part over one that adds a part.
-- A P2 does not block the brief. The lead records its decision in the
-  decisions-and-deferrals table or passes it to the implementer as a note.
+1. Write your concerns before reading the PROPOSAL.
+2. One objection per `path:line`, trace, run or quoted requirement, with severity.
+3. P1 only for an always-rule violation or a [severity table](../../teams/README.md#severity)
+   condition. Everything else is P2 with a proposed decision.
+4. A P2 does not block. The lead records a decision in the table or a note to the
+   implementer.
+5. AGREE when no P1 remains and every P2 has a decision. Name the PROPOSAL URL.
 
-AGREE when no P1 remains and every P2 has a decision. Name the PROPOSAL comment.
-AGREE means work may start.
+Lead, after each round:
 
-## Revise
+1. A substantive change alters a contract, a scenario, a mechanism or the decisions
+   table. It invalidates earlier AGREEs. Say so in the PROPOSAL.
+2. If a shared contract changes, pause the briefs that depend on it until the spec is
+   updated.
+3. Post BLOCKED when both sides have evidence and still disagree, or when a product
+   or scope question is open. Silence is not agreement.
 
-A substantive change is one that changes a contract, a scenario, a mechanism or the
-decisions table. It invalidates earlier AGREEs; say so in the PROPOSAL. Editorial
-changes do not. If a shared contract changes, pause the briefs that depend on it
-until the spec is updated.
+## Step 7: Choose the implementer
 
-Post BLOCKED when the lead and critic both have evidence and still disagree, or when
-a product or scope question is open. Silence is not agreement.
+Name a Haiku implementer only when all hold:
 
-## Choose the implementer
+- The brief names every file and function to change, every contract and scenario.
+- No design choice is open.
+- No schema, migration, process or external service is added.
+- A mechanical check proves the result.
+- The brief states the expected saving over an Opus implementer.
 
-Name a Haiku implementer only if the brief names every file and function to change,
-every contract and scenario, leaves no design choice open, adds no schema, migration,
-process or external service, has a mechanical check, and states the expected saving
-over an Opus implementer. Otherwise name an Opus entry and say which condition
-failed. Do not change the design to meet these conditions.
+Otherwise name an Opus entry and say which condition failed. Do not change the design
+to meet these conditions.

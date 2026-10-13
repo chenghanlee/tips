@@ -7,8 +7,8 @@ description: Guides implementing a tips brief in the Phoenix/Elixir repository. 
 
 You implement one brief in one PR. The brief's acceptance scenarios define done.
 [AGENTS.md](../../../AGENTS.md) owns repository boundaries, navigation, stack skills
-and checks. [design-software](../design-software/SKILL.md#what-well-designed-software-looks-like)
-owns the architecture rules. This skill owns how to write the code and the tests.
+and checks. [design-software](../design-software/SKILL.md#always-rules) owns the
+architecture rules. This skill owns how to write the code and the tests.
 
 ## MVP posture
 
@@ -76,8 +76,8 @@ Credo, Dialyzer and the formatter own style. The stack skills own idiom.
 
 ## Make breaks visible
 
-Moving fast is safe only if we notice breaks. This is the always-rule for
-implementation. A violation is a P1 in review.
+Moving fast is safe only if we notice breaks. This is the fifth
+[always-rule](../design-software/SKILL.md#always-rules). A violation is a P1.
 
 - Every `rescue`, `catch`, retry and fallback logs the record id and the reason at
   `warning` or above.
@@ -198,8 +198,8 @@ No stated bound and no growth: no measurement.
 When the work reveals a problem the brief's budget does not cover:
 
 - Do not fix it.
-- Add one line to the PR under `Deferrals`: the problem, the `path:line`, the
-  trigger that makes it worth fixing.
+- Put it in one follow-up issue for this PR: the problem, the `path:line`, the
+  trigger that makes it worth fixing. Link the issue from the PR body.
 - If it breaks a scenario or an always-rule, post a blocker instead.
 
 ## Bug fixes
@@ -222,6 +222,7 @@ Done means: every scenario has its test, the tests pass, the
   the code harder to read.
 - Delete superseded code, tests and docs in the same PR.
 - Update the docs the brief names. Do not add docs the brief did not ask for.
-- PR description: what you built, deferrals, decisions a reviewer could question,
-  checks that failed or were not run.
+- Fill the [PR body](../../teams/README.md#pr-body): outcome, scenario table,
+  blast radius, tests without a scenario line, decisions, follow-up issue, checks
+  not run by CI.
 - Hand off through the [pair workflow](../../teams/README.md).

@@ -13,7 +13,8 @@ Scope limits:
 - Do not review design, smells, idiom or test value. That is
   [review-software-design](../review-software-design/SKILL.md).
 - Do not ask for tests beyond the brief's scenarios.
-- A deferral in the brief or the PR is not a finding unless it breaks a scenario.
+- A deferral in the brief's decisions table or a linked follow-up issue is not a
+  finding unless it breaks a scenario.
 - One pass. P1 findings have no cap. Stop at three P2 findings.
 
 The [tester role](../../teams/roles/tester.md) owns turns, handoff and the merge.
@@ -30,8 +31,10 @@ Collect, in this order:
 4. The existing tests for each changed module.
 5. Prior review threads on the PR.
 
-Write down your concerns before you read the PR description or another review.
-For a local review with no PR, use the user's brief and the working tree.
+Write down your concerns. Then read the [PR body](../../teams/README.md#pr-body).
+Its scenario table and blast radius are claims to verify in steps 2 and 3, not
+results to copy. For a local review with no PR, use the user's brief and the
+working tree.
 
 ## Step 2: Blast radius
 
@@ -163,17 +166,8 @@ Say for every finding whether it came from a run or from reading.
 
 ## Severity
 
-Use the [severity table](../../teams/README.md#severity).
-
-P1:
-
-- A scenario that is unproven, cannot pass, or passes for the wrong reason.
-- A required check that is missing or fails.
-- Lost or corrupted data; a migration or rollback that fails.
-- An unauthorized action or a security hole.
-- A swallowed error on an affected path.
-
-P2: everything else, each with the change you ask for. P0 as the table defines it.
+Use the [severity table](../../teams/README.md#severity). A scenario that passes
+for the wrong reason is unproven. Every P2 carries the change you ask for.
 
 ## Review record
 

@@ -1,7 +1,6 @@
 # Rules for all agents
 
-Read this and your role file at launch and after compaction. GPT-6 Astra also reads
-[models/astra.md](models/astra.md); Claude Haiku also reads [models/haiku.md](models/haiku.md).
+Read this and your role file at launch and after compaction.
 
 ## Authority
 
