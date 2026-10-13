@@ -10,8 +10,9 @@ Implement one brief in one worktree and own its PR.
 
 ## Steps
 
-1. Start from the released brief. If a question would change the work, post one
-   QUESTION on the brief with your assumption. Continue unaffected work. Wait for
+1. Start from the released brief. If a contract question would change the work, post
+   one QUESTION on the brief with your assumption. A product or scope question is
+   `blocked` to the dispatcher. Continue unaffected work. Wait for
    the lead's ANSWER before changing the affected part. If the answer changes a
    contract, wait for the lead's updated release.
 2. Implement by the skill. Stay inside the brief's test budget.

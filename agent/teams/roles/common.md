@@ -25,9 +25,9 @@ Read this and your role file at launch and after compaction.
 - Keep each comment under 400 words. If it has more than 800 words, the script warns.
   Explain why it needs that many words. Put logs and screenshots in a gist with
   `gh gist create <file>`. Link to CI runs by URL. Do not paste output.
-- Before a handoff, compaction, restart or session end, save a checkpoint. The lead
-  designer updates the spec body. Everyone else posts a checkpoint comment or updates
-  their PR body.
+- Before compaction, restart or session end, or when your state is not already in a
+  posted PROPOSAL, review or PR body, save a checkpoint. The lead designer updates
+  the spec body. Everyone else posts a checkpoint comment or updates their PR body.
   Resume with `agent/teams/board.py read <issue> --after <your checkpoint URL>`.
 - Post the comment, then send the Herdr prompt as a separate step. If you repeat the
   post, the script returns the existing comment's URL.

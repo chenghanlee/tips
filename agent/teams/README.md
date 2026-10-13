@@ -64,8 +64,9 @@ changed implementer or merge-confirming tester is refused.
 
 Every message starts a turn with the recipient's full context. Send only handoffs,
 `done`, `blocked`, the dispatcher's answer to a blocker, a review URL to the
-merge-confirming tester, a new-head notice to a reviewer, and the tester's launch
-request. No acknowledgments or progress updates. Put everything the recipient needs
+merge-confirming tester, a new-head notice to a reviewer, the tester's launch
+request, and the design-phase messages the [designer role](roles/designer.md) lists.
+No acknowledgments or progress updates. Put everything the recipient needs
 in the message or the linked record. After sending, end your turn. If sending fails
 you still hold the turn: report `blocked` with the exact command and error; nobody
 delivers a denied message another way.
@@ -126,7 +127,8 @@ Oban workers, shared fixtures; the callers and entry points each reaches.
 Test name and one-line reason, or "none".
 
 ## Decisions
-Choices a reviewer could question, one line each, with the reason.
+Choices made during implementation that the brief does not record, one line each
+with the reason, or "none".
 
 ## Follow-up
 Issue URL for deferred work, or "none".
@@ -147,8 +149,9 @@ claims instead of redoing them.
 | P2 | Any other finding. |
 
 The implementer fixes every P0 and P1. For P2s, fix them, decline them with a reason,
-or defer them in one follow-up issue linked from the PR body. A deferral in the brief's
-decisions table or in a linked issue is not a finding unless it breaks a scenario.
+or defer them in one follow-up issue linked from the PR body. A deferral recorded in
+the brief's decisions table or in a linked follow-up issue settles P2 findings on that
+point. It never settles a P0 or P1 condition.
 
 ### Merge
 

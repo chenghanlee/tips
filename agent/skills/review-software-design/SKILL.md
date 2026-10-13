@@ -5,7 +5,7 @@ description: Guides the reviewing designer's pass over a tips PR. Covers conform
 
 # Review software design
 
-You answer one question: is this the smallest correct shape for the brief's
+You answer one question: could a simpler implementation satisfy the brief's
 contracts. The [design-software](../design-software/SKILL.md) rules are the
 standard. The [designer role](../../teams/roles/designer.md) owns turns and
 messages.
@@ -14,11 +14,13 @@ Scope limits:
 
 - Do not review scenarios, checks or the merge. That is
   [review-software-correctness](../review-software-correctness/SKILL.md).
-- One pass, at most five findings. More than five means the brief or the design was
-  wrong; say that in one finding.
-- A shortcut the brief accepted, or a deferral in a linked issue, is not a finding
-  unless it breaks a scenario. A shortcut the brief did not accept is a P2 with a
-  proposed deferral, not a demand for completeness.
+- One pass. Report every P0 and P1. Report at most three P2 findings, the ones with
+  the greatest consequence. Combine findings only when they share a cause and fix.
+- Deferrals follow the [severity rule](../../teams/README.md#severity): a recorded
+  deferral settles P2 on that point, never P0 or P1. A shortcut the brief did not
+  accept is a P2 with a proposed deferral, not a demand for completeness.
+- For a local review with no PR, use the user's brief and report in the form the
+  user asked for; do not publish a GitHub review.
 - Credo, Dialyzer and the formatter own style. Review idiom only where the change
   uses the stack against its stack skill in AGENTS.md; cite the skill. One finding
   per repeated pattern.
@@ -39,6 +41,10 @@ Scope limits:
   so and propose the brief edit.
 - A mechanism the brief did not ask for needs the load or failure it answers. Without
   one, P2 to remove.
+- For each shortcut the brief accepted, check that the diff matches its decision
+  row: what breaks if it is wrong and how we would notice. A job that retries and
+  logs is fine at MVP. Silent data loss is not. Report only a missing or
+  contradicted row.
 
 ## Step 3: Always-rules
 
@@ -47,8 +53,8 @@ A violation is a P1. Cite the rule and the `path:line`.
 
 ## Step 4: Simplicity
 
-Ask: could this be half the code. Name the mechanism that could go and what replaces
-it. A finding shows the current cost and the replacement, including who does the
+Look for mechanisms that can be removed or replaced without losing required
+behaviour. Name the mechanism and what replaces it. A finding shows the current cost and the replacement, including who does the
 extra work if the replacement moves it. Fewer lines alone do not prove simplicity.
 
 ## Step 5: Smells
@@ -75,18 +81,13 @@ The tests are the brief's scenarios and contracts, and nothing more.
 
 - Map each new test to a scenario or contract line, or to a reason in the PR body's
   tests-without-a-scenario-line section. Neither: P2 to delete.
-- Each test fails if its contract breaks, and passes for one reason. Two tests that
-  fail for the same bug: keep one.
+- Each test fails if its contract breaks, and passes for one reason. Ask to delete a
+  test only when surviving tests cover its distinct required cases; name them.
 - Flag combination grids, one test per error tuple, tests of private helpers,
-  restated pattern matches, tests of constraints the database enforces.
-- Check the net count against the brief's test budget. Check that replaced tests were
-  deleted. More test lines than code lines in the PR: name it.
+  restated pattern matches, tests that only assert the database raises.
+- Check the net test change against the brief's test budget and the PR body's
+  reasons. Check that replaced tests were deleted.
 - Raise a test's correctness only when you can show the case where it passes wrongly.
-
-## Step 8: Blast radius of shortcuts
-
-For each accepted shortcut, state what breaks if it is wrong and how we would notice.
-A job that retries and logs is fine at MVP. Silent data loss is not.
 
 ## Record
 

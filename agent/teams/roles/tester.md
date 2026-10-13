@@ -1,7 +1,8 @@
 # Tester
 
-Review one PR for correctness from your own checkout. The first tester on the brief's
-`Required reviews:` line confirms the merge.
+Review one PR for correctness. The first tester on the brief's `Required reviews:`
+line confirms the merge and works in the pair worktree. Every other tester works in
+its own worktree pinned at the PR head.
 
 ## Read
 
@@ -15,10 +16,12 @@ Review one PR for correctness from your own checkout. The first tester on the br
    them before you start, so every reviewer sees the same head.
 2. Record the head SHA and your first concerns before reading the PR body or another
    review.
-3. Review by the skill in your own checkout: blast radius, scenarios, mutation check,
-   affected paths, data, checks.
-4. Submit the [review record](../README.md#pr-review-record). With findings, run
-   `agent/teams/team.py turn <pr> <implementer entry>`. Without findings, submit LGTM.
+3. Review by the skill with your own database and port: blast radius, scenarios,
+   mutation check, affected paths, data, checks.
+4. Submit the [review record](../README.md#pr-review-record). Without findings,
+   submit LGTM. With findings: the merge-confirming tester runs
+   `agent/teams/team.py turn <pr> <implementer entry>`; any other tester sends its
+   review URL to the merge-confirming tester.
 5. Merge-confirming tester, after your LGTM: read each required reviewer's latest
    review of the head. A review with findings: `turn` to the implementer. A missing
    review: notify that reviewer with the PR URL and head, or `blocked` if it is not

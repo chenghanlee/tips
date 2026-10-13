@@ -13,8 +13,8 @@ architecture rules. This skill owns how to write the code and the tests.
 ## MVP posture
 
 Tips is a greenfield MVP looking for product-market fit. Ship the smallest change
-that makes every scenario in the brief pass. Correct means the contract holds.
-Complete is a product choice the brief makes, not you.
+that makes every scenario in the brief pass. Implement the scope the brief agreed.
+Ask the lead about a missing requirement; do not add scope.
 
 Classify each choice before you make it:
 
@@ -30,9 +30,9 @@ Read, in this order, then stop:
 
 1. The brief: outcome, contracts, scenarios, test budget, decisions table,
    restrictions.
-2. Each `path:line` the brief names and its callers, found with the
+2. The stack skills AGENTS.md names for the files you will change.
+3. Each `path:line` the brief names and its callers, found with the
    [navigation rules](../../../AGENTS.md#elixir-navigation).
-3. The stack skills AGENTS.md names for the files you will change.
 4. The existing tests for the changed modules.
 
 Reading beyond this list needs a reason you can state in one line. If the brief is
@@ -51,17 +51,22 @@ Apply these in every change. Each has the smell that breaks it.
 - One error vocabulary per context: `{:ok, value}` and `{:error, reason}` with a
   fixed set of reasons. Use `with` for multi-step fallible flows. Smell: a function
   that returns `nil`, `false` and `{:error, _}` for different failures.
-- Validate and authorize where the request enters: the LiveView event, controller
-  action, channel handler or job. Inside, functions trust their arguments.
-  Authorize the action where it is received, even if mount already checked.
-  Smell: the same check at every layer.
+- Parse untrusted input at the entry point (LiveView event, controller action,
+  channel handler, job args) with existing parsers or changesets. Context operations
+  admit callers freshly and enforce domain rules, per the
+  [Admission contract](../../../docs/design/backend-design.md#admission-locking-and-returned-data).
+  Writes recheck eligibility under the required locks and hold it through commit.
+  Web entry points keep authentication and access checks. UI feedback is not
+  authorization. Query filters, database constraints and guarded writes stay. Add a
+  repeated check only for a distinct trust boundary or state that may have changed.
+  Smell: the same check in the LiveView, the context and the query with no reason.
 - LiveViews and controllers call context functions. They do not call `Repo`.
   Smell: a query inside a `handle_event`.
 - One module writes each fact. Find the other copies of a rule, limit, enum or
   label before changing it: constraints, migrations, helper text, fixtures, docs.
   Update each one. Smell: two modules that update the same column.
-- Names say what the function does, including side effects. Arguments say which.
-  No option that changes behaviour. Smell: an `opts` list with five keys.
+- Name a function for its operation and side effects. Arguments identify the
+  inputs. No option that changes behaviour. Smell: an `opts` list with five keys.
 - Functions fit on one screen. A module has one reason to change. Smell: a context
   module with thirty public functions.
 - Reuse before invention: existing modules, Ecto, Oban and Phoenix features first.
@@ -79,8 +84,8 @@ Credo, Dialyzer and the formatter own style. The stack skills own idiom.
 Moving fast is safe only if we notice breaks. This is the fifth
 [always-rule](../design-software/SKILL.md#always-rules). A violation is a P1.
 
-- Every `rescue`, `catch`, retry and fallback logs the record id and the reason at
-  `warning` or above.
+- Every `rescue`, `catch`, retry and fallback logs the identifiers it has (record,
+  job, request) and the reason. Pick the log level by consequence.
 - No `_ -> :ok`, no `rescue _ -> nil`, no default value that hides a failure.
 - A job that fails raises or returns `{:error, reason}` so Oban retries and records
   it. Do not swallow the error and return `:ok`.
@@ -144,8 +149,7 @@ Schema and stored data are expensive to reverse.
 ## Tests
 
 The brief's scenarios and contracts are the test list. The brief's test budget is
-the limit. The repository has more test lines than application lines; do not add
-to the ratio without a reason.
+the expected net test change; explain any difference in the PR body.
 
 Order of work:
 
@@ -162,11 +166,14 @@ Rules:
 - One to two tests per scenario. A test that maps to no scenario or contract line
   needs a one-line reason in the PR.
 - Banned by default: combination grids over inputs, one test per error tuple, tests
-  of private helpers, tests that restate a pattern match, tests of a constraint the
-  database enforces, tests of cases that cannot happen.
+  of private helpers, tests that restate a pattern match, tests that only assert the
+  database raises, tests of cases that cannot happen. A test of how the application
+  handles a constraint error, or of an invariant under concurrent writes, is allowed
+  when a scenario names it.
 - Allowed without a brief line: one regression test per fixed bug; one race or
   property test where the brief names a concurrency contract.
-- Two tests that fail for the same bug: keep one.
+- Delete a test only when surviving tests cover its distinct required cases. Name
+  them in the PR body.
 - Test through public entry points: the context function, the LiveView, the job.
   Add a unit test only for pure logic a scenario test cannot reach. Add a browser
   test only for an interaction lower-level tests cannot check.
@@ -209,7 +216,7 @@ failed assumption before adding a condition. Check the other sites that share th
 assumption and fix them in the same PR. Verify the whole contract, not only the
 reported case.
 
-Refactor only when the brief requires it, or when the current shape blocks a
+Refactor only when the brief requires it, or when the current code blocks a
 scenario or its test. Name the blocking problem in the PR. Keep the refactor inside
 the affected flow. Stop when the problem is resolved.
 

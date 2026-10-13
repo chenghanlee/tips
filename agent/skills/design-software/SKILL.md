@@ -1,23 +1,20 @@
 ---
 name: design-software
-description: Guides the design lead and the design critic of a tips feature. Covers reading, candidate designs, the choice, the spec and brief format, the always-rules and the when-it-matters rules, test budgets, critique, agreement and the choice of implementer. Code reviews use review-software-design.
+description: Guides the design lead and the design critic of a tips feature. Covers reading, candidate designs, the choice, the spec and brief format, the always-rules and the when-it-matters rules, the test budget, critique and the choice of implementer. Code reviews use review-software-design.
 ---
 
 # Design software
 
 The lead writes the spec and briefs. The critic objects from a different persona.
-The [designer role](../../teams/roles/designer.md) owns turns and messages. This
-skill owns what to write and how to judge it.
+The [designer role](../../teams/roles/designer.md) owns turns, messages, the round
+limit and the AGREE condition. This skill owns what to write and how to judge it.
 
-Tips is a greenfield MVP looking for product-market fit. Design the smallest correct
-thing that can ship today. Correct means the contract holds. Complete is a product
-choice the user makes.
+Tips is a greenfield MVP looking for product-market fit. Design the smallest change
+that satisfies the contracts. Completeness is the user's product decision.
 
 Scope limits:
 
-- Three critique rounds after `Choice`. Then AGREE with the open P2s recorded as
-  decisions, or BLOCKED.
-- P1 only as the [severity table](../../teams/README.md#severity) defines it.
+- Severity follows the [severity table](../../teams/README.md#severity).
   Performance and maintainability are P2 with a decision.
 - Prefer an objection that removes a part over one that adds a part.
 
@@ -35,20 +32,17 @@ and the signal that would show the answer is wrong. Design for that signal.
 
 ## Step 2: Candidates
 
-Agents converge on the first design that works. The candidates step widens the
-search before the critique narrows it.
+Agents converge on the first design that works. This step widens the search before
+the critique narrows it.
 
-Lead:
+Lead: post two or three candidates, each under 150 words: the mechanism, what it
+adds, what it leaves out, which always-rule it may violate and why. One candidate
+adds no new mechanism. One candidate is enough when settled requirements leave no
+material design choice; name the constraint.
 
-1. Post two or three candidates, each under 150 words: the mechanism, what it adds,
-   what it leaves out, which always-rule it strains.
-2. One candidate must add no new mechanism.
-3. Posting one candidate is a P1 against the lead.
-
-Critic:
-
-1. Post your own candidates from your persona before reading the lead's.
-2. Rank all candidates, one reason per rank.
+Critic: before reading the lead's candidates, write one independent alternative or
+concern from your persona, or say you have none. Then rank all candidates, one
+reason per rank.
 
 Each persona asks its own questions of every candidate. Two personas never share a
 list.
@@ -62,8 +56,9 @@ list.
 ## Step 3: Choice
 
 The lead ranks the candidates, names the choice and says why each other candidate
-lost. Later PROPOSALs refine the chosen candidate only. The critic reopens the choice
-only for an always-rule violation.
+lost. Later PROPOSALs refine the chosen candidate. The choice reopens only for an
+always-rule violation or new evidence that changes feasibility, required behaviour
+or cost. The lead decides and says why.
 
 ## Step 4: Spec
 
@@ -80,7 +75,8 @@ The lead edits the body. Everyone else comments.
 
 ## Step 5: Briefs
 
-One brief per PR, under 900 words. A longer brief is two briefs. Sections, in order:
+One brief per PR. Aim for 900 words. Split only at contracts that can ship
+independently. Sections, in order:
 
 1. **Outcome.** One paragraph: what a user or operator can do afterwards.
 2. **Implementer and Required reviews.** `Implementer: <entry>` and
@@ -89,8 +85,8 @@ One brief per PR, under 900 words. A longer brief is two briefs. Sections, in or
    new. Limits, states, transitions, who writes which fact.
 4. **Acceptance scenarios.** Numbered. Each names the input, the action and the
    observable result. These are the test list.
-5. **Test budget.** New tests expected, one to two per scenario. Existing tests this
-   brief replaces or deletes, by name.
+5. **Test budget.** The expected net test change: tests added, one to two per
+   scenario, and existing tests deleted or replaced, by name, each with a reason.
 6. **Decisions and deferrals.** The rows of the spec table that apply to this brief.
 7. **Smallest version.** What this brief leaves out and why that is safe.
 8. **Restrictions.** Files or behaviour the implementer must not touch.
@@ -113,43 +109,52 @@ that breaks it.
    path with errors handled later.
 4. **Bounded work.** Every loop, scan, queue and job has a size, time or page bound
    and a stated continuation. Smell: process all rows.
-5. **Breaks visible.** Every rescue, retry and fallback logs the record id and the
-   reason. No swallowed error, no default that hides a failure. Smell: `_ -> :ok`.
+5. **Breaks visible.** Every rescue, retry and fallback logs the identifiers it has
+   and the reason. No swallowed error, no default that hides a failure. Smell:
+   `_ -> :ok`.
 
 ## When-it-matters rules
 
 A violation is a P2 with a decision.
 
-- **Contracts at the boundary.** Validate, authorize and set deadlines where a
-  request enters. Inside, functions trust their arguments. Smell: the same check at
-  every layer.
-- **Smallest mechanism.** A query before a process, a process before a job, a job
-  before a table. A new mechanism names the load or failure that justifies it. Smell:
-  a scheduler, cache or abstraction with one user.
+- **Checks where they belong.** Entry points parse input with existing parsers or
+  changesets. Context operations admit callers freshly and enforce domain rules, per
+  the [Admission contract](../../../docs/design/backend-design.md#admission-locking-and-returned-data).
+  Writes recheck eligibility under the required locks through commit. Query filters,
+  database constraints and guarded writes stay. A repeated check needs a distinct
+  trust boundary or state that may have changed. Smell: the same check in the
+  LiveView, the context and the query with no reason.
+- **Smallest mechanism.** Choose the simplest mechanism that meets the contract's
+  lifetime, durability and consistency needs, existing facilities first. A new
+  mechanism names the load or failure that justifies it. Smell: a scheduler, cache or
+  abstraction with one user.
 - **Reuse before invention.** Existing modules, Oban and Ecto first. Smell: a wrapper
   where the dependency has the feature.
 - **Testable by construction.** Side effects behind a function a test can replace.
   Time and randomness injected. Smell: tests that need sleeps or a real provider.
 - **Change stays local.** A feature touches its module and its callers, not shared
   config or unrelated tests. Smell: merge conflicts in `config/config.exs`.
-- **Readable at the call site.** Names say what, arguments say which, no flags that
-  change behaviour. Smell: an `opts` list with five keys.
+- **Readable at the call site.** Name a function for its operation and side effects.
+  Arguments identify the inputs. No flag that changes behaviour. Smell: an `opts`
+  list with five keys.
 
 Language and framework idiom comes from the stack skills in AGENTS.md.
 
 ## Test budget
 
-The repository has more test lines than application lines. The brief controls this.
+The brief controls test growth.
 
 - The scenarios and contracts are the test list. One to two tests per scenario.
 - Banned by default: combination grids over inputs, one test per error tuple, tests
-  of private helpers, tests that restate a pattern match, tests of a constraint the
-  database enforces, tests of cases that cannot happen.
+  of private helpers, tests that restate a pattern match, tests that only assert the
+  database raises, tests of cases that cannot happen. A test of how the application
+  handles a constraint error, or of an invariant under concurrent writes, is allowed
+  when a scenario names it.
 - Allowed without a brief line: one regression test per fixed bug; one race or
   property test where the brief names a concurrency contract.
-- When a feature replaces behaviour, the brief names the tests to delete.
-- A critic adds a scenario only by naming the contract it proves and the scenario it
-  replaces.
+- When a feature replaces behaviour, the brief names the tests to delete. A test is
+  deleted only when surviving tests cover its distinct required cases.
+- A critic adds a scenario by naming the uncovered contract. The budget updates.
 
 ## Step 6: Critique
 
@@ -157,11 +162,10 @@ Critic, for each PROPOSAL:
 
 1. Write your concerns before reading the PROPOSAL.
 2. One objection per `path:line`, trace, run or quoted requirement, with severity.
-3. P1 only for an always-rule violation or a [severity table](../../teams/README.md#severity)
-   condition. Everything else is P2 with a proposed decision.
+3. P1 only for an always-rule violation or a severity-table condition. Everything
+   else is P2 with a proposed decision.
 4. A P2 does not block. The lead records a decision in the table or a note to the
    implementer.
-5. AGREE when no P1 remains and every P2 has a decision. Name the PROPOSAL URL.
 
 Lead, after each round:
 
@@ -180,7 +184,6 @@ Name a Haiku implementer only when all hold:
 - No design choice is open.
 - No schema, migration, process or external service is added.
 - A mechanical check proves the result.
-- The brief states the expected saving over an Opus implementer.
 
 Otherwise name an Opus entry and say which condition failed. Do not change the design
 to meet these conditions.
