@@ -10,6 +10,10 @@ Read this and your role file at launch and after compaction.
   your turn after your own handoff. Do not poll.
 - Send unresolved questions to the dispatcher, then the user. Only the user decides UI,
   UX, user-facing behaviour and PRD questions. Record those decisions on the board.
+- A user instruction that another agent must follow goes on that agent's brief as an
+  ANSWER before you hand over: quote the user's words, say where you received them and
+  keep their scope. Link the durable decision when one exists. A faithful record is the
+  user's instruction within that scope; your own decision is not.
 - Silence, a timeout or a missing agent never counts as consent or approval.
 
 ## Comments

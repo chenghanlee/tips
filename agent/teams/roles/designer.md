@@ -43,7 +43,10 @@ persona.
    ranking of all candidates, one reason per rank.
 2. CRITIQUE each later PROPOSAL by the skill's critique rules. Ask to reopen the choice
    only for a required rule violation or new evidence that changes feasibility, required
-   behaviour or cost. The lead decides and says why.
+   behaviour or cost. The lead decides and says why. For each mechanism a brief
+   changes, read the function bodies its Contracts name and report any producer or
+   consumer of that state the brief omits, as a finding against the contract it leaves
+   uncovered. Repeat when a revised PROPOSAL changes the mechanism.
 3. AGREE when no P0 or P1 remains and each P2 has a decision. Name the PROPOSAL URL.
 4. Answer an implementer's QUESTION only when the lead asks.
 

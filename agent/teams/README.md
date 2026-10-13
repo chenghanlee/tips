@@ -92,8 +92,8 @@ head and the required checks. Use the first matching row:
 | No PR | Implementer: open it. |
 | A required check failed | Implementer: fix it. |
 | The latest review of the head by any reviewer in `Required reviews:` is not an LGTM | Implementer: address it. |
-| The head has no review | Tester: review it. |
-| The tester's latest review is an LGTM and a required reviewer has not reviewed the head | Tester: notify that reviewer, or report `blocked` when it is not launched. |
+| The tester has not reviewed the head | Tester: review it. |
+| A required reviewer has not reviewed the head | Tester: notify that reviewer, or report `blocked` when it is not launched. |
 | Every required reviewer's latest review of the head is an LGTM | Tester: merge. |
 
 ## PR review record

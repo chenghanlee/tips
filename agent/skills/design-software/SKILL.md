@@ -84,7 +84,8 @@ independently. Sections, in order:
 2. **Implementer and Required reviews.** `Implementer: <entry>` and `Required reviews: <entries>`, testers first.
 3. **Contracts.** Give the `path:line` each contract applies to. For new code, name the
    module and function. List limits, states and transitions. Name which module writes
-   each fact.
+   each fact. For a changed mechanism, name at `path:line` each existing function that
+   produces or consumes the state it changes.
    State required performance limits and workload assumptions that affect the design,
    and link any existing contract that defines them.
 4. **Acceptance scenarios.** Numbered. Each names the input, the action and the
