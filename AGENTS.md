@@ -32,6 +32,8 @@ Before reading, editing or reviewing Elixir code, load `elixir` and each skill t
 
 These five are user-maintained files outside version control ([setup](agent/teams/SETUP.md#one-time-setup)). If one is missing, report it before the work that needs it.
 
+Before designing, building or reshaping a user interface (pages, components, templates, CSS), Claude clients load the `frontend-design:frontend-design` plugin skill and apply it. The brief, the [frontend design](docs/design/frontend-design.md) and the [visual baseline](docs/design/visual/README.md) take precedence where they differ. If the skill is missing, report it before the UI work.
+
 ## Elixir navigation
 
 `"$TIPS_DEXTER"` answers from an index of this worktree's Elixir files, its `deps/` and the Elixir sources; root `tmp/` is outside the index. [Pair provisioning](agent/lsp/README.md#pair-provisioning) sets the variable. Commands are in the [Dexter reference](agent/skills/dexter/SKILL.md).
