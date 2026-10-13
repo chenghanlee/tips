@@ -47,6 +47,9 @@ A violation of any of these is a P1. Cite the rule and the `path:line`.
 - Named failure paths: every fallible call says what happens on timeout, duplicate
   and crash between steps, and what makes the retry safe.
 - Bounded work: every loop, scan, queue and job has a bound and a continuation.
+- Breaks visible: every rescue, retry and fallback logs the id and reason; no
+  swallowed error, no default that hides a failure
+  ([implement-software](../implement-software/SKILL.md#make-breaks-visible)).
 
 ## Simplicity
 

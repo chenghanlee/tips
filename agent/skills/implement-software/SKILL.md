@@ -1,275 +1,227 @@
 ---
 name: implement-software
-description: Guides implementation planning, features, fixes, refactors and tests in the tips Phoenix/Elixir repository. Applies when designing a code change, implementing required behavior or choosing tests. Code reviews use review-software-correctness and review-software-design, which reference this skill's contract, state and testing rules.
+description: Guides implementing a tips brief in the Phoenix/Elixir repository. Covers scope, the MVP posture, code rules, state and failure, data changes, tests and the test budget, deferrals and when to stop. Code reviews use review-software-correctness and review-software-design, which link to this skill's contract and failure sections.
 ---
 
 # Implement software
 
-Use general guidance throughout the task; apply checks marked **Trigger** or **When**
-when their conditions occur. These are decision cues, not sequential gates. Follow
-[AGENTS.md](../../../AGENTS.md) for repository boundaries, navigation, skill routing,
-checks and collaboration.
+You implement one brief in one PR. The brief's acceptance scenarios define done.
+[AGENTS.md](../../../AGENTS.md) owns repository boundaries, navigation, stack skills
+and checks. [design-software](../design-software/SKILL.md#what-well-designed-software-looks-like)
+owns the architecture rules. This skill owns how to write the code and the tests.
 
-## Scope the task
+## MVP posture
 
-Investigate until remaining uncertainty would not change the approach or required
-verification. Spend more where mistakes could lose data, cause external effects or
-be expensive to undo.
+Tips is a greenfield MVP looking for product-market fit. Ship the smallest change
+that makes every scenario in the brief pass. Correct means the contract holds.
+Complete is a product choice the brief makes, not you.
 
-Identify the acceptance scenarios and scope before investigating. Follow task links
-and repository entry points to the authoritative requirements, affected contracts
-and relevant decisions; read what resolves the current question. Resolve routine
-choices from the task, existing decisions and repository conventions. When
-alternatives satisfy the same requirements, choose the simplest without asking.
-Ask through the existing workflow only when an unresolved ambiguity changes what
-counts as correct behavior; continue independent work while awaiting the answer
-when that workflow permits it.
-Do not add adjacent capabilities.
+Classify each choice before you make it:
 
-## Build the simplest working solution
+- Cheap to reverse: code, config, queries, jobs, module layout. Decide, ship, note it
+  in the PR if a reviewer could ask why.
+- Expensive to reverse: schema, stored data, public URLs, provider contracts, new hex
+  dependencies. Follow the brief. If the brief does not cover it, post a blocker.
+  Do not guess.
 
-Build the simplest design that delivers the required behavior through the complete
-affected flow, including required failure handling. A shorter implementation that
-leaves required behavior unfinished is not simpler to maintain. Among complete
-solutions, prefer fewer interacting parts, clearer ownership and less coordination;
-prefer the user's experience over reducing code.
+## Scope
 
-Add an abstraction, dependency, process, configuration option or stored state only
-when you can name the current requirement it serves and why the simpler approach
-is insufficient. Do not build for hypothetical scale, reuse or compatibility.
+Read, in this order, then stop:
 
-## Reuse existing mechanisms and follow conventions
+1. The brief: outcome, contracts, scenarios, test budget, decisions table,
+   restrictions.
+2. Each `path:line` the brief names and its callers, found with the
+   [navigation rules](../../../AGENTS.md#elixir-navigation).
+3. The stack skills AGENTS.md names for the files you will change.
+4. The existing tests for the changed modules.
 
-Before building a custom mechanism, check existing code, built-in features, locked
-dependencies and commonly used libraries or tools. Prefer stable interfaces with
-behavior you can establish from documentation, source or a focused probe. Include verification,
-workarounds and future fixes in the integration and maintenance cost. Build your own
-only when none meets the requirements or that total cost exceeds building and
-maintaining your own. When you build your own, say what you checked and why in the PR.
+Reading beyond this list needs a reason you can state in one line. If the brief is
+missing something you need, post the question through the pair workflow and
+continue with the parts that do not depend on it.
 
-Before copying a nearby pattern, check it against the current contract and
-conventions. Repetition in the repository does not establish that a pattern is
-correct.
+The brief's decisions table is binding. Do not reopen a decision in code. Do not add
+capabilities the brief does not name.
 
-When the design depends on a dependency's behavior, verify the specific guarantee
-at the installed version and configuration. Link the supporting source in the PR.
-Similar names or examples do not establish equivalent behavior.
+## Code rules
 
-Follow applicable standards and language and framework idioms. Explain deviations
-in the PR. Use Ecto's query, changeset and migration DSLs; use raw SQL or `fragment`
-only for what they cannot express, and bind runtime values as parameters.
+Apply these in every change. Each has the smell that breaks it.
+
+- Pattern-match on the shape you expect. Let an unexpected shape fail at the
+  boundary. Smell: `nil` checks on every step of a function.
+- One error vocabulary per context: `{:ok, value}` and `{:error, reason}` with a
+  fixed set of reasons. Use `with` for multi-step fallible flows. Smell: a function
+  that returns `nil`, `false` and `{:error, _}` for different failures.
+- Validate and authorize where the request enters: the LiveView event, controller
+  action, channel handler or job. Inside, functions trust their arguments.
+  Authorize the action where it is received, even if mount already checked.
+  Smell: the same check at every layer.
+- LiveViews and controllers call context functions. They do not call `Repo`.
+  Smell: a query inside a `handle_event`.
+- One module writes each fact. Find the other copies of a rule, limit, enum or
+  label before changing it: constraints, migrations, helper text, fixtures, docs.
+  Update each one. Smell: two modules that update the same column.
+- Names say what the function does, including side effects. Arguments say which.
+  No option that changes behaviour. Smell: an `opts` list with five keys.
+- Functions fit on one screen. A module has one reason to change. Smell: a context
+  module with thirty public functions.
+- Reuse before invention: existing modules, Ecto, Oban and Phoenix features first.
+  A new process, cache, GenServer, scheduler or abstraction needs the load or
+  failure it answers, stated in the PR. Smell: a wrapper with one user.
+- Use Ecto's query, changeset and migration DSLs. Use raw SQL or `fragment` only
+  for what they cannot express. Bind runtime values as parameters.
+- When you rely on a dependency's behaviour, check it at the installed version and
+  link the source in the PR. A similar name does not prove the same behaviour.
+
+Credo, Dialyzer and the formatter own style. The stack skills own idiom.
+
+## Make breaks visible
+
+Moving fast is safe only if we notice breaks. This is the always-rule for
+implementation. A violation is a P1 in review.
+
+- Every `rescue`, `catch`, retry and fallback logs the record id and the reason at
+  `warning` or above.
+- No `_ -> :ok`, no `rescue _ -> nil`, no default value that hides a failure.
+- A job that fails raises or returns `{:error, reason}` so Oban retries and records
+  it. Do not swallow the error and return `:ok`.
+- Do not report "not found", "invalid input" or "success" unless the contract allows
+  it for that case.
 
 ## Trace the affected contract
 
-**When changing behavior or a function's return shape:** identify the required
-outcome and what must remain true. Find affected callers using the repository's
-navigation rules, and check the consequences through to the final state and effects.
-A correct handler result alone does not establish a correct outcome.
+When you change behaviour or a return shape: find every caller with Dexter
+`references` and scoped `rg`, and check the result through to the final state and
+side effects. A correct return value does not prove a correct outcome.
 
-**When adding a dependency between modules or domains:** respect documented
-ownership and dependency boundaries while choosing the simplest local
-implementation. A new feature alone does not justify a new layer or framework.
+When you refactor: keep observable behaviour the same except where the brief says
+otherwise. If existing behaviour conflicts with the brief, say so in the PR. Do not
+change the contract silently.
 
-**When changing a shared rule, stored fact or runtime state representation:** find
-its other representations.
-Limits, patterns, enums, labels, messages and filters can appear in constraints,
-migrations, helper text, documentation, fixtures and other runtimes. Copies of one
-rule may look different.
+## State and failure
 
-For that rule or fact, keep one authoritative source. Derive duplicate state rather
-than storing copies that can disagree; keep independent facts separate. When stored
-copies are necessary, define how they stay consistent. Update
-each representation affected by the requirement. Consolidate only when it simplifies
-this task or removes a concrete inconsistency, and that gain justifies the coupling
-and verification cost. Historical migrations are evidence to inspect, not
-automatically files to rewrite.
+### Delayed and concurrent work
 
-**When refactoring:** preserve existing observable behavior except for changes the
-task explicitly requires. If that behavior conflicts with a requirement, make the
-conflict explicit rather than silently changing the contract.
+Trigger: a job, process, async callback, mount or reconnect path, transaction, lock,
+retry, timeout, deadline, quota or limit.
 
-## Handle state and failure
-
-### Incoming actions
-
-**Trigger:** adding or changing a LiveView event handler, controller action, channel
-message handler or other entry point that receives input from a user or external
-system.
-
-Parse and validate untrusted input into a defined internal representation at the
-receiving boundary; reuse schema or SDK guarantees where they establish the needed
-contract. Do not spread guesses about data shapes through downstream code.
-Authorize the action where it is received, even if mount, an earlier step or another
-layer already checked. Earlier checks may be stale when the action runs.
-
-### State, resources and delayed work
-
-**Trigger:** adding or changing an async callback, process, job, mount or reconnect
-path, transaction, lock, OS process, retry, delayed action, timeout, deadline, quota
-or resource limit.
-
-Identify where the affected state can change and which transitions could break the
-requirement. Establish who owns each resource, who releases it and what survives
-the caller's exit.
-
-- Do not release capacity while the work it bounds still runs. Cancellation
-  requested does not mean work has stopped.
-- Before applying a result, establish that it still belongs to the current operation.
-  A read started before reconnect must not overwrite newer input.
-- Revalidate delayed or retried actions when their inputs or permissions may have
-  changed. Refresh or reject permanently invalid inputs rather than offering a
-  retry that cannot succeed.
-- Record completion only when the required work is done. Reuse production's success
-  decision; cleanup running is not evidence of success.
-- When adding or changing a timeout, retry, deadline, quota or resource limit: bound
-  the whole operation. Add up sequential work, retries, queueing, cleanup and work
-  that outlives the caller; a per-step timeout does not bound the operation.
-- For a shared deadline, quota or concurrency limit, define which results stop new
-  work and what happens to work already in progress.
+- Name who owns each resource, who releases it and what survives the caller's exit.
+- Do not release capacity while the work it bounds still runs. A cancel request does
+  not mean the work stopped.
+- Before applying a result, check it still belongs to the current operation. A read
+  started before reconnect must not overwrite newer input.
+- Revalidate a delayed or retried action: its inputs or permissions may have changed.
+- Record completion only when the work is done. Cleanup running is not success.
+- Bound the whole operation, not each step. Add up sequential work, retries,
+  queueing and cleanup.
+- For a shared deadline, quota or concurrency limit, say which results stop new work
+  and what happens to work in progress.
 
 ### Fallible boundaries
 
-**Trigger:** adding or changing a database, HTTP, provider, browser-storage, parser
-or OS call, or its result handling.
+Trigger: a database, HTTP, provider, storage, parser or OS call, or its result
+handling.
 
-Check relevant returns, exceptions, exits, timeouts, partial effects and required
-response fields. Handle each failure at the layer responsible for its recovery,
-preserving the distinctions that change recovery. Add a branch only when it changes
-the required response or recovery; otherwise let the existing error boundary handle
-it, after confirming it gives the needed behavior. Do not disguise an unexpected
-failure as a default value.
+- Check returns, exceptions, exits, timeouts, partial effects and required response
+  fields.
+- Handle each failure at the layer that can recover from it. Add a branch only when
+  it changes the response or the recovery. Otherwise let the existing error boundary
+  handle it, after checking that it does.
+- Every caller handles or propagates a new result shape. An unmatched error is a
+  crash or a wrong response.
+- Before a retry or rollback, establish what may already have committed. No response
+  does not prove failure. A local rollback does not undo an external effect.
 
-Every affected caller must handle or propagate a new result shape. An unmatched
-error can become a crash or the wrong response. Do not report "not found", "invalid
-input" or "success" unless the contract permits it.
+## Data changes
 
-Before retrying or rolling back, establish what may already have committed and what
-evidence can settle an uncertain outcome. No response does not prove failure; a
-local rollback does not undo an external effect.
+Schema and stored data are expensive to reverse.
 
-## Establish useful evidence
+- Migrations are additive. A destructive migration (drop, rename, narrow) goes in a
+  later PR after the code that stopped using the column has shipped.
+- Backfills are bounded and resumable: batches, a cursor, a stated page size.
+- Nothing is deleted from storage without a scenario in the brief that says so.
+- A new column or table needs the contract in the brief that writes it.
 
-When relying on a test or measurement, check that its setup reached the condition
-being claimed and that the observation distinguishes the required behavior from a
-plausible defect. An unexpectedly passing regression test is a cue to inspect both
-setup and expectation. Use the existing before/after result when it establishes the
-claim; add inspection, a reproduction, a control or a temporary mutation only to
-resolve a specific remaining doubt. Choose the cheapest adequate method.
+## Tests
 
-### Choose and maintain tests
+The brief's scenarios and contracts are the test list. The brief's test budget is
+the limit. The repository has more test lines than application lines; do not add
+to the ratio without a reason.
 
-Derive expected behavior from the requirement independently of the implementation.
-Code and tests can agree while both violate the requirement. Tests should allow
-another implementation that satisfies the same contract.
+Order of work:
 
-Cover acceptance scenarios and reported regressions with the smallest set of test
-changes. Do not add tests merely because functions, branches or inputs changed.
-The repository already has more test lines than application lines; the brief's
-scenarios and contracts are the test list and its test budget is the limit.
+1. Read the existing tests for the changed modules.
+2. Delete tests for behaviour this brief replaces. The brief names them.
+3. For each scenario, find an existing test that can cover it with the same setup
+   and action. Extend it. Add a new test only when none can.
+4. Write the scenario test before the implementation. Run it. It must fail for the
+   reason the scenario describes.
+5. Implement until it passes. Stop.
 
-- A test that maps to no scenario or contract line needs a one-line reason in the PR.
+Rules:
+
+- One to two tests per scenario. A test that maps to no scenario or contract line
+  needs a one-line reason in the PR.
 - Banned by default: combination grids over inputs, one test per error tuple, tests
   of private helpers, tests that restate a pattern match, tests of a constraint the
-  database already enforces, tests of cases that cannot happen.
-- Allowed without a brief line: one regression test per fixed bug; a race or property
-  test where the brief names a concurrency contract.
-- Two tests that fail for the same bug: keep one. When the change replaces behaviour,
-  delete the old tests in the same PR.
-Read existing tests first. Leave adequate coverage unchanged; update assertions for
-changed requirements; extend an existing test when it can cover the missing scenario
-with the same setup and action. Add a test only when none can cover the required
-scenario.
+  database enforces, tests of cases that cannot happen.
+- Allowed without a brief line: one regression test per fixed bug; one race or
+  property test where the brief names a concurrency contract.
+- Two tests that fail for the same bug: keep one.
+- Test through public entry points: the context function, the LiveView, the job.
+  Add a unit test only for pure logic a scenario test cannot reach. Add a browser
+  test only for an interaction lower-level tests cannot check.
+- Derive the expected result from the brief, not from the code. Code and tests can
+  agree and both be wrong.
+- A test proves a scenario only if its setup reached the condition and its assertion
+  would fail for a plausible defect. An unexpectedly passing test is a cue to inspect
+  setup and expectation.
+- A double may replace an external call. The production code responsible for the
+  claim must still run.
+- Wait for the event or observable state with a time limit. A sleep is not proof.
+  A timeout is not a pass.
+- When code and tests disagree, the brief decides which is wrong. Do not change a
+  fixture to make wrong behaviour pass.
 
-For new behavior or a regression, write or update the test before changing the
-implementation. Confirm that it fails for the expected reason.
+## Performance
 
-Use integration tests through public entry points. Add a unit test only for a
-pure-logic boundary case that integration tests do not cover. Add a browser test
-only for a user interaction that lower-level tests cannot check.
+Trigger: the brief states a bound, or the change adds work that grows with data: a
+query in a loop, a new preload, an unbounded result set, a transaction around an
+external call, work that outlives the caller.
 
-Test application behavior, including its use of dependencies. Do not test the
-framework itself, private functions or code structure.
+Name what grows and with what workload. Fix it with a filter, index, page or bound.
+Measure only when the brief states a bound or the cost could change the design;
+then read [performance measurement](references/performance-measurement.md) first.
+No stated bound and no growth: no measurement.
 
-Before adding or changing tests, weigh the relevant
-[Test Desiderata](https://testdesiderata.com/): isolated, composable, deterministic,
-fast, writable, readable, behavioral, structure-insensitive, automated, specific,
-predictive and inspiring.
+## Deferrals
 
-### Check the evidence produced by tests
+When the work reveals a problem the brief's budget does not cover:
 
-- **When using doubles:** keep the production code responsible for the claimed
-  property running. Otherwise, the test may verify only the substitute.
-- **When waiting for async behavior:** wait for the required event or observable
-  state with a time limit. A sleep does not prove completion; a timeout is not a pass.
-- **When code and tests disagree:** let the contract decide which is wrong. Do not
-  change fixtures merely to make incorrect behavior pass.
-- **When deleting or replacing tests:** first map still-required scenarios to
-  surviving coverage. Delete tests for obsolete requirements or those made unnecessary by the
-  change; preserve coverage of every acceptance scenario and regression that still
-  applies.
+- Do not fix it.
+- Add one line to the PR under `Deferrals`: the problem, the `path:line`, the
+  trigger that makes it worth fixing.
+- If it breaks a scenario or an always-rule, post a blocker instead.
 
-## Check performance claims and bounds
+## Bug fixes
 
-**Trigger:** any of the following:
+When a result contradicts the brief, or a review finding shows a defect: find the
+failed assumption before adding a condition. Check the other sites that share the
+assumption and fix them in the same PR. Verify the whole contract, not only the
+reported case.
 
-- A performance claim or observed regression.
-- A change to how work grows with data: a query inside a loop, a new preload, an
-  unbounded result set, a transaction wrapping an external call, parallel work or
-  work that outlives the caller.
-- A change to what the browser must load or do before content is visible or an
-  interaction completes: a new or reordered request, a critical-path asset or font,
-  payload size, client-side work on interaction or async content that moves the layout.
-
-The trigger selects the risk to assess, not a measurement of every changed asset.
-A performance claim or an uncertain cost that could change the design requires
-profiling; an ordinary bounded change with neither needs no measurement.
-
-Name the property at risk and the workload. Profile the suspected cost, not test-suite
-elapsed time. Before measuring, read the relevant part of
-[performance measurement](references/performance-measurement.md).
-
-For database work, check how query count and rows read or returned grow with data.
-Match filters, indexes and pagination to the access pattern. Keep transaction and
-lock lifetimes limited to the work that needs them, accounting for contention and
-connection occupancy.
-
-## Repair and refactor
-
-**When a result contradicts expectations, or a bug or review finding exposes a
-defect:** identify the failed assumption before adding another condition. Check
-other sites and transitions that depend on it, and repair those that share the
-defect. Verify the whole affected contract, including behavior the reported failure
-did not exercise.
-
-**When this task reveals repeated violations of one consequential invariant:** use
-an existing enforcement point where it covers the affected paths, fix the remaining
-violations and keep checks at each trust boundary. Add custom enforcement only
-within the task's scope and when preventing recurrence justifies its execution and
-maintenance cost; check the invariant itself and make failures name the rule and
-the correction.
-
-**When considering a refactor:** proceed only if the task requires it or the current
-implementation reveals an ownership, interface or state problem that materially
-complicates the required behavior or its verification. Name that problem and keep
-the revision within the affected flow. Inconsistency elsewhere or hypothetical reuse does not justify
-expanding the task. Preserve required behavior and verify each increment. Effort
-already spent is not a reason to retain an approach. Stop when the named problem is
-resolved and required verification passes.
+Refactor only when the brief requires it, or when the current shape blocks a
+scenario or its test. Name the blocking problem in the PR. Keep the refactor inside
+the affected flow. Stop when the problem is resolved.
 
 ## Finish
 
-Required behavior and checks remain required; a named verification gap does not
-satisfy a requirement.
+Done means: every scenario has its test, the tests pass, the
+[required checks](../../../AGENTS.md#checks) pass.
 
-Inspect the diff and affected callers for missed behavior. Remove additions whose
-absence would not break a requirement or make the solution harder to understand,
-change or operate. Update affected documentation and delete superseded code, files,
-documentation and tests in the same PR.
-
-Run the [required repository checks](../../../AGENTS.md#checks). Follow the existing
-blocker, [PR review](../../teams/README.md#pr-review-record) and handoff procedures.
-
-Record durable contracts and decision reasons in the repository documentation that
-owns them, linked from the relevant entry point; update it rather than creating
-competing instructions. Record task-specific trade-offs, open assumptions and
-verification limits in the PR or handoff so later work knows when to revisit them.
+- Inspect the diff. Remove anything whose absence would not fail a scenario or make
+  the code harder to read.
+- Delete superseded code, tests and docs in the same PR.
+- Update the docs the brief names. Do not add docs the brief did not ask for.
+- PR description: what you built, deferrals, decisions a reviewer could question,
+  checks that failed or were not run.
+- Hand off through the [pair workflow](../../teams/README.md).
