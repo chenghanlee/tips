@@ -601,9 +601,12 @@ defmodule TipsWeb.Editor do
     end
   end
 
+  # The selection changed: the deadline timer follows it before any read,
+  # which may never succeed.
   defp start_cycle(socket) do
     socket
     |> update(:video_cycle, &%{&1 | generation: &1.generation + 1, delay_ms: @status_delay_ms})
+    |> put_video_states([])
     |> run_cycle()
   end
 
