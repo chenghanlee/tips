@@ -1,4 +1,4 @@
-@AGENTS.md
+Read @AGENTS.md 
 
 ## Haiku delegation
 
