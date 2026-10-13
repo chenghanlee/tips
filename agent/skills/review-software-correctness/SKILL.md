@@ -1,100 +1,201 @@
 ---
 name: review-software-correctness
-description: Guides the tester's review of a tips PR, diff or commit for correctness against the brief: acceptance scenarios, contracts, inputs, state, trust, and the required checks. Excludes design quality, smells and test value, which review-software-design owns.
+description: Guides the tester's review of a tips PR for correctness against its brief. Covers the blast radius of the change, running the scenarios, a mutation check, data checks, the proof standard for findings, severity and the review record. Design quality, smells and test value belong to review-software-design.
 ---
 
 # Review software correctness
 
-You answer one question: does the change do what the brief says, and can we prove
-it. Design quality, smells, idiom and test value belong to
-[review-software-design](../review-software-design/SKILL.md); do not raise them
-here. Read [implement-software](../implement-software/SKILL.md) as the shared
-standard for contracts, state and failure; this skill adds review methods and
-probes. In a pair, the [tester role](../../teams/roles/tester.md) owns turn-taking,
-handoff and the merge; this skill owns what to inspect.
+You answer one question: does the change do what the brief says, on every path it
+touches, and can we prove it.
 
-## Establish scope
+Scope limits:
 
-Establish the reviewed head. Read the brief's acceptance scenarios and contracts,
-the diff against the base, changed files and their callers, existing tests and
-prior review threads. For a local review, use the user's brief in place of absent
-records. Record your observations before reading the PR description or another
-review.
+- Do not review design, smells, idiom or test value. That is
+  [review-software-design](../review-software-design/SKILL.md).
+- Do not ask for tests beyond the brief's scenarios.
+- A deferral in the brief or the PR is not a finding unless it breaks a scenario.
+- One pass. P1 findings have no cap. Stop at three P2 findings.
 
-## Acceptance scenarios
+The [tester role](../../teams/roles/tester.md) owns turns, handoff and the merge.
+[implement-software](../implement-software/SKILL.md) is the standard for
+contracts, state and failure. This skill owns what to inspect and what to run.
 
-Walk the brief's scenarios in order. For each one, name the test or the run that
-proves it, or mark it unproven. A scenario with no proof is a P1. Do not ask for
-more tests than the scenarios need; a scenario proven by one test is proven.
+## Step 1: Inputs
 
-Derive the expected result from the brief, not from the code or the test. Code and
-tests can agree while both violate the requirement.
+Collect, in this order:
 
-## Probes
+1. The brief: contracts, acceptance scenarios, test budget, decisions table.
+2. The head SHA you review. Record it.
+3. The diff against the PR base.
+4. The existing tests for each changed module.
+5. Prior review threads on the PR.
 
-Apply the probes the change makes relevant. Trace execution and data through
-unchanged callers and code that uses the results. For each suspected defect,
-identify the line and the input, state or sequence that triggers it.
+Write down your concerns before you read the PR description or another review.
+For a local review with no PR, use the user's brief and the working tree.
 
-- Behaviour: observable results, feedback and recovery for each reachable state,
-  including loading, empty, error, stale and conflict states; UI copy against the
-  glossary.
-- State and data: duplicate or out-of-order updates across tabs, reconnects and
-  timeouts; cancellation or restart after a write; migrations on existing rows;
-  submitted, stored, retried and displayed values compared. For jobs: stale inputs,
-  repeated effects under retry, and whether the business write and job insertion
-  commit together.
-- Contracts and boundaries: both sides of each
+## Step 2: Blast radius
+
+Find everything the change can affect, not only the changed lines.
+
+1. List each changed public function, schema, changeset, query, migration, config
+   key, PubSub topic, Oban queue or worker, shared test fixture and shared
+   component.
+2. For each item, find its users with Dexter `references` and scoped `rg`, as the
+   [navigation rules](../../../AGENTS.md#elixir-navigation) say. Investigate every
+   user that only one of them found.
+3. Repeat step 2 once for each user found. Stop after two levels.
+4. Collect the entry points reached: LiveViews, controllers, channels, jobs, other
+   contexts.
+
+Indirect reach counts:
+
+- A changeset change reaches every form and context that uses it.
+- A migration reaches every existing row.
+- A shared fixture or factory change reaches every test that uses it.
+- A config change reaches every environment that reads it.
+- A changed error tuple reaches every caller that matches on it.
+
+Write the list in the review body under `Blast radius`. An empty list is a claim;
+state how you checked it.
+
+## Step 3: Scenarios
+
+Walk the brief's scenarios in order. Fill one row per scenario:
+
+| Scenario | Proof | Status |
+|---|---|---|
+| number and title | test name, or the command you ran | proven, unproven or wrong |
+
+Rules:
+
+- Derive the expected result from the brief, not from the code or the test. Code
+  and tests can agree and both be wrong.
+- Run the test. Read its assertion. The test proves the scenario only if its setup
+  reached the condition and its assertion fails for a plausible defect.
+- A double may replace an external call. The production code responsible for the
+  claim must still run.
+- A sleep is not proof. A timeout is not a pass.
+- A scenario that names a user interaction is proven in the browser, following
+  [manual browser review](../../teams/README.md#manual-browser-review), or marked
+  unproven.
+- One test per scenario is enough. Do not ask for more.
+
+Unproven and wrong are P1.
+
+## Step 4: Mutation check
+
+Pick the scenario with the highest cost if wrong: data loss, money, access, or an
+external effect.
+
+1. Break the production code for that scenario. Invert a condition, drop a write,
+   return early.
+2. Run its test. It must fail.
+3. Revert the change. Confirm the working tree is clean.
+
+A test that still passes is a P1: the test does not prove the scenario. Record the
+mutation and the result in the review body.
+
+## Step 5: Affected paths
+
+For each entry point in the blast radius:
+
+1. Run its existing tests.
+2. Pick two or three probes from the list below that match what changed. Name them
+   in the review body.
+3. Trace one input from the entry point through the changed code to the final
+   state and side effects.
+
+Probes, by change type:
+
+- Behaviour: each reachable state has an observable result: loading, empty, error,
+  stale, conflict. UI copy matches the glossary.
+- State: duplicate or out-of-order updates across tabs, reconnects and timeouts;
+  cancel or restart after a write; stored, retried and displayed values compared.
+- Jobs: stale inputs on retry; repeated effects on retry; the business write and
+  the job insertion commit together.
+- Boundaries: both sides of each
   [affected contract](../implement-software/SKILL.md#trace-the-affected-contract)
-  and [fallible boundary](../implement-software/SKILL.md#fallible-boundaries),
-  including partial provider responses, exit status, release configuration and
-  readiness.
-- Inputs: accepted and rejected values at every entry point, including stored data
-  and boundary values: nil, empty, malformed, encoded identifiers, character versus
-  byte limits, duplicates, values at and past limits.
-- Trust: untrusted data traced into decisions and effects; identity, authorization
-  and sensitive data at each boundary; an id substituted; an operation replayed
-  after permissions change; untrusted content into HTML, URLs, providers or
-  commands; disclosure through output or logs.
+  and [fallible boundary](../implement-software/SKILL.md#fallible-boundaries);
+  partial provider responses; exit status.
+- Inputs: nil, empty, malformed, encoded identifiers, character versus byte
+  limits, duplicates, values at and past limits, stored data from before the
+  change.
+- Trust: an id substituted for another user's; an action replayed after
+  permissions changed; untrusted content into HTML, URLs, providers or commands;
+  sensitive data in output or logs.
+- Breaks visible: a `rescue`, `catch`, retry or fallback on an affected path that
+  swallows the error, returns a default, or logs without the record id.
 
-## Checks
+## Step 6: Data
 
-Run the [required checks](../../../AGENTS.md#checks) for the changed files in
-your own database and port. Report which passed, which failed with the failing
-lines only, and which you did not run: browser tests, real-provider tests, release
-smoke, migration rollback. CI results that did not run are not a pass.
+Only when the PR has a migration or changes stored data.
 
-A test proves a scenario only if its setup reached the condition and its assertion
-distinguishes the required behaviour from a plausible defect. When a double is
-used, the production code responsible for the claim must still run. A sleep does
-not prove completion.
+1. Run the migration on a database with existing rows, not an empty one.
+2. Read rows written before the change through the new code.
+3. Run the rollback.
+4. Check that a backfill is bounded and resumable.
 
-## Manual and browser review
+A failure in any step is P1.
 
-When the brief names a user interaction, run it in the browser as the
-[manual browser review](../../teams/README.md#manual-browser-review) describes.
-Otherwise say that no UI flow was reviewed.
+## Step 7: Checks
+
+Run the [required checks](../../../AGENTS.md#checks) for the changed files in your
+own database and port. Run the full test suite once, not only the changed files.
+
+- Rerun a failing test once. If it passes the second time, report it as flaky with
+  the test name. Do not hide it.
+- Report: which checks passed, which failed with the failing lines only, which you
+  did not run.
+- Not run by you: browser tests, real-provider tests, release smoke, migration
+  rollback. Say so for each.
+- A CI result that did not run is not a pass.
+
+## Proof standard
+
+A P1 needs one of:
+
+- A reproduction: the command, the input and the output.
+- A trace: `path:line` from the input through the code to the wrong result.
+
+Without one, file it as a P2 marked `suspected`, with what you tried.
+
+Say for every finding whether it came from a run or from reading.
 
 ## Severity
 
-Use the [severity table](../../teams/README.md#severity). A scenario that cannot
-pass, a missing or failing required check, or lost or corrupted data is P1 or P0.
-Everything else is P2 with the change you ask for.
+Use the [severity table](../../teams/README.md#severity).
+
+P1:
+
+- A scenario that is unproven, cannot pass, or passes for the wrong reason.
+- A required check that is missing or fails.
+- Lost or corrupted data; a migration or rollback that fails.
+- An unauthorized action or a security hole.
+- A swallowed error on an affected path.
+
+P2: everything else, each with the change you ask for. P0 as the table defines it.
 
 ## Review record
 
-Try to reproduce each suspected defect. Say which results came from executed
-checks and which from reading code. Cite the scenario or contract behind each
-finding, in the [finding format](../../../AGENTS.md#github): for wrong behaviour,
-the input, the actual result and the expected result.
-
 Submit the [PR review record](../../teams/README.md#pr-review-record): decision on
-line 1, your entry and session on line 2, one finding per inline comment. Report
-what you reviewed and what remains unproven. "No findings" is valid. Do not aim
-for a finding count.
+line 1, your entry and session on line 2, one finding per inline comment in the
+[finding format](../../../AGENTS.md#github).
+
+Review body, in this order:
+
+1. Head SHA.
+2. `Blast radius`: the list from step 2.
+3. `Scenarios`: the table from step 3.
+4. `Mutation`: what you broke and whether the test failed.
+5. `Ran`: the commands and checks you ran, with results.
+6. `Not run`: what you did not run and why.
+7. Findings outside the diff, each with `path:line`.
+
+"No findings" is valid when every scenario is proven and every step above is
+recorded.
 
 ## Merge
 
 Merge only as the [merge rule](../../teams/README.md#merge) allows: every required
 review is an LGTM on the head, every thread is resolved, the required checks pass.
-This skill does not authorize publishing a review or merging on its own.
+This skill does not authorize a review or a merge on its own.
