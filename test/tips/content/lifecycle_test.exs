@@ -219,6 +219,47 @@ defmodule Tips.Content.LifecycleTest do
   end
 
   for kind <- [:tip, :review] do
+    test "#{kind}: hide and restore leave attached media and cleanup jobs unchanged" do
+      kind = unquote(kind)
+      {_author, row} = content(kind)
+      video = attached_video_fixture(row, position: 0)
+      image = image_fixture(row, position: 1)
+      mod = scope(moderator!(user_fixture()))
+      before = Enum.map([video, image], &reload/1)
+
+      assert {:ok, %{outcome: :changed}} = Content.hide_content(mod, kind, row.id, 1, [])
+      assert Enum.map([video, image], &reload/1) == before
+      refute_enqueued(worker: CleanupMedia)
+
+      assert {:ok, %{outcome: :changed}} = Content.restore_content(mod, kind, row.id, 2, [])
+      assert Enum.map([video, image], &reload/1) == before
+      refute_enqueued(worker: CleanupMedia)
+    end
+  end
+
+  test "review deletion retires only the review's media" do
+    author = user_fixture()
+    reviewer = user_fixture()
+    tip = tip_fixture(author)
+    review = review_fixture(tip, user_id: reviewer.id)
+    tip_image = image_fixture(tip, position: 0)
+    review_image = image_fixture(review, position: 0)
+    review_video = attached_video_fixture(review, position: 1)
+    tip_image_before = reload(tip_image)
+
+    assert {:ok, %{state: :deleted, outcome: :changed}} =
+             Content.delete_content(scope(reviewer), :review, review.id)
+
+    for row <- [review_image, review_video] do
+      assert %{cleanup_at: %DateTime{}, position: nil} = reload(row)
+      assert_enqueued(worker: CleanupMedia, args: %{media_id: row.id})
+    end
+
+    assert reload(tip_image) == tip_image_before
+    assert [_, _] = all_enqueued(worker: CleanupMedia)
+  end
+
+  for kind <- [:tip, :review] do
     test "#{kind}: hide/restore guards version and reviewed reports without replaying publication" do
       kind = unquote(kind)
       {author, row} = content(kind)
