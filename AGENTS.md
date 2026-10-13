@@ -14,7 +14,7 @@
 
 ## Boundaries
 
-- Machine installs and machine or client settings need the user's action; propose the exact change. Locked repository dependencies and documented provisioning are allowed.
+- Ask the user before downloading, installing or upgrading any tool, library, runtime, browser or other software, in any location, including your home directory, a cache or `tmp/`. Say what, where, how large and why; wait for the answer. Machine and client settings also need the user's action; propose the exact change. The only exceptions: locked repository dependencies (`mix deps.get --check-locked`, `mix assets.setup`) and provisioning that `team.py` or the setup docs run.
 - Never put secrets in source, logs, issues, PRs, handoffs or chat.
 - Never push directly to `main`, edit another agent's work or reset its database.
 - Report a denied action with its exact error, secrets redacted. Follow the client's approval policy ([setup](agent/teams/SETUP.md#one-time-setup)); in a pair, follow the [blocker procedure](agent/teams/README.md#report-and-resolve-blockers). Do not bypass the denial.
