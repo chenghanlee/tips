@@ -483,7 +483,7 @@ defmodule Tips.Content do
   | Same-key retry | none |
   | Actual edit | `:content_version`, `:search_text`, `:media_changes`, `:media_cleanup_jobs` |
   | No-op edit | none |
-  | Author deletion | `:content_version`, `:report_resolution`, `:notification_removal` |
+  | Author deletion | `:content_version`, `:report_resolution`, `:notification_removal`, `:media_changes`, `:media_cleanup_jobs` |
   | Hide | `:content_version`, `:report_resolution` |
   | Restore | `:content_version` |
   | Unchanged deletion, hide or restore | none |
