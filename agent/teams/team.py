@@ -426,6 +426,10 @@ def load_config() -> tuple[Path, Config]:
         run("git", "-C", script.parent, "rev-parse", "--path-format=absolute", "--git-common-dir")
     )
     canonical = common.parent.resolve()
+    alternates = common / "objects/info/alternates"
+    if alternates.is_file():
+        # A reviewer's shared clone: the main checkout owns the config and records.
+        canonical = Path(alternates.read_text().strip()).resolve().parent.parent
     path = Path(os.environ.get("TIPS_TEAM_CONFIG", canonical / "agent/teams/config.toml"))
     with path.open("rb") as f:
         value = cast(Config, tomllib.load(f))
@@ -1360,12 +1364,17 @@ def caller_record() -> tuple[Record, str]:
     raise RuntimeError(f"This pane is {me or 'unnamed'}, not a launched client")
 
 
-def tester_message(record: Record, pr: str, url: str, head: str) -> str:
+def tester_message(record: Record, pr: str, url: str, head: str, failures: list[str]) -> str:
     implementer, tester = record["implementer"], record["tester"]
     testers, designers = current_roster(record)
     others = testers + designers
     pending = [e for e in others if e not in record["agents"]]
     message = f"Your turn: review {url} at {head}."
+    if failures:
+        message += (
+            f" The handoff could not notify {', '.join(failures)} of this head: notify "
+            "them with the PR URL and head, or report blocked if they are not running."
+        )
     if pending:
         # Reviewer worktrees need Git administration, so the dispatcher provisions them.
         commands = "; ".join(f"agent/teams/team.py review {pr} {e}" for e in pending)
@@ -1417,10 +1426,12 @@ def implementer_message(pr: str, url: str, problem: str | None) -> str:
     return message
 
 
-def notify_reviewers(record: Record, pr: str, url: str, head: str) -> None:
+def notify_reviewers(record: Record, pr: str, url: str, head: str) -> list[str]:
     """Tell each launched, currently required reviewer of this PR about the new head, so
-    none waits for the tester's LGTM. A reviewer that cannot be reached is reported."""
+    none waits for the tester's LGTM. Return one line per reviewer that could not be
+    reached, for the tester's handoff."""
     testers, designers = current_roster(record)
+    failures: list[str] = []
     for entry in testers + designers:
         allocation = record["agents"].get(entry)
         if allocation is None or allocation.get("pr") != pr:
@@ -1433,7 +1444,9 @@ def notify_reviewers(record: Record, pr: str, url: str, head: str) -> None:
             herdr("agent", "prompt", allocation["name"], notice)
             print(f"Notified {allocation['name']} of {head}")
         except RuntimeError as error:
+            failures.append(f"{allocation['name']} ({str(error).strip()})")
             print(f"Could not notify {allocation['name']}: {error}")
+    return failures
 
 
 def turn(pr: str, recipient: str) -> None:
@@ -1459,11 +1472,11 @@ def turn(pr: str, recipient: str) -> None:
     elif problem:
         raise RuntimeError(f"{problem} Commit and push, then hand over.")
     else:
-        message = tester_message(record, pr, url, head)
+        # Reviewers first: the tester's handoff names any that could not be reached.
+        failures = notify_reviewers(record, pr, url, head)
+        message = tester_message(record, pr, url, head, failures)
     partner = live_name(record["slot"], recipient)
     herdr("agent", "prompt", partner, message)
-    if recipient == record["tester"]:
-        notify_reviewers(record, pr, url, head)
     print(
         f"Notified {partner}. Stop using this worktree, build processes and files, "
         "and database; end your turn now."
@@ -1563,6 +1576,8 @@ def owned_worktrees(present: dict[str, Allocation]) -> set[Path]:
             try:
                 if root.parent != main / ".worktrees":
                     raise RuntimeError(f"unexpected checkout {root}")
+                if root.resolve() != Path(allocation["worktree"]).resolve():
+                    raise RuntimeError(f"{root} is not its checkout")
                 own_repository(root)
             except RuntimeError as error:
                 raise RuntimeError(f"{pane}: {error}; preserved") from error
@@ -1586,6 +1601,24 @@ def check_worktrees(roots: set[Path], merged: str) -> None:
             raise RuntimeError(
                 f"Unmerged worktree {root}; remaining resources preserved"
             ) from error
+        if not own_repository(root):
+            continue
+        # A clone's branches and stashes die with its .git; a worktree's live in main's.
+        refs = git(
+            "for-each-ref",
+            "--format=%(refname) %(objectname)",
+            "refs/heads",
+            "refs/stash",
+            root=root,
+        )
+        for line in refs.splitlines():
+            name, commit = line.split()
+            try:
+                git("merge-base", "--is-ancestor", commit, merged, root=root)
+            except RuntimeError as error:
+                raise RuntimeError(
+                    f"Unmerged {name} in {root}; remaining resources preserved"
+                ) from error
 
 
 def drop_databases(suffixes: list[str]) -> None:

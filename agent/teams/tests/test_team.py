@@ -1280,11 +1280,12 @@ class PairLifecycleTest(Harness):
         assert "When every required reviewer's latest review of this head is LGTM" in ring[3]
         assert "all threads are resolved and required checks pass" in ring[3]
         # Once the reviewer is launched, the handoff no longer asks for it: the handoff
-        # itself tells the reviewer about the head, without waiting for the tester's LGTM.
+        # itself tells the reviewer about the head, before the tester and without waiting
+        # for the tester's LGTM.
         self.team("review", "7", "critic")
         moved = self.push(wt, "second push")
         self.team("turn", "7", "tester", cwd=wt, pane=impl)
-        tester_ring, critic_ring = self.events("agent", "prompt")[-2:]
+        critic_ring, tester_ring = self.events("agent", "prompt")[-2:]
         assert tester_ring[2] == "team-1-tester"
         assert "review: run" not in tester_ring[3]
         assert critic_ring[2] == "team-1-critic"
@@ -1296,6 +1297,17 @@ class PairLifecycleTest(Harness):
         self.team("turn", "7", "impl", cwd=wt, pane=tester)
         assert len(self.events("agent", "prompt")) == prompts + 1
         assert self.events("agent", "prompt")[-1][2] == "team-1-impl"
+        # A reviewer that cannot be reached is named in the tester's handoff instead.
+        state = self.state()
+        critic_pane = next(x for x in state["panes"] if x.get("label") == "team-1-critic")
+        for key in ("agent", "name", "agent_status", "agent_session"):
+            critic_pane.pop(key, None)
+        self.save(state)
+        self.team("turn", "7", "tester", cwd=wt, pane=impl)
+        ring = self.events("agent", "prompt")[-1]
+        assert ring[2] == "team-1-tester"
+        assert "The handoff could not notify team-1-critic (" in ring[3]
+        assert "notify them with the PR URL and head, or report blocked" in ring[3]
         # The brief cannot move the merge-confirming tester under a running pair.
         prompts = len(self.events("agent", "prompt"))
         body = "Implementer: impl\nRequired reviews: second, critic\n"
@@ -1373,6 +1385,12 @@ class PairLifecycleTest(Harness):
         alternates = (wt / ".git/objects/info/alternates").read_text().strip()
         assert Path(alternates).resolve() == (self.repo / ".git/objects").resolve()
         assert self.git("remote", "get-url", "origin", cwd=wt) == str(self.repo)
+        # The clone's own copy of team.py still resolves records in the main checkout.
+        assert (wt / "agent/teams/team.py").is_file()
+        out = execute(
+            ["python3", str(wt / "agent/teams/team.py"), "stop", "99"], cwd=wt, env=self.env
+        )
+        assert "nothing removed" in out.stdout, out.stdout + out.stderr
         assert self.git("worktree", "list", "--porcelain").count("worktree ") == 2
         critic = self.pane("team-1-critic")
         assert critic["cwd"] == str(wt)
@@ -1574,7 +1592,27 @@ class PairLifecycleTest(Harness):
         refused = self.team("stop", "29", ok=False)
         assert f"Unmerged worktree {review}" in refused.stderr, refused.stderr
         assert self.git("rev-parse", "HEAD", cwd=review) == stray
+        # Work parked on a clone branch or stash would die with the clone's .git.
+        self.git("branch", "-q", "parked", stray, cwd=review)
         self.git("checkout", "-q", "--detach", "HEAD~1", cwd=review)
+        refused = self.team("stop", "29", ok=False)
+        assert f"Unmerged refs/heads/parked in {review}" in refused.stderr, refused.stderr
+        self.git("branch", "-q", "-D", "parked", cwd=review)
+        (review / "tracked.txt").write_text("stashed\n")
+        self.git("stash", "push", "-q", "-m", "parked", cwd=review)
+        refused = self.team("stop", "29", ok=False)
+        assert f"Unmerged refs/stash in {review}" in refused.stderr, refused.stderr
+        self.git("stash", "drop", "-q", cwd=review)
+        # A recorded pane whose shell sits in another checkout is not that checkout's owner.
+        state = self.state()
+        critic_pane = next(x for x in state["panes"] if x.get("label") == "team-1-critic")
+        critic_pane["cwd"] = str(self.worktree("29"))
+        self.save(state)
+        refused = self.team("stop", "29", ok=False)
+        assert "is not its checkout; preserved" in refused.stderr, refused.stderr
+        assert review.exists()
+        critic_pane["cwd"] = str(review)
+        self.save(state)
         self.team("stop", "29")
         assert not review.exists()
 
