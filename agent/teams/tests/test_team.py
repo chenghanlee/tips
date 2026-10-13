@@ -1385,12 +1385,22 @@ class PairLifecycleTest(Harness):
         alternates = (wt / ".git/objects/info/alternates").read_text().strip()
         assert Path(alternates).resolve() == (self.repo / ".git/objects").resolve()
         assert self.git("remote", "get-url", "origin", cwd=wt) == str(self.repo)
-        # The clone's own copy of team.py still resolves records in the main checkout.
-        assert (wt / "agent/teams/team.py").is_file()
-        out = execute(
-            ["python3", str(wt / "agent/teams/team.py"), "stop", "99"], cwd=wt, env=self.env
+        # The clone's own board.py, run from the reviewer's pane without --as or --role,
+        # finds the allocation record in the main checkout and posts as the reviewer.
+        posted = execute(
+            ["python3", str(wt / "agent/teams/board.py"), "post", "29", "FINDING"],
+            cwd=wt,
+            env=dict(
+                self.env,
+                HERDR_PANE_ID=self.pane("team-1-critic")["pane_id"],
+                PYTHONDONTWRITEBYTECODE="1",  # the fixture .gitignore lacks __pycache__
+            ),
+            input_text="Posted from the clone\n",
         )
-        assert "nothing removed" in out.stdout, out.stdout + out.stderr
+        assert posted.returncode == 0, posted.stdout + posted.stderr
+        assert self.comments("29")[-1]["body"] == (
+            "FINDING designer team-1-critic session-team-1-critic\nPosted from the clone"
+        )
         assert self.git("worktree", "list", "--porcelain").count("worktree ") == 2
         critic = self.pane("team-1-critic")
         assert critic["cwd"] == str(wt)
