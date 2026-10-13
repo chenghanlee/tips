@@ -20,6 +20,11 @@
 // ignored.
 // Autosave starts once recovery settles.
 //
+// The page renders the current attachment selection in data-editor-record on
+// every change. A save writes the selection rendered at that moment, and a
+// rendered selection that differs from the last one schedules a save like
+// typing does.
+//
 // After a submit fails validation (editor:refused), the hook opens the
 // evidence disclosure when it holds an invalid field and focuses the error
 // summary. A summary link focuses its field.
@@ -86,6 +91,8 @@ export const EditorDraft = {
     // A submission whose outcome the page has not settled.
     this.unsettled = false
     this.typed = !sameAttrs(readAttrs(this.el, this.kind), this.record.intent.attrs, this.kind)
+    // The selection last rendered by the page, as JSON.
+    this.uploads = renderedUploads(this.el)
     this.onInput = () => {
       this.typed = true
       this.schedule()
@@ -103,6 +110,16 @@ export const EditorDraft = {
       this.unsettled = unresolved
     })
     load(this.record.storage).then((result) => this.settleRead(result))
+  },
+
+  // A new selection is input. The record a restore renders is not.
+  updated() {
+    const uploads = renderedUploads(this.el)
+    if (uploads === this.uploads) return
+    this.uploads = uploads
+    if (this.phase === "restoring") return
+    this.typed = true
+    this.schedule()
   },
 
   disconnected() {
@@ -263,7 +280,8 @@ export const EditorDraft = {
   // Creates the slot's draft at revision 0, then saves under the pair it holds.
   async write(attrs) {
     const draft = this.expected ?? {draft_id: this.record.draft.draft_id, revision: 0}
-    const record = {...this.record, draft, intent: {attrs, uploads: this.record.intent.uploads}}
+    const uploads = JSON.parse(renderedUploads(this.el))
+    const record = {...this.record, draft, intent: {attrs, uploads}}
     const result =
       this.expected === null ? await create(record) : await save(record.storage, this.expected, record)
     if (this.phase === "destroyed") return result
@@ -393,6 +411,8 @@ function readAttrs(form, kind) {
     ? {...attrs, model_id: null, model_other: attrs.model_other ?? ""}
     : {...attrs, model_other: null}
 }
+
+const renderedUploads = (form) => JSON.stringify(JSON.parse(form.dataset.editorRecord).intent.uploads)
 
 // The form renders null as an empty field.
 const sameAttrs = (a, b, kind) => FIELDS[kind].every((field) => (a[field] ?? "") === (b[field] ?? ""))

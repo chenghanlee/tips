@@ -10,8 +10,8 @@ defmodule Tips.Content.PublicationConcurrencyTest do
 
   alias Tips.Accounts.{Scope, User}
   alias Tips.Content
-  alias Tips.Content.{Model, Notification, Review, Tag, Tip, Vote}
   alias Tips.Content.Media.Asset
+  alias Tips.Content.{Model, Notification, Review, Tag, Tip, Vote}
   alias Tips.R2Stub
   alias Tips.Repo
 

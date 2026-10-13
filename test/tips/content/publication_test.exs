@@ -4,10 +4,10 @@ defmodule Tips.Content.PublicationTest do
   alias Tips.Accounts.Scope
   alias Tips.AdmissionLimiter
   alias Tips.Content
-  alias Tips.Content.{Notification, Review, Tag, Tip, Vote}
   alias Tips.Content.Media.Asset
-  alias Tips.R2Stub
+  alias Tips.Content.{Notification, Review, Tag, Tip, Vote}
   alias Tips.Content.Search.Embeddings
+  alias Tips.R2Stub
 
   import ExUnit.CaptureLog
   import Tips.AccountsFixtures

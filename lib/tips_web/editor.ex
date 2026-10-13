@@ -6,12 +6,18 @@ defmodule TipsWeb.Editor do
   `assets/js/editor_draft.js`.
 
   The page assigns `:identity`, `:record`, `:attrs`, `:form`, `:check`,
-  `:pending`, `:receipt`, `:saved`, `:refusal` and `:outcome`:
+  `:pending`, `:receipt`, `:saved`, `:refusal`, `:outcome`, `:images` and
+  `:attached`, and allows the `:images` upload:
 
     * `:record` is the draft the page was mounted, restored or recovered with.
       It holds the submission key, the edit base and expected version, and
-      after a submit the submitted values. The hook owns the browser revision
-      after its first save and never writes it back to the page.
+      after a submit the submitted values. Its selection is the page's
+      current one: a selected file is a `missing_image` descriptor, and
+      Remove drops an entry. The hook owns the browser revision after its
+      first save and never writes it back to the page.
+    * `:images` maps each image slot to its selected upload entry. A file
+      selected while a slot awaits reselection binds to that slot; a
+      replacement keeps its slot. `:attached` is each saved attachment's kind.
     * `:attrs` are the current field values, exactly as typed. `phx-change`
       keeps them in step with the browser. It validates only after a submit
       failed validation; `:check` holds that submit's values and errors.
@@ -24,12 +30,13 @@ defmodule TipsWeb.Editor do
       whose browser draft was kept.
 
   A submit validates the whole form with `Tips.Content.change_content/2`,
-  readmits the session, then publishes or saves. A `:created`,
-  `:existing_equivalent`, `:updated` or `:noop` receipt pushes `editor:clear`;
+  readmits the session, then publishes or saves with each slot's uploaded
+  file. Entries are consumed only with a `:created`, `:existing_equivalent`,
+  `:updated` or `:noop` receipt, which then pushes `editor:clear`;
   once the hook has cleared the submitted draft, the page leaves for the
   published item; the hook leaves by itself if that reply is lost. If other
-  browser work kept the draft, the page stays. Any other receipt keeps the
-  draft. An unknown outcome runs one lookup:
+  browser work kept the draft, the page stays. Any other result keeps the
+  draft and the selected files, for a retry with the same key. An unknown outcome runs one lookup:
   `Tips.Content.get_publication/4` for a publication, `get_edit_form/3` for an
   edit, which shows the saved version beside the proposal and keeps the
   expected version. A restored new draft is looked up before it is applied.
@@ -69,6 +76,8 @@ defmodule TipsWeb.Editor do
 
     socket
     |> assign_identity(target)
+    |> assign(:attached, %{})
+    |> allow_images()
     |> assign_record(%{
       storage: %{account_id: account_id(socket), slot: target},
       draft: %{draft_id: key, revision: 0},
@@ -87,11 +96,13 @@ defmodule TipsWeb.Editor do
   """
   @spec assign_edit(Phoenix.LiveView.Socket.t(), Content.edit_form()) ::
           Phoenix.LiveView.Socket.t()
-  def assign_edit(socket, %{kind: kind, id: id, base: base, edit_version: version}) do
+  def assign_edit(socket, %{kind: kind, id: id, base: base, edit_version: version} = form) do
     target = {:edit, kind, id}
 
     socket
     |> assign_identity(target)
+    |> assign(:attached, Map.new(form.media, &{&1.id, &1.kind}))
+    |> allow_images()
     |> assign_record(%{
       storage: %{account_id: account_id(socket), slot: target},
       draft: %{draft_id: Ecto.UUID.generate(), revision: 0},
@@ -112,13 +123,25 @@ defmodule TipsWeb.Editor do
       receipt: nil,
       saved: nil,
       refusal: nil,
-      outcome: nil
+      outcome: nil,
+      images: %{}
+    )
+  end
+
+  # One image per submission; the page owns each file until its content is confirmed.
+  defp allow_images(socket) do
+    LiveView.allow_upload(socket, :images,
+      accept: ~w(.png .jpg .jpeg .webp .gif),
+      max_entries: 1,
+      max_file_size: 10_000_000,
+      auto_upload: false
     )
   end
 
   defp assign_record(socket, record) do
     socket
     |> assign(:record, record)
+    |> bind_images()
     |> assign_attrs(record.intent.attrs)
   end
 
@@ -147,8 +170,11 @@ defmodule TipsWeb.Editor do
   @doc """
   Handles the editor form's events and the `EditorDraft` hook's:
 
-    * `"change"` keeps the typed values; it validates changed fields only
-      after a submit failed validation.
+    * `"change"` keeps the typed values, image descriptions and selected
+      files; it validates changed fields only after a submit failed
+      validation.
+    * `"remove_attachment"` drops an image slot (`"slot"`), cancelling its
+      file, or a saved attachment (`"media_id"`) from the selection.
     * `"submit"` publishes or saves (see the module documentation).
     * `"editor:restore"` applies the record the hook read, replying
       `restored`, `published` (its publication was already confirmed, so the
@@ -162,6 +188,7 @@ defmodule TipsWeb.Editor do
           {:noreply, LiveView.Socket.t()} | {:reply, map(), LiveView.Socket.t()}
   def handle_event("change", params, socket), do: {:noreply, change(socket, params)}
   def handle_event("submit", params, socket), do: {:noreply, submit(socket, params)}
+  def handle_event("remove_attachment", params, socket), do: {:noreply, remove(socket, params)}
 
   def handle_event("editor:restore", params, socket) do
     {reply, socket} = restore(socket, params)
@@ -186,7 +213,98 @@ defmodule TipsWeb.Editor do
 
   defp change(socket, params) do
     kind = kind(socket.assigns.identity.target)
-    assign_attrs(socket, typed_attrs(kind, params[Atom.to_string(kind)], socket.assigns.attrs))
+
+    socket
+    |> update(:record, &describe_images(&1, params["image_descriptions"]))
+    |> bind_images()
+    |> assign_attrs(typed_attrs(kind, params[Atom.to_string(kind)], socket.assigns.attrs))
+  end
+
+  defp describe_images(%{intent: %{uploads: [_ | _] = uploads}} = record, descriptions)
+       when is_map(descriptions) do
+    uploads =
+      Enum.map(uploads, fn
+        {:missing_image, slot, image} when is_binary(:erlang.map_get(slot, descriptions)) ->
+          {:missing_image, slot, %{image | description: descriptions[slot]}}
+
+        upload ->
+          upload
+      end)
+
+    put_in(record.intent.uploads, uploads)
+  end
+
+  defp describe_images(record, _descriptions), do: record
+
+  # Binds each selected file to an image slot: its own, else the first slot
+  # awaiting reselection, else a new slot at the end. The slot's descriptor
+  # follows its file and keeps its description. A selection the page cannot
+  # know (`nil`) takes no files.
+  defp bind_images(%{assigns: %{record: %{intent: %{uploads: nil}}}} = socket), do: socket
+
+  defp bind_images(socket) do
+    entries = socket.assigns.uploads.images.entries
+
+    refs =
+      Map.filter(socket.assigns.images, fn {_slot, ref} ->
+        Enum.any?(entries, &(&1.ref == ref))
+      end)
+
+    free = Enum.reject(entries, &(&1.ref in Map.values(refs)))
+
+    {uploads, {refs, free}} =
+      Enum.map_reduce(socket.assigns.record.intent.uploads, {refs, free}, fn
+        {:missing_image, slot, image}, {refs, [entry | free]} when not is_map_key(refs, slot) ->
+          {{:missing_image, slot, image(entry, image.description)},
+           {Map.put(refs, slot, entry.ref), free}}
+
+        upload, acc ->
+          {upload, acc}
+      end)
+
+    {added, refs} =
+      Enum.map_reduce(free, refs, fn entry, refs ->
+        slot = Ecto.UUID.generate()
+        {{:missing_image, slot, image(entry, nil)}, Map.put(refs, slot, entry.ref)}
+      end)
+
+    socket
+    |> assign(:images, refs)
+    |> update(:record, &put_in(&1.intent.uploads, uploads ++ added))
+  end
+
+  defp image(entry, description) do
+    %{
+      filename: entry.client_name,
+      type: entry.client_type,
+      size: entry.client_size,
+      description: description
+    }
+  end
+
+  defp remove(socket, %{"slot" => slot}) do
+    socket =
+      case socket.assigns.images do
+        %{^slot => ref} -> LiveView.cancel_upload(socket, :images, ref)
+        _unbound -> socket
+      end
+
+    socket
+    |> update(:images, &Map.delete(&1, slot))
+    |> drop_upload(&match?({:missing_image, ^slot, _image}, &1))
+  end
+
+  defp remove(socket, %{"media_id" => id}) do
+    drop_upload(socket, fn
+      {:retained, media_id, _description} -> Integer.to_string(media_id) == id
+      _other -> false
+    end)
+  end
+
+  defp drop_upload(socket, removed?) do
+    update(socket, :record, fn record ->
+      update_in(record.intent.uploads, &Enum.reject(&1, removed?))
+    end)
   end
 
   # Validates every field, including untouched ones, then readmits the session
@@ -219,7 +337,8 @@ defmodule TipsWeb.Editor do
     socket = fix(socket, attrs)
 
     with {:ok, socket} <- UserAuth.readmit(socket),
-         {:ok, receipt} <- save(socket.assigns.current_scope, socket.assigns.record) do
+         {:ok, receipt} <-
+           save(socket.assigns.current_scope, socket.assigns.record, files(socket)) do
       acknowledge(socket, receipt)
     else
       {:error, %Ecto.Changeset{errors: errors}} ->
@@ -237,24 +356,52 @@ defmodule TipsWeb.Editor do
   # a retry and reconnect recovery.
   defp fix(socket, attrs), do: update(socket, :record, &put_in(&1.intent.attrs, attrs))
 
-  defp save(scope, %{target: :new_tip, submission_key: key} = record),
-    do: Content.publish_tip(scope, key, record.intent.attrs, uploads(record))
+  defp save(scope, %{target: :new_tip, submission_key: key} = record, files),
+    do: Content.publish_tip(scope, key, record.intent.attrs, uploads(record, files))
 
-  defp save(scope, %{target: {:new_review, tip_id}, submission_key: key} = record),
-    do: Content.publish_review(scope, tip_id, key, record.intent.attrs, uploads(record))
+  defp save(scope, %{target: {:new_review, tip_id}, submission_key: key} = record, files),
+    do: Content.publish_review(scope, tip_id, key, record.intent.attrs, uploads(record, files))
 
-  defp save(scope, %{target: {:edit, :tip, id}, expected_version: version} = record),
-    do: Content.edit_tip(scope, id, version, record.intent.attrs, uploads(record))
+  defp save(scope, %{target: {:edit, :tip, id}, expected_version: version} = record, files),
+    do: Content.edit_tip(scope, id, version, record.intent.attrs, uploads(record, files))
 
-  defp save(scope, %{target: {:edit, :review, id}, expected_version: version} = record),
-    do: Content.edit_review(scope, id, version, record.intent.attrs, uploads(record))
+  defp save(scope, %{target: {:edit, :review, id}, expected_version: version} = record, files),
+    do: Content.edit_review(scope, id, version, record.intent.attrs, uploads(record, files))
 
-  # Browser image metadata never proves saved bytes.
-  defp uploads(%{intent: %{uploads: nil}}), do: nil
-  defp uploads(%{intent: %{uploads: uploads}}), do: Enum.map(uploads, &attachment/1)
+  # The uploaded file of each bound slot. The entries stay until a confirmed
+  # receipt consumes them, so a retry sends them again. An entry that never
+  # uploaded, such as a rejected one, leaves its slot missing.
+  defp files(socket) do
+    slots = Map.new(socket.assigns.images, fn {slot, ref} -> {ref, slot} end)
+    {done, _not_uploaded} = LiveView.uploaded_entries(socket, :images)
 
-  defp attachment({:missing_image, slot, _image}), do: {:missing_image, slot}
-  defp attachment(media), do: media
+    for %{ref: ref} = entry <- done, Map.has_key?(slots, ref), into: %{} do
+      LiveView.consume_uploaded_entry(socket, entry, fn %{path: path} ->
+        {:postpone, {slots[ref], %{path: path, filename: entry.client_name}}}
+      end)
+    end
+  end
+
+  defp consume_files(socket) do
+    {done, _not_uploaded} = LiveView.uploaded_entries(socket, :images)
+    Enum.each(done, &LiveView.consume_uploaded_entry(socket, &1, fn _file -> {:ok, nil} end))
+    socket
+  end
+
+  # Browser image metadata never proves saved bytes; only a page file does.
+  defp uploads(%{intent: %{uploads: nil}}, _files), do: nil
+
+  defp uploads(%{intent: %{uploads: uploads}}, files),
+    do: Enum.map(uploads, &attachment(&1, files))
+
+  defp attachment({:missing_image, slot, image}, files) do
+    case files do
+      %{^slot => file} -> {:image_file, slot, file, image.description}
+      _missing -> {:missing_image, slot}
+    end
+  end
+
+  defp attachment(media, _files), do: media
 
   defp invalid(socket, errors) do
     socket
@@ -267,7 +414,7 @@ defmodule TipsWeb.Editor do
   defp acknowledge(socket, %{outcome: outcome} = receipt)
        when outcome in [:created, :existing_equivalent, :updated, :noop] do
     %{storage: storage, draft: %{draft_id: draft_id}} = socket.assigns.record
-    socket = confirm(socket, receipt)
+    socket = socket |> consume_files() |> confirm(receipt)
 
     LiveView.push_event(socket, "editor:clear", %{
       storage: storage_json(storage),
@@ -297,7 +444,7 @@ defmodule TipsWeb.Editor do
         socket.assigns.current_scope,
         publication_kind(record.target),
         record.submission_key,
-        %{attrs: record.intent.attrs, uploads: uploads(record)}
+        %{attrs: record.intent.attrs, uploads: uploads(record, %{})}
       )
     end
   end
@@ -498,6 +645,7 @@ defmodule TipsWeb.Editor do
          {:ok, record} <- own_record(socket, json) do
       socket
       |> assign(:record, record)
+      |> bind_images()
       |> assign_attrs(typed_attrs(kind, params[Atom.to_string(kind)], record.intent.attrs))
     else
       _ -> socket
@@ -604,22 +752,42 @@ defmodule TipsWeb.Editor do
   end
 
   @doc """
-  Renders the optional Prompt and Result disclosure, open when either holds
-  text. The `EditorDraft` hook opens it when a restored draft has evidence.
+  Renders the optional Prompt and Result disclosure with the image
+  selection, open when either text field holds text or something is
+  selected. The `EditorDraft` hook opens it when a restored draft has
+  evidence. Each selected or restored image shows its file name and size, its
+  description and Remove; a slot without a file asks for it again. Saved
+  attachments of an edit show Remove. Errors of the last refused submit and
+  of a rejected file show beside their item.
   """
   attr :form, Phoenix.HTML.Form, required: true
   attr :id, :string, required: true
+  attr :upload, Phoenix.LiveView.UploadConfig, required: true
+  attr :selection, :list, required: true, doc: "the record's selection; `nil` when unknown"
+  attr :images, :map, required: true, doc: "image slot to upload entry ref"
+  attr :attached, :map, required: true, doc: "saved attachment id to kind"
 
   def evidence_fields(assigns) do
+    entries = Map.new(assigns.upload.entries, &{&1.ref, &1})
+    selection = assigns.selection || []
+
+    items =
+      for upload <- selection,
+          item = attachment_item(upload, assigns, entries),
+          do: item
+
     assigns =
-      assign(
-        assigns,
-        :open,
-        Enum.any?([:prompt, :output], &(assigns.form[&1].value not in [nil, ""]))
+      assign(assigns,
+        items: items,
+        open:
+          selection != [] or
+            Enum.any?([:prompt, :output], &(assigns.form[&1].value not in [nil, ""])),
+        summary: summary(length(selection)),
+        invalid: Keyword.has_key?(assigns.form.errors, :uploads) && "true"
       )
 
     ~H"""
-    <TipsWeb.UI.disclosure id={@id} open={@open} summary="Prompt and result">
+    <TipsWeb.UI.disclosure id={@id} open={@open} summary={@summary}>
       <TipsWeb.UI.field
         field={@form[:prompt]}
         type="textarea"
@@ -634,9 +802,124 @@ defmodule TipsWeb.Editor do
         label="Result text (optional)"
         helper="Up to 10,000 characters. Shown exactly as you type it."
       />
+      <ol :if={@items != []} id={"#{@id}-attachments"} aria-label="Attachments" class="grid gap-3">
+        <li :for={item <- @items} id={item.id} class="grid gap-2 rounded-md border p-3">
+          <p class="text-sm">
+            <strong id={"#{item.id}-name"}>{item.name}</strong>
+            <span :if={item.size}>· {item.size}</span>
+          </p>
+          <p :if={item.note} class="text-sm text-muted-foreground">{item.note}</p>
+          <p :for={error <- item.errors} class="text-sm font-medium text-destructive">{error}</p>
+          <div :if={item.slot} class="grid gap-1">
+            <label for={"#{item.id}-description"} class="text-sm font-medium">
+              Image description (optional)
+            </label>
+            <input
+              type="text"
+              id={"#{item.id}-description"}
+              name={"image_descriptions[#{item.slot}]"}
+              value={item.description}
+              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50"
+            />
+          </div>
+          <p :if={!item.slot && item.description} class="text-sm">
+            Description: {item.description}
+          </p>
+          <div>
+            <TipsWeb.UI.button
+              type="button"
+              variant="outline"
+              phx-click="remove_attachment"
+              {item.remove}
+              aria-describedby={"#{item.id}-name"}
+            >
+              Remove
+            </TipsWeb.UI.button>
+          </div>
+        </li>
+      </ol>
+      <div class="grid gap-1">
+        <label for={@upload.ref} class="text-sm font-medium">Add an image (optional)</label>
+        <.live_file_input
+          upload={@upload}
+          aria-describedby={"#{@id}-image-help"}
+          aria-invalid={@invalid}
+          class="text-sm"
+        />
+        <p id={"#{@id}-image-help"} class="text-sm text-muted-foreground">
+          PNG, JPEG, WebP or GIF up to 10 MB.
+        </p>
+        <p
+          :for={error <- upload_errors(@upload)}
+          class="text-sm font-medium text-destructive"
+        >
+          {file_error(error)}
+        </p>
+      </div>
     </TipsWeb.UI.disclosure>
     """
   end
+
+  defp summary(0), do: "Prompt and result"
+  defp summary(1), do: "Prompt and result · 1 attachment"
+  defp summary(count), do: "Prompt and result · #{count} attachments"
+
+  defp attachment_item({:missing_image, slot, image}, assigns, entries) do
+    entry = entries[assigns.images[slot]]
+    id = "#{assigns.id}-image-#{slot}"
+
+    %{
+      id: id,
+      slot: slot,
+      name: image.filename,
+      size: size(image.size),
+      description: image.description,
+      note: if(entry, do: nil, else: "Select this image again to attach it."),
+      errors:
+        Enum.map(entry_errors(assigns.upload, entry), &"#{image.filename} #{file_error(&1)}.") ++
+          submit_errors(assigns.form, image.filename, slot: slot),
+      remove: ["phx-value-slot": slot]
+    }
+  end
+
+  defp attachment_item({:retained, media_id, description}, assigns, _entries) do
+    name =
+      case assigns.attached[media_id] do
+        :image -> "Saved image"
+        :video -> "Saved video"
+        nil -> "Saved attachment"
+      end
+
+    %{
+      id: "#{assigns.id}-media-#{media_id}",
+      slot: nil,
+      name: name,
+      size: nil,
+      description: description,
+      note: nil,
+      errors: submit_errors(assigns.form, name, media_id: media_id),
+      remove: ["phx-value-media_id": media_id]
+    }
+  end
+
+  # The editor selects no staged videos yet.
+  defp attachment_item(_upload, _assigns, _entries), do: nil
+
+  defp entry_errors(_upload, nil), do: []
+  defp entry_errors(upload, entry), do: upload_errors(upload, entry)
+
+  defp submit_errors(form, name, [{key, value}]) do
+    for {:uploads, {_message, keys} = error} <- form.errors, keys[key] == value do
+      "#{name} #{CoreComponents.translate_error(error)}."
+    end
+  end
+
+  defp file_error(:too_large), do: "is larger than 10 MB"
+  defp file_error(:not_accepted), do: "is not a PNG, JPEG, WebP or GIF"
+  defp file_error(:too_many_files), do: "Remove the selected image before adding another."
+
+  defp size(bytes) when bytes < 1_000_000, do: "#{max(div(bytes, 1000), 1)} KB"
+  defp size(bytes), do: "#{Float.round(bytes / 1_000_000, 1)} MB"
 
   @doc """
   Renders the error summary of the last refused submit: one link per error,
