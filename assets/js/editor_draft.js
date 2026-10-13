@@ -23,7 +23,9 @@
 // The page renders the current attachment selection in data-editor-record on
 // every change. A save writes the selection rendered at that moment, and a
 // rendered selection that differs from the last one schedules a save like
-// typing does.
+// typing does. One that arrives while a submit awaits the page's answer waits
+// for it, so it cannot replace the revision a confirmed receipt clears; it is
+// saved if the draft stays.
 //
 // After a submit fails validation (editor:refused), the hook opens the
 // evidence disclosure when it holds an invalid field and focuses the error
@@ -90,6 +92,9 @@ export const EditorDraft = {
     this.destination = null
     // A submission whose outcome the page has not settled.
     this.unsettled = false
+    // A submit awaits the page's answer; a selection change meanwhile waits for it.
+    this.submitting = false
+    this.deferred = false
     this.typed = !sameAttrs(readAttrs(this.el, this.kind), this.record.intent.attrs, this.kind)
     // The selection last rendered by the page, as JSON.
     this.uploads = renderedUploads(this.el)
@@ -108,6 +113,11 @@ export const EditorDraft = {
     this.handleEvent(EDITOR_EVENTS.clear, (request) => this.clearSubmitted(request))
     this.handleEvent(EDITOR_EVENTS.settled, ({unresolved}) => {
       this.unsettled = unresolved
+      this.submitting = false
+      if (this.deferred) {
+        this.deferred = false
+        this.schedule()
+      }
     })
     load(this.record.storage).then((result) => this.settleRead(result))
   },
@@ -119,7 +129,8 @@ export const EditorDraft = {
     this.uploads = uploads
     if (this.phase === "restoring") return
     this.typed = true
-    this.schedule()
+    if (this.submitting) this.deferred = true
+    else this.schedule()
   },
 
   disconnected() {
@@ -306,6 +317,7 @@ export const EditorDraft = {
   // An unrestored or unreadable editor holds no revision.
   submitted() {
     this.unsettled = true
+    this.submitting = true
     if (this.phase !== "composing") {
       const status = this.phase === "paused" && this.kept ? "conflict" : "none"
       this.submission = Promise.resolve({status, pair: null})
@@ -349,8 +361,9 @@ export const EditorDraft = {
       return
     }
     this.phase = "cleared"
+    // A navigation across live sessions reloads the page and answers null.
     this.pushEvent(EDITOR_EVENTS.cleared, {status}).then(
-      ({left}) => left || this.leave(),
+      (reply) => reply?.left || this.leave(),
       () => this.leave(),
     )
   },

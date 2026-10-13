@@ -19,6 +19,7 @@ defmodule TipsWeb.EditorTest do
   import Tips.VisibilityFixtures
   import TipsWeb.ReaderPageHelpers
 
+  alias Phoenix.LiveView.{UploadConfig, UploadEntry}
   alias Tips.Accounts.{Scope, UserToken}
   alias Tips.Content
   alias Tips.Content.Media.{Asset, R2}
@@ -26,6 +27,7 @@ defmodule TipsWeb.EditorTest do
   alias Tips.R2Stub
   alias Tips.Repo
   alias Tips.Workers.CleanupMedia
+  alias TipsWeb.Editor
 
   @png Path.expand("../../fixtures/images/static.png", __DIR__)
 
@@ -605,10 +607,43 @@ defmodule TipsWeb.EditorTest do
 
       refute_push_event(lv, "editor:clear", _)
       assert text(html, "#{form_id}-refusal") =~ "This draft was published earlier"
-      assert [_ref] = done_refs(html)
+      # A consumed entry leaves on its upload process's report, which is queued
+      # during the event and handled before the next render.
+      assert [_ref] = done_refs(render(lv))
       assert [{"PUT", stored}] = R2Stub.requests()
       assert [%Asset{key: ^stored}] = Repo.all(Asset)
     end
+  end
+
+  test "a file whose upload could not be written shows its error beside its slot" do
+    entry = %UploadEntry{
+      ref: "0",
+      upload_ref: "phx-images",
+      upload_config: :images,
+      client_name: "plan.png",
+      client_size: 2048,
+      client_type: "image/png"
+    }
+
+    upload = %UploadConfig{
+      name: :images,
+      ref: "phx-images",
+      entries: [entry],
+      errors: [{"0", {:writer_failure, :enospc}}]
+    }
+
+    html =
+      render_component(&Editor.evidence_fields/1,
+        form: Phoenix.Component.to_form(%{}, as: :tip),
+        id: "evidence",
+        upload: upload,
+        selection: [{:missing_image, "s1", %{filename: "plan.png", size: 2048, description: nil}}],
+        images: %{"s1" => "0"},
+        attached: %{}
+      )
+
+    assert text(html, "#evidence-image-s1") =~
+             "plan.png could not be uploaded. Remove it and select it again."
   end
 
   defp select_image(lv, form_id) do

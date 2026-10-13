@@ -49,6 +49,8 @@ defmodule TipsWeb.Editor do
   use Phoenix.Component
   use TipsWeb, :verified_routes
 
+  require Logger
+
   alias Phoenix.LiveView
   alias Tips.Content
   alias TipsWeb.{AuthMailAdmission, CoreComponents, EditorContract, Reader, UserAuth}
@@ -134,8 +136,22 @@ defmodule TipsWeb.Editor do
       accept: ~w(.png .jpg .jpeg .webp .gif),
       max_entries: 1,
       max_file_size: 10_000_000,
-      auto_upload: false
+      auto_upload: false,
+      progress: &log_failed_write/3
     )
+  end
+
+  # LiveView keeps an entry whose temporary file could not be written, with a
+  # `{:writer_failure, reason}` error that renders beside its item.
+  defp log_failed_write(:images, entry, socket) do
+    for {:writer_failure, reason} <- upload_errors(socket.assigns.uploads.images, entry) do
+      Logger.warning(
+        "Image upload not written: target=#{inspect(socket.assigns.identity.target)} " <>
+          "entry=#{entry.ref} reason=#{inspect(reason)}"
+      )
+    end
+
+    {:noreply, socket}
   end
 
   defp assign_record(socket, record) do
@@ -917,6 +933,9 @@ defmodule TipsWeb.Editor do
   defp file_error(:too_large), do: "is larger than 10 MB"
   defp file_error(:not_accepted), do: "is not a PNG, JPEG, WebP or GIF"
   defp file_error(:too_many_files), do: "Remove the selected image before adding another."
+
+  defp file_error({:writer_failure, _reason}),
+    do: "could not be uploaded. Remove it and select it again"
 
   defp size(bytes) when bytes < 1_000_000, do: "#{max(div(bytes, 1000), 1)} KB"
   defp size(bytes), do: "#{Float.round(bytes / 1_000_000, 1)} MB"

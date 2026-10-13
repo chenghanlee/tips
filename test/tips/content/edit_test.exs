@@ -337,13 +337,14 @@ defmodule Tips.Content.EditTest do
       assert [%Asset{kind: :image, key: ^stored, position: 0}, %Asset{id: ^video_id, position: 1}] =
                attached(tip)
 
+      media = Repo.all(from a in Asset, order_by: a.id)
       stale = [{:image_file, "s1", R2Stub.image_file(dir), nil}, {:retained, video.id, nil}]
 
       assert {:error, :conflict} = Content.edit_tip(scope(author), tip.id, 1, @tip_attrs, stale)
       assert [{"PUT", lost}, {"DELETE", deleted}] = R2Stub.requests()
       assert deleted == lost
 
-      assert [%Asset{key: ^stored}, %Asset{id: ^video_id}] = attached(tip)
+      assert Repo.all(from a in Asset, order_by: a.id) == media
       assert [_replaced_job] = all_enqueued(worker: CleanupMedia)
       assert %Tip{edit_version: 2} = reload(tip)
     end
