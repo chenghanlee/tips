@@ -1,6 +1,6 @@
 ---
 name: review-software-design
-description: Guides the reviewing designer's pass over a tips PR. Covers compliance with the brief's contracts, the required rules, simplicity, warning signs, limits and test value. Acceptance scenarios, checks and merging belong to review-software-correctness.
+description: Guides the reviewing designer's pass over a tips PR. Covers compliance with the brief's contracts, the required rules, simplicity, code and architecture smells, limits and test value. Acceptance scenarios, checks and merging belong to review-software-correctness.
 ---
 
 # Review software design
@@ -56,16 +56,17 @@ Name the mechanism and its replacement. State the current cost and the cost of t
 replacement in the finding. Name who does any work transferred by the replacement. Do
 not infer simplicity from fewer lines alone.
 
-## Step 5: Warning signs
+## Step 5: Code and architecture smells
 
-For each finding, report P2 with a proposed change or a line for the follow-up issue.
+Check the diff for code smells and software architecture smells. Report a smell only
+when it has a cost now: the code is harder to change or test, a fact has two
+writers, or a failure path is hidden. Report each as P2 with a proposed change, or as
+a line for the follow-up issue.
 
-- Architecture: a module that writes another module's facts; a boundary check repeated
-  inside; a process, cache, scheduler or abstraction with one user; a job that does what
-  a query could; config or shared test files changed for one feature.
-- Code: an `opts` list that changes behaviour; a name that hides a side effect; a
-  wrapper over a dependency feature; a copied pattern the contract does not need; a
-  default that disguises a failure.
+Examples from this repository: a module that writes another module's facts; a
+boundary check repeated inside; a process, cache or abstraction with one user; a job
+that does what a query could; an `opts` list that changes behaviour; a wrapper over a
+dependency feature; a default that hides a failure.
 
 ## Step 6: Limits
 
