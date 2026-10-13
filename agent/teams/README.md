@@ -212,9 +212,12 @@ reports `blocked` with both run links. The dispatcher opens the revert with `gh 
 Codex clients cannot run Wallaby browser tests on macOS: the Codex sandbox kills the
 Chrome that chromedriver starts, and each attempt leaves a crash dialog
 ([#432](https://github.com/chenghanlee/tips/issues/432)). Wallaby runs on the
-implementer's Claude client; the tester verifies the retained log. `agent-browser`
-does start Chrome from a Codex client (verified 2026-10-14, agent-browser 0.38.1,
-codex-cli 0.162.1), so the manual steps below apply to both client kinds.
+implementer's Claude client; the tester verifies the retained log. The exact
+`agent-browser open about:blank --session <name>`, `get url` and `close` sequence below
+succeeded from this machine's configured Codex client on 2026-10-14 (agent-browser
+0.38.1, codex-cli 0.162.1). Codex manual review still needs the
+[browser setup](SETUP.md#browser-access-for-the-tester) and that preflight in the
+tester's own session.
 
 Clients launch with `MIX_ENV=test`. Wait for `mix test` to exit, then start the app on
 the same port:

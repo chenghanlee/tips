@@ -23,8 +23,10 @@ separate worktree checked out at the PR head.
    you are a Codex client, do not run them. Read the implementer's retained log named
    in the PR body under "Checks not run by CI": check the command, the `exit=` line and
    the failure list, and write "browser run by <implementer entry>, log verified" in
-   your review. If the PR body names no log, send `turn` to the implementer asking for
-   one. For manual checks use `agent-browser` as the [manual browser review](../README.md#manual-browser-review) says; it starts Chrome from a Codex client without the crash.
+   your review. If the PR body names no log, record that in your review; the
+   merge-confirming tester then runs `agent/teams/team.py turn <pr> <implementer entry>`
+   to request it, and any other tester sends its review URL to the merge-confirming
+   tester. For manual checks follow [manual browser review](../README.md#manual-browser-review), including its Codex setup, launch form and failure steps.
 4. Submit the [review record](../README.md#pr-review-record). Without findings, submit
    LGTM. With findings: the merge-confirming tester runs `agent/teams/team.py turn <pr> <implementer entry>`; any other tester sends its review URL to the merge-confirming
    tester.
