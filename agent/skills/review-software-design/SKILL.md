@@ -1,6 +1,6 @@
 ---
 name: review-software-design
-description: Guides the reviewing designer's pass over a tips PR. Covers compliance with the brief's contracts, the required rules, simplicity, code and architecture smells, limits and test value. Acceptance scenarios, checks and merging belong to review-software-correctness.
+description: Guides the reviewing designer's pass over a tips PR. Covers compliance with the brief's contracts, the required rules, simplicity, code and architecture smells, limits, access paths and test value. Acceptance scenarios, checks and merging belong to review-software-correctness.
 ---
 
 # Review software design
@@ -68,11 +68,19 @@ boundary check repeated inside; a process, cache or abstraction with one user; a
 that does what a query could; an `opts` list that changes behaviour; a wrapper over a
 dependency feature; a default that hides a failure.
 
-## Step 6: Limits
+## Step 6: Limits and access paths
 
-Only where the brief states a limit or the change adds work that grows with data: a
-query in a loop, a result set with no limit, a transaction around an external call, work
-that outlives the caller. Name what grows, the workload and the consequence. Do not
+For each new table, migration, query, filter or order in the diff:
+
+- Check that an index serves the filter and the order. Check that each new foreign
+  key has an index. A missing index on a table that grows with users or content is a
+  P2 with the index to add.
+- Run `EXPLAIN` on each new or changed query against a database with data when the
+  plan is not obvious from the schema. Report a sequential scan on a growing table.
+
+Where the brief states a limit or the change adds work that grows with data (a query
+in a loop, a result set with no limit, a transaction around an external call, work
+that outlives the caller): name what grows, the workload and the consequence. Do not
 report a finding when there is no stated limit and no growth.
 
 ## Step 7: Test value

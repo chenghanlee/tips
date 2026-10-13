@@ -85,6 +85,8 @@ independently. Sections, in order:
 3. **Contracts.** Give the `path:line` each contract applies to. For new code, name the
    module and function. List limits, states and transitions. Name which module writes
    each fact.
+   For each new table or query, name the filter and order it uses and the index that
+   serves them.
 4. **Acceptance scenarios.** Numbered. Each names the input, the action and the
    observable result. These are the test list.
 5. **Test budget.** The expected net test change: tests added, one to two per scenario,
@@ -126,6 +128,10 @@ Classify a violation as P2 and record a decision.
   commit. Keep query filters, database constraints and guarded writes. Repeat a check
   only for a distinct trust boundary or state that may have changed. Problem example:
   the same check in the LiveView, the context and the query with no reason.
+- **Indexed access paths.** Every query that runs per request or per job has an index
+  that serves its filter and order. Every foreign key has an index. Every new table
+  names its indexes in the brief. Problem example: a table with only a primary key,
+  queried by a foreign key.
 - **Simplest mechanism.** Choose the simplest mechanism that meets the contract's
   lifetime, durability and consistency needs. Use existing facilities first. State the
   workload or failure that justifies each new mechanism. Problem example: a scheduler,

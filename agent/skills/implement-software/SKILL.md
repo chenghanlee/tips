@@ -149,6 +149,8 @@ Schema and stored data are expensive to reverse.
   cursor and a stated page size.
 - Delete from storage only when a scenario in the brief requires it.
 - Name the contract that writes each new column or table in the brief.
+- Add the index the brief names for each new query. Add an index for each new foreign
+  key and for each column a filter or order uses. Put it in the same migration.
 
 ## Tests
 
@@ -198,6 +200,10 @@ Rules:
 Trigger: the brief states a limit, or the change adds work that grows with data: a query
 in a loop, a new preload, a result set with no limit, a transaction around an external
 call, work that outlives the caller.
+
+For each new or changed query, run `EXPLAIN` against a database with data and confirm
+it uses an index for its filter and order. A sequential scan on a table that grows
+with users or content is a defect; add the index.
 
 Name what grows and with what workload. Fix it with a filter, index, page or limit.
 Measure only when the brief states a limit or the cost could change the design. Before
