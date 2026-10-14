@@ -627,8 +627,9 @@ def claim_root(root: Path, repository: str) -> Path:
     fields = object_fields(json.loads(identity.read_text()), str(identity))
     if fields.get("repository") != repository:
         raise RuntimeError(f"{root} belongs to {fields.get('repository')}, not {repository}")
+    # Checked before any record, lock or allocation is written through them.
     for directory in ("state", "allocations"):
-        (root / directory).mkdir(exist_ok=True)
+        contained(root / directory, root).mkdir(exist_ok=True)
     return root
 
 

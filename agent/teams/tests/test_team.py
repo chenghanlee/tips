@@ -1545,16 +1545,23 @@ class PairLifecycleTest(Harness):
         assert "escapes" in refused.stderr
         assert not any(outside.iterdir())
 
-    def test_a_symlinked_allocations_directory_refuses_before_creating_anything(self) -> None:
+    def test_a_symlinked_root_directory_refuses_before_creating_anything(self) -> None:
         self.team("clean")  # creates the root
-        outside = self.root / "outside"
-        outside.mkdir()
-        allocations = self.trusted / "allocations"
-        allocations.rmdir()
-        allocations.symlink_to(outside, target_is_directory=True)
-        refused = self.team("start", "29", ok=False)
-        assert "passes through a symlink; refused" in refused.stderr
-        assert not any(outside.iterdir())
+        for name in ("allocations", "state"):
+            with self.subTest(directory=name):
+                outside = self.root / f"outside-{name}"
+                outside.mkdir()
+                directory = self.trusted / name
+                directory.rename(self.root / f"kept-{name}")
+                directory.symlink_to(outside, target_is_directory=True)
+                refused = self.team("start", "29", ok=False)
+                assert f"{directory} escapes {self.trusted} or passes through a symlink" in (
+                    refused.stderr
+                )
+                assert not any(outside.iterdir())
+                directory.unlink()
+                (self.root / f"kept-{name}").rename(directory)
+        assert [e for e in self.state()["events"] if e[0] != "gh"] == []
 
     @unittest.skipUnless(
         os.environ.get("TIPS_TEST_REAL_CODEX"), "opt-in installed Codex config check"
