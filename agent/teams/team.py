@@ -3,7 +3,7 @@
 
 Configured agents are `[agents.<entry>]` in config.toml. Every client gets an allocation with
 a generation ID that never repeats: an empty project directory it clones into itself with
-bootstrap.py, a logs directory, and trusted configuration, all under the trusted root
+bootstrap.py, a logs directory, and launcher configuration, all under the harness root
 `~/.local/share/tips-agent-teams/<repo-key>/`. The slot's record in the root's `state/`
 holds the record version and ID, the brief or spec, its roster, and every launched client's
 Herdr name, kind, project, database suffix, port, pane, session and task-submission state.
@@ -155,7 +155,7 @@ ROLES = ("designer", "implementer", "tester")
 # A team's workspace holds one tab per role; every client of that role is a pane in it.
 TABS = {"designer": "designers", "implementer": "implementers", "tester": "reviewers"}
 ENTRY = r"[a-z0-9][a-z0-9-]*"
-# Version 3 records live in the trusted root and name projects, not worktrees.
+# Version 3 records live in the harness root and name projects, not worktrees.
 RECORD_VERSION = 3
 NEVER_SUBMITTED, UNKNOWN, SUBMITTED = "never_submitted", "unknown", "submitted"
 AGENT_FIELDS = {
@@ -169,7 +169,7 @@ AGENT_FIELDS = {
     "db_suffix",
     "probe",
 }
-# A probe is a short argv list from trusted configuration, never shell text.
+# A probe is a short argv list from launcher configuration, never shell text.
 PROBE_ARGS = 16
 PROBE_ARG_CHARS = 256
 # PostgreSQL truncates identifiers longer than this; partitions append up to three digits.
@@ -587,34 +587,66 @@ def validate_allocations(path: Path, value: Config) -> None:
             stems.append(stem)
 
 
-def trusted_root() -> Path:
-    """The harness and state root, a sibling of the main checkout:
-    `<checkout parent>/agent_teams/<repository name>`. It must be a real path outside the
-    repository and outside temporary directories."""
-    root = main.parent / "agent_teams" / cfg["github"]["repository"].split("/")[1]
-    temporary = [Path(p).resolve() for p in (*TEMPORARY, os.environ.get("TMPDIR", "/tmp"))]
-    if root.resolve() != root:
-        raise RuntimeError(f"Trusted root {root} passes through a symlink; refused")
-    for parent in (main, *temporary):
-        if root == parent or parent in root.parents:
-            raise RuntimeError(f"Trusted root {root} is inside {parent}; refused")
+def installed(key: str) -> Path | None:
+    """A path install.json records for an operator-installed harness, or None in a checkout.
+    install.py writes install.json beside the installed scripts."""
+    record = Path(__file__).resolve().parent / "install.json"
+    if not record.is_file():
+        return None
+    value = object_fields(json.loads(record.read_text()), str(record)).get(key)
+    require_type(value, str, f"{record}: {key}")
+    return Path(str(value))
+
+
+def repo_key(repository: str) -> str:
+    """The root's directory name: the repository name without its owner."""
+    return repository.split("/")[-1]
+
+
+def default_root(checkout: Path, repository: str) -> Path:
+    """The harness and state root: agent_teams/<repository name>/ beside the checkout."""
+    return checkout.resolve().parent / "agent_teams" / repo_key(repository)
+
+
+def claim_root(root: Path, repository: str) -> Path:
+    """Create the root for this repository on first use, or refuse one that names another,
+    including another owner's repository with the same name. The root is not
+    write-protected; repository.json only keeps two repositories apart."""
+    identity = root / "repository.json"
+    if identity.exists():
+        fields = object_fields(json.loads(identity.read_text()), str(identity))
+        if fields.get("repository") != repository:
+            raise RuntimeError(f"{root} belongs to {fields.get('repository')}, not {repository}")
+    else:
+        root.mkdir(parents=True, exist_ok=True)
+        identity.write_text(json.dumps({"repository": repository}) + "\n")
+    for directory in ("state", "allocations"):
+        (root / directory).mkdir(exist_ok=True)
     return root
 
 
+def harness_root() -> Path:
+    """The parent of TIPS_TEAM_HARNESS, else the installed harness's recorded root, else
+    the default beside the main checkout; created on first use. It must be a real path
+    outside the repository and outside temporary directories."""
+    override = os.environ.get("TIPS_TEAM_HARNESS")
+    if override:
+        if not Path(override).is_absolute():
+            raise RuntimeError("TIPS_TEAM_HARNESS must be an absolute path")
+        root = Path(override).parent
+    else:
+        root = installed("root") or default_root(main, cfg["github"]["repository"])
+    temporary = [Path(p).resolve() for p in (*TEMPORARY, os.environ.get("TMPDIR", "/tmp"))]
+    if root.resolve() != root:
+        raise RuntimeError(f"Harness root {root} passes through a symlink; refused")
+    for parent in (main, *temporary):
+        if root == parent or parent in root.parents:
+            raise RuntimeError(f"Harness root {root} is inside {parent}; refused")
+    return claim_root(root, cfg["github"]["repository"])
+
+
 def state_dir() -> Path:
-    """The record store. The root is bound to the configured repository by the same
-    `repository.json` that install.py writes; a root that names another one is refused."""
-    root, name = trusted_root(), cfg["github"]["repository"]
-    identity_file = root / "repository.json"
-    if not identity_file.exists():
-        root.mkdir(parents=True, exist_ok=True)
-        identity_file.write_text(json.dumps({"repository": name}) + "\n")
-    recorded = object_fields(json.loads(identity_file.read_text()), str(identity_file))
-    if recorded.get("repository") != name:
-        raise RuntimeError(f"{root} belongs to {recorded.get('repository')}, not {name}; refused")
-    state = root / "state"
-    state.mkdir(exist_ok=True, mode=0o700)
-    return state
+    return harness_root() / "state"
 
 
 def contained(path: Path, parent: Path) -> Path:
@@ -625,11 +657,11 @@ def contained(path: Path, parent: Path) -> Path:
 
 
 def allocation_paths(ident: str) -> tuple[Path, Path, Path, Path]:
-    """The allocation's directory, its project and logs, and its trusted configuration.
+    """The allocation's directory, its project and logs, and its launcher configuration.
 
     The allocation directory is the client's working root, so a Codex sandbox can write the
-    clone's `.git`; the trusted configuration is outside it."""
-    root = trusted_root()
+    clone's `.git`; the launcher configuration is outside it."""
+    root = harness_root()
     base = root / "allocations" / ident
     return base, base / "project", base / "logs", root / "state" / ident
 
@@ -757,7 +789,8 @@ def records() -> dict[int, Record]:
             '"Records from an older team.py" says.'
         )
     found: dict[int, Record] = {}
-    for path in sorted(state_dir().glob("*.json")):
+    # Slot records are <slot>.json; other files there, such as dispatcher.json, are not.
+    for path in sorted(p for p in state_dir().glob("*.json") if p.stem.isdecimal()):
         record = load_record(path)
         if path.stem != str(record["slot"]):
             raise RuntimeError(f"{path}: file name does not match slot {record['slot']}")
@@ -990,7 +1023,8 @@ def agent_env(allocation: Allocation) -> dict[str, str]:
         # Provider settings are read by path from the main checkout; nothing is copied.
         "TIPS_PROVIDER_ENV_FILE": str(main / ".env"),
         "TIPS_DEXTER": str(project / ".dexter/dexter.sh"),
-        "TIPS_TEAM_HARNESS": str(harness()),
+        # Worker-side commands resolve the same root, as PR5's install layout defines it.
+        "TIPS_TEAM_HARNESS": str(harness_root() / "harness"),
         "TIPS_TEAM_ALLOCATION_ID": allocation["id"],
         "TIPS_TEAM_STATE": str(state_dir()),
     }
@@ -1011,7 +1045,7 @@ def tools() -> tuple[Path, Path, Path]:
 
 def allocate(record: Record, entry: str, role: str) -> Allocation:
     """Reserve the entry's database and port, and create its allocation directory with an
-    empty project and logs, and its trusted configuration directory, under the trusted
+    empty project and logs, and its launcher configuration directory, under the trusted
     root."""
     slot, generation = record["slot"], record["generation"]
     suffix = database_stem(cfg["team"], slot, generation, cfg["agents"][entry]["db_suffix"])
@@ -1025,7 +1059,7 @@ def allocate(record: Record, entry: str, role: str) -> Allocation:
     if len((max(DATABASE_BASES, key=len) + suffix).encode()) + PARTITION_DIGITS > NAME_BYTES:
         raise RuntimeError(f"{entry}: database names for {suffix} exceed {NAME_BYTES} bytes")
     ident = f"g{generation}-{entry}"
-    root = trusted_root()
+    root = harness_root()
     for directory in allocation_paths(ident):
         directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         contained(directory, root)
@@ -1092,7 +1126,7 @@ def add_allocation(record: Record, entry: str, role: str) -> Allocation:
 
 
 def configure_bootstrap(record: Record, allocation: Allocation, branch: str, commit: str) -> None:
-    """Write the trusted configuration bootstrap.py reads: what to clone and check out, the
+    """Write the launcher configuration bootstrap.py reads: what to clone and check out, the
     shared tools, and the entry's probe. Workers never write this directory."""
     binary, skills, sources = tools()
     _, project, logs, config = allocation_paths(allocation["id"])
@@ -1940,14 +1974,14 @@ def request_reports(record: Record, missing: list[str], running: set[str]) -> No
 
 def retirement_paths(allocation: Allocation) -> tuple[Path, Path, Path, Path]:
     """The allocation's directories, refused unless the record names its canonical
-    allocation and no path leaves the trusted root or passes through a symlink."""
+    allocation and no path leaves the harness root or passes through a symlink."""
     paths = allocation_paths(allocation["id"])
     if Path(allocation["root"]) != paths[0]:
         raise RuntimeError(
             f"{allocation['name']}: recorded allocation {allocation['root']} is not "
             f"{paths[0]}; preserved"
         )
-    trusted = trusted_root()
+    trusted = harness_root()
     for directory in paths:
         if directory.exists() or directory.is_symlink():
             contained(directory, trusted)
@@ -2080,7 +2114,7 @@ def remove_if_empty(directory: Path) -> None:
 
 
 def retain_files(record: Record, dropped: list[str], kept: str, reports: Reports) -> None:
-    """Remove only empty residue; record in each allocation's trusted configuration what it
+    """Remove only empty residue; record in each allocation's launcher configuration what it
     leaves behind and why. Project files are never deleted."""
     for allocation in record["agents"].values():
         root, project, logs, config = retirement_paths(allocation)
@@ -2121,7 +2155,7 @@ def remove_empty_residue(issue: str) -> None:
             paths = allocation_paths(str(note.get("id")))
             for directory in paths[:3]:
                 if directory.exists() or directory.is_symlink():
-                    contained(directory, trusted_root())
+                    contained(directory, harness_root())
             order = (paths[1], paths[2], paths[0])
             for directory in order:
                 remove_if_empty(directory)

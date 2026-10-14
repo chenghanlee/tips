@@ -37,7 +37,7 @@ def own_allocation() -> tuple[str, dict[str, object], dict[str, object], Path]:
             "TIPS_TEAM_ALLOCATION_ID and TIPS_TEAM_STATE are not set; run this from the pane "
             "team.py launched"
         )
-    for path in sorted(state.glob("*.json")):
+    for path in sorted(p for p in state.glob("*.json") if p.stem.isdecimal()):
         record = object_fields(json.loads(path.read_text()), str(path))
         agents = object_fields(record.get("agents"), f"{path}: agents")
         for value in agents.values():

@@ -2,7 +2,7 @@
 """Prepare the calling worker's own project from its trusted allocation configuration.
 
 A worker runs this under its own authority: `python3 <harness>/bootstrap.py [--commit SHA]`.
-team.py wrote the configuration to `<trusted root>/state/<id>/bootstrap.json`; the worker
+team.py wrote the configuration to `<harness root>/state/<id>/bootstrap.json`; the worker
 cannot change it. An empty project gets a fresh clone on the configured branch, at the
 configured commit, or at origin/main. A reused clone is fetched and never reset: `--commit`
 moves it only when it is clean, and refuses otherwise. Then this fetches locked
@@ -80,7 +80,7 @@ class Console:
 
 
 def settings_path() -> tuple[str, Path]:
-    """The allocation ID and its trusted configuration file, from the launch environment."""
+    """The allocation ID and its launcher configuration file, from the launch environment."""
     ident = os.environ.get("TIPS_TEAM_ALLOCATION_ID", "")
     state = os.environ.get("TIPS_TEAM_STATE", "")
     if not IDENT.fullmatch(ident) or not state:
@@ -95,7 +95,7 @@ def settings_path() -> tuple[str, Path]:
 
 
 def load_settings() -> dict[str, object]:
-    """Read and check the trusted configuration; the project must be this allocation's."""
+    """Read and check the launcher configuration; the project must be this allocation's."""
     ident, path = settings_path()
     try:
         fields = json.loads(path.read_text())

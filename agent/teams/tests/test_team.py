@@ -774,7 +774,7 @@ if "args=" in sys.argv:
 
 class Harness(unittest.TestCase):
     """A harness checkout and a bare origin, with fake Herdr, gh, Mix, psql, ps, Codex and
-    Dexter on PATH. The trusted root is the checkout's sibling `agent_teams/r`."""
+    Dexter on PATH. The harness root is the checkout's sibling `agent_teams/r`."""
 
     def setUp(self) -> None:
         TEST_RUNS.mkdir(parents=True, exist_ok=True)
@@ -898,11 +898,11 @@ class Harness(unittest.TestCase):
         return json.loads((self.trusted / f"state/{slot}.json").read_text())
 
     def recorded_briefs(self) -> set[str]:
-        files = (self.trusted / "state").glob("*.json")
+        files = (p for p in (self.trusted / "state").glob("*.json") if p.stem.isdecimal())
         return {json.loads(path.read_text())["brief"] for path in files}
 
     def allocation(self, name: str) -> dict[str, Any]:
-        for path in (self.trusted / "state").glob("*.json"):
+        for path in (self.trusted / "state").glob("[0-9]*.json"):
             for allocation in json.loads(path.read_text())["agents"].values():
                 if allocation["name"] == name:
                     return allocation
@@ -941,7 +941,7 @@ class Harness(unittest.TestCase):
         pane = self.pane(name)
         env = dict(self.env, HERDR_PANE_ID=pane["pane_id"], **extra)
         env.update({k: v for k, v in pane["launch_env"].items() if v is not None})
-        harness = Path(env["TIPS_TEAM_HARNESS"])
+        harness = self.repo / "agent/teams"
         result = execute(
             ["python3", str(harness / script), *args],
             cwd=self.allocation(name)["root"],
@@ -1040,8 +1040,8 @@ class PairLifecycleTest(Harness):
             "impl",
             "tester",
         )
-        # Each client has its own allocation under the trusted root: an empty project and
-        # logs in its working directory, trusted configuration outside it.
+        # Each client has its own allocation under the harness root: an empty project and
+        # logs in its working directory, launcher configuration outside it.
         impl_root = self.trusted / "allocations/g1-impl"
         tester_root = self.trusted / "allocations/g1-tester"
         assert self.allocation("team-1-impl")["root"] == str(impl_root)
@@ -1066,7 +1066,7 @@ class PairLifecycleTest(Harness):
             "TIPS_CHECK_TIMEOUT_SECONDS": "1800",
             "TIPS_TEAM_CONFIG": str(self.repo / "agent/teams/config.toml"),
             "TIPS_PROVIDER_ENV_FILE": str(self.repo / ".env"),
-            "TIPS_TEAM_HARNESS": str(self.repo / "agent/teams"),
+            "TIPS_TEAM_HARNESS": str(self.trusted / "harness"),
             "TIPS_TEAM_STATE": str(self.trusted / "state"),
         }
         assert impl["launch_env"] == {
@@ -1439,11 +1439,22 @@ class PairLifecycleTest(Harness):
         assert not self.trusted.exists()
 
     def test_a_root_claimed_by_another_repository_is_refused(self) -> None:
+        # Another owner's repository with the same name has the same default root.
         self.trusted.mkdir(parents=True)
-        (self.trusted / "repository.json").write_text('{"repository": "o/other"}\n')
+        (self.trusted / "repository.json").write_text('{"repository": "x/r"}\n')
         refused = self.team("start", "29", ok=False)
-        assert f"{self.trusted} belongs to o/other, not o/r; refused" in refused.stderr
+        assert f"{self.trusted} belongs to x/r, not o/r" in refused.stderr
         assert not (self.trusted / "state").exists()
+        # A dispatcher record beside the slot records is not a slot record.
+        (self.trusted / "repository.json").write_text('{"repository": "o/r"}\n')
+        (self.trusted / "state").mkdir()
+        (self.trusted / "state/dispatcher.json").write_text('{"pid": 1}\n')
+        self.team("start", "29")
+        assert self.recorded_briefs() == {"29"}
+        # The harness override names <root>/harness by an absolute path.
+        self.env["TIPS_TEAM_HARNESS"] = "agent_teams/r/harness"
+        refused = self.team("stop", "29", ok=False)
+        assert "TIPS_TEAM_HARNESS must be an absolute path" in refused.stderr
 
     def test_records_from_a_shared_worktree_team_py_refuse_every_command(self) -> None:
         legacy = self.repo / "agent/teams/allocations/1.json"
@@ -1461,13 +1472,13 @@ class PairLifecycleTest(Harness):
         failed = self.worker("team-1-impl", "bootstrap.py", ok=False, TMPDIR=str(self.root))
         assert f"Trusted {self.repo / 'agent/teams'} is inside {self.root}" in failed.stderr
         assert not any(self.project("team-1-impl").iterdir())
-        # A trusted configuration that grants a trusted path is a layout error.
+        # A launcher configuration that grants a trusted path is a layout error.
         path = self.trusted / "state/g1-impl/bootstrap.json"
         settings = json.loads(path.read_text())
         path.write_text(json.dumps({**settings, "writable": [str(self.trusted)]}))
         failed = self.bootstrap("team-1-impl", ok=False)
         assert f"is inside {self.trusted}; refused" in failed.stderr
-        # A project that is a symlink out of the trusted root is refused.
+        # A project that is a symlink out of the harness root is refused.
         path.write_text(json.dumps(settings))
         project = self.project("team-1-impl")
         project.rmdir()
@@ -1477,7 +1488,7 @@ class PairLifecycleTest(Harness):
         failed = self.bootstrap("team-1-impl", ok=False)
         assert "passes through a symlink; refused" in failed.stderr
         assert not any(outside.iterdir())
-        # The launcher refuses an allocation directory that escapes the trusted root.
+        # The launcher refuses an allocation directory that escapes the harness root.
         self.update(issues={**self.state()["issues"], "33": BRIEF})
         (self.trusted / "allocations/g2-impl").symlink_to(outside)
         refused = self.team("start", "33", ok=False)
