@@ -61,7 +61,7 @@ class ObserveTest(Harness):
         first = self.comments("7")[0]["body"].splitlines()
         assert first[0] == "FINDING tester team-1-tester session-team-1-tester"
         assert first[1] == (
-            'TEAM_FINDING {"v":1,"pr":7,"check":"mergeability",'
+            'TEAM_FINDING {"v":2,"pr":7,"check":"mergeability",'
             f'"head":"{self.head}","base":"{base}","state":"open"}}'
         )
         assert first[2] == f"Merge conflict at head {self.head} and base main {base}."
@@ -85,7 +85,8 @@ class ObserveTest(Harness):
             ("check:CI/checks", "c" * 40),
             ("check:CI/release", "c" * 40),
         ]
-        assert all(f["supersedes"] == [{"head": self.head, "base": base}] for f in newer)
+        ids = [c["id"] for c in self.comments("7")[:3]]
+        assert [f["supersedes"] for f in newer] == [[i] for i in ids]
         assert f"Supersedes {self.comments('7')[0]['html_url']}." in self.comments("7")[3]["body"]
         self.observe(ok=False)
         assert len(self.findings()) == 6
@@ -140,15 +141,38 @@ class ObserveTest(Harness):
         assert "open finding" in self.observe(ok=False).stderr
         assert open_url != self.comments("7")[-1]["html_url"]
 
+    def test_a_stale_pass_resolves_only_the_finding_events_it_saw_open(self) -> None:
+        reviews = [review("tester", self.head, n=1), review("critic", self.head, n=2)]
+        self.update(reviews=reviews, checks=[check("checks", "fail"), check("release", "pass")])
+        self.observe(ok=False)
+        first = self.comments("7")[0]
+        # While this reader reads a pass, another observer resolves that finding and records
+        # a new failure of the same check at the same head and base.
+        header = first["body"].splitlines()[0]
+        opened = marker(first["body"])
+        resolution = opened | {"state": "resolved", "resolves": first["id"]}
+        bodies = [
+            f"{header}\nTEAM_FINDING {json.dumps(fields, separators=(',', ':'))}\n{text}"
+            for fields, text in ((resolution, "Passed."), (opened, "Failed again."))
+        ]
+        self.update(checks=[check("checks", "pass", 2), check("release", "pass")])
+        self.update(post_on_checks=bodies)
+        assert f"ready to merge at {self.head}" in self.observe().stdout  # its own snapshot
+        newer = self.comments("7")[2]["html_url"]
+        # The newer failure is still open: an unavailable read reports it.
+        self.update(checks_error="fixture checks unavailable")
+        assert f"open finding {newer}" in self.observe(ok=False).stderr
+
     def test_a_finding_no_check_can_resolve_is_resolved_by_hand(self) -> None:
         # The required check was renamed: no later pass carries the old identity.
         renamed = [check("old", "fail"), check("checks", "pass"), check("release", "pass")]
         self.update(checks=renamed, required=["old", "checks", "release"])
         self.observe(ok=False)
-        url = self.comments("7")[0]["html_url"]
+        opened = self.comments("7")[0]
+        url = opened["html_url"]
         self.update(checks=renamed[1:], required=["checks", "release"])
         assert f"open finding {url}" in self.observe(ok=False).stderr
-        resolved = marker(self.comments("7")[0]["body"]) | {"state": "resolved"}
+        resolved = marker(opened["body"]) | {"state": "resolved", "resolves": opened["id"]}
         body = "TEAM_FINDING " + json.dumps(resolved, separators=(",", ":"))
         command = [
             "python3",
