@@ -6,7 +6,9 @@ SDK these tests are skipped and say so.
 
 import asyncio
 import importlib.util
+import json
 import os
+import shutil
 import sys
 import unittest
 from collections.abc import Awaitable, Callable
@@ -83,6 +85,14 @@ elif a[1] in ("item-add", "item-edit"):
     print(json.dumps({"id": "I_new"}))
 """
 
+# Logs each git call's working directory and arguments, then runs the real git.
+LOGGING_GIT = """#!/usr/bin/env python3
+import json, os, sys
+with open(%r, "a") as log:
+    log.write(json.dumps([os.getcwd(), *sys.argv[1:]]) + "\\n")
+os.execv(%r, [%r, *sys.argv[1:]])
+"""
+
 
 @unittest.skipUnless(HAS_SDK, NO_SDK)
 class AdapterTest(Harness):
@@ -97,6 +107,13 @@ class AdapterTest(Harness):
         (self.bin / "gh").write_text(ADAPTER_GH)
         for name in ("gh", "gh-base"):
             (self.bin / name).chmod(0o755)
+        git = shutil.which("git", path=self.env["PATH"])
+        assert git
+        self.git_log = self.root / "git-calls"
+        self.adapter_bin = self.root / "adapter-bin"
+        self.adapter_bin.mkdir()
+        (self.adapter_bin / "git").write_text(LOGGING_GIT % (str(self.git_log), git, git))
+        (self.adapter_bin / "git").chmod(0o755)
 
     def session(self, steps: Callable[[Any], Awaitable[None]]) -> None:
         """Start the adapter as the dispatcher's client would and run steps against it."""
@@ -107,7 +124,7 @@ class AdapterTest(Harness):
             **self.env,
             "TIPS_DISPATCHER_SESSION": "dispatcher-session",
             # A cwd-relative PATH entry and Python path injection must not reach commands.
-            "PATH": "relative-bin" + os.pathsep + self.env["PATH"],
+            "PATH": os.pathsep.join(("relative-bin", str(self.adapter_bin), self.env["PATH"])),
             "PYTHONPATH": str(self.root),
         }
         params = StdioServerParameters(
@@ -123,6 +140,12 @@ class AdapterTest(Harness):
                 await steps(client)
 
         asyncio.run(run())
+        # The adapter runs git only in the harness, never in a worker's clone, whose
+        # .git/config and hooks the worker controls.
+        calls = [json.loads(line) for line in self.git_log.read_text().splitlines()]
+        assert calls  # the harness's own startup git ran through the wrapper
+        allocations = str(self.trusted / "allocations")
+        assert not [c for c in calls if any(allocations in part for part in c)], calls
 
     @staticmethod
     async def call(client: Any, name: str, ok: bool = True, **arguments: Any) -> str:
