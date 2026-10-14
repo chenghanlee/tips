@@ -1,7 +1,9 @@
 # Team workflow
 
 GitHub issues, PRs and reviews store the workflow state. Herdr messages start turns. One
-dispatcher chooses work, opens features, starts pairs and launches reviewers. An
+dispatcher chooses work, opens features, starts pairs and launches reviewers. It has no
+shell or file tools: it acts only through the fixed operations of
+[adapter.py](adapter.py), which call the commands below. An
 implementer and a merge-confirming tester share one worktree and take turns. Every other
 reviewer uses a separate worktree checked out at the PR head. Follow
 [AGENTS.md](../../AGENTS.md) and the skill for your task:
@@ -37,8 +39,9 @@ record.
 
 ## Commands
 
-Run them from the root of your checkout. The dispatcher runs `start`, `review` and
-`stop` from the main checkout.
+Run them from the root of your checkout. The dispatcher's `start_pair`,
+`launch_reviewer`, `retire_team` and `status` tools run `start`, `review`, `stop` and
+`status` from the main checkout.
 
 | Command | Caller | Effect |
 |---|---|---|
@@ -47,6 +50,7 @@ Run them from the root of your checkout. The dispatcher runs `start`, `review` a
 | `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Notify the implementer even if the tree has uncommitted changes. Include any mismatch in the message. |
 | `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create `.worktrees/review-<pr>-<entry>` detached at the PR head with its own database suffix, port, dependencies and Dexter, and launch the reviewer there, in the team's workspace. |
 | `agent/teams/team.py stop <brief>` | Dispatcher | Refuse dirty, unmerged or foreign-owned work. Stop every recorded client and Dexter, drop the slot's databases, remove its worktrees, branch and workspace, delete the record. |
+| `agent/teams/team.py status` | Dispatcher, user | Every allocation record with each client's live Herdr pane, name, kind, state and session, and whether the recorded dispatcher process runs. |
 | `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. |
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment or only those after a checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | Tokens per launched session and model, from the session logs. |
@@ -83,6 +87,11 @@ acknowledgments or progress updates. Put everything the recipient needs in the m
 or the linked record. After sending, end your turn. If sending fails, keep the turn.
 Report `blocked` with the exact command and error. Do not deliver a denied message
 another way.
+
+Before sending the dispatcher `done`, `blocked` or a launch request, post it on the brief
+with `agent/teams/board.py post <brief> DONE` or `BLOCKED`; a launch request is BLOCKED.
+The dispatcher's `wait_for_team` returns each such comment until a dispatcher action
+names its comment id, so a missed message does not lose the request.
 
 No label shows who has the turn. After a restart, read the PR, reviews of its current
 head and the required checks. Use the first matching row:
@@ -192,7 +201,11 @@ you cannot answer. Record the answer on the issue. Set Active and notify the age
 not run or retry a denied command on another agent's behalf.
 
 If an implementer's failing check also fails on the latest `main` run, the implementer
-reports `blocked` with both run links. The dispatcher opens the revert with `gh pr revert <pr>` and merges it after checks pass. Then fix the original issue.
+reports `blocked` with both run links. The dispatcher asks the merge-confirming tester
+of the affected brief to revert the PR that broke `main`: the tester runs
+`gh pr revert <pr>` from its own checkout, merges the revert after the required checks
+pass and reports `done`. Diagnosis that needs access outside the tester's allocation
+goes to the user. Then fix the original issue.
 
 ## Constraints
 

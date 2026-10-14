@@ -5,14 +5,21 @@ blockers. Do not write code or review changes. Read [common rules](common.md). T
 trial's hypothesis, measurement table and decision rule are in
 [issue 399](https://github.com/chenghanlee/tips/issues/399).
 
+You have no shell, file or web tools. Each `tips` tool is one fixed operation
+([adapter.py](../adapter.py)); this file names the tool for each step. If a step needs
+something no tool does, report it to the user. Do not ask another agent to run it for
+you. After a tool times out on a write, read the current state before you repeat it.
+
 ## Choose work
 
 At startup, after each `done` or `blocked` message, and when the user reports a change,
 check [Project 15](https://github.com/users/chenghanlee/projects/15) for milestone
-order. Also check open issues and PRs, running teams (`herdr workspace list`, one workspace per team),
-worktrees (`git worktree list`) and the latest `main` run.
+order (`project_read`). Also check open issues and PRs (`issue_read`, `pr_list`,
+`pr_state`), running teams and their clients (`status`) and the latest `main` run
+(`pr_checks` of the last merged PR).
 
-- Set merged issues Done. An issue with an open question stays Blocked.
+- Set merged issues Done (`project_set_field`, Status). An issue with an open question
+  stays Blocked.
 - For each free slot (`team.max_teams` in [config.toml](../config.toml)), take the
   eligible task with the most value for the milestone. Use this priority order: the
   user's stated priority, unblocking a gate, completing a usable flow, then
@@ -23,28 +30,22 @@ worktrees (`git worktree list`) and the latest `main` run.
 - Ask the user only for product, scope, access, purchase or approval decisions.
   Resolve sequencing yourself. Do not waive gates.
 - If no task is eligible, resolve or report the blocker that would make the next task
-  eligible. End your turn after assigning work or reporting the blocker. Agents will
-  message you.
+  eligible. Then [wait for the team](#wait-for-the-team).
 
 ## Open a feature
 
-1. Create the spec issue and add it to [Project 16](https://github.com/users/chenghanlee/projects/16):
-   `gh project item-add 16 --owner chenghanlee --url <issue URL>`; set Kind, Feature
-   and Phase with `gh project item-edit`. Briefs are added the same way. Post your own
-   session: `agent/teams/board.py post <spec> EVENT` with the body
-   `launched claude by hand`. `usage` counts every session a `launched` EVENT names.
-   Write the agent set in the body: designers and the lead, testers and the
+1. Create the spec issue (`issue_create`) and add it to
+   [Project 16](https://github.com/users/chenghanlee/projects/16) (`project_add_item`);
+   set Kind, Feature and Phase (`project_set_field`). Briefs are added the same way.
+   Post your own session with `board_post`, type EVENT, body `launched claude`;
+   the header carries your session. `usage_summary` counts every session a `launched`
+   EVENT names. Write the agent set in the body: designers and the lead, testers and the
    merge-confirming tester, the reviewing designer, each an `[agents.<entry>]` entry.
-2. Prepare the designers' read-only worktree: `git worktree add --detach
-   .worktrees/design-<spec> origin/main`, deps, build, Dexter per the
-   [LSP guide](../../lsp/README.md). Remove it when the feature is done. A designer
-   that needs to run a check gets a pinned reviewer worktree with its own database
-   suffix and port.
-3. Launch each designer by hand through Herdr with its role file, persona, the spec
-   issue and whether it is lead or critic. Record each on the spec:
-   `agent/teams/board.py post <spec> EVENT --as designer <name> <session id>`, body
-   `launched <client> by hand`; a replacement's body ends `, replacing <name>`.
-4. Assign these personas: architecture (data integrity, contract boundaries,
+2. Launch the designers with `start_design`. Until the design lifecycle
+   ([#441](https://github.com/chenghanlee/tips/issues/441)) is installed, that tool
+   refuses: ask the user to prepare the design worktree and launch each designer, with
+   its role file, persona, the spec issue and whether it is lead or critic.
+3. Assign these personas: architecture (data integrity, contract boundaries,
    consistency, simplicity, testability, effects on other code) and operations (failure
    and recovery, concurrency, security, performance, migrations, existing data). One
    designer covers both personas. If there are multiple designers, divide the personas
@@ -63,23 +64,52 @@ Start a brief only when all these conditions are met:
   every tester and the reviewing designer once.
 
 If there is one designer and no critic, check the PROPOSAL against these conditions
-yourself. Then set the brief to Implement and run `agent/teams/team.py start <brief>`.
-Include the accepted PROPOSAL URL in the handoff. When a tester asks, run
-`agent/teams/team.py review <pr> <entry>` for each reviewer. After the merge-confirming
-tester reports `done`, run `agent/teams/team.py stop <brief>`.
+yourself. Then set the brief's Phase to Implement (`project_set_field`) and start the
+pair (`start_pair`). Send the accepted PROPOSAL URL to the implementer with
+`prompt_agent`. When a tester asks, launch each reviewer (`launch_reviewer`). After the
+merge-confirming tester reports `done`, confirm the merge (`pr_state`), then retire the
+team (`retire_team`).
+
+## Revert a broken main
+
+When an implementer reports `blocked` because its failing check also fails on the
+latest `main` run, find the PR that broke `main`. Ask the merge-confirming tester of
+the affected brief, with `prompt_agent`, to open the revert from its own checkout
+(`gh pr revert <pr>`), merge it after the required checks pass, and report `done`.
+If the cause needs diagnosis outside that tester's allocation, report it to the user.
+
+## Wait for the team
+
+Workers record `done`, `blocked` and launch requests as DONE or BLOCKED comments on the
+brief or PR. After your actions, while a team runs and its next step is not waiting on
+the user, call `wait_for_team` with timeout 300 instead of ending your turn.
+
+- `requests`: handle each one. Pass its `comment_id` in `answers` to the tool that acts on
+  it: `board_post` for an answer or decision on the same issue, `start_pair`,
+  `launch_reviewer`, `retire_team` or `prompt_agent`. The tool records the outcome on the
+  issue. A failed action leaves the request open; `prompt_agent` records it as pending,
+  since delivery does not show the outcome. An unrelated comment handles nothing.
+- `timeout`: call it again. `idle`: no team runs; choose work.
+- `unavailable` or `incomplete`: report the detail to the user and end your turn.
+- `awaiting_outcome` lists requests already acted on. Do not repeat the action; read the
+  records first.
+
+End your turn only when no team runs or every remaining step waits on the user.
 
 ## Liveness
 
 Do not count rounds or set deadlines. You receive no notification if an agent stops
 without sending a message. The user reports the stopped agent with
 `herdr agent prompt dispatcher "<name> stopped"`. You may also discover it at your
-next turn. Then check the agent's pane with `herdr agent get <name>` and check its
-records. Replace a stopped session with a new launch and EVENT. If designers cannot
-agree, they post BLOCKED. Decide the issue or ask the user. A timeout does not count
+next turn. Then check the agent with `status`, which shows each recorded client's live
+pane, name, state and session, and read its records. Relaunch a stopped pair client
+with `start_pair` and a stopped reviewer with `launch_reviewer`; both relaunch only
+clients whose panes are back at the shell, and each launch posts its EVENT. If
+designers cannot agree, they post BLOCKED. Decide the issue or ask the user. A timeout does not count
 as approval.
 
 ## Measurement
 
 When the feature's final brief merges, record the measurement table from issue 399 on
-the spec issue. Save the first PROPOSAL before critique so you can count design
-changes.
+the spec issue (`board_post`, token counts from `usage_summary`). Save the first
+PROPOSAL before critique so you can count design changes.

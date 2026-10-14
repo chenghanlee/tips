@@ -33,7 +33,7 @@ gh project field-create <number> --owner <owner> --name Implementer --data-type 
 
 The dispatcher edits fields with `gh project item-edit`. The `gh` token needs the `project` scope.
 
-Install Python 3.12 and the [configured client CLIs](config.toml). Authenticate the clients and the GitHub CLI (`gh`) for this repository. Agents also need GNU `timeout` (macOS: `brew install coreutils`) and `unbuffer` (Expect): the Elixir skill requires it on Mix commands. Testers use `agent-browser` for manual browser review.
+Install Python 3.12 and the [configured client CLIs](config.toml). Create the dispatcher's locked environment once per checkout, as in [development](development.md#dependencies-and-test-isolation), or install a harness release (below). Authenticate the clients and the GitHub CLI (`gh`) for this repository. Agents also need GNU `timeout` (macOS: `brew install coreutils`) and `unbuffer` (Expect): the Elixir skill requires it on Mix commands. Testers use `agent-browser` for manual browser review.
 
 The user maintains third-party skills in these Git-ignored directories in the main checkout:
 
@@ -129,6 +129,19 @@ permission flow. See [Claude auto-mode configuration](https://code.claude.com/do
 
 ## Start the dispatcher
 
+The launcher starts Claude in restricted mode with no built-in tools (`--restricted
+--tools ""`) and one MCP server, [adapter.py](adapter.py), under `--strict-mcp-config`.
+The launcher sets the server, `--settings`, the session ID and the environment. User,
+project and local settings files, CLAUDE.md files, other MCP servers and Remote Control
+are not loaded. The dispatcher's system prompt is AGENTS.md, the [workflow](README.md)
+and its [role files](roles/dispatcher.md), read by the launcher before start.
+
+A restricted client reports no session to Herdr. The launcher execs the client, which
+keeps the launcher's process ID, so it records that ID, its start time, the pane and the
+session in `agent/teams/allocations/dispatcher/launch.json`. It names the pane
+`dispatcher` only when Herdr's foreground client is that process. It refuses to start
+while that process runs, or while an unrecorded agent is named `dispatcher`.
+
 From a plain shell in a Herdr pane (`HERDR_ENV=1`) at the main checkout:
 
 ```bash
@@ -155,14 +168,38 @@ type `board changed` in its pane. Answer its product and scope questions there.
 Each message gives the dispatcher full context, so it compacts at the configured
 threshold (`dispatcher.compact_percent`) and reloads state from GitHub.
 
-The dispatcher runs `team.py` from the main checkout. Handle each client's initial
-repository trust prompt. If an approval prompt stops launch, inspect it and follow
-the active approval policy.
+The dispatcher's tools run `team.py` from the main checkout. Handle each client's
+initial repository trust prompt. If an approval prompt stops launch, inspect it and
+follow the active approval policy. Until the design lifecycle
+([#441](https://github.com/chenghanlee/tips/issues/441)) is installed, the dispatcher
+cannot launch designers: when it asks, prepare the design worktree and launch them by
+hand as the [dispatcher role](roles/dispatcher.md#open-a-feature) describes.
+
+## Install a harness release
+
+Run this once per harness release, with no team running, from the main checkout:
+
+```bash
+python3 agent/teams/install.py <commit>
+```
+
+The commit must be merged into `origin/main`, and the checkout's tracked files must be
+clean. The command copies AGENTS.md and `agent/teams` from that commit, creates the
+locked environment (`--require-hashes`, wheels only) and records the commit, the
+repository and this checkout's path in `install.json`. It installs under
+`~/.local/share/tips-agent-teams/<repo-key>/` (`--root` selects another directory):
+`releases/<commit>-<time>/` holds each release and `harness` points at the current one.
+The switch is one atomic rename. A failed install deletes only its own unfinished
+release, so the previous one keeps working. `state/` and `allocations/` are never
+changed. Earlier releases stay on disk; to roll back, install the earlier commit again.
+Start the installed dispatcher with `<root>/harness/agent/teams/dispatch`.
 
 ## Configuration
 
 Edit [config.toml](config.toml) for slots, agent and dispatcher settings, resource
-allocation, permissions and time limits. Each `[agents.<entry>]` defines a role,
+allocation, permissions and time limits. `[github]` names the repository every GitHub
+call uses, and for each project the dispatcher may edit, the fields it may set.
+`timeouts.github_seconds` (default 30) bounds each GitHub call. Each `[agents.<entry>]` defines a role,
 client, model, effort, optional advisor and persona, database suffix and port offset.
 Briefs name entries in `Implementer:` and `Required reviews:`.
 

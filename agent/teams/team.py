@@ -44,11 +44,19 @@ class TeamSettings(TypedDict):
     db_suffix_prefix: str
 
 
+class GitHubSettings(TypedDict):
+    """The repository GitHub calls name, and the projects and fields the dispatcher may edit."""
+
+    repository: str
+    projects: dict[str, list[str]]
+
+
 class Config(TypedDict):
     team: TeamSettings
     timeouts: dict[str, int]
     launch: dict[str, str]
     agents: dict[str, AgentSpec]
+    github: NotRequired[GitHubSettings]
 
 
 class Allocation(TypedDict):
@@ -131,6 +139,9 @@ AGENT_FIELDS = {"role", "kind", "model", "effort", "advisor", "persona", "port_o
 DEXTER_CONNECT_SECONDS = 30
 # A cold Hex cache downloads every package; anything slower is a hung fetch.
 DEPS_FETCH_SECONDS = 300
+# Bounds one whole GitHub read or write; timeouts.github_seconds overrides it.
+GITHUB_SECONDS = 30
+REPOSITORY = r"[A-Za-z0-9-]+/[A-Za-z0-9._-]+"
 CODEX_CONFIG = """[plugins."mix-credo@elixir-agent-tools"]
 enabled = true
 """
@@ -420,13 +431,42 @@ def release_name(pane: str, current: Entity) -> None:
                 # Herdr already released it between list and clear.
 
 
-def load_config() -> tuple[Path, Config]:
-    script = Path(__file__).resolve()
+def installed_source() -> Path | None:
+    """The main checkout an operator-installed harness names, or None in a checkout.
+
+    install.py writes install.json beside the installed scripts. Its source path is
+    trusted configuration: the installed code never derives the checkout from its location.
+    """
+    record = Path(__file__).resolve().parent / "install.json"
+    if not record.is_file():
+        return None
+    source = object_fields(json.loads(record.read_text()), str(record)).get("source")
+    require_type(source, str, f"{record}: source")
+    return Path(str(source))
+
+
+def checkout_root(script: Path) -> Path:
     common = Path(
         run("git", "-C", script.parent, "rev-parse", "--path-format=absolute", "--git-common-dir")
     )
-    canonical = common.parent.resolve()
-    path = Path(os.environ.get("TIPS_TEAM_CONFIG", canonical / "agent/teams/config.toml"))
+    return common.parent.resolve()
+
+
+def config_location() -> tuple[Path, Path]:
+    """The main checkout and the configuration file: TIPS_TEAM_CONFIG, else the default."""
+    script = Path(__file__).resolve()
+    source = installed_source()
+    if source is None:
+        canonical = checkout_root(script)
+        default = canonical / "agent/teams/config.toml"
+    else:
+        # The installed harness reads its own reviewed configuration.
+        canonical, default = source, script.parent / "config.toml"
+    return canonical, Path(os.environ.get("TIPS_TEAM_CONFIG", default))
+
+
+def load_config() -> tuple[Path, Config]:
+    canonical, path = config_location()
     with path.open("rb") as f:
         value = cast(Config, tomllib.load(f))
     validate_config_fields(path, value)
@@ -445,11 +485,25 @@ def validate_config_fields(path: Path, value: Config) -> None:
     policies = object_fields(fields.get("launch"), f"{path}: launch")
     for key in ("codex_approval", "claude_permission_mode"):
         require_type(policies.get(key), str, f"{path}: launch.{key}")
+    if "github" in fields:
+        validate_github(path, fields["github"])
     agents = object_fields(fields.get("agents"), f"{path}: agents")
     if not agents:
         raise RuntimeError(f"{path}: agents must name at least one entry")
     for name, entry in agents.items():
         validate_agent_fields(f"{path}: agents.{name}", name, entry)
+
+
+def validate_github(path: Path, value: object) -> None:
+    github = object_fields(value, f"{path}: github")
+    require_type(github.get("repository"), str, f"{path}: github.repository")
+    if not re.fullmatch(REPOSITORY, str(github["repository"])):
+        raise RuntimeError(f"{path}: github.repository must be owner/name")
+    for number, names in object_fields(github.get("projects"), f"{path}: github.projects").items():
+        if not number.isdecimal() or not isinstance(names, list):
+            raise RuntimeError(f"{path}: github.projects maps a project number to field names")
+        for name in cast(list[object], names):
+            require_type(name, str, f"{path}: github.projects.{number}")
 
 
 def validate_agent_fields(label: str, name: str, entry: object) -> None:
@@ -606,7 +660,10 @@ def roster(brief: str) -> tuple[str, list[str], list[str]]:
     Read reviewer names from `Required reviews:`. Keep testers in the listed order;
     the first tester confirms the merge. Return testers and designers separately.
     """
-    body = str(json.loads(run("gh", "issue", "view", brief, "--json", "body")).get("body") or "")
+    view = run(
+        "gh", "issue", "view", brief, *repo_args(), "--json", "body", timeout=github_seconds()
+    )
+    body = str(json.loads(view).get("body") or "")
     implementer = issue_line(body, "Implementer")
     reviews = issue_line(body, "Required reviews")
     if implementer is None or reviews is None:
@@ -651,14 +708,43 @@ def comment_header(kind: str, role: str, name: str, session: str) -> str:
     return f"{kind} {role} {name} {session or 'unknown'}"
 
 
+def github_settings() -> GitHubSettings | None:
+    """The configured repository settings; None before configure() or without [github]."""
+    try:
+        return cfg.get("github")
+    except NameError:
+        return None
+
+
+def github_seconds() -> int:
+    try:
+        return cfg["timeouts"].get("github_seconds", GITHUB_SECONDS)
+    except NameError:
+        return GITHUB_SECONDS
+
+
 def repository() -> str:
+    settings = github_settings()
+    if settings:
+        return settings["repository"]
     return str(json.loads(run("gh", "repo", "view", "--json", "nameWithOwner"))["nameWithOwner"])
+
+
+def repo_args() -> list[str]:
+    """Name the configured repository instead of discovering it from the working directory."""
+    settings = github_settings()
+    return ["--repo", settings["repository"]] if settings else []
 
 
 def issue_comments(issue: str) -> list[dict[str, object]]:
     """Return issue comments oldest first, with id, html_url, body and created_at fields."""
     output = run(
-        "gh", "api", "--paginate", "--slurp", f"repos/{repository()}/issues/{issue}/comments"
+        "gh",
+        "api",
+        "--paginate",
+        "--slurp",
+        f"repos/{repository()}/issues/{issue}/comments",
+        timeout=github_seconds(),
     )
     pages = json.loads(output)
     if not isinstance(pages, list):
@@ -673,7 +759,17 @@ def post_comment(issue: str, text: str) -> str:
     for comment in issue_comments(issue):
         if comment.get("body") == text:
             return str(comment["html_url"])
-    return run("gh", "issue", "comment", issue, "--body-file", "-", input_text=text)
+    return run(
+        "gh",
+        "issue",
+        "comment",
+        issue,
+        *repo_args(),
+        "--body-file",
+        "-",
+        input_text=text,
+        timeout=github_seconds(),
+    )
 
 
 def event_role(allocation: Allocation) -> str:
@@ -1245,7 +1341,18 @@ def start(brief: str) -> None:
 def pull_request(pr: str) -> tuple[str, str, list[str]]:
     """The PR's URL, head commit and closing-reference issue numbers."""
     view = object_fields(
-        json.loads(run("gh", "pr", "view", pr, "--json", "headRefOid,url,closingIssuesReferences")),
+        json.loads(
+            run(
+                "gh",
+                "pr",
+                "view",
+                pr,
+                *repo_args(),
+                "--json",
+                "headRefOid,url,closingIssuesReferences",
+                timeout=github_seconds(),
+            )
+        ),
         f"PR {pr}",
     )
     references = object_list(view.get("closingIssuesReferences") or [], f"PR {pr} closing issues")
@@ -1544,6 +1651,141 @@ def drop_databases(suffixes: list[str]) -> None:
             run(*psql, "-c", 'DROP DATABASE "' + db.replace('"', '""') + '"', cwd=main)
 
 
+def client_state(allocation: Allocation, panes: set[str], agents: dict[str, Entity]) -> str:
+    """One recorded client's live state: Herdr's pane and agent identity, not the record alone."""
+    pane, session = allocation["pane"], allocation["session"] or "none"
+    kind = f"{allocation['role']}, {allocation['kind']}"
+    head = f"{allocation['entry']} ({kind}) {allocation['name']}"
+    if pane not in panes:
+        return f"{head}: pane {pane or 'none'} missing; recorded session {session}"
+    agent = agents.get(pane)
+    if agent is None:
+        return f"{head}: pane {pane} at the shell, client exited; recorded session {session}"
+    if agent.get("name") != allocation["name"] or agent.get("agent") != allocation["kind"]:
+        holder = f"{agent.get('name') or 'unnamed'} ({agent.get('agent')})"
+        return f"{head}: pane {pane} holds {holder}, not the recorded client; preserved"
+    live = session_id(agent) or "unknown"
+    state = agent.get("agent_status") or "unknown"
+    started = "running" if allocation["session"] else "startup incomplete"
+    return f"{head}: {started} in {pane}, {state}; live session {live}, recorded {session}"
+
+
+class DispatcherLaunch(TypedDict):
+    """The launched dispatcher client: its process id and start time, pane and session.
+
+    A restricted client reports no session to Herdr, so this record is its identity: the
+    launcher execs the client, which keeps the launcher's process id.
+    """
+
+    pid: int
+    started: str
+    pane: str
+    session: str
+
+
+def dispatcher_path() -> Path:
+    # PR4 integration point (#441): keep it beside the allocation records in the state root.
+    return records_dir() / "dispatcher" / "launch.json"
+
+
+def dispatcher_launch() -> DispatcherLaunch | None:
+    path = dispatcher_path()
+    if not path.exists():
+        return None
+    fields = object_fields(json.loads(path.read_text()), str(path))
+    require_type(fields.get("pid"), int, f"{path} pid")
+    for key in ("started", "pane", "session"):
+        require_type(fields.get(key), str, f"{path} {key}")
+    return cast(DispatcherLaunch, fields)
+
+
+def start_time(pid: int) -> str | None:
+    """The process's start time as ps prints it, spacing normalized; None if not running."""
+    row = processes().get(pid)
+    return " ".join(row[1].split()) if row else None
+
+
+def dispatcher_running(launch: DispatcherLaunch) -> bool:
+    """Whether the recorded process still runs: the same process id and start time."""
+    return start_time(launch["pid"]) == " ".join(launch["started"].split())
+
+
+def record_dispatcher(pane: str, session: str) -> DispatcherLaunch:
+    """Record this process, which is about to exec the client, as the dispatcher."""
+    pid = os.getpid()
+    started = start_time(pid)
+    if started is None:
+        raise RuntimeError(f"ps does not list this process ({pid})")
+    launch = DispatcherLaunch(pid=pid, started=started, pane=pane, session=session)
+    path = dispatcher_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    staged = path.with_suffix(".next")
+    staged.write_text(json.dumps(launch) + "\n")
+    staged.replace(path)
+    return launch
+
+
+def dispatcher_status(named: Entity | None) -> str:
+    launch = dispatcher_launch()
+    if launch and dispatcher_running(launch):
+        held = f"pid {launch['pid']} in {launch['pane']}, session {launch['session']}"
+        state = named.get("agent_status") if named else None
+        if named and named.get("pane_id") != launch["pane"]:
+            return f"dispatcher: {held}; the agent named dispatcher is in {named['pane_id']}"
+        return f"dispatcher: running, {held}, {state or 'no Herdr name'}"
+    if named:
+        return f"dispatcher: {named['pane_id']} is named dispatcher but is not the recorded launch"
+    return "dispatcher: not running"
+
+
+def status() -> None:
+    """Print every allocation record with each client's live Herdr state and the dispatcher's."""
+    agents = {a["pane_id"]: a for a in herdr("agent", "list")["agents"]}
+    named = {a.get("name"): a for a in agents.values()}
+    print(dispatcher_status(named.get("dispatcher")))
+    found = records()
+    if not found:
+        print("No allocation records.")
+    for slot, record in sorted(found.items()):
+        panes = {p["pane_id"] for p in live_panes(record["workspace"])}
+        workspace = record["workspace"] or "none"
+        if record["workspace"] and not panes:
+            workspace += " (closed)"
+        print(f"slot {slot}: brief #{record['brief']}, workspace {workspace}")
+        for _, allocation in sorted(record["agents"].items()):
+            print("  " + client_state(allocation, panes, agents))
+
+
+class AmbiguousError(RuntimeError):
+    """A write that may have taken effect before it failed."""
+
+
+def prompt_agent(brief: str, entry: str, text: str) -> None:
+    """Send text to a recorded client of the brief once its pane holds that same client.
+
+    The target is a recorded role, never a pane: an unrecorded or replaced client is refused.
+    A timeout leaves delivery unknown, so the error says not to resend blindly.
+    """
+    record = record_for(brief)
+    if record is None:
+        raise RuntimeError(f"Brief #{brief} has no allocation record")
+    allocation = record["agents"].get(entry)
+    if allocation is None:
+        raise RuntimeError(f"Brief #{brief} has no launched {entry}")
+    if allocation["pane"] not in {p["pane_id"] for p in live_panes(record["workspace"])}:
+        raise RuntimeError(f"{allocation['name']}: recorded pane {allocation['pane']} is gone")
+    if running_client(allocation) is None:
+        raise RuntimeError(f"{allocation['name']} is not running in {allocation['pane']}")
+    try:
+        herdr("agent", "prompt", allocation["name"], text)
+    except subprocess.TimeoutExpired as error:
+        raise AmbiguousError(
+            f"Prompt to {allocation['name']} timed out after it was sent; it may have been "
+            "delivered. Read the agent's records before sending it again."
+        ) from error
+    print(f"Prompted {allocation['name']}")
+
+
 def configure() -> None:
     global main, cfg
     if os.environ.get("HERDR_ENV") != "1":
@@ -1565,8 +1807,11 @@ def cli() -> None:
     args = sys.argv[1:]
     usage = (
         "Usage: agent/teams/team.py start <brief> | turn <pr> <entry> | "
-        "review <pr> <entry> | stop <brief>"
+        "review <pr> <entry> | stop <brief> | status"
     )
+    if args == ["status"]:
+        status()
+        return
     if len(args) < 2 or not args[1].isdecimal():
         raise RuntimeError(usage)
     named = len(args) == 3 and re.fullmatch(ENTRY, args[2]) is not None

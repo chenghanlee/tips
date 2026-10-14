@@ -5,6 +5,7 @@
 For Python changes in `agent/teams`, the required CI job `checks` runs:
 
 ```sh
+python -m pip install --require-hashes --no-deps -r agent/teams/requirements.lock
 ruff check agent/teams
 ruff format --check agent/teams
 pyright --project agent/teams/pyproject.toml
@@ -12,7 +13,10 @@ python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
 ```
 
 Run these commands in your worktree before pushing if Ruff and Pyright are on
-`PATH`. Otherwise, use CI.
+`PATH`. Otherwise, use CI. Locally, use the locked environment below instead of the
+first line: `pyright --pythonpath agent/teams/.venv/bin/python --project
+agent/teams/pyproject.toml`, and run the tests with `agent/teams/.venv/bin/python`.
+With another Python the adapter tests are skipped and say so.
 
 Run these additional tests for the listed changes:
 
@@ -20,10 +24,23 @@ Run these additional tests for the listed changes:
 |---|---|---|
 | Provisioning or client stopping | Real-daemon tests (`-k real_daemons`), with `TIPS_TEST_REAL_DEXTER` and `DEXTER_ELIXIR_LIB_ROOT` set. See the [LSP guide](../lsp/README.md). | CI runs these in the `dexter` job against the newly built binary. |
 | Codex launch arguments or generated Codex configuration | Installed-Codex tests, with `TIPS_TEST_REAL_CODEX=1`. | Run locally and record the result on the PR. CI has no Codex client. |
+| Dispatcher launch arguments, adapter tools or `wait_for_team` | The real restricted client with the launcher's arguments against a disposable copy, fake `gh` and a refusing fake `herdr`: it lists only the adapter tools and stays in the wait loop through a timeout until a worker request arrives. | Run locally and record the transcript summary on the PR. CI has no Claude client. |
 
 ## Dependencies and test isolation
 
-- Scripts use only the Python standard library.
+- Scripts use only the Python standard library, except [adapter.py](adapter.py). It
+  needs the official MCP Python SDK, pinned with every transitive package and its hashes
+  in [requirements.lock](requirements.lock) (about 30 packages). Create the locked
+  environment from the repository root; it is Git-ignored:
+
+  ```sh
+  python3.12 -m venv agent/teams/.venv
+  agent/teams/.venv/bin/python -m pip install --require-hashes --no-deps -r agent/teams/requirements.lock
+  ```
+
+  After changing `dependencies` in [pyproject.toml](pyproject.toml), regenerate the lock
+  from `agent/teams`:
+  `uv pip compile pyproject.toml --generate-hashes --python-version 3.12 --universal -o requirements.lock`.
 - Tests use disposable Git repositories, a fake Herdr process, and child processes
   that the tests start and own.
   Never use live pairs in tests.
@@ -31,11 +48,14 @@ Run these additional tests for the listed changes:
 
 ## Lint exceptions
 
-The reviewed `# noqa: S603` exceptions apply only to `team.py:execute` and
-`StopAgentTest.client`. These calls use variable argument lists, no shell, a resolved
-executable, and fixed, caller-supplied or test-owned arguments.
+The reviewed `# noqa: S603` exceptions apply only to `team.py:execute`,
+`StopAgentTest.client` and the namer that `dispatcher.py:start_here` starts. These calls
+use variable argument lists, no shell, a resolved executable, and fixed,
+caller-supplied or test-owned arguments. The `# noqa: S606` in `start_here` replaces
+the launcher with the resolved `claude` executable and its fixed arguments, so the
+client is the pane's foreground process.
 
-When changing either call, review the executable selection and arguments for
+When changing any of these calls, review the executable selection and arguments for
 safety. Lint does not verify their safety. Do not suppress other warnings.
 
 Lint and type-check settings are in [pyproject.toml](pyproject.toml).

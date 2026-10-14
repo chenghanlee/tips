@@ -12,7 +12,7 @@ import subprocess
 import sys
 from typing import Any
 
-from team import execute
+from team import execute, github_seconds, repo_args
 
 QUERY = """
 query($owner: String!, $name: String!, $number: Int!, $after: String) {
@@ -43,7 +43,7 @@ class RefusalError(Exception):
 
 
 def gh(*args: str) -> str:
-    result = execute(["gh", *args])
+    result = execute(["gh", *args], timeout=github_seconds())
     if result.returncode:
         raise RefusalError(result.stderr.strip() or result.stdout.strip() or "gh failed")
     return result.stdout.strip()
@@ -51,7 +51,7 @@ def gh(*args: str) -> str:
 
 def pull_request(number: int) -> tuple[str, str, str]:
     """Return (owner/repo, PR url, head commit)."""
-    pr = json.loads(gh("pr", "view", str(number), "--json", "headRefOid,url"))
+    pr = json.loads(gh("pr", "view", str(number), *repo_args(), "--json", "headRefOid,url"))
     repo = re.fullmatch(r"https://github\.com/([^/]+/[^/]+)/pull/\d+", pr["url"])
     if not repo:
         raise RefusalError(f"Unexpected PR URL: {pr['url']}")

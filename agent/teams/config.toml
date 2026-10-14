@@ -20,6 +20,15 @@ checks_minutes = 30
 codex_approval = "never"
 claude_permission_mode = "auto"
 
+# GitHub calls name this repository instead of reading it from a checkout. The dispatcher
+# adapter may read these projects, add items to them and set only the listed fields.
+[github]
+repository = "chenghanlee/tips"
+
+[github.projects]
+15 = ["Status"]
+16 = ["Kind", "Feature", "Phase", "Implementer"]
+
 # agent/teams/dispatch always starts this agent as Claude. It compacts at
 # compact_percent because each message starts a new turn with the full conversation.
 [dispatcher]
