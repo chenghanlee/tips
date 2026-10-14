@@ -217,8 +217,10 @@ resources, and the team's Herdr workspace and tabs, in `<root>/state/<slot>.json
 `github.repository` names the repository and the root; `team.clone_url` is what each
 client clones; `team.psql` is the fixed argv `stop` uses to list and drop a retired
 team's databases (the shipped value is the compose database's local development
-connection). Scripts use the main checkout's config unless
-`TIPS_TEAM_CONFIG=/absolute/path` selects another file. Settings apply at the next launch;
+connection). A checkout's scripts use the main checkout's config; an installed harness
+uses its release's config, `<root>/harness/agent/teams/config.toml`.
+`TIPS_TEAM_CONFIG=/absolute/path` selects another file. Launched clients get the file the
+launcher read. Settings apply at the next launch;
 a relaunched client keeps its recorded database, port and client kind and takes its
 model, effort, advisor and persona from the current file.
 

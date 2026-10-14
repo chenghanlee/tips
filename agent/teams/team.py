@@ -470,15 +470,17 @@ def checkout_root(script: Path) -> Path:
 
 
 def config_location() -> tuple[Path, Path]:
-    """The main checkout and the configuration file: TIPS_TEAM_CONFIG, else the default."""
-    script = Path(__file__).resolve()
+    """The main checkout and the configuration file: TIPS_TEAM_CONFIG, else the default.
+    Workers get the same file (agent_env)."""
     source = installed_source()
     if source is None:
-        canonical = checkout_root(script)
+        canonical = checkout_root(Path(__file__).resolve())
         default = canonical / "agent/teams/config.toml"
     else:
-        # The installed harness reads its own reviewed configuration.
-        canonical, default = source, script.parent / "config.toml"
+        # The installed harness reads its own reviewed configuration, by the stable link
+        # its workers' scripts use (harness()).
+        canonical = source
+        default = cast(Path, installed("root")) / "harness/agent/teams/config.toml"
     return canonical, Path(os.environ.get("TIPS_TEAM_CONFIG", default))
 
 
@@ -1084,7 +1086,7 @@ def harness() -> Path:
 
 def agent_env(allocation: Allocation) -> dict[str, str]:
     """Build the client's environment from its recorded allocation."""
-    config = Path(os.environ.get("TIPS_TEAM_CONFIG", main / "agent/teams/config.toml")).resolve()
+    config = config_location()[1].absolute()  # the file this command read
     project = project_of(allocation)
     env = {
         "PGPORT": str(cfg["team"]["postgres_port"]),

@@ -1,9 +1,11 @@
 """The harness root: where it may be, and the stable path workers name. The concurrent
 first-claim test is RepositoryConfigTest in test_team.py."""
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any, cast
 from unittest import mock
 
 import team
@@ -43,6 +45,35 @@ class ClaimRootTest(unittest.TestCase):
         ):
             assert team.harness() == root / "harness/agent/teams"
         assert team.harness() == Path(team.__file__).resolve().parent
+
+    def test_workers_get_the_config_the_installed_harness_reads(self) -> None:
+        root = self.base / "agent_teams/tips"
+        recorded = {"root": root, "source": self.checkout}
+        allocation: dict[str, Any] = {
+            "id": "g1-impl",
+            "launch": "launch",
+            "kind": "claude",
+            "root": str(root / "allocations/g1-impl"),
+            "db_suffix": "a",
+            "port": 4100,
+        }
+        settings = {"team": {"postgres_port": 5432}, "timeouts": {"checks_minutes": 30}}
+        environ = {k: v for k, v in os.environ.items() if k != "TIPS_TEAM_CONFIG"}
+        with (
+            mock.patch.dict(os.environ, environ, clear=True),
+            mock.patch.object(team, "installed", side_effect=recorded.get),
+            mock.patch.object(team, "harness_root", return_value=root),
+            mock.patch.object(team, "state_dir", return_value=root / "state"),
+            mock.patch.object(team, "main", self.checkout, create=True),
+            mock.patch.object(team, "cfg", settings, create=True),
+        ):
+            config = root / "harness/agent/teams/config.toml"
+            assert team.config_location() == (self.checkout, config)
+            env = team.agent_env(cast(team.Allocation, allocation))
+            assert env["TIPS_TEAM_CONFIG"] == str(config)
+            os.environ["TIPS_TEAM_CONFIG"] = str(self.base / "other.toml")
+            env = team.agent_env(cast(team.Allocation, allocation))
+            assert env["TIPS_TEAM_CONFIG"] == str(self.base / "other.toml")
 
     def test_a_symlinked_state_directory_refuses_before_the_identity_is_published(self) -> None:
         root = self.base / "agent_teams/tips"
