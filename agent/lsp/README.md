@@ -1,9 +1,9 @@
 # Agent language tools
 
-Each worktree uses one **Dexter** language server: a Go
+Each checkout uses one **Dexter** language server: a Go
 binary built from the pinned upstream revision plus one local patch. Claude and
 Codex both run its bound command, `"$TIPS_DEXTER"`, from their shell tool and
-attach to the same per-worktree daemon. There is one interface and one index:
+attach to the same per-checkout daemon. There is one interface and one index:
 no editor client, plugin, adapter or MCP server.
 
 This beta is read-only. It does not support renaming or other edits.
@@ -31,7 +31,7 @@ There is no reference search by name: it missed uses that the positional search
 finds. Take the definition's line from `lookup` and the name's column from
 `query symbols`, then run `query references` there.
 
-Queries accept files in the bound worktree, its dependency sources and the configured
+Queries accept files in the bound checkout, its dependency sources and the configured
 Elixir sources; a file from another checkout is refused with `does not belong
 to workspace`. Do not start another language server.
 
@@ -39,7 +39,7 @@ to workspace`. Do not start another language server.
 
 - Freshness is not strict. The daemon watches saved files, but an empty answer
   is not proof of absence. Rerun after large checkouts or generated code.
-- Index scope: the worktree, its `deps/` and the configured Elixir sources. The
+- Index scope: the checkout, its `deps/` and the configured Elixir sources. The
   root's `tmp/` directory and nested checkouts are left out, so scratch copies
   of application modules never answer for the application. Index-based
   discovery (`workspace-symbols`, `lookup`, `references`, call hierarchy)
@@ -51,7 +51,7 @@ to workspace`. Do not start another language server.
   Cached files follow later disk changes
   (`Edit`, `mix format`, generators, shell rewrites) by size and mtime.
   Save before navigating; unsaved editor buffers are not supported.
-  One writer per worktree.
+  One writer per checkout.
 - Call hierarchy selects one callable identity, `Module.function/arity`. A
   definition with default arguments prepares its maximum arity; prepare at a
   lower-arity call to inspect that callable's incoming calls. The hierarchy
@@ -113,8 +113,8 @@ to workspace`. Do not start another language server.
 
 `--root` must be the exact checkout Dexter serves: a directory holding `.git`
 or `mix.exs`, never one with only a `.dexter/` index. The command works from
-any caller directory. Each worktree gets its own daemon and index, and
-worktrees run concurrently. Nested checkouts, including scratch clones and
+any caller directory. Each checkout gets its own daemon and index, and
+checkouts run concurrently. Nested checkouts, including scratch clones and
 linked worktrees under `.worktrees/`, are excluded from the parent's index
 and watcher. Dependency sources under `deps/` remain available. A root reached
 through a symlink is admitted only under the exact spelling it was bound with.
@@ -122,41 +122,40 @@ This beta does not support an application in a subdirectory or monorepo.
 
 ## Pair provisioning
 
-`agent/teams/team.py start` and `review` write, per worktree:
+Each launched client runs `python3 <harness>/bootstrap.py` in its own allocation
+([allocations](../teams/README.md#allocations)). It writes, in its own clone, at
+git-ignored paths:
 
-- `.dexter/dexter.sh`: `exec vendor/dexter --root <worktree> "$@"` with the
+- `.dexter/dexter.sh`: `exec <shared vendor/dexter> --root <clone> "$@"` with the
   selected sources exported. Its absolute path is `TIPS_DEXTER` in the session.
-- For Codex, `.codex/config.toml` with Credo enabled.
+- `.agents/skills`: a link to the main checkout's shared skills.
 
-Claude's launch settings disable known language-server plugins, including
-in linked worktrees.
+Then it runs three steps in the clone. Any failure blocks the client with its error:
 
-Provisioning then runs three steps in the shared worktree. Any failure stops the launch:
-
-1. `mix deps.get --check-locked`, for a new worktree or one without `deps/`;
-   otherwise the existing dependencies are kept. A fetch that would change
-   `mix.lock` fails.
+1. `mix deps.get --check-locked`, unless a fetch for the clone's current
+   `mix.lock` already succeeded; a failed fetch or a new lock fetches again. A
+   fetch that would change `mix.lock` fails.
 2. `dexter.sh query workspace-symbols --raw --wait <timeout> MixProject` starts
    the daemon and checks that its index answers.
 3. `dexter.sh reindex` reconciles the index with the disk.
 
-The developer and the tester share this daemon and index. After a later
-dependency change, follow [Reindex](../skills/dexter/SKILL.md#reindex).
+Each client has its own clone, daemon and index. After a later dependency change,
+follow [Reindex](../skills/dexter/SKILL.md#reindex).
 
-`team.py stop` runs `dexter.sh stop` per worktree before retiring it; an
-attached client keeps the daemon alive and the worktree is preserved. A daemon
-idles out after fifteen minutes without clients and restarts from its index on
-the next request. Do not run `git clean -x` in a pair worktree: it removes the
-bound command and the index under `.dexter/`.
+`team.py stop` stops each clone's daemon with the Dexter binary and sources recorded in
+the allocation's `bootstrap.json`, not with the clone's wrapper, and retains the clone.
+A daemon idles out after fifteen minutes without clients and restarts from its index
+on the next request. Do not run `git clean -x` in a clone: it removes the bound
+command and the index under `.dexter/`.
 
-The daemon belongs to the worktree, not to a client. A `query` that starts the
+The daemon belongs to the clone, not to a client. A `query` that starts the
 daemon is its parent until that query ends, and `team.py` refuses to stop a
 client while one of its descendants survives. So a client stopped during a cold
 start, for example on the first query after the daemon idled out, is refused
 and everything is preserved. Wait for the query to end (within `--wait` plus
 30 seconds), then run the stop again: the daemon is then nobody's child and
-still serves the worktree. Do not use `dexter.sh stop` to hurry this: it
-refuses while the query is attached, and retirement runs it anyway.
+still serves the clone. Do not use `dexter.sh stop` to hurry this: it
+refuses while the query is attached, and retirement stops the daemon anyway.
 
 ## Build
 
@@ -178,8 +177,8 @@ agent/lsp/dexter/vendor/dexter version   # 0.7.2, then: local_build_id <id>
 ```
 
 A daemon and a client with different ids refuse each other and nothing replaces
-the running daemon. Before rebuilding over active pairs, stop each worktree's
-daemon with its bound command, build, then re-provision.
+the running daemon. Before rebuilding over active pairs, stop each clone's
+daemon with its bound command, build, then rerun each client's `bootstrap.py`.
 The build refuses to replace a binary used by a running daemon and aborts if
 it cannot inspect processes. Keep agents stopped until the build finishes.
 
@@ -194,4 +193,4 @@ Dexter indexes the Elixir standard library from source. Put the release matching
 (from the [Elixir repository](https://github.com/elixir-lang/elixir); the tree
 contains `VERSION` and `lib/elixir/lib/enum.ex`), or point `DEXTER_ELIXIR_LIB_ROOT`
 at another checkout's `lib/`. A Homebrew installation has no sources. Provisioning
-refuses to start unless the tree's `VERSION` matches the worktree's toolchain.
+refuses to start unless the tree's `VERSION` matches the checkout's toolchain.

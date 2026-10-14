@@ -21,7 +21,7 @@ import tarfile
 import tomllib
 from pathlib import Path
 
-from team import REPOSITORY, claim_root, default_root, execute, run
+from team import REPOSITORY, claim_root, default_root, execute, load_record, run
 
 # Creating the environment and fetching locked wheels; the same budget as dependency fetches.
 INSTALL_SECONDS = 300
@@ -55,11 +55,28 @@ def repository(source: Path, commit: str) -> str:
     return name
 
 
-def require_drained(source: Path) -> None:
-    # PR4 integration point (#441): check <root>/state/ allocation records instead.
-    records = sorted((source / "agent/teams/allocations").glob("*.json"))
-    if records:
-        raise RuntimeError(f"Teams are running ({len(records)} records); drain them first")
+def require_drained(root: Path) -> None:
+    """Refuse while the root being changed holds a team record, readable or not, or an
+    allocation that is neither recorded nor retired."""
+    state = root / "state"
+    busy: list[str] = []
+    for path in sorted(p for p in state.glob("*.json") if p.stem.isdecimal()):
+        try:
+            busy.append(f"slot {path.stem} (#{load_record(path)['brief']})")
+        except (RuntimeError, ValueError, KeyError, OSError) as error:
+            busy.append(f"slot {path.stem} (unreadable: {error})")
+    if busy:
+        raise RuntimeError(f"Teams are running in {root}: {', '.join(busy)}; drain them first")
+    unfinished = [
+        path.parent.name
+        for path in sorted(state.glob("*/bootstrap.json"))
+        if not (path.parent / "retired.json").exists()
+    ]
+    if unfinished:
+        raise RuntimeError(
+            f"Allocations {', '.join(unfinished)} in {root} are neither recorded nor retired; "
+            "retire them first"
+        )
 
 
 def export(source: Path, commit: str, release: Path) -> None:
@@ -104,10 +121,10 @@ def install(source: Path, name: str, root: Path | None) -> Path:
     require_clean(source)
     commit = reviewed_commit(source, name)
     repo = repository(source, commit)
-    root = (root or default_root(source, repo)).resolve()
-    claim_root(root, repo)
+    root = (root or default_root(source, repo)).absolute()
+    claim_root(root, repo, source)
     (root / "releases").mkdir(exist_ok=True)
-    require_drained(source)
+    require_drained(root)
     stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
     release = root / "releases" / f"{commit[:12]}-{stamp}"
     release.mkdir()

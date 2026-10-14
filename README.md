@@ -53,7 +53,7 @@ criteria and review evidence in the relevant GitHub issue and PR.
 
 - [Agent pairs](agent/teams/README.md): a dispatcher starts one developer and one tester
   per issue; [setup](agent/teams/SETUP.md) covers prerequisites and configuration.
-- [Elixir language server](agent/lsp/README.md): one shared Dexter server per worktree,
+- [Elixir language server](agent/lsp/README.md): one shared Dexter server per checkout,
   used as a CLI by Claude and Codex.
 
 Agent tooling is separate from the application. You do not need it to run Tips.
@@ -83,7 +83,7 @@ sources live in `agent/lsp/vendor/`.
 
 Keep root files in their standard locations for Mix, Git and Docker.
 Put disposable experiment output in ignored `tmp/` or outside the repository.
-Dexter stores its per-worktree index and bound commands in `.dexter/`.
+Dexter stores its per-checkout index and bound commands in `.dexter/`.
 
 Leave generated and client-managed folders, such as `_build/`, `deps/`, `.codex/`
 and `.claude/`, in their expected locations.

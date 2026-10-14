@@ -18,13 +18,6 @@ from tests.test_team import CONFIG, FAKE_GH, Harness
 TEAMS = Path(__file__).resolve().parents[1]
 HAS_SDK = importlib.util.find_spec("mcp") is not None
 NO_SDK = "MCP SDK missing: install agent/teams/requirements.lock (development.md)"
-GITHUB = """
-[github]
-repository = "o/r"
-
-[github.projects]
-16 = ["Phase", "Feature"]
-"""
 TOOLS = {
     "status",
     "start_pair",
@@ -60,7 +53,7 @@ if a[:2] == ["issue", "view"] and "title" in a[a.index("--json") + 1]:
             "url": "https://github.com/o/r/issues/" + a[2], "body": body}
     print(json.dumps({key: view[key] for key in a[a.index("--json") + 1].split(",")}))
     sys.exit(0)
-if a[:2] == ["pr", "view"] and "state" in a[a.index("--json") + 1]:
+if a[:2] == ["pr", "view"] and "mergeStateStatus" in a[a.index("--json") + 1]:
     pass
 elif a[:2] not in (["issue", "create"], ["pr", "checks"], ["pr", "list"]) and a[0] != "project":
     os.execv(base, [base, *a])
@@ -93,12 +86,11 @@ elif a[1] in ("item-add", "item-edit"):
 class AdapterTest(Harness):
     def setUp(self) -> None:
         super().setUp()
-        for name in ("adapter.py", "pr_review.py"):
-            (self.repo / "agent/teams" / name).write_text((TEAMS / name).read_text())
+        (self.repo / "agent/teams/adapter.py").write_text((TEAMS / "adapter.py").read_text())
         config = CONFIG.replace("checks_minutes = 30", "checks_minutes = 30\ngithub_seconds = 2")
-        (self.repo / "agent/teams/config.toml").write_text(config + GITHUB)
+        self.write_config(config)
         self.commit("adapter")
-        self.git("update-ref", "refs/remotes/origin/main", "HEAD")
+        self.git("push", "-q", "origin", "main")
         (self.bin / "gh-base").write_text(FAKE_GH)
         (self.bin / "gh").write_text(ADAPTER_GH)
         for name in ("gh", "gh-base"):
@@ -160,28 +152,35 @@ class AdapterTest(Harness):
             assert "not approved" in field
             other = await self.call(client, "project_read", ok=False, project=15)
             assert "not configured" in other
-            design = await self.call(
-                client, "start_design", ok=False, spec=40, entry="critic", lead=True
-            )
-            assert "#441" in design
+            design = await self.call(client, "start_design", ok=False, spec=40, entry="impl")
+            assert "not a configured designer entry" in design
 
         self.session(steps)
         assert not self.events("agent", "start")
         assert not [e for e in self.state()["events"] if e[:3] == ["gh", "project", "item-edit"]]
 
-    def test_pair_review_prompt_status_and_retirement_through_the_adapter(self) -> None:
+    def test_design_pair_review_prompt_status_and_retirement_through_the_adapter(self) -> None:
         async def launch(client: Any) -> None:
             assert "No allocation records" in await self.call(client, "status")
+            await self.call(client, "start_design", spec=40, entry="critic")
             await self.call(client, "start_pair", brief=29)
             status = await self.call(client, "status")
-            assert "impl (implementer, codex) team-1-impl: running" in status, status
+            assert "impl (implementer, codex) team-2-impl: running" in status, status
             assert "dispatcher: not running" in status
             await self.call(client, "prompt_agent", brief=29, entry="tester", text="Your turn")
 
         self.session(launch)
-        assert ["agent", "prompt", "team-1-tester", "Your turn"] in self.state()["events"]
-        wt = self.worktree("29")
-        head = self.push(wt)
+        assert ["agent", "prompt", "team-2-tester", "Your turn"] in self.state()["events"]
+        # The adapter's launches ran no Git, Mix or Dexter step: each clone is the
+        # client's own, prepared by its bootstrap.
+        assert not self.events("mix")
+        assert not self.events("dexter")
+        for name in ("team-1-critic", "team-2-impl", "team-2-tester"):
+            assert not any(self.project(name).iterdir()), name
+        self.bootstrap("team-2-impl")
+        self.bootstrap("team-2-tester")
+        head = self.push("team-2-impl")
+        mixes = len(self.events("mix"))  # the workers' own bootstraps
 
         async def review(client: Any) -> None:
             await self.call(client, "launch_reviewer", pr=7, entry="critic")
@@ -190,18 +189,32 @@ class AdapterTest(Harness):
             assert '"bucket": "pending"' in state
 
         self.session(review)
-        assert self.pane("team-1-critic")["agent"] == "claude"
-        self.git("merge", "-q", "--no-ff", "-m", "merge 29", "task/29")
-        self.clients_exit(1)
+        assert len(self.events("mix")) == mixes
+        assert not any(self.project("team-2-critic").iterdir())
+        self.bootstrap("team-2-critic")
 
-        async def retire(client: Any) -> None:
+        async def unmerged(client: Any) -> None:
+            refused = await self.call(client, "retire_team", ok=False, brief=29)
+            assert "not closed by a merged PR" in refused
+
+        self.session(unmerged)
+        self.merge(head)
+
+        async def first(client: Any) -> None:
+            refused = await self.call(client, "retire_team", ok=False, brief=29)
+            assert "No retirement report yet" in refused
+
+        self.session(first)
+        self.retire("team-2-impl", "team-2-tester", "team-2-critic")
+        self.clients_exit(2)
+
+        async def second(client: Any) -> None:
             status = await self.call(client, "status")
             assert "at the shell, client exited" in status, status
-            await self.call(client, "retire_team", brief=29)
+            assert "slot 2 released" in await self.call(client, "retire_team", brief=29)
 
-        self.session(retire)
-        assert not wt.exists()
-        assert not (self.repo / "agent/teams/allocations/1.json").exists()
+        self.session(second)
+        assert self.recorded_briefs() == {"40"}
 
     def test_board_issue_and_project_writes_name_the_repository_and_dispatcher(self) -> None:
         content = {"number": 29, "url": "https://github.com/o/r/issues/29"}

@@ -7,14 +7,15 @@ Agents follow the [pair workflow](README.md).
 
 ```
 USER         set goals · answer product questions · start the dispatcher once · report an agent that has stopped
-DISPATCHER   open a feature → designers agree on a spec and briefs → team.py start <brief>
+DISPATCHER   open a feature → team.py design <spec> <entry> → designers agree on a spec and briefs → team.py start <brief>
+EVERY CLIENT bootstrap.py prepares its own clone before its first task
 IMPLEMENTER  ask questions only when answers affect the work → code → push → PR "Closes #<brief>" → team.py turn <pr> <tester>
-TESTER       ask the dispatcher to launch the other reviewers → review the head
-DISPATCHER   team.py review <pr> <entry> for each
-REVIEWERS    review from pinned worktrees → notify the tester with the review URL
-TESTER       findings → team.py turn <pr> <implementer>   (repeat until no P0 or P1)
-TESTER       every required review LGTM on the head · required checks pass → gh pr merge → "done"
-DISPATCHER   team.py stop <brief> → next
+             (notifies every required reviewer of the head; asks the dispatcher to launch missing ones)
+DISPATCHER   team.py review <pr> <entry> for each requested reviewer
+REVIEWERS    bootstrap.py --commit <head> → review the head → notify the tester with the review URL
+TESTER       any review with findings → team.py turn <pr> <implementer>   (repeat until no P0 or P1)
+TESTER       pr_review.py observe <pr> reports ready → gh pr merge → "done"
+DISPATCHER   team.py stop <brief> → every client runs retirement.py → team.py stop <brief> → next
 ```
 
 ## One-time setup
@@ -40,7 +41,7 @@ The user maintains third-party skills in these Git-ignored directories in the ma
 - `.agents/skills/`: `elixir`, `phoenix`, `ecto`, `otp`, `oban` and `herdr`, for Codex.
 - `.claude/skills/`: the same five Elixir skills, for Claude.
 
-Keep the Codex and Claude skill copies in sync. `team.py start` links the main checkout's `.agents/skills/` into each worktree and checks only that the directory exists.
+Keep the Codex and Claude skill copies in sync. `team.py` checks that the main checkout's `.agents/skills/` exists, and `bootstrap.py` links it into each clone.
 
 The repository tracks five skills: the [Dexter reference](../skills/dexter/SKILL.md), [design-software](../skills/design-software/SKILL.md), [implement-software](../skills/implement-software/SKILL.md) and [review-software-correctness](../skills/review-software-correctness/SKILL.md). Link them once into both locations from the main checkout:
 
@@ -51,7 +52,7 @@ for skill in dexter design-software implement-software review-software-correctne
 done
 ```
 
-These links let clients discover skills from the main checkout. Agents must read tracked skills and their references from their own worktree, because the linked directory points to the main checkout's copy.
+These links let clients discover skills from the main checkout. Agents must read tracked skills and their references from their own clone, because the linked directory points to the main checkout's copy.
 
 Install only the `mix-credo` plugin, for the clients you use:
 
@@ -65,11 +66,11 @@ claude plugin marketplace add georgeguimaraes/elixir-agent-tools
 claude plugin install mix-credo@elixir-agent-tools
 ```
 
-Generated settings enable Credo for both clients. Claude launches use `--settings` to disable known language-server plugins, including in linked worktrees; existing local settings files are preserved. Remove any old `mcp_servers.elixir-lsp` entry from Codex configuration. The launcher does not disable that server.
+Generated settings enable Credo for both clients. Claude launches use `--settings` to disable known language-server plugins; existing local settings files are preserved. Remove any old `mcp_servers.elixir-lsp` entry from Codex configuration. The launcher does not disable that server.
 
 Build Dexter using the [LSP guide](../lsp/README.md#build). The build uses the pinned source and local patch to produce one binary. Put matching Elixir sources in the main checkout's `agent/lsp/vendor/elixir-<version>/` (the source tree contains `lib/elixir/lib/enum.ex`), or set `DEXTER_ELIXIR_LIB_ROOT` to their `lib/` directory. Stop pairs before replacing the shared build.
 
-Codex launches with approval policy `never`; denied actions cannot escalate, and the launcher does not change sandbox settings. Before the first pair, allow Codex to reach GitHub over HTTPS, the Herdr and Dexter Unix sockets, and the local database and test port. `--allow-unix-socket` is a flag of `codex sandbox`, not of the interactive client the launcher starts. Verify in a launched tester: `gh pr view 331 --json state`, `herdr agent get "$HERDR_PANE_ID"`, `"$TIPS_DEXTER" lookup Tips.Repo` and `unbuffer mix test`.
+Codex launches with approval policy `never` and `-C <allocation directory>`; denied actions cannot escalate, and the launcher does not change sandbox settings. Workers run with your current client settings: worker sandbox profiles are deferred by the user's decision of 2026-10-14 ([#437](https://github.com/chenghanlee/tips/issues/437)). Before the first pair, allow Codex to reach GitHub over HTTPS, the Herdr and Dexter Unix sockets, and the local database and test port. `--allow-unix-socket` is a flag of `codex sandbox`, not of the interactive client the launcher starts. Verify in a launched tester: `gh pr view 331 --json state`, `herdr agent get "$HERDR_PANE_ID"`, `"$TIPS_DEXTER" lookup Tips.Repo` and `unbuffer mix test`.
 
 ### Browser access for the tester
 
@@ -168,12 +169,13 @@ type `board changed` in its pane. Answer its product and scope questions there.
 Each message gives the dispatcher full context, so it compacts at the configured
 threshold (`dispatcher.compact_percent`) and reloads state from GitHub.
 
-The dispatcher's tools run `team.py` from the main checkout. Handle each client's
-initial repository trust prompt. If an approval prompt stops launch, inspect it and
-follow the active approval policy. Until the design lifecycle
-([#441](https://github.com/chenghanlee/tips/issues/441)) is installed, the dispatcher
-cannot launch designers: when it asks, prepare the design worktree and launch them by
-hand as the [dispatcher role](roles/dispatcher.md#open-a-feature) describes.
+The dispatcher's tools run `team.py` from the main checkout. Clients start in their
+allocation directory, so a client may ask whether to trust it. On 2026-10-14, a fresh
+allocation under `../agent_teams/tips/` on this machine showed no trust or import
+dialog for Claude Code 2.1.299 or Codex 0.162.1; Codex only warned that `-c` overrides
+run without its shared background server. If a trust prompt appears, it stops that
+launch: inspect it and decide; do not trust a directory you did not expect. If an
+approval prompt stops launch, inspect it and follow the active approval policy.
 
 ## Install a harness release
 
@@ -191,11 +193,13 @@ repository, this checkout's path and the root in `install.json`. The root defaul
 repository name in `github.repository` (`agent_teams/tips/`); `--root` selects another
 directory. The root is created on first use, and its `repository.json` must name the
 configured repository. `TIPS_TEAM_HARNESS`, an absolute `<root>/harness` path, overrides
-the root for the launcher and `team.py`. The install is a copy; it does not protect the root from writes.
+the root for the launcher and `team.py`. The install is a copy; it does not protect the
+root from writes.
 `releases/<commit>-<time>/` holds each release and `harness` points at the current one.
 The switch is one atomic rename. A failed install deletes only its own unfinished
 release, so the previous one keeps working. The install never changes `state/` or
-`allocations/`. Earlier releases stay on disk; to roll back, install the earlier commit again.
+`allocations/`, and it refuses while the target root's `state/` holds a team record or an
+allocation that is neither recorded nor retired. Earlier releases stay on disk; to roll back, install the earlier commit again.
 Start the installed dispatcher with `<root>/harness/agent/teams/dispatch`.
 
 ## Configuration
@@ -208,8 +212,12 @@ client, model, effort, optional advisor and persona, database suffix and port of
 Briefs name entries in `Implementer:` and `Required reviews:`.
 
 A configured entry can run in several allocations. Each launch records its
-resources, and the team's Herdr workspace and tabs, in
-`agent/teams/allocations/<slot>.json`; restart, handoff and cleanup read that record. Scripts use the main checkout's config unless
+resources, and the team's Herdr workspace and tabs, in `<root>/state/<slot>.json`
+([allocations](README.md#allocations)); restart, handoff and cleanup read that record.
+`github.repository` names the repository and the root; `team.clone_url` is what each
+client clones; `team.psql` is the fixed argv `stop` uses to list and drop a retired
+team's databases (the shipped value is the compose database's local development
+connection). Scripts use the main checkout's config unless
 `TIPS_TEAM_CONFIG=/absolute/path` selects another file. Settings apply at the next launch;
 a relaunched client keeps its recorded database, port and client kind and takes its
 model, effort, advisor and persona from the current file.
@@ -218,12 +226,72 @@ A Claude entry launches with `--advisor <advisor>` when its `advisor` is set; th
 
 | Allocation | Components |
 |---|---|
-| Database suffix | `team.db_suffix_prefix`, slot number, `agents.<entry>.db_suffix` |
+| Database suffix | `team.db_suffix_prefix`, slot number, `g`, generation, `agents.<entry>.db_suffix` |
 | Test port | `team.port_base` + slot number × `team.port_stride` + entry `port_offset` |
+
+`timeouts.lock_seconds` bounds how long `start`, `design`, `review`, `reset` or `stop` waits for
+another one to finish.
 
 `timeouts.dexter_startup_seconds` bounds the Dexter warm-up at start, Elixir version detection and the daemon stop during cleanup. `TIPS_DEXTER_HOME` selects another shared Dexter build directory.
 
 Set database connection limits in [compose.yaml](../../compose.yaml). `TIPS_DB_MAX_CONNECTIONS` overrides those limits. Recreate the database service to apply changes. Do this only when no pairs are running.
+
+## Launch recovery
+
+`team.py` records each client's task-submission state before the client can act on it:
+
+| State | Meaning |
+|---|---|
+| `never_submitted` | Nothing was sent, or the operator ran `reset` after checking the client's work. `start` or `review` may launch the client. |
+| `unknown` | Written before the client starts. The launch stopped before Herdr confirmed the task prompt. |
+| `submitted` | Herdr sent the task prompt. It does not mean the task is done. |
+
+A Claude client holds its brief as its system prompt; its task prompt is `Begin.`. A
+Codex client starts with no instructions and gets its brief as its task prompt, because
+no tested signal yet shows that Codex accepted a task passed at start.
+
+After an interrupted `start` or `review`, rerun it:
+
+- A running client with its recorded name, kind and allocation is kept, and nothing is
+  resent. If its task submission is `unknown`, the command says so. Read the pane. If
+  the client never got its task, exit it, then reset it as below.
+- A stopped client whose task submission is `unknown` or `submitted` is refused: it may
+  have done its task and exited. You, the operator, decide whether to replay it. Check
+  the brief, the PR and its reviews. To replace it, run
+  `agent/teams/team.py reset <brief> <entry>`, then rerun the command. The replacement
+  gets its task again.
+- A client with no record entry is recorded as `unknown` and refused when an earlier
+  allocation of its entry for the same issue that was never retired, a Herdr workspace
+  of the issue or a Herdr client with its name remains: a lost record does not prove that
+  nothing was sent. Database names carry the generation, so an earlier launch's
+  databases belong to that allocation. Close any earlier workspace, then reset it as
+  above.
+- Another client in a recorded pane, a live client the record never started, a client
+  whose session differs from the recorded one, or a client that reports no session is
+  refused. Inspect the pane. `team.py` assigns each Claude client's session id at
+  launch; a Codex client's is recorded when Herdr first reports it. Herdr reports
+  sessions through the user hook, so keep that hook installed.
+
+`start`, `design`, `review`, `reset` and `stop` hold a lock on `<root>/state/.lock`. A
+command that waits longer than `timeouts.lock_seconds` stops with a `Busy` error; rerun
+it when the other command has finished. The lock is released when its holder exits,
+including after a crash. Keep the root on a local filesystem: the
+lock and the durable record writes are not reliable on a network filesystem.
+
+### Records from an older team.py
+
+Earlier versions kept records in the main checkout's `agent/teams/allocations/` and
+shared one worktree per pair. While any `agent/teams/allocations/*.json` exists, this
+version refuses every launch and stop. Before you install it, drain each old record with
+the `team.py` that wrote it:
+
+- Merged brief: run its `stop`.
+- Brief in progress: push the worktree's work, write down each client's name and session
+  (the brief's launch EVENTs show them, so `board.py usage` still counts them), exit its
+  clients, close its Herdr workspace and move the record out of
+  `agent/teams/allocations/`. With this version, `start` launches new clients in new
+  allocations; the implementer's clone checks out the pushed `task/<brief>`. Remove the
+  old worktree by hand once its work is pushed.
 
 ## Changing these scripts
 

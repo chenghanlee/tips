@@ -11,6 +11,7 @@ import unittest
 from pathlib import Path
 
 from team import execute, repo_key
+from tests.test_team import TEST_RUNS
 
 TEAMS = Path(__file__).resolve().parents[1]
 IDENTITY = ["-c", "user.name=Test", "-c", "user.email=test@example.invalid"]
@@ -20,7 +21,8 @@ MISSING = "nonexistent-package==1.0 --hash=sha256:" + "0" * 64 + "\n"
 
 class InstallTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory(prefix="install test ")
+        TEST_RUNS.mkdir(parents=True, exist_ok=True)
+        self.tmp = tempfile.TemporaryDirectory(prefix="install test ", dir=TEST_RUNS)
         self.addCleanup(self.tmp.cleanup)
         base = Path(self.tmp.name).resolve()
         self.source, self.root = base / "source", base / "harness root"
@@ -51,10 +53,10 @@ class InstallTest(unittest.TestCase):
         self.git("commit", "-q", "-m", message)
         return self.git("rev-parse", "HEAD")
 
-    def install(self, commit: str, ok: bool = True) -> str:
+    def install(self, commit: str, ok: bool = True, root: Path | None = None) -> str:
         script = self.source / "agent/teams/install.py"
         result = execute(
-            ["python3", script, commit, "--root", self.root],
+            ["python3", script, commit, "--root", root or self.root],
             cwd=self.source,
             env=self.env,
             timeout=300,
@@ -101,11 +103,24 @@ class InstallTest(unittest.TestCase):
         unmerged = self.commit("not merged")
         assert "not merged into origin/main" in self.install(unmerged, ok=False)
         self.git("checkout", "-q", "main")
-        record = self.source / "agent/teams/allocations/1.json"
-        record.parent.mkdir()
+        # The root being changed must be drained: a team record, readable or not, or an
+        # allocation that is neither recorded nor retired refuses the install.
+        record = self.root / "state/1.json"
         record.write_text("{}\n")
         assert "drain them first" in self.install(self.first, ok=False)
         record.unlink()
+        allocation = self.root / "state/g1-impl"
+        allocation.mkdir()
+        (allocation / "bootstrap.json").write_text("{}\n")
+        assert "g1-impl" in self.install(self.first, ok=False)
+        (allocation / "retired.json").write_text("{}\n")
+        # A root inside the checkout or a temporary directory is refused before any write.
+        inside = self.install(self.first, ok=False, root=self.source / "agent_teams/r")
+        assert "inside" in inside
+        assert not (self.source / "agent_teams").exists()
+        with tempfile.TemporaryDirectory() as temporary:
+            refused = self.install(self.first, ok=False, root=Path(temporary).resolve() / "r")
+            assert "inside" in refused
         # The same repository name under another owner is refused.
         (self.root / "repository.json").write_text(json.dumps({"repository": "x/r"}))
         assert "belongs to x/r, not o/r" in self.install(self.first, ok=False)

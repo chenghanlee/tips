@@ -44,10 +44,10 @@ implementer's `blocked` with both run links.
    the header carries your session. `usage_summary` counts every session a `launched`
    EVENT names. Write the agent set in the body: designers and the lead, testers and the
    merge-confirming tester, the reviewing designer, each an `[agents.<entry>]` entry.
-2. Launch the designers with `start_design`. Until the design lifecycle
-   ([#441](https://github.com/chenghanlee/tips/issues/441)) is installed, that tool
-   refuses: ask the user to prepare the design worktree and launch each designer, with
-   its role file, persona, the spec issue and whether it is lead or critic.
+2. Launch each designer with `start_design` (spec, entry). Each gets its own allocation
+   and clone, with its own database suffix and port, and its launch EVENT on the spec.
+   The spec body tells it whether it is lead or critic. Retire the spec's team with
+   `retire_team` when the feature is done; the designers' databases are kept.
 3. Assign these personas: architecture (data integrity, contract boundaries,
    consistency, simplicity, testability, effects on other code) and operations (failure
    and recovery, concurrency, security, performance, migrations, existing data). One
@@ -71,7 +71,8 @@ yourself. Then set the brief's Phase to Implement (`project_set_field`) and star
 pair (`start_pair`). Send the accepted PROPOSAL URL to the implementer with
 `prompt_agent`. When a tester asks, launch each reviewer (`launch_reviewer`). After the
 merge-confirming tester reports `done`, confirm the merge (`pr_state`), then retire the
-team (`retire_team`).
+team (`retire_team`). It refuses a brief no merged PR closes. Its first call asks each
+client for a retirement report and refuses; call it again once the reports are posted.
 
 ## Revert a broken main
 
@@ -88,9 +89,10 @@ without sending a message. The user reports the stopped agent with
 `herdr agent prompt dispatcher "<name> stopped"`. You may also discover it at your
 next turn. Then check the agent with `status`, which shows each recorded client's live
 pane, name, state and session, and read its records. Relaunch a stopped pair client
-with `start_pair` and a stopped reviewer with `launch_reviewer`; both relaunch only
-clients whose panes are back at the shell, and each launch posts its EVENT. If
-designers cannot agree, they post BLOCKED. Decide the issue or ask the user. A timeout does not count
+with `start_pair` and a stopped reviewer with `launch_reviewer`; each launch posts its
+EVENT. If a tool refuses because the client may already have done its task, ask the
+user; only the user runs `team.py reset`. If designers cannot agree, they post BLOCKED.
+Decide the issue or ask the user. A timeout does not count
 as approval.
 
 ## Measurement

@@ -166,11 +166,10 @@ def launch_reviewer(pr: Number, entry: Entry) -> str:
 
 
 @server.tool()
-def start_design(spec: Number, entry: Entry, lead: bool) -> str:
-    """Launch a designer for a spec. Available when the design lifecycle is installed."""
-    # PR4 integration point (#441): call team.design(spec, entry) once it exists.
-    del spec, entry, lead
-    raise ToolError("Design launches arrive with the allocation lifecycle (#441); ask the user.")
+def start_design(spec: Number, entry: Entry) -> str:
+    """Launch a configured designer entry for a spec in its own allocation (team.py design).
+    The spec body names the lead and the critics."""
+    return operate(lambda: team.design(str(spec), entry), writes=True)
 
 
 @server.tool()
@@ -182,9 +181,9 @@ def prompt_agent(brief: Number, entry: Entry, text: Message) -> str:
 
 @server.tool()
 def retire_team(brief: Number) -> str:
-    """Stop a merged brief's clients and release its resources (team.py stop)."""
-    # PR4 integration point (#441): retirement removes empty residue itself and reports
-    # partial cleanup; no separate tool.
+    """Retire a team (team.py stop). A brief must be closed by a merged PR. The first call
+    asks each client for a retirement report and refuses; call again once they are posted.
+    Retirement keeps unpreserved work and reports what it retained."""
     return operate(lambda: team.stop_brief(str(brief)), writes=True)
 
 

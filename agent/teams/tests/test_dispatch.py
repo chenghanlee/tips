@@ -12,11 +12,10 @@ from pathlib import Path
 from typing import Any
 
 from team import execute, repo_key
-from tests.test_team import CONFIG
+from tests.test_team import CONFIG, TEST_RUNS
 
 TEAMS = Path(__file__).resolve().parents[1]
 DOCUMENTS = ("AGENTS.md", "README.md", "roles/common.md", "roles/dispatcher.md")
-GITHUB = '\n[github]\nrepository = "o/r"\n\n[github.projects]\n16 = ["Phase"]\n'
 
 # Logs every call with its arguments and the variables the launcher sets. The client stub
 # records its process id, which Herdr's fake reports as the pane's foreground client.
@@ -65,7 +64,8 @@ if Path(sys.argv[0]).name == "herdr":
 
 class DispatchTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory(prefix="dispatch test ")
+        TEST_RUNS.mkdir(parents=True, exist_ok=True)
+        self.tmp = tempfile.TemporaryDirectory(prefix="dispatch test ", dir=TEST_RUNS)
         self.addCleanup(self.tmp.cleanup)
         # The checkout sits in the temporary directory; the harness root is its sibling.
         self.root = Path(self.tmp.name).resolve() / "tips"
@@ -102,7 +102,7 @@ class DispatchTest(unittest.TestCase):
 
     def write_config(self, model: str) -> None:
         dispatcher = f'\n[dispatcher]\nmodel="{model}"\neffort="high"\ncompact_percent=42\n'
-        self.config.write_text(CONFIG + GITHUB + dispatcher)
+        self.config.write_text(CONFIG + dispatcher)
 
     def calls(self, name: str) -> list[list[Any]]:
         lines = self.log.read_text().splitlines() if self.log.exists() else []

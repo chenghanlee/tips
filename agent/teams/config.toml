@@ -1,8 +1,24 @@
 # Agent launch settings. Changes apply to newly started sessions.
 # An empty model uses the client's configured default.
+# GitHub calls name this repository instead of reading it from a checkout. Trusted state
+# lives beside the main checkout, in <checkout parent>/agent_teams/<repository name>/.
+# The dispatcher adapter may read the listed projects, add items to them and set only the
+# listed fields.
+[github]
+repository = "chenghanlee/tips"
+
+[github.projects]
+15 = ["Status"]
+16 = ["Kind", "Feature", "Phase", "Implementer"]
+
 [team]
-# The current database suffix format supports up to 9 teams. Validation rejects
-# suffixes that overlap with numbered database partitions.
+# Each allocation clones this URL itself.
+clone_url = "https://github.com/chenghanlee/tips.git"
+# Fixed argv that `team.py stop` uses to drop a retired team's databases: an absolute
+# psql and the compose database's development connection. No project file is read.
+psql = ["/opt/homebrew/bin/psql", "postgresql://postgres:postgres@127.0.0.1:5433/postgres"]
+# Validation rejects database names that overlap another slot's numbered partitions or
+# exceed PostgreSQL's 63 bytes.
 max_teams = 4
 port_base = 4100
 port_stride = 10
@@ -15,19 +31,12 @@ shutdown_seconds = 15
 shell_seconds = 15
 dexter_startup_seconds = 60
 checks_minutes = 30
+# How long start, review, reset or stop waits for another one to finish.
+lock_seconds = 60
 
 [launch]
 codex_approval = "never"
 claude_permission_mode = "auto"
-
-# GitHub calls name this repository instead of reading it from a checkout. The dispatcher
-# adapter may read these projects, add items to them and set only the listed fields.
-[github]
-repository = "chenghanlee/tips"
-
-[github.projects]
-15 = ["Status"]
-16 = ["Kind", "Feature", "Phase", "Implementer"]
 
 # agent/teams/dispatch always starts this agent as Claude. It compacts at
 # compact_percent because each message starts a new turn with the full conversation.
@@ -37,7 +46,8 @@ effort = "medium"
 compact_percent = 35
 
 # Briefs name agents with `Implementer: <entry>` and `Required reviews: <entry>, <entry>`.
-# Each launch gets a database suffix (db_suffix_prefix + slot + db_suffix)
+# Each launch gets a database suffix (db_suffix_prefix + slot + "g" + generation + db_suffix;
+# db_suffix must start with a non-digit)
 # and a test port (port_base + slot * port_stride + port_offset).
 # `advisor` applies only to Claude entries. `persona` adds optional text to the launch prompt.
 [agents.opus-implementer]

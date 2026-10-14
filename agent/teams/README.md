@@ -1,11 +1,11 @@
 # Team workflow
 
 GitHub issues, PRs and reviews store the workflow state. Herdr messages start turns. One
-dispatcher chooses work, opens features, starts pairs and launches reviewers. It has no
-shell or file tools: it acts only through the fixed operations of
-[adapter.py](adapter.py), which call the commands below. An
-implementer and a merge-confirming tester share one worktree and take turns. Every other
-reviewer uses a separate worktree checked out at the PR head. Follow
+dispatcher chooses work, opens features, starts pairs and launches reviewers and
+designers. It has no shell or file tools: it acts only through the fixed operations of
+[adapter.py](adapter.py), which call the commands below. Every launched client gets its
+own [allocation](#allocations) and its own clone of the repository; no two clients share
+a checkout. Follow
 [AGENTS.md](../../AGENTS.md) and the skill for your task:
 [design-software](../skills/design-software/SKILL.md),
 [implement-software](../skills/implement-software/SKILL.md),
@@ -20,43 +20,86 @@ lists your responsibilities: [dispatcher](roles/dispatcher.md),
 
 ```
 USER         set goals · answer product questions · start the dispatcher once · report an agent that has stopped
-DISPATCHER   open a feature → designers agree on a spec and briefs → team.py start <brief>
+DISPATCHER   open a feature → team.py design <spec> <entry> → designers agree on a spec and briefs → team.py start <brief>
+EVERY CLIENT bootstrap.py prepares its own clone before its first task
 IMPLEMENTER  ask questions only when answers affect the work → code → push → PR "Closes #<brief>" → team.py turn <pr> <tester>
-TESTER       ask the dispatcher to launch the other reviewers → review the head
-DISPATCHER   team.py review <pr> <entry> for each
-REVIEWERS    review from pinned worktrees → notify the tester with the review URL
-TESTER       findings → team.py turn <pr> <implementer>   (repeat until no P0 or P1)
-TESTER       every required review LGTM on the head · required checks pass → gh pr merge → "done"
-DISPATCHER   team.py stop <brief> → next
+             (notifies every required reviewer of the head; asks the dispatcher to launch missing ones)
+DISPATCHER   team.py review <pr> <entry> for each requested reviewer
+REVIEWERS    bootstrap.py --commit <head> → review the head → notify the tester with the review URL
+TESTER       any review with findings → team.py turn <pr> <implementer>   (repeat until no P0 or P1)
+TESTER       pr_review.py observe <pr> reports ready → gh pr merge → "done"
+DISPATCHER   team.py stop <brief> → every client runs retirement.py → team.py stop <brief> → next
 ```
 
 Agents are `[agents.<entry>]` entries in [config.toml](config.toml). A brief names its
 agents: `Implementer: <entry>` and `Required reviews: <entry>, <entry>`, testers first.
 The first tester confirms the merge. A launched client is `team-<slot>-<entry>` in
-Herdr; records use the entry name. Launches are recorded in the main checkout's
-`agent/teams/allocations/<slot>.json`. The restart and cleanup commands read this
-record.
+Herdr; records use the entry name. Launches are recorded in the harness root's
+`state/<slot>.json`, with each client's allocation and task-submission state.
+`start`, `design`, `review`, `reset` and `stop` read this record and run one at a time
+([launch recovery](SETUP.md#launch-recovery)).
+
+### Allocations
+
+The harness root is `agent_teams/<repository name>/` beside the main checkout (for this
+repository, `../agent_teams/tips/`). An absolute `TIPS_TEAM_HARNESS` names
+`<root>/harness` instead, and an installed harness uses the root its `install.json`
+records. `team.py` creates the root on first use with `repository.json` naming
+`github.repository`, and refuses a root that names another repository, including
+another owner's repository with the same name. Each launch creates an allocation whose
+ID (`g<generation>-<entry>`) never repeats:
+
+| Path | Holds | Written by |
+|---|---|---|
+| `allocations/<id>/` | The client's working directory | The client |
+| `allocations/<id>/project/` | The client's own clone; empty until `bootstrap.py` runs | The client |
+| `allocations/<id>/logs/` | Full logs of `bootstrap.py`; `deps-fetched`, the digest of the `mix.lock` last fetched successfully | The client |
+| `state/<id>/bootstrap.json` | The issue and entry, what to clone and check out, the Dexter binary and sources | `team.py` |
+| `state/<id>/retired.json` | What `stop` retained and why | `team.py` |
+| `state/<slot>.json`, `state/.lock`, `state/generation` | Records, the store lock, the last generation | `team.py` |
+
+`team.py` runs no Git, Mix or Dexter command in a project. The client does:
+`python3 <harness>/bootstrap.py [--commit <sha>]` clones into an empty project (the
+implementer on `task/<brief>`, others detached at the commit or at `origin/main`), or
+fetches an existing clone without resetting it. Without `--commit`, it finishes the
+checkout of a clone that an interrupted run left off it, and refuses one with commits or
+files not on origin. With `--commit`, it refuses a dirty clone and a commit that no
+origin branch contains. Then it runs `mix deps.get --check-locked`
+unless a fetch for the current `mix.lock` already succeeded, writes the git-ignored Dexter wrapper and skills link, starts Dexter
+and updates its index. Running them is the proof that the client can clone, fetch and
+index. The console shows at most 8 KiB;
+the full log is in `logs/`. Each database name is `tips_test` or `tips_dev`, then
+`db_suffix_prefix`, the slot, `g`, the generation and the entry's `db_suffix`, so no
+generation reuses another's databases.
+
+**Accepted risk.** Workers retain broad authority. Mistakes, misleading instructions or deliberate actions can modify the harness, records or other allocations, and a worker can perform an operation the dispatcher asks for outside the dispatcher's tool surface. Restricted dispatcher tools remove its direct execution authority (RP8c direct retry prevented) but do not enforce a worker or deputy boundary; the no-proxy rule stays procedural. The sibling root reduces accidental edits from ordinary checkout operations; it does not prevent absolute-path writes. Shared-state corruption can defeat recovery assumptions or lose work. Accepted for this MVP. Revisit after an unauthorized cross-allocation or control-file write, or a delegated denial bypass, in normal use. E0's failures stay recorded as facts, not as passing tests.
 
 ## Commands
 
-Run them from the root of your checkout. The dispatcher's `start_pair`,
-`launch_reviewer`, `retire_team` and `status` tools run `start`, `review`, `stop` and
-`status` from the main checkout.
+Run worker commands from your own allocation. The dispatcher runs `start`, `design`,
+`review`, `stop` and `status` through its `start_pair`, `start_design`,
+`launch_reviewer`, `retire_team` and `status` tools, from the main checkout. Only the
+operator (the user) runs `reset`.
 
 | Command | Caller | Effect |
 |---|---|---|
-| `agent/teams/team.py start <brief>` | Dispatcher | Read `Implementer:` and `Required reviews:`. Create branch `task/<brief>` from `origin/main` and worktree `.worktrees/<brief>`. Set up dependencies and Dexter. Launch the implementer and merge-confirming tester in the team's workspace (see [Herdr layout](#herdr-layout)), write the allocation record, and post one EVENT per launch on the brief. |
-| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Run from the pair checkout. Require a clean tree at the PR head and a PR that closes the brief. Notify the tester with the PR URL, SHA and the `review` commands for reviewers not yet launched. |
-| `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Notify the implementer even if the tree has uncommitted changes. Include any mismatch in the message. |
-| `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create `.worktrees/review-<pr>-<entry>` detached at the PR head with its own database suffix, port, dependencies and Dexter, and launch the reviewer there, in the team's workspace. |
-| `agent/teams/team.py stop <brief>` | Dispatcher | Refuse dirty, unmerged or foreign-owned work. Stop every recorded client and Dexter, drop the slot's databases, remove its worktrees, branch and workspace, delete the record. |
+| `agent/teams/team.py start <brief>` | Dispatcher | Read `Implementer:` and `Required reviews:`. Create an allocation for the implementer (bootstrap branch `task/<brief>`) and the merge-confirming tester. Launch both in the team's workspace (see [Herdr layout](#herdr-layout)), write the record, and post one EVENT per launch on the brief. |
+| `agent/teams/team.py design <spec> <entry>` | Dispatcher | Launch a designer entry for the spec issue in its own allocation, in the spec's team workspace, and post its launch EVENT on the spec. The spec body names the lead and the critics. |
+| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require your own clone to be clean at the PR head and the PR to close the brief. Record the PR's failures (see `observe`); refuse while a merge conflict finding is open. Notify every launched required reviewer of the head and the `bootstrap.py --commit` command that moves its clone there. For each reviewer not launched, post a pending EVENT on the PR and ask the dispatcher to run its `review` command. Try every send; report each failed one. |
+| `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Record the PR's failures, then notify the implementer with the open findings. Your clone's state does not block it. |
+| `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create its allocation, configured for the PR head, with its own database suffix and port, and launch the reviewer in the team's workspace. |
+| `agent/teams/team.py reset <issue> <entry>` | Operator | Record the operator's decision, after checking a stopped client's work on the issue and PR, that `start`, `design` or `review` may launch a replacement in the same allocation that gets the task again. Refuse a running client. |
+| `agent/teams/team.py stop <issue>` | Dispatcher | See [Retirement](#retirement). |
 | `agent/teams/team.py status` | Dispatcher, user | Every allocation record with each client's live Herdr pane, name, kind, state and session, and whether the recorded dispatcher process runs. |
+| `agent/teams/team.py clean` | Operator | List retained allocations with their reasons. Deletes nothing. |
+| `python3 <harness>/bootstrap.py [--commit <sha>]` | Launched client | Prepare your own clone, as [Allocations](#allocations) says. |
+| `python3 <harness>/retirement.py` | Launched client | Fetch origin, then post your clone's state on the issue: clean, unpushed commits, HEAD merged into `origin/main`. Changes nothing. |
 | `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. |
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment; with `--after`, only the comments after that checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | Tokens per launched session and model, from the session logs. |
-| `agent/teams/pr_review.py list <pr>` | Any agent | Recent reviews and every unresolved thread. |
+| `agent/teams/pr_review.py list <pr>` | Any agent | Recent reviews and every unresolved thread. Display only. |
+| `agent/teams/pr_review.py observe <pr>` | Launched client | Read the head, base, mergeability, checks and reviews within one 30-second deadline; refuse a read during which the head or base changed. Required checks are the contexts the base branch's effective rules require; a required check that has not reported blocks, and other checks are only shown. Record each failure once as a FINDING on the PR; append a resolution naming the finding comment's ID when passing evidence for the same check appears; a resolution closes only the findings that the observation read as open. Unavailable evidence records and resolves nothing. Exit 0 only when the PR can merge at this head. |
 | `agent/teams/pr_review.py resolve <thread>` | Thread opener | Resolve your own thread. |
-| `herdr agent prompt dispatcher "<URL> review: run <review commands>"` | Tester | Ask the dispatcher to launch each reviewer the handoff lists as not launched. |
 | `herdr agent prompt team-<slot>-<entry> "<review URL>"` | Other reviewer | Tell the merge-confirming tester a review exists. |
 | `herdr agent prompt dispatcher "<URL> done"` | Tester | The PR merged. |
 | `herdr agent prompt dispatcher "<comment URL> blocked"` | Turn holder | A blocker is recorded. |
@@ -71,18 +114,50 @@ opens with its first client. `start` and `review` reopen a closed pane in the sa
 workspace and tab; `stop` refuses a workspace that holds a pane the record does not
 name, and otherwise closes the whole workspace.
 
-Rerunning `start` or `review` keeps a running client and relaunches a missing one from
-its record. The command refuses a client whose startup did not complete. Inspect its
-pane. Exit the client if it is idle. Then rerun the command. `review` reads the brief's
+Rerunning `start`, `design` or `review` keeps a running client and sends it nothing. It
+refuses a stopped client that may have received its task, and a client whose record is
+missing while an earlier allocation, workspace or Herdr client of it remains. The dispatcher
+reports that refusal to the user; only the operator decides on a replay
+([launch recovery](SETUP.md#launch-recovery)). `review` reads the brief's
 current `Required reviews:` line. To add a reviewer, run its command. The command
 rejects changes to the implementer or merge-confirming tester.
+
+### Retirement
+
+`team.py stop <issue>` for a brief first refuses, asking no client and changing nothing,
+unless GitHub shows the brief closed by a merged PR within `timeouts.shell_seconds`. It
+then needs a retirement report from every client of the team, from its current launch; a
+report from an earlier launch does not count. Until each has one, it changes nothing: it
+asks each running client to run `retirement.py`, prints the command the operator runs
+for a stopped client, and keeps every resource reserved. With every report, it:
+
+1. Refuses, stopping nothing and keeping the record, databases, files and reservation,
+   unless every report shows a clean clone with no unpushed commits and, for a brief,
+   HEAD merged into `origin/main`. Preserve the work, have the client report again, then
+   rerun stop.
+2. Refuses a pane in the workspace that the record does not name, and another client in
+   an allocation.
+3. Stops the recorded clients and closes the workspace.
+4. Stops each project's Dexter daemon with the binary that bootstrap used.
+5. Keeps the reservation while any of the team's ports still answers.
+6. Drops the team's databases and their numbered partitions with the configured
+   `team.psql`, without `FORCE`. A refused drop keeps the rest and the reservation. A
+   design team keeps its databases.
+7. Removes only empty allocation directories, writes `state/<id>/retired.json` with the
+   retained paths and reasons, and deletes the record.
+
+Project and log files are never deleted: a process outside the pane can still write
+there. `agent/teams/team.py clean` lists each retained allocation with its reasons and
+deletes nothing. The operator deletes one by hand, naming its ID
+(`rm -rf <root>/allocations/<id>`), only after establishing that its work is preserved
+and every writer has stopped; an earlier listing or a closed pane is not enough. If
+unsure, keep it.
 
 ## Turns
 
 Every message starts a turn with the recipient's full context. Send only handoffs,
 `done`, `blocked`, the dispatcher's answer to a blocker, a review URL to the
-merge-confirming tester, a new-head notice to a reviewer, the tester's launch request,
-and the design-phase messages the [designer role](roles/designer.md) lists. Do not send
+merge-confirming tester, and the design-phase messages the [designer role](roles/designer.md) lists. Do not send
 acknowledgments or progress updates. Put everything the recipient needs in the message
 or the linked record. After sending, end your turn. If sending fails, keep the turn.
 Report `blocked` with the exact command and error. Do not deliver a denied message
@@ -94,11 +169,10 @@ head and the required checks. Use the first matching row:
 | Condition | Turn |
 |---|---|
 | No PR | Implementer: open it. |
-| A required check failed | Implementer: fix it. |
+| A required check failed, or a FINDING is open | Implementer: fix it. |
 | The latest review of the head by any reviewer in `Required reviews:` is not an LGTM | Implementer: address it. |
-| The head has no review | Tester: review it. |
-| The tester's latest review is an LGTM and a required reviewer has not reviewed the head | Tester: notify that reviewer, or report `blocked` when it is not launched. |
-| Every required reviewer's latest review of the head is an LGTM | Tester: merge. |
+| A required reviewer has not reviewed the head | That reviewer: review it. The handoff notified it or asked the dispatcher to launch it. |
+| `agent/teams/pr_review.py observe <pr>` reports ready to merge | Tester: merge. |
 
 ## PR review record
 
@@ -172,18 +246,28 @@ point. It never settles a P0 or P1 condition.
 
 ### Merge
 
-Merge-confirming tester: merge when every reviewer in `Required reviews:` has an LGTM as
-its latest review of the head, every thread is resolved, and the required checks pass:
+Merge-confirming tester: wait for the required checks, then merge only when `observe`
+reports the PR ready at the head: every reviewer in `Required reviews:` has an LGTM as its
+latest review of that head, every thread is resolved, the required checks pass, GitHub
+reports it mergeable and no FINDING is open.
 
 ```sh
 timeout "$TIPS_CHECK_TIMEOUT_SECONDS" gh pr checks <pr> --watch --required
+agent/teams/pr_review.py observe <pr>
 gh pr merge <pr> --merge --match-head-commit <sha>
 ```
 
-If a check fails, run `agent/teams/team.py turn <pr> <implementer entry>` to notify the
-implementer. If merge is refused for another reason, report `blocked` with the exact
-error. After the merge closes the brief and deletes the branch, notify the dispatcher
-with `done`.
+If a check failed or `observe` records a finding, run
+`agent/teams/team.py turn <pr> <implementer entry>` to notify the implementer. If `observe`
+reports evidence unavailable, run it again later; unavailable never counts as ready. If
+merge is refused for another reason, report `blocked` with the exact error.
+
+A finding that no later check can resolve, for example after a required check was renamed
+or removed, is resolved by hand. Post a FINDING whose first body line is the finding's
+`TEAM_FINDING` marker with `"state":"resolved"` and `"resolves":<id>`, followed by the
+reason: `agent/teams/board.py post <pr> FINDING`. `<id>` is the number after
+`#issuecomment-` in the open finding's URL; a resolution closes only that comment's finding.
+After the merge closes the brief and deletes the branch, notify the dispatcher with `done`.
 
 ## Report and resolve blockers
 
@@ -205,13 +289,12 @@ the tester's allocation goes to the user. Then fix the original issue.
 
 - One PR per issue. Open a new issue for work outside the scope. Keep that work out of
   the current PR.
-- The pair shares one worktree and takes turns; other reviewers have their own. Keep
-  each client's assigned database and test port in every run.
-- Put temporary files in the worktree's `tmp/`. Make source changes in worktrees, never
-  the main checkout.
+- Each client works only in its own clone. Keep its assigned database and test port in
+  every run.
+- Put temporary files in your clone's `tmp/`. Never change the main checkout.
 - Never rewrite published commits: merge `origin/main`, no rebase or force-push.
 - Provider settings come from the main checkout's `.env` through
-  `TIPS_PROVIDER_ENV_FILE`. Never copy secrets into a worktree. Real-provider tests need
+  `TIPS_PROVIDER_ENV_FILE`. Never copy secrets into a clone. Real-provider tests need
   the user's authorization on the issue.
 
 ## Manual browser review
