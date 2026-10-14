@@ -1477,6 +1477,8 @@ class PairLifecycleTest(Harness):
             ('db_suffix = "c"', 'db_suffix = "c"\nprobe = ["make"]', "unknown keys ['probe']"),
             ('psql = ["/fixture/psql", "fixture-dsn"]', "psql = []", "psql must hold 1 to 16"),
             ('db_suffix_prefix = "_t"', 'db_suffix_prefix = "_' + "t" * 50 + '"', "exceed 63"),
+            ('[github.projects]\n16 = ["Phase", "Feature"]\n', "", "github.projects must be"),
+            ('16 = ["Phase", "Feature"]', '16 = ["Phase", 7]', "github.projects.16 must be str"),
         )
         for original, edited, message in cases:
             with self.subTest(edited=edited):
