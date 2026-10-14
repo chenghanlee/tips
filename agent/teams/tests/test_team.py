@@ -642,16 +642,6 @@ elif a[:2] == ["agent", "start"]:
     x["agent_status"] = "blocked" if s.get("start_fails") else "idle"
     if s.get("wrong_start_root"):
         x["cwd"] = s["wrong_start_root"]
-    if mode == "crash_after":
-        # The client outlives its launcher, as a Herdr client does.
-        client = subprocess.Popen(
-            ["sleep", "60"],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
-        s["client_pids"] = s.get("client_pids", []) + [client.pid]
     if mode == "timeout_live":
         finish("timed out waiting for " + a[2])
     result = {"agent": x}
@@ -1651,11 +1641,6 @@ class LaunchRecoveryTest(Harness):
     def starts(self) -> list[str]:
         return [e[2] for e in self.events("agent", "start")]
 
-    def kill_clients(self) -> None:
-        for pid in self.state().get("client_pids", []):
-            with contextlib.suppress(ProcessLookupError):
-                os.kill(pid, signal.SIGKILL)
-
     def test_two_concurrent_starts_launch_each_client_once(self) -> None:
         # The second start runs while the first is starting the implementer.
         self.fault("agent start", "team-1-impl", "concurrent", argv=["start", "29"])
@@ -1700,15 +1685,20 @@ class LaunchRecoveryTest(Harness):
         bodies = [c["body"] for c in self.comments("29")]
         header = "EVENT tester team-1-tester session-team-1-tester\n"
         assert any(body.startswith(header) for body in bodies)
-        # The launcher is killed after the Codex client started; the client outlives it and
-        # never holds the store lock, so the rerun is not busy and adopts it.
-        self.addCleanup(self.kill_clients)
+        # The launcher is killed after the Codex client started. The crash released the
+        # lock, so the rerun is not busy, and it adopts the client.
         self.fault("agent start", "team-2-impl", "crash_after")
         self.team("start", "31", ok=False)
-        assert self.state()["client_pids"]
         assert "Already running: team-2-impl" in self.team("start", "31").stdout
         assert self.starts()[2:] == ["team-2-impl", "team-2-tester"]
         assert not self.prompts("team-2-impl")
+        # The launcher dies before Herdr sends Begin.: the task was not submitted.
+        self.fault("agent prompt", "team-3-tester", "crash_before")
+        self.team("start", "30", ok=False)
+        assert self.record(3)["agents"]["tester"]["submission"] == "unknown"
+        rerun = self.team("start", "30").stdout
+        assert "team-3-tester: task submission is unknown; nothing was resent" in rerun
+        assert self.prompts("team-3-tester") == ["Begin."]  # only the call the crash cut short
 
     def test_task_done_and_client_exited_before_the_record_update_is_never_replayed(self) -> None:
         self.fault("agent start", "team-1-tester", "timeout_exited")

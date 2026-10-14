@@ -613,7 +613,8 @@ def store_lock() -> Generator[None]:
 
     The lock is on a file that is never replaced, so it is not lost when a record is
     rewritten. The kernel releases it when this process exits, even after a crash. Python
-    opens files non-inheritable, so a child process never holds it.
+    opens the file non-inheritable and `subprocess` closes other descriptors by default, so
+    a child does not receive it.
     """
     path = records_dir() / ".lock"
     path.parent.mkdir(parents=True, exist_ok=True)

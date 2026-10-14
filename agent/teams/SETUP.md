@@ -193,7 +193,7 @@ Set database connection limits in [compose.yaml](../../compose.yaml). `TIPS_DB_M
 
 | State | Meaning |
 |---|---|
-| `never_submitted` | Nothing was sent. `start` or `review` may launch the client. |
+| `never_submitted` | Nothing was sent, or the operator ran `reset` after checking the client's work. `start` or `review` may launch the client. |
 | `unknown` | Written before the client starts. The launch stopped before Herdr confirmed the task prompt. |
 | `submitted` | Herdr sent the task prompt. It does not mean the task is done. |
 
