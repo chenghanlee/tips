@@ -24,7 +24,7 @@ Run these additional tests for the listed changes:
 |---|---|---|
 | Provisioning or client stopping | Real-daemon tests (`-k real_daemons`), with `TIPS_TEST_REAL_DEXTER` and `DEXTER_ELIXIR_LIB_ROOT` set. See the [LSP guide](../lsp/README.md). | CI runs these in the `dexter` job against the newly built binary. |
 | Codex launch arguments or generated Codex configuration | Installed-Codex tests, with `TIPS_TEST_REAL_CODEX=1`. | Run locally and record the result on the PR. CI has no Codex client. |
-| Dispatcher launch arguments, adapter tools or `wait_for_team` | The real restricted client with the launcher's arguments against a disposable copy, fake `gh` and a refusing fake `herdr`: it lists only the adapter tools and stays in the wait loop through a timeout until a worker request arrives. | Run locally and record the transcript summary on the PR. CI has no Claude client. |
+| Dispatcher launch arguments or adapter tools | The real restricted client with the launcher's arguments against a disposable copy, fake `gh` and a refusing fake `herdr`: it lists only the adapter tools and a read tool works. | Run locally and record the transcript summary on the PR. CI has no Claude client. |
 
 ## Dependencies and test isolation
 

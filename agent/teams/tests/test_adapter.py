@@ -6,7 +6,6 @@ SDK these tests are skipped and say so.
 
 import asyncio
 import importlib.util
-import json
 import os
 import sys
 import unittest
@@ -42,7 +41,6 @@ TOOLS = {
     "board_read",
     "board_post",
     "usage_summary",
-    "wait_for_team",
     "project_read",
     "project_add_item",
     "project_set_field",
@@ -56,26 +54,6 @@ a = sys.argv[1:]
 path = Path(os.environ["HERDR_FIXTURE"])
 s = json.loads(path.read_text())
 base = str(Path(sys.argv[0]).with_name("gh-base"))
-if a[0] == "api" and a[1] != "--paginate":
-    # Comment reads by page or by id, as pending.py makes them.
-    s.setdefault("events", []).append(["gh", *a])
-    path.write_text(json.dumps(s))
-    route, _, query = a[1].partition("?")
-    parts = route.split("/")
-    def located(number, comment):
-        return {**comment, "issue_url": "https://api.github.com/repos/o/r/issues/" + number}
-    stored = s.get("comments", {})
-    if parts[-2] == "comments":
-        found = [located(n, c) for n, cs in stored.items() for c in cs if str(c["id"]) == parts[-1]]
-        if not found:
-            sys.exit("gh: Not Found (HTTP 404)")
-        print(json.dumps(found[0]))
-    else:
-        params = dict(pair.split("=") for pair in query.split("&"))
-        size, page = int(params["per_page"]), int(params["page"])
-        page_items = stored.get(parts[-2], [])[(page - 1) * size : page * size]
-        print(json.dumps([located(parts[-2], c) for c in page_items]))
-    sys.exit(0)
 if a[:2] == ["pr", "view"] and "state" in a[a.index("--json") + 1]:
     pass
 elif a[:2] not in (["issue", "create"], ["pr", "checks"], ["pr", "list"]) and a[0] != "project":
@@ -109,7 +87,7 @@ elif a[1] in ("item-add", "item-edit"):
 class AdapterTest(Harness):
     def setUp(self) -> None:
         super().setUp()
-        for name in ("adapter.py", "pending.py", "pr_review.py"):
+        for name in ("adapter.py", "pr_review.py"):
             (self.repo / "agent/teams" / name).write_text((TEAMS / name).read_text())
         config = CONFIG.replace("checks_minutes = 30", "checks_minutes = 30\ngithub_seconds = 2")
         (self.repo / "agent/teams/config.toml").write_text(config + GITHUB)
@@ -145,28 +123,6 @@ class AdapterTest(Harness):
                 await steps(client)
 
         asyncio.run(run())
-
-    def request(self, issue: int, kind: str, name: str) -> int:
-        """Post a worker's request comment to the fixture as board.py would; return its id."""
-        state = self.state()
-        comments = state.setdefault("comments", {})
-        number = sum(len(c) for c in comments.values()) + 1
-        body = f"{kind} implementer {name} worker-session\n{kind.lower()} {number}"
-        url = f"https://github.com/o/r/issues/{issue}#issuecomment-{number}"
-        created = "2026-10-14T10:00:00Z"
-        comment = {"id": number, "html_url": url, "body": body, "created_at": created}
-        comments.setdefault(str(issue), []).append(comment)
-        self.update(comments=comments)
-        return number
-
-    @staticmethod
-    async def wait(client: Any) -> dict[str, Any]:
-        text = await AdapterTest.call(client, "wait_for_team", timeout=0)
-        return json.loads(text)
-
-    @staticmethod
-    def ids(found: dict[str, Any], key: str = "requests") -> list[int]:
-        return [item["comment_id"] for item in found.get(key, [])]
 
     @staticmethod
     async def call(client: Any, name: str, ok: bool = True, **arguments: Any) -> str:
@@ -282,68 +238,3 @@ class AdapterTest(Harness):
         create = ["issue", "create", "--repo", "o/r", "--title", "Spec", "--body-file", "-"]
         assert creates == [["gh", *create]]
 
-    def test_a_request_stays_open_until_an_action_record_names_it(self) -> None:
-        async def idle(client: Any) -> None:
-            found = await self.wait(client)
-            assert found == {"result": "idle", "watched": [], "github_requests": 0}, found
-            await self.call(client, "start_pair", brief=29)
-
-        self.session(idle)
-        # Two independent requests on one thread.
-        blocked = self.request(29, "BLOCKED", "team-1-impl")
-        done = self.request(29, "DONE", "team-1-tester")
-
-        async def act(client: Any) -> None:
-            found = await self.wait(client)
-            assert found["result"] == "requests"
-            assert self.ids(found) == [blocked, done]
-            assert found["github_requests"] == 1
-            # An unrelated dispatcher comment handles nothing.
-            await self.call(client, "board_post", issue=29, comment_type="EVENT", body="note")
-            assert self.ids(await self.wait(client)) == [blocked, done]
-            # An action names only one of the two.
-            answer: dict[str, Any] = {"issue": 29, "comment_type": "ANSWER", "body": "Use X."}
-            await self.call(client, "board_post", **answer, answers=[blocked])
-            found = await self.wait(client)
-            assert self.ids(found) == [done]
-            # Delivery only: recorded pending, so it waits for an outcome, not for action.
-            prompt: dict[str, Any] = {"brief": 29, "entry": "tester", "text": "Merged?"}
-            await self.call(client, "prompt_agent", **prompt, answers=[done])
-            found = await self.wait(client)
-            assert found["result"] == "timeout"
-            assert self.ids(found, "awaiting_outcome") == [done]
-            # Answers must be worker requests, and a post answers only its own issue.
-            refused = await self.call(client, "board_post", ok=False, **answer, answers=[1])
-            assert "not a worker BLOCKED or DONE request" in refused
-            other: dict[str, Any] = {"issue": 30, "comment_type": "ANSWER", "body": "No."}
-            await self.call(client, "board_post", ok=False, **other, answers=[done])
-
-        self.session(act)
-        later = self.request(29, "BLOCKED", "team-1-impl")
-
-        async def restart(client: Any) -> None:
-            # A new adapter reads the same records: the request after the action is open.
-            found = await self.wait(client)
-            assert self.ids(found) == [later]
-            assert self.ids(found, "awaiting_outcome") == [done]
-            # A failed action leaves the request open and says so.
-            failed = await self.call(
-                client, "prompt_agent", ok=False, brief=29, entry="ghost", text="x", answers=[later]
-            )
-            assert "no launched ghost" in failed
-            found = await self.wait(client)
-            assert found["requests"][0]["last_action"] == "failed"
-            await self.call(client, "retire_team", ok=False, brief=29, answers=[later])
-            assert self.ids(await self.wait(client)) == [later]
-
-        self.session(restart)
-        records = [c["body"] for c in self.state()["comments"]["29"] if "TEAM_ACTION" in c["body"]]
-        assert len(records) == 4, records
-        assert records[0].startswith("ANSWER dispatcher dispatcher dispatcher-session\nUse X.")
-        assert f'"sources": [{done}], "state": "pending"' in records[1]
-        assert f'"sources": [{later}], "state": "failed"' in records[2]
-        assert records[1].startswith("EVENT dispatcher dispatcher dispatcher-session\n")
-        # Exactly one prompt reached Herdr; the refused and failed actions sent nothing.
-        prompts = [e for e in self.state()["events"] if e[:2] == ["agent", "prompt"]]
-        assert [e[3] for e in prompts].count("Merged?") == 1, prompts
-        assert all(e[3] != "x" for e in prompts), prompts

@@ -9,6 +9,7 @@ You have no shell, file or web tools. Each `tips` tool is one fixed operation
 ([adapter.py](../adapter.py)); this file names the tool for each step. If a step needs
 something no tool does, report it to the user. Do not ask another agent to run it for
 you. After a tool times out on a write, read the current state before you repeat it.
+If `prompt_agent` fails, keep the turn and report the exact error to the user.
 
 ## Choose work
 
@@ -78,24 +79,6 @@ latest `main` run, find the PR that broke `main`. Ask the merge-confirming teste
 the affected brief, with `prompt_agent`, to open the revert from its own checkout
 (`gh pr revert <pr>`), merge it after the required checks pass, and report `done`.
 If the cause needs diagnosis outside that tester's allocation, report it to the user.
-
-## Wait for the team
-
-Workers notify you through Herdr; that is the required path. They may also record
-`done`, `blocked` and launch requests as DONE or BLOCKED comments on the brief or PR.
-`wait_for_team` is optional: call it with a timeout of up to 300 seconds to find
-recorded requests nobody has answered, for example after a restart or when a message
-may have been missed.
-
-- `requests`: handle each one. Pass its `comment_id` in `answers` to the tool that acts on
-  it: `board_post` for an answer or decision on the same issue, `start_pair`,
-  `launch_reviewer`, `retire_team` or `prompt_agent`. The tool records the outcome on the
-  issue. A failed action leaves the request open; `prompt_agent` records it as pending,
-  since delivery does not show the outcome. An unrelated comment handles nothing.
-- `timeout`: nothing recorded is open. `idle`: no team runs.
-- `unavailable` or `incomplete`: report the detail to the user and end your turn.
-- `awaiting_outcome` lists requests already acted on. Do not repeat the action; read the
-  records first.
 
 ## Liveness
 

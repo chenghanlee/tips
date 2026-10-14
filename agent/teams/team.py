@@ -1805,10 +1805,6 @@ def status() -> None:
             print("  " + client_state(allocation, panes, agents))
 
 
-class AmbiguousError(RuntimeError):
-    """A write that may have taken effect before it failed."""
-
-
 def prompt_agent(brief: str, entry: str, text: str) -> None:
     """Send text to a recorded client of the brief once its pane holds that same client.
 
@@ -1828,7 +1824,7 @@ def prompt_agent(brief: str, entry: str, text: str) -> None:
     try:
         herdr("agent", "prompt", allocation["name"], text)
     except subprocess.TimeoutExpired as error:
-        raise AmbiguousError(
+        raise RuntimeError(
             f"Prompt to {allocation['name']} timed out after it was sent; it may have been "
             "delivered. Read the agent's records before sending it again."
         ) from error

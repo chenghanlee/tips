@@ -8,7 +8,6 @@ GitHub calls name the configured repository. Run with the locked environment
 """
 
 import contextlib
-import datetime
 import io
 import json
 import os
@@ -22,7 +21,6 @@ from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import Field
 
 import board
-import pending
 import pr_review
 import team
 
@@ -42,9 +40,6 @@ CommentType = Literal[
     "PROPOSAL", "CRITIQUE", "QUESTION", "ANSWER", "AGREE", "FINDING", "BLOCKED", "DONE", "EVENT"
 ]
 PrState = Literal["open", "closed", "merged", "all"]
-# Worker request comment ids an action answers (pending.py).
-Answers = Annotated[list[Number], Field(max_length=20)]
-Seconds = Annotated[int, Field(ge=0, le=300)]
 ERRORS = (
     RuntimeError,
     OSError,
@@ -113,45 +108,6 @@ def dispatcher() -> tuple[str, str, str]:
     return ("dispatcher", "dispatcher", os.environ.get("TIPS_DISPATCHER_SESSION", ""))
 
 
-def answering(
-    summary: str, answers: list[int], action: Callable[[], str | None], delivered: bool = False
-) -> Callable[[], str | None]:
-    """Run an action that answers worker requests, then record its outcome on their issues.
-
-    The record is a dispatcher EVENT ending with the pending.py marker: done after the
-    action completed, pending if it only delivered a message or its outcome is unknown,
-    failed if it failed. Invalid ids refuse the action before it runs.
-    """
-
-    def run() -> str | None:
-        groups = pending.source_issues(answers) if answers else {}
-        failure: BaseException | None = None
-        result: str | None = None
-        try:
-            result = action()
-            state = "pending" if delivered else "done"
-        except (team.AmbiguousError, subprocess.TimeoutExpired) as error:
-            failure, state = error, "pending"
-        except ERRORS as error:
-            failure, state = error, "failed"
-        try:
-            for issue, sources in groups.items():
-                # The time keeps a repeated record from matching an older identical one.
-                at = datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds")
-                text = f"{summary}: {state} at {at}\n{pending.marker(sources, state)}"
-                print(f"Recorded {state}: {board.post_as(str(issue), 'EVENT', dispatcher(), text)}")
-        except ERRORS as error:
-            raise RuntimeError(
-                f"{summary}: {state}, but recording it failed ({error}); the request will be "
-                "returned again. Read the current state before acting on it."
-            ) from failure or error
-        if failure is not None:
-            raise failure
-        return result
-
-    return run
-
-
 def gh(*args: str, input_text: str | None = None) -> str:
     """Run gh with a fixed operation shape, the configured repository and the GitHub deadline."""
     return team.run("gh", *args, input_text=input_text, timeout=team.github_seconds())
@@ -186,37 +142,15 @@ def status() -> str:
 
 
 @server.tool()
-def wait_for_team(timeout: Seconds) -> str:
-    """Optional: wait up to timeout seconds for a recorded worker request that needs action.
-    Workers notify you through Herdr; this finds recorded requests nobody answered.
-
-    Reads the briefs and PRs of every allocation record at once, then every 30 s.
-    result is requests (each with its comment_id), timeout, idle, unavailable or
-    incomplete. Answer a request by passing its comment_id in `answers` to the tool that
-    handles it. Reports the GitHub requests it made.
-    """
-    # A read: no lock or output capture, so it does not block other tools while it waits.
-    try:
-        found = pending.wait(timeout)
-    except ERRORS as error:
-        found = {"result": "unavailable", "detail": str(error)}
-    return cap(json.dumps(found, indent=1))
-
-
-@server.tool()
-def start_pair(brief: Number, answers: Answers | None = None) -> str:
+def start_pair(brief: Number) -> str:
     """Launch a released brief's implementer and merge-confirming tester (team.py start)."""
-    action = answering(f"start_pair {brief}", answers or [], lambda: team.start(str(brief)))
-    return operate(action, writes=True)
+    return operate(lambda: team.start(str(brief)), writes=True)
 
 
 @server.tool()
-def launch_reviewer(pr: Number, entry: Entry, answers: Answers | None = None) -> str:
+def launch_reviewer(pr: Number, entry: Entry) -> str:
     """Launch one additional required reviewer of the PR at its head (team.py review)."""
-    action = answering(
-        f"launch_reviewer {pr} {entry}", answers or [], lambda: team.review(str(pr), entry)
-    )
-    return operate(action, writes=True)
+    return operate(lambda: team.review(str(pr), entry), writes=True)
 
 
 @server.tool()
@@ -228,23 +162,18 @@ def start_design(spec: Number, entry: Entry, lead: bool) -> str:
 
 
 @server.tool()
-def prompt_agent(brief: Number, entry: Entry, text: Message, answers: Answers | None = None) -> str:
+def prompt_agent(brief: Number, entry: Entry, text: Message) -> str:
     """Send a message to a recorded client of the brief, such as a handoff or an answer.
-    Answered requests are recorded pending: delivery does not show the outcome."""
-    summary = f"prompt_agent {brief} {entry}"
-    action = answering(
-        summary, answers or [], lambda: team.prompt_agent(str(brief), entry, text), delivered=True
-    )
-    return operate(action, writes=True)
+    Success means Herdr delivered it, not that the client acted on it."""
+    return operate(lambda: team.prompt_agent(str(brief), entry, text), writes=True)
 
 
 @server.tool()
-def retire_team(brief: Number, answers: Answers | None = None) -> str:
+def retire_team(brief: Number) -> str:
     """Stop a merged brief's clients and release its resources (team.py stop)."""
     # PR4 integration point (#441): retirement removes empty residue itself and reports
     # partial cleanup; no separate tool.
-    action = answering(f"retire_team {brief}", answers or [], lambda: team.stop_brief(str(brief)))
-    return operate(action, writes=True)
+    return operate(lambda: team.stop_brief(str(brief)), writes=True)
 
 
 # Pull requests
@@ -335,22 +264,9 @@ def board_read(issue: Number, after_comment_id: Number | None = None) -> str:
 
 
 @server.tool()
-def board_post(
-    issue: Number, comment_type: CommentType, body: Body, answers: Answers | None = None
-) -> str:
-    """Post a board comment as the dispatcher, with its session in the header. With
-    answers, the comment records those requests of this issue as done."""
-
-    def post() -> str:
-        text = body
-        if answers:
-            groups = pending.source_issues(answers)
-            if set(groups) != {issue}:
-                raise RuntimeError(f"answers must be requests on #{issue}; use the tool that acts")
-            text = f"{body.strip()}\n{pending.marker(answers, 'done')}"
-        return board.post_as(str(issue), comment_type, dispatcher(), text)
-
-    return operate(post, writes=True)
+def board_post(issue: Number, comment_type: CommentType, body: Body) -> str:
+    """Post a board comment as the dispatcher, with its session in the header."""
+    return operate(lambda: board.post_as(str(issue), comment_type, dispatcher(), body), writes=True)
 
 
 @server.tool()
