@@ -51,7 +51,7 @@ ID (`g<generation>-<entry>`) never repeats:
 |---|---|---|
 | `allocations/<id>/` | The client's working directory | The client |
 | `allocations/<id>/project/` | The client's own clone; empty until `bootstrap.py` runs | The client |
-| `allocations/<id>/logs/` | Full logs of `bootstrap.py` | The client |
+| `allocations/<id>/logs/` | Full logs of `bootstrap.py`; `deps-fetched`, the digest of the `mix.lock` last fetched successfully | The client |
 | `state/<id>/bootstrap.json` | The issue and entry, what to clone and check out, the Dexter binary and sources | `team.py` |
 | `state/<id>/retired.json` | What `stop` retained and why | `team.py` |
 | `state/<slot>.json`, `state/.lock`, `state/generation` | Records, the store lock, the last generation | `team.py` |
@@ -60,8 +60,8 @@ ID (`g<generation>-<entry>`) never repeats:
 `python3 <harness>/bootstrap.py [--commit <sha>]` clones into an empty project (the
 implementer on `task/<brief>`, others detached at the commit or at `origin/main`), or
 fetches an existing clone without resetting it. With `--commit`, it refuses a dirty
-clone and a commit that is not on origin. Then it runs `mix deps.get --check-locked` when
-`deps/` is missing, writes the git-ignored Dexter wrapper and skills link, starts Dexter
+clone and a commit that is not on origin. Then it runs `mix deps.get --check-locked`
+unless a fetch for the current `mix.lock` already succeeded, writes the git-ignored Dexter wrapper and skills link, starts Dexter
 and updates its index. Running them is the proof that the client can clone, fetch and
 index. The console shows at most 8 KiB;
 the full log is in `logs/`. Each database name is `tips_test` or `tips_dev`, then

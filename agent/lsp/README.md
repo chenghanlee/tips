@@ -132,9 +132,9 @@ git-ignored paths:
 
 Then it runs three steps in the clone. Any failure blocks the client with its error:
 
-1. `mix deps.get --check-locked`, for a new clone or one without `deps/`;
-   otherwise the existing dependencies are kept. A fetch that would change
-   `mix.lock` fails.
+1. `mix deps.get --check-locked`, unless a fetch for the clone's current
+   `mix.lock` already succeeded; a failed fetch or a new lock fetches again. A
+   fetch that would change `mix.lock` fails.
 2. `dexter.sh query workspace-symbols --raw --wait <timeout> MixProject` starts
    the daemon and checks that its index answers.
 3. `dexter.sh reindex` reconciles the index with the disk.

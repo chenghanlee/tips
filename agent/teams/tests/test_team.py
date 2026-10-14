@@ -444,6 +444,9 @@ state = json.loads(state_path.read_text())
 state['events'].append(['mix', os.getcwd(), *sys.argv[1:]])
 state['mix_env'] = {k: os.environ.get(k) for k in ('HEX_HOME', 'MIX_ENV')}
 state_path.write_text(json.dumps(state))
+if state.get('mix_partial'):
+    Path('deps').mkdir(exist_ok=True)
+    sys.exit('fixture mix failed after writing deps')
 if state.get('mix_fails'):
     sys.exit('fixture mix failed')
 Path('deps').mkdir(exist_ok=True)
@@ -1358,6 +1361,32 @@ class PairLifecycleTest(Harness):
         (self.repo / "agent/lsp/dexter/vendor/dexter").unlink()
         assert "Missing executable" in self.team("start", "34", ok=False).stderr
         assert self.recorded_briefs() == {"29"}
+
+    def test_bootstrap_fetches_dependencies_until_a_fetch_for_the_current_lock_succeeds(
+        self,
+    ) -> None:
+        self.team("start", "29")
+        self.bootstrap("team-1-impl")
+        self.bootstrap("team-1-tester")
+        tester = self.project("team-1-tester")
+
+        def fetches() -> int:
+            return len([e for e in self.events("mix") if e[1] == str(tester)])
+
+        assert fetches() == 1
+        self.bootstrap("team-1-tester")
+        assert fetches() == 1  # same lock, fetched: nothing to do
+        # A new head changes mix.lock: the fetch runs again although deps/ exists.
+        (self.project("team-1-impl") / "mix.lock").write_text("new lock\n")
+        head = self.push("team-1-impl", "new dependency")
+        self.update(mix_partial=True)
+        failed = self.bootstrap("team-1-tester", "--commit", head, ok=False)
+        assert "fixture mix failed after writing deps" in failed.stderr
+        assert fetches() == 2
+        # The failed fetch left deps/ behind; the retry still fetches before ready.
+        self.update(mix_partial=False)
+        assert "Bootstrap ready" in self.bootstrap("team-1-tester", "--commit", head).stdout
+        assert fetches() == 3
 
     def test_lost_setup_output_never_starts_a_client(self) -> None:
         self.update(setup_lost=True)

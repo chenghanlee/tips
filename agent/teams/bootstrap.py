@@ -15,6 +15,7 @@ shows at most CONSOLE_BYTES. This script never calls Herdr.
 
 import argparse
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -245,12 +246,27 @@ def write_helpers(console: Console, settings: dict[str, object], project: Path) 
     return wrapper
 
 
-def prepare(console: Console, settings: dict[str, object], project: Path, fetch: bool) -> None:
+def lock_digest(project: Path) -> str:
+    lock = project / "mix.lock"
+    return hashlib.sha256(lock.read_bytes()).hexdigest() if lock.is_file() else "none"
+
+
+def fetch_deps(console: Console, project: Path, fetched: Path) -> None:
+    """Fetch locked dependencies unless a fetch for this exact mix.lock already succeeded.
+    The marker is written only after success, so a failed or partial fetch, or a new
+    lock, fetches again; deps/ existing proves nothing."""
+    digest = lock_digest(project)
+    if (project / "deps").is_dir() and fetched.is_file() and fetched.read_text() == digest:
+        return
+    fetched.unlink(missing_ok=True)
+    # --check-locked never rewrites the lock.
+    command(console, ["mix", "deps.get", "--check-locked"], project, DEPS_FETCH_SECONDS)
+    fetched.write_text(digest)
+
+
+def prepare(console: Console, settings: dict[str, object], project: Path, fetched: Path) -> None:
     """Fetch locked dependencies, start Dexter and update its index."""
-    if fetch:
-        # --check-locked never rewrites the lock. A reused clone keeps its own dependency
-        # state: it may hold an unfinished change.
-        command(console, ["mix", "deps.get", "--check-locked"], project, DEPS_FETCH_SECONDS)
+    fetch_deps(console, project, fetched)
     wrapper = write_helpers(console, settings, project)
     seconds = cast(int, settings["startup_seconds"])
     budget = seconds + DEXTER_CONNECT_SECONDS + 5
@@ -281,7 +297,7 @@ def bootstrap(commit: str) -> None:
                 clone(console, settings | {"commit": commit or settings["commit"]}, project)
             else:
                 reuse(console, settings, project, commit)
-            prepare(console, settings, project, fresh or not (project / "deps").is_dir())
+            prepare(console, settings, project, logs / "deps-fetched")
             head = git(console, project, "rev-parse", "HEAD")
             if commit and head != commit:
                 raise BootstrapError(f"HEAD is {head}, not {commit}")
