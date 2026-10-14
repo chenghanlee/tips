@@ -182,10 +182,14 @@ def clone(console: Console, settings: dict[str, object], project: Path) -> None:
 def checkout_commit(console: Console, project: Path, commit: str) -> None:
     if not SHA.fullmatch(commit):
         raise BootstrapError(f"--commit must be a full 40-character SHA; received {commit!r}")
+    refused = f"Commit {commit} is not on origin; push it first"
     try:
         git(console, project, "cat-file", "-e", f"{commit}^{{commit}}")
     except BootstrapError as error:
-        raise BootstrapError(f"Commit {commit} is not on origin; push it first") from error
+        raise BootstrapError(refused) from error
+    # A local commit exists here too; only an origin branch that contains it proves a push.
+    if not git(console, project, "branch", "-r", "--contains", commit, "--list", "origin/*"):
+        raise BootstrapError(refused)
     git(console, project, "checkout", "-q", "--detach", commit)
 
 

@@ -1701,11 +1701,14 @@ class HandoffTest(Harness):
         assert "uncommitted or untracked files; nothing changed" in failed.stderr
         assert (tester / "tracked.txt").read_text() == "tester experiment\n"
         assert self.git("rev-parse", "HEAD", cwd=tester) == head
-        # A head that never reached origin is refused.
+        # A head that never reached origin is refused, even when the clone has it locally.
         self.git("checkout", "-q", "tracked.txt", cwd=tester)
-        failed = self.bootstrap("team-1-tester", "--commit", "0" * 40, ok=False)
-        assert "is not on origin; push it first" in failed.stderr
-        assert self.git("rev-parse", "HEAD", cwd=tester) == head
+        local = self.commit("local only", cwd=tester)
+        self.git("checkout", "-q", "--detach", head, cwd=tester)
+        for missing in (local, "0" * 40):
+            failed = self.bootstrap("team-1-tester", "--commit", missing, ok=False)
+            assert f"Commit {missing} is not on origin; push it first" in failed.stderr
+            assert self.git("rev-parse", "HEAD", cwd=tester) == head
         self.bootstrap("team-1-tester", "--commit", repaired)
         assert self.git("rev-parse", "HEAD", cwd=tester) == repaired
 
