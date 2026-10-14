@@ -1425,6 +1425,18 @@ class PairLifecycleTest(Harness):
         self.team("start", "29")
         assert len(self.events("agent", "start")) == 2
 
+    def test_a_team_whose_clients_never_launched_retires_without_reports(self) -> None:
+        self.update(setup_lost=True)
+        self.team("start", "29", ok=False)
+        assert [a["launch"] for a in self.record(1)["agents"].values()] == ["", ""]
+        self.update(setup_lost=False)
+        self.merge(self.git("--git-dir", self.origin, "rev-parse", "main"))
+        self.databases("tips_test_t1g1i")
+        stopped = self.team("stop", "29").stdout
+        assert "slot 1 released" in stopped
+        assert self.recorded_briefs() == set()
+        assert self.remaining_databases() == []
+
     def test_client_started_blocked_or_in_another_root_is_reported(self) -> None:
         # A blocked client has the recorded identity: a rerun adopts it and sends nothing.
         self.update(start_fails=True)

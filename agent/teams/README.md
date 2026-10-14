@@ -122,9 +122,11 @@ rejects changes to the implementer or merge-confirming tester.
 `team.py stop <issue>` for a brief first refuses, asking no client and changing nothing,
 unless GitHub shows the brief closed by a merged PR within `timeouts.shell_seconds`. It
 then needs a retirement report from every client of the team, from its current launch; a
-report from an earlier launch does not count. Until each has one, it changes nothing: it
-asks each running client to run `retirement.py`, prints the command the operator runs
-for a stopped client, and keeps every resource reserved. With every report, it:
+report from an earlier launch does not count. A client that never launched, with no
+launch id and its task never submitted, has no session and needs no report. Until each
+has one, it changes nothing: it asks each running client to run `retirement.py`, prints
+the command the operator runs for a stopped client, and keeps every resource reserved.
+With every report, it:
 
 1. Refuses, stopping nothing and keeping the record, databases, files and reservation,
    unless every report shows a clean clone with no unpushed commits and, for a brief,
