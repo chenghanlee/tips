@@ -4,6 +4,7 @@ import contextlib
 import json
 import os
 import re
+import shutil
 import signal
 import socket
 import subprocess
@@ -1469,6 +1470,24 @@ class PairLifecycleTest(Harness):
         self.env["TIPS_TEAM_HARNESS"] = "agent_teams/r/harness"
         refused = self.team("stop", "29", ok=False)
         assert "TIPS_TEAM_HARNESS must be an absolute path" in refused.stderr
+
+    def test_a_root_in_the_checkout_or_a_temporary_directory_is_refused(self) -> None:
+        scratch, tmp = self.root / "scratch", Path("/tmp").resolve()
+        roots = {
+            "checkout": (self.repo / "x", self.repo, {}),
+            "tmp": (tmp / f"tips-root-{os.getpid()}", tmp, {}),
+            "TMPDIR": (scratch / "x", scratch, {"TMPDIR": str(scratch)}),
+        }
+        env = self.env
+        for case, (root, parent, extra) in roots.items():
+            self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+            with self.subTest(case=case):
+                self.env = {**env, **extra, "TIPS_TEAM_HARNESS": str(root / "harness")}
+                refused = self.team("start", "29", ok=False)
+                assert f"Harness root {root} is inside {parent}; refused" in refused.stderr
+                assert not root.exists()
+        self.env = env
+        assert [e for e in self.state()["events"] if e[0] != "gh"] == []
 
     def test_records_from_a_shared_worktree_team_py_refuse_every_command(self) -> None:
         legacy = self.repo / "agent/teams/allocations/1.json"
