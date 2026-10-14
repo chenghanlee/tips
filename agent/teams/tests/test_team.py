@@ -2474,14 +2474,25 @@ class RepositoryConfigTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=TEST_RUNS) as directory:
             root = Path(directory).resolve() / "agent_teams/tips"
             identity = root / "repository.json"
-            # Both claims see no identity file before either writes one.
-            barrier, exists = threading.Barrier(2), Path.exists
+            # Both claims see no identity file before either writes one; the second publishes
+            # only after the first has read the identity back, so a last-writer-wins
+            # publication lets both claim.
+            barrier, first, read = threading.Barrier(2), threading.Lock(), threading.Event()
+            exists, read_text = Path.exists, Path.read_text
 
             def interleaved(path: Path) -> bool:
                 found = exists(path)
                 if path == identity:
                     barrier.wait(timeout=5)
+                    if not first.acquire(blocking=False):
+                        assert read.wait(timeout=5)
                 return found
+
+            def reading(path: Path, *args: Any, **kwargs: Any) -> str:
+                text = read_text(path, *args, **kwargs)
+                if path == identity:
+                    read.set()
+                return text
 
             def claim(repository: str) -> str:
                 try:
@@ -2490,7 +2501,11 @@ class RepositoryConfigTest(unittest.TestCase):
                 except RuntimeError as error:
                     return str(error)
 
-            with mock.patch.object(Path, "exists", interleaved), ThreadPoolExecutor(2) as pool:
+            with (
+                mock.patch.object(Path, "exists", interleaved),
+                mock.patch.object(Path, "read_text", reading),
+                ThreadPoolExecutor(2) as pool,
+            ):
                 results = list(pool.map(claim, ["owner1/tips", "owner2/tips"]))
             owner = json.loads(identity.read_text())["repository"]
             loser = "owner2/tips" if owner == "owner1/tips" else "owner1/tips"
