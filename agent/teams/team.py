@@ -2213,7 +2213,9 @@ def stop_brief(brief: str) -> None:
         if record["kind"] != "design" and not merged_brief(brief):
             raise RuntimeError(
                 f"#{brief} is not closed by a merged PR. Nothing was asked or stopped; the "
-                "record, databases, files and reservation are kept."
+                "record, databases, files and reservation are kept. If the brief was closed "
+                "without a merged PR, the operator retires it by hand; until then the slot "
+                "stays taken: agent/teams/README.md#retire-a-brief-closed-without-a-merged-pr"
             )
         require_only_recorded_panes(record)
         paths = [retirement_paths(a) for a in record["agents"].values()]

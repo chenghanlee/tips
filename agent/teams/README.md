@@ -150,6 +150,23 @@ deletes nothing. The operator deletes one by hand, naming its ID
 and every writer has stopped; an earlier listing or a closed pane is not enough. If
 unsure, keep it.
 
+#### Retire a brief closed without a merged PR
+
+`stop` refuses a brief that was cancelled or closed without a merged PR, so its slot
+stays taken until the operator retires it by hand. While no `team.py` command runs:
+
+1. Have each client push or record what should be kept, exit it, and close the team's
+   workspace (`herdr workspace close <workspace>` from `state/<slot>.json`).
+2. Stop each clone's Dexter daemon: `<root>/allocations/<id>/project/.dexter/dexter.sh
+   stop`, where the wrapper exists.
+3. For each allocation in the record, write `<root>/state/<id>/retired.json`:
+   `{"id": "<id>", "issue": "<issue>", "db_suffix": "<db_suffix>", "reason": "brief
+   closed without a merged PR", "databases_kept_because": "brief closed without a merged
+   PR"}`. `clean` then lists it, and a later `start` of the issue no longer reports it as
+   an earlier launch.
+4. Rename `<root>/state/<slot>.json` to `<root>/state/<slot>.closed`. This frees the
+   slot; files and databases stay.
+
 ## Turns
 
 Every message starts a turn with the recipient's full context. Send only handoffs,
