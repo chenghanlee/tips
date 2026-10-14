@@ -195,8 +195,9 @@ Rules:
   would fail for a plausible defect. Inspect the setup and expectation when a test
   passes unexpectedly.
 - For a scenario the brief marks `Masking risk:`, supply a control: a small change to
-  production code that introduces the named defect. Run the test with it, confirm the
-  test fails at the assertion that detects that defect, then revert. Put the control
+  production code, or to a stub the test controls, that introduces the named defect.
+  Never change the assertion. Run the test with the control, confirm the test fails at
+  the assertion that detects that defect, then revert. Put the control
   and the failing assertion in the PR body. One control serves several scenarios only
   when it shows each one's distinguishing defect.
 - A double may replace an external call. The production code responsible for the claim
