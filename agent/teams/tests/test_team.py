@@ -1344,6 +1344,20 @@ class PairLifecycleTest(Harness):
     def test_failed_bootstrap_is_recoverable_and_proves_only_the_steps_it_ran(self) -> None:
         self.team("start", "29")
         project = self.project("team-1-impl")
+        # A run killed after the clone and before its checkout left both clones on local
+        # main. A rerun finishes the checkout of a clean clone and refuses local work.
+        tester = self.project("team-1-tester")
+        for clone in (project, tester):
+            self.git("clone", "-q", self.origin, clone, cwd=clone.parent)
+        self.commit("local only", cwd=tester)
+        failed = self.bootstrap("team-1-tester", ok=False)
+        assert "is on main, not a detached HEAD, and has commits or files not on origin" in (
+            failed.stderr
+        )
+        assert self.git("branch", "--show-current", cwd=tester) == "main"
+        self.git("reset", "-q", "--hard", "origin/main", cwd=tester)
+        self.bootstrap("team-1-tester")
+        assert self.git("branch", "--show-current", cwd=tester) == ""
         failures = (
             ({"mix_fails": True}, "fixture mix failed"),
             ({"dexter_fails": True}, "fixture Dexter failed"),
@@ -1362,6 +1376,9 @@ class PairLifecycleTest(Harness):
         mixes = [e for e in self.events("mix") if e[1] == str(project)]
         assert len(mixes) == 2
         assert self.git("branch", "--show-current", cwd=project) == "task/29"
+        assert self.git("rev-parse", "HEAD", cwd=project) == self.git(
+            "rev-parse", "origin/main", cwd=project
+        )
         # Missing tools are refused before a record or allocation exists.
         self.update(issues={**self.state()["issues"], "34": BRIEF})
         self.env["DEXTER_ELIXIR_LIB_ROOT"] = str(self.root / "no-sources")

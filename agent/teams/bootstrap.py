@@ -170,13 +170,36 @@ def clone(console: Console, settings: dict[str, object], project: Path) -> None:
     command(console, ["git", "clone", "-q", url, str(project)], project.parent, GIT_SECONDS)
     if commit:
         checkout_commit(console, project, commit)
-    elif branch:
+    else:
+        check_out_start(console, project, branch)
+
+
+def check_out_start(console: Console, project: Path, branch: str) -> None:
+    """Create the configured branch from its origin branch or origin/main, or detach at
+    origin/main when there is none."""
+    if branch:
         remote = f"origin/{branch}"
         known = git(console, project, "branch", "-r", "--list", remote)
         start = remote if known else "origin/main"
         git(console, project, "checkout", "-q", "--no-track", "-b", branch, start)
     else:
         git(console, project, "checkout", "-q", "--detach", "origin/main")
+
+
+def finish_start(console: Console, project: Path, branch: str) -> None:
+    """Finish the checkout that a first run killed after its clone never reached. Only a
+    clean clone with nothing outside origin moves; anything else is refused."""
+    current = git(console, project, "branch", "--show-current")
+    if current == branch:
+        return
+    dirty = git(console, project, "status", "--porcelain", "--untracked-files=all")
+    if dirty or git(console, project, "rev-list", "HEAD", "--not", "--remotes=origin"):
+        raise BootstrapError(
+            f"{project} is on {current or 'a detached HEAD'}, not {branch or 'a detached HEAD'}"
+            ", and has commits or files not on origin; nothing changed. Push or remove them, "
+            f"check out {branch or 'origin/main detached'}, then run this again."
+        )
+    check_out_start(console, project, branch)
 
 
 def checkout_commit(console: Console, project: Path, commit: str) -> None:
@@ -194,7 +217,8 @@ def checkout_commit(console: Console, project: Path, commit: str) -> None:
 
 
 def reuse(console: Console, settings: dict[str, object], project: Path, commit: str) -> None:
-    """Fetch the worker's existing clone. Move it to `commit` only when it is clean."""
+    """Fetch the worker's existing clone. Move it to `commit` only when it is clean;
+    without one, finish an interrupted start checkout."""
     if Path(git(console, project, "rev-parse", "--show-toplevel")).resolve() != project:
         raise BootstrapError(f"{project} is not the top of its own clone; nothing changed")
     origin = git(console, project, "remote", "get-url", "origin")
@@ -202,6 +226,7 @@ def reuse(console: Console, settings: dict[str, object], project: Path, commit: 
         raise BootstrapError(f"{project}'s origin is {origin}, not {settings['clone_url']}")
     git(console, project, "fetch", "-q", "origin")
     if not commit:
+        finish_start(console, project, str(settings["branch"]))
         return
     if git(console, project, "status", "--porcelain", "--untracked-files=all"):
         raise BootstrapError(

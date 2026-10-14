@@ -59,8 +59,10 @@ ID (`g<generation>-<entry>`) never repeats:
 `team.py` runs no Git, Mix or Dexter command in a project. The client does:
 `python3 <harness>/bootstrap.py [--commit <sha>]` clones into an empty project (the
 implementer on `task/<brief>`, others detached at the commit or at `origin/main`), or
-fetches an existing clone without resetting it. With `--commit`, it refuses a dirty
-clone and a commit that is not on origin. Then it runs `mix deps.get --check-locked`
+fetches an existing clone without resetting it. Without `--commit`, it finishes the
+checkout of a clone that an interrupted run left off it, and refuses one with commits or
+files not on origin. With `--commit`, it refuses a dirty clone and a commit that no
+origin branch contains. Then it runs `mix deps.get --check-locked`
 unless a fetch for the current `mix.lock` already succeeded, writes the git-ignored Dexter wrapper and skills link, starts Dexter
 and updates its index. Running them is the proof that the client can clone, fetch and
 index. The console shows at most 8 KiB;
