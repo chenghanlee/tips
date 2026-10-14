@@ -131,6 +131,10 @@ AGENT_FIELDS = {"role", "kind", "model", "effort", "advisor", "persona", "port_o
 DEXTER_CONNECT_SECONDS = 30
 # A cold Hex cache downloads every package; anything slower is a hung fetch.
 DEPS_FETCH_SECONDS = 300
+# Each GitHub read takes at most this many pages of 100 entries within this many seconds.
+# Initial defaults, not measurements: widen them only after a legitimate read exceeds one.
+READ_PAGES = 10
+READ_SECONDS = 30
 CODEX_CONFIG = """[plugins."mix-credo@elixir-agent-tools"]
 enabled = true
 """
@@ -655,17 +659,33 @@ def repository() -> str:
     return str(json.loads(run("gh", "repo", "view", "--json", "nameWithOwner"))["nameWithOwner"])
 
 
+def read_github(args: Sequence[str], deadline: float, label: str) -> str:
+    """Run one GitHub read within the whole read's deadline; a late read is incomplete."""
+    incomplete = f"{label}: read incomplete after {READ_SECONDS}s"
+    left = deadline - time.monotonic()
+    if left <= 0:
+        raise RuntimeError(incomplete)
+    try:
+        return run(*args, timeout=left)
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError(incomplete) from error
+
+
 def issue_comments(issue: str) -> list[dict[str, object]]:
-    """Return issue comments oldest first, with id, html_url, body and created_at fields."""
-    output = run(
-        "gh", "api", "--paginate", "--slurp", f"repos/{repository()}/issues/{issue}/comments"
-    )
-    pages = json.loads(output)
-    if not isinstance(pages, list):
-        raise RuntimeError(f"issue #{issue} comments: expected pages, received {pages!r}")
-    return [
-        c for page in cast(list[object], pages) for c in object_list(page, f"#{issue} comments")
-    ]
+    """Return issue comments oldest first, with id, html_url, body and created_at fields.
+
+    Deduplication and finding folds need every comment, so a truncated read raises.
+    """
+    deadline = time.monotonic() + READ_SECONDS
+    path = f"repos/{repository()}/issues/{issue}/comments?per_page=100"
+    found: list[dict[str, object]] = []
+    for page in range(1, READ_PAGES + 1):
+        output = read_github(["gh", "api", f"{path}&page={page}"], deadline, f"#{issue} comments")
+        batch = object_list(json.loads(output), f"#{issue} comments")
+        found += batch
+        if len(batch) < 100:
+            return found
+    raise RuntimeError(f"#{issue} has over {READ_PAGES * 100} comments; read incomplete")
 
 
 def post_comment(issue: str, text: str) -> str:
@@ -1319,55 +1339,66 @@ def caller_record() -> tuple[Record, str]:
     raise RuntimeError(f"This pane is {me or 'unnamed'}, not a launched client")
 
 
-def tester_message(record: Record, pr: str, url: str, head: str) -> str:
-    implementer, tester = record["implementer"], record["tester"]
+def poster(allocation: Allocation) -> tuple[str, str, str]:
+    """The (role, name, session) attribution of comments the client posts."""
+    return event_role(allocation), allocation["name"], allocation["session"]
+
+
+def required_reviewers(record: Record) -> list[str]:
+    """The brief's current `Required reviews:` entries, merge-confirming tester first."""
     testers, designers = current_roster(record)
-    others = testers + designers
-    pending = [e for e in others if e not in record["agents"]]
-    message = f"Your turn: review {url} at {head}."
-    if pending:
-        # Reviewer worktrees need Git administration, so the dispatcher provisions them.
-        commands = "; ".join(f"agent/teams/team.py review {pr} {e}" for e in pending)
-        message += (
-            f" Before you review, ask the dispatcher to launch the other reviewers for "
-            f"parallel review: herdr agent prompt dispatcher '{url} review: run {commands}'."
-        )
+    return [record["tester"], *testers, *designers]
+
+
+def findings_text(known: list[tuple[str, str]]) -> str:
+    if not known:
+        return ""
+    return "Open findings: " + "; ".join(f"{check} {url}" for check, url in known) + ". "
+
+
+def tester_message(
+    record: Record, pr: str, url: str, head: str, missing: list[str], known: list[tuple[str, str]]
+) -> str:
+    implementer, tester = record["implementer"], record["tester"]
+    message = f"Your turn: review {url} at {head}. This handoff notified every launched "
+    message += "required reviewer of this head"
+    if missing:
+        message += f" and asked the dispatcher to launch {', '.join(missing)}"
+    message += ". " + findings_text(known)
     message += (
-        " Follow agent/teams/roles/tester.md and agent/skills/review-software-correctness/SKILL.md "
-        "from this worktree and use the README PR review record. "
+        "Follow agent/teams/roles/tester.md and "
+        "agent/skills/review-software-correctness/SKILL.md from this worktree and use the "
+        "README PR review record. "
         f"Put {tester}, <session> on line 2; replace <session> with your session ID. "
-        f"If you find issues, submit your review and run "
-        f"agent/teams/team.py turn {pr} {implementer}. "
-        "If you find no issues, submit LGTM."
-    )
-    if others:
-        named = ", ".join(f"{e} ({live_name(record['slot'], e)})" for e in others)
-        message += (
-            f" After your LGTM, read each required reviewer's latest review of this head: {named}. "
-            f"If a review has findings, run agent/teams/team.py turn {pr} {implementer}. "
-            "If a review is missing, notify that reviewer with the PR URL and head, or "
-            "report blocked if they are not running. When every required reviewer's latest "
-            "review of this head is LGTM, "
-            "follow the README merge step: confirm all threads are resolved and required "
-            "checks pass, then merge."
-        )
-    else:
-        message += (
-            " When your LGTM is the only required review, follow the README merge step: "
-            "confirm all threads are resolved and required checks pass, then merge."
-        )
-    return (
-        message + " After the merge, notify the dispatcher with "
+        "When your review or any required reviewer's latest review of this head has findings, "
+        f"run agent/teams/team.py turn {pr} {implementer}; do not wait for the other reviews. "
+        f"Follow the README merge step when agent/teams/pr_review.py observe {pr} reports "
+        "ready to merge. After the merge, notify the dispatcher with "
         f"herdr agent prompt dispatcher '{url} done'."
     )
+    return message
 
 
-def implementer_message(pr: str, url: str, problem: str | None) -> str:
-    message = (
-        f"Your turn on {url}: run agent/teams/pr_review.py list {pr} and "
-        f"gh pr checks {pr} --required. Fix review findings and failed checks following "
-        "agent/skills/implement-software/SKILL.md from this worktree. Push your changes, "
-        "then hand the turn back to the tester. If blocked, follow the README blocker procedure."
+def reviewer_notice(record: Record, entry: str, url: str, head: str) -> str:
+    tester = live_name(record["slot"], record["tester"])
+    return (
+        f"New head to review on {url}: {head}. In your own worktree run git fetch origin, "
+        f'then git checkout --detach {head}, then "$TIPS_DEXTER" reindex. Review the changes '
+        f"since your last review. Submit the README review record with {entry}, <session> on "
+        f"line 2, then send its URL with herdr agent prompt {tester} '<review URL>'."
+    )
+
+
+def implementer_message(
+    pr: str, url: str, problem: str | None, known: list[tuple[str, str]]
+) -> str:
+    message = f"Your turn on {url}: run agent/teams/pr_review.py list {pr} and "
+    message += f"agent/teams/pr_review.py observe {pr}. " + findings_text(known)
+    message += (
+        "Fix review findings, failed checks and open findings following "
+        "agent/skills/implement-software/SKILL.md from this worktree. Push your changes, then "
+        "run agent/teams/team.py turn <pr> <tester entry>; it notifies every required reviewer. "
+        "If blocked, follow the README blocker procedure."
     )
     if problem:
         # Handing back never refuses: only the implementer can repair the checkout.
@@ -1376,8 +1407,86 @@ def implementer_message(pr: str, url: str, problem: str | None) -> str:
     return message
 
 
+def observe_pr(pr: str, head: str, allocation: Allocation) -> list[tuple[str, str]]:
+    """Record the PR's failures as the caller; return each open finding's check and URL.
+
+    Evidence read for another head is refused: it cannot describe the handed-off commit.
+    """
+    import pr_review  # pr_review imports this module, so load it only when needed.
+
+    state = pr_review.read_state(int(pr))
+    if state.head != head:
+        raise RuntimeError(f"PR {pr} moved from {head} to {state.head}; nothing sent")
+    known = pr_review.observe(state, poster(allocation))
+    return [(finding.check, url) for finding, url in known.items()]
+
+
+def deliver(sends: list[tuple[str, str]]) -> list[str]:
+    """Send every message; return the failed sends with their errors."""
+    failed: list[str] = []
+    for name, message in sends:
+        try:
+            herdr("agent", "prompt", name, message)
+        except (RuntimeError, subprocess.TimeoutExpired) as error:
+            failed.append(f"{name}: {error}")
+        else:
+            print(f"Notified {name}")
+    return failed
+
+
+def request_launch(
+    record: Record, me: str, pr: str, url: str, head: str, missing: list[str]
+) -> list[str]:
+    """Record a pending notice on the PR and ask the dispatcher to launch the reviewers."""
+    failed: list[str] = []
+    try:
+        post_event(
+            pr,
+            record["agents"][me],
+            f"pending review of {head} by {', '.join(missing)}: not launched; "
+            "launch requested from the dispatcher",
+        )
+    except RuntimeError as error:
+        failed.append(str(error))
+    commands = "; ".join(f"agent/teams/team.py review {pr} {entry}" for entry in missing)
+    return failed + deliver([("dispatcher", f"{url} review: run {commands}")])
+
+
+def hand_to_reviewers(
+    record: Record, me: str, pr: str, url: str, head: str, known: list[tuple[str, str]]
+) -> None:
+    """Notify every required reviewer of one head; request launch of the missing ones."""
+    conflicts = [link for check, link in known if check == "mergeability"]
+    if conflicts:
+        raise RuntimeError(
+            f"Known merge conflict {', '.join(conflicts)}: merge origin/main and push, or "
+            "report blocked. Nobody was notified."
+        )
+    reviewers = required_reviewers(record)
+    missing = [entry for entry in reviewers if entry not in record["agents"]]
+    tester = live_name(record["slot"], record["tester"])
+    sends = [(tester, tester_message(record, pr, url, head, missing, known))]
+    sends += [
+        (live_name(record["slot"], entry), reviewer_notice(record, entry, url, head))
+        for entry in reviewers[1:]
+        if entry in record["agents"]
+    ]
+    failed = deliver(sends)
+    if missing:
+        failed += request_launch(record, me, pr, url, head, missing)
+    if failed:
+        raise RuntimeError(
+            "Handoff incomplete; failed sends: " + "; ".join(failed) + ". Report blocked with "
+            "these errors, or rerun turn after fixing them."
+        )
+
+
 def turn(pr: str, recipient: str) -> None:
-    """Transfer the turn to the other pair agent and notify it."""
+    """Hand a pushed head to every required reviewer, or hand findings to the implementer.
+
+    Both directions first record the PR's failures; a failure that cannot be recorded
+    blocks the handoff.
+    """
     record, me = caller_record()
     pair = {record["implementer"], record["tester"]}
     if me not in pair or recipient not in pair or recipient == me:
@@ -1394,18 +1503,16 @@ def turn(pr: str, recipient: str) -> None:
             "fix the PR's closing reference first"
         )
     problem = checkout_problem(head)
-    if recipient == record["implementer"]:
-        message = implementer_message(pr, url, problem)
-    elif problem:
+    if recipient == record["tester"] and problem:
         raise RuntimeError(f"{problem} Commit and push, then hand over.")
+    known = observe_pr(pr, head, record["agents"][me])
+    if recipient == record["implementer"]:
+        partner = live_name(record["slot"], recipient)
+        herdr("agent", "prompt", partner, implementer_message(pr, url, problem, known))
+        print(f"Notified {partner}")
     else:
-        message = tester_message(record, pr, url, head)
-    partner = live_name(record["slot"], recipient)
-    herdr("agent", "prompt", partner, message)
-    print(
-        f"Notified {partner}. Stop using this worktree, build processes and files, "
-        "and database; end your turn now."
-    )
+        hand_to_reviewers(record, me, pr, url, head, known)
+    print("Stop using this worktree, build processes and files, and database; end your turn.")
 
 
 def stop_brief(brief: str) -> None:

@@ -64,7 +64,7 @@ Start a brief only when all these conditions are met:
 
 If there is one designer and no critic, check the PROPOSAL against these conditions
 yourself. Then set the brief to Implement and run `agent/teams/team.py start <brief>`.
-Include the accepted PROPOSAL URL in the handoff. When a tester asks, run
+Include the accepted PROPOSAL URL in the handoff. When a handoff asks, run
 `agent/teams/team.py review <pr> <entry>` for each reviewer. After the merge-confirming
 tester reports `done`, run `agent/teams/team.py stop <brief>`.
 
