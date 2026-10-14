@@ -180,9 +180,56 @@ A Claude entry launches with `--advisor <advisor>` when its `advisor` is set; th
 | Database suffix | `team.db_suffix_prefix`, slot number, `agents.<entry>.db_suffix` |
 | Test port | `team.port_base` + slot number × `team.port_stride` + entry `port_offset` |
 
+`timeouts.lock_seconds` bounds how long `start`, `review`, `reset` or `stop` waits for
+another one to finish.
+
 `timeouts.dexter_startup_seconds` bounds the Dexter warm-up at start, Elixir version detection and the daemon stop during cleanup. `TIPS_DEXTER_HOME` selects another shared Dexter build directory.
 
 Set database connection limits in [compose.yaml](../../compose.yaml). `TIPS_DB_MAX_CONNECTIONS` overrides those limits. Recreate the database service to apply changes. Do this only when no pairs are running.
+
+## Launch recovery
+
+`team.py` records each client's task-submission state before the client can act on it:
+
+| State | Meaning |
+|---|---|
+| `never_submitted` | Nothing was sent. `start` or `review` may launch the client. |
+| `unknown` | Written before the client starts. The launch stopped before Herdr confirmed the task prompt. |
+| `submitted` | Herdr sent the task prompt. It does not mean the task is done. |
+
+A Claude client holds its brief as its system prompt; its task prompt is `Begin.`. A
+Codex client starts with no instructions and gets its brief as its task prompt, because
+no tested signal yet shows that Codex accepted a task passed at start.
+
+After an interrupted `start` or `review`, rerun it:
+
+- A running client with its recorded name, kind and worktree is kept, and nothing is
+  resent. If its task submission is `unknown`, the command says so. Read the pane. If
+  the client never got its task, exit it, then reset it as below.
+- A stopped client whose task submission is `unknown` or `submitted` is refused: it may
+  have done its task and exited. Check the brief, the PR and its reviews. To replace it,
+  run `agent/teams/team.py reset <brief> <entry>`, then rerun the command. The
+  replacement gets its task again.
+- Another client in a recorded pane, or a live client the record never started, is
+  refused. Inspect the pane.
+
+`start`, `review`, `reset` and `stop` hold a lock on `agent/teams/allocations/.lock`. A
+command that waits longer than `timeouts.lock_seconds` stops with a `Busy` error; rerun
+it when the other command has finished. The lock is released when its holder exits,
+including after a crash. Keep `agent/teams/allocations/` on a local filesystem: the
+lock and the durable record writes are not reliable on a network filesystem.
+
+### Records from an older team.py
+
+`team.py` refuses records without a version. A default state could relaunch a client
+that already did its task. Before you install this version, drain each old record with
+the `team.py` that wrote it:
+
+- Merged brief: run its `stop`.
+- Brief in progress: write down each client's name and session (the brief's launch
+  EVENTs show them, so `board.py usage` still counts them), exit its clients, close its
+  Herdr workspace and move the record out of `agent/teams/allocations/`. Then run
+  `start` for the brief with this version. The worktree keeps its work.
 
 ## Changing these scripts
 

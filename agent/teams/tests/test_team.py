@@ -33,6 +33,7 @@ shutdown_seconds = 15
 shell_seconds = 15
 dexter_startup_seconds = 60
 checks_minutes = 30
+lock_seconds = 1
 
 [launch]
 codex_approval = "never"
@@ -470,9 +471,14 @@ path.write_text(json.dumps(s))
 
 # One pane model for every pair: a pane with an agent has a client leading its foreground
 # group; a bare pane is its shell. `pane run` really executes the setup and keeps the result.
+# `faults` injects one failure into the first call whose command and some argument match:
+# crash_before and crash_after kill the calling launcher (SIGKILL) before or after the call
+# takes effect; for `agent start`, timeout_live starts the client and then reports a
+# timeout, timeout_exited runs the task's side effect and exits before the timeout, and
+# concurrent runs a second team.py with `argv` while the first holds the store lock.
 PAIR_HERDR = (
     r"""#!/usr/bin/env python3
-import json, os, subprocess, sys
+import json, os, signal, subprocess, sys
 """
     + PANE_SCREEN
     + r"""
@@ -502,12 +508,31 @@ def pane(key):
 
 def finish(error=None):
     json.dump(s, open(path, "w"))
+    if fault and fault["mode"] == "crash_after":
+        os.kill(os.getppid(), signal.SIGKILL)
     if error:
         sys.exit(error)
     if a[:2] != ["pane", "run"]:
         print(json.dumps({"result": result}))
     sys.exit(0)
 
+
+fault = next(
+    (
+        f
+        for f in s.get("faults", [])
+        if not f.get("done")
+        and a[:2] == f["call"].split()
+        and any(f["arg"] in str(arg) for arg in a[2:])
+    ),
+    None,
+)
+if fault:
+    fault["done"] = True
+    if fault["mode"] == "crash_before":
+        json.dump(s, open(path, "w"))
+        os.kill(os.getppid(), signal.SIGKILL)
+        sys.exit(1)
 
 if a[:2] == ["workspace", "list"]:
     result = {"workspaces": s["workspaces"]}
@@ -599,12 +624,36 @@ elif a[:2] == ["agent", "get"]:
         finish("agent_not_found")
     result = {"agent": x}
 elif a[:2] == ["agent", "start"]:
+    mode = fault["mode"] if fault else None
+    if mode == "concurrent":
+        json.dump(s, open(path, "w"))
+        nested = subprocess.run(
+            ["python3", "agent/teams/team.py", *fault["argv"]], text=True, capture_output=True
+        )
+        s = json.load(open(path))
+        s["nested"] = {"code": nested.returncode, "stderr": nested.stderr}
     x = pane(opt("--pane"))
+    if mode == "timeout_exited":
+        # The client took its task, did it and exited before Herdr saw it ready.
+        s["events"].append(["side-effect", a[2]])
+        finish("timed out waiting for " + a[2])
     x.update(agent=opt("--kind"), name=a[2], launch_argv=a, launch_env=x.get("env", {}))
     x["agent_session"] = {"kind": "id", "value": "session-" + a[2]}
     x["agent_status"] = "blocked" if s.get("start_fails") else "idle"
     if s.get("wrong_start_root"):
         x["cwd"] = s["wrong_start_root"]
+    if mode == "crash_after":
+        # The client outlives its launcher, as a Herdr client does.
+        client = subprocess.Popen(
+            ["sleep", "60"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        s["client_pids"] = s.get("client_pids", []) + [client.pid]
+    if mode == "timeout_live":
+        finish("timed out waiting for " + a[2])
     result = {"agent": x}
 elif a[:2] == ["agent", "prompt"]:
     pane(a[2])
@@ -784,6 +833,15 @@ class Harness(unittest.TestCase):
         self.update(pr_head=head, pr_briefs={**self.state().get("pr_briefs", {}), pr: [brief]})
         return head
 
+    def reset(self, brief: str, *entries: str) -> None:
+        """The operator, having checked the stopped clients' work, allows replacements."""
+        for entry in entries:
+            self.team("reset", brief, entry)
+
+    def prompts(self, name: str) -> list[str]:
+        """The messages Herdr sent to the named client, oldest first."""
+        return [e[3] for e in self.events("agent", "prompt") if e[2] == name]
+
     def launch_env(self, label: str) -> tuple[str, str]:
         env = self.pane(label)["launch_env"]
         return env["TIPS_DB_SUFFIX"], env["TIPS_TEST_PORT"]
@@ -839,7 +897,12 @@ class PairLifecycleTest(Harness):
             "TIPS_TEST_PORT": "4111",
             "HEX_HOME": None,
         }
-        impl_brief, tester_brief = impl["launch_argv"][-1], self.system_prompt("team-1-tester")
+        # Codex starts with no task and gets its brief as the first message; Claude holds
+        # its brief as a system prompt, so its first message only starts the work.
+        assert impl["launch_argv"][-1] == "model_reasoning_effort=\"xhigh\""
+        assert self.prompts("team-1-tester") == ["Begin."]
+        [impl_brief] = self.prompts("team-1-impl")
+        tester_brief = self.system_prompt("team-1-tester")
         assert impl_brief.startswith("You are impl, the implementer for brief #29;")
         assert "team-1-impl" in impl_brief
         assert "team.py turn <pr> tester" in impl_brief
@@ -849,8 +912,6 @@ class PairLifecycleTest(Harness):
         assert "persona" not in tester_brief
         for text in (impl_brief, tester_brief):
             assert f"TIPS_DEXTER={wt / '.dexter/dexter.sh'}" in text
-        # Claude holds its brief as a system prompt, so it alone needs a first message.
-        assert self.events("agent", "prompt") == [["agent", "prompt", "team-1-tester", "Begin."]]
         argv = tester["launch_argv"]
         assert {"fixture-impl", "never"} <= set(impl["launch_argv"])
         assert "fixture-test" in argv
@@ -886,6 +947,8 @@ class PairLifecycleTest(Harness):
             "tester",
         )
         assert record["agents"]["tester"]["session"] == "session-team-1-tester"
+        assert (record["version"], len(record["id"])) == (2, 32)
+        assert {a["submission"] for a in record["agents"].values()} == {"submitted"}
         # Each launch is recorded on the brief as the launched client, with its allocation.
         assert [c["body"] for c in self.comments("29")] == [
             f"EVENT implementer team-1-impl session-team-1-impl\nlaunched codex in {wt}; "
@@ -923,7 +986,7 @@ class PairLifecycleTest(Harness):
         assert not self.state()["workspaces"]
         assert not (self.repo / "agent/teams/allocations").exists()
 
-    def test_restart_keeps_live_clients_and_relaunches_missing_ones_from_the_record(self) -> None:
+    def test_restart_adopts_live_clients_and_replaces_stopped_ones_only_after_reset(self) -> None:
         self.team("start", "29")
         wt = self.worktree("29")
         (wt / "tracked.txt").write_text("unfinished work\n")
@@ -932,8 +995,18 @@ class PairLifecycleTest(Harness):
         self.team("start", "29")
         later = self.state()["events"][before:]
         assert not any(e[:2] in (["agent", "start"], ["pane", "run"]) for e in later)
+        assert not any(e[:2] == ["agent", "prompt"] for e in later)
         assert not any(e[0] == "mix" for e in later)
-        # A missing client is relaunched with the database and port it was launched with,
+        # Reset refuses a running client.
+        refused = self.team("reset", "29", "impl", ok=False)
+        assert "team-1-impl is running in" in refused.stderr
+        # A stopped client may have done its task: a rerun neither relaunches nor resends.
+        self.clients_exit(1)
+        refused = self.team("start", "29", ok=False)
+        assert "team-1-impl is not running and its task submission is submitted" in refused.stderr
+        assert "agent/teams/team.py reset 29 impl" in refused.stderr
+        assert len(self.events("agent", "start")) == 2
+        # After a reset, the replacement gets the database and port it was launched with,
         # even after config.toml changed them; the worktree keeps its unfinished work.
         config = self.repo / "agent/teams/config.toml"
         config.write_text(
@@ -941,12 +1014,16 @@ class PairLifecycleTest(Harness):
                 "port_offset = 1", "port_offset = 5"
             )
         )
-        self.clients_exit(1)
+        reset = self.team("reset", "29", "tester").stdout
+        assert "task submission was submitted, session session-team-1-tester" in reset
+        self.reset("29", "impl")
         self.team("start", "29")
         assert len(self.events("agent", "start")) == 4
         assert self.launch_env("team-1-tester") == ("_t1r", "4111")
         assert (wt / "tracked.txt").read_text() == "unfinished work\n"
-        assert len(self.events("mix")) == 1
+        assert len([e for e in self.events("mix") if e[1] == str(wt)]) == 1
+        assert self.record(1)["agents"]["tester"]["submission"] == "submitted"
+        assert self.prompts("team-1-tester") == ["Begin.", "Begin."]
         assert self.workspaces() == ["team-1-29"]
         # A closed pane is reopened in its role's tab; the allocation keeps its resources.
         # Herdr closes a tab with its last pane, so the role gets a new tab too.
@@ -956,6 +1033,7 @@ class PairLifecycleTest(Harness):
         state["tabs"] = [t for t in state["tabs"] if t["tab_id"] != old["tab"]]
         self.save(state)
         self.clients_exit(1)
+        self.reset("29", "impl", "tester")
         self.team("start", "29")
         new = self.record(1)["agents"]["impl"]
         assert new["pane"] != old["pane"]
@@ -971,6 +1049,7 @@ class PairLifecycleTest(Harness):
         }
         # A vanished workspace is recreated with both clients in their tabs.
         self.update(workspaces=[], tabs=[], panes=[])
+        self.reset("29", "impl", "tester")
         self.team("start", "29")
         assert self.workspaces() == ["team-1-29"]
         workspace = self.record(1)["workspace"]
@@ -982,12 +1061,14 @@ class PairLifecycleTest(Harness):
         assert self.launch_env("team-1-impl") == ("_t1", "4110")
         # A client cannot change kind or disappear from config while it is allocated.
         self.clients_exit(1)
+        self.reset("29", "impl", "tester")
         config.write_text(
             CONFIG.replace(
                 'kind = "codex"\nmodel = "fixture-impl"', 'model = "fixture-impl"\nkind = "claude"'
             )
         )
         assert "launched as codex; preserved" in self.team("start", "29", ok=False).stderr
+        assert self.record(1)["agents"]["impl"]["submission"] == "never_submitted"
         config.write_text(CONFIG.replace("[agents.tester]", "[agents.other]"))
         assert "not a configured entry" in self.team("start", "29", ok=False).stderr
         # The pair cannot change hands while the checkout is theirs.
@@ -1104,37 +1185,36 @@ class PairLifecycleTest(Harness):
         refused = self.team("start", "29", ok=False)
         assert "timed out waiting for output match" in refused.stderr
         assert not self.events("agent", "start")
+        # Nothing could have received the task, so a rerun launches.
+        assert self.record(1)["agents"]["impl"]["submission"] == "never_submitted"
+        self.update(setup_lost=False)
+        self.team("start", "29")
+        assert len(self.events("agent", "start")) == 2
 
     def test_client_started_blocked_or_in_another_root_is_reported(self) -> None:
-        cases = (
-            ("29", {"start_fails": True}, "startup did not complete; inspect"),
-            ("30", {"wrong_start_root": "/"}, "runs in /, not its worktree; preserved"),
-        )
-        for brief, flags, rerun in cases:
-            with self.subTest(flags=flags):
-                self.update(**{"start_fails": False, "wrong_start_root": "", **flags})
-                refused = self.team("start", brief, ok=False)
-                assert "unexpected state or root" in refused.stderr
-                assert len(self.events("agent", "start")) == 1
-                assert not self.events("agent", "prompt")
-                # The client is still there but its startup never completed: a rerun must
-                # not call it ready or start another; the operator exits it, then reruns.
-                refused = self.team("start", brief, ok=False)
-                assert rerun in refused.stderr, refused.stderr
-                assert len(self.events("agent", "start")) == 1
-                assert not self.events("agent", "prompt")
-                self.update(events=[], start_fails=False, wrong_start_root="")
-                self.clients_exit(int(brief) - 28)
-                self.team("start", brief)
-                assert len(self.events("agent", "start")) == 2
-                # A replacement for a client that once ran gets the same treatment: the
-                # old session does not vouch for it.
-                self.clients_exit(int(brief) - 28)
-                self.update(events=[], **flags)
-                assert "unexpected state or root" in self.team("start", brief, ok=False).stderr
-                assert rerun in self.team("start", brief, ok=False).stderr
-                assert len(self.events("agent", "start")) == 1
-                self.update(events=[], start_fails=False, wrong_start_root="")
+        # A blocked client has the recorded identity: a rerun adopts it and sends nothing.
+        self.update(start_fails=True)
+        assert "unexpected state or root" in self.team("start", "29", ok=False).stderr
+        assert self.record(1)["agents"]["impl"]["submission"] == "unknown"
+        self.update(start_fails=False)
+        rerun = self.team("start", "29").stdout
+        assert "Already running: team-1-impl (blocked)" in rerun
+        assert "team-1-impl: task submission is unknown; nothing was resent" in rerun
+        assert len(self.events("agent", "start")) == 2
+        assert not self.prompts("team-1-impl")
+        # A client in another root is not the recorded client: refused.
+        self.update(wrong_start_root="/")
+        assert "unexpected state or root" in self.team("start", "30", ok=False).stderr
+        refused = self.team("start", "30", ok=False)
+        assert "runs in /, not its worktree; preserved" in refused.stderr
+        assert len(self.events("agent", "start")) == 3
+        # Once the operator has exited it and reset the record, a replacement launches.
+        self.update(wrong_start_root="")
+        self.clients_exit(2)
+        self.reset("30", "impl")
+        self.team("start", "30")
+        assert self.prompts("team-2-impl")[0].startswith("You are impl, the implementer")
+        assert self.record(2)["agents"]["impl"]["submission"] == "submitted"
 
     def test_invalid_config_refuses_before_herdr(self) -> None:
         path = self.repo / "agent/teams/config.toml"
@@ -1181,7 +1261,7 @@ class PairLifecycleTest(Harness):
         self.team("start", "29")
         wt = self.worktree("29")
         launch = self.pane("team-1-impl")["launch_argv"]
-        args = launch[launch.index("--") + 1 : -1]
+        args = launch[launch.index("--") + 1 :]
         config = tomllib.loads((wt / ".codex/config.toml").read_text())
         # A CLI trust override does not prove project-file loading. Parse the
         # generated values explicitly, without changing the user's trust store.
@@ -1371,7 +1451,7 @@ class PairLifecycleTest(Harness):
         second = self.pane("team-1-second")
         assert second["agent"] == "codex"
         assert self.launch_env("team-1-second") == ("_t1s", "4113")
-        assert "the additional tester for brief #29" in second["launch_argv"][-1]
+        assert "the additional tester for brief #29" in self.prompts("team-1-second")[0]
         # Every reviewer is a pane in the team's workspace: designers in their own tab,
         # the second tester split off the merge-confirming tester's pane.
         assert self.workspaces() == ["team-1-29"]
@@ -1419,8 +1499,12 @@ class PairLifecycleTest(Harness):
         assert "changed its implementer or merge-confirming tester" in refused.stderr
         assert len(self.events("agent", "start")) == starts
         self.update(issues={**self.state()["issues"], "29": WIDE})
-        # A stopped reviewer moves to the new head when its worktree is clean, never when dirty.
+        # A stopped reviewer is replaced only after a reset. The replacement moves to the new
+        # head when its worktree is clean, never when dirty.
         self.clients_exit(1)
+        refused = self.team("review", "7", "critic", ok=False)
+        assert "task submission is submitted" in refused.stderr
+        self.reset("29", "critic")
         (wt / "notes.txt").write_text("in progress\n")
         refused = self.team("review", "7", "critic", ok=False)
         assert f"is dirty and not at {moved}" in refused.stderr
@@ -1556,6 +1640,119 @@ class PairLifecycleTest(Harness):
         self.team("stop", "29")
         assert log.read_text() == "stop\nstop\n"
         assert not wt.exists()
+
+
+class LaunchRecoveryTest(Harness):
+    """Interrupted launches through `team.py start`, with faults injected into fake Herdr."""
+
+    def fault(self, call: str, arg: str, mode: str, **extra: object) -> None:
+        self.update(faults=[{"call": call, "arg": arg, "mode": mode, **extra}])
+
+    def starts(self) -> list[str]:
+        return [e[2] for e in self.events("agent", "start")]
+
+    def kill_clients(self) -> None:
+        for pid in self.state().get("client_pids", []):
+            with contextlib.suppress(ProcessLookupError):
+                os.kill(pid, signal.SIGKILL)
+
+    def test_two_concurrent_starts_launch_each_client_once(self) -> None:
+        # The second start runs while the first is starting the implementer.
+        self.fault("agent start", "team-1-impl", "concurrent", argv=["start", "29"])
+        self.team("start", "29")
+        nested = self.state()["nested"]
+        assert nested["code"] == 1
+        assert "Busy: another team.py start, review, reset or stop held" in nested["stderr"]
+        assert self.starts() == ["team-1-impl", "team-1-tester"]
+        assert len(self.prompts("team-1-impl")) == 1
+        assert self.prompts("team-1-tester") == ["Begin."]
+
+    def test_crash_before_durable_unknown_relaunches_and_after_it_holds_the_task(self) -> None:
+        # Before: the launcher dies while preparing the tester's shell. No client could have
+        # received the task, and the crash released the lock, so a rerun launches it.
+        self.fault("pane run", "_t1r", "crash_before")
+        self.team("start", "29", ok=False)
+        assert self.record(1)["agents"]["tester"]["submission"] == "never_submitted"
+        self.team("start", "29")
+        assert self.starts() == ["team-1-impl", "team-1-tester"]
+        assert self.prompts("team-1-tester") == ["Begin."]
+        # After: the launcher dies once UNKNOWN is on disk, before the client starts.
+        self.fault("agent start", "team-2-tester", "crash_before")
+        self.team("start", "30", ok=False)
+        assert self.record(2)["agents"]["tester"]["submission"] == "unknown"
+        refused = self.team("start", "30", ok=False)
+        assert "team-2-tester is not running and its task submission is unknown" in refused.stderr
+        assert self.starts() == ["team-1-impl", "team-1-tester", "team-2-impl", "team-2-tester"]
+        assert not self.prompts("team-2-tester")
+
+    def test_client_live_after_launcher_timeout_or_crash_is_adopted_without_resend(self) -> None:
+        # Herdr times out after the Claude tester started: Begin. was never sent.
+        self.fault("agent start", "team-1-tester", "timeout_live")
+        assert "timed out waiting for team-1-tester" in self.team("start", "29", ok=False).stderr
+        assert self.record(1)["agents"]["tester"]["submission"] == "unknown"
+        rerun = self.team("start", "29").stdout
+        assert "team-1-tester: task submission is unknown; nothing was resent" in rerun
+        assert self.starts() == ["team-1-impl", "team-1-tester"]
+        assert not self.prompts("team-1-tester")
+        tester = self.record(1)["agents"]["tester"]
+        assert (tester["session"], tester["submission"]) == ("session-team-1-tester", "unknown")
+        # The adoption records the launch EVENT the timeout skipped.
+        bodies = [c["body"] for c in self.comments("29")]
+        header = "EVENT tester team-1-tester session-team-1-tester\n"
+        assert any(body.startswith(header) for body in bodies)
+        # The launcher is killed after the Codex client started; the client outlives it and
+        # never holds the store lock, so the rerun is not busy and adopts it.
+        self.addCleanup(self.kill_clients)
+        self.fault("agent start", "team-2-impl", "crash_after")
+        self.team("start", "31", ok=False)
+        assert self.state()["client_pids"]
+        assert "Already running: team-2-impl" in self.team("start", "31").stdout
+        assert self.starts()[2:] == ["team-2-impl", "team-2-tester"]
+        assert not self.prompts("team-2-impl")
+
+    def test_task_done_and_client_exited_before_the_record_update_is_never_replayed(self) -> None:
+        self.fault("agent start", "team-1-tester", "timeout_exited")
+        self.team("start", "29", ok=False)
+        assert self.events("side-effect") == [["side-effect", "team-1-tester"]]
+        held = "team-1-tester is not running and its task submission is unknown"
+        for _ in range(2):
+            assert held in self.team("start", "29", ok=False).stderr
+        assert self.starts() == ["team-1-impl", "team-1-tester"]
+        assert not self.prompts("team-1-tester")
+
+    def test_malformed_record_or_uncertain_client_identity_blocks(self) -> None:
+        self.team("start", "29")
+        path = self.repo / "agent/teams/allocations/1.json"
+        good = json.loads(path.read_text())
+        unknown_state = json.loads(path.read_text())
+        unknown_state["agents"]["tester"]["submission"] = "done"
+        cases = {
+            "without record versions": {k: v for k, v in good.items() if k != "version"},
+            "record version 1 is not 2": {**good, "version": 1},
+            "allocation id must be 32 hex digits": {**good, "id": "slot-1"},
+            "agents.tester.submission is not a known state": unknown_state,
+        }
+        for message, value in cases.items():
+            with self.subTest(message=message):
+                path.write_text(json.dumps(value))
+                for command in (("start", "29"), ("reset", "29", "impl"), ("stop", "29")):
+                    assert message in self.team(*command, ok=False).stderr
+        # A live client with the recorded name that this record never started.
+        never = json.loads(json.dumps(good))
+        never["agents"]["tester"]["submission"] = "never_submitted"
+        path.write_text(json.dumps(never))
+        refused = self.team("start", "29", ok=False)
+        assert "team-1-tester is live in w1:p2, but this record never started it" in refused.stderr
+        # Another client in a recorded pane.
+        path.write_text(json.dumps(good))
+        state = self.state()
+        visitor = next(x for x in state["panes"] if x.get("label") == "team-1-tester")
+        visitor.update(name="visitor", cwd=str(self.repo))
+        self.save(state)
+        assert "conflicting client; preserved" in self.team("start", "29", ok=False).stderr
+        assert self.starts() == ["team-1-impl", "team-1-tester"]
+        assert len(self.events("agent", "prompt")) == 2
+        assert self.state()["workspaces"]
 
 
 class RepositoryConfigTest(unittest.TestCase):

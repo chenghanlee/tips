@@ -15,6 +15,8 @@ shutdown_seconds = 15
 shell_seconds = 15
 dexter_startup_seconds = 60
 checks_minutes = 30
+# How long start, review, reset or stop waits for another one to finish.
+lock_seconds = 60
 
 [launch]
 codex_approval = "never"
