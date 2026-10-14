@@ -99,6 +99,14 @@ When you change behaviour or a return format: find every caller with Dexter `ref
 and scoped `rg`, and check the result through to the final state and side effects. A
 correct return value does not prove a correct outcome.
 
+When you add, cache, move or remove a fact (a stored value, a derived flag, or a timer
+that keeps it current): find every path that constructs, updates, reads, resets or
+removes it, and every late callback (timer, async result, message) that can arrive
+after it changed. List them under the PR body's `Affected code`. Prefer removing the
+redundant copy, or giving the fact one writer, to patching each path. Keep any trigger
+that re-evaluates a time-dependent fact, and start it on every path that creates the
+fact.
+
 When you refactor: keep observable behaviour the same except where the brief says
 otherwise. If existing behaviour conflicts with the brief, say so in the PR. Do not
 change the contract silently.
@@ -186,6 +194,12 @@ Rules:
 - A test proves a scenario only if its setup reached the condition and its assertion
   would fail for a plausible defect. Inspect the setup and expectation when a test
   passes unexpectedly.
+- For a scenario the brief marks `Masking risk:`, supply a control: a small change to
+  production code, or to a stub the test controls, that introduces the named defect.
+  Never change the assertion. Run the test with the control, confirm the test fails at
+  the assertion that detects that defect, then revert. Put the control
+  and the failing assertion in the PR body. One control serves several scenarios only
+  when it shows each one's distinguishing defect.
 - A double may replace an external call. The production code responsible for the claim
   must still run.
 - Wait for the event or observable state with a time limit. A sleep is not proof. A
@@ -222,7 +236,9 @@ When the work reveals a problem the brief's budget does not cover:
 
 When a result contradicts the brief, or a review finding shows a defect: find the failed
 assumption before adding a condition. Check the other sites that share the assumption
-and fix them in the same PR. Verify the whole contract, not only the reported case.
+and fix them in the same PR. When the fix changes how a fact is stored, list its paths
+as [Trace the affected contract](#trace-the-affected-contract) says. Verify the whole
+contract, not only the reported case.
 
 Refactor only when the brief requires it, or when the current code blocks a scenario or
 its test. Name the blocking problem in the PR. Keep the refactor inside the affected
