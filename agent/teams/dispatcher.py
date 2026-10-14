@@ -7,6 +7,7 @@ The launcher assigns the session ID and names the pane `dispatcher` in Herdr its
 Settings are [dispatcher] in config.toml.
 """
 
+import fcntl
 import json
 import os
 import shlex
@@ -118,10 +119,33 @@ def name_when_ready(launch: team.DispatcherLaunch, seconds: float) -> None:
         time.sleep(0.5)
 
 
+def hold_start_lock() -> int:
+    """Lock <root>/state/dispatcher.lock for the life of the client; refuse if it is held.
+
+    Deliberately the opposite of team.py's store lock, which is close-on-exec and ends with
+    the command: this descriptor is inheritable, so exec hands it to the client. A second
+    launcher then fails at once while the client, or any process it started that kept the
+    descriptor, runs. That serializes check, record and exec, and the kernel releases it
+    when they exit, so a crash leaves nothing to clean up.
+    """
+    path = team.harness_root() / "state/dispatcher.lock"
+    descriptor = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(descriptor)
+        raise RuntimeError(
+            f"Busy: a dispatcher is running or starting ({path} is locked); start one only."
+        ) from None
+    os.set_inheritable(descriptor, True)
+    return descriptor
+
+
 def start_here(settings: dict[str, object], main: Path, config: Path, launch_seconds: int) -> None:
     pane = os.environ.get("HERDR_PANE_ID", "")
     if not pane:
         raise RuntimeError("HERDR_PANE_ID is not set; start the dispatcher inside Herdr.")
+    hold_start_lock()
     # Uncertain identity blocks: refuse unless no dispatcher can be running.
     launch = team.dispatcher_launch()
     if launch and team.dispatcher_running(launch):

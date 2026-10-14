@@ -1,8 +1,10 @@
 """Dispatcher launch tests using fake clients and Herdr; never create live panes."""
 
+import fcntl
 import json
 import os
 import shutil
+import subprocess
 import tempfile
 import time
 import unittest
@@ -28,6 +30,15 @@ with open(os.environ["DISPATCH_LOG"], "a") as output:
 client = Path(os.environ["DISPATCH_LOG"] + ".client")
 if Path(sys.argv[0]).name == "claude":
     client.write_text(str(os.getpid()))
+    # A fresh descriptor cannot lock the file while the inherited one holds it.
+    import fcntl
+    with open(os.environ["LOCK_PATH"], "a") as probe:
+        try:
+            fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            held = "free"
+        except BlockingIOError:
+            held = "held"
+    Path(os.environ["DISPATCH_LOG"] + ".lock").write_text(held)
     time.sleep(float(os.environ.get("CLIENT_SECONDS", "0")))
 if Path(sys.argv[0]).name == "herdr":
     agents = json.loads(os.environ.get("LIVE_AGENTS", "[]"))
@@ -86,6 +97,7 @@ class DispatchTest(unittest.TestCase):
             HERDR_PANE_ID="caller",
             TIPS_TEAM_CONFIG=str(self.config),
             DISPATCH_LOG=str(self.log),
+            LOCK_PATH=str(self.state / "dispatcher.lock"),
         )
 
     def write_config(self, model: str) -> None:
@@ -184,6 +196,30 @@ class DispatchTest(unittest.TestCase):
         (other / "repository.json").write_text(json.dumps({"repository": "x/r"}))
         output = self.dispatch(ok=False, TIPS_TEAM_HARNESS=str(other / "harness"))
         assert "belongs to x/r, not o/r" in output
+
+    def test_the_client_holds_the_start_lock_and_a_second_launch_fails_at_once(self) -> None:
+        self.dispatch()
+        assert (self.root / "calls.lock").read_text() == "held"
+        # Two launchers at once: one client starts, the other is refused while it runs.
+        command = [self.scripts / "dispatch"]
+        env = {**self.env, "CLIENT_SECONDS": "4"}
+        pipe, merged = subprocess.PIPE, subprocess.STDOUT
+        first = subprocess.Popen(command, env=env, stdout=pipe, stderr=merged)
+        second = subprocess.Popen(command, env=env, stdout=pipe, stderr=merged)
+        outputs = [p.communicate(timeout=30)[0].decode() for p in (first, second)]
+        codes = sorted(p.returncode for p in (first, second))
+        assert codes == [0, 1], outputs
+        assert any("Busy" in output for output in outputs), outputs
+        assert len(self.calls("claude")) == 2
+
+    def test_a_held_start_lock_refuses_before_any_check(self) -> None:
+        self.state.mkdir(parents=True)
+        with open(self.state / "dispatcher.lock", "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            output = self.dispatch(ok=False)
+        assert "Busy" in output
+        assert not self.calls("claude")
+        assert not self.calls("herdr")
 
     def test_the_namer_leaves_a_pane_whose_client_is_not_the_launched_process(self) -> None:
         self.dispatch(CLIENT_SECONDS="3", FOREIGN_CLIENT="1")
