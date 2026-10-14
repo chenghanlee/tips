@@ -41,7 +41,6 @@ class AgentSpec(TypedDict):
     persona: NotRequired[str]
     port_offset: int
     db_suffix: str
-    probe: NotRequired[list[str]]
 
 
 class GitHubSettings(TypedDict):
@@ -167,11 +166,10 @@ AGENT_FIELDS = {
     "persona",
     "port_offset",
     "db_suffix",
-    "probe",
 }
-# A probe is a short argv list from launcher configuration, never shell text.
-PROBE_ARGS = 16
-PROBE_ARG_CHARS = 256
+# team.psql is a short argv list, never shell text.
+ARGV_ARGS = 16
+ARGV_ARG_CHARS = 256
 # PostgreSQL truncates identifiers longer than this; partitions append up to three digits.
 NAME_BYTES = 63
 PARTITION_DIGITS = 3
@@ -485,7 +483,7 @@ def validate_config_fields(path: Path, value: Config) -> None:
     require_type(github.get("repository"), str, f"{path}: github.repository")
     if not re.fullmatch(REPOSITORY, str(github["repository"])):
         raise RuntimeError(f"{path}: github.repository must be owner/name")
-    validate_probe(f"{path}: team.psql", settings.get("psql"))
+    validate_argv(f"{path}: team.psql", settings.get("psql"))
     if not Path(cast(list[str], settings["psql"])[0]).is_absolute():
         raise RuntimeError(f"{path}: team.psql must start with an absolute executable path")
     object_fields(fields.get("timeouts"), f"{path}: timeouts")
@@ -514,19 +512,17 @@ def validate_agent_fields(label: str, name: str, entry: object) -> None:
     require_type(spec.get("port_offset"), int, f"{label}.port_offset")
     if not re.fullmatch(r"[^0-9]\S*", str(spec["db_suffix"])):
         raise RuntimeError(f"{label}.db_suffix must be nonempty and start with a non-digit")
-    if "probe" in spec:
-        validate_probe(f"{label}.probe", spec["probe"])
 
 
-def validate_probe(label: str, value: object) -> None:
-    """A probe is 1 to PROBE_ARGS nonempty strings; argv[0] names the program."""
+def validate_argv(label: str, value: object) -> None:
+    """1 to ARGV_ARGS nonempty strings; argv[0] names the program."""
     require_type(value, list, label)
     args = cast(list[object], value)
-    if not 1 <= len(args) <= PROBE_ARGS:
-        raise RuntimeError(f"{label} must hold 1 to {PROBE_ARGS} arguments")
+    if not 1 <= len(args) <= ARGV_ARGS:
+        raise RuntimeError(f"{label} must hold 1 to {ARGV_ARGS} arguments")
     for arg in args:
-        if not isinstance(arg, str) or not 0 < len(arg) <= PROBE_ARG_CHARS or "\0" in arg:
-            raise RuntimeError(f"{label} arguments must be strings of 1 to {PROBE_ARG_CHARS} chars")
+        if not isinstance(arg, str) or not 0 < len(arg) <= ARGV_ARG_CHARS or "\0" in arg:
+            raise RuntimeError(f"{label} arguments must be strings of 1 to {ARGV_ARG_CHARS} chars")
 
 
 def validate_settings(path: Path, value: Config) -> None:
@@ -1127,7 +1123,7 @@ def add_allocation(record: Record, entry: str, role: str) -> Allocation:
 
 def configure_bootstrap(record: Record, allocation: Allocation, branch: str, commit: str) -> None:
     """Write the launcher configuration bootstrap.py reads: what to clone and check out, the
-    shared tools, and the entry's probe. Workers never write this directory."""
+    shared tools."""
     binary, skills, sources = tools()
     _, project, logs, config = allocation_paths(allocation["id"])
     settings = {
@@ -1145,7 +1141,6 @@ def configure_bootstrap(record: Record, allocation: Allocation, branch: str, com
         "dexter": str(binary),
         "sources": str(sources),
         "skills": str(skills),
-        "probe": cfg["agents"][allocation["entry"]].get("probe", []),
         # What the launch lets the worker write; bootstrap refuses trusted paths inside it.
         "writable": [allocation["root"]],
     }
@@ -1282,7 +1277,7 @@ def bootstrap_brief(allocation: Allocation, commit: str) -> str:
     return (
         f"Your allocation is {allocation['id']}; your project is {project}. First run "
         f"{command}: it clones the repository into the project or reuses your clone, fetches "
-        "dependencies, starts Dexter and runs any probe your entry lists. Its full log is in "
+        "dependencies and starts Dexter. Its full log is in "
         f"{logs}. If it fails, report blocked with its error and stop; do not prepare the "
         f"project another way. Then work only in {project}: read its AGENTS.md and "
         "agent/teams/README.md; they were not loaded at startup. "
@@ -2139,30 +2134,25 @@ def retain_files(record: Record, dropped: list[str], kept: str, reports: Reports
             print(f"Retained {path}: {note['reason']}; see {config / 'retired.json'}")
 
 
-def remove_empty_residue(issue: str) -> None:
-    """After the operator has cleared what a retired team left, remove its allocation
-    directories that are now empty. Anything still holding a file stays."""
-    with store_lock():
-        if record_for(issue) is not None:
-            raise RuntimeError(f"#{issue} still has an allocation record; run stop first")
-        notes = sorted(state_dir().glob("*/retired.json"))
-        found = 0
-        for path in notes:
-            note = object_fields(json.loads(path.read_text()), str(path))
-            if str(note.get("issue")) != issue:
-                continue
-            found += 1
-            paths = allocation_paths(str(note.get("id")))
-            for directory in paths[:3]:
-                if directory.exists() or directory.is_symlink():
-                    contained(directory, harness_root())
-            order = (paths[1], paths[2], paths[0])
-            for directory in order:
-                remove_if_empty(directory)
-            left = [str(d) for d in order if d.exists()]
-            print(f"{note.get('id')}: " + (f"kept {', '.join(left)}" if left else "removed"))
-        if not found:
-            print(f"#{issue}: no retired allocations")
+def list_retained() -> None:
+    """List each retired allocation that still has files, with why it was kept. Deletes
+    nothing: a writer outside the pane can outlive stop, so only the operator, having
+    established that the work is preserved and every writer has stopped, deletes an
+    allocation by its ID."""
+    found = False
+    for path in sorted(state_dir().glob("*/retired.json")):
+        note = object_fields(json.loads(path.read_text()), str(path))
+        root = allocation_paths(str(note.get("id")))[0]
+        if not root.exists():
+            continue
+        found = True
+        kept = note.get("databases_kept_because") or "dropped"
+        print(
+            f"{note.get('id')} (#{note.get('issue')}): {root}; files: {note.get('reason')}; "
+            f"databases {note.get('db_suffix')}: {kept}; report: {note.get('report') or 'none'}"
+        )
+    if not found:
+        print("No retained allocations")
 
 
 def stop_brief(brief: str) -> None:
@@ -2247,8 +2237,11 @@ def cli() -> None:
     usage = (
         "Usage: agent/teams/team.py start <brief> | design <spec> <entry> | "
         "turn <pr> <entry> | review <pr> <entry> | reset <issue> <entry> | stop <issue> | "
-        "residue <issue>"
+        "clean"
     )
+    if args == ["clean"]:
+        list_retained()
+        return
     if len(args) < 2 or not args[1].isdecimal():
         raise RuntimeError(usage)
     named = len(args) == 3 and re.fullmatch(ENTRY, args[2]) is not None
@@ -2256,8 +2249,6 @@ def cli() -> None:
         start(args[1])
     elif args[0] == "stop" and len(args) == 2:
         stop_brief(args[1])
-    elif args[0] == "residue" and len(args) == 2:
-        remove_empty_residue(args[1])
     elif args[0] == "turn" and named:
         turn(args[1], args[2])
     elif args[0] == "design" and named:

@@ -4,7 +4,6 @@ import contextlib
 import json
 import os
 import re
-import shutil
 import signal
 import socket
 import subprocess
@@ -1049,7 +1048,8 @@ class PairLifecycleTest(Harness):
             assert sorted(p.name for p in root.iterdir()) == ["logs", "project"]
             assert not any((root / "project").iterdir())
         settings = json.loads((self.trusted / "state/g1-impl/bootstrap.json").read_text())
-        assert (settings["branch"], settings["commit"], settings["probe"]) == ("task/29", "", [])
+        assert (settings["branch"], settings["commit"]) == ("task/29", "")
+        assert "probe" not in settings
         assert settings["clone_url"] == str(self.origin)
         assert settings["writable"] == [str(impl_root)]
         tester_settings = json.loads((self.trusted / "state/g1-tester/bootstrap.json").read_text())
@@ -1356,29 +1356,6 @@ class PairLifecycleTest(Harness):
         assert "Missing executable" in self.team("start", "34", ok=False).stderr
         assert self.recorded_briefs() == {"29"}
 
-    def test_probe_runs_only_for_its_entry_and_a_failure_blocks_with_its_error(self) -> None:
-        probe = 'probe = ["python3", "-c", "open(\'probe.txt\', \'w\').write(\'ran\')"]\n'
-        self.write_config(CONFIG.replace("[agents.critic]\n", "[agents.critic]\n" + probe))
-        self.team("start", "29")
-        self.bootstrap("team-1-impl")
-        head = self.push("team-1-impl")
-        self.team("review", "7", "critic")
-        settings = json.loads((self.trusted / "state/g1-critic/bootstrap.json").read_text())
-        assert settings["probe"][0] == "python3"
-        assert settings["commit"] == head
-        self.bootstrap("team-1-critic")
-        assert (self.project("team-1-critic") / "probe.txt").read_text() == "ran"
-        assert not (self.project("team-1-impl") / "probe.txt").exists()
-        # A failed probe blocks with its exact error; nothing else stands in for it.
-        failing = 'probe = ["/bin/sh", "-c", "echo browser driver missing >&2; exit 3"]\n'
-        self.write_config(CONFIG.replace("[agents.second]\n", "[agents.second]\n" + failing))
-        self.update(issues={**self.state()["issues"], "29": WIDE})
-        self.team("review", "7", "second")
-        failed = self.bootstrap("team-1-second", ok=False)
-        assert "failed with 3" in failed.stderr
-        assert "browser driver missing" in failed.stderr
-        assert "Bootstrap ready" not in failed.stdout
-
     def test_lost_setup_output_never_starts_a_client(self) -> None:
         self.update(setup_lost=True)
         refused = self.team("start", "29", ok=False)
@@ -1424,17 +1401,14 @@ class PairLifecycleTest(Harness):
             ('db_suffix = "r"', 'db_suffix = "9r"', "db_suffix must be nonempty and start"),
             ('repository = "o/r"', 'repository = "o"', "github.repository must be owner/name"),
             ('psql = ["/fixture/psql"', 'psql = ["psql"', "psql must start with an absolute"),
-            ('db_suffix = "c"', 'db_suffix = "c"\nprobe = []', "probe must hold 1 to 16"),
-            ('db_suffix = "c"', 'db_suffix = "c"\nprobe = "make check"', "probe must be list"),
+            ('db_suffix = "c"', 'db_suffix = "c"\nprobe = ["make"]', "unknown keys ['probe']"),
+            ('psql = ["/fixture/psql", "fixture-dsn"]', "psql = []", "psql must hold 1 to 16"),
             ('db_suffix_prefix = "_t"', 'db_suffix_prefix = "_' + "t" * 50 + '"', "exceed 63"),
         )
         for original, edited, message in cases:
             with self.subTest(edited=edited):
                 self.write_config(CONFIG.replace(original, edited))
                 assert message in self.team("start", "29", ok=False).stderr
-        long_probe = "probe = [" + ", ".join(['"x"'] * 17) + "]"
-        self.write_config(CONFIG.replace('db_suffix = "c"', 'db_suffix = "c"\n' + long_probe))
-        assert "probe must hold 1 to 16" in self.team("start", "29", ok=False).stderr
         assert self.state()["events"] == []
         assert not self.trusted.exists()
 
@@ -2026,16 +2000,11 @@ class RetirementTest(Harness):
         assert late.read_text() == "written while stopping\n"
         retired = json.loads((self.trusted / "state/g1-impl/retired.json").read_text())
         assert str(project) in retired["retained"]
-        # Residue removal deletes only directories the operator has emptied.
-        allocation = project.parent
-        assert f"g1-impl: kept {project}" in self.team("residue", "29").stdout
+        # clean lists what stop retained and deletes nothing.
+        listed = self.team("clean").stdout
+        assert f"g1-impl (#29): {project.parent}; files: project and log files" in listed
+        assert "databases _t1g1i: dropped" in listed
         assert late.exists()
-        shutil.rmtree(project)
-        shutil.rmtree(allocation / "logs")
-        assert "g1-impl: removed" in self.team("residue", "29").stdout
-        assert not allocation.exists()
-        self.team("start", "30")
-        assert "#30 still has an allocation record" in self.team("residue", "30", ok=False).stderr
 
     def test_refused_database_drop_keeps_the_rest_and_the_reservation(self) -> None:
         self.merged_pair()

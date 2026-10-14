@@ -7,7 +7,7 @@ cannot change it. An empty project gets a fresh clone on the configured branch, 
 configured commit, or at origin/main. A reused clone is fetched and never reset: `--commit`
 moves it only when it is clean, and refuses otherwise. Then this fetches locked
 dependencies, writes the Dexter wrapper and the skills link in git-ignored paths, starts
-Dexter and updates its index, and runs the entry's probe if it has one.
+Dexter and updates its index.
 
 Every command's full output goes to a log in the allocation's logs directory; the console
 shows at most CONSOLE_BYTES. This script never calls Herdr.
@@ -30,7 +30,6 @@ CONSOLE_BYTES = 8192
 GIT_SECONDS = 300
 # A cold Hex cache downloads every package; anything slower is a hung fetch.
 DEPS_FETCH_SECONDS = 300
-PROBE_SECONDS = 300
 # Dexter's query gives up this long after --wait: its allowance to reach the daemon.
 DEXTER_CONNECT_SECONDS = 30
 SHA = re.compile(r"[0-9a-f]{40}")
@@ -48,7 +47,6 @@ SETTINGS = {
     "sources": str,
     "skills": str,
     "startup_seconds": int,
-    "probe": list,
     "writable": list,
 }
 
@@ -108,9 +106,6 @@ def load_settings() -> dict[str, object]:
         if type(settings.get(key)) is not kind:
             raise BootstrapError(f"{path}: {key} must be {kind.__name__}")
     own_paths(path, ident, settings)
-    probe = cast(list[object], settings["probe"])
-    if not all(isinstance(arg, str) and arg for arg in probe):
-        raise BootstrapError(f"{path}: probe must be a list of nonempty strings")
     trusted_layout(path.parent.parent, cast(list[object], settings["writable"]))
     return settings
 
@@ -251,7 +246,7 @@ def write_helpers(console: Console, settings: dict[str, object], project: Path) 
 
 
 def prepare(console: Console, settings: dict[str, object], project: Path, fetch: bool) -> None:
-    """Fetch locked dependencies, start Dexter, update its index, run the probe."""
+    """Fetch locked dependencies, start Dexter and update its index."""
     if fetch:
         # --check-locked never rewrites the lock. A reused clone keeps its own dependency
         # state: it may hold an unfinished change.
@@ -269,9 +264,6 @@ def prepare(console: Console, settings: dict[str, object], project: Path, fetch:
         raise BootstrapError("Dexter indexed no MixProject module; inspect its daemon log.")
     # A daemon that was already running does not watch deps/: reconcile it with the disk.
     command(console, ["/bin/sh", str(wrapper), "reindex"], project, budget)
-    probe = cast(list[str], settings["probe"])
-    if probe:
-        command(console, probe, project, PROBE_SECONDS)
 
 
 def bootstrap(commit: str) -> None:

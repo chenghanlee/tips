@@ -44,8 +44,6 @@ compact_percent = 35
 # db_suffix must start with a non-digit)
 # and a test port (port_base + slot * port_stride + port_offset).
 # `advisor` applies only to Claude entries. `persona` adds optional text to the launch prompt.
-# `probe` is an optional argv list (at most 16 arguments) that bootstrap.py runs in the
-# entry's project after Dexter is ready; a failure blocks the worker with its exact error.
 [agents.opus-implementer]
 role = "implementer"
 kind = "claude"
