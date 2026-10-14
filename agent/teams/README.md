@@ -165,6 +165,8 @@ stays taken until the operator retires it by hand. While no `team.py` command ru
 2. Stop each clone's Dexter daemon with the binary and sources that
    `<root>/state/<id>/bootstrap.json` names, never the clone's own wrapper:
    `DEXTER_ELIXIR_LIB_ROOT=<sources> <dexter> --root <root>/allocations/<id>/project stop`.
+   Stop any other daemon the allocations own and confirm that every `port` in the record
+   is free; if either is uncertain, stop here and keep the record and the slot.
 3. For each allocation in the record, write `<root>/state/<id>/retired.json`:
    `{"id": "<id>", "issue": "<issue>", "db_suffix": "<db_suffix>", "reason": "brief
    closed without a merged PR", "databases_kept_because": "brief closed without a merged
