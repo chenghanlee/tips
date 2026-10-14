@@ -70,7 +70,8 @@ class Allocation(TypedDict):
     """One launched client and its allocation, whose `id` never repeats. `pr` and `head` are
     set for reviewers of a pushed PR; `head` is the commit its bootstrap configuration names.
 
-    `pane`, `name`, `kind`, `root` and `session` identify the client process.
+    `pane`, `name`, `kind`, `root` and `session` identify the client process. `launch` is
+    new for each launch; a retirement report counts only for the launch it names.
     `submission` is the task-submission state, separate from whether a process runs:
     NEVER_SUBMITTED until launch writes UNKNOWN, durably, before the client can accept any
     input; SUBMITTED only after the task prompt's positive transport result. SUBMITTED does
@@ -89,6 +90,7 @@ class Allocation(TypedDict):
     tab: str
     pane: str
     session: str
+    launch: str
     submission: str
     pr: NotRequired[str]
     head: NotRequired[str]
@@ -731,6 +733,7 @@ def load_record(path: Path) -> Record:
             "tab",
             "pane",
             "session",
+            "launch",
         ):
             require_type(allocation.get(key), str, f"{path}: agents.{entry}.{key}")
         require_type(allocation.get("port"), int, f"{path}: agents.{entry}.port")
@@ -1031,6 +1034,7 @@ def agent_env(allocation: Allocation) -> dict[str, str]:
         # Worker-side commands resolve the same root, as PR5's install layout defines it.
         "TIPS_TEAM_HARNESS": str(harness_root() / "harness"),
         "TIPS_TEAM_ALLOCATION_ID": allocation["id"],
+        "TIPS_TEAM_LAUNCH": allocation["launch"],
         "TIPS_TEAM_STATE": str(state_dir()),
     }
     if allocation["kind"] == "codex":
@@ -1084,6 +1088,7 @@ def allocate(record: Record, entry: str, role: str) -> Allocation:
         tab="",
         pane="",
         session="",
+        launch="",
         submission=NEVER_SUBMITTED,
     )
     record["agents"][entry] = allocation
@@ -1526,6 +1531,7 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
     # Claude runs a session id assigned here; Codex's is known only if Herdr reports it.
     session = str(uuid.uuid4()) if kind == "claude" else ""
     args = client_args(allocation, prompt, session)  # a configuration error refuses first
+    allocation["launch"] = uuid.uuid4().hex
     enter(pane, root, agent_env(allocation))
     allocation["submission"], allocation["session"] = UNKNOWN, session
     save_record(record)
@@ -1934,9 +1940,10 @@ Reports = dict[str, tuple[dict[str, object], str]]
 
 
 def retirement_reports(record: Record) -> Reports:
-    """Each allocation's latest retirement report on the issue, posted under its own client's
-    name: the report's fields and the comment URL. Reports are advisory evidence."""
-    names = {a["id"]: a["name"] for a in record["agents"].values()}
+    """Each allocation's latest retirement report on the issue from its current launch:
+    posted under the client's recorded name and session, naming the recorded launch. A
+    report from an earlier launch is no evidence. Reports are advisory evidence."""
+    current = {a["id"]: (a["name"], a["session"], a["launch"]) for a in record["agents"].values()}
     reports: Reports = {}
     for comment in issue_comments(record["brief"]):
         lines = str(comment.get("body") or "").splitlines()
@@ -1950,7 +1957,8 @@ def retirement_reports(record: Record) -> Reports:
                 except ValueError:
                     continue  # a malformed report is no evidence
                 ident = str(fields.get("id"))
-                if names.get(ident) == header["name"]:
+                found = (header["name"], header["session"], fields.get("launch"))
+                if fields.get("launch") and current.get(ident) == found:
                     reports[ident] = (fields, str(comment["html_url"]))
     return reports
 
@@ -1967,7 +1975,7 @@ def request_reports(record: Record, missing: list[str], running: set[str]) -> No
     failed = deliver(sends)
     stopped = [
         f"{a['name']}: cd {a['root']} && TIPS_TEAM_STATE={state_dir()} "
-        f"TIPS_TEAM_ALLOCATION_ID={a['id']} {command}"
+        f"TIPS_TEAM_ALLOCATION_ID={a['id']} TIPS_TEAM_LAUNCH={a['launch']} {command}"
         for e, a in record["agents"].items()
         if e in missing and e not in running
     ]

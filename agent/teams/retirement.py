@@ -3,7 +3,7 @@
 
 A worker runs this under its own authority when the dispatcher asks it to retire:
 `python3 <harness>/retirement.py`. It fetches origin, then posts one EVENT on its issue with
-a `TEAM_RETIREMENT` line: whether the clone is clean, how many local commits no origin
+a `TEAM_RETIREMENT` line naming its launch: whether the clone is clean, how many local commits no origin
 branch holds, whether HEAD is merged into origin/main, and HEAD. `team.py stop` reads the
 latest report as advisory evidence before it drops any database. This script never calls
 Herdr, never deletes a file and never resets the clone.
@@ -48,6 +48,13 @@ def own_allocation() -> tuple[str, dict[str, object], dict[str, object], Path]:
                 project = Path(str(allocation.get("root"))) / "project"
                 if str(project) != settings.get("project"):
                     raise RetirementError(f"{path}: {ident} does not own {project}")
+                launch = os.environ.get("TIPS_TEAM_LAUNCH", "")
+                if not launch or launch != allocation.get("launch"):
+                    raise RetirementError(
+                        f"This pane's launch {launch or '(none)'} is not {ident}'s current "
+                        f"launch {allocation.get('launch') or '(none)'}; a report from it would "
+                        "describe another session"
+                    )
                 return str(record.get("brief")), allocation, settings, project
     raise RetirementError(f"No allocation record in {state} names {ident}")
 
@@ -86,7 +93,7 @@ def clone_state(project: Path) -> dict[str, object]:
 
 def report() -> str:
     issue, allocation, settings, project = own_allocation()
-    fields = {"v": 1, "id": allocation["id"], **clone_state(project)}
+    fields = {"v": 1, "id": allocation["id"], "launch": allocation["launch"], **clone_state(project)}
     role = str(allocation.get("role", "")).split()[-1]
     header = comment_header(
         "EVENT", role, str(allocation.get("name")), str(allocation.get("session") or "")

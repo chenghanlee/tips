@@ -570,7 +570,7 @@ result = {}
 ENV = [
     "PGPORT", "TIPS_DB_SUFFIX", "TIPS_TEST_PORT", "MIX_ENV", "TIPS_CHECK_TIMEOUT_SECONDS",
     "TIPS_TEAM_CONFIG", "TIPS_PROVIDER_ENV_FILE", "TIPS_DEXTER", "HEX_HOME",
-    "TIPS_TEAM_HARNESS", "TIPS_TEAM_ALLOCATION_ID", "TIPS_TEAM_STATE",
+    "TIPS_TEAM_HARNESS", "TIPS_TEAM_ALLOCATION_ID", "TIPS_TEAM_STATE", "TIPS_TEAM_LAUNCH",
 ]
 SNAPSHOT = (
     "\npython3 -c 'import os,json; "
@@ -810,6 +810,7 @@ class Harness(unittest.TestCase):
             "TIPS_TEAM_STATE",
             "TIPS_TEAM_ALLOCATION_ID",
             "TIPS_TEAM_HARNESS",
+            "TIPS_TEAM_LAUNCH",
             "PGPORT",
             "MIX_ENV",
             "HEX_HOME",
@@ -944,8 +945,9 @@ class Harness(unittest.TestCase):
         """Run a worker-side helper as the named client: its pane's environment, in its
         allocation directory, under the test's own authority."""
         pane = self.pane(name)
-        env = dict(self.env, HERDR_PANE_ID=pane["pane_id"], **extra)
+        env = dict(self.env, HERDR_PANE_ID=pane["pane_id"])
         env.update({k: v for k, v in pane["launch_env"].items() if v is not None})
+        env.update(extra)
         harness = self.repo / "agent/teams"
         result = execute(
             ["python3", str(harness / script), *args],
@@ -1081,6 +1083,7 @@ class PairLifecycleTest(Harness):
             "TIPS_TEST_PORT": "4110",
             "TIPS_DEXTER": str(impl_root / "project/.dexter/dexter.sh"),
             "TIPS_TEAM_ALLOCATION_ID": "g1-impl",
+            "TIPS_TEAM_LAUNCH": self.allocation("team-1-impl")["launch"],
             # Codex's sandbox cannot write the shared Hex cache; Claude keeps the default.
             "HEX_HOME": str(impl_root / "project/tmp/hex"),
         }
@@ -1090,8 +1093,10 @@ class PairLifecycleTest(Harness):
             "TIPS_TEST_PORT": "4111",
             "TIPS_DEXTER": str(tester_root / "project/.dexter/dexter.sh"),
             "TIPS_TEAM_ALLOCATION_ID": "g1-tester",
+            "TIPS_TEAM_LAUNCH": self.allocation("team-1-tester")["launch"],
             "HEX_HOME": None,
         }
+        assert re.fullmatch(r"[0-9a-f]{32}", self.allocation("team-1-tester")["launch"])
         # Codex works in the allocation directory, outside the clone.
         argv = impl["launch_argv"]
         assert argv[argv.index("-C") + 1] == str(impl_root)
@@ -1952,7 +1957,11 @@ class RetirementTest(Harness):
         # A stopped client without a report gets an operator command, not a guess.
         self.clients_exit(1)
         refused = self.team("stop", "29", ok=False)
-        assert "TIPS_TEAM_ALLOCATION_ID=g1-impl" in refused.stderr
+        launch = self.allocation("team-1-impl")["launch"]
+        assert f"TIPS_TEAM_ALLOCATION_ID=g1-impl TIPS_TEAM_LAUNCH={launch}" in refused.stderr
+        # A process whose environment names another launch cannot report for this one.
+        stale = self.worker("team-1-impl", "retirement.py", ok=False, TIPS_TEAM_LAUNCH="0" * 32)
+        assert f"is not g1-impl's current launch {launch}" in stale.stderr
         # Each worker reports its own clone; the report changes nothing.
         before = self.git("rev-parse", "HEAD", cwd=self.project("team-1-impl"))
         self.retire("team-1-impl", "team-1-tester", "team-1-critic")
@@ -1963,6 +1972,7 @@ class RetirementTest(Harness):
         assert fields == {
             "v": 1,
             "id": "g1-impl",
+            "launch": launch,
             "cloned": True,
             "clean": True,
             "unpushed": 0,
@@ -2008,6 +2018,25 @@ class RetirementTest(Harness):
         assert self.recorded_briefs() == {"30"}
         assert self.pane("team-2-impl")["agent"] == "codex"
         assert "nothing removed" in self.team("stop", "29").stdout
+
+    def test_a_report_from_an_earlier_launch_is_no_evidence_for_the_current_one(self) -> None:
+        self.merged_pair()
+        self.retire("team-1-impl", "team-1-tester")
+        self.clients_exit(1)
+        # The operator replaces both clients; the new tester leaves work and no report.
+        self.reset("29", "impl", "tester")
+        self.team("start", "29")
+        (self.project("team-1-tester") / "unfinished.txt").write_text("new session work\n")
+        self.databases("tips_test_t1g1r")
+        self.clients_exit(1)
+        refused = self.team("stop", "29", ok=False)
+        assert "No retirement report yet from team-1-impl, team-1-tester" in refused.stderr
+        assert self.remaining_databases() == ["tips_test_t1g1r"]
+        assert self.recorded_briefs() == {"29"}
+        # A report from the current launch is accepted.
+        self.retire("team-1-impl", "team-1-tester")
+        stopped = self.team("stop", "29").stdout
+        assert "team-1-tester reported uncommitted or unpushed work" in stopped
 
     def test_unmerged_or_dirty_work_keeps_its_databases_and_files(self) -> None:
         self.databases("tips_test_t1g1i", "tips_test_t1g1r")
