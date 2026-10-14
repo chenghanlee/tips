@@ -253,3 +253,9 @@ class AdapterTest(Harness):
             assert "spec spec" not in later
 
         self.session(steps)
+
+    def test_real_github_comment_ids_are_accepted(self) -> None:
+        async def steps(client: Any) -> None:
+            await self.call(client, "board_read", issue=29, after_comment_id=6151732486)
+
+        self.session(steps)

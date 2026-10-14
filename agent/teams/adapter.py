@@ -31,6 +31,8 @@ PROJECT_ITEMS = 1000
 ENTRY_PATTERN = r"^[a-z0-9][a-z0-9-]*$"
 
 Number = Annotated[int, Field(ge=1, le=99_999_999)]
+# GitHub REST ids, such as comment ids, already exceed 32 bits.
+GitHubId = Annotated[int, Field(ge=1, le=2**63 - 1)]
 Entry = Annotated[str, Field(pattern=ENTRY_PATTERN, max_length=40)]
 Message = Annotated[str, Field(min_length=1, max_length=RESPONSE_BYTES)]
 Title = Annotated[str, Field(min_length=1, max_length=256)]
@@ -258,7 +260,7 @@ def issue_create(title: Title, body: Body) -> str:
 
 
 @server.tool()
-def board_read(issue: Number, after_comment_id: Number | None = None) -> str:
+def board_read(issue: Number, after_comment_id: GitHubId | None = None) -> str:
     """An issue body and its comments, or only the comments after the given comment id."""
     return operate(lambda: board.read_text(str(issue), after_comment_id))
 
