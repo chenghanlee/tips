@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 from typing import IO, cast
 
-from team import dexter_invocation, execute
+from team import TEMPORARY, dexter_invocation, execute
 
 CONSOLE_BYTES = 8192
 GIT_SECONDS = 300
@@ -51,7 +51,6 @@ SETTINGS = {
     "probe": list,
     "writable": list,
 }
-TEMPORARY = ("/tmp", "/private/tmp", "/var/tmp", "/private/var/tmp")
 
 
 class BootstrapError(RuntimeError):

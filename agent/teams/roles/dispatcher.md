@@ -10,7 +10,7 @@ trial's hypothesis, measurement table and decision rule are in
 At startup, after each `done` or `blocked` message, and when the user reports a change,
 check [Project 15](https://github.com/users/chenghanlee/projects/15) for milestone
 order. Also check open issues and PRs, running teams (`herdr workspace list`, one workspace per team),
-worktrees (`git worktree list`) and the latest `main` run.
+the team records in the trusted root's `state/` and the latest `main` run.
 
 - Set merged issues Done. An issue with an open question stays Blocked.
 - For each free slot (`team.max_teams` in [config.toml](../config.toml)), take the
@@ -35,16 +35,12 @@ worktrees (`git worktree list`) and the latest `main` run.
    `launched claude by hand`. `usage` counts every session a `launched` EVENT names.
    Write the agent set in the body: designers and the lead, testers and the
    merge-confirming tester, the reviewing designer, each an `[agents.<entry>]` entry.
-2. Prepare the designers' read-only worktree: `git worktree add --detach
-   .worktrees/design-<spec> origin/main`, deps, build, Dexter per the
-   [LSP guide](../../lsp/README.md). Remove it when the feature is done. A designer
-   that needs to run a check gets a pinned reviewer worktree with its own database
-   suffix and port.
-3. Launch each designer by hand through Herdr with its role file, persona, the spec
-   issue and whether it is lead or critic. Record each on the spec:
-   `agent/teams/board.py post <spec> EVENT --as designer <name> <session id>`, body
-   `launched <client> by hand`; a replacement's body ends `, replacing <name>`.
-4. Assign these personas: architecture (data integrity, contract boundaries,
+2. Launch each designer with `agent/teams/team.py design <spec> <entry>`. Each gets its
+   own allocation and clone, with its own database suffix and port, and its launch
+   EVENT on the spec. The spec body tells it whether it is lead or critic. Run
+   `agent/teams/team.py stop <spec>` when the feature is done; the designers' databases
+   are kept.
+3. Assign these personas: architecture (data integrity, contract boundaries,
    consistency, simplicity, testability, effects on other code) and operations (failure
    and recovery, concurrency, security, performance, migrations, existing data). One
    designer covers both personas. If there are multiple designers, divide the personas

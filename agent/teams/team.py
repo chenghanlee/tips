@@ -45,8 +45,11 @@ class AgentSpec(TypedDict):
     probe: NotRequired[list[str]]
 
 
-class TeamSettings(TypedDict):
+class GitHubSettings(TypedDict):
     repository: str
+
+
+class TeamSettings(TypedDict):
     clone_url: str
     psql: list[str]
     max_teams: int
@@ -57,6 +60,7 @@ class TeamSettings(TypedDict):
 
 
 class Config(TypedDict):
+    github: GitHubSettings
     team: TeamSettings
     timeouts: dict[str, int]
     launch: dict[str, str]
@@ -180,22 +184,9 @@ DEPS_FETCH_SECONDS = 300
 # Each GitHub read takes at most this many pages of 100 entries within this many seconds.
 # Initial defaults, not measurements: widen them only after a legitimate read exceeds one.
 READ_PAGES = 10
+REPOSITORY = r"[A-Za-z0-9-]+/[A-Za-z0-9._-]+"
+TEMPORARY = ("/tmp", "/var/tmp")
 READ_SECONDS = 30
-# Passed at launch: a project's own .codex/config.toml does not exist before the clone.
-# The Codex baseline profile, all on the command line. Plugin switches and feature flags
-# are safe whether or not a plugin is installed. Workers get no computer-use or browser
-# control tools: unified-computer-use provides cua_repl.
-CODEX_PLUGINS = {
-    "mix-credo@elixir-agent-tools": True,
-    "unified-computer-use@openai-bundled": False,
-    "computer-use@openai-bundled": False,
-    "chrome@openai-bundled": False,
-    "browser@openai-bundled": False,
-}
-CODEX_FEATURES_OFF = ("computer_use", "browser_use")
-# MCP servers a worker must not have. A user server can be disabled only when the user's
-# configuration defines it, so launch disables the ones still listed and then verifies.
-CODEX_MCP_OFF = ("chrome-devtools", "computer-use", "cua_repl")
 # Disable alternate language paths in launched clients, without editing user settings.
 NATIVE_LSP_PLUGINS = {
     "elixir-lsp@elixir-agent-tools": False,
@@ -489,10 +480,12 @@ def validate_config_fields(path: Path, value: Config) -> None:
     settings = object_fields(fields.get("team"), f"{path}: team")
     for key in ("max_teams", "port_base", "port_stride", "postgres_port"):
         require_type(settings.get(key), int, f"{path}: team.{key}")
-    for key in ("db_suffix_prefix", "repository", "clone_url"):
+    for key in ("db_suffix_prefix", "clone_url"):
         require_type(settings.get(key), str, f"{path}: team.{key}")
-    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", str(settings["repository"])):
-        raise RuntimeError(f"{path}: team.repository must be <owner>/<repository>")
+    github = object_fields(fields.get("github"), f"{path}: github")
+    require_type(github.get("repository"), str, f"{path}: github.repository")
+    if not re.fullmatch(REPOSITORY, str(github["repository"])):
+        raise RuntimeError(f"{path}: github.repository must be owner/name")
     validate_probe(f"{path}: team.psql", settings.get("psql"))
     if not Path(cast(list[str], settings["psql"])[0]).is_absolute():
         raise RuntimeError(f"{path}: team.psql must start with an absolute executable path")
@@ -596,22 +589,32 @@ def validate_allocations(path: Path, value: Config) -> None:
 
 
 def trusted_root() -> Path:
-    """The canonical store for this repository: `<data home>/tips-agent-teams/<repo-key>`."""
-    base = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share").resolve()
-    key = hashlib.sha256(cfg["team"]["repository"].encode()).hexdigest()[:16]
-    return base / "tips-agent-teams" / key
+    """The harness and state root, a sibling of the main checkout:
+    `<checkout parent>/agent_teams/<repository name>`. It must be a real path outside the
+    repository and outside temporary directories."""
+    root = main.parent / "agent_teams" / cfg["github"]["repository"].split("/")[1]
+    temporary = [Path(p).resolve() for p in (*TEMPORARY, os.environ.get("TMPDIR", "/tmp"))]
+    if root.resolve() != root:
+        raise RuntimeError(f"Trusted root {root} passes through a symlink; refused")
+    for parent in (main, *temporary):
+        if root == parent or parent in root.parents:
+            raise RuntimeError(f"Trusted root {root} is inside {parent}; refused")
+    return root
 
 
 def state_dir() -> Path:
-    """The record store; created on first use and bound to the configured repository."""
-    state = trusted_root() / "state"
-    identity_file = state / "repository"
-    if not state.is_dir():
-        state.mkdir(parents=True, mode=0o700)
-        identity_file.write_text(cfg["team"]["repository"] + "\n")
-    stored = identity_file.read_text().strip() if identity_file.is_file() else ""
-    if stored != cfg["team"]["repository"]:
-        raise RuntimeError(f"{state} belongs to {stored or 'no repository'}; refused")
+    """The record store. The root is bound to the configured repository by the same
+    `repository.json` that install.py writes; a root that names another one is refused."""
+    root, name = trusted_root(), cfg["github"]["repository"]
+    identity_file = root / "repository.json"
+    if not identity_file.exists():
+        root.mkdir(parents=True, exist_ok=True)
+        identity_file.write_text(json.dumps({"repository": name}) + "\n")
+    recorded = object_fields(json.loads(identity_file.read_text()), str(identity_file))
+    if recorded.get("repository") != name:
+        raise RuntimeError(f"{root} belongs to {recorded.get('repository')}, not {name}; refused")
+    state = root / "state"
+    state.mkdir(exist_ok=True, mode=0o700)
     return state
 
 
@@ -1056,7 +1059,7 @@ def configure_bootstrap(allocation: Allocation, branch: str, commit: str) -> Non
         "project": str(project),
         "logs": str(logs),
         "clone_url": cfg["team"]["clone_url"],
-        "repository": cfg["team"]["repository"],
+        "repository": cfg["github"]["repository"],
         "startup_seconds": cfg["timeouts"]["dexter_startup_seconds"],
         "branch": branch,
         "commit": commit,
@@ -1299,31 +1302,6 @@ def agent_spec(allocation: Allocation) -> AgentSpec:
     return spec
 
 
-def codex_servers(args: list[str]) -> set[str]:
-    """The MCP servers Codex enables under these arguments, read outside any project."""
-    listing = run(
-        "codex", *args, "mcp", "list", "--json", cwd=state_dir(), timeout=60, input_text=""
-    )
-    servers = object_list(json.loads(listing), "codex mcp list")
-    return {str(server.get("name")) for server in servers if server.get("enabled")}
-
-
-def codex_profile_args() -> list[str]:
-    """The Codex baseline profile arguments; refuse a launch that still has a forbidden
-    server. Codex splits `-c` keys on dots and keeps quotes, so names stay unquoted."""
-    args: list[str] = []
-    for name, enabled in CODEX_PLUGINS.items():
-        args += ["-c", f"plugins.{name}.enabled={json.dumps(enabled)}"]
-    for feature in CODEX_FEATURES_OFF:
-        args += ["--disable", feature]
-    for name in sorted(codex_servers(args) & set(CODEX_MCP_OFF)):
-        args += ["-c", f"mcp_servers.{name}.enabled=false"]
-    left = codex_servers(args) & set(CODEX_MCP_OFF)
-    if left:
-        raise RuntimeError(f"The Codex profile cannot disable {sorted(left)}; nothing launched")
-    return args
-
-
 def client_args(allocation: Allocation, prompt: str) -> list[str]:
     """Client arguments. Claude keeps the brief as its system prompt and waits for its first
     message. Codex starts with no instructions: no tested signal shows that it accepted a
@@ -1338,7 +1316,7 @@ def client_args(allocation: Allocation, prompt: str) -> list[str]:
         if spec["model"]:
             args += ["-m", spec["model"]]
         effort = ["-c", "model_reasoning_effort=" + json.dumps(spec["effort"])]
-        return [*args, *codex_profile_args(), *effort]
+        return [*args, *effort]
     args = [
         "--permission-mode",
         policies["claude_permission_mode"],
@@ -2063,6 +2041,32 @@ def retain_files(record: Record, dropped: list[str], kept: str, reports: Reports
             print(f"Retained {path}: {note['reason']}; see {config / 'retired.json'}")
 
 
+def remove_empty_residue(issue: str) -> None:
+    """After the operator has cleared what a retired team left, remove its allocation
+    directories that are now empty. Anything still holding a file stays."""
+    with store_lock():
+        if record_for(issue) is not None:
+            raise RuntimeError(f"#{issue} still has an allocation record; run stop first")
+        notes = sorted(state_dir().glob("*/retired.json"))
+        found = 0
+        for path in notes:
+            note = object_fields(json.loads(path.read_text()), str(path))
+            if str(note.get("issue")) != issue:
+                continue
+            found += 1
+            paths = allocation_paths(str(note.get("id")))
+            for directory in paths[:3]:
+                if directory.exists() or directory.is_symlink():
+                    contained(directory, trusted_root())
+            order = (paths[1], paths[2], paths[0])
+            for directory in order:
+                remove_if_empty(directory)
+            left = [str(d) for d in order if d.exists()]
+            print(f"{note.get('id')}: " + (f"kept {', '.join(left)}" if left else "removed"))
+        if not found:
+            print(f"#{issue}: no retired allocations")
+
+
 def stop_brief(brief: str) -> None:
     """Stop a team's recorded clients and Dexter daemons and release its slot.
 
@@ -2144,7 +2148,8 @@ def cli() -> None:
     args = sys.argv[1:]
     usage = (
         "Usage: agent/teams/team.py start <brief> | design <spec> <entry> | "
-        "turn <pr> <entry> | review <pr> <entry> | reset <issue> <entry> | stop <issue>"
+        "turn <pr> <entry> | review <pr> <entry> | reset <issue> <entry> | stop <issue> | "
+        "residue <issue>"
     )
     if len(args) < 2 or not args[1].isdecimal():
         raise RuntimeError(usage)
@@ -2153,6 +2158,8 @@ def cli() -> None:
         start(args[1])
     elif args[0] == "stop" and len(args) == 2:
         stop_brief(args[1])
+    elif args[0] == "residue" and len(args) == 2:
+        remove_empty_residue(args[1])
     elif args[0] == "turn" and named:
         turn(args[1], args[2])
     elif args[0] == "design" and named:

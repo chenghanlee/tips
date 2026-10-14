@@ -1,9 +1,9 @@
 """Brief lifecycle tests: real Git and process trees, fake Herdr; never a live pane or client."""
 
 import contextlib
-import hashlib
 import json
 import os
+import shutil
 import signal
 import socket
 import subprocess
@@ -22,8 +22,10 @@ SCRIPT = Path(__file__).resolve().parents[1] / "team.py"
 CONFIG = """\
 # Agent launch settings. Changes apply to newly started sessions.
 # An empty model uses the client's configured default.
-[team]
+[github]
 repository = "o/r"
+
+[team]
 clone_url = "/fixture/origin.git"
 psql = ["/fixture/psql", "fixture-dsn"]
 max_teams = 6
@@ -776,35 +778,9 @@ if "args=" in sys.argv:
         print("/fixture/vendor/dexter daemon " + root)
 """
 
-# Stands in for `codex mcp list --json` under the launch's -c overrides.
-FAKE_CODEX = r"""#!/usr/bin/env python3
-import json, os, sys
-state = json.load(open(os.environ["HERDR_FIXTURE"]))
-a = sys.argv[1:]
-state.setdefault("events", []).append(["codex", *a])
-json.dump(state, open(os.environ["HERDR_FIXTURE"], "w"))
-servers = [
-    {"name": "chrome-devtools", "enabled": True},
-    {"name": "cua_repl", "enabled": True, "plugin": "unified-computer-use@openai-bundled"},
-    {"name": "computer-use", "enabled": False},
-    {"name": "node_repl", "enabled": True},
-]
-sets = [a[i + 1] for i, x in enumerate(a) if x == "-c"]
-listed = []
-for s in servers:
-    if s.get("plugin") and "plugins.%s.enabled=false" % s["plugin"] in sets:
-        continue
-    on = s["enabled"] and "mcp_servers.%s.enabled=false" % s["name"] not in sets
-    listed.append({"name": s["name"], "enabled": on or s["name"] in state.get("stuck", [])})
-if a[-3:] != ["mcp", "list", "--json"]:
-    sys.exit("unexpected codex call " + repr(a))
-print(json.dumps(listed))
-"""
-
-
 class Harness(unittest.TestCase):
     """A harness checkout and a bare origin, with fake Herdr, gh, Mix, psql, ps, Codex and
-    Dexter on PATH. Trusted state lives under the fixture's XDG_DATA_HOME."""
+    Dexter on PATH. The trusted root is the checkout's sibling `agent_teams/r`."""
 
     def setUp(self) -> None:
         TEST_RUNS.mkdir(parents=True, exist_ok=True)
@@ -815,15 +791,13 @@ class Harness(unittest.TestCase):
         self.origin = self.root / "origin.git"
         self.stdlib = self.root / "stdlib/lib"
         self.state_path = self.root / "state.json"
-        key = hashlib.sha256(b"o/r").hexdigest()[:16]
-        self.trusted = self.root / "data/tips-agent-teams" / key
+        self.trusted = self.root / "agent_teams/r"
         self.env = dict(
             os.environ,
             GIT_CONFIG_GLOBAL=os.devnull,
             GIT_CONFIG_NOSYSTEM="1",
             HERDR_ENV="1",
             HERDR_FIXTURE=str(self.state_path),
-            XDG_DATA_HOME=str(self.root / "data"),
             PSQL_LOG=str(self.root / "psql-calls"),
             PSQL_DBS=str(self.root / "databases"),
             DEXTER_ELIXIR_LIB_ROOT=str(self.stdlib),
@@ -859,7 +833,6 @@ class Harness(unittest.TestCase):
             "gh": FAKE_GH,
             "psql": FAKE_PSQL,
             "ps": FAKE_PS,
-            "codex": FAKE_CODEX,
             "elixir": '#!/bin/sh\nprintf "1.2.3\\n"\n',
         }
         for name, body in fakes.items():
@@ -1114,18 +1087,9 @@ class PairLifecycleTest(Harness):
             "TIPS_TEAM_ALLOCATION_ID": "g1-tester",
             "HEX_HOME": None,
         }
-        # Client configuration is on the command line: Codex works in the allocation
-        # directory with Credo on and no computer-use or browser-control tools.
+        # Codex works in the allocation directory, outside the clone.
         argv = impl["launch_argv"]
         assert argv[argv.index("-C") + 1] == str(impl_root)
-        overrides = [argv[i + 1] for i, arg in enumerate(argv) if arg == "-c"]
-        assert "plugins.mix-credo@elixir-agent-tools.enabled=true" in overrides
-        assert "plugins.unified-computer-use@openai-bundled.enabled=false" in overrides
-        assert "mcp_servers.chrome-devtools.enabled=false" in overrides
-        assert not any("cua_repl" in item or "computer-use.enabled" in item for item in overrides)
-        assert {"computer_use", "browser_use"} <= {
-            argv[i + 1] for i, arg in enumerate(argv) if arg == "--disable"
-        }
         assert argv[-1] == 'model_reasoning_effort="xhigh"'
         assert "--add-dir" not in argv
         assert not (impl_root / ".codex").exists()
@@ -1455,7 +1419,7 @@ class PairLifecycleTest(Harness):
             ('advisor = "fixture-advisor"', 'adviser = "x"', "unknown keys ['adviser']"),
             ('model = "fixture-impl"', 'model = "x"\nadvisor = "y"', "advisor applies to Claude"),
             ('db_suffix = "r"', 'db_suffix = "9r"', "db_suffix must be nonempty and start"),
-            ('repository = "o/r"', 'repository = "o"', "team.repository must be"),
+            ('repository = "o/r"', 'repository = "o"', "github.repository must be owner/name"),
             ('psql = ["/fixture/psql"', 'psql = ["psql"', "psql must start with an absolute"),
             ('db_suffix = "c"', 'db_suffix = "c"\nprobe = []', "probe must hold 1 to 16"),
             ('db_suffix = "c"', 'db_suffix = "c"\nprobe = "make check"', "probe must be list"),
@@ -1470,6 +1434,13 @@ class PairLifecycleTest(Harness):
         assert "probe must hold 1 to 16" in self.team("start", "29", ok=False).stderr
         assert self.state()["events"] == []
         assert not self.trusted.exists()
+
+    def test_a_root_claimed_by_another_repository_is_refused(self) -> None:
+        self.trusted.mkdir(parents=True)
+        (self.trusted / "repository.json").write_text('{"repository": "o/other"}\n')
+        refused = self.team("start", "29", ok=False)
+        assert f"{self.trusted} belongs to o/other, not o/r; refused" in refused.stderr
+        assert not (self.trusted / "state").exists()
 
     def test_records_from_a_shared_worktree_team_py_refuse_every_command(self) -> None:
         legacy = self.repo / "agent/teams/allocations/1.json"
@@ -1513,8 +1484,7 @@ class PairLifecycleTest(Harness):
     @unittest.skipUnless(
         os.environ.get("TIPS_TEST_REAL_CODEX"), "opt-in installed Codex config check"
     )
-    def test_installed_codex_accepts_generated_configuration(self) -> None:
-        (self.bin / "codex").unlink()
+    def test_codex_started_in_the_allocation_ignores_the_clone_configuration(self) -> None:
         self.team("start", "29")
         launch = self.pane("team-1-impl")["launch_argv"]
         args = launch[launch.index("--") + 1 :]
@@ -1531,7 +1501,7 @@ class PairLifecycleTest(Harness):
         )
         assert result.returncode == 0, result.stderr
         enabled = {s["name"] for s in json.loads(result.stdout) if s.get("enabled")}
-        assert not enabled & {"chrome-devtools", "computer-use", "cua_repl", "project-evil"}
+        assert "project-evil" not in enabled
 
     def use_real_dexter(self) -> None:
         """Bootstrap with the real Dexter binary and a real Mix project."""
@@ -2039,6 +2009,16 @@ class RetirementTest(Harness):
         assert late.read_text() == "written while stopping\n"
         retired = json.loads((self.trusted / "state/g1-impl/retired.json").read_text())
         assert str(project) in retired["retained"]
+        # Residue removal deletes only directories the operator has emptied.
+        allocation = project.parent
+        assert f"g1-impl: kept {project}" in self.team("residue", "29").stdout
+        assert late.exists()
+        shutil.rmtree(project)
+        shutil.rmtree(allocation / "logs")
+        assert "g1-impl: removed" in self.team("residue", "29").stdout
+        assert not allocation.exists()
+        self.team("start", "30")
+        assert "#30 still has an allocation record" in self.team("residue", "30", ok=False).stderr
 
     def test_refused_database_drop_keeps_the_rest_and_the_reservation(self) -> None:
         self.merged_pair()

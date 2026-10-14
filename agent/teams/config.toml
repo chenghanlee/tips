@@ -1,9 +1,12 @@
 # Agent launch settings. Changes apply to newly started sessions.
 # An empty model uses the client's configured default.
-[team]
-# Each allocation clones this repository itself. Trusted state lives under
-# ${XDG_DATA_HOME:-~/.local/share}/tips-agent-teams/<key of repository>/.
+# GitHub calls name this repository instead of reading it from a checkout. Trusted state
+# lives beside the main checkout, in <checkout parent>/agent_teams/<repository name>/.
+[github]
 repository = "chenghanlee/tips"
+
+[team]
+# Each allocation clones this URL itself.
 clone_url = "https://github.com/chenghanlee/tips.git"
 # Fixed argv that `team.py stop` uses to drop a retired team's databases: an absolute
 # psql and the compose database's development connection. No project file is read.

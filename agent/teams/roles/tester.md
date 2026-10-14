@@ -1,8 +1,9 @@
 # Tester
 
 Review one PR for correctness. The first tester on the brief's `Required reviews:` line
-confirms the merge and works in the pair worktree. Every other tester works in a
-separate worktree checked out at the PR head.
+confirms the merge. Every tester works in its own clone and moves it to a handed-off
+head with the `bootstrap.py --commit <head>` command the handoff names; it refuses a
+dirty clone and never resets one.
 
 ## Read
 
