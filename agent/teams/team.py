@@ -2084,16 +2084,17 @@ def merged_brief(brief: str) -> bool:
 
 
 def preservation_gap(record: Record, reports: Reports) -> str:
-    """Why the team's databases are kept, or "" when the brief is closed by a merged PR and
-    every client reported a clean clone whose HEAD is merged, with nothing unpushed."""
-    if record["kind"] == "design":
-        return "a design team has no merged work"
+    """Why the team's work is not shown preserved, or "": every client reported a clean
+    clone with nothing unpushed and, for a brief, a HEAD merged into origin/main, and the
+    brief is closed by a merged PR. A design team commits nothing, so it needs no merge."""
     for allocation in record["agents"].values():
         fields, url = reports[allocation["id"]]
         if fields.get("clean") is not True or fields.get("unpushed") != 0:
             return f"{allocation['name']} reported uncommitted or unpushed work: {url}"
-        if fields.get("merged") is not True:
+        if record["kind"] != "design" and fields.get("merged") is not True:
             return f"{allocation['name']} reported a HEAD not merged into origin/main: {url}"
+    if record["kind"] == "design":
+        return ""
     if not merged_brief(record["brief"]):
         return f"brief #{record['brief']} is not closed by a merged PR"
     return ""
@@ -2192,9 +2193,11 @@ def list_retained() -> None:
 def stop_brief(brief: str) -> None:
     """Stop a team's recorded clients and Dexter daemons and release its slot.
 
-    Every client first posts a retirement report. Databases are dropped only for merged
-    work with clean reports; project and log files are always retained. A conflict, a
-    failed stop or a busy port keeps the reservation, so stop can run again.
+    Every client first posts a retirement report from its current launch. Work that the
+    reports and GitHub do not show preserved keeps everything: nothing is stopped and the
+    record stays. Databases are dropped only for merged work; project and log files are
+    always retained. A conflict, a failed stop or a busy port keeps the reservation, so
+    stop can run again.
     """
     with store_lock():
         record = record_for(brief)
@@ -2213,6 +2216,13 @@ def stop_brief(brief: str) -> None:
         missing = [e for e, a in record["agents"].items() if a["id"] not in reports]
         if missing:
             request_reports(record, missing, set(present))
+        gap = preservation_gap(record, reports)
+        if gap:
+            raise RuntimeError(
+                f"#{brief}: {gap}. Nothing was stopped; the record, databases, files and "
+                "reservation are kept. Preserve the work (commit, push and merge it), have the "
+                "client report again, then rerun stop."
+            )
         verify_present(present)
         for allocation in present.values():
             stop(allocation["pane"], allocation["root"])
@@ -2225,7 +2235,7 @@ def stop_brief(brief: str) -> None:
         busy = [str(a["port"]) for a in record["agents"].values() if port_in_use(a["port"])]
         if busy:
             raise RuntimeError(f"Ports {', '.join(busy)} are in use; the reservation is kept")
-        kept = preservation_gap(record, reports)
+        kept = "a design team's databases are kept" if record["kind"] == "design" else ""
         suffixes = [a["db_suffix"] for a in record["agents"].values()]
         dropped = [] if kept else drop_databases(suffixes)
         retain_files(record, dropped, kept, reports)

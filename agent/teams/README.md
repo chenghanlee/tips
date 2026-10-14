@@ -117,21 +117,26 @@ rejects changes to the implementer or merge-confirming tester.
 
 ### Retirement
 
-`team.py stop <issue>` first needs a retirement report from every client of the team.
-Until each has one, it changes nothing: it asks each running client to run
-`retirement.py`, prints the command the operator runs for a stopped client, and keeps
-every resource reserved. With every report, it:
+`team.py stop <issue>` first needs a retirement report from every client of the team,
+from its current launch; a report from an earlier launch does not count. Until each has
+one, it changes nothing: it asks each running client to run `retirement.py`, prints the
+command the operator runs for a stopped client, and keeps every resource reserved. With
+every report, it:
 
-1. Refuses a pane in the workspace that the record does not name, and another client in
+1. Refuses, stopping nothing and keeping the record, databases, files and reservation,
+   unless every report shows a clean clone with no unpushed commits and, for a brief,
+   HEAD merged into `origin/main`, and GitHub shows the brief closed by a merged PR
+   within `timeouts.shell_seconds`. Preserve the work, have the client report again,
+   then rerun stop.
+2. Refuses a pane in the workspace that the record does not name, and another client in
    an allocation.
-2. Stops the recorded clients and closes the workspace.
-3. Stops each project's Dexter daemon with the binary that bootstrap used.
-4. Keeps the reservation while any of the team's ports still answers.
-5. Drops the team's databases and their numbered partitions with the configured
-   `team.psql`, without `FORCE`, only when GitHub shows the brief closed by a merged PR
-   and every report shows a clean clone, no unpushed commits and HEAD merged. Otherwise
-   it keeps them and says why. A refused drop keeps the rest and the reservation.
-6. Removes only empty allocation directories, writes `state/<id>/retired.json` with the
+3. Stops the recorded clients and closes the workspace.
+4. Stops each project's Dexter daemon with the binary that bootstrap used.
+5. Keeps the reservation while any of the team's ports still answers.
+6. Drops the team's databases and their numbered partitions with the configured
+   `team.psql`, without `FORCE`. A refused drop keeps the rest and the reservation. A
+   design team keeps its databases.
+7. Removes only empty allocation directories, writes `state/<id>/retired.json` with the
    retained paths and reasons, and deletes the record.
 
 Project and log files are never deleted: a process outside the pane can still write
@@ -139,7 +144,7 @@ there. `agent/teams/team.py clean` lists each retained allocation with its reaso
 deletes nothing. The operator deletes one by hand, naming its ID
 (`rm -rf <root>/allocations/<id>`), only after establishing that its work is preserved
 and every writer has stopped; an earlier listing or a closed pane is not enough. If
-unsure, keep it. A design team keeps its databases.
+unsure, keep it.
 
 ## Turns
 

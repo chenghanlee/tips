@@ -1914,7 +1914,7 @@ class DesignTest(Harness):
         assert not any(call[-2:-1] == ["-c"] for call in self.psql_calls())
         assert project.is_dir()
         retired = json.loads((self.trusted / "state/g1-critic/retired.json").read_text())
-        assert retired["databases_kept_because"] == "a design team has no merged work"
+        assert retired["databases_kept_because"] == "a design team's databases are kept"
         assert self.recorded_briefs() == set()
 
 
@@ -2036,33 +2036,38 @@ class RetirementTest(Harness):
         assert "No retirement report yet from team-1-impl, team-1-tester" in refused.stderr
         assert self.remaining_databases() == ["tips_test_t1g1r"]
         assert self.recorded_briefs() == {"29"}
-        # A report from the current launch is accepted.
+        # A report from the current launch is accepted, and it shows the unpreserved work.
         self.retire("team-1-impl", "team-1-tester")
-        stopped = self.team("stop", "29").stdout
-        assert "team-1-tester reported uncommitted or unpushed work" in stopped
+        refused = self.team("stop", "29", ok=False)
+        assert "team-1-tester reported uncommitted or unpushed work" in refused.stderr
 
-    def test_unmerged_or_dirty_work_keeps_its_databases_and_files(self) -> None:
+    def test_unpreserved_work_keeps_the_record_and_every_reservation(self) -> None:
         self.databases("tips_test_t1g1i", "tips_test_t1g1r")
         project = self.project("team-1-impl")
         (project / "uncommitted").write_text("keep")
         self.retire("team-1-impl", "team-1-tester")
         self.clients_exit(1)
-        stopped = self.team("stop", "29").stdout
-        assert "team-1-impl reported uncommitted or unpushed work" in stopped
+        refused = self.team("stop", "29", ok=False).stderr
+        assert "team-1-impl reported uncommitted or unpushed work" in refused
+        assert "the record, databases, files and reservation are kept" in refused
         assert self.remaining_databases() == ["tips_test_t1g1i", "tips_test_t1g1r"]
         assert (project / "uncommitted").read_text() == "keep"
-        # Committed but unpushed work is also kept. The freed slot takes a new generation.
+        assert self.recorded_briefs() == {"29"}
+        assert not (self.trusted / "state/g1-impl/retired.json").exists()
+        # Committed but unpushed work is kept the same way; another brief takes another slot.
+        (project / "uncommitted").unlink()
+        self.commit("local only", cwd=project)
+        self.retire("team-1-impl")
+        assert "reported uncommitted or unpushed work" in self.team("stop", "29", ok=False).stderr
+        assert self.git("log", "-1", "--format=%s", cwd=project) == "local only"
         self.team("start", "30")
-        self.bootstrap("team-1-impl")
-        other = self.project("team-1-impl")
-        assert other == self.trusted / "allocations/g2-impl/project"
-        self.commit("local only", cwd=other)
-        self.retire("team-1-impl", "team-1-tester")
-        self.clients_exit(1)
-        assert "team-1-impl reported uncommitted or unpushed work" in (
-            self.team("stop", "30").stdout
-        )
-        assert self.git("log", "-1", "--format=%s", cwd=other) == "local only"
+        assert self.record(2)["brief"] == "30"
+        # Once the work is pushed and merged and reported again, the brief retires.
+        self.merge(self.push("team-1-impl", "pushed"))
+        self.retire("team-1-impl")
+        self.team("stop", "29")
+        assert self.recorded_briefs() == {"30"}
+        assert self.remaining_databases() == []
 
     def test_a_writer_that_outlives_stop_never_causes_deletion(self) -> None:
         self.merged_pair()
