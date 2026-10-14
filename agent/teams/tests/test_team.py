@@ -1630,6 +1630,7 @@ class PairLifecycleTest(Harness):
         self.bootstrap("team-1-tester")
         self.addCleanup(self.stop_real_daemon, self.project("team-1-tester"))
         assert daemon_pid(project)
+        self.merge(self.push("team-1-impl"))
         self.retire("team-1-impl", "team-1-tester")
         self.clients_exit(1)
         self.team("stop", "29")
