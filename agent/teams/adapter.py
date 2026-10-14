@@ -31,6 +31,7 @@ PROJECT_ITEMS = 1000
 ENTRY_PATTERN = r"^[a-z0-9][a-z0-9-]*$"
 
 Number = Annotated[int, Field(ge=1, le=99_999_999)]
+Offset = Annotated[int, Field(ge=0, le=100_000_000)]
 # GitHub REST ids, such as comment ids, already exceed 32 bits.
 GitHubId = Annotated[int, Field(ge=1, le=2**63 - 1)]
 Entry = Annotated[str, Field(pattern=ENTRY_PATTERN, max_length=40)]
@@ -84,6 +85,15 @@ def cap(text: str) -> str:
         return text
     kept = data[:RESPONSE_BYTES].decode(errors="ignore")
     return kept + f"\n[truncated: {len(data) - RESPONSE_BYTES} more bytes]"
+
+
+def page(text: str, offset: int) -> str:
+    """The text from a character offset, cut to fit one response, with the next offset."""
+    rest = text[offset:]
+    kept = rest.encode()[: RESPONSE_BYTES - 100].decode(errors="ignore")
+    if len(kept) < len(rest):
+        kept += f"\n[more: call again with offset={offset + len(kept)}]"
+    return kept
 
 
 def operate(action: Callable[[], str | None], *, writes: bool = False) -> str:
@@ -244,11 +254,13 @@ def pr_read(pr: Number) -> str:
 
 
 @server.tool()
-def issue_read(issue: Number) -> str:
-    """An issue's number, title, state, labels, URL and body."""
+def issue_read(issue: Number, offset: Offset = 0) -> str:
+    """An issue's number, title, state, labels, URL and body, from a character offset.
+    A long result ends with the offset to read the rest from."""
     fields = "number,title,state,labels,url,body"
     repository = settings()["repository"]
-    return operate(lambda: gh("issue", "view", str(issue), "--repo", repository, "--json", fields))
+    args = ["issue", "view", str(issue), "--repo", repository, "--json", fields]
+    return operate(lambda: page(gh(*args), offset))
 
 
 @server.tool()
@@ -260,9 +272,12 @@ def issue_create(title: Title, body: Body) -> str:
 
 
 @server.tool()
-def board_read(issue: Number, after_comment_id: GitHubId | None = None) -> str:
-    """An issue body and its comments, or only the comments after the given comment id."""
-    return operate(lambda: board.read_text(str(issue), after_comment_id))
+def board_read(
+    issue: Number, after_comment_id: GitHubId | None = None, offset: Offset = 0
+) -> str:
+    """An issue body and its comments, or only the comments after the given comment id,
+    from a character offset. A long result ends with the offset to read the rest from."""
+    return operate(lambda: page(board.read_text(str(issue), after_comment_id), offset))
 
 
 @server.tool()

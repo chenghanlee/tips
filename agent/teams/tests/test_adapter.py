@@ -54,6 +54,12 @@ a = sys.argv[1:]
 path = Path(os.environ["HERDR_FIXTURE"])
 s = json.loads(path.read_text())
 base = str(Path(sys.argv[0]).with_name("gh-base"))
+if a[:2] == ["issue", "view"] and "title" in a[a.index("--json") + 1]:
+    body = s.get("issues", {}).get(a[2], "")
+    view = {"number": int(a[2]), "title": "Brief", "state": "OPEN", "labels": [],
+            "url": "https://github.com/o/r/issues/" + a[2], "body": body}
+    print(json.dumps({key: view[key] for key in a[a.index("--json") + 1].split(",")}))
+    sys.exit(0)
 if a[:2] == ["pr", "view"] and "state" in a[a.index("--json") + 1]:
     pass
 elif a[:2] not in (["issue", "create"], ["pr", "checks"], ["pr", "list"]) and a[0] != "project":
@@ -246,7 +252,7 @@ class AdapterTest(Harness):
             await self.call(client, "board_post", issue=29, comment_type="EVENT", body="first")
             await self.call(client, "board_post", issue=29, comment_type="EVENT", body="second")
             full = await self.call(client, "board_read", issue=29)
-            assert "[truncated:" in full
+            assert "[more: call again with offset=" in full
             later = await self.call(client, "board_read", issue=29, after_comment_id=1)
             assert "second" in later
             assert "first" not in later
@@ -257,5 +263,19 @@ class AdapterTest(Harness):
     def test_real_github_comment_ids_are_accepted(self) -> None:
         async def steps(client: Any) -> None:
             await self.call(client, "board_read", issue=29, after_comment_id=6151732486)
+
+        self.session(steps)
+
+    def test_a_long_issue_body_continues_from_an_offset(self) -> None:
+        self.update(issues={"29": "x" * 9000 + "TAIL"})
+
+        async def steps(client: Any) -> None:
+            for tool in ("issue_read", "board_read"):
+                first = await self.call(client, tool, issue=29)
+                assert "TAIL" not in first
+                offset = int(first.rsplit("offset=", 1)[1].split("]")[0])
+                rest = await self.call(client, tool, issue=29, offset=offset)
+                assert "TAIL" in rest, tool
+                assert len(first.encode()) <= 8192
 
         self.session(steps)
