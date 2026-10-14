@@ -43,3 +43,14 @@ class ClaimRootTest(unittest.TestCase):
         ):
             assert team.harness() == root / "harness/agent/teams"
         assert team.harness() == Path(team.__file__).resolve().parent
+
+    def test_a_symlinked_state_directory_refuses_before_the_identity_is_published(self) -> None:
+        root = self.base / "agent_teams/tips"
+        root.mkdir(parents=True)
+        outside = self.base / "outside"
+        outside.mkdir()
+        (root / "state").symlink_to(outside, target_is_directory=True)
+        with self.assertRaises(RuntimeError):
+            team.claim_root(root, "o/tips", self.checkout)
+        assert sorted(p.name for p in root.iterdir()) == ["state"]
+        assert not any(outside.iterdir())
