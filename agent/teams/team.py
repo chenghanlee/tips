@@ -2,12 +2,16 @@
 """Manage brief teams in Herdr: start the pair, hand off the checkout, launch reviewers, stop.
 
 Configured agents are `[agents.<entry>]` in config.toml. Each launch writes an allocation
-record to `agent/teams/allocations/<slot>.json` with the implementer, merge-confirming tester,
-and every launched client's Herdr name, kind, worktree, database suffix, port, pane and session.
-Restart, handoff and teardown use that record. Model, effort, advisor and persona come from
+record to `agent/teams/allocations/<slot>.json` with the record version, the allocation ID,
+the implementer, merge-confirming tester, and every launched client's Herdr name, kind,
+worktree, database suffix, port, pane, session and task-submission state. Restart, handoff
+and teardown use that record. One lock on `agent/teams/allocations/.lock` serializes start,
+review, reset and stop. Model, effort, advisor and persona come from
 the current configuration. The brief's `Required reviews:` line names any additional reviewers.
 """
 
+import contextlib
+import fcntl
 import json
 import os
 import re
@@ -20,7 +24,7 @@ import tempfile
 import time
 import tomllib
 import uuid
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
 from pathlib import Path
 from typing import NotRequired, TypedDict, cast
 
@@ -52,7 +56,14 @@ class Config(TypedDict):
 
 
 class Allocation(TypedDict):
-    """One launched client. `pr` and `head` are set for reviewers of a pushed PR."""
+    """One launched client. `pr` and `head` are set for reviewers of a pushed PR.
+
+    `pane`, `name`, `kind`, `worktree` and `session` identify the client process.
+    `submission` is the task-submission state, separate from whether a process runs:
+    NEVER_SUBMITTED until launch writes UNKNOWN, durably, before the client can accept any
+    input; SUBMITTED only after the task prompt's positive transport result. SUBMITTED does
+    not mean the task is done; the brief, PR and reviews record its outcome.
+    """
 
     entry: str
     role: str
@@ -65,14 +76,17 @@ class Allocation(TypedDict):
     tab: str
     pane: str
     session: str
+    submission: str
     pr: NotRequired[str]
     head: NotRequired[str]
 
 
 class Record(TypedDict):
     """A slot's allocation record: the brief, its roster, its Herdr workspace and tabs, and
-    every launched client."""
+    every launched client. `id` identifies this allocation; a slot number is reused."""
 
+    version: int
+    id: str
     slot: int
     brief: str
     worktree: str
@@ -126,6 +140,8 @@ ROLES = ("designer", "implementer", "tester")
 # A team's workspace holds one tab per role; every client of that role is a pane in it.
 TABS = {"designer": "designers", "implementer": "implementers", "tester": "reviewers"}
 ENTRY = r"[a-z0-9][a-z0-9-]*"
+RECORD_VERSION = 2
+NEVER_SUBMITTED, UNKNOWN, SUBMITTED = "never_submitted", "unknown", "submitted"
 AGENT_FIELDS = {"role", "kind", "model", "effort", "advisor", "persona", "port_offset", "db_suffix"}
 # Dexter's query gives up this long after --wait: its allowance to reach the daemon.
 DEXTER_CONNECT_SECONDS = 30
@@ -478,6 +494,7 @@ def validate_settings(path: Path, value: Config) -> None:
         "shell_seconds",
         "checks_minutes",
         "dexter_startup_seconds",
+        "lock_seconds",
     ):
         if type(value["timeouts"][key]) is not int or value["timeouts"][key] <= 0:
             raise RuntimeError(f"{path}: timeouts.{key} must be a positive integer")
@@ -528,8 +545,28 @@ def record_path(slot: int) -> Path:
     return records_dir() / f"{slot}.json"
 
 
+def require_current_record(path: Path, fields: dict[str, object]) -> None:
+    """Refuse a record another team.py version wrote, or one without a valid allocation ID."""
+    if "version" not in fields:
+        raise RuntimeError(
+            f"{path} was written by a team.py without record versions; refusing every launch "
+            "and stop. Drain it with the team.py that wrote it, as agent/teams/SETUP.md "
+            '"Records from an older team.py" says.'
+        )
+    if fields["version"] != RECORD_VERSION:
+        raise RuntimeError(
+            f"{path}: record version {fields['version']!r} is not {RECORD_VERSION}; preserved"
+        )
+    allocation_id = fields.get("id")
+    if not isinstance(allocation_id, str) or not re.fullmatch(r"[0-9a-f]{32}", allocation_id):
+        raise RuntimeError(f"{path}: allocation id must be 32 hex digits; preserved")
+
+
 def load_record(path: Path) -> Record:
+    """Read a record this version wrote. Never fill in a default for a missing field: a
+    client that a default called never-submitted could do its task twice."""
     fields = object_fields(json.loads(path.read_text()), str(path))
+    require_current_record(path, fields)
     require_type(fields.get("slot"), int, f"{path}: slot")
     for key in ("brief", "worktree", "implementer", "tester", "workspace"):
         require_type(fields.get(key), str, f"{path}: {key}")
@@ -538,20 +575,68 @@ def load_record(path: Path) -> Record:
     for entry, value in object_fields(fields.get("agents"), f"{path}: agents").items():
         allocation = object_fields(value, f"{path}: agents.{entry}")
         for key in (
-            "entry", "role", "name", "kind", "worktree", "db_suffix", "workspace", "tab", "pane"
+            "entry",
+            "role",
+            "name",
+            "kind",
+            "worktree",
+            "db_suffix",
+            "workspace",
+            "tab",
+            "pane",
+            "session",
         ):
             require_type(allocation.get(key), str, f"{path}: agents.{entry}.{key}")
         require_type(allocation.get("port"), int, f"{path}: agents.{entry}.port")
+        if allocation.get("submission") not in (NEVER_SUBMITTED, UNKNOWN, SUBMITTED):
+            raise RuntimeError(f"{path}: agents.{entry}.submission is not a known state; preserved")
     return cast(Record, fields)
 
 
 def save_record(record: Record) -> None:
-    """Replace the slot's record atomically: an interrupted write must not lose it."""
+    """Replace the slot's record atomically and durably: once this returns, a launcher crash
+    or timeout keeps the new record. The directory must be on a local filesystem."""
     path = record_path(record["slot"])
     path.parent.mkdir(parents=True, exist_ok=True)
     staged = path.with_suffix(".json.tmp")
-    staged.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+    with staged.open("w") as handle:
+        handle.write(json.dumps(record, indent=2, sort_keys=True) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
     staged.replace(path)
+    directory = os.open(path.parent, os.O_RDONLY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+
+
+@contextlib.contextmanager
+def store_lock() -> Generator[None]:
+    """Hold the record store's lock: one start, review, reset or stop at a time.
+
+    The lock is on a file that is never replaced, so it is not lost when a record is
+    rewritten. The kernel releases it when this process exits, even after a crash. Python
+    opens the file non-inheritable and `subprocess` closes other descriptors by default, so
+    a child does not receive it.
+    """
+    path = records_dir() / ".lock"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    seconds = cfg["timeouts"]["lock_seconds"]
+    with path.open("a") as handle:
+        deadline = time.monotonic() + seconds
+        while True:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(
+                        f"Busy: another team.py start, review, reset or stop held {path} for "
+                        f"{seconds} s. Rerun this command after it finishes."
+                    ) from None
+                time.sleep(0.1)
+        yield
 
 
 def records() -> dict[int, Record]:
@@ -834,8 +919,55 @@ def allocate(record: Record, entry: str, role: str, worktree: Path) -> Allocatio
         tab="",
         pane="",
         session="",
+        submission=NEVER_SUBMITTED,
     )
     record["agents"][entry] = allocation
+    return allocation
+
+
+def earlier_launch(record: Record, entry: str, worktree: Path, branch: str | None) -> list[str]:
+    """What remains of an earlier launch of this client that the record does not hold.
+
+    A missing record or entry never proves that a task was never sent: the record may have
+    been lost while its worktree, branch, workspace, client or databases remained.
+    """
+    found = [f"worktree {worktree}"] if worktree.exists() else []
+    if branch and git("branch", "--list", branch):
+        found.append(f"branch {branch}")
+    label = re.compile(rf"team-[0-9]+-{re.escape(record['brief'])}")
+    found += [
+        f"Herdr workspace {w['label']}"
+        for w in herdr("workspace", "list")["workspaces"]
+        if label.fullmatch(w.get("label", "")) and w["workspace_id"] != record["workspace"]
+    ]
+    name = live_name(record["slot"], entry)
+    if any(a.get("name") == name for a in herdr("agent", "list")["agents"]):
+        found.append(f"Herdr client {name}")
+    suffix = db_suffix(entry, record["slot"])
+    try:
+        found += [f"database {db}" for db in allocated_databases([suffix])]
+    except (RuntimeError, OSError, subprocess.TimeoutExpired) as error:
+        # Without the list nothing proves that no earlier launch left work.
+        found.append(
+            f"databases unreadable: the earlier-launch check lists databases {suffix}* "
+            f"through Docker, which failed ({error})"
+        )
+    return found
+
+
+def add_allocation(
+    record: Record, entry: str, role: str, worktree: Path, branch: str | None
+) -> Allocation:
+    """Allocate a client the record does not hold. If an earlier launch left anything
+    behind, its task may already have been sent: record the submission as unknown."""
+    allocation = allocate(record, entry, role, worktree)
+    remains = earlier_launch(record, entry, worktree, branch)
+    if remains:
+        allocation["submission"] = UNKNOWN
+        print(
+            f"{allocation['name']} has no earlier record, but these remain: "
+            f"{', '.join(remains)}. Its task submission is recorded as unknown."
+        )
     return allocation
 
 
@@ -1027,7 +1159,13 @@ def open_pane(record: Record, allocation: Allocation) -> None:
 
 
 def enter(pane: str, worktree: Path, env: dict[str, str]) -> None:
-    """Move the pane's shell into the worktree with the client's environment."""
+    """Move the pane's shell into the worktree with the client's environment.
+
+    The setup is typed into the pane, so it runs only when the pane is at its shell: typed
+    into a client, it would be a prompt.
+    """
+    if pane_occupant(pane)[1]:
+        raise RuntimeError(f"{pane}: a client appeared in the pane; preserved")
     token = uuid.uuid4().hex
     setup = (
         "cd -- "
@@ -1117,13 +1255,18 @@ def agent_spec(allocation: Allocation) -> AgentSpec:
     return spec
 
 
-def client_args(allocation: Allocation, prompt: str) -> list[str]:
+def client_args(allocation: Allocation, prompt: str, session: str) -> list[str]:
+    """Client arguments. Claude keeps the brief as its system prompt and waits for its first
+    message; it runs the session id the launcher assigned, because Herdr learns session ids
+    from a user hook that restricted mode ignores. Codex starts with no instructions: no
+    documented signal shows that it accepted a task passed at start, so launch sends its
+    brief as the first message."""
     spec, policies, worktree = agent_spec(allocation), cfg["launch"], allocation["worktree"]
     if spec["kind"] == "codex":
         args = ["-a", policies["codex_approval"], "-C", str(worktree)]
         if spec["model"]:
             args += ["-m", spec["model"]]
-        return [*args, "-c", "model_reasoning_effort=" + json.dumps(spec["effort"]), prompt]
+        return [*args, "-c", "model_reasoning_effort=" + json.dumps(spec["effort"])]
     args = [
         "--permission-mode",
         policies["claude_permission_mode"],
@@ -1136,6 +1279,8 @@ def client_args(allocation: Allocation, prompt: str) -> list[str]:
         ),
         "--append-system-prompt",
         prompt,
+        "--session-id",
+        session,
     ]
     if spec["model"]:
         args += ["--model", spec["model"]]
@@ -1145,14 +1290,16 @@ def client_args(allocation: Allocation, prompt: str) -> list[str]:
     return args
 
 
-def running_client(allocation: Allocation) -> Entity | None:
-    """The recorded client if it is live in its pane; None if the pane is at the shell.
+def running_client(record: Record, allocation: Allocation) -> Entity | None:
+    """The recorded client if it is live in its pane; None if the pane is gone or at the shell.
 
-    A live client with another name, kind or root is refused, and so is the recorded
-    client whose startup never completed: its first prompt may not have arrived, and
-    resending it blindly could double the work, so the operator inspects it.
+    A live client with another name, kind, root or session makes the pane's owner
+    uncertain: refused, and so is one that reports no session, since nothing then shows
+    which client is live. Only a record with no session yet accepts the live one's.
     """
     name, pane = allocation["name"], allocation["pane"]
+    if pane not in {p["pane_id"] for p in live_panes(record["workspace"])}:
+        return None
     root, live = pane_occupant(pane)
     if not live:
         return None
@@ -1161,26 +1308,92 @@ def running_client(allocation: Allocation) -> Entity | None:
         raise RuntimeError(f"{pane}: conflicting client; preserved")
     if root != Path(allocation["worktree"]):
         raise RuntimeError(f"{pane}: {name} runs in {root}, not its worktree; preserved")
-    if not allocation["session"]:
+    recorded, live_session = allocation["session"], session_id(agent)
+    if not live_session:
         raise RuntimeError(
-            f"{name} started but its startup did not complete; inspect {pane}. If it is idle, "
-            "exit the client there, then rerun this command to relaunch it from the record."
+            f"{pane}: {name} reports no session; cannot confirm the recorded client; preserved. "
+            "Nothing was resent; only the operator decides what happens to it."
+        )
+    if recorded not in ("", "unknown") and live_session != recorded:
+        raise RuntimeError(f"{pane}: {name} runs session {live_session}, not {recorded}; preserved")
+    return agent
+
+
+def reconcile(record: Record, allocation: Allocation) -> Entity | None:
+    """Return the live recorded client to adopt, or None when a launch may send the task.
+
+    | Client | Submission | Result |
+    |---|---|---|
+    | live, recorded identity | unknown or submitted | adopt; resend nothing |
+    | live, recorded identity | never submitted | refuse: this record did not start it |
+    | another client in the pane | any | refuse |
+    | none | never submitted | launch |
+    | none | unknown or submitted | refuse: the client may have done the task, then exited |
+    """
+    agent = running_client(record, allocation)
+    name, state = allocation["name"], allocation["submission"]
+    if agent and state == NEVER_SUBMITTED:
+        raise RuntimeError(
+            f"{name} is live in {allocation['pane']}, but this record never started it; preserved"
+        )
+    if agent is None and state != NEVER_SUBMITTED:
+        raise RuntimeError(
+            f"{name} is not running and its task submission is {state}. It may have done the "
+            "task before it exited, so nothing was launched or resent; only the operator "
+            "decides whether to replay it: after checking its work on the brief and PR, the "
+            f"operator runs agent/teams/team.py reset {record['brief']} {allocation['entry']}, "
+            "then reruns this command."
         )
     return agent
 
 
+def adopt(record: Record, allocation: Allocation, agent: Entity) -> None:
+    """Keep a live recorded client; never resend its task. If the launch stopped before the
+    record held a session, record the one the client reports; running_client refused any
+    other mismatch."""
+    name, session = allocation["name"], session_id(agent)
+    if session and allocation["session"] in ("", "unknown"):
+        allocation["session"] = session
+        save_record(record)
+    if allocation["submission"] == SUBMITTED:
+        return
+    # The launch stopped before it finished; its EVENT may be missing. Posting is idempotent.
+    post_event(record["brief"], allocation, launch_text(allocation))
+    print(
+        f"{name}: task submission is {allocation['submission']}; nothing was resent. Only the "
+        f"operator decides whether to replay it: if {allocation['pane']} shows that the client "
+        "never got its task, the operator exits the client, runs agent/teams/team.py reset "
+        f"{record['brief']} {allocation['entry']} and reruns this command."
+    )
+
+
+def launch_text(allocation: Allocation) -> str:
+    return (
+        f"launched {allocation['kind']} in {allocation['worktree']}; "
+        f"database suffix {allocation['db_suffix']}; port {allocation['port']}"
+    )
+
+
 def launch(record: Record, allocation: Allocation, prompt: str) -> None:
-    """Start one client in its pane, or keep the one already running there."""
+    """Start one client in its pane and send its task, or adopt the one already there.
+
+    The task-submission state is UNKNOWN on disk before the client starts: Claude's startup
+    carries the brief, and a timeout cannot show what a client received. It becomes
+    SUBMITTED only when Herdr reports that the task prompt was sent.
+    """
+    agent = reconcile(record, allocation)
+    if agent:
+        print(f"Already running: {allocation['name']} ({agent.get('agent_status')})")
+        adopt(record, allocation, agent)
+        return
     name, pane = allocation["name"], allocation["pane"]
     kind, worktree = allocation["kind"], Path(allocation["worktree"])
-    agent = running_client(allocation)
-    if agent:
-        print(f"Already running: {name} ({agent.get('agent_status')})")
-        return
-    # The pane is at the shell: the old session must not vouch for the replacement.
-    allocation["session"] = ""
-    save_record(record)
+    # Claude runs a session id assigned here; Codex's is known only if Herdr reports it.
+    session = str(uuid.uuid4()) if kind == "claude" else ""
+    args = client_args(allocation, prompt, session)  # a configuration error refuses first
     enter(pane, worktree, agent_env(allocation))
+    allocation["submission"], allocation["session"] = UNKNOWN, session
+    save_record(record)
     herdr(
         "agent",
         "start",
@@ -1192,29 +1405,27 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
         "--timeout",
         str(cfg["timeouts"]["launch_seconds"] * 1000),
         "--",
-        *client_args(allocation, prompt),
+        *args,
     )
     started = herdr("agent", "get", pane)["agent"]
+    reported = session_id(started)
+    if not session:
+        allocation["session"] = reported or "unknown"
+        save_record(record)
     if (
         pane_occupant(pane) != (worktree, True)
         or started.get("agent") != kind
         or started.get("name") != name
         or started.get("agent_status") in ("blocked", "unknown")
+        or (session and reported not in ("", session))
     ):
         raise RuntimeError(f"{name} started in an unexpected state or root; inspect {pane}")
-    if kind == "claude":
-        # Claude holds the brief as its system prompt and waits; Codex receives it as input.
-        herdr("agent", "prompt", name, "Begin.")
-    # Recorded only now: a session in the record means startup completed.
-    allocation["session"] = session_id(started) or "unknown"
+    # The task prompt: Claude already holds its brief and waits for a first message.
+    herdr("agent", "prompt", name, "Begin." if kind == "claude" else prompt)
+    allocation["submission"] = SUBMITTED
     save_record(record)
     print(f"Launched {name}: {kind} in {worktree}, session {allocation['session']}")
-    post_event(
-        record["brief"],
-        allocation,
-        f"launched {kind} in {worktree}; database suffix {allocation['db_suffix']}; "
-        f"port {allocation['port']}",
-    )
+    post_event(record["brief"], allocation, launch_text(allocation))
 
 
 def require_main_checkout() -> None:
@@ -1246,35 +1457,40 @@ def start(brief: str) -> None:
     pair = [implementer, testers[0]]
     worktree = main / ".worktrees" / brief
     tools(worktree)  # missing tools refuse before a slot is reserved
-    slot, record = find_slot(brief)
-    if record is None:
-        record = Record(
-            slot=slot,
-            brief=brief,
-            worktree=str(worktree),
-            implementer=pair[0],
-            tester=pair[1],
-            workspace="",
-            tabs={},
-            agents={},
-        )
-        save_record(record)  # the slot is reserved before anything is provisioned
-    else:
-        current_roster(record)
-    refuse_foreign_owner(worktree, [live_name(slot, entry) for entry in pair])
-    duties = ("implementer", "merge-confirming tester")
-    clients = [
-        record["agents"].get(entry) or allocate(record, entry, duty, worktree)
-        for entry, duty in zip(pair, duties, strict=True)
-    ]
-    save_record(record)
-    prepare_worktree(worktree, clients, f"task/{brief}", None)
-    for allocation in clients:
-        open_pane(record, allocation)
+    with store_lock():
+        slot, record = find_slot(brief)
+        if record is None:
+            record = Record(
+                version=RECORD_VERSION,
+                id=uuid.uuid4().hex,
+                slot=slot,
+                brief=brief,
+                worktree=str(worktree),
+                implementer=pair[0],
+                tester=pair[1],
+                workspace="",
+                tabs={},
+                agents={},
+            )
+            save_record(record)  # the slot is reserved before anything is provisioned
+        else:
+            current_roster(record)
+        refuse_foreign_owner(worktree, [live_name(slot, entry) for entry in pair])
+        duties = ("implementer", "merge-confirming tester")
+        clients = [
+            record["agents"].get(entry)
+            or add_allocation(record, entry, duty, worktree, f"task/{brief}")
+            for entry, duty in zip(pair, duties, strict=True)
+        ]
+        save_record(record)
+        for allocation in clients:
+            reconcile(record, allocation)  # refuse before preparing anything
+        prepare_worktree(worktree, clients, f"task/{brief}", None)
         wrapper = worktree / ".dexter/dexter.sh"
-        launch(
-            record, allocation, pair_brief(record, allocation["entry"], allocation["role"], wrapper)
-        )
+        for allocation in clients:
+            open_pane(record, allocation)
+            prompt = pair_brief(record, allocation["entry"], allocation["role"], wrapper)
+            launch(record, allocation, prompt)
     print(f"Brief {brief}: pair in slot {slot}, {worktree}")
 
 
@@ -1298,35 +1514,64 @@ def review(pr: str, entry: str) -> None:
     """Pin a required reviewer's own worktree at the PR head and launch it there."""
     require_main_checkout()
     url, head, briefs = pull_request(pr)
-    record = brief_record(pr, briefs)
-    testers, designers = current_roster(record)
-    if entry not in testers + designers:
-        raise RuntimeError(
-            f"{entry} is not an additional reviewer of brief #{record['brief']} "
-            f"(additional reviewers: {', '.join(testers + designers) or 'none'})"
+    with store_lock():
+        record = brief_record(pr, briefs)
+        testers, designers = current_roster(record)
+        if entry not in testers + designers:
+            raise RuntimeError(
+                f"{entry} is not an additional reviewer of brief #{record['brief']} "
+                f"(additional reviewers: {', '.join(testers + designers) or 'none'})"
+            )
+        duty = "reviewing designer" if entry in designers else "additional tester"
+        worktree = main / ".worktrees" / f"review-{pr}-{entry}"
+        refuse_foreign_owner(worktree, [live_name(record["slot"], entry)])
+        allocation = record["agents"].get(entry) or add_allocation(
+            record, entry, duty, worktree, None
         )
-    duty = "reviewing designer" if entry in designers else "additional tester"
-    worktree = main / ".worktrees" / f"review-{pr}-{entry}"
-    refuse_foreign_owner(worktree, [live_name(record["slot"], entry)])
-    allocation = record["agents"].get(entry) or allocate(record, entry, duty, worktree)
-    allocation["pr"] = pr
-    save_record(record)
-    live = {p["pane_id"] for p in live_panes(record["workspace"])}
-    if allocation["pane"] in live and running_client(allocation):
-        # A running reviewer keeps the head it is on; its record says which.
+        allocation["pr"] = pr
+        save_record(record)
+        agent = reconcile(record, allocation)
+        if agent:
+            # A running reviewer keeps the head it is on; its record says which.
+            allocation["head"] = git("rev-parse", "HEAD", root=worktree)
+            save_record(record)
+            print(f"Already running: {allocation['name']} at {allocation['head']}")
+            adopt(record, allocation, agent)
+            return
+        prepare_worktree(worktree, [allocation], None, head)
         allocation["head"] = git("rev-parse", "HEAD", root=worktree)
         save_record(record)
-        print(f"Already running: {allocation['name']} at {allocation['head']}")
-        return
-    prepare_worktree(worktree, [allocation], None, head)
-    allocation["head"] = git("rev-parse", "HEAD", root=worktree)
-    save_record(record)
-    open_pane(record, allocation)
-    wrapper = worktree / ".dexter/dexter.sh"
-    launch(
-        record, allocation, reviewer_brief(record, entry, duty, url, allocation["head"], wrapper)
-    )
+        open_pane(record, allocation)
+        wrapper = worktree / ".dexter/dexter.sh"
+        prompt = reviewer_brief(record, entry, duty, url, allocation["head"], wrapper)
+        launch(record, allocation, prompt)
     print(f"PR {pr}: {entry} reviews from {worktree} at {allocation['head']}")
+
+
+def reset(brief: str, entry: str) -> None:
+    """Record the operator's decision that a stopped client may be replaced with its task.
+
+    Run it only after checking the brief and PR for what the client did. The client must
+    not be running: a live one is adopted, never replaced.
+    """
+    require_main_checkout()
+    with store_lock():
+        record = record_for(brief)
+        allocation = record["agents"].get(entry) if record else None
+        if record is None or allocation is None:
+            raise RuntimeError(f"Brief {brief} has no recorded client {entry}")
+        if running_client(record, allocation):
+            raise RuntimeError(
+                f"{allocation['name']} is running in {allocation['pane']}; exit it first"
+            )
+        print(
+            f"Reset {allocation['name']}: task submission was {allocation['submission']}, "
+            f"session {allocation['session'] or 'none'}. The next start or review launches a "
+            "replacement and sends its task."
+        )
+        allocation["submission"] = NEVER_SUBMITTED
+        allocation["session"] = ""
+        save_record(record)
 
 
 def checkout_problem(head: str) -> str | None:
@@ -1536,6 +1781,11 @@ def turn(pr: str, recipient: str) -> None:
 
 def stop_brief(brief: str) -> None:
     """Remove a brief's resources only when its work is clean and merged."""
+    with store_lock():
+        retire_brief(brief)
+
+
+def retire_brief(brief: str) -> None:
     record = record_for(brief)
     if record is None:
         print(f"Brief {brief}: no allocation record; nothing removed")
@@ -1647,27 +1897,40 @@ def check_worktrees(roots: set[Path]) -> None:
             ) from error
 
 
-def drop_databases(suffixes: list[str]) -> None:
+PSQL = (
+    "docker",
+    "compose",
+    "exec",
+    "-T",
+    "db",
+    "psql",
+    "-U",
+    "postgres",
+    "-d",
+    "postgres",
+    "-v",
+    "ON_ERROR_STOP=1",
+)
+
+
+def allocated_databases(suffixes: list[str]) -> list[str]:
+    """The test and dev databases, and their numbered partitions, of these suffixes."""
     stems = [base + suffix for base in ("tips_test", "tips_dev") for suffix in suffixes]
-    psql = [
-        "docker",
-        "compose",
-        "exec",
-        "-T",
-        "db",
-        "psql",
-        "-U",
-        "postgres",
-        "-d",
-        "postgres",
-        "-v",
-        "ON_ERROR_STOP=1",
+    seconds = cfg["timeouts"]["shell_seconds"]
+    query = (*PSQL, "-Atc", "SELECT datname FROM pg_database")
+    databases = run(*query, cwd=main, timeout=seconds).splitlines()
+    return [
+        db
+        for db in databases
+        if any(re.fullmatch(re.escape(stem) + r"[0-9]*", db) for stem in stems)
     ]
-    databases = run(*psql, "-Atc", "SELECT datname FROM pg_database", cwd=main).splitlines()
-    for db in databases:
-        if any(re.fullmatch(re.escape(stem) + r"[0-9]*", db) for stem in stems):
-            # Do not use FORCE: an unexpected remaining connection blocks deletion.
-            run(*psql, "-c", 'DROP DATABASE "' + db.replace('"', '""') + '"', cwd=main)
+
+
+def drop_databases(suffixes: list[str]) -> None:
+    for db in allocated_databases(suffixes):
+        # Do not use FORCE: an unexpected remaining connection blocks deletion.
+        drop = (*PSQL, "-c", 'DROP DATABASE "' + db.replace('"', '""') + '"')
+        run(*drop, cwd=main, timeout=cfg["timeouts"]["shell_seconds"])
 
 
 def configure() -> None:
@@ -1691,7 +1954,7 @@ def cli() -> None:
     args = sys.argv[1:]
     usage = (
         "Usage: agent/teams/team.py start <brief> | turn <pr> <entry> | "
-        "review <pr> <entry> | stop <brief>"
+        "review <pr> <entry> | reset <brief> <entry> | stop <brief>"
     )
     if len(args) < 2 or not args[1].isdecimal():
         raise RuntimeError(usage)
@@ -1704,6 +1967,8 @@ def cli() -> None:
         turn(args[1], args[2])
     elif args[0] == "review" and named:
         review(args[1], args[2])
+    elif args[0] == "reset" and named:
+        reset(args[1], args[2])
     else:
         raise RuntimeError(usage)
 

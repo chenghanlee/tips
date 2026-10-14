@@ -32,13 +32,14 @@ Agents are `[agents.<entry>]` entries in [config.toml](config.toml). A brief nam
 agents: `Implementer: <entry>` and `Required reviews: <entry>, <entry>`, testers first.
 The first tester confirms the merge. A launched client is `team-<slot>-<entry>` in
 Herdr; records use the entry name. Launches are recorded in the main checkout's
-`agent/teams/allocations/<slot>.json`. The restart and cleanup commands read this
-record.
+`agent/teams/allocations/<slot>.json`, with each client's task-submission state.
+`start`, `review`, `reset` and `stop` read this record and run one at a time
+([launch recovery](SETUP.md#launch-recovery)).
 
 ## Commands
 
 Run them from the root of your checkout. The dispatcher runs `start`, `review` and
-`stop` from the main checkout.
+`stop` from the main checkout. Only the operator (the user) runs `reset`.
 
 | Command | Caller | Effect |
 |---|---|---|
@@ -46,6 +47,7 @@ Run them from the root of your checkout. The dispatcher runs `start`, `review` a
 | `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Run from the pair checkout. Require a clean tree at the PR head and a PR that closes the brief. Record the PR's failures (see `observe`); refuse while a merge conflict finding is open. Notify every launched required reviewer of the head. For each reviewer not launched, post a pending EVENT on the PR and ask the dispatcher to run its `review` command. Try every send; report each failed one. |
 | `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Record the PR's failures, then notify the implementer even if the tree has uncommitted changes. Include any mismatch and the open findings in the message. |
 | `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create `.worktrees/review-<pr>-<entry>` detached at the PR head with its own database suffix, port, dependencies and Dexter, and launch the reviewer there, in the team's workspace. |
+| `agent/teams/team.py reset <brief> <entry>` | Operator | Record the operator's decision, after checking a stopped client's work on the brief and PR, that `start` or `review` may launch a replacement that gets the task again. Refuse a running client. |
 | `agent/teams/team.py stop <brief>` | Dispatcher | Refuse dirty, unmerged or foreign-owned work. Stop every recorded client and Dexter, drop the slot's databases, remove its worktrees, branch and workspace, delete the record. |
 | `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. |
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment or only those after a checkpoint. |
@@ -67,9 +69,11 @@ opens with its first client. `start` and `review` reopen a closed pane in the sa
 workspace and tab; `stop` refuses a workspace that holds a pane the record does not
 name, and otherwise closes the whole workspace.
 
-Rerunning `start` or `review` keeps a running client and relaunches a missing one from
-its record. The command refuses a client whose startup did not complete. Inspect its
-pane. Exit the client if it is idle. Then rerun the command. `review` reads the brief's
+Rerunning `start` or `review` keeps a running client and sends it nothing. It refuses a
+stopped client that may have received its task, and a client whose record is missing
+while its worktree, branch, workspace, Herdr client or databases remain. The dispatcher
+reports that refusal to the user; only the operator decides on a replay
+([launch recovery](SETUP.md#launch-recovery)). `review` reads the brief's
 current `Required reviews:` line. To add a reviewer, run its command. The command
 rejects changes to the implementer or merge-confirming tester.
 

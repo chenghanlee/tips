@@ -27,6 +27,10 @@ Run these additional tests for the listed changes:
 - Tests use disposable Git repositories, a fake Herdr process, and child processes
   that the tests start and own.
   Never use live pairs in tests.
+- The fake Herdr injects launch faults on request: a killed launcher, a start timeout,
+  a client that exits, a second concurrent `team.py`. Use these instead of sleeps.
+- The allocation records and their lock must be on a local filesystem: `team.py` relies
+  on `flock`, atomic rename and `fsync`.
 - Tests need permission to run `ps` and send signals to their own child processes.
 
 ## Lint exceptions
