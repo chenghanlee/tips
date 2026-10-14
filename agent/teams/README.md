@@ -51,7 +51,7 @@ Run them from the root of your checkout. The dispatcher runs `start`, `review` a
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment or only those after a checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | Tokens per launched session and model, from the session logs. |
 | `agent/teams/pr_review.py list <pr>` | Any agent | Recent reviews and every unresolved thread. Display only. |
-| `agent/teams/pr_review.py observe <pr>` | Launched client | Read the head, base, mergeability, checks and reviews within one 30-second deadline; refuse a read during which the head or base changed. Required checks are the contexts the base branch's effective rules require; a required check that has not reported blocks, and other checks are only shown. Record each failure once as a FINDING on the PR; append a resolution when passing evidence for the same check appears. Unavailable evidence records and resolves nothing. Exit 0 only when the PR can merge at this head. |
+| `agent/teams/pr_review.py observe <pr>` | Launched client | Read the head, base, mergeability, checks and reviews within one 30-second deadline; refuse a read during which the head or base changed. Required checks are the contexts the base branch's effective rules require; a required check that has not reported blocks, and other checks are only shown. Record each failure once as a FINDING on the PR; append a resolution naming the finding comment's ID when passing evidence for the same check appears; a resolution closes only the findings that the observation read as open. Unavailable evidence records and resolves nothing. Exit 0 only when the PR can merge at this head. |
 | `agent/teams/pr_review.py resolve <thread>` | Thread opener | Resolve your own thread. |
 | `herdr agent prompt team-<slot>-<entry> "<review URL>"` | Other reviewer | Tell the merge-confirming tester a review exists. |
 | `herdr agent prompt dispatcher "<URL> done"` | Tester | The PR merged. |
@@ -184,9 +184,10 @@ merge is refused for another reason, report `blocked` with the exact error.
 
 A finding that no later check can resolve, for example after a required check was renamed
 or removed, is resolved by hand. Post a FINDING whose first body line is the finding's
-`TEAM_FINDING` marker with `"state":"resolved"`, followed by the reason:
-`agent/teams/board.py post <pr> FINDING`. After the merge closes the brief and deletes the branch, notify the dispatcher
-with `done`.
+`TEAM_FINDING` marker with `"state":"resolved"` and `"resolves":<id>`, followed by the
+reason: `agent/teams/board.py post <pr> FINDING`. `<id>` is the number after
+`#issuecomment-` in the open finding's URL; a resolution closes only that comment's finding.
+After the merge closes the brief and deletes the branch, notify the dispatcher with `done`.
 
 ## Report and resolve blockers
 

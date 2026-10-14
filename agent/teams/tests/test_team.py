@@ -478,10 +478,10 @@ elif a[:2] == ["pr", "checks"]:
     # first and last view.
     if "head_after_checks" in s:
         s["pr_head"] = s.pop("head_after_checks")
-    if "post_on_checks" in s:
+    posts = s.pop("post_on_checks", [])
+    for body in [posts] if isinstance(posts, str) else posts:
         n = sum(len(c) for c in comments.values()) + 1
         url = "https://github.com/o/r/issues/%s#issuecomment-%d" % (a[2], n)
-        body = s.pop("post_on_checks")
         comments.setdefault(a[2], []).append({"id": n, "html_url": url, "body": body})
     rows = s.get("checks", PASSING)
     buckets = {row["bucket"] for row in rows}
