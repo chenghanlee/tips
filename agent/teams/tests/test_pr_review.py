@@ -32,13 +32,14 @@ class ObserveTest(Harness):
     def setUp(self) -> None:
         super().setUp()
         self.team("start", "29")
-        self.head = self.push(self.worktree("29"))
+        self.bootstrap("team-1-impl")
+        self.head = self.push("team-1-impl")
         self.tester = self.pane("team-1-tester")["pane_id"]
 
     def observe(self, ok: bool = True) -> subprocess.CompletedProcess[str]:
         result = execute(
             ["python3", str(self.repo / "agent/teams/pr_review.py"), "observe", "7"],
-            cwd=self.worktree("29"),
+            cwd=self.allocation("team-1-tester")["root"],
             env=dict(self.env, HERDR_PANE_ID=self.tester),
             timeout=60,
         )
@@ -101,7 +102,7 @@ class ObserveTest(Harness):
         assert "required checks unavailable: fixture checks unavailable" in result.stderr
         assert all(f"open finding {url}" in result.stderr for url in urls)
         # A repair head with checks still running proves nothing yet.
-        head = self.push(self.worktree("29"), "repair")
+        head = self.push("team-1-impl", "repair")
         self.update(checks_error="", checks=[check("checks", "pending", 2)])
         result = self.observe(ok=False)
         assert len(self.comments("7")) == 2
@@ -213,7 +214,7 @@ class ObserveTest(Harness):
     def test_only_current_head_lgtms_from_every_required_reviewer_allow_merge(self) -> None:
         old = self.head
         self.update(reviews=[review("tester", old, n=1), review("critic", old, n=2)])
-        new = self.push(self.worktree("29"), "next")
+        new = self.push("team-1-impl", "next")
         result = self.observe(ok=False)
         assert f"tester has not reviewed head {new}" in result.stderr
         assert f"critic has not reviewed head {new}" in result.stderr

@@ -1,8 +1,15 @@
 # Agent launch settings. Changes apply to newly started sessions.
 # An empty model uses the client's configured default.
 [team]
-# The current database suffix format supports up to 9 teams. Validation rejects
-# suffixes that overlap with numbered database partitions.
+# Each allocation clones this repository itself. Trusted state lives under
+# ${XDG_DATA_HOME:-~/.local/share}/tips-agent-teams/<key of repository>/.
+repository = "chenghanlee/tips"
+clone_url = "https://github.com/chenghanlee/tips.git"
+# Fixed argv that `team.py stop` uses to drop a retired team's databases: an absolute
+# psql and the compose database's development connection. No project file is read.
+psql = ["/opt/homebrew/bin/psql", "postgresql://postgres:postgres@127.0.0.1:5433/postgres"]
+# Validation rejects database names that overlap another slot's numbered partitions or
+# exceed PostgreSQL's 63 bytes.
 max_teams = 4
 port_base = 4100
 port_stride = 10
@@ -30,9 +37,12 @@ effort = "medium"
 compact_percent = 35
 
 # Briefs name agents with `Implementer: <entry>` and `Required reviews: <entry>, <entry>`.
-# Each launch gets a database suffix (db_suffix_prefix + slot + db_suffix)
+# Each launch gets a database suffix (db_suffix_prefix + slot + "g" + generation + db_suffix;
+# db_suffix must start with a non-digit)
 # and a test port (port_base + slot * port_stride + port_offset).
 # `advisor` applies only to Claude entries. `persona` adds optional text to the launch prompt.
+# `probe` is an optional argv list (at most 16 arguments) that bootstrap.py runs in the
+# entry's project after Dexter is ready; a failure blocks the worker with its exact error.
 [agents.opus-implementer]
 role = "implementer"
 kind = "claude"
