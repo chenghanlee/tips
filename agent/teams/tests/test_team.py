@@ -8,14 +8,17 @@ import signal
 import socket
 import subprocess
 import tempfile
+import threading
 import time
 import unittest
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 from bootstrap import wrapper_text
-from team import command_args, execute
+from team import claim_root, command_args, execute
 
 SCRIPT = Path(__file__).resolve().parents[1] / "team.py"
 # Deliberately fixed test data: changing production defaults must not rewrite tests.
@@ -2281,6 +2284,36 @@ class LaunchRecoveryTest(Harness):
 
 
 class RepositoryConfigTest(unittest.TestCase):
+    def test_two_first_claims_of_one_root_leave_one_owner(self) -> None:
+        TEST_RUNS.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=TEST_RUNS) as directory:
+            root = Path(directory).resolve() / "agent_teams/tips"
+            identity = root / "repository.json"
+            # Both claims see no identity file before either writes one.
+            barrier, exists = threading.Barrier(2), Path.exists
+
+            def interleaved(path: Path) -> bool:
+                found = exists(path)
+                if path == identity:
+                    barrier.wait(timeout=5)
+                return found
+
+            def claim(repository: str) -> str:
+                try:
+                    claim_root(root, repository)
+                    return "claimed"
+                except RuntimeError as error:
+                    return str(error)
+
+            with mock.patch.object(Path, "exists", interleaved), ThreadPoolExecutor(2) as pool:
+                results = list(pool.map(claim, ["owner1/tips", "owner2/tips"]))
+            owner = json.loads(identity.read_text())["repository"]
+            loser = "owner2/tips" if owner == "owner1/tips" else "owner1/tips"
+            assert sorted(results) == sorted(
+                ["claimed", f"{root} belongs to {owner}, not {loser}"]
+            ), results
+            assert [p.name for p in root.iterdir() if p.name.startswith(".")] == []
+
     def test_shipped_configuration_validates(self) -> None:
         env = dict(os.environ, TIPS_TEAM_CONFIG=str(SCRIPT.parent / "config.toml"))
         code = "import sys; sys.path.insert(0,sys.argv[1]); from team import load_config; "

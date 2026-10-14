@@ -24,6 +24,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import tomllib
 import uuid
@@ -609,13 +610,21 @@ def claim_root(root: Path, repository: str) -> Path:
     including another owner's repository with the same name. The root is not
     write-protected; repository.json only keeps two repositories apart."""
     identity = root / "repository.json"
-    if identity.exists():
-        fields = object_fields(json.loads(identity.read_text()), str(identity))
-        if fields.get("repository") != repository:
-            raise RuntimeError(f"{root} belongs to {fields.get('repository')}, not {repository}")
-    else:
+    if not identity.exists():
+        # Publish a complete identity with one exclusive link: of two first callers, the
+        # second finds the first one's file and is refused below.
         root.mkdir(parents=True, exist_ok=True)
-        identity.write_text(json.dumps({"repository": repository}) + "\n")
+        with tempfile.NamedTemporaryFile("w", dir=root, prefix=".repository.", delete=False) as f:
+            f.write(json.dumps({"repository": repository}) + "\n")
+        try:
+            os.link(f.name, identity)
+        except FileExistsError:
+            pass
+        finally:
+            os.unlink(f.name)
+    fields = object_fields(json.loads(identity.read_text()), str(identity))
+    if fields.get("repository") != repository:
+        raise RuntimeError(f"{root} belongs to {fields.get('repository')}, not {repository}")
     for directory in ("state", "allocations"):
         (root / directory).mkdir(exist_ok=True)
     return root
