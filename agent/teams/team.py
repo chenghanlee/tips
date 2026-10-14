@@ -655,32 +655,40 @@ def comment_header(kind: str, role: str, name: str, session: str) -> str:
     return f"{kind} {role} {name} {session or 'unknown'}"
 
 
-def repository() -> str:
-    return str(json.loads(run("gh", "repo", "view", "--json", "nameWithOwner"))["nameWithOwner"])
-
-
-def read_github(args: Sequence[str], deadline: float, label: str) -> str:
-    """Run one GitHub read within the whole read's deadline; a late read is incomplete."""
-    incomplete = f"{label}: read incomplete after {READ_SECONDS}s"
+def github(
+    args: Sequence[str], deadline: float, label: str, input_text: str | None = None
+) -> str:
+    """Run one GitHub call within its whole operation's deadline; a late call is incomplete."""
+    incomplete = f"{label}: incomplete after the {READ_SECONDS}s deadline"
     left = deadline - time.monotonic()
     if left <= 0:
         raise RuntimeError(incomplete)
     try:
-        return run(*args, timeout=left)
+        return run(*args, timeout=left, input_text=input_text)
     except subprocess.TimeoutExpired as error:
         raise RuntimeError(incomplete) from error
 
 
-def issue_comments(issue: str) -> list[dict[str, object]]:
+def deadline_from_now() -> float:
+    return time.monotonic() + READ_SECONDS
+
+
+def repository(deadline: float | None = None) -> str:
+    command = ["gh", "repo", "view", "--json", "nameWithOwner"]
+    output = github(command, deadline or deadline_from_now(), "repository")
+    return str(json.loads(output)["nameWithOwner"])
+
+
+def issue_comments(issue: str, deadline: float | None = None) -> list[dict[str, object]]:
     """Return issue comments oldest first, with id, html_url, body and created_at fields.
 
     Deduplication and finding folds need every comment, so a truncated read raises.
     """
-    deadline = time.monotonic() + READ_SECONDS
-    path = f"repos/{repository()}/issues/{issue}/comments?per_page=100"
+    deadline = deadline or deadline_from_now()
+    path = f"repos/{repository(deadline)}/issues/{issue}/comments?per_page=100"
     found: list[dict[str, object]] = []
     for page in range(1, READ_PAGES + 1):
-        output = read_github(["gh", "api", f"{path}&page={page}"], deadline, f"#{issue} comments")
+        output = github(["gh", "api", f"{path}&page={page}"], deadline, f"#{issue} comments")
         batch = object_list(json.loads(output), f"#{issue} comments")
         found += batch
         if len(batch) < 100:
@@ -688,12 +696,20 @@ def issue_comments(issue: str) -> list[dict[str, object]]:
     raise RuntimeError(f"#{issue} has over {READ_PAGES * 100} comments; read incomplete")
 
 
-def post_comment(issue: str, text: str) -> str:
-    """If the same comment exists, return its URL. Otherwise, post it."""
-    for comment in issue_comments(issue):
+def post_comment(issue: str, text: str, deadline: float | None = None) -> str:
+    """If the same comment exists, return its URL. Otherwise, post it. The read and the
+    write share one deadline."""
+    deadline = deadline or deadline_from_now()
+    for comment in issue_comments(issue, deadline):
         if comment.get("body") == text:
             return str(comment["html_url"])
-    return run("gh", "issue", "comment", issue, "--body-file", "-", input_text=text)
+    return add_comment(issue, text, deadline)
+
+
+def add_comment(issue: str, text: str, deadline: float) -> str:
+    """Post a comment without a duplicate check; the caller has already read the issue."""
+    command = ["gh", "issue", "comment", issue, "--body-file", "-"]
+    return github(command, deadline, f"comment on #{issue}", input_text=text)
 
 
 def event_role(allocation: Allocation) -> str:
@@ -1264,10 +1280,8 @@ def start(brief: str) -> None:
 
 def pull_request(pr: str) -> tuple[str, str, list[str]]:
     """The PR's URL, head commit and closing-reference issue numbers."""
-    view = object_fields(
-        json.loads(run("gh", "pr", "view", pr, "--json", "headRefOid,url,closingIssuesReferences")),
-        f"PR {pr}",
-    )
+    command = ["gh", "pr", "view", pr, "--json", "headRefOid,url,closingIssuesReferences"]
+    view = object_fields(json.loads(github(command, deadline_from_now(), f"PR {pr}")), f"PR {pr}")
     references = object_list(view.get("closingIssuesReferences") or [], f"PR {pr} closing issues")
     briefs = [str(issue.get("number")) for issue in references]
     return str(view.get("url")), str(view.get("headRefOid")), briefs
@@ -1407,18 +1421,14 @@ def implementer_message(
     return message
 
 
-def observe_pr(pr: str, head: str, allocation: Allocation) -> list[tuple[str, str]]:
-    """Record the PR's failures as the caller; return each open finding's check and URL.
-
-    Evidence read for another head is refused: it cannot describe the handed-off commit.
-    """
+def observe_pr(pr: str, head: str, allocation: Allocation) -> tuple[list[tuple[str, str]], str]:
+    """Record the PR's failures at this head as the caller. Return each open finding's check
+    and URL, and the conflict the current read shows: "current", "unknown" or ""."""
     import pr_review  # pr_review imports this module, so load it only when needed.
 
-    state = pr_review.read_state(int(pr))
-    if state.head != head:
-        raise RuntimeError(f"PR {pr} moved from {head} to {state.head}; nothing sent")
-    known = pr_review.observe(state, poster(allocation))
-    return [(finding.check, url) for finding, url in known.items()]
+    state, known = pr_review.observe(int(pr), poster(allocation), head)
+    conflict = {"CONFLICTING": "current", pr_review.UNAVAILABLE: "unknown"}
+    return [(f.check, url) for f, url in known.items()], conflict.get(state.mergeable, "")
 
 
 def deliver(sends: list[tuple[str, str]]) -> list[str]:
@@ -1452,16 +1462,22 @@ def request_launch(
     return failed + deliver([("dispatcher", f"{url} review: run {commands}")])
 
 
+def conflict_refusal(head: str, links: list[str], conflict: str) -> str:
+    if conflict == "unknown":
+        return (
+            f"Known merge conflict {', '.join(links)}, and GitHub has not reported "
+            f"mergeability for {head} yet: rerun turn shortly. Nobody was notified."
+        )
+    return (
+        f"Known merge conflict {', '.join(links)}: merge origin/main and push, or report "
+        "blocked. Nobody was notified."
+    )
+
+
 def hand_to_reviewers(
     record: Record, me: str, pr: str, url: str, head: str, known: list[tuple[str, str]]
 ) -> None:
     """Notify every required reviewer of one head; request launch of the missing ones."""
-    conflicts = [link for check, link in known if check == "mergeability"]
-    if conflicts:
-        raise RuntimeError(
-            f"Known merge conflict {', '.join(conflicts)}: merge origin/main and push, or "
-            "report blocked. Nobody was notified."
-        )
     reviewers = required_reviewers(record)
     missing = [entry for entry in reviewers if entry not in record["agents"]]
     tester = live_name(record["slot"], record["tester"])
@@ -1505,7 +1521,10 @@ def turn(pr: str, recipient: str) -> None:
     problem = checkout_problem(head)
     if recipient == record["tester"] and problem:
         raise RuntimeError(f"{problem} Commit and push, then hand over.")
-    known = observe_pr(pr, head, record["agents"][me])
+    known, conflict = observe_pr(pr, head, record["agents"][me])
+    conflicts = [link for check, link in known if check == "mergeability"]
+    if recipient == record["tester"] and conflicts:
+        raise RuntimeError(conflict_refusal(head, conflicts, conflict))
     if recipient == record["implementer"]:
         partner = live_name(record["slot"], recipient)
         herdr("agent", "prompt", partner, implementer_message(pr, url, problem, known))

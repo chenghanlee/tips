@@ -438,7 +438,10 @@ a = sys.argv[1:]
 s.setdefault("events", []).append(["gh", *a])
 comments = s.setdefault("comments", {})
 out, code = "", 0
-PASSING = [{"name": "checks", "workflow": "CI", "bucket": "pass", "link": "https://ci/1"}]
+PASSING = [
+    {"name": "checks", "workflow": "CI", "bucket": "pass", "link": "https://ci/1"},
+    {"name": "release", "workflow": "CI", "bucket": "pass", "link": "https://ci/1"},
+]
 if a[:2] == ["issue", "view"]:
     body = s.get("issues", {}).get(a[2], "")
     view = {"body": body, "url": "https://github.com/o/r/issues/" + a[2]}
@@ -471,13 +474,21 @@ elif a[:2] == ["pr", "view"]:
     }
     out = json.dumps({key: view[key] for key in a[a.index("--json") + 1].split(",")})
 elif a[:2] == ["pr", "checks"]:
-    # The head can move while a reader is between its first and last view.
+    # The head can move, or another observer can post, while a reader is between its
+    # first and last view.
     if "head_after_checks" in s:
         s["pr_head"] = s.pop("head_after_checks")
+    if "post_on_checks" in s:
+        n = sum(len(c) for c in comments.values()) + 1
+        url = "https://github.com/o/r/issues/%s#issuecomment-%d" % (a[2], n)
+        body = s.pop("post_on_checks")
+        comments.setdefault(a[2], []).append({"id": n, "html_url": url, "body": body})
     rows = s.get("checks", PASSING)
     buckets = {row["bucket"] for row in rows}
     if s.get("checks_error"):
         out, code = s["checks_error"], 1
+    elif not rows:
+        out, code = "no checks reported on the 'task/29' branch", 1
     else:
         out = json.dumps(rows)
         code = 1 if buckets & {"fail", "cancel"} else 8 if "pending" in buckets else 0
@@ -488,6 +499,12 @@ elif a[:2] == ["api", "graphql"]:
     out = json.dumps({"data": {"repository": {"pullRequest": {name: page}}}})
 elif a[:2] == ["repo", "view"]:
     out = json.dumps({"nameWithOwner": "o/r"})
+elif a[0] == "api" and "/rules/branches/" in a[1]:
+    required = [{"context": name} for name in s.get("required", ["checks", "release"])]
+    rule = {"type": "required_status_checks", "parameters": {"required_status_checks": required}}
+    out = json.dumps([{"type": "deletion"}, *([rule] if required else [])])
+elif a[0] == "api" and "/comments?" in a[1] and s.get("history_fails"):
+    out, code = "fixture comment-history unavailable", 1
 elif a[0] == "api" and "/comments?" in a[1]:
     issue = a[1].split("/issues/")[1].split("/")[0]
     page = int(a[1].rsplit("page=", 1)[1])
@@ -1372,15 +1389,26 @@ class PairLifecycleTest(Harness):
         unrecorded = f"Known failure not recorded on PR 7: Merge conflict at head {head}"
         assert unrecorded in refused.stderr
         assert "Error: fixture GitHub refused the comment" in refused.stderr
+        # An unreadable comment history loses neither the failure nor the error.
+        self.update(comments_fail=False, history_fails=True)
+        refused = self.team("turn", "7", "tester", cwd=wt, pane=impl, ok=False)
+        assert unrecorded in refused.stderr
+        assert "Error: fixture comment-history unavailable" in refused.stderr
         # Recorded, it still blocks; later unavailable reads neither record nor clear it.
-        self.update(comments_fail=False)
+        self.update(history_fails=False)
         refused = self.team("turn", "7", "tester", cwd=wt, pane=impl, ok=False)
         finding = self.comments("7")[-1]["html_url"]
         assert f"Known merge conflict {finding}" in refused.stderr
+        assert "merge origin/main and push" in refused.stderr
         self.update(pr_mergeable="UNKNOWN", checks_error="fixture checks unavailable")
         refused = self.team("turn", "7", "tester", cwd=wt, pane=impl, ok=False)
         assert f"Known merge conflict {finding}" in refused.stderr
         assert self.comments("7")[-1]["html_url"] == finding
+        # After the repair push GitHub has not computed mergeability yet: rerun, not remerge.
+        head = self.push(wt, "merged main")
+        refused = self.team("turn", "7", "tester", cwd=wt, pane=impl, ok=False)
+        assert f"has not reported mergeability for {head} yet" in refused.stderr
+        assert "rerun turn" in refused.stderr
         assert len(self.events("agent", "prompt")) == prompts
         # A mergeable read resolves it with a new event, and the handoff goes out.
         self.update(pr_mergeable="MERGEABLE")

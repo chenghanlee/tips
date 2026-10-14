@@ -53,8 +53,11 @@ class ObserveTest(Harness):
         self.update(
             pr_mergeable="CONFLICTING", checks=[check("checks", "fail"), check("release", "cancel")]
         )
+        reads = len(self.events("gh", "api"))
         result = self.observe(ok=False)
         assert "not ready to merge" in result.stderr
+        # One comment-history read for the whole observation, not one per finding.
+        assert len([e for e in self.events("gh", "api")[reads:] if "/comments?" in e[2]]) == 1
         first = self.comments("7")[0]["body"].splitlines()
         assert first[0] == "FINDING tester team-1-tester session-team-1-tester"
         assert first[1] == (
@@ -117,6 +120,71 @@ class ObserveTest(Harness):
         moved = f"headRefOid changed from {self.head} to {'d' * 40} during the read"
         assert moved in self.observe(ok=False).stderr
         assert self.comments("7") == []
+
+    def test_pass_read_before_a_concurrent_failure_never_resolves_it(self) -> None:
+        self.update(checks=[check("checks", "fail")])
+        self.observe(ok=False)
+        open_url = self.comments("7")[0]["html_url"]
+        self.update(checks=[check("checks", "pass")])
+        self.observe(ok=False)  # not ready: release is not reported; the pass still counts
+        assert '"state":"resolved"' in self.comments("7")[-1]["body"]
+        # The check passes when this reader reads it; meanwhile another observer records a
+        # failed rerun at the same head. The stale pass must not resolve that newer finding.
+        newer = self.comments("7")[0]["body"].replace("fail", "fail again")
+        self.update(checks=[check("checks", "pass", 2)], post_on_checks=newer)
+        count = len(self.comments("7"))
+        self.observe(ok=False)
+        assert len(self.comments("7")) == count + 1  # only the concurrent post
+        assert '"state":"open"' in self.comments("7")[-1]["body"]
+        self.update(checks=[check("checks", "fail", 3)])
+        assert "open finding" in self.observe(ok=False).stderr
+        assert open_url != self.comments("7")[-1]["html_url"]
+
+    def test_a_finding_no_check_can_resolve_is_resolved_by_hand(self) -> None:
+        # The required check was renamed: no later pass carries the old identity.
+        renamed = [check("old", "fail"), check("checks", "pass"), check("release", "pass")]
+        self.update(checks=renamed, required=["old", "checks", "release"])
+        self.observe(ok=False)
+        url = self.comments("7")[0]["html_url"]
+        self.update(checks=renamed[1:], required=["checks", "release"])
+        assert f"open finding {url}" in self.observe(ok=False).stderr
+        resolved = marker(self.comments("7")[0]["body"]) | {"state": "resolved"}
+        body = "TEAM_FINDING " + json.dumps(resolved, separators=(",", ":"))
+        command = [
+            "python3",
+            str(self.repo / "agent/teams/board.py"),
+            "post",
+            "7",
+            "FINDING",
+            "--as",
+            "tester",
+            "team-1-tester",
+            "s",
+        ]
+        text = f"{body}\nRenamed to check:CI/checks, which passes."
+        posted = execute(command, cwd=self.repo, env=self.env, input_text=text, timeout=60)
+        assert posted.returncode == 0, posted.stderr
+        assert "open finding" not in self.observe(ok=False).stderr
+
+    def test_configured_required_checks_decide_readiness(self) -> None:
+        reviews = [review("tester", self.head, n=1), review("critic", self.head, n=2)]
+        # Configured and reported: a failed optional check is shown, never recorded.
+        passing = [check("checks", "pass"), check("release", "pass")]
+        self.update(reviews=reviews, checks=[*passing, check("dexter", "fail")])
+        result = self.observe()
+        assert "optional check:CI/dexter fail https://ci/1" in result.stdout
+        assert f"ready to merge at {self.head}" in result.stdout
+        # Configured but not reported yet: unavailable, so never ready and nothing recorded.
+        self.update(checks=[check("checks", "pass")])
+        result = self.observe(ok=False)
+        assert "required check release not reported" in result.stderr
+        assert self.findings() == []
+        # No required checks configured: readiness follows mergeability and reviews.
+        self.update(required=[], checks=[check("dexter", "fail")])
+        result = self.observe()
+        assert "no required checks configured" in result.stdout
+        assert f"ready to merge at {self.head}" in result.stdout
+        assert self.findings() == []
 
     def test_only_current_head_lgtms_from_every_required_reviewer_allow_merge(self) -> None:
         old = self.head
