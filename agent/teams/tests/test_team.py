@@ -3,6 +3,7 @@
 import contextlib
 import json
 import os
+import re
 import signal
 import subprocess
 import tempfile
@@ -638,7 +639,10 @@ elif a[:2] == ["agent", "start"]:
         s["events"].append(["side-effect", a[2]])
         finish("timed out waiting for " + a[2])
     x.update(agent=opt("--kind"), name=a[2], launch_argv=a, launch_env=x.get("env", {}))
-    x["agent_session"] = {"kind": "id", "value": "session-" + a[2]}
+    # Claude reports the id the launcher assigned; Herdr learns it through a user hook,
+    # which restricted mode ignores (no_sessions).
+    sid = opt("--session-id") if "--session-id" in a else "session-" + a[2]
+    x["agent_session"] = None if s.get("no_sessions") else {"kind": "id", "value": sid}
     x["agent_status"] = "blocked" if s.get("start_fails") else "idle"
     if s.get("wrong_start_root"):
         x["cwd"] = s["wrong_start_root"]
@@ -832,6 +836,16 @@ class Harness(unittest.TestCase):
         """The messages Herdr sent to the named client, oldest first."""
         return [e[3] for e in self.events("agent", "prompt") if e[2] == name]
 
+    def dropped(self) -> list[str]:
+        """The DROP DATABASE calls made through Docker."""
+        log = self.root / "docker-calls"
+        return [c for c in log.read_text().splitlines() if "DROP" in c] if log.exists() else []
+
+    def launched_session(self, label: str) -> str:
+        """The session id the launcher assigned to a Claude client."""
+        argv = self.pane(label)["launch_argv"]
+        return argv[argv.index("--session-id") + 1]
+
     def launch_env(self, label: str) -> tuple[str, str]:
         env = self.pane(label)["launch_env"]
         return env["TIPS_DB_SUFFIX"], env["TIPS_TEST_PORT"]
@@ -936,14 +950,17 @@ class PairLifecycleTest(Harness):
             "impl",
             "tester",
         )
-        assert record["agents"]["tester"]["session"] == "session-team-1-tester"
+        tester_session = self.launched_session("team-1-tester")
+        assert re.fullmatch(r"[0-9a-f-]{36}", tester_session)
+        assert "--session-id" not in impl["launch_argv"]
+        assert record["agents"]["tester"]["session"] == tester_session
         assert (record["version"], len(record["id"])) == (2, 32)
         assert {a["submission"] for a in record["agents"].values()} == {"submitted"}
         # Each launch is recorded on the brief as the launched client, with its allocation.
         assert [c["body"] for c in self.comments("29")] == [
             f"EVENT implementer team-1-impl session-team-1-impl\nlaunched codex in {wt}; "
             "database suffix _t1; port 4110",
-            f"EVENT tester team-1-tester session-team-1-tester\nlaunched claude in {wt}; "
+            f"EVENT tester team-1-tester {tester_session}\nlaunched claude in {wt}; "
             "database suffix _t1r; port 4111",
         ]
         # A refused post is an error after the launch itself: the record stands and the
@@ -1005,7 +1022,8 @@ class PairLifecycleTest(Harness):
             )
         )
         reset = self.team("reset", "29", "tester").stdout
-        assert "task submission was submitted, session session-team-1-tester" in reset
+        session = self.launched_session("team-1-tester")
+        assert f"task submission was submitted, session {session}" in reset
         self.reset("29", "impl")
         self.team("start", "29")
         assert len(self.events("agent", "start")) == 4
@@ -1434,7 +1452,7 @@ class PairLifecycleTest(Harness):
         assert ["dexter", str(wt), "reindex"] in self.events("dexter")
         allocation = self.record(1)["agents"]["critic"]
         assert (allocation["pr"], allocation["head"]) == ("7", head)
-        assert allocation["session"] == "session-team-1-critic"
+        assert allocation["session"] == self.launched_session("team-1-critic")
         # The lead adds a tester to the brief: it is a Codex client with its own resources.
         self.update(issues={**self.state()["issues"], "29": WIDE})
         self.team("review", "7", "second")
@@ -1545,7 +1563,7 @@ class PairLifecycleTest(Harness):
         refused = self.team("stop", "29", ok=False)
         assert "holds other panes ['w1:p9']" in refused.stderr
         assert wt.exists()
-        assert not (self.root / "docker-calls").exists()
+        assert not self.dropped()
         self.update(strays=[])
         assert "nothing removed" in self.team("stop", "99").stdout
         # A pane arriving while clients are stopped is found at the close itself: its
@@ -1555,7 +1573,7 @@ class PairLifecycleTest(Harness):
         assert "holds other panes ['w1:p8']" in refused.stderr, refused.stderr
         assert "team-1-29" in self.workspaces()
         assert wt.exists()
-        assert not (self.root / "docker-calls").exists()
+        assert not self.dropped()
         del self.env["RACE_VISITOR_WORKSPACE"]
         self.update(strays=[])
         self.team("stop", "29")
@@ -1595,7 +1613,7 @@ class PairLifecycleTest(Harness):
         assert "Unmerged worktree" in self.team("stop", "29", ok=False).stderr
         # Refused before any client is stopped or any database is touched.
         assert not any(e[:2] == ["pane", "get"] for e in self.state()["events"][before:])
-        assert not (self.root / "docker-calls").exists()
+        assert not self.dropped()
         assert (wt / "uncommitted").read_text() == "keep"
         assert self.git("branch", "--list", "task/29") != ""
         assert self.state()["workspaces"]
@@ -1611,7 +1629,7 @@ class PairLifecycleTest(Harness):
         assert "Dirty worktree" in refused.stderr
         assert wt.exists()
         assert self.state()["workspaces"]
-        assert not (self.root / "docker-calls").exists()
+        assert not self.dropped()
 
     def test_failed_daemon_stop_preserves_the_brief_until_it_succeeds(self) -> None:
         self.team("start", "29")
@@ -1624,7 +1642,7 @@ class PairLifecycleTest(Harness):
         self.env.update(DEXTER_STOP_LOG=str(log), DEXTER_STOP_FAIL="1")
         self.team("stop", "29", ok=False)
         assert wt.exists()
-        assert not (self.root / "docker-calls").exists()
+        assert not self.dropped()
         assert self.record(1)["brief"] == "29"
         self.env["DEXTER_STOP_FAIL"] = "0"
         self.team("stop", "29")
@@ -1680,10 +1698,11 @@ class LaunchRecoveryTest(Harness):
         assert self.starts() == ["team-1-impl", "team-1-tester"]
         assert not self.prompts("team-1-tester")
         tester = self.record(1)["agents"]["tester"]
-        assert (tester["session"], tester["submission"]) == ("session-team-1-tester", "unknown")
+        session = self.launched_session("team-1-tester")
+        assert (tester["session"], tester["submission"]) == (session, "unknown")
         # The adoption records the launch EVENT the timeout skipped.
         bodies = [c["body"] for c in self.comments("29")]
-        header = "EVENT tester team-1-tester session-team-1-tester\n"
+        header = f"EVENT tester team-1-tester {session}\n"
         assert any(body.startswith(header) for body in bodies)
         # The launcher is killed after the Codex client started. The crash released the
         # lock, so the rerun is not busy, and it adopts the client.
@@ -1710,6 +1729,38 @@ class LaunchRecoveryTest(Harness):
         assert self.starts() == ["team-1-impl", "team-1-tester"]
         assert not self.prompts("team-1-tester")
 
+    def test_missing_record_with_earlier_artifacts_never_means_never_submitted(self) -> None:
+        # Codex's reproduction: the clients exit and the record is gone, but the worktree,
+        # branch, workspace and databases of the earlier launch remain.
+        self.team("start", "29")
+        self.clients_exit(1)
+        (self.repo / "agent/teams/allocations/1.json").unlink()
+        (self.root / "databases").write_text("tips_test_t1\ntips_test_t1r\n")
+        held = "team-1-impl is not running and its task submission is unknown"
+        for _ in range(2):
+            refused = self.team("start", "29", ok=False)
+            assert held in refused.stderr, refused.stderr
+            assert "agent/teams/team.py reset 29 impl" in refused.stderr
+        assert self.starts() == ["team-1-impl", "team-1-tester"]
+        assert len(self.events("agent", "prompt")) == 2
+        # The operator checks the work, closes the earlier workspace and resets each client;
+        # then both relaunch.
+        self.update(workspaces=[], tabs=[], panes=[])
+        self.reset("29", "impl", "tester")
+        self.team("start", "29")
+        assert self.starts()[2:] == ["team-1-impl", "team-1-tester"]
+        # A reviewer whose allocation entry is gone while its worktree remains is held too.
+        self.push(self.worktree("29"))
+        self.team("review", "7", "critic")
+        self.clients_exit(1)
+        path = self.repo / "agent/teams/allocations/1.json"
+        record = json.loads(path.read_text())
+        del record["agents"]["critic"]
+        path.write_text(json.dumps(record))
+        refused = self.team("review", "7", "critic", ok=False).stderr
+        assert "team-1-critic is not running and its task submission is unknown" in refused
+        assert self.starts().count("team-1-critic") == 1
+
     def test_malformed_record_or_uncertain_client_identity_blocks(self) -> None:
         self.team("start", "29")
         path = self.repo / "agent/teams/allocations/1.json"
@@ -1733,8 +1784,19 @@ class LaunchRecoveryTest(Harness):
         path.write_text(json.dumps(never))
         refused = self.team("start", "29", ok=False)
         assert "team-1-tester is live in w1:p2, but this record never started it" in refused.stderr
-        # Another client in a recorded pane.
+        # A client with the recorded name, kind and root but another session replaced it.
         path.write_text(json.dumps(good))
+        state = self.state()
+        tester = next(x for x in state["panes"] if x.get("label") == "team-1-tester")
+        tester["agent_session"] = {"kind": "id", "value": "session-replacement"}
+        self.save(state)
+        refused = self.team("start", "29", ok=False).stderr
+        session = self.launched_session("team-1-tester")
+        assert f"runs session session-replacement, not {session}; preserved" in refused
+        assert self.record(1)["agents"]["tester"]["session"] == session
+        tester["agent_session"] = {"kind": "id", "value": session}
+        self.save(state)
+        # Another client in a recorded pane.
         state = self.state()
         visitor = next(x for x in state["panes"] if x.get("label") == "team-1-tester")
         visitor.update(name="visitor", cwd=str(self.repo))
@@ -1743,6 +1805,18 @@ class LaunchRecoveryTest(Harness):
         assert self.starts() == ["team-1-impl", "team-1-tester"]
         assert len(self.events("agent", "prompt")) == 2
         assert self.state()["workspaces"]
+        # Herdr reports no session (restricted mode): the record keeps the Claude session
+        # the launcher assigned, and a replacement reported later is still refused.
+        self.update(no_sessions=True)
+        self.team("start", "30")
+        session = self.launched_session("team-2-tester")
+        assert self.record(2)["agents"]["tester"]["session"] == session
+        assert self.record(2)["agents"]["impl"]["session"] == "unknown"
+        state = self.state()
+        tester = next(x for x in state["panes"] if x.get("label") == "team-2-tester")
+        tester["agent_session"] = {"kind": "id", "value": "session-replacement"}
+        self.save(state)
+        assert "preserved" in self.team("start", "30", ok=False).stderr
 
 
 class RepositoryConfigTest(unittest.TestCase):

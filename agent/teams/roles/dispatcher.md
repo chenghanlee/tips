@@ -74,8 +74,9 @@ Do not count rounds or set deadlines. You receive no notification if an agent st
 without sending a message. The user reports the stopped agent with
 `herdr agent prompt dispatcher "<name> stopped"`. You may also discover it at your
 next turn. Then check the agent's pane with `herdr agent get <name>` and check its
-records. Replace a stopped session with a new launch and EVENT. If designers cannot
-agree, they post BLOCKED. Decide the issue or ask the user. A timeout does not count
+records. Replace a stopped session with a new launch and EVENT. If `team.py` refuses
+because the client may already have done its task, ask the user; only the user runs
+`team.py reset`. If designers cannot agree, they post BLOCKED. Decide the issue or ask the user. A timeout does not count
 as approval.
 
 ## Measurement

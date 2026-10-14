@@ -38,8 +38,8 @@ Herdr; records use the entry name. Launches are recorded in the main checkout's
 
 ## Commands
 
-Run them from the root of your checkout. The dispatcher runs `start`, `review`, `reset`
-and `stop` from the main checkout.
+Run them from the root of your checkout. The dispatcher runs `start`, `review` and
+`stop` from the main checkout. Only the operator (the user) runs `reset`.
 
 | Command | Caller | Effect |
 |---|---|---|
@@ -47,7 +47,7 @@ and `stop` from the main checkout.
 | `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Run from the pair checkout. Require a clean tree at the PR head and a PR that closes the brief. Notify the tester with the PR URL, SHA and the `review` commands for reviewers not yet launched. |
 | `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Notify the implementer even if the tree has uncommitted changes. Include any mismatch in the message. |
 | `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create `.worktrees/review-<pr>-<entry>` detached at the PR head with its own database suffix, port, dependencies and Dexter, and launch the reviewer there, in the team's workspace. |
-| `agent/teams/team.py reset <brief> <entry>` | Dispatcher | After checking a stopped client's work on the brief and PR, allow `start` or `review` to launch a replacement that gets the task again. Refuse a running client. |
+| `agent/teams/team.py reset <brief> <entry>` | Operator | Record the operator's decision, after checking a stopped client's work on the brief and PR, that `start` or `review` may launch a replacement that gets the task again. Refuse a running client. |
 | `agent/teams/team.py stop <brief>` | Dispatcher | Refuse dirty, unmerged or foreign-owned work. Stop every recorded client and Dexter, drop the slot's databases, remove its worktrees, branch and workspace, delete the record. |
 | `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. |
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment or only those after a checkpoint. |
@@ -70,7 +70,9 @@ workspace and tab; `stop` refuses a workspace that holds a pane the record does 
 name, and otherwise closes the whole workspace.
 
 Rerunning `start` or `review` keeps a running client and sends it nothing. It refuses a
-stopped client that may have received its task: check its work, then `reset` it and rerun
+stopped client that may have received its task, and a client whose record is missing
+while its worktree, branch, workspace, Herdr client or databases remain. The dispatcher
+reports that refusal to the user; only the operator decides on a replay
 ([launch recovery](SETUP.md#launch-recovery)). `review` reads the brief's
 current `Required reviews:` line. To add a reviewer, run its command. The command
 rejects changes to the implementer or merge-confirming tester.

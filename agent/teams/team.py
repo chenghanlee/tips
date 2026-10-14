@@ -889,6 +889,44 @@ def allocate(record: Record, entry: str, role: str, worktree: Path) -> Allocatio
     return allocation
 
 
+def earlier_launch(record: Record, entry: str, worktree: Path, branch: str | None) -> list[str]:
+    """What remains of an earlier launch of this client that the record does not hold.
+
+    A missing record or entry never proves that a task was never sent: the record may have
+    been lost while its worktree, branch, workspace, client or databases remained.
+    """
+    found = [f"worktree {worktree}"] if worktree.exists() else []
+    if branch and git("branch", "--list", branch):
+        found.append(f"branch {branch}")
+    label = re.compile(rf"team-[0-9]+-{re.escape(record['brief'])}")
+    found += [
+        f"Herdr workspace {w['label']}"
+        for w in herdr("workspace", "list")["workspaces"]
+        if label.fullmatch(w.get("label", "")) and w["workspace_id"] != record["workspace"]
+    ]
+    name = live_name(record["slot"], entry)
+    if any(a.get("name") == name for a in herdr("agent", "list")["agents"]):
+        found.append(f"Herdr client {name}")
+    found += [f"database {db}" for db in allocated_databases([db_suffix(entry, record["slot"])])]
+    return found
+
+
+def add_allocation(
+    record: Record, entry: str, role: str, worktree: Path, branch: str | None
+) -> Allocation:
+    """Allocate a client the record does not hold. If an earlier launch left anything
+    behind, its task may already have been sent: record the submission as unknown."""
+    allocation = allocate(record, entry, role, worktree)
+    remains = earlier_launch(record, entry, worktree, branch)
+    if remains:
+        allocation["submission"] = UNKNOWN
+        print(
+            f"{allocation['name']} has no earlier record, but these remain: "
+            f"{', '.join(remains)}. Its task submission is recorded as unknown."
+        )
+    return allocation
+
+
 def checkout(worktree: Path, branch: str | None, commit: str | None) -> bool:
     """Add the worktree on `branch` from fetched origin/main, or detached at `commit`.
 
@@ -1173,10 +1211,12 @@ def agent_spec(allocation: Allocation) -> AgentSpec:
     return spec
 
 
-def client_args(allocation: Allocation, prompt: str) -> list[str]:
+def client_args(allocation: Allocation, prompt: str, session: str) -> list[str]:
     """Client arguments. Claude keeps the brief as its system prompt and waits for its first
-    message. Codex starts with no instructions: no tested signal shows that it accepted a
-    task passed at start, so launch sends its brief as the first message."""
+    message; it runs the session id the launcher assigned, because Herdr learns session ids
+    from a user hook that restricted mode ignores. Codex starts with no instructions: no
+    documented signal shows that it accepted a task passed at start, so launch sends its
+    brief as the first message."""
     spec, policies, worktree = agent_spec(allocation), cfg["launch"], allocation["worktree"]
     if spec["kind"] == "codex":
         args = ["-a", policies["codex_approval"], "-C", str(worktree)]
@@ -1195,6 +1235,8 @@ def client_args(allocation: Allocation, prompt: str) -> list[str]:
         ),
         "--append-system-prompt",
         prompt,
+        "--session-id",
+        session,
     ]
     if spec["model"]:
         args += ["--model", spec["model"]]
@@ -1207,7 +1249,8 @@ def client_args(allocation: Allocation, prompt: str) -> list[str]:
 def running_client(record: Record, allocation: Allocation) -> Entity | None:
     """The recorded client if it is live in its pane; None if the pane is gone or at the shell.
 
-    A live client with another name, kind or root makes the pane's owner uncertain: refused.
+    A live client with another name, kind, root or session makes the pane's owner
+    uncertain: refused. Only a record with no session yet accepts the live one's.
     """
     name, pane = allocation["name"], allocation["pane"]
     if pane not in {p["pane_id"] for p in live_panes(record["workspace"])}:
@@ -1220,6 +1263,9 @@ def running_client(record: Record, allocation: Allocation) -> Entity | None:
         raise RuntimeError(f"{pane}: conflicting client; preserved")
     if root != Path(allocation["worktree"]):
         raise RuntimeError(f"{pane}: {name} runs in {root}, not its worktree; preserved")
+    recorded, live_session = allocation["session"], session_id(agent)
+    if recorded not in ("", "unknown") and live_session and live_session != recorded:
+        raise RuntimeError(f"{pane}: {name} runs session {live_session}, not {recorded}; preserved")
     return agent
 
 
@@ -1243,18 +1289,20 @@ def reconcile(record: Record, allocation: Allocation) -> Entity | None:
     if agent is None and state != NEVER_SUBMITTED:
         raise RuntimeError(
             f"{name} is not running and its task submission is {state}. It may have done the "
-            "task before it exited, so nothing was launched or resent. Check its work on the "
-            "brief and PR. To launch a replacement that gets the task again, run "
-            f"agent/teams/team.py reset {record['brief']} {allocation['entry']}, then rerun "
-            "this command."
+            "task before it exited, so nothing was launched or resent. Only the operator "
+            "decides whether to replay it: after checking its work on the brief and PR, the "
+            f"operator runs agent/teams/team.py reset {record['brief']} {allocation['entry']}, "
+            "then reruns this command."
         )
     return agent
 
 
 def adopt(record: Record, allocation: Allocation, agent: Entity) -> None:
-    """Keep a live recorded client. Record the session it reports; never resend its task."""
+    """Keep a live recorded client; never resend its task. If the launch stopped before the
+    record held a session, record the one the client reports; running_client refused any
+    other mismatch."""
     name, session = allocation["name"], session_id(agent)
-    if session and session != allocation["session"]:
+    if session and allocation["session"] in ("", "unknown"):
         allocation["session"] = session
         save_record(record)
     if allocation["submission"] == SUBMITTED:
@@ -1262,10 +1310,10 @@ def adopt(record: Record, allocation: Allocation, agent: Entity) -> None:
     # The launch stopped before it finished; its EVENT may be missing. Posting is idempotent.
     post_event(record["brief"], allocation, launch_text(allocation))
     print(
-        f"{name}: task submission is {allocation['submission']}; nothing was resent. If "
-        f"{allocation['pane']} shows that the client never got its task, exit the client, run "
-        f"agent/teams/team.py reset {record['brief']} {allocation['entry']}, then rerun this "
-        "command."
+        f"{name}: task submission is {allocation['submission']}; nothing was resent. Only the "
+        f"operator decides whether to replay it: if {allocation['pane']} shows that the client "
+        "never got its task, the operator exits the client, runs agent/teams/team.py reset "
+        f"{record['brief']} {allocation['entry']} and reruns this command."
     )
 
 
@@ -1290,9 +1338,11 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
         return
     name, pane = allocation["name"], allocation["pane"]
     kind, worktree = allocation["kind"], Path(allocation["worktree"])
-    args = client_args(allocation, prompt)  # a configuration error refuses before any change
+    # Claude runs a session id assigned here; Codex's is known only if Herdr reports it.
+    session = str(uuid.uuid4()) if kind == "claude" else ""
+    args = client_args(allocation, prompt, session)  # a configuration error refuses first
     enter(pane, worktree, agent_env(allocation))
-    allocation["submission"] = UNKNOWN
+    allocation["submission"], allocation["session"] = UNKNOWN, session
     save_record(record)
     herdr(
         "agent",
@@ -1308,13 +1358,16 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
         *args,
     )
     started = herdr("agent", "get", pane)["agent"]
-    allocation["session"] = session_id(started) or "unknown"
-    save_record(record)
+    reported = session_id(started)
+    if not session:
+        allocation["session"] = reported or "unknown"
+        save_record(record)
     if (
         pane_occupant(pane) != (worktree, True)
         or started.get("agent") != kind
         or started.get("name") != name
         or started.get("agent_status") in ("blocked", "unknown")
+        or (session and reported not in ("", session))
     ):
         raise RuntimeError(f"{name} started in an unexpected state or root; inspect {pane}")
     # The task prompt: Claude already holds its brief and waits for a first message.
@@ -1375,7 +1428,8 @@ def start(brief: str) -> None:
         refuse_foreign_owner(worktree, [live_name(slot, entry) for entry in pair])
         duties = ("implementer", "merge-confirming tester")
         clients = [
-            record["agents"].get(entry) or allocate(record, entry, duty, worktree)
+            record["agents"].get(entry)
+            or add_allocation(record, entry, duty, worktree, f"task/{brief}")
             for entry, duty in zip(pair, duties, strict=True)
         ]
         save_record(record)
@@ -1423,7 +1477,9 @@ def review(pr: str, entry: str) -> None:
         duty = "reviewing designer" if entry in designers else "additional tester"
         worktree = main / ".worktrees" / f"review-{pr}-{entry}"
         refuse_foreign_owner(worktree, [live_name(record["slot"], entry)])
-        allocation = record["agents"].get(entry) or allocate(record, entry, duty, worktree)
+        allocation = record["agents"].get(entry) or add_allocation(
+            record, entry, duty, worktree, None
+        )
         allocation["pr"] = pr
         save_record(record)
         agent = reconcile(record, allocation)
@@ -1701,27 +1757,37 @@ def check_worktrees(roots: set[Path]) -> None:
             ) from error
 
 
-def drop_databases(suffixes: list[str]) -> None:
+PSQL = (
+    "docker",
+    "compose",
+    "exec",
+    "-T",
+    "db",
+    "psql",
+    "-U",
+    "postgres",
+    "-d",
+    "postgres",
+    "-v",
+    "ON_ERROR_STOP=1",
+)
+
+
+def allocated_databases(suffixes: list[str]) -> list[str]:
+    """The test and dev databases, and their numbered partitions, of these suffixes."""
     stems = [base + suffix for base in ("tips_test", "tips_dev") for suffix in suffixes]
-    psql = [
-        "docker",
-        "compose",
-        "exec",
-        "-T",
-        "db",
-        "psql",
-        "-U",
-        "postgres",
-        "-d",
-        "postgres",
-        "-v",
-        "ON_ERROR_STOP=1",
+    databases = run(*PSQL, "-Atc", "SELECT datname FROM pg_database", cwd=main).splitlines()
+    return [
+        db
+        for db in databases
+        if any(re.fullmatch(re.escape(stem) + r"[0-9]*", db) for stem in stems)
     ]
-    databases = run(*psql, "-Atc", "SELECT datname FROM pg_database", cwd=main).splitlines()
-    for db in databases:
-        if any(re.fullmatch(re.escape(stem) + r"[0-9]*", db) for stem in stems):
-            # Do not use FORCE: an unexpected remaining connection blocks deletion.
-            run(*psql, "-c", 'DROP DATABASE "' + db.replace('"', '""') + '"', cwd=main)
+
+
+def drop_databases(suffixes: list[str]) -> None:
+    for db in allocated_databases(suffixes):
+        # Do not use FORCE: an unexpected remaining connection blocks deletion.
+        run(*PSQL, "-c", 'DROP DATABASE "' + db.replace('"', '""') + '"', cwd=main)
 
 
 def configure() -> None:
