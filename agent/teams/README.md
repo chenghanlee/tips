@@ -132,9 +132,12 @@ One paragraph: what works now.
 |---|---|---|
 | 1 <title> | test/path_test.exs:"name" | CI run URL or local command |
 
+A `Masking risk:` row also names its control and the assertion the control fails.
+
 ## Affected code
 Changed public functions, schemas, changesets, migrations, config, PubSub topics,
-Oban workers, shared fixtures; the callers and entry points each reaches.
+Oban workers, shared fixtures; the callers and entry points each reaches. For a
+changed fact, its construct, update, read, reset, removal and late-callback paths.
 
 ## Tests without a scenario line
 Test name and one-line reason, or "none".

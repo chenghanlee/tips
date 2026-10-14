@@ -88,7 +88,10 @@ independently. Sections, in order:
    State required performance limits and workload assumptions that affect the design,
    and link any existing contract that defines them.
 4. **Acceptance scenarios.** Numbered. Each names the input, the action and the
-   observable result. These are the test list.
+   observable result. These are the test list. Mark a scenario `Masking risk:` when
+   its test could pass with the defect it exists to catch, and name that defect: the
+   distinguishing defect. Prompts, not a complete list: the test crosses a boundary,
+   uses a stub or double, waits on async work or a timer, or drives a browser.
 5. **Test budget.** The expected net test change: tests added, one to two per scenario,
    and existing tests deleted or replaced, by name, each with a reason.
 6. **Decisions and deferrals.** The rows of the spec table that apply to this brief.
@@ -206,6 +209,8 @@ Critic, for each PROPOSAL:
    everything else as P2 with a proposed decision.
 4. A P2 does not block. The lead records a decision in the table or a note to the
    implementer.
+5. Check each scenario for a masking risk. For an unmarked one, propose the mark and
+   its distinguishing defect.
 
 Lead, after each round:
 

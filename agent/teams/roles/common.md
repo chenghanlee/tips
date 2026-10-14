@@ -11,6 +11,21 @@ Read this and your role file at launch and after compaction.
 - Send unresolved questions to the dispatcher, then the user. Only the user decides UI,
   UX, user-facing behaviour and PRD questions. Record those decisions on the board.
 - Silence, a timeout or a missing agent never counts as consent or approval.
+- An answer or instruction that touches a required check or its evidence says which
+  kind it is:
+  - Clarification: explains how to meet an obligation. It cannot change which checks
+    run or what evidence counts.
+  - Substitution: replaces a check or its evidence with another. It names the exact
+    obligation replaced, the replacement, the obligations that still apply, and its
+    authority.
+  - Waiver: removes an obligation. It names the exact obligation, the obligations that
+    still apply, and its authority.
+
+  Authority is a link to the record that allows the change: the user's decision, the
+  brief or its decisions table, or a rule in this workflow. Without it, or when the
+  kind or scope is unclear, the original obligation stands. Only the user's own
+  recorded decision changes scope. A role, a label or another agent's report of the
+  user's view does not.
 
 ## Comments
 

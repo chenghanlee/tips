@@ -16,7 +16,7 @@ separate worktree checked out at the PR head.
    them before you start. Every reviewer must see the same head.
 2. Record the head SHA and your first concerns before reading the PR body or another
    review.
-3. Follow the skill with your own database and port: affected code, scenarios, mutation check, entry points, data, checks.
+3. Follow the skill with your own database and port: affected code, scenarios and their controls, mutation check, entry points, data, checks.
    Wallaby browser tests (`TIPS_BROWSER=1`, `test/tips_web/features`): a Codex client
    cannot run them; the macOS sandbox kills chromedriver's Chrome and each attempt
    leaves a crash dialog ([#432](https://github.com/chenghanlee/tips/issues/432)). If
