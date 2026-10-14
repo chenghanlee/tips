@@ -6,13 +6,12 @@ and the checkout's tracked files clean. The release holds AGENTS.md and agent/te
 that commit, plus the locked adapter environment, under <root>/releases/. <root>/harness
 then points at it; the switch is one atomic rename. state/ and allocations/ are never
 touched. A failed install removes only its own unfinished release, so the previous
-harness keeps running. Default root: ~/.local/share/tips-agent-teams/<repo-key>/, where
-repo-key is the first 16 hex characters of SHA-256 of the configured owner/name.
+harness keeps running. Default root: agent_teams/<repository name>/ in the main checkout's
+parent directory, created on first use. The root is a copy target, not write-protected.
 """
 
 import argparse
 import datetime
-import hashlib
 import json
 import re
 import shutil
@@ -22,7 +21,7 @@ import tarfile
 import tomllib
 from pathlib import Path
 
-from team import REPOSITORY, execute, run
+from team import REPOSITORY, claim_root, default_root, execute, run
 
 # Creating the environment and fetching locked wheels; the same budget as dependency fetches.
 INSTALL_SECONDS = 300
@@ -54,25 +53,6 @@ def repository(source: Path, commit: str) -> str:
     if not re.fullmatch(REPOSITORY, name):
         raise RuntimeError(f"agent/teams/config.toml at {commit} has no github.repository")
     return name
-
-
-def default_root(name: str) -> Path:
-    key = hashlib.sha256(name.encode()).hexdigest()[:16]
-    return Path.home() / ".local/share/tips-agent-teams" / key
-
-
-def claim_root(root: Path, name: str) -> None:
-    """Create the root for this repository, or refuse a root that records another one."""
-    identity = root / "repository.json"
-    if identity.exists():
-        recorded = json.loads(identity.read_text()).get("repository")
-        if recorded != name:
-            raise RuntimeError(f"{root} belongs to {recorded}, not {name}")
-    else:
-        root.mkdir(parents=True, exist_ok=True)
-        identity.write_text(json.dumps({"repository": name}) + "\n")
-    for directory in ("releases", "state", "allocations"):
-        (root / directory).mkdir(exist_ok=True)
 
 
 def require_drained(source: Path) -> None:
@@ -124,8 +104,9 @@ def install(source: Path, name: str, root: Path | None) -> Path:
     require_clean(source)
     commit = reviewed_commit(source, name)
     repo = repository(source, commit)
-    root = (root or default_root(repo)).resolve()
+    root = (root or default_root(source, repo)).resolve()
     claim_root(root, repo)
+    (root / "releases").mkdir(exist_ok=True)
     require_drained(source)
     stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
     release = root / "releases" / f"{commit[:12]}-{stamp}"
@@ -134,7 +115,13 @@ def install(source: Path, name: str, root: Path | None) -> Path:
         export(source, commit, release)
         teams = release / "agent/teams"
         build_environment(teams)
-        record = {"commit": commit, "repository": repo, "source": str(source), "installed": stamp}
+        record = {
+            "commit": commit,
+            "repository": repo,
+            "source": str(source),
+            "root": str(root),
+            "installed": stamp,
+        }
         (teams / "install.json").write_text(json.dumps(record, indent=2) + "\n")
         switch(root, release)
     except BaseException:

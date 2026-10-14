@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from team import execute
+from team import execute, repo_key
 
 TEAMS = Path(__file__).resolve().parents[1]
 IDENTITY = ["-c", "user.name=Test", "-c", "user.email=test@example.invalid"]
@@ -75,6 +75,7 @@ class InstallTest(unittest.TestCase):
         assert release.parent == self.root / "releases"
         record = json.loads((release / "agent/teams/install.json").read_text())
         assert record == {**record, "commit": self.first, "repository": "o/r"}
+        assert record["root"] == str(self.root)
         assert record["source"] == str(self.source)
         assert (release / "AGENTS.md").read_text() == "Release one.\n"
         execute([release / "agent/teams/.venv/bin/python", "-c", "pass"], check=True)
@@ -105,7 +106,20 @@ class InstallTest(unittest.TestCase):
         record.write_text("{}\n")
         assert "drain them first" in self.install(self.first, ok=False)
         record.unlink()
-        (self.root / "repository.json").write_text(json.dumps({"repository": "x/other"}))
-        assert "belongs to x/other" in self.install(self.first, ok=False)
+        # The same repository name under another owner is refused.
+        (self.root / "repository.json").write_text(json.dumps({"repository": "x/r"}))
+        assert "belongs to x/r, not o/r" in self.install(self.first, ok=False)
         assert not (self.root / "harness").exists()
         self.operator_data_kept()
+
+    def test_the_default_root_is_agent_teams_beside_the_checkout(self) -> None:
+        output = execute(
+            ["python3", self.source / "agent/teams/install.py", self.first],
+            cwd=self.source,
+            env=self.env,
+            timeout=300,
+        )
+        assert output.returncode == 0, output.stdout + output.stderr
+        root = self.source.parent / "agent_teams" / repo_key("o/r")
+        assert (root / "harness").resolve().parent == root / "releases"
+        assert json.loads((root / "repository.json").read_text()) == {"repository": "o/r"}

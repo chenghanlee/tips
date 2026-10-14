@@ -138,7 +138,7 @@ and its [role files](roles/dispatcher.md), read by the launcher before start.
 
 A restricted client reports no session to Herdr. The launcher execs the client, which
 keeps the launcher's process ID, so it records that ID, its start time, the pane and the
-session in `agent/teams/allocations/dispatcher/launch.json`. It names the pane
+session in `state/dispatcher.json` under the [harness root](#install-a-harness-release). It names the pane
 `dispatcher` only when Herdr's foreground client is that process. It refuses to start
 while that process runs, or while an unrecorded agent is named `dispatcher`.
 
@@ -186,12 +186,16 @@ python3 agent/teams/install.py <commit>
 The commit must be merged into `origin/main`, and the checkout's tracked files must be
 clean. The command copies AGENTS.md and `agent/teams` from that commit, creates the
 locked environment (`--require-hashes`, wheels only) and records the commit, the
-repository and this checkout's path in `install.json`. It installs under
-`~/.local/share/tips-agent-teams/<repo-key>/` (`--root` selects another directory):
+repository, this checkout's path and the root in `install.json`. The root defaults to
+`agent_teams/<name>/` in the main checkout's parent directory, where `<name>` is the
+repository name in `github.repository` (`agent_teams/tips/`); `--root` selects another
+directory. The root is created on first use, and its `repository.json` must name the
+configured repository. `TIPS_TEAM_HARNESS`, an absolute `<root>/harness` path, overrides
+the root for the launcher and `team.py`. The install is a copy; it does not protect the root from writes.
 `releases/<commit>-<time>/` holds each release and `harness` points at the current one.
 The switch is one atomic rename. A failed install deletes only its own unfinished
-release, so the previous one keeps working. `state/` and `allocations/` are never
-changed. Earlier releases stay on disk; to roll back, install the earlier commit again.
+release, so the previous one keeps working. The install never changes `state/` or
+`allocations/`. Earlier releases stay on disk; to roll back, install the earlier commit again.
 Start the installed dispatcher with `<root>/harness/agent/teams/dispatch`.
 
 ## Configuration

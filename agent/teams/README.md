@@ -88,10 +88,11 @@ or the linked record. After sending, end your turn. If sending fails, keep the t
 Report `blocked` with the exact command and error. Do not deliver a denied message
 another way.
 
-Before sending the dispatcher `done`, `blocked` or a launch request, post it on the brief
-with `agent/teams/board.py post <brief> DONE` or `BLOCKED`; a launch request is BLOCKED.
-The dispatcher's `wait_for_team` returns each such comment until a dispatcher action
-names its comment id, so a missed message does not lose the request.
+Herdr messages are the required way to notify the dispatcher. Recommended: before
+sending `done`, `blocked` or a launch request, also post it on the brief with
+`agent/teams/board.py post <brief> DONE` or `BLOCKED`; a launch request is BLOCKED. The
+dispatcher's optional `wait_for_team` returns each such comment until a dispatcher
+action names its comment id, so a missed message does not lose the request.
 
 No label shows who has the turn. After a restart, read the PR, reviews of its current
 head and the required checks. Use the first matching row:

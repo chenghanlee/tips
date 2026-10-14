@@ -431,18 +431,68 @@ def release_name(pane: str, current: Entity) -> None:
                 # Herdr already released it between list and clear.
 
 
-def installed_source() -> Path | None:
-    """The main checkout an operator-installed harness names, or None in a checkout.
+def installed(key: str) -> Path | None:
+    """A path install.json records for an operator-installed harness, or None in a checkout.
 
-    install.py writes install.json beside the installed scripts. Its source path is
-    trusted configuration: the installed code never derives the checkout from its location.
+    install.py writes install.json beside the installed scripts. Its paths are trusted
+    configuration: the installed code never derives them from its own location.
     """
     record = Path(__file__).resolve().parent / "install.json"
     if not record.is_file():
         return None
-    source = object_fields(json.loads(record.read_text()), str(record)).get("source")
-    require_type(source, str, f"{record}: source")
-    return Path(str(source))
+    value = object_fields(json.loads(record.read_text()), str(record)).get(key)
+    require_type(value, str, f"{record}: {key}")
+    return Path(str(value))
+
+
+def installed_source() -> Path | None:
+    """The main checkout an installed harness names, or None in a checkout."""
+    return installed("source")
+
+
+def repo_key(repository: str) -> str:
+    """The root's directory name: the repository name without its owner."""
+    return repository.split("/")[-1]
+
+
+def default_root(checkout: Path, repository: str) -> Path:
+    """The harness and state root: agent_teams/<repository name>/ beside the checkout."""
+    return checkout.resolve().parent / "agent_teams" / repo_key(repository)
+
+
+def claim_root(root: Path, repository: str) -> Path:
+    """Create the root for this repository on first use, or refuse one that names another.
+
+    The root is not write-protected; repository.json only keeps two repositories apart.
+    """
+    identity = root / "repository.json"
+    if identity.exists():
+        fields = object_fields(json.loads(identity.read_text()), str(identity))
+        if fields.get("repository") != repository:
+            raise RuntimeError(f"{root} belongs to {fields.get('repository')}, not {repository}")
+    else:
+        root.mkdir(parents=True, exist_ok=True)
+        identity.write_text(json.dumps({"repository": repository}) + "\n")
+    for directory in ("state", "allocations"):
+        (root / directory).mkdir(exist_ok=True)
+    return root
+
+
+def harness_root() -> Path:
+    """The parent of TIPS_TEAM_HARNESS, else the installed harness's recorded root, else
+    the default beside the main checkout; created on first use."""
+    settings = github_settings()
+    if not settings:
+        raise RuntimeError("config.toml has no [github] repository to name the harness root")
+    override = os.environ.get("TIPS_TEAM_HARNESS")
+    if override:
+        harness = Path(override)
+        if not harness.is_absolute():
+            raise RuntimeError("TIPS_TEAM_HARNESS must be an absolute path")
+        root = harness.parent
+    else:
+        root = installed("root") or default_root(main, settings["repository"])
+    return claim_root(root, settings["repository"])
 
 
 def checkout_root(script: Path) -> Path:
@@ -1684,8 +1734,7 @@ class DispatcherLaunch(TypedDict):
 
 
 def dispatcher_path() -> Path:
-    # PR4 integration point (#441): keep it beside the allocation records in the state root.
-    return records_dir() / "dispatcher" / "launch.json"
+    return harness_root() / "state/dispatcher.json"
 
 
 def dispatcher_launch() -> DispatcherLaunch | None:

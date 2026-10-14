@@ -30,7 +30,8 @@ order (`project_read`). Also check open issues and PRs (`issue_read`, `pr_list`,
 - Ask the user only for product, scope, access, purchase or approval decisions.
   Resolve sequencing yourself. Do not waive gates.
 - If no task is eligible, resolve or report the blocker that would make the next task
-  eligible. Then [wait for the team](#wait-for-the-team).
+  eligible. End your turn after assigning work or reporting the blocker. Agents will
+  message you through Herdr.
 
 ## Open a feature
 
@@ -80,21 +81,21 @@ If the cause needs diagnosis outside that tester's allocation, report it to the 
 
 ## Wait for the team
 
-Workers record `done`, `blocked` and launch requests as DONE or BLOCKED comments on the
-brief or PR. After your actions, while a team runs and its next step is not waiting on
-the user, call `wait_for_team` with timeout 300 instead of ending your turn.
+Workers notify you through Herdr; that is the required path. They may also record
+`done`, `blocked` and launch requests as DONE or BLOCKED comments on the brief or PR.
+`wait_for_team` is optional: call it with a timeout of up to 300 seconds to find
+recorded requests nobody has answered, for example after a restart or when a message
+may have been missed.
 
 - `requests`: handle each one. Pass its `comment_id` in `answers` to the tool that acts on
   it: `board_post` for an answer or decision on the same issue, `start_pair`,
   `launch_reviewer`, `retire_team` or `prompt_agent`. The tool records the outcome on the
   issue. A failed action leaves the request open; `prompt_agent` records it as pending,
   since delivery does not show the outcome. An unrelated comment handles nothing.
-- `timeout`: call it again. `idle`: no team runs; choose work.
+- `timeout`: nothing recorded is open. `idle`: no team runs.
 - `unavailable` or `incomplete`: report the detail to the user and end your turn.
 - `awaiting_outcome` lists requests already acted on. Do not repeat the action; read the
   records first.
-
-End your turn only when no team runs or every remaining step waits on the user.
 
 ## Liveness
 

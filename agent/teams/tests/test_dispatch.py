@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-from team import execute
+from team import execute, repo_key
 from tests.test_team import CONFIG
 
 TEAMS = Path(__file__).resolve().parents[1]
@@ -56,7 +56,9 @@ class DispatchTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory(prefix="dispatch test ")
         self.addCleanup(self.tmp.cleanup)
-        self.root = Path(self.tmp.name).resolve()
+        # The checkout sits in the temporary directory; the harness root is its sibling.
+        self.root = Path(self.tmp.name).resolve() / "tips"
+        self.state = Path(self.tmp.name).resolve() / "agent_teams" / repo_key("o/r") / "state"
         self.scripts = self.root / "agent/teams"
         (self.scripts / "roles").mkdir(parents=True)
         for name in ("dispatch", "dispatcher.py", "team.py"):
@@ -100,8 +102,7 @@ class DispatchTest(unittest.TestCase):
         return result.stdout + result.stderr
 
     def launch_record(self) -> dict[str, Any]:
-        path = self.root / "agent/teams/allocations/dispatcher/launch.json"
-        return json.loads(path.read_text())
+        return json.loads((self.state / "dispatcher.json").read_text())
 
     def renamed(self, seconds: float = 10) -> list[list[Any]]:
         """Wait for the detached namer's rename; return the rename calls."""
@@ -170,6 +171,20 @@ class DispatchTest(unittest.TestCase):
         assert record["session"] == session[session.index("--session-id") + 1]
         assert [call[1] for call in self.renamed()] == [["agent", "rename", "caller", "dispatcher"]]
 
+    def test_the_root_is_created_on_first_use_and_must_name_the_repository(self) -> None:
+        root = self.state.parent
+        self.dispatch()
+        assert json.loads((root / "repository.json").read_text()) == {"repository": "o/r"}
+        assert root.parent.name == "agent_teams"
+        # TIPS_TEAM_HARNESS names <root>/harness and moves the root.
+        other = self.root.parent / "elsewhere"
+        self.dispatch(TIPS_TEAM_HARNESS=str(other / "harness"))
+        assert (other / "state/dispatcher.json").exists()
+        # Another repository with the same name is refused.
+        (other / "repository.json").write_text(json.dumps({"repository": "x/r"}))
+        output = self.dispatch(ok=False, TIPS_TEAM_HARNESS=str(other / "harness"))
+        assert "belongs to x/r, not o/r" in output
+
     def test_the_namer_leaves_a_pane_whose_client_is_not_the_launched_process(self) -> None:
         self.dispatch(CLIENT_SECONDS="3", FOREIGN_CLIENT="1")
         assert not self.renamed(seconds=4)
@@ -184,7 +199,7 @@ class DispatchTest(unittest.TestCase):
                 assert ("--model" in args) == bool(model)
 
     def write_launch(self, pid: int, started: str) -> None:
-        path = self.root / "agent/teams/allocations/dispatcher/launch.json"
+        path = self.state / "dispatcher.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         record = {"pid": pid, "started": started, "pane": "w9:p9", "session": "s"}
         path.write_text(json.dumps(record))

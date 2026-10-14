@@ -33,7 +33,6 @@ TOOLS = {
     "start_design",
     "prompt_agent",
     "retire_team",
-    "remove_empty_residue",
     "pr_state",
     "pr_checks",
     "pr_list",

@@ -187,7 +187,8 @@ def status() -> str:
 
 @server.tool()
 def wait_for_team(timeout: Seconds) -> str:
-    """Wait up to timeout seconds for a worker request that needs action.
+    """Optional: wait up to timeout seconds for a recorded worker request that needs action.
+    Workers notify you through Herdr; this finds recorded requests nobody answered.
 
     Reads the briefs and PRs of every allocation record at once, then every 30 s.
     result is requests (each with its comment_id), timeout, idle, unavailable or
@@ -240,16 +241,10 @@ def prompt_agent(brief: Number, entry: Entry, text: Message, answers: Answers | 
 @server.tool()
 def retire_team(brief: Number, answers: Answers | None = None) -> str:
     """Stop a merged brief's clients and release its resources (team.py stop)."""
+    # PR4 integration point (#441): retirement removes empty residue itself and reports
+    # partial cleanup; no separate tool.
     action = answering(f"retire_team {brief}", answers or [], lambda: team.stop_brief(str(brief)))
     return operate(action, writes=True)
-
-
-@server.tool()
-def remove_empty_residue(brief: Number) -> str:
-    """Remove an empty retired allocation directory. Available with the retirement lifecycle."""
-    # PR4 integration point (#441): call retirement.remove_empty_residue once it exists.
-    del brief
-    raise ToolError("Residue removal arrives with the retirement lifecycle (#441).")
 
 
 # Pull requests
