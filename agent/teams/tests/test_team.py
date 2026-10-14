@@ -1428,6 +1428,18 @@ class PairLifecycleTest(Harness):
         self.team("start", "29")
         assert len(self.events("agent", "start")) == 2
 
+    def test_a_team_whose_clients_never_launched_retires_without_reports(self) -> None:
+        self.update(setup_lost=True)
+        self.team("start", "29", ok=False)
+        assert [a["launch"] for a in self.record(1)["agents"].values()] == ["", ""]
+        self.update(setup_lost=False)
+        self.merge(self.git("--git-dir", self.origin, "rev-parse", "main"))
+        self.databases("tips_test_t1g1i")
+        stopped = self.team("stop", "29").stdout
+        assert "slot 1 released" in stopped
+        assert self.recorded_briefs() == set()
+        assert self.remaining_databases() == []
+
     def test_client_started_blocked_or_in_another_root_is_reported(self) -> None:
         # A blocked client has the recorded identity: a rerun adopts it and sends nothing.
         self.update(start_fails=True)
@@ -2097,6 +2109,8 @@ class RetirementTest(Harness):
         (project / "unfinished.txt").write_text("in progress\n")
         refused = self.team("stop", "29", ok=False).stderr
         assert "#29 is not closed by a merged PR. Nothing was asked or stopped" in refused
+        assert "closed without a merged PR, the operator retires it by hand" in refused
+        assert "agent/teams/README.md#retire-a-brief-closed-without-a-merged-pr" in refused
         assert not any(p.startswith("Retire") for p in self.latest_prompts().values())
         assert self.workspaces() == ["team-1-29"]
         # Clean reports with HEAD on origin/main are not enough while the brief is open.
@@ -2109,6 +2123,19 @@ class RetirementTest(Harness):
         assert "#29 is not closed by a merged PR" in refused
         assert self.remaining_databases() == ["tips_test_t1g1i"]
         assert self.recorded_briefs() == {"29"}
+        # The README's manual retirement of a brief closed without a merged PR frees the
+        # slot, keeps the files and lists them.
+        state = self.trusted / "state"
+        why = "brief closed without a merged PR"
+        for allocation in self.record(1)["agents"].values():
+            note = {"id": allocation["id"], "issue": "29", "db_suffix": allocation["db_suffix"]}
+            note |= {"reason": why, "databases_kept_because": why}
+            (state / allocation["id"] / "retired.json").write_text(json.dumps(note))
+        (state / "1.json").rename(state / "1.closed")
+        assert f"g1-impl (#29): {self.trusted / 'allocations/g1-impl'}" in self.team("clean").stdout
+        self.team("start", "30")
+        assert self.record(1)["brief"] == "30"
+        assert (project / "tracked.txt").exists()
 
     def test_unpreserved_work_keeps_the_record_and_every_reservation(self) -> None:
         self.merged_pair()
@@ -2450,14 +2477,25 @@ class RepositoryConfigTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=TEST_RUNS) as directory:
             root = Path(directory).resolve() / "agent_teams/tips"
             identity = root / "repository.json"
-            # Both claims see no identity file before either writes one.
-            barrier, exists = threading.Barrier(2), Path.exists
+            # Both claims see no identity file before either writes one; the second publishes
+            # only after the first has read the identity back, so a last-writer-wins
+            # publication lets both claim.
+            barrier, first, read = threading.Barrier(2), threading.Lock(), threading.Event()
+            exists, read_text = Path.exists, Path.read_text
 
             def interleaved(path: Path) -> bool:
                 found = exists(path)
                 if path == identity:
                     barrier.wait(timeout=5)
+                    if not first.acquire(blocking=False):
+                        assert read.wait(timeout=5)
                 return found
+
+            def reading(path: Path, *args: Any, **kwargs: Any) -> str:
+                text = read_text(path, *args, **kwargs)
+                if path == identity:
+                    read.set()
+                return text
 
             def claim(repository: str) -> str:
                 try:
@@ -2466,7 +2504,11 @@ class RepositoryConfigTest(unittest.TestCase):
                 except RuntimeError as error:
                     return str(error)
 
-            with mock.patch.object(Path, "exists", interleaved), ThreadPoolExecutor(2) as pool:
+            with (
+                mock.patch.object(Path, "exists", interleaved),
+                mock.patch.object(Path, "read_text", reading),
+                ThreadPoolExecutor(2) as pool,
+            ):
                 results = list(pool.map(claim, ["owner1/tips", "owner2/tips"]))
             owner = json.loads(identity.read_text())["repository"]
             loser = "owner2/tips" if owner == "owner1/tips" else "owner1/tips"

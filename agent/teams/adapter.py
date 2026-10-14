@@ -181,9 +181,10 @@ def prompt_agent(brief: Number, entry: Entry, text: Message) -> str:
 
 @server.tool()
 def retire_team(brief: Number) -> str:
-    """Retire a team (team.py stop). A brief must be closed by a merged PR. The first call
-    asks each client for a retirement report and refuses; call again once they are posted.
-    Retirement keeps unpreserved work and reports what it retained."""
+    """Retire a team (team.py stop). A brief must be closed by a merged PR; one closed
+    without a merged PR is retired by the user by hand. The first call asks each client
+    that launched for a retirement report and refuses; call again once they are posted. A
+    client that never launched needs no report. Unpreserved work keeps everything."""
     return operate(lambda: team.stop_brief(str(brief)), writes=True)
 
 

@@ -71,8 +71,11 @@ yourself. Then set the brief's Phase to Implement (`project_set_field`) and star
 pair (`start_pair`). Send the accepted PROPOSAL URL to the implementer with
 `prompt_agent`. When a tester asks, launch each reviewer (`launch_reviewer`). After the
 merge-confirming tester reports `done`, confirm the merge (`pr_state`), then retire the
-team (`retire_team`). It refuses a brief no merged PR closes. Its first call asks each
-client for a retirement report and refuses; call it again once the reports are posted.
+team (`retire_team`). Its first call asks each client that launched for a retirement
+report and refuses; call it again once the reports are posted. A client that never
+launched needs no report. It refuses a brief no merged PR closes: if the brief was closed
+without a merged PR, ask the user to retire it by hand
+([steps](../README.md#retire-a-brief-closed-without-a-merged-pr)).
 
 ## Revert a broken main
 

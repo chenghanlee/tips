@@ -127,9 +127,11 @@ rejects changes to the implementer or merge-confirming tester.
 `team.py stop <issue>` for a brief first refuses, asking no client and changing nothing,
 unless GitHub shows the brief closed by a merged PR within `timeouts.shell_seconds`. It
 then needs a retirement report from every client of the team, from its current launch; a
-report from an earlier launch does not count. Until each has one, it changes nothing: it
-asks each running client to run `retirement.py`, prints the command the operator runs
-for a stopped client, and keeps every resource reserved. With every report, it:
+report from an earlier launch does not count. A client that never launched, with no
+launch id and its task never submitted, has no session and needs no report. Until each
+has one, it changes nothing: it asks each running client to run `retirement.py`, prints
+the command the operator runs for a stopped client, and keeps every resource reserved.
+With every report, it:
 
 1. Refuses, stopping nothing and keeping the record, databases, files and reservation,
    unless every report shows a clean clone with no unpushed commits and, for a brief,
@@ -152,6 +154,23 @@ deletes nothing. The operator deletes one by hand, naming its ID
 (`rm -rf <root>/allocations/<id>`), only after establishing that its work is preserved
 and every writer has stopped; an earlier listing or a closed pane is not enough. If
 unsure, keep it.
+
+#### Retire a brief closed without a merged PR
+
+`stop` refuses a brief that was cancelled or closed without a merged PR, so its slot
+stays taken until the operator retires it by hand. While no `team.py` command runs:
+
+1. Have each client push or record what should be kept, exit it, and close the team's
+   workspace (`herdr workspace close <workspace>` from `state/<slot>.json`).
+2. Stop each clone's Dexter daemon: `<root>/allocations/<id>/project/.dexter/dexter.sh
+   stop`, where the wrapper exists.
+3. For each allocation in the record, write `<root>/state/<id>/retired.json`:
+   `{"id": "<id>", "issue": "<issue>", "db_suffix": "<db_suffix>", "reason": "brief
+   closed without a merged PR", "databases_kept_because": "brief closed without a merged
+   PR"}`. `clean` then lists it, and a later `start` of the issue no longer reports it as
+   an earlier launch.
+4. Rename `<root>/state/<slot>.json` to `<root>/state/<slot>.closed`. This frees the
+   slot; files and databases stay.
 
 ## Turns
 

@@ -2029,6 +2029,12 @@ def retirement_reports(record: Record) -> Reports:
     return reports
 
 
+def never_launched(allocation: Allocation) -> bool:
+    """No client was ever entered in the allocation: launch ids are saved only after one
+    is, so there is no session to report and no work in its clone."""
+    return not allocation["launch"] and allocation["submission"] == NEVER_SUBMITTED
+
+
 def request_reports(record: Record, missing: list[str], running: set[str]) -> None:
     """Ask each running client without a report to post one, name the operator command for
     each stopped one, then refuse: every resource stays reserved until stop runs again."""
@@ -2154,6 +2160,8 @@ def preservation_gap(record: Record, reports: Reports) -> str:
     a clean clone with nothing unpushed and, for a brief, a HEAD merged into origin/main. A
     design team commits nothing, so it needs no merge."""
     for allocation in record["agents"].values():
+        if never_launched(allocation):
+            continue
         fields, url = reports[allocation["id"]]
         if fields.get("clean") is not True or fields.get("unpushed") != 0:
             return f"{allocation['name']} reported uncommitted or unpushed work: {url}"
@@ -2270,7 +2278,9 @@ def stop_brief(brief: str) -> None:
         if record["kind"] != "design" and not merged_brief(brief):
             raise RuntimeError(
                 f"#{brief} is not closed by a merged PR. Nothing was asked or stopped; the "
-                "record, databases, files and reservation are kept."
+                "record, databases, files and reservation are kept. If the brief was closed "
+                "without a merged PR, the operator retires it by hand; until then the slot "
+                "stays taken: agent/teams/README.md#retire-a-brief-closed-without-a-merged-pr"
             )
         require_only_recorded_panes(record)
         paths = [retirement_paths(a) for a in record["agents"].values()]
@@ -2281,7 +2291,11 @@ def stop_brief(brief: str) -> None:
         present = {
             e: a for e, a in record["agents"].items() if running_client(record, a) is not None
         }
-        missing = [e for e, a in record["agents"].items() if a["id"] not in reports]
+        missing = [
+            e
+            for e, a in record["agents"].items()
+            if a["id"] not in reports and (e in present or not never_launched(a))
+        ]
         if missing:
             request_reports(record, missing, set(present))
         gap = preservation_gap(record, reports)
