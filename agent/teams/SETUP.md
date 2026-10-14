@@ -213,12 +213,14 @@ After an interrupted `start` or `review`, rerun it:
   gets its task again.
 - A client with no record entry is recorded as `unknown` and refused when its worktree,
   task branch, a Herdr workspace of its brief, a Herdr client with its name or its
-  databases remain: a lost record does not prove that nothing was sent. Close any
+  databases remain, or when Docker cannot list the databases within
+  `timeouts.shell_seconds`: a lost record does not prove that nothing was sent. Close any
   earlier workspace, then reset it as above.
-- Another client in a recorded pane, a live client the record never started, or a
-  client whose session differs from the recorded one is refused. Inspect the pane.
-  `team.py` assigns each Claude client's session id at launch; a Codex client's is
-  recorded when Herdr first reports it.
+- Another client in a recorded pane, a live client the record never started, a client
+  whose session differs from the recorded one, or a client that reports no session is
+  refused. Inspect the pane. `team.py` assigns each Claude client's session id at
+  launch; a Codex client's is recorded when Herdr first reports it. Herdr reports
+  sessions through the user hook, so keep that hook installed.
 
 `start`, `review`, `reset` and `stop` hold a lock on `agent/teams/allocations/.lock`. A
 command that waits longer than `timeouts.lock_seconds` stops with a `Busy` error; rerun

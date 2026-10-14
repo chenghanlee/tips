@@ -907,7 +907,15 @@ def earlier_launch(record: Record, entry: str, worktree: Path, branch: str | Non
     name = live_name(record["slot"], entry)
     if any(a.get("name") == name for a in herdr("agent", "list")["agents"]):
         found.append(f"Herdr client {name}")
-    found += [f"database {db}" for db in allocated_databases([db_suffix(entry, record["slot"])])]
+    suffix = db_suffix(entry, record["slot"])
+    try:
+        found += [f"database {db}" for db in allocated_databases([suffix])]
+    except (RuntimeError, OSError, subprocess.TimeoutExpired) as error:
+        # Without the list nothing proves that no earlier launch left work.
+        found.append(
+            f"databases unreadable: the earlier-launch check lists databases {suffix}* "
+            f"through Docker, which failed ({error})"
+        )
     return found
 
 
@@ -1250,7 +1258,8 @@ def running_client(record: Record, allocation: Allocation) -> Entity | None:
     """The recorded client if it is live in its pane; None if the pane is gone or at the shell.
 
     A live client with another name, kind, root or session makes the pane's owner
-    uncertain: refused. Only a record with no session yet accepts the live one's.
+    uncertain: refused, and so is one that reports no session, since nothing then shows
+    which client is live. Only a record with no session yet accepts the live one's.
     """
     name, pane = allocation["name"], allocation["pane"]
     if pane not in {p["pane_id"] for p in live_panes(record["workspace"])}:
@@ -1264,7 +1273,12 @@ def running_client(record: Record, allocation: Allocation) -> Entity | None:
     if root != Path(allocation["worktree"]):
         raise RuntimeError(f"{pane}: {name} runs in {root}, not its worktree; preserved")
     recorded, live_session = allocation["session"], session_id(agent)
-    if recorded not in ("", "unknown") and live_session and live_session != recorded:
+    if not live_session:
+        raise RuntimeError(
+            f"{pane}: {name} reports no session; cannot confirm the recorded client; preserved. "
+            "Nothing was resent; only the operator decides what happens to it."
+        )
+    if recorded not in ("", "unknown") and live_session != recorded:
         raise RuntimeError(f"{pane}: {name} runs session {live_session}, not {recorded}; preserved")
     return agent
 
@@ -1289,7 +1303,7 @@ def reconcile(record: Record, allocation: Allocation) -> Entity | None:
     if agent is None and state != NEVER_SUBMITTED:
         raise RuntimeError(
             f"{name} is not running and its task submission is {state}. It may have done the "
-            "task before it exited, so nothing was launched or resent. Only the operator "
+            "task before it exited, so nothing was launched or resent; only the operator "
             "decides whether to replay it: after checking its work on the brief and PR, the "
             f"operator runs agent/teams/team.py reset {record['brief']} {allocation['entry']}, "
             "then reruns this command."
@@ -1776,7 +1790,9 @@ PSQL = (
 def allocated_databases(suffixes: list[str]) -> list[str]:
     """The test and dev databases, and their numbered partitions, of these suffixes."""
     stems = [base + suffix for base in ("tips_test", "tips_dev") for suffix in suffixes]
-    databases = run(*PSQL, "-Atc", "SELECT datname FROM pg_database", cwd=main).splitlines()
+    seconds = cfg["timeouts"]["shell_seconds"]
+    query = (*PSQL, "-Atc", "SELECT datname FROM pg_database")
+    databases = run(*query, cwd=main, timeout=seconds).splitlines()
     return [
         db
         for db in databases
@@ -1787,7 +1803,8 @@ def allocated_databases(suffixes: list[str]) -> list[str]:
 def drop_databases(suffixes: list[str]) -> None:
     for db in allocated_databases(suffixes):
         # Do not use FORCE: an unexpected remaining connection blocks deletion.
-        run(*PSQL, "-c", 'DROP DATABASE "' + db.replace('"', '""') + '"', cwd=main)
+        drop = (*PSQL, "-c", 'DROP DATABASE "' + db.replace('"', '""') + '"')
+        run(*drop, cwd=main, timeout=cfg["timeouts"]["shell_seconds"])
 
 
 def configure() -> None:

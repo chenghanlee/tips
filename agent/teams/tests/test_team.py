@@ -711,7 +711,8 @@ class Harness(unittest.TestCase):
             "elixir": '#!/bin/sh\nprintf "1.2.3\\n"\n',
             "docker": (
                 '#!/bin/sh\nprintf "%s\\n" "$*" >> "$DOCKER_LOG"\n'
-                'case "$*" in *SELECT*) cat "$DOCKER_DBS" 2>/dev/null;; esac\nexit 0\n'
+                'case "$*" in *SELECT*) [ -n "$DOCKER_FAILS" ] && { echo "db down" >&2; exit 1; }\n'
+                'cat "$DOCKER_DBS" 2>/dev/null;; esac\nexit 0\n'
             ),
             # Stop-time events land after the first checks: ps runs only in stop(). A write
             # dirties the worktree; a visitor pane joins a recorded workspace.
@@ -1709,6 +1710,8 @@ class LaunchRecoveryTest(Harness):
         self.fault("agent start", "team-2-impl", "crash_after")
         self.team("start", "31", ok=False)
         assert "Already running: team-2-impl" in self.team("start", "31").stdout
+        # First discovery: the record had no session and the client reports one.
+        assert self.record(2)["agents"]["impl"]["session"] == "session-team-2-impl"
         assert self.starts()[2:] == ["team-2-impl", "team-2-tester"]
         assert not self.prompts("team-2-impl")
         # The launcher dies before Herdr sends Begin.: the task was not submitted.
@@ -1806,17 +1809,40 @@ class LaunchRecoveryTest(Harness):
         assert len(self.events("agent", "prompt")) == 2
         assert self.state()["workspaces"]
         # Herdr reports no session (restricted mode): the record keeps the Claude session
-        # the launcher assigned, and a replacement reported later is still refused.
+        # the launcher assigned, but nothing shows which client is live, so a rerun refuses
+        # to adopt either client; so does a replacement reported later.
         self.update(no_sessions=True)
         self.team("start", "30")
         session = self.launched_session("team-2-tester")
         assert self.record(2)["agents"]["tester"]["session"] == session
         assert self.record(2)["agents"]["impl"]["session"] == "unknown"
+        refused = self.team("start", "30", ok=False).stderr
+        assert "team-2-impl reports no session; cannot confirm the recorded client" in refused
+        assert "only the operator decides" in refused
+        state = self.state()
+        for pane in state["panes"]:
+            if pane.get("label") == "team-2-impl":
+                pane["agent_session"] = {"kind": "id", "value": "session-team-2-impl"}
+        self.save(state)
+        refused = self.team("start", "30", ok=False).stderr
+        assert "team-2-tester reports no session; cannot confirm the recorded client" in refused
         state = self.state()
         tester = next(x for x in state["panes"] if x.get("label") == "team-2-tester")
         tester["agent_session"] = {"kind": "id", "value": "session-replacement"}
         self.save(state)
         assert "preserved" in self.team("start", "30", ok=False).stderr
+        assert self.starts().count("team-2-tester") == 1
+
+    def test_unreadable_databases_hold_a_new_client_as_unknown(self) -> None:
+        # Without the database list, nothing proves that no earlier launch left work.
+        self.env["DOCKER_FAILS"] = "1"
+        result = self.team("start", "29", ok=False)
+        refused = result.stdout + result.stderr
+        assert "databases unreadable" in refused
+        assert "team-1-impl is not running and its task submission is unknown" in refused
+        assert "only the operator decides" in refused
+        assert not self.starts()
+        assert self.record(1)["agents"]["impl"]["submission"] == "unknown"
 
 
 class RepositoryConfigTest(unittest.TestCase):
