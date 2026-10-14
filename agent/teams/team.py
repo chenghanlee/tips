@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
-"""Manage brief teams in Herdr: start the pair, hand off the checkout, launch reviewers, stop.
+"""Manage teams in Herdr: start a brief's pair, launch reviewers and designers, hand off, stop.
 
-Configured agents are `[agents.<entry>]` in config.toml. Each launch writes an allocation
-record to `agent/teams/allocations/<slot>.json` with the record version, the allocation ID,
-the implementer, merge-confirming tester, and every launched client's Herdr name, kind,
-worktree, database suffix, port, pane, session and task-submission state. Restart, handoff
-and teardown use that record. One lock on `agent/teams/allocations/.lock` serializes start,
-review, reset and stop. Model, effort, advisor and persona come from
-the current configuration. The brief's `Required reviews:` line names any additional reviewers.
+Configured agents are `[agents.<entry>]` in config.toml. Every client gets an allocation with
+a generation ID that never repeats: an empty project directory it clones into itself with
+bootstrap.py, a logs directory, and launcher configuration, all under the harness root
+`~/.local/share/tips-agent-teams/<repo-key>/`. The slot's record in the root's `state/`
+holds the record version and ID, the brief or spec, its roster, and every launched client's
+Herdr name, kind, project, database suffix, port, pane, session and task-submission state.
+Restart, handoff and retirement use that record. One lock on `state/.lock` serializes start,
+design, review, reset and stop. This controller never runs Git, builds or a worker-provided
+executable in a project.
 """
 
 import contextlib
+import errno
 import fcntl
 import json
 import os
@@ -18,6 +21,7 @@ import re
 import shlex
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -40,7 +44,13 @@ class AgentSpec(TypedDict):
     db_suffix: str
 
 
+class GitHubSettings(TypedDict):
+    repository: str
+
+
 class TeamSettings(TypedDict):
+    clone_url: str
+    psql: list[str]
     max_teams: int
     port_base: int
     port_stride: int
@@ -49,6 +59,7 @@ class TeamSettings(TypedDict):
 
 
 class Config(TypedDict):
+    github: GitHubSettings
     team: TeamSettings
     timeouts: dict[str, int]
     launch: dict[str, str]
@@ -56,40 +67,46 @@ class Config(TypedDict):
 
 
 class Allocation(TypedDict):
-    """One launched client. `pr` and `head` are set for reviewers of a pushed PR.
+    """One launched client and its allocation, whose `id` never repeats. `pr` and `head` are
+    set for reviewers of a pushed PR; `head` is the commit its bootstrap configuration names.
 
-    `pane`, `name`, `kind`, `worktree` and `session` identify the client process.
+    `pane`, `name`, `kind`, `root` and `session` identify the client process. `launch` is
+    new for each launch; a retirement report counts only for the launch it names.
     `submission` is the task-submission state, separate from whether a process runs:
     NEVER_SUBMITTED until launch writes UNKNOWN, durably, before the client can accept any
     input; SUBMITTED only after the task prompt's positive transport result. SUBMITTED does
     not mean the task is done; the brief, PR and reviews record its outcome.
     """
 
+    id: str
     entry: str
     role: str
     name: str
     kind: str
-    worktree: str
+    root: str
     db_suffix: str
     port: int
     workspace: str
     tab: str
     pane: str
     session: str
+    launch: str
     submission: str
     pr: NotRequired[str]
     head: NotRequired[str]
 
 
 class Record(TypedDict):
-    """A slot's allocation record: the brief, its roster, its Herdr workspace and tabs, and
-    every launched client. `id` identifies this allocation; a slot number is reused."""
+    """A slot's record: its ID and generation, the brief (or spec for a design team), the
+    pair, its Herdr workspace and tabs, and every launched client. A slot number is reused;
+    the ID and generation are not. A design team has no pair."""
 
     version: int
     id: str
     slot: int
+    generation: int
+    kind: str
     brief: str
-    worktree: str
     implementer: str
     tester: str
     workspace: str
@@ -140,9 +157,26 @@ ROLES = ("designer", "implementer", "tester")
 # A team's workspace holds one tab per role; every client of that role is a pane in it.
 TABS = {"designer": "designers", "implementer": "implementers", "tester": "reviewers"}
 ENTRY = r"[a-z0-9][a-z0-9-]*"
-RECORD_VERSION = 2
+# Version 3 records live in the harness root and name projects, not worktrees.
+RECORD_VERSION = 3
 NEVER_SUBMITTED, UNKNOWN, SUBMITTED = "never_submitted", "unknown", "submitted"
-AGENT_FIELDS = {"role", "kind", "model", "effort", "advisor", "persona", "port_offset", "db_suffix"}
+AGENT_FIELDS = {
+    "role",
+    "kind",
+    "model",
+    "effort",
+    "advisor",
+    "persona",
+    "port_offset",
+    "db_suffix",
+}
+# team.psql is a short argv list, never shell text.
+ARGV_ARGS = 16
+ARGV_ARG_CHARS = 256
+# PostgreSQL truncates identifiers longer than this; partitions append up to three digits.
+NAME_BYTES = 63
+PARTITION_DIGITS = 3
+DATABASE_BASES = ("tips_test", "tips_dev")
 # Dexter's query gives up this long after --wait: its allowance to reach the daemon.
 DEXTER_CONNECT_SECONDS = 30
 # A cold Hex cache downloads every package; anything slower is a hung fetch.
@@ -150,10 +184,9 @@ DEPS_FETCH_SECONDS = 300
 # Each GitHub read takes at most this many pages of 100 entries within this many seconds.
 # Initial defaults, not measurements: widen them only after a legitimate read exceeds one.
 READ_PAGES = 10
+REPOSITORY = r"[A-Za-z0-9-]+/[A-Za-z0-9._-]+"
+TEMPORARY = ("/tmp", "/var/tmp")
 READ_SECONDS = 30
-CODEX_CONFIG = """[plugins."mix-credo@elixir-agent-tools"]
-enabled = true
-"""
 # Disable alternate language paths in launched clients, without editing user settings.
 NATIVE_LSP_PLUGINS = {
     "elixir-lsp@elixir-agent-tools": False,
@@ -219,21 +252,6 @@ def run(
     return p.stdout.strip()
 
 
-def require_git_admin(common: Path) -> None:
-    """Check write access to main's .git before running Git administration.
-
-    Probe by creating a temporary file; mode bits may not reveal a sandbox write denial.
-    """
-    try:
-        with tempfile.TemporaryFile(dir=common):
-            pass
-    except OSError as error:
-        raise RuntimeError(
-            f"Cannot write {common} ({error.strerror}); "
-            "ask the dispatcher to run it from the main checkout."
-        ) from error
-
-
 def object_fields(value: object, label: str) -> dict[str, object]:
     """Validate external object keys before interpreting their values."""
     if not isinstance(value, dict):
@@ -244,7 +262,9 @@ def object_fields(value: object, label: str) -> dict[str, object]:
     return cast(dict[str, object], fields)
 
 
-def require_type(value: object, expected: type[str] | type[int], label: str) -> None:
+def require_type(
+    value: object, expected: type[str] | type[int] | type[list[object]], label: str
+) -> None:
     if type(value) is not expected:
         raise ValueError(f"{label} must be {expected.__name__}; received {value!r}")
 
@@ -460,7 +480,15 @@ def validate_config_fields(path: Path, value: Config) -> None:
     settings = object_fields(fields.get("team"), f"{path}: team")
     for key in ("max_teams", "port_base", "port_stride", "postgres_port"):
         require_type(settings.get(key), int, f"{path}: team.{key}")
-    require_type(settings.get("db_suffix_prefix"), str, f"{path}: team.db_suffix_prefix")
+    for key in ("db_suffix_prefix", "clone_url"):
+        require_type(settings.get(key), str, f"{path}: team.{key}")
+    github = object_fields(fields.get("github"), f"{path}: github")
+    require_type(github.get("repository"), str, f"{path}: github.repository")
+    if not re.fullmatch(REPOSITORY, str(github["repository"])):
+        raise RuntimeError(f"{path}: github.repository must be owner/name")
+    validate_argv(f"{path}: team.psql", settings.get("psql"))
+    if not Path(cast(list[str], settings["psql"])[0]).is_absolute():
+        raise RuntimeError(f"{path}: team.psql must start with an absolute executable path")
     object_fields(fields.get("timeouts"), f"{path}: timeouts")
     policies = object_fields(fields.get("launch"), f"{path}: launch")
     for key in ("codex_approval", "claude_permission_mode"):
@@ -485,6 +513,19 @@ def validate_agent_fields(label: str, name: str, entry: object) -> None:
         if key in spec:
             require_type(spec[key], str, f"{label}.{key}")
     require_type(spec.get("port_offset"), int, f"{label}.port_offset")
+    if not re.fullmatch(r"[^0-9]\S*", str(spec["db_suffix"])):
+        raise RuntimeError(f"{label}.db_suffix must be nonempty and start with a non-digit")
+
+
+def validate_argv(label: str, value: object) -> None:
+    """1 to ARGV_ARGS nonempty strings; argv[0] names the program."""
+    require_type(value, list, label)
+    args = cast(list[object], value)
+    if not 1 <= len(args) <= ARGV_ARGS:
+        raise RuntimeError(f"{label} must hold 1 to {ARGV_ARGS} arguments")
+    for arg in args:
+        if not isinstance(arg, str) or not 0 < len(arg) <= ARGV_ARG_CHARS or "\0" in arg:
+            raise RuntimeError(f"{label} arguments must be strings of 1 to {ARGV_ARG_CHARS} chars")
 
 
 def validate_settings(path: Path, value: Config) -> None:
@@ -516,33 +557,139 @@ def overlapping(a: str, b: str) -> bool:
     )
 
 
+def database_stem(team: TeamSettings, slot: int, generation: int, suffix: str) -> str:
+    """The slot, then the generation after a non-digit, then the entry's suffix, which starts
+    with a non-digit: numbered partitions of one stem never equal another stem."""
+    return f"{team['db_suffix_prefix']}{slot}g{generation}{suffix}"
+
+
 def validate_allocations(path: Path, value: Config) -> None:
+    """Ports and database stems of every slot are distinct, and a long generation still fits
+    PostgreSQL's identifier length. Generations differ after the non-digit separator, so one
+    generation's stems decide."""
     ports: set[int] = set()
     stems: list[str] = []
-    for n in range(1, value["team"]["max_teams"] + 1):
+    team = value["team"]
+    for n in range(1, team["max_teams"] + 1):
         for spec in value["agents"].values():
-            port = (
-                value["team"]["port_base"] + n * value["team"]["port_stride"] + spec["port_offset"]
-            )
-            stem = value["team"]["db_suffix_prefix"] + str(n) + spec["db_suffix"]
+            port = team["port_base"] + n * team["port_stride"] + spec["port_offset"]
+            stem = database_stem(team, n, 1, spec["db_suffix"])
             if port in ports or not 1 <= port <= 65535:
                 raise RuntimeError(f"{path}: overlapping or invalid test ports")
             if any(overlapping(stem, other) for other in stems):
                 raise RuntimeError(f"{path}: overlapping database suffix/partition allocation")
+            widest = database_stem(team, n, 10**6, spec["db_suffix"])
+            longest = max(DATABASE_BASES, key=len) + widest
+            if len(longest.encode()) + PARTITION_DIGITS > NAME_BYTES:
+                raise RuntimeError(f"{path}: database names would exceed {NAME_BYTES} bytes")
             ports.add(port)
             stems.append(stem)
 
 
-def git(*args: str | Path, root: Path | None = None) -> str:
-    return run("git", "-C", root or main, *args)
+def installed(key: str) -> Path | None:
+    """A path install.json records for an operator-installed harness, or None in a checkout.
+    install.py writes install.json beside the installed scripts."""
+    record = Path(__file__).resolve().parent / "install.json"
+    if not record.is_file():
+        return None
+    value = object_fields(json.loads(record.read_text()), str(record)).get(key)
+    require_type(value, str, f"{record}: {key}")
+    return Path(str(value))
 
 
-def records_dir() -> Path:
-    return main / "agent/teams/allocations"
+def repo_key(repository: str) -> str:
+    """The root's directory name: the repository name without its owner."""
+    return repository.split("/")[-1]
+
+
+def default_root(checkout: Path, repository: str) -> Path:
+    """The harness and state root: agent_teams/<repository name>/ beside the checkout."""
+    return checkout.resolve().parent / "agent_teams" / repo_key(repository)
+
+
+def claim_root(root: Path, repository: str) -> Path:
+    """Create the root for this repository on first use, or refuse one that names another,
+    including another owner's repository with the same name. The root is not
+    write-protected; repository.json only keeps two repositories apart."""
+    identity = root / "repository.json"
+    if not identity.exists():
+        # Publish a complete identity with one exclusive link: of two first callers, the
+        # second finds the first one's file and is refused below.
+        root.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile("w", dir=root, prefix=".repository.", delete=False) as f:
+            f.write(json.dumps({"repository": repository}) + "\n")
+        try:
+            os.link(f.name, identity)
+        except FileExistsError:
+            pass
+        finally:
+            os.unlink(f.name)
+    fields = object_fields(json.loads(identity.read_text()), str(identity))
+    if fields.get("repository") != repository:
+        raise RuntimeError(f"{root} belongs to {fields.get('repository')}, not {repository}")
+    # Checked before any record, lock or allocation is written through them.
+    for directory in ("state", "allocations"):
+        contained(root / directory, root).mkdir(exist_ok=True)
+    return root
+
+
+def harness_root() -> Path:
+    """The parent of TIPS_TEAM_HARNESS, else the installed harness's recorded root, else
+    the default beside the main checkout; created on first use. It must be a real path
+    outside the repository and outside temporary directories."""
+    override = os.environ.get("TIPS_TEAM_HARNESS")
+    if override:
+        if not Path(override).is_absolute():
+            raise RuntimeError("TIPS_TEAM_HARNESS must be an absolute path")
+        root = Path(override).parent
+    else:
+        root = installed("root") or default_root(main, cfg["github"]["repository"])
+    temporary = [Path(p).resolve() for p in (*TEMPORARY, os.environ.get("TMPDIR", "/tmp"))]
+    if root.resolve() != root:
+        raise RuntimeError(f"Harness root {root} passes through a symlink; refused")
+    for parent in (main, *temporary):
+        if root == parent or parent in root.parents:
+            raise RuntimeError(f"Harness root {root} is inside {parent}; refused")
+    return claim_root(root, cfg["github"]["repository"])
+
+
+def state_dir() -> Path:
+    return harness_root() / "state"
+
+
+def contained(path: Path, parent: Path) -> Path:
+    """Refuse a path that leaves its trusted parent or passes through a symlink."""
+    if path.resolve() != path or parent not in path.parents:
+        raise RuntimeError(f"{path} escapes {parent} or passes through a symlink; refused")
+    return path
+
+
+def allocation_paths(ident: str) -> tuple[Path, Path, Path, Path]:
+    """The allocation's directory, its project and logs, and its launcher configuration.
+
+    The allocation directory is the client's working root, so a Codex sandbox can write the
+    clone's `.git`; the launcher configuration is outside it."""
+    root = harness_root()
+    base = root / "allocations" / ident
+    return base, base / "project", base / "logs", root / "state" / ident
+
+
+def project_of(allocation: Allocation) -> Path:
+    return Path(allocation["root"]) / "project"
 
 
 def record_path(slot: int) -> Path:
-    return records_dir() / f"{slot}.json"
+    return state_dir() / f"{slot}.json"
+
+
+def next_generation() -> int:
+    """A generation this store never handed out before; call it under the lock."""
+    path = state_dir() / "generation"
+    last = int(path.read_text()) if path.is_file() else 0
+    staged = path.with_suffix(".tmp")
+    staged.write_text(f"{last + 1}\n")
+    staged.replace(path)
+    return last + 1
 
 
 def require_current_record(path: Path, fields: dict[str, object]) -> None:
@@ -567,24 +714,27 @@ def load_record(path: Path) -> Record:
     client that a default called never-submitted could do its task twice."""
     fields = object_fields(json.loads(path.read_text()), str(path))
     require_current_record(path, fields)
-    require_type(fields.get("slot"), int, f"{path}: slot")
-    for key in ("brief", "worktree", "implementer", "tester", "workspace"):
+    for key in ("slot", "generation"):
+        require_type(fields.get(key), int, f"{path}: {key}")
+    for key in ("kind", "brief", "implementer", "tester", "workspace"):
         require_type(fields.get(key), str, f"{path}: {key}")
     for label, tab in object_fields(fields.get("tabs"), f"{path}: tabs").items():
         require_type(tab, str, f"{path}: tabs.{label}")
     for entry, value in object_fields(fields.get("agents"), f"{path}: agents").items():
         allocation = object_fields(value, f"{path}: agents.{entry}")
         for key in (
+            "id",
             "entry",
             "role",
             "name",
             "kind",
-            "worktree",
+            "root",
             "db_suffix",
             "workspace",
             "tab",
             "pane",
             "session",
+            "launch",
         ):
             require_type(allocation.get(key), str, f"{path}: agents.{entry}.{key}")
         require_type(allocation.get("port"), int, f"{path}: agents.{entry}.port")
@@ -613,15 +763,14 @@ def save_record(record: Record) -> None:
 
 @contextlib.contextmanager
 def store_lock() -> Generator[None]:
-    """Hold the record store's lock: one start, review, reset or stop at a time.
+    """Hold the record store's lock: one start, design, review, reset or stop at a time.
 
     The lock is on a file that is never replaced, so it is not lost when a record is
     rewritten. The kernel releases it when this process exits, even after a crash. Python
     opens the file non-inheritable and `subprocess` closes other descriptors by default, so
     a child does not receive it.
     """
-    path = records_dir() / ".lock"
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path = state_dir() / ".lock"
     seconds = cfg["timeouts"]["lock_seconds"]
     with path.open("a") as handle:
         deadline = time.monotonic() + seconds
@@ -632,22 +781,29 @@ def store_lock() -> Generator[None]:
             except BlockingIOError:
                 if time.monotonic() >= deadline:
                     raise RuntimeError(
-                        f"Busy: another team.py start, review, reset or stop held {path} for "
-                        f"{seconds} s. Rerun this command after it finishes."
+                        f"Busy: another team.py command held {path} for {seconds} s. "
+                        "Rerun this command after it finishes."
                     ) from None
                 time.sleep(0.1)
         yield
 
 
 def records() -> dict[int, Record]:
-    """Every slot's allocation record; slot discovery reads these, not Herdr."""
+    """Every slot's record; slot discovery reads these, not Herdr."""
+    legacy = sorted((main / "agent/teams/allocations").glob("*.json"))
+    if legacy:
+        raise RuntimeError(
+            f"{legacy[0]} was written by a team.py that used shared worktrees; refusing every "
+            "launch and stop. Drain it with the team.py that wrote it, as agent/teams/SETUP.md "
+            '"Records from an older team.py" says.'
+        )
     found: dict[int, Record] = {}
-    if records_dir().is_dir():
-        for path in sorted(records_dir().glob("*.json")):
-            record = load_record(path)
-            if path.stem != str(record["slot"]):
-                raise RuntimeError(f"{path}: file name does not match slot {record['slot']}")
-            found[record["slot"]] = record
+    # Slot records are <slot>.json; other files there, such as dispatcher.json, are not.
+    for path in sorted(p for p in state_dir().glob("*.json") if p.stem.isdecimal()):
+        record = load_record(path)
+        if path.stem != str(record["slot"]):
+            raise RuntimeError(f"{path}: file name does not match slot {record['slot']}")
+        found[record["slot"]] = record
     return found
 
 
@@ -821,21 +977,6 @@ def post_event(brief: str, allocation: Allocation, text: str) -> None:
     print(f"Recorded on #{brief}: {url}")
 
 
-def bound_command(binary: Path, root: Path, sources: Path | str) -> str:
-    """Build the worktree's Dexter wrapper with paths to the binary, root and Elixir sources."""
-    return (
-        "#!/bin/sh\n"
-        f"export DEXTER_ELIXIR_LIB_ROOT={shlex.quote(str(sources))}\n"
-        f"exec {shlex.quote(str(binary))} --root {shlex.quote(str(root))}"
-        ' "$@"\n'
-    )
-
-
-def warm_up_query(startup_seconds: int) -> list[str]:
-    """Return wrapper arguments that start the daemon and wait for its index."""
-    return ["query", "workspace-symbols", "--raw", "--wait", f"{startup_seconds}s", "MixProject"]
-
-
 def dexter_binary() -> Path:
     home = Path(os.environ.get("TIPS_DEXTER_HOME", str(main / "agent/lsp/dexter"))).resolve()
     binary = home / "vendor/dexter"
@@ -845,7 +986,7 @@ def dexter_binary() -> Path:
 
 
 def elixir_sources(cwd: Path) -> Path:
-    """The Elixir standard-library sources Dexter indexes for this worktree."""
+    """The Elixir standard-library sources Dexter indexes for a project."""
     version = run(
         "elixir", "--short-version", cwd=cwd, timeout=cfg["timeouts"]["dexter_startup_seconds"]
     )
@@ -867,19 +1008,20 @@ def elixir_sources(cwd: Path) -> Path:
     return sources.resolve()
 
 
-def db_suffix(entry: str, slot: int) -> str:
-    return cfg["team"]["db_suffix_prefix"] + str(slot) + cfg["agents"][entry]["db_suffix"]
-
-
 def test_port(entry: str, slot: int) -> int:
     team = cfg["team"]
     return team["port_base"] + team["port_stride"] * slot + cfg["agents"][entry]["port_offset"]
 
 
+def harness() -> Path:
+    """The directory of the harness code that is running; workers call its helpers."""
+    return Path(__file__).resolve().parent
+
+
 def agent_env(allocation: Allocation) -> dict[str, str]:
-    """Build the client's environment from its recorded database, port and worktree tools."""
+    """Build the client's environment from its recorded allocation."""
     config = Path(os.environ.get("TIPS_TEAM_CONFIG", main / "agent/teams/config.toml")).resolve()
-    worktree = Path(allocation["worktree"])
+    project = project_of(allocation)
     env = {
         "PGPORT": str(cfg["team"]["postgres_port"]),
         "TIPS_DB_SUFFIX": allocation["db_suffix"],
@@ -889,51 +1031,88 @@ def agent_env(allocation: Allocation) -> dict[str, str]:
         "TIPS_TEAM_CONFIG": str(config),
         # Provider settings are read by path from the main checkout; nothing is copied.
         "TIPS_PROVIDER_ENV_FILE": str(main / ".env"),
-        "TIPS_DEXTER": str(worktree / ".dexter/dexter.sh"),
+        "TIPS_DEXTER": str(project / ".dexter/dexter.sh"),
+        # Worker-side commands resolve the same root, as PR5's install layout defines it.
+        "TIPS_TEAM_HARNESS": str(harness_root() / "harness"),
+        "TIPS_TEAM_ALLOCATION_ID": allocation["id"],
+        "TIPS_TEAM_LAUNCH": allocation["launch"],
+        "TIPS_TEAM_STATE": str(state_dir()),
     }
     if allocation["kind"] == "codex":
         # Codex's sandbox cannot write the shared Hex cache in the home directory.
-        env["HEX_HOME"] = str(worktree / "tmp/hex")
+        env["HEX_HOME"] = str(project / "tmp/hex")
     return env
 
 
-def allocate(record: Record, entry: str, role: str, worktree: Path) -> Allocation:
-    """Reserve the entry's database and port in this slot and save them in its allocation record."""
-    slot = record["slot"]
-    suffix, port = db_suffix(entry, slot), test_port(entry, slot)
+def tools() -> tuple[Path, Path, Path]:
+    """Check the shared tools before reserving anything; return the Dexter binary, the
+    shared skills and the Elixir sources."""
+    binary, skills = dexter_binary(), main / ".agents/skills"
+    if not skills.is_dir():
+        raise RuntimeError("Shared skills directory is missing.")
+    return binary, skills, elixir_sources(main)
+
+
+def allocate(record: Record, entry: str, role: str) -> Allocation:
+    """Reserve the entry's database and port, and create its allocation directory with an
+    empty project and logs, and its launcher configuration directory, under the trusted
+    root."""
+    slot, generation = record["slot"], record["generation"]
+    suffix = database_stem(cfg["team"], slot, generation, cfg["agents"][entry]["db_suffix"])
+    port = test_port(entry, slot)
     for held in reserved():
         if overlapping(suffix, held["db_suffix"]) or port == held["port"]:
             raise RuntimeError(
                 f"{entry}: database {suffix} or port {port} collides with {held['name']}'s "
                 f"allocation ({held['db_suffix']}, {held['port']})"
             )
+    if len((max(DATABASE_BASES, key=len) + suffix).encode()) + PARTITION_DIGITS > NAME_BYTES:
+        raise RuntimeError(f"{entry}: database names for {suffix} exceed {NAME_BYTES} bytes")
+    ident = f"g{generation}-{entry}"
+    root = harness_root()
+    for directory in allocation_paths(ident):
+        # Checked before creation too: a symlinked parent would put the new directory
+        # outside the root before the check after it could refuse.
+        contained(directory, root)
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        contained(directory, root)
     allocation = Allocation(
+        id=ident,
         entry=entry,
         role=role,
         name=live_name(slot, entry),
         kind=cfg["agents"][entry]["kind"],
-        worktree=str(worktree),
+        root=str(allocation_paths(ident)[0]),
         db_suffix=suffix,
         port=port,
         workspace="",
         tab="",
         pane="",
         session="",
+        launch="",
         submission=NEVER_SUBMITTED,
     )
     record["agents"][entry] = allocation
     return allocation
 
 
-def earlier_launch(record: Record, entry: str, worktree: Path, branch: str | None) -> list[str]:
-    """What remains of an earlier launch of this client that the record does not hold.
+def earlier_launch(record: Record, entry: str) -> list[str]:
+    """What remains of an earlier launch of this client that no record holds.
 
     A missing record or entry never proves that a task was never sent: the record may have
-    been lost while its worktree, branch, workspace, client or databases remained.
+    been lost while an allocation, workspace or client remained. Database names carry the
+    generation, so an earlier launch's databases belong to an allocation found here.
     """
-    found = [f"worktree {worktree}"] if worktree.exists() else []
-    if branch and git("branch", "--list", branch):
-        found.append(f"branch {branch}")
+    held = {a["id"] for r in [*records().values(), record] for a in r["agents"].values()}
+    found: list[str] = []
+    for path in sorted(state_dir().glob("*/bootstrap.json")):
+        settings = object_fields(json.loads(path.read_text()), str(path))
+        if (
+            (settings.get("issue"), settings.get("entry")) == (record["brief"], entry)
+            and path.parent.name not in held
+            and not (path.parent / "retired.json").exists()
+        ):
+            found.append(f"allocation {path.parent.name}")
     label = re.compile(rf"team-[0-9]+-{re.escape(record['brief'])}")
     found += [
         f"Herdr workspace {w['label']}"
@@ -943,25 +1122,14 @@ def earlier_launch(record: Record, entry: str, worktree: Path, branch: str | Non
     name = live_name(record["slot"], entry)
     if any(a.get("name") == name for a in herdr("agent", "list")["agents"]):
         found.append(f"Herdr client {name}")
-    suffix = db_suffix(entry, record["slot"])
-    try:
-        found += [f"database {db}" for db in allocated_databases([suffix])]
-    except (RuntimeError, OSError, subprocess.TimeoutExpired) as error:
-        # Without the list nothing proves that no earlier launch left work.
-        found.append(
-            f"databases unreadable: the earlier-launch check lists databases {suffix}* "
-            f"through Docker, which failed ({error})"
-        )
     return found
 
 
-def add_allocation(
-    record: Record, entry: str, role: str, worktree: Path, branch: str | None
-) -> Allocation:
+def add_allocation(record: Record, entry: str, role: str) -> Allocation:
     """Allocate a client the record does not hold. If an earlier launch left anything
     behind, its task may already have been sent: record the submission as unknown."""
-    allocation = allocate(record, entry, role, worktree)
-    remains = earlier_launch(record, entry, worktree, branch)
+    remains = earlier_launch(record, entry)
+    allocation = allocate(record, entry, role)
     if remains:
         allocation["submission"] = UNKNOWN
         print(
@@ -971,118 +1139,46 @@ def add_allocation(
     return allocation
 
 
-def checkout(worktree: Path, branch: str | None, commit: str | None) -> bool:
-    """Add the worktree on `branch` from fetched origin/main, or detached at `commit`.
-
-    Return whether it is new. An existing pair worktree is kept as it is: its agent may
-    hold unfinished work. An existing reviewer worktree moves to `commit` when clean,
-    so a relaunched reviewer sees the head its brief names.
-    """
-    git("fetch", "origin")
-    if worktree.exists():
-        if Path(git("rev-parse", "--show-toplevel", root=worktree)) != worktree or (
-            branch and git("branch", "--show-current", root=worktree) != branch
-        ):
-            raise RuntimeError(f"Not the expected worktree: {worktree}")
-        if commit and git("rev-parse", "HEAD", root=worktree) != commit:
-            if git("status", "--porcelain", "--untracked-files=all", root=worktree):
-                raise RuntimeError(f"{worktree} is dirty and not at {commit}; preserved")
-            require_commit(commit)
-            git("checkout", "--detach", "-q", commit, root=worktree)
-        return False
-    if branch:
-        if git("branch", "--list", branch):
-            git("worktree", "add", worktree, branch)
-        else:
-            git("worktree", "add", "--no-track", "-b", branch, worktree, "origin/main")
-    else:
-        require_commit(str(commit))
-        git("worktree", "add", "--detach", worktree, str(commit))
-    return True
-
-
-def require_commit(commit: str) -> None:
-    if execute(["git", "-C", main, "cat-file", "-e", f"{commit}^{{commit}}"]).returncode:
-        raise RuntimeError(f"Commit {commit} is not on origin; push it first")
-
-
-def link_skills(link: Path, shared: Path) -> None:
-    if link.is_symlink() and os.readlink(link) == str(shared):
-        return
-    if link.exists() and not link.is_symlink():
-        raise RuntimeError(f"Refusing to replace existing skills: {link}")
-    link.parent.mkdir(parents=True, exist_ok=True)
-    link.unlink(missing_ok=True)
-    link.symlink_to(shared)
-
-
-def prepare_index(worktree: Path, wrapper: Path, env: dict[str, str], fetch: bool) -> None:
-    """Fetch a new checkout's locked dependencies, start Dexter and update its index."""
-    if fetch:
-        # --check-locked never rewrites the lock. A reused worktree keeps its own dependency
-        # state: it may hold an unfinished change that only its agent can resolve.
-        run(
-            "mix",
-            "deps.get",
-            "--check-locked",
-            cwd=worktree,
-            env=env,
-            timeout=DEPS_FETCH_SECONDS,
-            input_text="",
-        )
-    # The query ends itself within --wait plus its connection allowance, so a valid slow
-    # start is never cut short; the margin only catches a hung query.
-    seconds = cfg["timeouts"]["dexter_startup_seconds"]
-    budget = seconds + DEXTER_CONNECT_SECONDS + 5
-    output = run(
-        "/bin/sh", wrapper, *warm_up_query(seconds), env=env, timeout=budget, input_text=""
-    )
-    if not json.loads(output):
-        raise RuntimeError("Dexter indexed no MixProject module; inspect the daemon log.")
-    # A daemon that was already running does not watch deps/: reconcile it with the disk.
-    run("/bin/sh", wrapper, "reindex", env=env, timeout=budget, input_text="")
-    print(f"Dexter index ready for {worktree}")
-
-
-def tools(worktree: Path) -> tuple[Path, Path, Path]:
-    """Check the required tools before changing the worktree; return their paths."""
-    binary, skills = dexter_binary(), main / ".agents/skills"
-    if not skills.is_dir():
-        raise RuntimeError("Shared skills directory is missing.")
-    return binary, skills, elixir_sources(worktree if worktree.is_dir() else main)
-
-
-def prepare_worktree(
-    worktree: Path, clients: list[Allocation], branch: str | None, commit: str | None
-) -> None:
-    """Create or reuse a worktree and prepare it once for the clients that will use it."""
-    binary, skills, sources = tools(worktree)
-    new = checkout(worktree, branch, commit)
-    wrapper = worktree / ".dexter/dexter.sh"
-    files = {
-        wrapper: bound_command(binary, worktree, sources),
-        worktree / ".dexter/.gitignore": "*\n",
-        worktree / ".codex/config.toml": CODEX_CONFIG,
+def configure_bootstrap(record: Record, allocation: Allocation, branch: str, commit: str) -> None:
+    """Write the launcher configuration bootstrap.py reads: what to clone and check out, the
+    shared tools."""
+    binary, skills, sources = tools()
+    _, project, logs, config = allocation_paths(allocation["id"])
+    settings = {
+        "id": allocation["id"],
+        "issue": record["brief"],
+        "entry": allocation["entry"],
+        "kind": allocation["kind"],
+        "project": str(project),
+        "logs": str(logs),
+        "clone_url": cfg["team"]["clone_url"],
+        "repository": cfg["github"]["repository"],
+        "startup_seconds": cfg["timeouts"]["dexter_startup_seconds"],
+        "branch": branch,
+        "commit": commit,
+        "dexter": str(binary),
+        "sources": str(sources),
+        "skills": str(skills),
+        # What the launch lets the worker write; bootstrap refuses trusted paths inside it.
+        "writable": [allocation["root"]],
     }
-    for path, content in files.items():
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if not path.is_file() or path.read_text() != content:
-            path.write_text(content)
-    wrapper.chmod(0o755)
-    link_skills(worktree / ".agents/skills", skills)
-    # A Codex client's environment wins: its sandbox needs the Hex cache inside the worktree.
-    owner = next((c for c in clients if c["kind"] == "codex"), clients[0])
-    env = {**os.environ, **agent_env(owner)}
-    # A fetch that failed last time left no dependencies: fetch again.
-    prepare_index(worktree, wrapper, env, fetch=new or not (worktree / "deps").is_dir())
+    staged = config / "bootstrap.json.tmp"
+    staged.write_text(json.dumps(settings, indent=2, sort_keys=True) + "\n")
+    staged.replace(config / "bootstrap.json")
 
 
-def refuse_foreign_owner(worktree: Path, names: list[str]) -> None:
-    """Only the assigned clients may work in a worktree."""
+def inside(path: Path, root: Path) -> bool:
+    return path == root or root in path.parents
+
+
+def refuse_foreign_owner(roots: list[Path], names: list[str]) -> None:
+    """Only the assigned clients may work in their allocations."""
     for agent in herdr("agent", "list")["agents"]:
-        if agent.get("name") not in names and pane_occupant(agent["pane_id"])[0] == worktree:
-            owner = agent.get("name") or agent["pane_id"]
-            raise RuntimeError(f"Conflicting live agent in {worktree}: {owner}")
+        cwd = pane_occupant(agent["pane_id"])[0]
+        for root in roots:
+            if agent.get("name") not in names and inside(cwd, root):
+                owner = agent.get("name") or agent["pane_id"]
+                raise RuntimeError(f"Conflicting live agent in {root}: {owner}; preserved")
 
 
 def live_workspaces() -> set[str]:
@@ -1111,7 +1207,7 @@ def open_pane(record: Record, allocation: Allocation) -> None:
             "workspace",
             "create",
             "--cwd",
-            str(main),
+            allocation["root"],
             "--label",
             f"team-{record['slot']}-{record['brief']}",
             "--no-focus",
@@ -1134,7 +1230,7 @@ def open_pane(record: Record, allocation: Allocation) -> None:
                 "--direction",
                 direction,
                 "--cwd",
-                str(main),
+                allocation["root"],
                 "--no-focus",
             )["pane"]
         else:
@@ -1144,7 +1240,7 @@ def open_pane(record: Record, allocation: Allocation) -> None:
                 "--workspace",
                 record["workspace"],
                 "--cwd",
-                str(main),
+                allocation["root"],
                 "--label",
                 label,
                 "--no-focus",
@@ -1158,8 +1254,8 @@ def open_pane(record: Record, allocation: Allocation) -> None:
     herdr("pane", "rename", allocation["pane"], allocation["name"])
 
 
-def enter(pane: str, worktree: Path, env: dict[str, str]) -> None:
-    """Move the pane's shell into the worktree with the client's environment.
+def enter(pane: str, root: Path, env: dict[str, str]) -> None:
+    """Move the pane's shell into the allocation directory with the client's environment.
 
     The setup is typed into the pane, so it runs only when the pane is at its shell: typed
     into a client, it would be a prompt.
@@ -1169,7 +1265,7 @@ def enter(pane: str, worktree: Path, env: dict[str, str]) -> None:
     token = uuid.uuid4().hex
     setup = (
         "cd -- "
-        + shlex.quote(str(worktree))
+        + shlex.quote(str(root))
         + " && export "
         + " ".join(shlex.quote(key + "=" + value) for key, value in env.items())
         # The format splits the marker, so neither the typed command's echo nor unwrapping,
@@ -1191,57 +1287,100 @@ def enter(pane: str, worktree: Path, env: dict[str, str]) -> None:
     )
 
 
+def bootstrap_brief(allocation: Allocation, commit: str) -> str:
+    """The first task: the worker prepares its own project. Startup loaded no repository
+    instructions: the client starts in the allocation directory, outside the clone."""
+    _, project, logs, _ = allocation_paths(allocation["id"])
+    command = f"python3 {harness() / 'bootstrap.py'}" + (f" --commit {commit}" if commit else "")
+    return (
+        f"Your allocation is {allocation['id']}; your project is {project}. First run "
+        f"{command}: it clones the repository into the project or reuses your clone, fetches "
+        "dependencies and starts Dexter. Its full log is in "
+        f"{logs}. If it fails, report blocked with its error and stop; do not prepare the "
+        f"project another way. Then work only in {project}: read its AGENTS.md and "
+        "agent/teams/README.md; they were not loaded at startup. "
+    )
+
+
 def dexter_brief(wrapper: Path) -> str:
     # The binary is shared by every checkout and the guide is not, so the binary's own
     # help defines the current syntax even when checkout docs are outdated.
     return (
-        "Load the skills required by AGENTS.md before reading Elixir code. "
+        "Load the skills required by AGENTS.md from .agents/skills before reading Elixir code. "
         "Follow its navigation table and function-use checks. "
-        f"Run TIPS_DEXTER={wrapper} through the shell for this worktree. "
+        f"Run TIPS_DEXTER={wrapper} through the shell for this project. "
         'Read "$TIPS_DEXTER" query --help and "$TIPS_DEXTER" lookup --help once; '
         "Their syntax and output override outdated checkout docs. "
         'After fetching or changing dependencies, run "$TIPS_DEXTER" reindex. '
         "Do not start another Elixir language server. The index may be outdated; "
-        "check empty results with rg. Leave the shared daemon running on exit. "
-        "Do not run git clean -x; it deletes the wrapper and index."
+        "check empty results with rg. Leave the daemon running on exit. "
+        "Do not run git clean -x; it deletes the wrapper and index. When the dispatcher asks "
+        f"you to retire, run python3 {harness() / 'retirement.py'} and end your turn: it "
+        "posts your clone's state to the issue and changes nothing."
     )
 
 
 def identity(record: Record, entry: str, duty: str) -> str:
     persona = agent_spec(record["agents"][entry]).get("persona")
-    text = f"You are {entry}, the {duty} for brief #{record['brief']}; your Herdr name is "
+    issue = "spec" if record["kind"] == "design" else "brief"
+    text = f"You are {entry}, the {duty} for {issue} #{record['brief']}; your Herdr name is "
     text += f"{live_name(record['slot'], entry)}. "
     if persona:
         text += f"Your persona: {persona}. "
     return text
 
 
-def pair_brief(record: Record, entry: str, duty: str, wrapper: Path) -> str:
+def pair_brief(record: Record, entry: str, duty: str) -> str:
     # A relaunched client gets this brief too, so it finds the turn instead of assuming it.
+    allocation = record["agents"][entry]
     implementer, tester = record["implementer"], record["tester"]
-    partner = tester if entry == implementer else implementer
+    if entry == implementer:
+        handoff = f"After each push, hand the head to the reviewers with {turn_command(tester)}. "
+    else:
+        handoff = f"Hand findings to the implementer with {turn_command(implementer)}. "
     return (
         identity(record, entry, duty)
-        + f"Read agent/teams/README.md, then the brief with gh issue view {record['brief']}. "
-        "Use the README restart rule to find whose turn it is. If yours, continue the "
-        "workflow; otherwise end your turn and wait for your partner's message. "
-        f"Hand the checkout over with agent/teams/team.py turn <pr> {partner}. "
-        f"Put {entry}, <session> on line 2 of each review record; "
-        "replace <session> with your session ID. " + dexter_brief(wrapper)
+        + bootstrap_brief(allocation, "")
+        + f"Then read the brief with gh issue view {record['brief']}. Use the README restart "
+        "rule to find whose turn it is. If yours, continue the workflow; otherwise end your "
+        "turn and wait for a message. "
+        + handoff
+        + f"Put {entry}, <session> on line 2 of each review record; replace <session> with "
+        "your session ID. "
+        + dexter_brief(project_of(allocation) / ".dexter/dexter.sh")
     )
 
 
-def reviewer_brief(record: Record, entry: str, duty: str, pr: str, head: str, wrapper: Path) -> str:
+def turn_command(recipient: str) -> str:
+    return f"python3 {harness() / 'team.py'} turn <pr> {recipient}"
+
+
+def reviewer_brief(record: Record, entry: str, duty: str, pr: str, head: str) -> str:
+    allocation = record["agents"][entry]
     tester = live_name(record["slot"], record["tester"])
     return (
         identity(record, entry, duty)
-        + f"Review PR {pr} from this worktree, pinned at {head}; never the pair checkout. "
-        "Read agent/teams/README.md and follow its reviewer steps. Never run "
-        "agent/teams/team.py turn. Submit the README review record with "
+        + bootstrap_brief(allocation, head)
+        + f"Review PR {pr} at {head} from your own clone. Follow the README reviewer steps. "
+        "Never run team.py turn. Submit the README review record with "
         f"{entry}, <session> on line 2; replace <session> with your session ID. "
         "Then notify the merge-confirming tester with "
         f"herdr agent prompt {tester} '<your review URL>' and end your turn. "
-        "If the PR head changes, follow the README reviewer steps again. " + dexter_brief(wrapper)
+        "When notified of a new head, the notice names the bootstrap command that moves "
+        "your clone to it. "
+        + dexter_brief(project_of(allocation) / ".dexter/dexter.sh")
+    )
+
+
+def design_brief(record: Record, entry: str) -> str:
+    allocation = record["agents"][entry]
+    return (
+        identity(record, entry, "designer")
+        + bootstrap_brief(allocation, "")
+        + "Read agent/teams/roles/designer.md, then the spec with "
+        f"gh issue view {record['brief']}; its body names the lead and the critics. Use "
+        "agent/teams/board.py to read and post. "
+        + dexter_brief(project_of(allocation) / ".dexter/dexter.sh")
     )
 
 
@@ -1260,19 +1399,20 @@ def client_args(allocation: Allocation, prompt: str, session: str) -> list[str]:
     message; it runs the session id the launcher assigned, because Herdr learns session ids
     from a user hook that restricted mode ignores. Codex starts with no instructions: no
     documented signal shows that it accepted a task passed at start, so launch sends its
-    brief as the first message."""
-    spec, policies, worktree = agent_spec(allocation), cfg["launch"], allocation["worktree"]
+    brief as the first message. Both start in the allocation directory, which holds the
+    project and its logs."""
+    spec, policies = agent_spec(allocation), cfg["launch"]
     if spec["kind"] == "codex":
-        args = ["-a", policies["codex_approval"], "-C", str(worktree)]
+        args = ["-a", policies["codex_approval"], "-C", allocation["root"]]
         if spec["model"]:
             args += ["-m", spec["model"]]
-        return [*args, "-c", "model_reasoning_effort=" + json.dumps(spec["effort"])]
+        effort = ["-c", "model_reasoning_effort=" + json.dumps(spec["effort"])]
+        return [*args, *effort]
     args = [
         "--permission-mode",
         policies["claude_permission_mode"],
         "--effort",
         spec["effort"],
-        # CLI settings also apply in linked worktrees and preserve user files.
         "--settings",
         json.dumps(
             {"enabledPlugins": {"mix-credo@elixir-agent-tools": True, **NATIVE_LSP_PLUGINS}}
@@ -1306,8 +1446,8 @@ def running_client(record: Record, allocation: Allocation) -> Entity | None:
     agent = herdr("agent", "get", pane)["agent"]
     if agent.get("name") != name or agent.get("agent") != allocation["kind"]:
         raise RuntimeError(f"{pane}: conflicting client; preserved")
-    if root != Path(allocation["worktree"]):
-        raise RuntimeError(f"{pane}: {name} runs in {root}, not its worktree; preserved")
+    if root != Path(allocation["root"]):
+        raise RuntimeError(f"{pane}: {name} runs in {root}, not its allocation; preserved")
     recorded, live_session = allocation["session"], session_id(agent)
     if not live_session:
         raise RuntimeError(
@@ -1341,8 +1481,8 @@ def reconcile(record: Record, allocation: Allocation) -> Entity | None:
             f"{name} is not running and its task submission is {state}. It may have done the "
             "task before it exited, so nothing was launched or resent; only the operator "
             "decides whether to replay it: after checking its work on the brief and PR, the "
-            f"operator runs agent/teams/team.py reset {record['brief']} {allocation['entry']}, "
-            "then reruns this command."
+            f"operator runs python3 {harness() / 'team.py'} reset {record['brief']} "
+            f"{allocation['entry']}, then reruns this command."
         )
     return agent
 
@@ -1362,15 +1502,16 @@ def adopt(record: Record, allocation: Allocation, agent: Entity) -> None:
     print(
         f"{name}: task submission is {allocation['submission']}; nothing was resent. Only the "
         f"operator decides whether to replay it: if {allocation['pane']} shows that the client "
-        "never got its task, the operator exits the client, runs agent/teams/team.py reset "
-        f"{record['brief']} {allocation['entry']} and reruns this command."
+        "never got its task, the operator exits the client, runs "
+        f"python3 {harness() / 'team.py'} reset {record['brief']} {allocation['entry']} and "
+        "reruns this command."
     )
 
 
 def launch_text(allocation: Allocation) -> str:
     return (
-        f"launched {allocation['kind']} in {allocation['worktree']}; "
-        f"database suffix {allocation['db_suffix']}; port {allocation['port']}"
+        f"launched {allocation['kind']} in {allocation['root']}; allocation "
+        f"{allocation['id']}; database suffix {allocation['db_suffix']}; port {allocation['port']}"
     )
 
 
@@ -1387,11 +1528,12 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
         adopt(record, allocation, agent)
         return
     name, pane = allocation["name"], allocation["pane"]
-    kind, worktree = allocation["kind"], Path(allocation["worktree"])
+    kind, root = allocation["kind"], Path(allocation["root"])
     # Claude runs a session id assigned here; Codex's is known only if Herdr reports it.
     session = str(uuid.uuid4()) if kind == "claude" else ""
     args = client_args(allocation, prompt, session)  # a configuration error refuses first
-    enter(pane, worktree, agent_env(allocation))
+    allocation["launch"] = uuid.uuid4().hex
+    enter(pane, root, agent_env(allocation))
     allocation["submission"], allocation["session"] = UNKNOWN, session
     save_record(record)
     herdr(
@@ -1413,7 +1555,7 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
         allocation["session"] = reported or "unknown"
         save_record(record)
     if (
-        pane_occupant(pane) != (worktree, True)
+        pane_occupant(pane) != (root, True)
         or started.get("agent") != kind
         or started.get("name") != name
         or started.get("agent_status") in ("blocked", "unknown")
@@ -1424,14 +1566,8 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
     herdr("agent", "prompt", name, "Begin." if kind == "claude" else prompt)
     allocation["submission"] = SUBMITTED
     save_record(record)
-    print(f"Launched {name}: {kind} in {worktree}, session {allocation['session']}")
+    print(f"Launched {name}: {kind} in {root}, session {allocation['session']}")
     post_event(record["brief"], allocation, launch_text(allocation))
-
-
-def require_main_checkout() -> None:
-    if Path.cwd() != main:
-        raise RuntimeError(f"Run from the main checkout: {main}")
-    require_git_admin(main / ".git")
 
 
 def current_roster(record: Record) -> tuple[list[str], list[str]]:
@@ -1450,48 +1586,77 @@ def current_roster(record: Record) -> tuple[list[str], list[str]]:
     return testers[1:], designers
 
 
+def team_record(issue: str, kind: str, implementer: str, tester: str) -> Record:
+    """The slot holding this issue, or a new record with a new generation in a free slot.
+
+    Call under the lock. The record is saved before anything is created, so a failure
+    later leaves a reservation that stop can retire.
+    """
+    slot, record = find_slot(issue)
+    if record is not None:
+        if record["kind"] != kind:
+            raise RuntimeError(f"#{issue} already holds a {record['kind']} team in slot {slot}")
+        return record
+    record = Record(
+        version=RECORD_VERSION,
+        id=uuid.uuid4().hex,
+        slot=slot,
+        generation=next_generation(),
+        kind=kind,
+        brief=issue,
+        implementer=implementer,
+        tester=tester,
+        workspace="",
+        tabs={},
+        agents={},
+    )
+    save_record(record)
+    return record
+
+
 def start(brief: str) -> None:
-    """Launch the brief's implementer and merge-confirming tester in one prepared worktree."""
-    require_main_checkout()
+    """Launch the brief's implementer and merge-confirming tester, each in its own empty
+    allocation; each clones and prepares its project itself."""
     implementer, testers, _ = roster(brief)
     pair = [implementer, testers[0]]
-    worktree = main / ".worktrees" / brief
-    tools(worktree)  # missing tools refuse before a slot is reserved
+    tools()  # missing tools refuse before a slot is reserved
     with store_lock():
-        slot, record = find_slot(brief)
-        if record is None:
-            record = Record(
-                version=RECORD_VERSION,
-                id=uuid.uuid4().hex,
-                slot=slot,
-                brief=brief,
-                worktree=str(worktree),
-                implementer=pair[0],
-                tester=pair[1],
-                workspace="",
-                tabs={},
-                agents={},
-            )
-            save_record(record)  # the slot is reserved before anything is provisioned
-        else:
+        record = team_record(brief, "brief", *pair)
+        if record["implementer"]:
             current_roster(record)
-        refuse_foreign_owner(worktree, [live_name(slot, entry) for entry in pair])
         duties = ("implementer", "merge-confirming tester")
-        clients = [
-            record["agents"].get(entry)
-            or add_allocation(record, entry, duty, worktree, f"task/{brief}")
-            for entry, duty in zip(pair, duties, strict=True)
-        ]
-        save_record(record)
+        for entry, duty in zip(pair, duties, strict=True):
+            if entry not in record["agents"]:
+                allocation = add_allocation(record, entry, duty)
+                branch = f"task/{brief}" if entry == implementer else ""
+                configure_bootstrap(record, allocation, branch, "")
+                save_record(record)
+        clients = [record["agents"][entry] for entry in pair]
+        refuse_foreign_owner([Path(a["root"]) for a in clients], [a["name"] for a in clients])
         for allocation in clients:
-            reconcile(record, allocation)  # refuse before preparing anything
-        prepare_worktree(worktree, clients, f"task/{brief}", None)
-        wrapper = worktree / ".dexter/dexter.sh"
+            reconcile(record, allocation)  # refuse before opening anything
         for allocation in clients:
             open_pane(record, allocation)
-            prompt = pair_brief(record, allocation["entry"], allocation["role"], wrapper)
-            launch(record, allocation, prompt)
-    print(f"Brief {brief}: pair in slot {slot}, {worktree}")
+            launch(record, allocation, pair_brief(record, allocation["entry"], allocation["role"]))
+    print(f"Brief {brief}: pair in slot {record['slot']}, generation {record['generation']}")
+
+
+def design(spec: str, entry: str) -> None:
+    """Launch a designer for the spec in its own allocation, through the same lifecycle."""
+    agent = cfg["agents"].get(entry)
+    if agent is None or agent["role"] != "designer":
+        raise RuntimeError(f"{entry} is not a configured designer entry")
+    tools()
+    with store_lock():
+        record = team_record(spec, "design", "", "")
+        if entry not in record["agents"]:
+            configure_bootstrap(record, add_allocation(record, entry, "designer"), "", "")
+            save_record(record)
+        allocation = record["agents"][entry]
+        refuse_foreign_owner([Path(allocation["root"])], [allocation["name"]])
+        open_pane(record, allocation)
+        launch(record, allocation, design_brief(record, entry))
+    print(f"Spec {spec}: {entry} in slot {record['slot']}, {allocation['root']}")
 
 
 def pull_request(pr: str) -> tuple[str, str, list[str]]:
@@ -1511,8 +1676,7 @@ def brief_record(pr: str, briefs: list[str]) -> Record:
 
 
 def review(pr: str, entry: str) -> None:
-    """Pin a required reviewer's own worktree at the PR head and launch it there."""
-    require_main_checkout()
+    """Launch a required reviewer in its own allocation, configured for the PR head."""
     url, head, briefs = pull_request(pr)
     with store_lock():
         record = brief_record(pr, briefs)
@@ -1523,29 +1687,22 @@ def review(pr: str, entry: str) -> None:
                 f"(additional reviewers: {', '.join(testers + designers) or 'none'})"
             )
         duty = "reviewing designer" if entry in designers else "additional tester"
-        worktree = main / ".worktrees" / f"review-{pr}-{entry}"
-        refuse_foreign_owner(worktree, [live_name(record["slot"], entry)])
-        allocation = record["agents"].get(entry) or add_allocation(
-            record, entry, duty, worktree, None
-        )
+        allocation = record["agents"].get(entry) or add_allocation(record, entry, duty)
         allocation["pr"] = pr
         save_record(record)
+        refuse_foreign_owner([Path(allocation["root"])], [allocation["name"]])
         agent = reconcile(record, allocation)
         if agent:
-            # A running reviewer keeps the head it is on; its record says which.
-            allocation["head"] = git("rev-parse", "HEAD", root=worktree)
-            save_record(record)
-            print(f"Already running: {allocation['name']} at {allocation['head']}")
+            # A running reviewer keeps the head it was given; new heads reach it by notice.
+            print(f"Already running: {allocation['name']} at {allocation.get('head')}")
             adopt(record, allocation, agent)
             return
-        prepare_worktree(worktree, [allocation], None, head)
-        allocation["head"] = git("rev-parse", "HEAD", root=worktree)
+        allocation["pr"], allocation["head"] = pr, head
+        configure_bootstrap(record, allocation, "", head)
         save_record(record)
         open_pane(record, allocation)
-        wrapper = worktree / ".dexter/dexter.sh"
-        prompt = reviewer_brief(record, entry, duty, url, allocation["head"], wrapper)
-        launch(record, allocation, prompt)
-    print(f"PR {pr}: {entry} reviews from {worktree} at {allocation['head']}")
+        launch(record, allocation, reviewer_brief(record, entry, duty, url, head))
+    print(f"PR {pr}: {entry} reviews {head} from {project_of(allocation)}")
 
 
 def reset(brief: str, entry: str) -> None:
@@ -1554,32 +1711,31 @@ def reset(brief: str, entry: str) -> None:
     Run it only after checking the brief and PR for what the client did. The client must
     not be running: a live one is adopted, never replaced.
     """
-    require_main_checkout()
     with store_lock():
         record = record_for(brief)
         allocation = record["agents"].get(entry) if record else None
         if record is None or allocation is None:
-            raise RuntimeError(f"Brief {brief} has no recorded client {entry}")
+            raise RuntimeError(f"#{brief} has no recorded client {entry}")
         if running_client(record, allocation):
             raise RuntimeError(
                 f"{allocation['name']} is running in {allocation['pane']}; exit it first"
             )
         print(
             f"Reset {allocation['name']}: task submission was {allocation['submission']}, "
-            f"session {allocation['session'] or 'none'}. The next start or review launches a "
-            "replacement and sends its task."
+            f"session {allocation['session'] or 'none'}. The next start, design or review "
+            "launches a replacement in the same allocation and sends its task."
         )
         allocation["submission"] = NEVER_SUBMITTED
         allocation["session"] = ""
         save_record(record)
 
 
-def checkout_problem(head: str) -> str | None:
-    """Why this checkout is not the pushed PR head, or None."""
-    here = Path.cwd()
-    if git("status", "--porcelain", "--untracked-files=all", root=here):
-        return "The worktree has uncommitted or untracked files."
-    local = git("rev-parse", "HEAD", root=here)
+def checkout_problem(project: Path, head: str) -> str | None:
+    """Why the caller's own clone is not the pushed PR head, or None. Runs only from the
+    worker's own turn, under its authority."""
+    if run("git", "-C", project, "status", "--porcelain", "--untracked-files=all"):
+        return f"{project} has uncommitted or untracked files."
+    local = run("git", "-C", project, "rev-parse", "HEAD")
     if local != head:
         return f"HEAD is {local}, not the PR head {head}."
     return None
@@ -1589,7 +1745,7 @@ def caller_record() -> tuple[Record, str]:
     """The allocation record of the calling pane and the entry it runs."""
     pane = os.environ.get("HERDR_PANE_ID")
     if not pane:
-        raise RuntimeError("HERDR_PANE_ID is not set; run turn from your own pair pane")
+        raise RuntimeError("HERDR_PANE_ID is not set; run this from your own pane")
     me = herdr("agent", "get", pane)["agent"].get("name") or ""
     for record in records().values():
         for entry, allocation in record["agents"].items():
@@ -1615,6 +1771,10 @@ def findings_text(known: list[tuple[str, str]]) -> str:
     return "Open findings: " + "; ".join(f"{check} {url}" for check, url in known) + ". "
 
 
+def bootstrap_command(head: str) -> str:
+    return f"python3 {harness() / 'bootstrap.py'} --commit {head}"
+
+
 def tester_message(
     record: Record, pr: str, url: str, head: str, missing: list[str], known: list[tuple[str, str]]
 ) -> str:
@@ -1625,14 +1785,15 @@ def tester_message(
         message += f" and asked the dispatcher to launch {', '.join(missing)}"
     message += ". " + findings_text(known)
     message += (
-        "Follow agent/teams/roles/tester.md and "
-        "agent/skills/review-software-correctness/SKILL.md from this worktree and use the "
+        f"Move your own clone to the head first: {bootstrap_command(head)}; it refuses a "
+        "dirty clone. Follow agent/teams/roles/tester.md and "
+        "agent/skills/review-software-correctness/SKILL.md from your clone and use the "
         "README PR review record. "
         f"Put {tester}, <session> on line 2; replace <session> with your session ID. "
         "When your review or any required reviewer's latest review of this head has findings, "
-        f"run agent/teams/team.py turn {pr} {implementer}; do not wait for the other reviews. "
-        f"Follow the README merge step when agent/teams/pr_review.py observe {pr} reports "
-        "ready to merge. After the merge, notify the dispatcher with "
+        f"run {turn_command(implementer).replace('<pr>', pr)}; do not wait for the other "
+        f"reviews. Follow the README merge step when python3 {harness() / 'pr_review.py'} "
+        f"observe {pr} reports ready to merge. After the merge, notify the dispatcher with "
         f"herdr agent prompt dispatcher '{url} done'."
     )
     return message
@@ -1641,28 +1802,24 @@ def tester_message(
 def reviewer_notice(record: Record, entry: str, url: str, head: str) -> str:
     tester = live_name(record["slot"], record["tester"])
     return (
-        f"New head to review on {url}: {head}. In your own worktree run git fetch origin, "
-        f'then git checkout --detach {head}, then "$TIPS_DEXTER" reindex. Review the changes '
-        f"since your last review. Submit the README review record with {entry}, <session> on "
-        f"line 2, then send its URL with herdr agent prompt {tester} '<review URL>'."
+        f"New head to review on {url}: {head}. Move your own clone to it with "
+        f"{bootstrap_command(head)}; it refuses a dirty clone and never resets one. Review "
+        f"the changes since your last review. Submit the README review record with {entry}, "
+        f"<session> on line 2, then send its URL with herdr agent prompt {tester} "
+        "'<review URL>'."
     )
 
 
-def implementer_message(
-    pr: str, url: str, problem: str | None, known: list[tuple[str, str]]
-) -> str:
-    message = f"Your turn on {url}: run agent/teams/pr_review.py list {pr} and "
-    message += f"agent/teams/pr_review.py observe {pr}. " + findings_text(known)
+def implementer_message(pr: str, url: str, known: list[tuple[str, str]]) -> str:
+    tools = harness() / "pr_review.py"
+    message = f"Your turn on {url}: run python3 {tools} list {pr} and "
+    message += f"python3 {tools} observe {pr}. " + findings_text(known)
     message += (
         "Fix review findings, failed checks and open findings following "
-        "agent/skills/implement-software/SKILL.md from this worktree. Push your changes, then "
-        "run agent/teams/team.py turn <pr> <tester entry>; it notifies every required reviewer. "
+        "agent/skills/implement-software/SKILL.md from your clone. Push your changes, then "
+        "run turn to the tester again; it notifies every required reviewer. "
         "If blocked, follow the README blocker procedure."
     )
-    if problem:
-        # Handing back never refuses: only the implementer can repair the checkout.
-        message += f" Fix the checkout first: {problem}"
-        print(f"Reported to the implementer: {problem}")
     return message
 
 
@@ -1752,69 +1909,358 @@ def turn(pr: str, recipient: str) -> None:
     pair = {record["implementer"], record["tester"]}
     if me not in pair or recipient not in pair or recipient == me:
         raise RuntimeError(
-            f"turn hands the pair checkout between {record['implementer']} and "
-            f"{record['tester']}; this pane is {me}"
+            f"turn hands work between {record['implementer'] or 'no implementer'} and "
+            f"{record['tester'] or 'no tester'}; this pane is {me}"
         )
-    if Path.cwd() != Path(record["worktree"]):
-        raise RuntimeError(f"Run turn from the pair checkout: {record['worktree']}")
     url, head, briefs = pull_request(pr)
     if record["brief"] not in briefs:
         raise RuntimeError(
             f"PR {pr} does not close brief #{record['brief']} (closes {briefs or 'nothing'}); "
             "fix the PR's closing reference first"
         )
-    problem = checkout_problem(head)
-    if recipient == record["tester"] and problem:
-        raise RuntimeError(f"{problem} Commit and push, then hand over.")
+    if recipient == record["tester"]:
+        # The handed-off commit is the implementer's own clean, pushed HEAD.
+        problem = checkout_problem(project_of(record["agents"][me]), head)
+        if problem:
+            raise RuntimeError(f"{problem} Commit and push, then hand over.")
     known, conflict = observe_pr(pr, head, record["agents"][me])
     conflicts = [link for check, link in known if check == "mergeability"]
     if recipient == record["tester"] and conflicts:
         raise RuntimeError(conflict_refusal(head, conflicts, conflict))
     if recipient == record["implementer"]:
         partner = live_name(record["slot"], recipient)
-        herdr("agent", "prompt", partner, implementer_message(pr, url, problem, known))
+        herdr("agent", "prompt", partner, implementer_message(pr, url, known))
         print(f"Notified {partner}")
     else:
         hand_to_reviewers(record, me, pr, url, head, known)
-    print("Stop using this worktree, build processes and files, and database; end your turn.")
+    print("End your turn now.")
+
+
+RETIREMENT = "TEAM_RETIREMENT "
+Reports = dict[str, tuple[dict[str, object], str]]
+
+
+def retirement_reports(record: Record) -> Reports:
+    """Each allocation's latest retirement report on the issue from its current launch:
+    posted under the client's recorded name and session, naming the recorded launch. A
+    report from an earlier launch is no evidence. Reports are advisory evidence."""
+    current = {a["id"]: (a["name"], a["session"], a["launch"]) for a in record["agents"].values()}
+    reports: Reports = {}
+    for comment in issue_comments(record["brief"]):
+        lines = str(comment.get("body") or "").splitlines()
+        header = HEADER.match(lines[0]) if lines else None
+        if not header or header["type"] != "EVENT":
+            continue
+        for line in lines[1:]:
+            if line.startswith(RETIREMENT):
+                try:
+                    fields = object_fields(json.loads(line[len(RETIREMENT) :]), "report")
+                except ValueError:
+                    continue  # a malformed report is no evidence
+                ident = str(fields.get("id"))
+                found = (header["name"], header["session"], fields.get("launch"))
+                if fields.get("launch") and current.get(ident) == found:
+                    reports[ident] = (fields, str(comment["html_url"]))
+    return reports
+
+
+def never_launched(allocation: Allocation) -> bool:
+    """No client was ever entered in the allocation: launch ids are saved only after one
+    is, so there is no session to report and no work in its clone."""
+    return not allocation["launch"] and allocation["submission"] == NEVER_SUBMITTED
+
+
+def request_reports(record: Record, missing: list[str], running: set[str]) -> None:
+    """Ask each running client without a report to post one, name the operator command for
+    each stopped one, then refuse: every resource stays reserved until stop runs again."""
+    command = f"python3 {harness() / 'retirement.py'}"
+    sends = [
+        (record["agents"][e]["name"], f"Retire: run {command}, then end your turn.")
+        for e in missing
+        if e in running
+    ]
+    failed = deliver(sends)
+    stopped = [
+        f"{a['name']}: cd {a['root']} && TIPS_TEAM_STATE={state_dir()} "
+        f"TIPS_TEAM_ALLOCATION_ID={a['id']} TIPS_TEAM_LAUNCH={a['launch']} {command}"
+        for e, a in record["agents"].items()
+        if e in missing and e not in running
+    ]
+    raise RuntimeError(
+        f"No retirement report yet from {', '.join(record['agents'][e]['name'] for e in missing)}."
+        f" Asked: {', '.join(n for n, _ in sends) or 'none'}; failed sends: "
+        f"{'; '.join(failed) or 'none'}. Not running, so the operator reports for them: "
+        f"{'; '.join(stopped) or 'none'}. Every resource stays reserved; run stop again after "
+        "the reports are posted."
+    )
+
+
+def retirement_paths(allocation: Allocation) -> tuple[Path, Path, Path, Path]:
+    """The allocation's directories, refused unless the record names its canonical
+    allocation and no path leaves the harness root or passes through a symlink."""
+    paths = allocation_paths(allocation["id"])
+    if Path(allocation["root"]) != paths[0]:
+        raise RuntimeError(
+            f"{allocation['name']}: recorded allocation {allocation['root']} is not "
+            f"{paths[0]}; preserved"
+        )
+    trusted = harness_root()
+    for directory in paths:
+        if directory.exists() or directory.is_symlink():
+            contained(directory, trusted)
+    return paths
+
+
+def verify_present(present: dict[str, Allocation]) -> None:
+    """Validate every recorded pane before stopping any client."""
+    for allocation in present.values():
+        root, live = pane_occupant(allocation["pane"])
+        if live:
+            agent = herdr("agent", "get", allocation["pane"])["agent"]
+            if agent.get("name") != allocation["name"] or root != Path(allocation["root"]):
+                raise RuntimeError(f"{allocation['pane']}: conflicting owner; preserved")
+
+
+def daemon_alive(project: Path) -> bool:
+    """Whether a Dexter daemon serves the project, by its process arguments."""
+    rows = run("ps", "-A", "-ww", "-o", "args=").splitlines()
+    return any(row.rstrip().endswith(f"dexter daemon {project}") for row in rows)
+
+
+def dexter_invocation(binary: str, root: Path, sources: str) -> tuple[list[str], dict[str, str]]:
+    """How to run Dexter for one project: its argv prefix and environment. bootstrap.py
+    writes this into the project's wrapper and stop runs it directly; keep both here."""
+    return [binary, "--root", str(root)], {"DEXTER_ELIXIR_LIB_ROOT": sources}
+
+
+def stop_daemon(project: Path, config: Path) -> None:
+    """Stop the project's Dexter daemon with the binary and sources its trusted bootstrap
+    configuration names, never the project's wrapper, and confirm that it exited."""
+    if not daemon_alive(project):
+        return
+    settings = object_fields(json.loads((config / "bootstrap.json").read_text()), "bootstrap")
+    argv, extra = dexter_invocation(str(settings["dexter"]), project, str(settings["sources"]))
+    result = execute(
+        [*argv, "stop"],
+        cwd=state_dir(),
+        env={**os.environ, **extra},
+        timeout=cfg["timeouts"]["dexter_startup_seconds"],
+        input_text="",
+    )
+    if result.returncode:
+        error = (result.stderr or result.stdout).strip()
+        raise RuntimeError(f"Dexter stop for {project} failed: {error}; the reservation is kept")
+    deadline = time.monotonic() + cfg["timeouts"]["shutdown_seconds"]
+    while daemon_alive(project):
+        if time.monotonic() >= deadline:
+            raise RuntimeError(f"Dexter still serves {project}; the reservation is kept")
+        time.sleep(0.1)
+
+
+def port_in_use(port: int) -> bool:
+    """Whether anything listens on the port; anything but a refused connection counts."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(1)
+        return probe.connect_ex(("127.0.0.1", port)) != errno.ECONNREFUSED
+
+
+def merged_brief(brief: str) -> bool:
+    """Whether GitHub reports the brief closed by a merged PR. stop holds the store lock, so
+    every read shares one timeouts.shell_seconds budget; a late answer keeps the record."""
+    seconds = cfg["timeouts"]["shell_seconds"]
+    deadline = time.monotonic() + seconds
+
+    def read(*args: str) -> object:
+        try:
+            return json.loads(run(*args, timeout=max(deadline - time.monotonic(), 0.01)))
+        except subprocess.TimeoutExpired as error:
+            raise RuntimeError(
+                f"GitHub did not answer within {seconds} s whether #{brief} is closed by a "
+                "merged PR; the record and reservation are kept"
+            ) from error
+
+    fields = "state,closedByPullRequestsReferences"
+    view = object_fields(read("gh", "issue", "view", brief, "--json", fields), brief)
+    if view.get("state") != "CLOSED":
+        return False
+    for pr in object_list(view.get("closedByPullRequestsReferences") or [], f"#{brief} PRs"):
+        state = read("gh", "pr", "view", str(pr.get("number")), "--json", "state")
+        if object_fields(state, "PR state").get("state") == "MERGED":
+            return True
+    return False
+
+
+def preservation_gap(record: Record, reports: Reports) -> str:
+    """Why the reports do not show the team's work preserved, or "": every client reported
+    a clean clone with nothing unpushed and, for a brief, a HEAD merged into origin/main. A
+    design team commits nothing, so it needs no merge."""
+    for allocation in record["agents"].values():
+        if never_launched(allocation):
+            continue
+        fields, url = reports[allocation["id"]]
+        if fields.get("clean") is not True or fields.get("unpushed") != 0:
+            return f"{allocation['name']} reported uncommitted or unpushed work: {url}"
+        if record["kind"] != "design" and fields.get("merged") is not True:
+            return f"{allocation['name']} reported a HEAD not merged into origin/main: {url}"
+    return ""
+
+
+def recorded_databases(name: str, suffixes: list[str]) -> bool:
+    """Whether the database is one of the recorded stems or a numbered partition of one."""
+    stems = [base + suffix for base in DATABASE_BASES for suffix in suffixes]
+    return any(re.fullmatch(re.escape(stem) + r"[0-9]*", name) for stem in stems)
+
+
+def drop_databases(suffixes: list[str]) -> list[str]:
+    """Drop exactly the recorded databases and their numbered partitions with the trusted
+    psql command: no FORCE, no project compose or configuration. The first refusal stops
+    the drop and keeps the reservation."""
+    psql = [*cfg["team"]["psql"], "-X", "-v", "ON_ERROR_STOP=1"]
+    timeout = cfg["timeouts"]["launch_seconds"]
+    listing = execute(
+        [*psql, "-Atc", "SELECT datname FROM pg_database"], cwd=state_dir(), timeout=timeout
+    )
+    if listing.returncode:
+        raise RuntimeError(f"psql could not list databases: {listing.stderr.strip()}; preserved")
+    dropped: list[str] = []
+    for db in listing.stdout.splitlines():
+        if recorded_databases(db, suffixes):
+            # Without FORCE, a remaining connection makes PostgreSQL refuse the drop.
+            statement = 'DROP DATABASE "' + db.replace('"', '""') + '"'
+            result = execute([*psql, "-c", statement], cwd=state_dir(), timeout=timeout)
+            if result.returncode:
+                raise RuntimeError(
+                    f"PostgreSQL refused to drop {db}: {result.stderr.strip()}. Dropped: "
+                    f"{', '.join(dropped) or 'none'}; the rest and the reservation are kept."
+                )
+            dropped.append(db)
+    return dropped
+
+
+def remove_if_empty(directory: Path) -> None:
+    """Remove an empty directory; one that holds anything stays."""
+    try:
+        directory.rmdir()
+    except FileNotFoundError:
+        pass
+    except OSError as error:
+        if error.errno not in (errno.ENOTEMPTY, errno.EEXIST):
+            raise
+
+
+def retain_files(record: Record, dropped: list[str], kept: str, reports: Reports) -> None:
+    """Remove only empty residue; record in each allocation's launcher configuration what it
+    leaves behind and why. Project files are never deleted."""
+    for allocation in record["agents"].values():
+        root, project, logs, config = retirement_paths(allocation)
+        for directory in (project, logs, root):
+            remove_if_empty(directory)
+        retained = [str(path) for path in (project, logs) if path.exists()]
+        own = [db for db in dropped if recorded_databases(db, [allocation["db_suffix"]])]
+        note = {
+            "id": allocation["id"],
+            "issue": record["brief"],
+            "retained": retained,
+            "reason": "project and log files are never deleted automatically",
+            "report": reports.get(allocation["id"], ({}, ""))[1],
+            "db_suffix": allocation["db_suffix"],
+            "databases_dropped": own,
+            "databases_kept_because": kept,
+        }
+        staged = config / "retired.json.tmp"
+        staged.write_text(json.dumps(note, indent=2, sort_keys=True) + "\n")
+        staged.replace(config / "retired.json")
+        for path in retained:
+            print(f"Retained {path}: {note['reason']}; see {config / 'retired.json'}")
+
+
+def list_retained() -> None:
+    """List each retired allocation that still has files, with why it was kept. Deletes
+    nothing: a writer outside the pane can outlive stop, so only the operator, having
+    established that the work is preserved and every writer has stopped, deletes an
+    allocation by its ID."""
+    found = False
+    for path in sorted(state_dir().glob("*/retired.json")):
+        note = object_fields(json.loads(path.read_text()), str(path))
+        root = allocation_paths(str(note.get("id")))[0]
+        if not root.exists():
+            continue
+        found = True
+        kept = note.get("databases_kept_because") or "dropped"
+        print(
+            f"{note.get('id')} (#{note.get('issue')}): {root}; files: {note.get('reason')}; "
+            f"databases {note.get('db_suffix')}: {kept}; report: {note.get('report') or 'none'}"
+        )
+    if not found:
+        print("No retained allocations")
 
 
 def stop_brief(brief: str) -> None:
-    """Remove a brief's resources only when its work is clean and merged."""
+    """Stop a team's recorded clients and Dexter daemons and release its slot.
+
+    A brief must be closed by a merged PR before any client is asked. Every client then
+    posts a retirement report from its current launch. Work that the reports do not show
+    preserved keeps everything: nothing is stopped and the record stays. Databases are
+    dropped only for merged work; project and log files are always retained. A conflict, a
+    failed stop or a busy port keeps the reservation, so stop can run again.
+    """
     with store_lock():
-        retire_brief(brief)
-
-
-def retire_brief(brief: str) -> None:
-    record = record_for(brief)
-    if record is None:
-        print(f"Brief {brief}: no allocation record; nothing removed")
-        return
-    live = {p["pane_id"] for p in live_panes(record["workspace"])}
-    present = {e: a for e, a in record["agents"].items() if a["pane"] in live}
-    require_only_recorded_panes(record)
-    roots = owned_worktrees(present)
-    pair = Path(record["worktree"])
-    if pair.is_dir():
-        roots.add(pair)
-    recorded = {Path(a["worktree"]) for a in record["agents"].values()}
-    roots |= {root for root in recorded if root.is_dir()}
-    check_shared_owners(roots, present)
-    if roots:
-        require_git_admin(main / ".git")
-        git("fetch", "origin")
-    check_worktrees(roots)
-    for allocation in present.values():
-        stop(allocation["pane"], pane_occupant(allocation["pane"])[0])
-    check_worktrees(roots)
-    check_shared_owners(roots, present)
-    # Rechecked at the close itself: a pane may have arrived during the shutdown.
-    if require_only_recorded_panes(record):
-        herdr("workspace", "close", record["workspace"])
-    retire(roots, [a["db_suffix"] for a in record["agents"].values()])
-    record_path(record["slot"]).unlink()
-    print(f"Brief {brief}: slot {record['slot']} retired; main checkout status follows")
-    print(git("status", "--short") or "Main checkout clean")
+        record = record_for(brief)
+        if record is None:
+            print(f"#{brief}: no allocation record; nothing removed")
+            return
+        # A brief still in progress is never interrupted: a wrong issue number asks no one.
+        if record["kind"] != "design" and not merged_brief(brief):
+            raise RuntimeError(
+                f"#{brief} is not closed by a merged PR. Nothing was asked or stopped; the "
+                "record, databases, files and reservation are kept. If the brief was closed "
+                "without a merged PR, the operator retires it by hand; until then the slot "
+                "stays taken: agent/teams/README.md#retire-a-brief-closed-without-a-merged-pr"
+            )
+        require_only_recorded_panes(record)
+        paths = [retirement_paths(a) for a in record["agents"].values()]
+        roots = [root for root, *_ in paths]
+        names = [a["name"] for a in record["agents"].values()]
+        refuse_foreign_owner(roots, names)
+        reports = retirement_reports(record)
+        present = {
+            e: a for e, a in record["agents"].items() if running_client(record, a) is not None
+        }
+        missing = [
+            e
+            for e, a in record["agents"].items()
+            if a["id"] not in reports and (e in present or not never_launched(a))
+        ]
+        if missing:
+            request_reports(record, missing, set(present))
+        gap = preservation_gap(record, reports)
+        if gap:
+            raise RuntimeError(
+                f"#{brief}: {gap}. Nothing was stopped; the record, databases, files and "
+                "reservation are kept. Preserve the work (commit, push and merge it), have the "
+                "client report again, then rerun stop."
+            )
+        verify_present(present)
+        for allocation in present.values():
+            stop(allocation["pane"], allocation["root"])
+        refuse_foreign_owner(roots, names)
+        # Rechecked at the close itself: a pane may have arrived during the shutdown.
+        if require_only_recorded_panes(record):
+            herdr("workspace", "close", record["workspace"])
+        for _, project, _, config in paths:
+            stop_daemon(project, config)
+        busy = [str(a["port"]) for a in record["agents"].values() if port_in_use(a["port"])]
+        if busy:
+            raise RuntimeError(f"Ports {', '.join(busy)} are in use; the reservation is kept")
+        kept = "a design team's databases are kept" if record["kind"] == "design" else ""
+        suffixes = [a["db_suffix"] for a in record["agents"].values()]
+        dropped = [] if kept else drop_databases(suffixes)
+        retain_files(record, dropped, kept, reports)
+        record_path(record["slot"]).unlink()
+    summary = f"databases dropped: {', '.join(dropped) or 'none'}"
+    if kept:
+        summary += f"; databases {', '.join(suffixes)} kept: {kept}"
+    print(f"#{brief}: slot {record['slot']} released; {summary}")
 
 
 def require_only_recorded_panes(record: Record) -> bool:
@@ -1825,112 +2271,9 @@ def require_only_recorded_panes(record: Record) -> bool:
     strangers = [p["pane_id"] for p in panes if p["pane_id"] not in recorded]
     if strangers:
         raise RuntimeError(
-            f"Workspace of brief #{record['brief']} holds other panes {strangers}; preserved"
+            f"Workspace of #{record['brief']} holds other panes {strangers}; preserved"
         )
     return bool(panes)
-
-
-def retire(roots: set[Path], suffixes: list[str]) -> None:
-    """Stop each worktree's daemon, drop the slot's databases, remove worktrees and branches."""
-    for root in sorted(roots):
-        wrapper = root / ".dexter/dexter.sh"
-        if wrapper.is_file():
-            result = execute(
-                ["/bin/sh", wrapper, "stop"],
-                timeout=cfg["timeouts"]["dexter_startup_seconds"],
-                input_text="",
-            )
-            if result.returncode:
-                raise RuntimeError(result.stderr or result.stdout)
-    drop_databases(suffixes)
-    for root in sorted(roots):
-        branch = git("branch", "--show-current", root=root)
-        git("worktree", "remove", root)
-        # check_worktrees proved the branch merged into fetched origin/main; -d would
-        # compare against the main checkout's own, possibly stale, branch.
-        if branch.startswith("task/"):
-            git("branch", "-D", branch)
-
-
-def check_shared_owners(roots: set[Path], present: dict[str, Allocation]) -> None:
-    """Do not remove a worktree used by an agent outside this slot."""
-    owned_panes = {allocation["pane"] for allocation in present.values()}
-    for agent in herdr("agent", "list")["agents"]:
-        pane = agent["pane_id"]
-        if pane not in owned_panes and pane_occupant(pane)[0] in roots:
-            raise RuntimeError(f"Worktree still shared with {agent.get('name') or pane}; preserved")
-
-
-def owned_worktrees(present: dict[str, Allocation]) -> set[Path]:
-    roots: set[Path] = set()
-    # Validate every pane before stopping any client.
-    for allocation in present.values():
-        pane = allocation["pane"]
-        root = pane_occupant(pane)[0]
-        if root != main and (
-            root.parent != main / ".worktrees"
-            or Path(
-                git("rev-parse", "--path-format=absolute", "--git-common-dir", root=root)
-            ).resolve()
-            != main / ".git"
-        ):
-            raise RuntimeError(f"{pane}: unexpected worktree {root}; preserved")
-        if pane_occupant(pane)[1]:
-            agent = herdr("agent", "get", pane)["agent"]
-            if agent.get("name") != allocation["name"]:
-                raise RuntimeError(f"{pane}: conflicting owner; preserved")
-        if root != main:
-            roots.add(root)
-    return roots
-
-
-def check_worktrees(roots: set[Path]) -> None:
-    for root in sorted(roots):
-        if git("status", "--porcelain", "--untracked-files=all", root=root):
-            raise RuntimeError(f"Dirty worktree {root}; remaining resources preserved")
-        # Merged HEAD also proves all local commits reached origin/main.
-        try:
-            git("merge-base", "--is-ancestor", "HEAD", "origin/main", root=root)
-        except RuntimeError as error:
-            raise RuntimeError(
-                f"Unmerged worktree {root}; remaining resources preserved"
-            ) from error
-
-
-PSQL = (
-    "docker",
-    "compose",
-    "exec",
-    "-T",
-    "db",
-    "psql",
-    "-U",
-    "postgres",
-    "-d",
-    "postgres",
-    "-v",
-    "ON_ERROR_STOP=1",
-)
-
-
-def allocated_databases(suffixes: list[str]) -> list[str]:
-    """The test and dev databases, and their numbered partitions, of these suffixes."""
-    stems = [base + suffix for base in ("tips_test", "tips_dev") for suffix in suffixes]
-    seconds = cfg["timeouts"]["shell_seconds"]
-    query = (*PSQL, "-Atc", "SELECT datname FROM pg_database")
-    databases = run(*query, cwd=main, timeout=seconds).splitlines()
-    return [
-        db
-        for db in databases
-        if any(re.fullmatch(re.escape(stem) + r"[0-9]*", db) for stem in stems)
-    ]
-
-
-def drop_databases(suffixes: list[str]) -> None:
-    for db in allocated_databases(suffixes):
-        # Do not use FORCE: an unexpected remaining connection blocks deletion.
-        drop = (*PSQL, "-c", 'DROP DATABASE "' + db.replace('"', '""') + '"')
-        run(*drop, cwd=main, timeout=cfg["timeouts"]["shell_seconds"])
 
 
 def configure() -> None:
@@ -1953,9 +2296,13 @@ def cli() -> None:
     configure()
     args = sys.argv[1:]
     usage = (
-        "Usage: agent/teams/team.py start <brief> | turn <pr> <entry> | "
-        "review <pr> <entry> | reset <brief> <entry> | stop <brief>"
+        "Usage: agent/teams/team.py start <brief> | design <spec> <entry> | "
+        "turn <pr> <entry> | review <pr> <entry> | reset <issue> <entry> | stop <issue> | "
+        "clean"
     )
+    if args == ["clean"]:
+        list_retained()
+        return
     if len(args) < 2 or not args[1].isdecimal():
         raise RuntimeError(usage)
     named = len(args) == 3 and re.fullmatch(ENTRY, args[2]) is not None
@@ -1965,6 +2312,8 @@ def cli() -> None:
         stop_brief(args[1])
     elif args[0] == "turn" and named:
         turn(args[1], args[2])
+    elif args[0] == "design" and named:
+        design(args[1], args[2])
     elif args[0] == "review" and named:
         review(args[1], args[2])
     elif args[0] == "reset" and named:

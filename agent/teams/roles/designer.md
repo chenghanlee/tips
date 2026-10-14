@@ -9,8 +9,8 @@ persona.
 1. [Common rules](common.md).
 2. [design-software](../../skills/design-software/SKILL.md): exploration, brief format,
    the required rules, test budgets, critique.
-3. The feature's issue on Project 15, the design sections the [design index](../../../docs/design/README.md) names, and the affected code in the shared
-   read-only worktree.
+3. The feature's issue on Project 15, the design sections the [design index](../../../docs/design/README.md) names, and the affected code in your own
+   clone. Make no source changes there.
 
 ## Steps: lead
 
@@ -49,14 +49,14 @@ persona.
 
 ## Steps: reviewing designer
 
-1. The dispatcher launches you with `team.py review <pr> <entry>` in a worktree checked
-   out at the PR head.
+1. The dispatcher launches you with `team.py review <pr> <entry>` in your own
+   allocation. Run the `bootstrap.py --commit <head>` command your brief names.
 2. Read the brief, then the diff, then the [PR body](../README.md#pr-body). Follow
    [review-software-design](../../skills/review-software-design/SKILL.md).
 3. Submit the [review record](../README.md#pr-review-record). Resolve only your own
    threads. Send the review URL to the merge-confirming tester.
-4. When notified of a new head, fetch it. Check it out detached. Reindex. Review the
-   changes since your last review.
+4. When notified of a new head, run the `bootstrap.py --commit <head>` command the notice
+   names. Review the changes since your last review.
 
 ## Messages you send
 
