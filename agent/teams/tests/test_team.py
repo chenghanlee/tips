@@ -2041,7 +2041,27 @@ class RetirementTest(Harness):
         refused = self.team("stop", "29", ok=False)
         assert "team-1-tester reported uncommitted or unpushed work" in refused.stderr
 
+    def test_an_open_brief_is_refused_before_any_client_is_asked(self) -> None:
+        self.databases("tips_test_t1g1i")
+        project = self.project("team-1-impl")
+        (project / "unfinished.txt").write_text("in progress\n")
+        refused = self.team("stop", "29", ok=False).stderr
+        assert "#29 is not closed by a merged PR. Nothing was asked or stopped" in refused
+        assert not any(p.startswith("Retire") for p in self.latest_prompts().values())
+        assert self.workspaces() == ["team-1-29"]
+        # Clean reports with HEAD on origin/main are not enough while the brief is open.
+        (project / "unfinished.txt").unlink()
+        head = self.push("team-1-impl")
+        self.git("--git-dir", self.origin, "update-ref", "refs/heads/main", head)
+        self.retire("team-1-impl", "team-1-tester")
+        self.clients_exit(1)
+        refused = self.team("stop", "29", ok=False).stderr
+        assert "#29 is not closed by a merged PR" in refused
+        assert self.remaining_databases() == ["tips_test_t1g1i"]
+        assert self.recorded_briefs() == {"29"}
+
     def test_unpreserved_work_keeps_the_record_and_every_reservation(self) -> None:
+        self.merged_pair()
         self.databases("tips_test_t1g1i", "tips_test_t1g1r")
         project = self.project("team-1-impl")
         (project / "uncommitted").write_text("keep")
@@ -2062,8 +2082,14 @@ class RetirementTest(Harness):
         assert self.git("log", "-1", "--format=%s", cwd=project) == "local only"
         self.team("start", "30")
         assert self.record(2)["brief"] == "30"
-        # Once the work is pushed and merged and reported again, the brief retires.
-        self.merge(self.push("team-1-impl", "pushed"))
+        # A pushed HEAD that is not merged into origin/main is kept the same way.
+        head = self.push("team-1-impl", "pushed")
+        self.retire("team-1-impl")
+        refused = self.team("stop", "29", ok=False).stderr
+        assert "team-1-impl reported a HEAD not merged into origin/main" in refused
+        assert self.remaining_databases() == ["tips_test_t1g1i", "tips_test_t1g1r"]
+        # Once the work is merged and reported again, the brief retires.
+        self.merge(head)
         self.retire("team-1-impl")
         self.team("stop", "29")
         assert self.recorded_briefs() == {"30"}
@@ -2162,11 +2188,13 @@ class RetirementTest(Harness):
         record["agents"]["impl"]["root"] = str(old)
         path.write_text(json.dumps(record))
         self.clients_exit(1)
+        self.update(closed_by={"29": ["7"]}, merged=["7"])
         refused = self.team("stop", "29", ok=False)
         assert f"recorded allocation {old} is not" in refused.stderr
         assert (old / "project/tracked.txt").exists()
 
     def test_symlinked_allocation_paths_are_refused_at_retirement(self) -> None:
+        self.merged_pair()
         self.retire("team-1-impl", "team-1-tester")
         self.clients_exit(1)
         logs = self.trusted / "allocations/g1-impl/logs"

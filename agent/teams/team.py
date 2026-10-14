@@ -2084,19 +2084,15 @@ def merged_brief(brief: str) -> bool:
 
 
 def preservation_gap(record: Record, reports: Reports) -> str:
-    """Why the team's work is not shown preserved, or "": every client reported a clean
-    clone with nothing unpushed and, for a brief, a HEAD merged into origin/main, and the
-    brief is closed by a merged PR. A design team commits nothing, so it needs no merge."""
+    """Why the reports do not show the team's work preserved, or "": every client reported
+    a clean clone with nothing unpushed and, for a brief, a HEAD merged into origin/main. A
+    design team commits nothing, so it needs no merge."""
     for allocation in record["agents"].values():
         fields, url = reports[allocation["id"]]
         if fields.get("clean") is not True or fields.get("unpushed") != 0:
             return f"{allocation['name']} reported uncommitted or unpushed work: {url}"
         if record["kind"] != "design" and fields.get("merged") is not True:
             return f"{allocation['name']} reported a HEAD not merged into origin/main: {url}"
-    if record["kind"] == "design":
-        return ""
-    if not merged_brief(record["brief"]):
-        return f"brief #{record['brief']} is not closed by a merged PR"
     return ""
 
 
@@ -2193,9 +2189,9 @@ def list_retained() -> None:
 def stop_brief(brief: str) -> None:
     """Stop a team's recorded clients and Dexter daemons and release its slot.
 
-    Every client first posts a retirement report from its current launch. Work that the
-    reports and GitHub do not show preserved keeps everything: nothing is stopped and the
-    record stays. Databases are dropped only for merged work; project and log files are
+    A brief must be closed by a merged PR before any client is asked. Every client then
+    posts a retirement report from its current launch. Work that the reports do not show
+    preserved keeps everything: nothing is stopped and the record stays. Databases are dropped only for merged work; project and log files are
     always retained. A conflict, a failed stop or a busy port keeps the reservation, so
     stop can run again.
     """
@@ -2204,6 +2200,12 @@ def stop_brief(brief: str) -> None:
         if record is None:
             print(f"#{brief}: no allocation record; nothing removed")
             return
+        # A brief still in progress is never interrupted: a wrong issue number asks no one.
+        if record["kind"] != "design" and not merged_brief(brief):
+            raise RuntimeError(
+                f"#{brief} is not closed by a merged PR. Nothing was asked or stopped; the "
+                "record, databases, files and reservation are kept."
+            )
         require_only_recorded_panes(record)
         paths = [retirement_paths(a) for a in record["agents"].values()]
         roots = [root for root, *_ in paths]

@@ -117,17 +117,17 @@ rejects changes to the implementer or merge-confirming tester.
 
 ### Retirement
 
-`team.py stop <issue>` first needs a retirement report from every client of the team,
-from its current launch; a report from an earlier launch does not count. Until each has
-one, it changes nothing: it asks each running client to run `retirement.py`, prints the
-command the operator runs for a stopped client, and keeps every resource reserved. With
-every report, it:
+`team.py stop <issue>` for a brief first refuses, asking no client and changing nothing,
+unless GitHub shows the brief closed by a merged PR within `timeouts.shell_seconds`. It
+then needs a retirement report from every client of the team, from its current launch; a
+report from an earlier launch does not count. Until each has one, it changes nothing: it
+asks each running client to run `retirement.py`, prints the command the operator runs
+for a stopped client, and keeps every resource reserved. With every report, it:
 
 1. Refuses, stopping nothing and keeping the record, databases, files and reservation,
    unless every report shows a clean clone with no unpushed commits and, for a brief,
-   HEAD merged into `origin/main`, and GitHub shows the brief closed by a merged PR
-   within `timeouts.shell_seconds`. Preserve the work, have the client report again,
-   then rerun stop.
+   HEAD merged into `origin/main`. Preserve the work, have the client report again, then
+   rerun stop.
 2. Refuses a pane in the workspace that the record does not name, and another client in
    an allocation.
 3. Stops the recorded clients and closes the workspace.
