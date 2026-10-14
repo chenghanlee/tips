@@ -1463,8 +1463,8 @@ def reconcile(record: Record, allocation: Allocation) -> Entity | None:
             f"{name} is not running and its task submission is {state}. It may have done the "
             "task before it exited, so nothing was launched or resent; only the operator "
             "decides whether to replay it: after checking its work on the brief and PR, the "
-            f"operator runs python3 {harness() / 'team.py'} reset {record['brief']} {allocation['entry']}, "
-            "then reruns this command."
+            f"operator runs python3 {harness() / 'team.py'} reset {record['brief']} "
+            f"{allocation['entry']}, then reruns this command."
         )
     return agent
 
@@ -1484,8 +1484,9 @@ def adopt(record: Record, allocation: Allocation, agent: Entity) -> None:
     print(
         f"{name}: task submission is {allocation['submission']}; nothing was resent. Only the "
         f"operator decides whether to replay it: if {allocation['pane']} shows that the client "
-        "never got its task, the operator exits the client, runs python3 {harness() / 'team.py'} reset "
-        f"{record['brief']} {allocation['entry']} and reruns this command."
+        "never got its task, the operator exits the client, runs "
+        f"python3 {harness() / 'team.py'} reset {record['brief']} {allocation['entry']} and "
+        "reruns this command."
     )
 
 

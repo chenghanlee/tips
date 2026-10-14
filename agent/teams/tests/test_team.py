@@ -2127,6 +2127,7 @@ class LaunchRecoveryTest(Harness):
         assert self.record(1)["agents"]["tester"]["submission"] == "unknown"
         rerun = self.team("start", "29").stdout
         assert "team-1-tester: task submission is unknown; nothing was resent" in rerun
+        assert f"python3 {self.repo / 'agent/teams/team.py'} reset 29 tester and" in rerun
         assert self.starts() == ["team-1-impl", "team-1-tester"]
         assert not self.prompts("team-1-tester")
         tester = self.record(1)["agents"]["tester"]
