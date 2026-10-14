@@ -57,6 +57,11 @@ class ClaimRootTest(unittest.TestCase):
             "db_suffix": "a",
             "port": 4100,
         }
+        # The installed layout: <root>/harness links to the release.
+        release = root / "releases/r1/agent/teams"
+        release.mkdir(parents=True)
+        (release / "config.toml").write_text("")
+        (root / "harness").symlink_to("releases/r1", target_is_directory=True)
         settings = {"team": {"postgres_port": 5432}, "timeouts": {"checks_minutes": 30}}
         environ = {k: v for k, v in os.environ.items() if k != "TIPS_TEAM_CONFIG"}
         with (
@@ -67,7 +72,9 @@ class ClaimRootTest(unittest.TestCase):
             mock.patch.object(team, "main", self.checkout, create=True),
             mock.patch.object(team, "cfg", settings, create=True),
         ):
+            # The stable link path, not the release it resolves to today.
             config = root / "harness/agent/teams/config.toml"
+            assert config.resolve() == (release / "config.toml").resolve()
             assert team.config_location() == (self.checkout, config)
             env = team.agent_env(cast(team.Allocation, allocation))
             assert env["TIPS_TEAM_CONFIG"] == str(config)
