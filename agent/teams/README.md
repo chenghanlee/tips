@@ -162,14 +162,18 @@ stays taken until the operator retires it by hand. While no `team.py` command ru
 
 1. Have each client push or record what should be kept, exit it, and close the team's
    workspace (`herdr workspace close <workspace>` from `state/<slot>.json`).
-2. Stop each clone's Dexter daemon: `<root>/allocations/<id>/project/.dexter/dexter.sh
-   stop`, where the wrapper exists.
+2. Stop each clone's Dexter daemon with the binary and sources that
+   `<root>/state/<id>/bootstrap.json` names, never the clone's own wrapper:
+   `DEXTER_ELIXIR_LIB_ROOT=<sources> <dexter> --root <root>/allocations/<id>/project stop`.
 3. For each allocation in the record, write `<root>/state/<id>/retired.json`:
    `{"id": "<id>", "issue": "<issue>", "db_suffix": "<db_suffix>", "reason": "brief
    closed without a merged PR", "databases_kept_because": "brief closed without a merged
    PR"}`. `clean` then lists it, and a later `start` of the issue no longer reports it as
    an earlier launch.
-4. Rename `<root>/state/<slot>.json` to `<root>/state/<slot>.closed`. This frees the
+4. Confirm that `herdr agent list` shows no `team-<slot>-*` client and `herdr workspace
+   list` shows no `team-<slot>-<issue>` workspace. A surviving client would share its name
+   with the next team's client in the slot.
+5. Rename `<root>/state/<slot>.json` to `<root>/state/<slot>.closed`. This frees the
    slot; files and databases stay.
 
 ## Turns
