@@ -1057,6 +1057,9 @@ def allocate(record: Record, entry: str, role: str) -> Allocation:
     ident = f"g{generation}-{entry}"
     root = harness_root()
     for directory in allocation_paths(ident):
+        # Checked before creation too: a symlinked parent would put the new directory
+        # outside the root before the check after it could refuse.
+        contained(directory, root)
         directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         contained(directory, root)
     allocation = Allocation(
