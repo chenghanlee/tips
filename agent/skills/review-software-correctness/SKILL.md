@@ -60,9 +60,14 @@ Include indirect effects:
 - A shared fixture or factory change affects every test that uses it.
 - A config change affects every environment that reads it.
 - A changed error tuple affects every caller that matches on it.
+- An added, cached, moved or removed fact affects each path that constructs, updates,
+  reads, resets or removes it, and each late callback
+  ([implement-software](../implement-software/SKILL.md#trace-the-affected-contract)).
+  Find them yourself before comparing with the PR body's list.
 
-Write the list in the review body under `Affected code`. If the list is empty, state how
-you checked that nothing else is affected.
+Write the list in the review body under `Affected code`. For a changed fact, name the
+paths you checked. If the list is empty, state how you checked that nothing else is
+affected.
 
 ## Step 3: Scenarios
 
@@ -78,6 +83,10 @@ Rules:
   tests can agree and both be wrong.
 - Run the test. Read its assertion. The test proves the scenario only if its setup
   reached the condition and its assertion fails for a plausible defect.
+- For a row the brief marks `Masking risk:`, reproduce the implementer's control from
+  the PR body: apply it, run the test, confirm it fails at the named assertion, then
+  revert. The row is unproven if the control is missing, the test still passes, or it
+  fails for another reason, such as setup, compilation or an unrelated crash.
 - A double may replace an external call. The production code responsible for the claim
   must still run.
 - Do not treat a sleep as proof or a timeout as a pass.
@@ -189,9 +198,12 @@ Review body, in this order:
 1. Head SHA.
 2. `Affected code`: the list from step 2.
 3. `Scenarios`: the table from step 3.
-4. `Mutation`: what you broke and whether the test failed.
+4. `Mutation`: what you broke and whether the test failed, and each control you
+   reproduced.
 5. `Ran`: the commands and checks you ran, with results.
-6. `Not run`: what you did not run and why, and any step marked not applicable.
+6. `Not run`: what you did not run and why, and any step marked not applicable. For a
+   required check, link the [substitution or waiver](../../teams/roles/common.md#authority)
+   that removed it.
 7. Findings outside the diff, each with `path:line`.
 
 "No findings" is valid when every scenario is proven and every step above is recorded.

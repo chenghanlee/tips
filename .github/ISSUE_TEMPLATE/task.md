@@ -13,6 +13,7 @@ One result that fits in one PR. State what is included and excluded.
 
 - [ ] Required behaviour:
 - [ ] Failure behaviour and affected callers:
+- [ ] Masking risk, if any: the scenario, and the defect its passing test could hide:
 
 ## Design links
 

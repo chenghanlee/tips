@@ -56,6 +56,11 @@ Name the mechanism and its replacement. State the current cost and the cost of t
 replacement in the finding. Name who does any work transferred by the replacement. Do
 not infer simplicity from fewer lines alone.
 
+When the change caches a derived fact or adds state that several paths must keep
+current, check whether removing the copy or giving it one writer would satisfy the
+contract. A replacement keeps the timer rule in
+[Trace the affected contract](../implement-software/SKILL.md#trace-the-affected-contract).
+
 ## Step 5: Code and architecture smells
 
 Check the diff for code smells and software architecture smells. Report a smell only
