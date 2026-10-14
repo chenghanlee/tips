@@ -427,8 +427,8 @@ if state.get('mix_fails'):
 Path('deps').mkdir(exist_ok=True)
 """
 
-# Issues, PRs, comments and the project live in the fixture state. Each posted comment
-# gets the next id and a time one minute after the previous one.
+# Issues, PRs, comments, reviews and required checks live in the fixture state. Each posted
+# comment gets the next id and a time one minute after the previous one.
 FAKE_GH = r"""#!/usr/bin/env python3
 import datetime, json, os, sys
 from pathlib import Path
@@ -437,35 +437,83 @@ s = json.loads(path.read_text())
 a = sys.argv[1:]
 s.setdefault("events", []).append(["gh", *a])
 comments = s.setdefault("comments", {})
+out, code = "", 0
+PASSING = [
+    {"name": "checks", "workflow": "CI", "bucket": "pass", "link": "https://ci/1"},
+    {"name": "release", "workflow": "CI", "bucket": "pass", "link": "https://ci/1"},
+]
 if a[:2] == ["issue", "view"]:
     body = s.get("issues", {}).get(a[2], "")
     view = {"body": body, "url": "https://github.com/o/r/issues/" + a[2]}
-    print(json.dumps({key: view[key] for key in a[a.index("--json") + 1].split(",")}))
+    out = json.dumps({key: view[key] for key in a[a.index("--json") + 1].split(",")})
 elif a[:2] == ["issue", "comment"]:
     if s.get("comments_fail"):
-        sys.exit("fixture GitHub refused the comment")
-    n = sum(len(c) for c in comments.values()) + 1
-    at = datetime.datetime(2026, 10, 12, 10, n, tzinfo=datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    url = "https://github.com/o/r/issues/%s#issuecomment-%d" % (a[2], n)
-    comments.setdefault(a[2], []).append(
-        {"id": n, "html_url": url, "body": sys.stdin.read(), "created_at": at}
-    )
-    print(url)
+        out, code = "fixture GitHub refused the comment", 1
+    else:
+        n = sum(len(c) for c in comments.values()) + 1
+        at = datetime.datetime(2026, 10, 12, 10, n % 60, tzinfo=datetime.UTC)
+        url = "https://github.com/o/r/issues/%s#issuecomment-%d" % (a[2], n)
+        comments.setdefault(a[2], []).append(
+            {
+                "id": n,
+                "html_url": url,
+                "body": sys.stdin.read(),
+                "created_at": at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            }
+        )
+        out = url
 elif a[:2] == ["pr", "view"]:
     briefs = [{"number": int(n)} for n in s.get("pr_briefs", {}).get(a[2], [])]
     view = {
         "headRefOid": s.get("pr_head", ""),
+        "baseRefOid": s.get("pr_base", "b" * 40),
+        "baseRefName": "main",
+        "mergeable": s.get("pr_mergeable", "MERGEABLE"),
         "url": "https://github.com/o/r/pull/" + a[2],
         "closingIssuesReferences": briefs,
     }
-    print(json.dumps({key: view[key] for key in a[a.index("--json") + 1].split(",")}))
+    out = json.dumps({key: view[key] for key in a[a.index("--json") + 1].split(",")})
+elif a[:2] == ["pr", "checks"]:
+    # The head can move, or another observer can post, while a reader is between its
+    # first and last view.
+    if "head_after_checks" in s:
+        s["pr_head"] = s.pop("head_after_checks")
+    posts = s.pop("post_on_checks", [])
+    for body in [posts] if isinstance(posts, str) else posts:
+        n = sum(len(c) for c in comments.values()) + 1
+        url = "https://github.com/o/r/issues/%s#issuecomment-%d" % (a[2], n)
+        comments.setdefault(a[2], []).append({"id": n, "html_url": url, "body": body})
+    rows = s.get("checks", PASSING)
+    buckets = {row["bucket"] for row in rows}
+    if s.get("checks_error"):
+        out, code = s["checks_error"], 1
+    elif not rows:
+        out, code = "no checks reported on the 'task/29' branch", 1
+    else:
+        out = json.dumps(rows)
+        code = 1 if buckets & {"fail", "cancel"} else 8 if "pending" in buckets else 0
+elif a[:2] == ["api", "graphql"]:
+    query = next(x for x in a if x.startswith("query="))
+    name = "reviewThreads" if "reviewThreads" in query else "reviews"
+    page = {"pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": s.get(name, [])}
+    out = json.dumps({"data": {"repository": {"pullRequest": {name: page}}}})
 elif a[:2] == ["repo", "view"]:
-    print(json.dumps({"nameWithOwner": "o/r"}))
-elif a[:3] == ["api", "--paginate", "--slurp"]:
-    print(json.dumps([comments.get(a[3].rsplit("/", 2)[1], [])]))
+    out = json.dumps({"nameWithOwner": "o/r"})
+elif a[0] == "api" and "/rules/branches/" in a[1]:
+    required = [{"context": name} for name in s.get("required", ["checks", "release"])]
+    rule = {"type": "required_status_checks", "parameters": {"required_status_checks": required}}
+    out = json.dumps([{"type": "deletion"}, *([rule] if required else [])])
+elif a[0] == "api" and "/comments?" in a[1] and s.get("history_fails"):
+    out, code = "fixture comment-history unavailable", 1
+elif a[0] == "api" and "/comments?" in a[1]:
+    issue = a[1].split("/issues/")[1].split("/")[0]
+    page = int(a[1].rsplit("page=", 1)[1])
+    out = json.dumps(comments.get(issue, [])[(page - 1) * 100 : page * 100])
 else:
-    sys.exit("Unexpected gh call: " + repr(a))
+    out, code = "Unexpected gh call: " + repr(a), 1
 path.write_text(json.dumps(s))
+print(out, file=sys.stderr if code == 1 and not out.startswith("[") else sys.stdout)
+sys.exit(code)
 """
 
 # One pane model for every pair: a pane with an agent has a client leading its foreground
@@ -607,7 +655,12 @@ elif a[:2] == ["agent", "start"]:
         x["cwd"] = s["wrong_start_root"]
     result = {"agent": x}
 elif a[:2] == ["agent", "prompt"]:
-    pane(a[2])
+    # Only a running client accepts a prompt; the dispatcher runs outside the fixture.
+    if a[2] == "dispatcher":
+        if s.get("dispatcher_down"):
+            finish("agent_not_found: dispatcher")
+    elif not pane(a[2]).get("agent"):
+        finish("agent_not_found: " + a[2])
 elif a[:2] == ["agent", "rename"]:
     pane(a[2]).pop("name", None)
 else:
@@ -694,7 +747,7 @@ class Harness(unittest.TestCase):
             ".codex/\n.agents/\n.dexter/\n.worktrees/\nagent/lsp/dexter/vendor/\n"
             "agent/teams/allocations/\ndeps/\ntmp/\n"
         )
-        for script in ("team.py", "board.py"):
+        for script in ("team.py", "board.py", "pr_review.py"):
             (self.repo / "agent/teams" / script).write_text((SCRIPT.parent / script).read_text())
         (self.repo / "agent/teams/config.toml").write_text(CONFIG)
         (self.repo / "tracked.txt").write_text("base\n")
@@ -1240,7 +1293,11 @@ class PairLifecycleTest(Harness):
         wait_until_stopped(wt)
         assert not wt.exists()
 
-    def test_turn_to_tester_needs_the_clean_pushed_head_then_rings_with_it(self) -> None:
+    def prompts(self) -> dict[str, str]:
+        """The latest prompt each recipient received."""
+        return {e[2]: e[3] for e in self.events("agent", "prompt")}
+
+    def test_turn_to_reviewers_needs_the_pushed_head_and_notifies_every_reviewer(self) -> None:
         self.team("start", "29")
         wt, impl = self.worktree("29"), self.pane("team-1-impl")["pane_id"]
         pushed = self.push(wt)
@@ -1255,24 +1312,38 @@ class PairLifecycleTest(Harness):
         assert len(self.events("agent", "prompt")) == prompts
         self.update(pr_head=pushed)
         self.team("turn", "7", "tester", cwd=wt, pane=impl)
-        assert len(self.events("agent", "prompt")) == prompts + 1
-        ring = self.events("agent", "prompt")[-1]
-        assert ring[2] == "team-1-tester"
-        assert "https://github.com/o/r/pull/7" in ring[3]
-        assert pushed in ring[3]
-        assert "agent/skills/review-software-correctness/SKILL.md from this worktree" in ring[3]
-        assert "Put tester, <session> on line 2" in ring[3]
-        assert "team.py turn 7 impl" in ring[3]
-        # The tester asks the dispatcher for reviewers that are not launched, then reviews.
-        assert "herdr agent prompt dispatcher" in ring[3]
-        assert "agent/teams/team.py review 7 critic" in ring[3]
-        assert "critic (team-1-critic)" in ring[3]
-        assert "When every required reviewer's latest review of this head is LGTM" in ring[3]
-        assert "all threads are resolved and required checks pass" in ring[3]
-        # Once the reviewer is launched, the handoff no longer asks for it.
+        # The critic is not launched: the handoff asks the dispatcher and records the notice.
+        sent = self.events("agent", "prompt")[prompts:]
+        assert [e[2] for e in sent] == ["team-1-tester", "dispatcher"]
+        ring = sent[0][3]
+        assert "https://github.com/o/r/pull/7" in ring
+        assert pushed in ring
+        assert "agent/skills/review-software-correctness/SKILL.md from this worktree" in ring
+        assert "Put tester, <session> on line 2" in ring
+        assert "team.py turn 7 impl; do not wait for the other reviews" in ring
+        assert "asked the dispatcher to launch critic" in ring
+        assert "pr_review.py observe 7 reports ready to merge" in ring
+        assert "After your LGTM" not in ring
+        assert sent[1][3] == (
+            "https://github.com/o/r/pull/7 review: run agent/teams/team.py review 7 critic"
+        )
+        assert self.comments("7")[-1]["body"] == (
+            "EVENT implementer team-1-impl session-team-1-impl\n"
+            f"pending review of {pushed} by critic: not launched; "
+            "launch requested from the dispatcher"
+        )
+        # A new head reaches the tester and the launched critic in the same handoff,
+        # before either has reviewed.
         self.team("review", "7", "critic")
+        moved = self.push(wt, "second push")
+        prompts = len(self.events("agent", "prompt"))
         self.team("turn", "7", "tester", cwd=wt, pane=impl)
-        assert "review: run" not in self.events("agent", "prompt")[-1][3]
+        sent = self.events("agent", "prompt")[prompts:]
+        assert [e[2] for e in sent] == ["team-1-tester", "team-1-critic"]
+        assert all(moved in e[3] for e in sent)
+        assert f"git checkout --detach {moved}" in sent[1][3]
+        assert "herdr agent prompt team-1-tester" in sent[1][3]
+        assert "asked the dispatcher" not in sent[0][3]
         # The brief cannot move the merge-confirming tester under a running pair.
         prompts = len(self.events("agent", "prompt"))
         body = "Implementer: impl\nRequired reviews: second, critic\n"
@@ -1280,27 +1351,91 @@ class PairLifecycleTest(Harness):
         refused = self.team("turn", "7", "tester", cwd=wt, pane=impl, ok=False)
         assert "changed its implementer or merge-confirming tester" in refused.stderr
         assert len(self.events("agent", "prompt")) == prompts
-        self.update(issues={**self.state()["issues"], "29": BRIEF})
-        # A brief with one reviewer merges on the tester's own LGTM.
-        self.team("start", "31")
-        wt31, impl31 = self.worktree("31"), self.pane("team-2-impl")["pane_id"]
-        self.push(wt31, pr="8", brief="31")
-        self.team("turn", "8", "tester", cwd=wt31, pane=impl31)
-        ring = self.events("agent", "prompt")[-1]
-        assert ring[2] == "team-2-tester"
-        assert "When your LGTM is the only required review" in ring[3]
-        assert "all threads are resolved and required checks pass" in ring[3]
-        assert "latest review of this head" not in ring[3]
-        assert "review: run" not in ring[3]
+
+    def test_absent_reviewer_and_failed_sends_are_reported_after_every_send(self) -> None:
+        self.team("start", "30")
+        wt, impl = self.worktree("30"), self.pane("team-1-impl")["pane_id"]
+        self.push(wt, pr="8", brief="30")
+        self.team("review", "8", "critic")
+        # The critic's client exited and the dispatcher is gone: both sends fail, the
+        # tester is still notified and the pending notice for second is recorded.
+        state = self.state()
+        critic = next(x for x in state["panes"] if x.get("label") == "team-1-critic")
+        critic.pop("agent")
+        state["dispatcher_down"] = True
+        self.save(state)
+        prompts = len(self.events("agent", "prompt"))
+        refused = self.team("turn", "8", "tester", cwd=wt, pane=impl, ok=False)
+        assert [e[2] for e in self.events("agent", "prompt")[prompts:]] == [
+            "team-1-tester",
+            "team-1-critic",
+            "dispatcher",
+        ]
+        assert "Notified team-1-tester" in refused.stdout
+        assert "Handoff incomplete; failed sends: team-1-critic: agent_not_found" in refused.stderr
+        assert "dispatcher: agent_not_found: dispatcher" in refused.stderr
+        assert "pending review of" in self.comments("8")[-1]["body"]
+        assert "by second: not launched" in self.comments("8")[-1]["body"]
+
+    def test_known_merge_conflict_blocks_review_handoff_until_resolved(self) -> None:
+        self.team("start", "29")
+        wt, impl = self.worktree("29"), self.pane("team-1-impl")["pane_id"]
+        head = self.push(wt)
+        self.team("review", "7", "critic")
+        prompts = len(self.events("agent", "prompt"))
+        # A conflict that cannot be recorded blocks the handoff with the failure and error.
+        self.update(pr_mergeable="CONFLICTING", comments_fail=True)
+        refused = self.team("turn", "7", "tester", cwd=wt, pane=impl, ok=False)
+        unrecorded = f"Known failure not recorded on PR 7: Merge conflict at head {head}"
+        assert unrecorded in refused.stderr
+        assert "Error: fixture GitHub refused the comment" in refused.stderr
+        # An unreadable comment history loses neither the failure nor the error.
+        self.update(comments_fail=False, history_fails=True)
+        refused = self.team("turn", "7", "tester", cwd=wt, pane=impl, ok=False)
+        assert unrecorded in refused.stderr
+        assert "Error: fixture comment-history unavailable" in refused.stderr
+        # Recorded, it still blocks; later unavailable reads neither record nor clear it.
+        self.update(history_fails=False)
+        refused = self.team("turn", "7", "tester", cwd=wt, pane=impl, ok=False)
+        finding = self.comments("7")[-1]["html_url"]
+        assert f"Known merge conflict {finding}" in refused.stderr
+        assert "merge origin/main and push" in refused.stderr
+        self.update(pr_mergeable="UNKNOWN", checks_error="fixture checks unavailable")
+        refused = self.team("turn", "7", "tester", cwd=wt, pane=impl, ok=False)
+        assert f"Known merge conflict {finding}" in refused.stderr
+        assert self.comments("7")[-1]["html_url"] == finding
+        # After the repair push GitHub has not computed mergeability yet: rerun, not remerge.
+        head = self.push(wt, "merged main")
+        refused = self.team("turn", "7", "tester", cwd=wt, pane=impl, ok=False)
+        assert f"has not reported mergeability for {head} yet" in refused.stderr
+        assert "rerun turn" in refused.stderr
+        assert len(self.events("agent", "prompt")) == prompts
+        # A mergeable read resolves it with a new event, and the handoff goes out.
+        self.update(pr_mergeable="MERGEABLE")
+        self.team("turn", "7", "tester", cwd=wt, pane=impl)
+        resolved = self.comments("7")[-1]["body"]
+        assert '"state":"resolved"' in resolved
+        assert f"Resolves {finding}." in resolved
+        assert [e[2] for e in self.events("agent", "prompt")[prompts:]] == [
+            "team-1-tester",
+            "team-1-critic",
+        ]
 
     def test_turn_to_implementer_always_rings_and_reports_a_checkout_problem(self) -> None:
         self.team("start", "29")
         wt, tester = self.worktree("29"), self.pane("team-1-tester")["pane_id"]
         pushed = self.push(wt)
+        # A failed check is recorded as the tester and named in the handoff.
+        failed = {"name": "checks", "workflow": "CI", "bucket": "fail", "link": "https://ci/2"}
+        self.update(checks=[failed])
         self.team("turn", "7", "impl", cwd=wt, pane=tester)
+        finding = self.comments("7")[-1]
+        assert finding["body"].startswith("FINDING tester team-1-tester session-team-1-tester\n")
         ring = self.events("agent", "prompt")[-1]
         assert ring[2] == "team-1-impl"
         assert "pr_review.py list 7" in ring[3]
+        assert "pr_review.py observe 7" in ring[3]
+        assert f"Open findings: check:CI/checks {finding['html_url']}" in ring[3]
         assert "agent/skills/implement-software/SKILL.md from this worktree" in ring[3]
         assert "Fix the checkout first" not in ring[3]
         # Only the implementer can repair the tree, so a problem is reported, not refused.

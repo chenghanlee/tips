@@ -9,11 +9,11 @@ Agents follow the [pair workflow](README.md).
 USER         set goals · answer product questions · start the dispatcher once · report an agent that has stopped
 DISPATCHER   open a feature → designers agree on a spec and briefs → team.py start <brief>
 IMPLEMENTER  ask questions only when answers affect the work → code → push → PR "Closes #<brief>" → team.py turn <pr> <tester>
-TESTER       ask the dispatcher to launch the other reviewers → review the head
-DISPATCHER   team.py review <pr> <entry> for each
-REVIEWERS    review from pinned worktrees → notify the tester with the review URL
-TESTER       findings → team.py turn <pr> <implementer>   (repeat until no P0 or P1)
-TESTER       every required review LGTM on the head · required checks pass → gh pr merge → "done"
+             (notifies every required reviewer of the head; asks the dispatcher to launch missing ones)
+DISPATCHER   team.py review <pr> <entry> for each requested reviewer
+REVIEWERS    review the head → notify the tester with the review URL
+TESTER       any review with findings → team.py turn <pr> <implementer>   (repeat until no P0 or P1)
+TESTER       pr_review.py observe <pr> reports ready → gh pr merge → "done"
 DISPATCHER   team.py stop <brief> → next
 ```
 

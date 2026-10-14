@@ -18,10 +18,14 @@ Implement one brief in one worktree. Manage its PR.
 2. Follow the skill. Keep tests within the brief's test budget.
 3. Record deferred work in one follow-up issue before handoff.
 4. Push. Open the PR with the [PR body](../README.md#pr-body) filled in. Then run
-   `agent/teams/team.py turn <pr> <tester entry>` from the pair checkout. Until the
-   tester returns the turn, do not change the worktree, build or database.
-5. When reviewers report findings, fix every P0 and P1. Handle P2s as the [severity rule](../README.md#severity) says. Update the PR body. Push and hand off again. The
-   tester returns failed checks through the same handoff.
+   `agent/teams/team.py turn <pr> <tester entry>` from the pair checkout. It records the
+   PR's failures and notifies every required reviewer of the head. It refuses while a
+   merge conflict finding is open: merge `origin/main`, push and run it again, or report
+   `blocked`. If it reports failed sends, report `blocked` with them. Until the tester
+   returns the turn, do not change the worktree, build or database.
+5. When reviewers report findings, fix every P0 and P1. Handle P2s as the [severity rule](../README.md#severity) says. Fix the open findings the handoff names. Update the
+   PR body. Push and hand off again. The tester returns failed checks through the same
+   handoff.
 
 ## Token rules
 

@@ -20,11 +20,11 @@ lists your responsibilities: [dispatcher](roles/dispatcher.md),
 USER         set goals · answer product questions · start the dispatcher once · report an agent that has stopped
 DISPATCHER   open a feature → designers agree on a spec and briefs → team.py start <brief>
 IMPLEMENTER  ask questions only when answers affect the work → code → push → PR "Closes #<brief>" → team.py turn <pr> <tester>
-TESTER       ask the dispatcher to launch the other reviewers → review the head
-DISPATCHER   team.py review <pr> <entry> for each
-REVIEWERS    review from pinned worktrees → notify the tester with the review URL
-TESTER       findings → team.py turn <pr> <implementer>   (repeat until no P0 or P1)
-TESTER       every required review LGTM on the head · required checks pass → gh pr merge → "done"
+             (notifies every required reviewer of the head; asks the dispatcher to launch missing ones)
+DISPATCHER   team.py review <pr> <entry> for each requested reviewer
+REVIEWERS    review the head → notify the tester with the review URL
+TESTER       any review with findings → team.py turn <pr> <implementer>   (repeat until no P0 or P1)
+TESTER       pr_review.py observe <pr> reports ready → gh pr merge → "done"
 DISPATCHER   team.py stop <brief> → next
 ```
 
@@ -43,16 +43,16 @@ Run them from the root of your checkout. The dispatcher runs `start`, `review` a
 | Command | Caller | Effect |
 |---|---|---|
 | `agent/teams/team.py start <brief>` | Dispatcher | Read `Implementer:` and `Required reviews:`. Create branch `task/<brief>` from `origin/main` and worktree `.worktrees/<brief>`. Set up dependencies and Dexter. Launch the implementer and merge-confirming tester in the team's workspace (see [Herdr layout](#herdr-layout)), write the allocation record, and post one EVENT per launch on the brief. |
-| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Run from the pair checkout. Require a clean tree at the PR head and a PR that closes the brief. Notify the tester with the PR URL, SHA and the `review` commands for reviewers not yet launched. |
-| `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Notify the implementer even if the tree has uncommitted changes. Include any mismatch in the message. |
+| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Run from the pair checkout. Require a clean tree at the PR head and a PR that closes the brief. Record the PR's failures (see `observe`); refuse while a merge conflict finding is open. Notify every launched required reviewer of the head. For each reviewer not launched, post a pending EVENT on the PR and ask the dispatcher to run its `review` command. Try every send; report each failed one. |
+| `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Record the PR's failures, then notify the implementer even if the tree has uncommitted changes. Include any mismatch and the open findings in the message. |
 | `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create `.worktrees/review-<pr>-<entry>` detached at the PR head with its own database suffix, port, dependencies and Dexter, and launch the reviewer there, in the team's workspace. |
 | `agent/teams/team.py stop <brief>` | Dispatcher | Refuse dirty, unmerged or foreign-owned work. Stop every recorded client and Dexter, drop the slot's databases, remove its worktrees, branch and workspace, delete the record. |
 | `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. |
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment or only those after a checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | Tokens per launched session and model, from the session logs. |
-| `agent/teams/pr_review.py list <pr>` | Any agent | Recent reviews and every unresolved thread. |
+| `agent/teams/pr_review.py list <pr>` | Any agent | Recent reviews and every unresolved thread. Display only. |
+| `agent/teams/pr_review.py observe <pr>` | Launched client | Read the head, base, mergeability, checks and reviews within one 30-second deadline; refuse a read during which the head or base changed. Required checks are the contexts the base branch's effective rules require; a required check that has not reported blocks, and other checks are only shown. Record each failure once as a FINDING on the PR; append a resolution naming the finding comment's ID when passing evidence for the same check appears; a resolution closes only the findings that the observation read as open. Unavailable evidence records and resolves nothing. Exit 0 only when the PR can merge at this head. |
 | `agent/teams/pr_review.py resolve <thread>` | Thread opener | Resolve your own thread. |
-| `herdr agent prompt dispatcher "<URL> review: run <review commands>"` | Tester | Ask the dispatcher to launch each reviewer the handoff lists as not launched. |
 | `herdr agent prompt team-<slot>-<entry> "<review URL>"` | Other reviewer | Tell the merge-confirming tester a review exists. |
 | `herdr agent prompt dispatcher "<URL> done"` | Tester | The PR merged. |
 | `herdr agent prompt dispatcher "<comment URL> blocked"` | Turn holder | A blocker is recorded. |
@@ -77,8 +77,7 @@ rejects changes to the implementer or merge-confirming tester.
 
 Every message starts a turn with the recipient's full context. Send only handoffs,
 `done`, `blocked`, the dispatcher's answer to a blocker, a review URL to the
-merge-confirming tester, a new-head notice to a reviewer, the tester's launch request,
-and the design-phase messages the [designer role](roles/designer.md) lists. Do not send
+merge-confirming tester, and the design-phase messages the [designer role](roles/designer.md) lists. Do not send
 acknowledgments or progress updates. Put everything the recipient needs in the message
 or the linked record. After sending, end your turn. If sending fails, keep the turn.
 Report `blocked` with the exact command and error. Do not deliver a denied message
@@ -90,11 +89,10 @@ head and the required checks. Use the first matching row:
 | Condition | Turn |
 |---|---|
 | No PR | Implementer: open it. |
-| A required check failed | Implementer: fix it. |
+| A required check failed, or a FINDING is open | Implementer: fix it. |
 | The latest review of the head by any reviewer in `Required reviews:` is not an LGTM | Implementer: address it. |
-| The head has no review | Tester: review it. |
-| The tester's latest review is an LGTM and a required reviewer has not reviewed the head | Tester: notify that reviewer, or report `blocked` when it is not launched. |
-| Every required reviewer's latest review of the head is an LGTM | Tester: merge. |
+| A required reviewer has not reviewed the head | That reviewer: review it. The handoff notified it or asked the dispatcher to launch it. |
+| `agent/teams/pr_review.py observe <pr>` reports ready to merge | Tester: merge. |
 
 ## PR review record
 
@@ -172,18 +170,28 @@ point. It never settles a P0 or P1 condition.
 
 ### Merge
 
-Merge-confirming tester: merge when every reviewer in `Required reviews:` has an LGTM as
-its latest review of the head, every thread is resolved, and the required checks pass:
+Merge-confirming tester: wait for the required checks, then merge only when `observe`
+reports the PR ready at the head: every reviewer in `Required reviews:` has an LGTM as its
+latest review of that head, every thread is resolved, the required checks pass, GitHub
+reports it mergeable and no FINDING is open.
 
 ```sh
 timeout "$TIPS_CHECK_TIMEOUT_SECONDS" gh pr checks <pr> --watch --required
+agent/teams/pr_review.py observe <pr>
 gh pr merge <pr> --merge --match-head-commit <sha>
 ```
 
-If a check fails, run `agent/teams/team.py turn <pr> <implementer entry>` to notify the
-implementer. If merge is refused for another reason, report `blocked` with the exact
-error. After the merge closes the brief and deletes the branch, notify the dispatcher
-with `done`.
+If a check failed or `observe` records a finding, run
+`agent/teams/team.py turn <pr> <implementer entry>` to notify the implementer. If `observe`
+reports evidence unavailable, run it again later; unavailable never counts as ready. If
+merge is refused for another reason, report `blocked` with the exact error.
+
+A finding that no later check can resolve, for example after a required check was renamed
+or removed, is resolved by hand. Post a FINDING whose first body line is the finding's
+`TEAM_FINDING` marker with `"state":"resolved"` and `"resolves":<id>`, followed by the
+reason: `agent/teams/board.py post <pr> FINDING`. `<id>` is the number after
+`#issuecomment-` in the open finding's URL; a resolution closes only that comment's finding.
+After the merge closes the brief and deletes the branch, notify the dispatcher with `done`.
 
 ## Report and resolve blockers
 
