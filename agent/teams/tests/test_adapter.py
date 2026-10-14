@@ -44,6 +44,8 @@ ADAPTER_GH = r"""#!/usr/bin/env python3
 import json, os, sys, time
 from pathlib import Path
 a = sys.argv[1:]
+if a[0] in ("pr", "issue") and ["--repo", "o/r"] not in [a[i : i + 2] for i in range(len(a))]:
+    sys.exit("fixture gh: no --repo o/r in " + repr(a))
 path = Path(os.environ["HERDR_FIXTURE"])
 s = json.loads(path.read_text())
 base = str(Path(sys.argv[0]).with_name("gh-base"))

@@ -464,6 +464,8 @@ from pathlib import Path
 path = Path(os.environ["HERDR_FIXTURE"])
 s = json.loads(path.read_text())
 a = sys.argv[1:]
+if a[0] in ("pr", "issue") and ["--repo", "o/r"] not in [a[i : i + 2] for i in range(len(a))]:
+    sys.exit("fixture gh: no --repo o/r in " + repr(a))  # never the working directory's remote
 s.setdefault("events", []).append(["gh", *a])
 comments = s.setdefault("comments", {})
 out, code = "", 0
@@ -537,8 +539,6 @@ elif a[:2] == ["api", "graphql"]:
     name = "reviewThreads" if "reviewThreads" in query else "reviews"
     page = {"pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": s.get(name, [])}
     out = json.dumps({"data": {"repository": {"pullRequest": {name: page}}}})
-elif a[:2] == ["repo", "view"]:
-    out = json.dumps({"nameWithOwner": "o/r"})
 elif a[0] == "api" and "/rules/branches/" in a[1]:
     required = [{"context": name} for name in s.get("required", ["checks", "release"])]
     rule = {"type": "required_status_checks", "parameters": {"required_status_checks": required}}
