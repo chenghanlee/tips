@@ -65,7 +65,7 @@ generation reuses another's databases.
 ## Commands
 
 Run worker commands from your own allocation. The dispatcher runs `start`, `design`,
-`review`, `reset` and `stop` from the main checkout.
+`review` and `stop` from the main checkout. Only the operator (the user) runs `reset`.
 
 | Command | Caller | Effect |
 |---|---|---|
@@ -74,7 +74,7 @@ Run worker commands from your own allocation. The dispatcher runs `start`, `desi
 | `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require your own clone to be clean at the PR head and the PR to close the brief. Record the PR's failures (see `observe`); refuse while a merge conflict finding is open. Notify every launched required reviewer of the head and the `bootstrap.py --commit` command that moves its clone there. For each reviewer not launched, post a pending EVENT on the PR and ask the dispatcher to run its `review` command. Try every send; report each failed one. |
 | `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Record the PR's failures, then notify the implementer with the open findings. Your clone's state does not block it. |
 | `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create its allocation, configured for the PR head, with its own database suffix and port, and launch the reviewer in the team's workspace. |
-| `agent/teams/team.py reset <issue> <entry>` | Dispatcher | After checking a stopped client's work on the issue and PR, allow `start`, `design` or `review` to launch a replacement in the same allocation that gets the task again. Refuse a running client. |
+| `agent/teams/team.py reset <issue> <entry>` | Operator | Record the operator's decision, after checking a stopped client's work on the issue and PR, that `start`, `design` or `review` may launch a replacement in the same allocation that gets the task again. Refuse a running client. |
 | `agent/teams/team.py stop <issue>` | Dispatcher | See [Retirement](#retirement). |
 | `python3 <harness>/bootstrap.py [--commit <sha>]` | Launched client | Prepare your own clone, as [Allocations](#allocations) says. |
 | `python3 <harness>/retirement.py` | Launched client | Fetch origin, then post your clone's state on the issue: clean, unpushed commits, HEAD merged into `origin/main`. Changes nothing. |
@@ -98,8 +98,10 @@ opens with its first client. `start` and `review` reopen a closed pane in the sa
 workspace and tab; `stop` refuses a workspace that holds a pane the record does not
 name, and otherwise closes the whole workspace.
 
-Rerunning `start` or `review` keeps a running client and sends it nothing. It refuses a
-stopped client that may have received its task: check its work, then `reset` it and rerun
+Rerunning `start`, `design` or `review` keeps a running client and sends it nothing. It
+refuses a stopped client that may have received its task, and a client whose record is
+missing while an earlier allocation, workspace or Herdr client of it remains. The dispatcher
+reports that refusal to the user; only the operator decides on a replay
 ([launch recovery](SETUP.md#launch-recovery)). `review` reads the brief's
 current `Required reviews:` line. To add a reviewer, run its command. The command
 rejects changes to the implementer or merge-confirming tester.

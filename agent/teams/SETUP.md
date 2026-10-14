@@ -193,7 +193,7 @@ Set database connection limits in [compose.yaml](../../compose.yaml). `TIPS_DB_M
 
 | State | Meaning |
 |---|---|
-| `never_submitted` | Nothing was sent. `start` or `review` may launch the client. |
+| `never_submitted` | Nothing was sent, or the operator ran `reset` after checking the client's work. `start` or `review` may launch the client. |
 | `unknown` | Written before the client starts. The launch stopped before Herdr confirmed the task prompt. |
 | `submitted` | Herdr sent the task prompt. It does not mean the task is done. |
 
@@ -207,11 +207,20 @@ After an interrupted `start` or `review`, rerun it:
   resent. If its task submission is `unknown`, the command says so. Read the pane. If
   the client never got its task, exit it, then reset it as below.
 - A stopped client whose task submission is `unknown` or `submitted` is refused: it may
-  have done its task and exited. Check the brief, the PR and its reviews. To replace it,
-  run `agent/teams/team.py reset <brief> <entry>`, then rerun the command. The
-  replacement gets its task again.
-- Another client in a recorded pane, or a live client the record never started, is
-  refused. Inspect the pane.
+  have done its task and exited. You, the operator, decide whether to replay it. Check
+  the brief, the PR and its reviews. To replace it, run
+  `agent/teams/team.py reset <brief> <entry>`, then rerun the command. The replacement
+  gets its task again.
+- A client with no record entry is recorded as `unknown` and refused when its worktree,
+  task branch, a Herdr workspace of its brief, a Herdr client with its name or its
+  databases remain, or when Docker cannot list the databases within
+  `timeouts.shell_seconds`: a lost record does not prove that nothing was sent. Close any
+  earlier workspace, then reset it as above.
+- Another client in a recorded pane, a live client the record never started, a client
+  whose session differs from the recorded one, or a client that reports no session is
+  refused. Inspect the pane. `team.py` assigns each Claude client's session id at
+  launch; a Codex client's is recorded when Herdr first reports it. Herdr reports
+  sessions through the user hook, so keep that hook installed.
 
 `start`, `review`, `reset` and `stop` hold a lock on `agent/teams/allocations/.lock`. A
 command that waits longer than `timeouts.lock_seconds` stops with a `Busy` error; rerun
@@ -228,8 +237,10 @@ the `team.py` that wrote it:
 - Merged brief: run its `stop`.
 - Brief in progress: write down each client's name and session (the brief's launch
   EVENTs show them, so `board.py usage` still counts them), exit its clients, close its
-  Herdr workspace and move the record out of `agent/teams/allocations/`. Then run
-  `start` for the brief with this version. The worktree keeps its work.
+  Herdr workspace and move the record out of `agent/teams/allocations/`. With this
+  version, `start` then refuses because the worktree remains and records the clients as
+  `unknown`; reset each client after checking its work, then rerun `start`. The worktree
+  keeps its work.
 
 ## Changing these scripts
 

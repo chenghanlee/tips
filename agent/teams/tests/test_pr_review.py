@@ -60,7 +60,8 @@ class ObserveTest(Harness):
         # One comment-history read for the whole observation, not one per finding.
         assert len([e for e in self.events("gh", "api")[reads:] if "/comments?" in e[2]]) == 1
         first = self.comments("7")[0]["body"].splitlines()
-        assert first[0] == "FINDING tester team-1-tester session-team-1-tester"
+        session = self.launched_session("team-1-tester")
+        assert first[0] == f"FINDING tester team-1-tester {session}"
         assert first[1] == (
             'TEAM_FINDING {"v":2,"pr":7,"check":"mergeability",'
             f'"head":"{self.head}","base":"{base}","state":"open"}}'

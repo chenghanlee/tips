@@ -15,7 +15,6 @@ executable in a project.
 import contextlib
 import errno
 import fcntl
-import hashlib
 import json
 import os
 import re
@@ -727,7 +726,8 @@ def store_lock() -> Generator[None]:
 
     The lock is on a file that is never replaced, so it is not lost when a record is
     rewritten. The kernel releases it when this process exits, even after a crash. Python
-    opens files non-inheritable, so a child process never holds it.
+    opens the file non-inheritable and `subprocess` closes other descriptors by default, so
+    a child does not receive it.
     """
     path = state_dir() / ".lock"
     seconds = cfg["timeouts"]["lock_seconds"]
@@ -1048,13 +1048,58 @@ def allocate(record: Record, entry: str, role: str) -> Allocation:
     return allocation
 
 
-def configure_bootstrap(allocation: Allocation, branch: str, commit: str) -> None:
+def earlier_launch(record: Record, entry: str) -> list[str]:
+    """What remains of an earlier launch of this client that no record holds.
+
+    A missing record or entry never proves that a task was never sent: the record may have
+    been lost while an allocation, workspace or client remained. Database names carry the
+    generation, so an earlier launch's databases belong to an allocation found here.
+    """
+    held = {a["id"] for r in [*records().values(), record] for a in r["agents"].values()}
+    found: list[str] = []
+    for path in sorted(state_dir().glob("*/bootstrap.json")):
+        settings = object_fields(json.loads(path.read_text()), str(path))
+        if (
+            (settings.get("issue"), settings.get("entry")) == (record["brief"], entry)
+            and path.parent.name not in held
+            and not (path.parent / "retired.json").exists()
+        ):
+            found.append(f"allocation {path.parent.name}")
+    label = re.compile(rf"team-[0-9]+-{re.escape(record['brief'])}")
+    found += [
+        f"Herdr workspace {w['label']}"
+        for w in herdr("workspace", "list")["workspaces"]
+        if label.fullmatch(w.get("label", "")) and w["workspace_id"] != record["workspace"]
+    ]
+    name = live_name(record["slot"], entry)
+    if any(a.get("name") == name for a in herdr("agent", "list")["agents"]):
+        found.append(f"Herdr client {name}")
+    return found
+
+
+def add_allocation(record: Record, entry: str, role: str) -> Allocation:
+    """Allocate a client the record does not hold. If an earlier launch left anything
+    behind, its task may already have been sent: record the submission as unknown."""
+    remains = earlier_launch(record, entry)
+    allocation = allocate(record, entry, role)
+    if remains:
+        allocation["submission"] = UNKNOWN
+        print(
+            f"{allocation['name']} has no earlier record, but these remain: "
+            f"{', '.join(remains)}. Its task submission is recorded as unknown."
+        )
+    return allocation
+
+
+def configure_bootstrap(record: Record, allocation: Allocation, branch: str, commit: str) -> None:
     """Write the trusted configuration bootstrap.py reads: what to clone and check out, the
     shared tools, and the entry's probe. Workers never write this directory."""
     binary, skills, sources = tools()
     _, project, logs, config = allocation_paths(allocation["id"])
     settings = {
         "id": allocation["id"],
+        "issue": record["brief"],
+        "entry": allocation["entry"],
         "kind": allocation["kind"],
         "project": str(project),
         "logs": str(logs),
@@ -1302,14 +1347,13 @@ def agent_spec(allocation: Allocation) -> AgentSpec:
     return spec
 
 
-def client_args(allocation: Allocation, prompt: str) -> list[str]:
+def client_args(allocation: Allocation, prompt: str, session: str) -> list[str]:
     """Client arguments. Claude keeps the brief as its system prompt and waits for its first
-    message. Codex starts with no instructions: no tested signal shows that it accepted a
-    task passed at start, so launch sends its brief as the first message.
-
-    Both start in the allocation directory, which holds the project and its logs. Client
-    configuration is on the command line, effective before the first task: no file a worker
-    can write configures its client."""
+    message; it runs the session id the launcher assigned, because Herdr learns session ids
+    from a user hook that restricted mode ignores. Codex starts with no instructions: no
+    documented signal shows that it accepted a task passed at start, so launch sends its
+    brief as the first message. Both start in the allocation directory, which holds the
+    project and its logs."""
     spec, policies = agent_spec(allocation), cfg["launch"]
     if spec["kind"] == "codex":
         args = ["-a", policies["codex_approval"], "-C", allocation["root"]]
@@ -1328,6 +1372,8 @@ def client_args(allocation: Allocation, prompt: str) -> list[str]:
         ),
         "--append-system-prompt",
         prompt,
+        "--session-id",
+        session,
     ]
     if spec["model"]:
         args += ["--model", spec["model"]]
@@ -1340,7 +1386,9 @@ def client_args(allocation: Allocation, prompt: str) -> list[str]:
 def running_client(record: Record, allocation: Allocation) -> Entity | None:
     """The recorded client if it is live in its pane; None if the pane is gone or at the shell.
 
-    A live client with another name, kind or root makes the pane's owner uncertain: refused.
+    A live client with another name, kind, root or session makes the pane's owner
+    uncertain: refused, and so is one that reports no session, since nothing then shows
+    which client is live. Only a record with no session yet accepts the live one's.
     """
     name, pane = allocation["name"], allocation["pane"]
     if pane not in {p["pane_id"] for p in live_panes(record["workspace"])}:
@@ -1353,6 +1401,14 @@ def running_client(record: Record, allocation: Allocation) -> Entity | None:
         raise RuntimeError(f"{pane}: conflicting client; preserved")
     if root != Path(allocation["root"]):
         raise RuntimeError(f"{pane}: {name} runs in {root}, not its allocation; preserved")
+    recorded, live_session = allocation["session"], session_id(agent)
+    if not live_session:
+        raise RuntimeError(
+            f"{pane}: {name} reports no session; cannot confirm the recorded client; preserved. "
+            "Nothing was resent; only the operator decides what happens to it."
+        )
+    if recorded not in ("", "unknown") and live_session != recorded:
+        raise RuntimeError(f"{pane}: {name} runs session {live_session}, not {recorded}; preserved")
     return agent
 
 
@@ -1376,18 +1432,20 @@ def reconcile(record: Record, allocation: Allocation) -> Entity | None:
     if agent is None and state != NEVER_SUBMITTED:
         raise RuntimeError(
             f"{name} is not running and its task submission is {state}. It may have done the "
-            "task before it exited, so nothing was launched or resent. Check its work on the "
-            "brief and PR. To launch a replacement that gets the task again, run "
-            f"python3 {harness() / 'team.py'} reset {record['brief']} {allocation['entry']}, "
-            "then rerun this command."
+            "task before it exited, so nothing was launched or resent; only the operator "
+            "decides whether to replay it: after checking its work on the brief and PR, the "
+            f"operator runs python3 {harness() / 'team.py'} reset {record['brief']} {allocation['entry']}, "
+            "then reruns this command."
         )
     return agent
 
 
 def adopt(record: Record, allocation: Allocation, agent: Entity) -> None:
-    """Keep a live recorded client. Record the session it reports; never resend its task."""
+    """Keep a live recorded client; never resend its task. If the launch stopped before the
+    record held a session, record the one the client reports; running_client refused any
+    other mismatch."""
     name, session = allocation["name"], session_id(agent)
-    if session and session != allocation["session"]:
+    if session and allocation["session"] in ("", "unknown"):
         allocation["session"] = session
         save_record(record)
     if allocation["submission"] == SUBMITTED:
@@ -1395,10 +1453,10 @@ def adopt(record: Record, allocation: Allocation, agent: Entity) -> None:
     # The launch stopped before it finished; its EVENT may be missing. Posting is idempotent.
     post_event(record["brief"], allocation, launch_text(allocation))
     print(
-        f"{name}: task submission is {allocation['submission']}; nothing was resent. If "
-        f"{allocation['pane']} shows that the client never got its task, exit the client, run "
-        f"python3 {harness() / 'team.py'} reset {record['brief']} {allocation['entry']}, then "
-        "rerun this command."
+        f"{name}: task submission is {allocation['submission']}; nothing was resent. Only the "
+        f"operator decides whether to replay it: if {allocation['pane']} shows that the client "
+        "never got its task, the operator exits the client, runs python3 {harness() / 'team.py'} reset "
+        f"{record['brief']} {allocation['entry']} and reruns this command."
     )
 
 
@@ -1423,9 +1481,11 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
         return
     name, pane = allocation["name"], allocation["pane"]
     kind, root = allocation["kind"], Path(allocation["root"])
-    args = client_args(allocation, prompt)  # a configuration error refuses before any change
+    # Claude runs a session id assigned here; Codex's is known only if Herdr reports it.
+    session = str(uuid.uuid4()) if kind == "claude" else ""
+    args = client_args(allocation, prompt, session)  # a configuration error refuses first
     enter(pane, root, agent_env(allocation))
-    allocation["submission"] = UNKNOWN
+    allocation["submission"], allocation["session"] = UNKNOWN, session
     save_record(record)
     herdr(
         "agent",
@@ -1441,13 +1501,16 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
         *args,
     )
     started = herdr("agent", "get", pane)["agent"]
-    allocation["session"] = session_id(started) or "unknown"
-    save_record(record)
+    reported = session_id(started)
+    if not session:
+        allocation["session"] = reported or "unknown"
+        save_record(record)
     if (
         pane_occupant(pane) != (root, True)
         or started.get("agent") != kind
         or started.get("name") != name
         or started.get("agent_status") in ("blocked", "unknown")
+        or (session and reported not in ("", session))
     ):
         raise RuntimeError(f"{name} started in an unexpected state or root; inspect {pane}")
     # The task prompt: Claude already holds its brief and waits for a first message.
@@ -1515,9 +1578,9 @@ def start(brief: str) -> None:
         duties = ("implementer", "merge-confirming tester")
         for entry, duty in zip(pair, duties, strict=True):
             if entry not in record["agents"]:
-                allocation = allocate(record, entry, duty)
+                allocation = add_allocation(record, entry, duty)
                 branch = f"task/{brief}" if entry == implementer else ""
-                configure_bootstrap(allocation, branch, "")
+                configure_bootstrap(record, allocation, branch, "")
                 save_record(record)
         clients = [record["agents"][entry] for entry in pair]
         refuse_foreign_owner([Path(a["root"]) for a in clients], [a["name"] for a in clients])
@@ -1538,7 +1601,7 @@ def design(spec: str, entry: str) -> None:
     with store_lock():
         record = team_record(spec, "design", "", "")
         if entry not in record["agents"]:
-            configure_bootstrap(allocate(record, entry, "designer"), "", "")
+            configure_bootstrap(record, add_allocation(record, entry, "designer"), "", "")
             save_record(record)
         allocation = record["agents"][entry]
         refuse_foreign_owner([Path(allocation["root"])], [allocation["name"]])
@@ -1575,7 +1638,8 @@ def review(pr: str, entry: str) -> None:
                 f"(additional reviewers: {', '.join(testers + designers) or 'none'})"
             )
         duty = "reviewing designer" if entry in designers else "additional tester"
-        allocation = record["agents"].get(entry) or allocate(record, entry, duty)
+        allocation = record["agents"].get(entry) or add_allocation(record, entry, duty)
+        allocation["pr"] = pr
         save_record(record)
         refuse_foreign_owner([Path(allocation["root"])], [allocation["name"]])
         agent = reconcile(record, allocation)
@@ -1585,7 +1649,7 @@ def review(pr: str, entry: str) -> None:
             adopt(record, allocation, agent)
             return
         allocation["pr"], allocation["head"] = pr, head
-        configure_bootstrap(allocation, "", head)
+        configure_bootstrap(record, allocation, "", head)
         save_record(record)
         open_pane(record, allocation)
         launch(record, allocation, reviewer_brief(record, entry, duty, url, head))
