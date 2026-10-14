@@ -209,8 +209,8 @@ Critic, for each PROPOSAL:
    everything else as P2 with a proposed decision.
 4. A P2 does not block. The lead records a decision in the table or a note to the
    implementer.
-5. Check each scenario for a masking risk. For an unmarked one, propose the mark and
-   its distinguishing defect.
+5. Check each scenario for a masking risk. For a scenario that has one but no mark,
+   propose the mark and its distinguishing defect.
 
 Lead, after each round:
 

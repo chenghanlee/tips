@@ -132,7 +132,8 @@ One paragraph: what works now.
 |---|---|---|
 | 1 <title> | test/path_test.exs:"name" | CI run URL or local command |
 
-A `Masking risk:` row also names its control and the assertion the control fails.
+A `Masking risk:` row also gives its control as an exact edit (`path:line` and the change)
+and the assertion the control fails.
 
 ## Affected code
 Changed public functions, schemas, changesets, migrations, config, PubSub topics,

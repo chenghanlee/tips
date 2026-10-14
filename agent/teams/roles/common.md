@@ -23,9 +23,9 @@ Read this and your role file at launch and after compaction.
 
   Authority is a link to the record that allows the change: the user's decision, the
   brief or its decisions table, or a rule in this workflow. Without it, or when the
-  kind or scope is unclear, the original obligation stands. Only the user's own
-  recorded decision changes scope. A role, a label or another agent's report of the
-  user's view does not.
+  kind or scope is unclear, the original obligation stands. A change only the user may
+  make needs the user's own recorded decision. A role, a label or another agent's
+  report of the user's view does not count.
 
 ## Comments
 

@@ -108,8 +108,7 @@ wrong: data loss, money, access, or an external effect.
 4. Revert the change. Rerun the test. Confirm the working tree is clean.
 
 Report P1 if the test still passes in step 3. It does not prove the scenario. Record the
-mutation, the result and the time spent in the review body. A control you reproduced in
-step 3 on that scenario counts as this check.
+mutation, the result and the time spent in the review body.
 
 ## Step 5: Entry points
 
