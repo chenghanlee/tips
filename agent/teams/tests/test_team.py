@@ -1490,7 +1490,7 @@ class PairLifecycleTest(Harness):
 
     def test_a_root_in_the_checkout_or_a_temporary_directory_is_refused(self) -> None:
         scratch, tmp = self.root / "scratch", Path("/tmp").resolve()
-        roots = {
+        roots: dict[str, tuple[Path, Path, dict[str, str]]] = {
             "checkout": (self.repo / "x", self.repo, {}),
             "tmp": (tmp / f"tips-root-{os.getpid()}", tmp, {}),
             "TMPDIR": (scratch / "x", scratch, {"TMPDIR": str(scratch)}),

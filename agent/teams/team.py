@@ -2191,9 +2191,9 @@ def stop_brief(brief: str) -> None:
 
     A brief must be closed by a merged PR before any client is asked. Every client then
     posts a retirement report from its current launch. Work that the reports do not show
-    preserved keeps everything: nothing is stopped and the record stays. Databases are dropped only for merged work; project and log files are
-    always retained. A conflict, a failed stop or a busy port keeps the reservation, so
-    stop can run again.
+    preserved keeps everything: nothing is stopped and the record stays. Databases are
+    dropped only for merged work; project and log files are always retained. A conflict, a
+    failed stop or a busy port keeps the reservation, so stop can run again.
     """
     with store_lock():
         record = record_for(brief)

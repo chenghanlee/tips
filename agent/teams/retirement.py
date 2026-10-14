@@ -3,10 +3,10 @@
 
 A worker runs this under its own authority when the dispatcher asks it to retire:
 `python3 <harness>/retirement.py`. It fetches origin, then posts one EVENT on its issue with
-a `TEAM_RETIREMENT` line naming its launch: whether the clone is clean, how many local commits no origin
-branch holds, whether HEAD is merged into origin/main, and HEAD. `team.py stop` reads the
-latest report as advisory evidence before it drops any database. This script never calls
-Herdr, never deletes a file and never resets the clone.
+a `TEAM_RETIREMENT` line naming its launch: whether the clone is clean, how many local
+commits no origin branch holds, whether HEAD is merged into origin/main, and HEAD.
+`team.py stop` reads the latest report as advisory evidence before it drops any database.
+This script never calls Herdr, never deletes a file and never resets the clone.
 """
 
 import json
@@ -93,7 +93,8 @@ def clone_state(project: Path) -> dict[str, object]:
 
 def report() -> str:
     issue, allocation, settings, project = own_allocation()
-    fields = {"v": 1, "id": allocation["id"], "launch": allocation["launch"], **clone_state(project)}
+    launch = allocation["launch"]
+    fields = {"v": 1, "id": allocation["id"], "launch": launch, **clone_state(project)}
     role = str(allocation.get("role", "")).split()[-1]
     header = comment_header(
         "EVENT", role, str(allocation.get("name")), str(allocation.get("session") or "")
