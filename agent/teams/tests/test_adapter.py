@@ -279,3 +279,35 @@ class AdapterTest(Harness):
                 assert len(first.encode()) <= 8192
 
         self.session(steps)
+
+    def test_an_error_after_a_prompt_is_sent_is_reported_as_ambiguous(self) -> None:
+        # Herdr reports its own timeout after the text may have reached the client.
+        herdr = self.bin / "herdr"
+        herdr.rename(self.bin / "herdr-base")
+        herdr.write_text(
+            "#!/bin/sh\n"
+            'if [ "$1 $2" = "agent prompt" ] && [ -n "$PROMPT_ERROR" ]; then\n'
+            '  "$(dirname "$0")/herdr-base" "$@" >/dev/null\n'
+            '  echo \'{"error":{"code":"timeout","message":"request timed out"}}\' >&2\n'
+            "  exit 1\n"
+            "fi\n"
+            'exec "$(dirname "$0")/herdr-base" "$@"\n'
+        )
+        herdr.chmod(0o755)
+
+        async def launch(client: Any) -> None:
+            await self.call(client, "start_pair", brief=29)
+
+        self.session(launch)
+        prompts = len(self.events("agent", "prompt"))
+        self.env["PROMPT_ERROR"] = "1"
+
+        async def prompt(client: Any) -> None:
+            error = await self.call(
+                client, "prompt_agent", ok=False, brief=29, entry="tester", text="Your turn"
+            )
+            assert "may have been delivered" in error, error
+            assert "before sending it again" in error
+
+        self.session(prompt)
+        assert len(self.events("agent", "prompt")) == prompts + 1

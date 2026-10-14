@@ -1817,7 +1817,8 @@ def prompt_agent(brief: str, entry: str, text: str) -> None:
     """Send text to a recorded client of the brief once its pane holds that same client.
 
     The target is a recorded role, never a pane: an unrecorded or replaced client is refused.
-    A timeout leaves delivery unknown, so the error says not to resend blindly.
+    Any failure of the prompt call, including Herdr's own timeout, may come after the text
+    reached the client, so the error says delivery is unknown and not to resend blindly.
     """
     record = record_for(brief)
     if record is None:
@@ -1831,10 +1832,10 @@ def prompt_agent(brief: str, entry: str, text: str) -> None:
         raise RuntimeError(f"{allocation['name']} is not running in {allocation['pane']}")
     try:
         herdr("agent", "prompt", allocation["name"], text)
-    except subprocess.TimeoutExpired as error:
+    except (subprocess.TimeoutExpired, RuntimeError, ValueError) as error:
         raise RuntimeError(
-            f"Prompt to {allocation['name']} timed out after it was sent; it may have been "
-            "delivered. Read the agent's records before sending it again."
+            f"Prompt to {allocation['name']} failed ({error}); it may have been delivered. "
+            "Read the agent's records before sending it again."
         ) from error
     print(f"Prompted {allocation['name']}")
 
