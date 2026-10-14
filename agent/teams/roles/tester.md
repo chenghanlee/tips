@@ -37,6 +37,20 @@ separate worktree checked out at the PR head.
 6. Other tester: send your review URL to the merge-confirming tester.
 7. A new head invalidates every LGTM. Review the changes since your last review.
 
+## Revert a broken main
+
+Merge-confirming tester, when the dispatcher asks you to revert PR `<pr>`:
+
+1. From your own checkout, run `gh pr revert <pr>`. It opens a revert PR; do not edit it.
+2. Wait for its required checks:
+   `timeout "$TIPS_CHECK_TIMEOUT_SECONDS" gh pr checks <revert> --watch --required`.
+3. If they pass, merge it with
+   `gh pr merge <revert> --merge --match-head-commit <sha>` and send `done` to the
+   dispatcher with the revert PR URL.
+4. If a check fails, or finding the cause needs access outside your allocation, send
+   `blocked` with the run link and the exact error. Do not diagnose outside your
+   allocation.
+
 ## Messages you send
 
 - Launch request to the dispatcher for missing reviewers.

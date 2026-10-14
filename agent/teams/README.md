@@ -197,10 +197,9 @@ not run or retry a denied command on another agent's behalf.
 
 If an implementer's failing check also fails on the latest `main` run, the implementer
 reports `blocked` with both run links. The dispatcher asks the merge-confirming tester
-of the affected brief to revert the PR that broke `main`: the tester runs
-`gh pr revert <pr>` from its own checkout, merges the revert after the required checks
-pass and reports `done`. Diagnosis that needs access outside the tester's allocation
-goes to the user. Then fix the original issue.
+of the affected brief to revert the PR that broke `main` with its
+[revert task](roles/tester.md#revert-a-broken-main). Diagnosis that needs access outside
+the tester's allocation goes to the user. Then fix the original issue.
 
 ## Constraints
 

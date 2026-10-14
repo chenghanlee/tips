@@ -76,9 +76,9 @@ team (`retire_team`).
 
 When an implementer reports `blocked` because its failing check also fails on the
 latest `main` run, find the PR that broke `main`. Ask the merge-confirming tester of
-the affected brief, with `prompt_agent`, to open the revert from its own checkout
-(`gh pr revert <pr>`), merge it after the required checks pass, and report `done`.
-If the cause needs diagnosis outside that tester's allocation, report it to the user.
+the affected brief, with `prompt_agent`, to run its
+[revert task](tester.md#revert-a-broken-main) for that PR. If the tester reports
+`blocked` because the cause needs diagnosis outside its allocation, report it to the user.
 
 ## Liveness
 
