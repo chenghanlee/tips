@@ -52,7 +52,7 @@ Run them from the root of your checkout. The dispatcher's `start_pair`,
 | `agent/teams/team.py stop <brief>` | Dispatcher | Refuse dirty, unmerged or foreign-owned work. Stop every recorded client and Dexter, drop the slot's databases, remove its worktrees, branch and workspace, delete the record. |
 | `agent/teams/team.py status` | Dispatcher, user | Every allocation record with each client's live Herdr pane, name, kind, state and session, and whether the recorded dispatcher process runs. |
 | `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. |
-| `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment or only those after a checkpoint. |
+| `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment; with `--after`, only the comments after that checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | Tokens per launched session and model, from the session logs. |
 | `agent/teams/pr_review.py list <pr>` | Any agent | Recent reviews and every unresolved thread. |
 | `agent/teams/pr_review.py resolve <thread>` | Thread opener | Resolve your own thread. |

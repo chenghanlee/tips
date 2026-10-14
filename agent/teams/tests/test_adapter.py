@@ -238,3 +238,18 @@ class AdapterTest(Harness):
         create = ["issue", "create", "--repo", "o/r", "--title", "Spec", "--body-file", "-"]
         assert creates == [["gh", *create]]
 
+
+    def test_board_read_after_a_comment_reaches_new_comments_on_a_long_issue(self) -> None:
+        self.update(issues={"29": "spec " * 2000})
+
+        async def steps(client: Any) -> None:
+            await self.call(client, "board_post", issue=29, comment_type="EVENT", body="first")
+            await self.call(client, "board_post", issue=29, comment_type="EVENT", body="second")
+            full = await self.call(client, "board_read", issue=29)
+            assert "[truncated:" in full
+            later = await self.call(client, "board_read", issue=29, after_comment_id=1)
+            assert "second" in later
+            assert "first" not in later
+            assert "spec spec" not in later
+
+        self.session(steps)

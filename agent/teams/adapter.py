@@ -259,7 +259,7 @@ def issue_create(title: Title, body: Body) -> str:
 
 @server.tool()
 def board_read(issue: Number, after_comment_id: Number | None = None) -> str:
-    """An issue body and its comments, or only comments after the given comment id."""
+    """An issue body and its comments, or only the comments after the given comment id."""
     return operate(lambda: board.read_text(str(issue), after_comment_id))
 
 

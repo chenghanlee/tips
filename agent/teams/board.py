@@ -100,7 +100,8 @@ def post(args: argparse.Namespace) -> None:
 
 
 def read_text(issue: str, after: int | None) -> str:
-    """The issue URL and body, then every comment, or only comments after comment id `after`."""
+    """The issue URL and body, then every comment; with `after`, the URL and only the
+    comments after that comment id, so new comments stay reachable on a long issue."""
     output = run(
         "gh", "issue", "view", issue, *repo_args(), "--json", "url,body", timeout=github_seconds()
     )
@@ -108,7 +109,7 @@ def read_text(issue: str, after: int | None) -> str:
     comments = issue_comments(issue)
     if after is not None:
         comments = [c for c in comments if int(str(c["id"])) > after]
-    parts = [f"{view['url']}\n{view['body']}"]
+    parts = [view["url"] if after is not None else f"{view['url']}\n{view['body']}"]
     for comment in comments:
         parts.append(f"\n--- {comment['html_url']} {comment['created_at']}\n{comment['body']}")
     return "\n".join(parts)
