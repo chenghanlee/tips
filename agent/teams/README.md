@@ -32,23 +32,28 @@ DISPATCHER   team.py stop <brief> → every client runs retirement.py → team.p
 Agents are `[agents.<entry>]` entries in [config.toml](config.toml). A brief names its
 agents: `Implementer: <entry>` and `Required reviews: <entry>, <entry>`, testers first.
 The first tester confirms the merge. A launched client is `team-<slot>-<entry>` in
-Herdr; records use the entry name. Launches are recorded in the trusted root's
+Herdr; records use the entry name. Launches are recorded in the harness root's
 `state/<slot>.json`, with each client's allocation and task-submission state.
 `start`, `design`, `review`, `reset` and `stop` read this record and run one at a time
 ([launch recovery](SETUP.md#launch-recovery)).
 
 ### Allocations
 
-The trusted root is `${XDG_DATA_HOME:-~/.local/share}/tips-agent-teams/<key>/`, where the
-key is derived from `team.repository` in config.toml. Each launch creates an allocation
-whose ID (`g<generation>-<entry>`) never repeats:
+The harness root is `agent_teams/<repository name>/` beside the main checkout (for this
+repository, `../agent_teams/tips/`). An absolute `TIPS_TEAM_HARNESS` names
+`<root>/harness` instead, and an installed harness uses the root its `install.json`
+records. `team.py` creates the root on first use with `repository.json` naming
+`github.repository`, and refuses a root that names another repository, including
+another owner's repository with the same name. Each launch creates an allocation whose
+ID (`g<generation>-<entry>`) never repeats:
 
 | Path | Holds | Written by |
 |---|---|---|
 | `allocations/<id>/` | The client's working directory | The client |
 | `allocations/<id>/project/` | The client's own clone; empty until `bootstrap.py` runs | The client |
 | `allocations/<id>/logs/` | Full logs of `bootstrap.py` | The client |
-| `state/<id>/bootstrap.json` | What to clone and check out, the Dexter binary and sources, the entry's probe | `team.py` |
+| `state/<id>/bootstrap.json` | The issue and entry, what to clone and check out, the Dexter binary and sources | `team.py` |
+| `state/<id>/retired.json` | What `stop` retained and why | `team.py` |
 | `state/<slot>.json`, `state/.lock`, `state/generation` | Records, the store lock, the last generation | `team.py` |
 
 `team.py` runs no Git, Mix or Dexter command in a project. The client does:
@@ -56,11 +61,14 @@ whose ID (`g<generation>-<entry>`) never repeats:
 implementer on `task/<brief>`, others detached at the commit or at `origin/main`), or
 fetches an existing clone without resetting it. With `--commit`, it refuses a dirty
 clone and a commit that is not on origin. Then it runs `mix deps.get --check-locked` when
-`deps/` is missing, writes the git-ignored Dexter wrapper and skills link, starts Dexter,
-updates its index and runs the entry's `probe`, if any. The console shows at most 8 KiB;
+`deps/` is missing, writes the git-ignored Dexter wrapper and skills link, starts Dexter
+and updates its index. Running them is the proof that the client can clone, fetch and
+index. The console shows at most 8 KiB;
 the full log is in `logs/`. Each database name is `tips_test` or `tips_dev`, then
 `db_suffix_prefix`, the slot, `g`, the generation and the entry's `db_suffix`, so no
 generation reuses another's databases.
+
+**Accepted risk.** Workers retain broad authority. Mistakes, misleading instructions or deliberate actions can modify the harness, records or other allocations, and a worker can perform an operation the dispatcher asks for outside the dispatcher's tool surface. Restricted dispatcher tools remove its direct execution authority (RP8c direct retry prevented) but do not enforce a worker or deputy boundary; the no-proxy rule stays procedural. The sibling root reduces accidental edits from ordinary checkout operations; it does not prevent absolute-path writes. Shared-state corruption can defeat recovery assumptions or lose work. Accepted for this MVP. Revisit after an unauthorized cross-allocation or control-file write, or a delegated denial bypass, in normal use. E0's failures stay recorded as facts, not as passing tests.
 
 ## Commands
 
@@ -76,6 +84,7 @@ Run worker commands from your own allocation. The dispatcher runs `start`, `desi
 | `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create its allocation, configured for the PR head, with its own database suffix and port, and launch the reviewer in the team's workspace. |
 | `agent/teams/team.py reset <issue> <entry>` | Operator | Record the operator's decision, after checking a stopped client's work on the issue and PR, that `start`, `design` or `review` may launch a replacement in the same allocation that gets the task again. Refuse a running client. |
 | `agent/teams/team.py stop <issue>` | Dispatcher | See [Retirement](#retirement). |
+| `agent/teams/team.py clean` | Operator | List retained allocations with their reasons. Deletes nothing. |
 | `python3 <harness>/bootstrap.py [--commit <sha>]` | Launched client | Prepare your own clone, as [Allocations](#allocations) says. |
 | `python3 <harness>/retirement.py` | Launched client | Fetch origin, then post your clone's state on the issue: clean, unpushed commits, HEAD merged into `origin/main`. Changes nothing. |
 | `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. |
@@ -126,7 +135,11 @@ every resource reserved. With every report, it:
    retained paths and reasons, and deletes the record.
 
 Project and log files are never deleted: a process outside the pane can still write
-there. Check `retired.json`, then remove them by hand. A design team keeps its databases.
+there. `agent/teams/team.py clean` lists each retained allocation with its reasons and
+deletes nothing. The operator deletes one by hand, naming its ID
+(`rm -rf <root>/allocations/<id>`), only after establishing that its work is preserved
+and every writer has stopped; an earlier listing or a closed pane is not enough. If
+unsure, keep it. A design team keeps its databases.
 
 ## Turns
 

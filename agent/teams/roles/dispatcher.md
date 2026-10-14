@@ -10,7 +10,7 @@ trial's hypothesis, measurement table and decision rule are in
 At startup, after each `done` or `blocked` message, and when the user reports a change,
 check [Project 15](https://github.com/users/chenghanlee/projects/15) for milestone
 order. Also check open issues and PRs, running teams (`herdr workspace list`, one workspace per team),
-the team records in the trusted root's `state/` and the latest `main` run.
+the team records in the harness root's `state/` and the latest `main` run.
 
 - Set merged issues Done. An issue with an open question stays Blocked.
 - For each free slot (`team.max_teams` in [config.toml](../config.toml)), take the

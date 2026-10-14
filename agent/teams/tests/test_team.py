@@ -739,7 +739,7 @@ finish()
 )
 
 IDENTITY = ["-c", "user.name=Test", "-c", "user.email=test@example.invalid"]
-# Harness fixtures stay outside temporary directories: bootstrap refuses trusted paths there.
+# Harness fixtures stay outside temporary directories: the harness root refuses them.
 TEST_RUNS = SCRIPT.parents[2] / "tmp/team-tests"
 
 # Stands in for psql: lists PSQL_DBS, drops one name per call, refuses names in PSQL_REFUSE.
