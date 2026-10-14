@@ -467,6 +467,9 @@ PASSING = [
     {"name": "checks", "workflow": "CI", "bucket": "pass", "link": "https://ci/1"},
     {"name": "release", "workflow": "CI", "bucket": "pass", "link": "https://ci/1"},
 ]
+if a[:2] == ["issue", "view"] and "closedBy" in a[-1] and s.get("gh_stalls"):
+    import time
+    time.sleep(30)  # GitHub never answers; the caller's bound must end this
 if a[:2] == ["issue", "view"]:
     body = s.get("issues", {}).get(a[2], "")
     view = {
@@ -2077,6 +2080,23 @@ class RetirementTest(Harness):
         assert f"g1-impl (#29): {project.parent}; files: project and log files" in listed
         assert "databases _t1g1i: dropped" in listed
         assert late.exists()
+
+    def test_a_stalled_github_read_keeps_the_record_and_releases_the_lock(self) -> None:
+        self.merged_pair()
+        self.retire("team-1-impl", "team-1-tester")
+        self.clients_exit(1)
+        self.databases("tips_test_t1g1i")
+        self.write_config(CONFIG.replace("shell_seconds = 15", "shell_seconds = 1"))
+        self.update(gh_stalls=True)
+        started = time.monotonic()
+        refused = self.team("stop", "29", ok=False)
+        assert time.monotonic() - started < 15
+        assert "GitHub did not answer within 1 s whether #29" in refused.stderr
+        assert self.remaining_databases() == ["tips_test_t1g1i"]
+        assert self.recorded_briefs() == {"29"}
+        self.update(gh_stalls=False)
+        self.team("stop", "29")
+        assert self.recorded_briefs() == set()
 
     def test_refused_database_drop_keeps_the_rest_and_the_reservation(self) -> None:
         self.merged_pair()

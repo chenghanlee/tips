@@ -2058,13 +2058,26 @@ def port_in_use(port: int) -> bool:
 
 
 def merged_brief(brief: str) -> bool:
-    """Whether GitHub reports the brief closed by a merged PR."""
+    """Whether GitHub reports the brief closed by a merged PR. stop holds the store lock, so
+    every read shares one timeouts.shell_seconds budget; a late answer keeps the record."""
+    seconds = cfg["timeouts"]["shell_seconds"]
+    deadline = time.monotonic() + seconds
+
+    def read(*args: str) -> object:
+        try:
+            return json.loads(run(*args, timeout=max(deadline - time.monotonic(), 0.01)))
+        except subprocess.TimeoutExpired as error:
+            raise RuntimeError(
+                f"GitHub did not answer within {seconds} s whether #{brief} is closed by a "
+                "merged PR; the record and reservation are kept"
+            ) from error
+
     fields = "state,closedByPullRequestsReferences"
-    view = object_fields(json.loads(run("gh", "issue", "view", brief, "--json", fields)), brief)
+    view = object_fields(read("gh", "issue", "view", brief, "--json", fields), brief)
     if view.get("state") != "CLOSED":
         return False
     for pr in object_list(view.get("closedByPullRequestsReferences") or [], f"#{brief} PRs"):
-        state = json.loads(run("gh", "pr", "view", str(pr.get("number")), "--json", "state"))
+        state = read("gh", "pr", "view", str(pr.get("number")), "--json", "state")
         if object_fields(state, "PR state").get("state") == "MERGED":
             return True
     return False
