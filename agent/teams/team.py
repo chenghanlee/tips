@@ -197,6 +197,8 @@ main: Path
 cfg: Config
 
 
+# --- Processes, JSON validation and Herdr ----------------------------------
+
 def command_args(
     args: Sequence[str | Path | int],
     *,
@@ -462,6 +464,8 @@ def release_name(pane: str, current: Entity) -> None:
                 # Herdr already released it between list and clear.
 
 
+# --- Configuration and the harness root ------------------------------------
+
 def checkout_root(script: Path) -> Path:
     common = Path(
         run("git", "-C", script.parent, "rev-parse", "--path-format=absolute", "--git-common-dir")
@@ -700,6 +704,8 @@ def contained(path: Path, parent: Path) -> Path:
     return path
 
 
+# --- Records and allocations -----------------------------------------------
+
 def allocation_paths(ident: str) -> tuple[Path, Path, Path, Path]:
     """The allocation's directory, its project and logs, and its launcher configuration.
 
@@ -912,6 +918,8 @@ def roster(brief: str) -> tuple[str, list[str], list[str]]:
     return implementer, by_role["tester"], by_role["designer"]
 
 
+# --- GitHub comments -------------------------------------------------------
+
 COMMENT_TYPES = (
     "PROPOSAL",
     "CRITIQUE",
@@ -1038,6 +1046,8 @@ def post_event(brief: str, allocation: Allocation, text: str) -> None:
         ) from error
     print(f"Recorded on #{brief}: {url}")
 
+
+# --- Tools and the client environment --------------------------------------
 
 def dexter_binary() -> Path:
     home = Path(os.environ.get("TIPS_DEXTER_HOME", str(main / "agent/lsp/dexter"))).resolve()
@@ -1256,6 +1266,8 @@ def refuse_foreign_owner(
                 owner = agent.get("name") or agent["pane_id"]
                 raise RuntimeError(f"Conflicting live agent in {root}: {owner}; preserved")
 
+
+# --- Launch: panes, briefs, clients and recovery ---------------------------
 
 def live_workspaces() -> set[str]:
     return {w["workspace_id"] for w in herdr("workspace", "list")["workspaces"]}
@@ -1807,6 +1819,8 @@ def reset(brief: str, entry: str) -> None:
         save_record(record)
 
 
+# --- Handoff and turns -----------------------------------------------------
+
 def checkout_problem(project: Path, head: str) -> str | None:
     """Why the caller's own clone is not the pushed PR head, or None. Runs only from the
     worker's own turn, under its authority."""
@@ -2012,6 +2026,8 @@ def turn(pr: str, recipient: str) -> None:
         hand_to_reviewers(record, me, pr, url, head, known)
     print("End your turn now.")
 
+
+# --- Retirement and stop ---------------------------------------------------
 
 RETIREMENT = "TEAM_RETIREMENT "
 Reports = dict[str, tuple[dict[str, object], str]]
@@ -2372,6 +2388,8 @@ def client_state(allocation: Allocation, panes: set[str], agents: dict[str, Enti
     started = "running" if allocation["session"] else "startup incomplete"
     return f"{head}: {started} in {pane}, {state}; live session {live}, recorded {session}"
 
+
+# --- Dispatcher record, status and CLI -------------------------------------
 
 class DispatcherLaunch(TypedDict):
     """The launched dispatcher client: its process id and start time, pane and session.
