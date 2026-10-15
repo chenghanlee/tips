@@ -53,11 +53,13 @@ class InstallTest(unittest.TestCase):
         self.git("commit", "-q", "-m", message)
         return self.git("rev-parse", "HEAD")
 
-    def install(self, commit: str, ok: bool = True, root: Path | None = None) -> str:
-        script = self.source / "agent/teams/install.py"
+    def install(
+        self, commit: str, ok: bool = True, root: Path | None = None, cwd: Path | None = None
+    ) -> str:
+        script = (cwd or self.source) / "agent/teams/install.py"
         result = execute(
             ["python3", script, commit, "--root", root or self.root],
-            cwd=self.source,
+            cwd=cwd or self.source,
             env=self.env,
             timeout=300,
         )
@@ -105,6 +107,16 @@ class InstallTest(unittest.TestCase):
         self.git("update-ref", "refs/remotes/origin/main", "HEAD")
         self.install(marked)
         execute([self.installed() / "agent/teams/.venv/bin/python", "-c", "pass"], check=True)
+
+    def test_a_linked_worktree_is_refused_before_anything_is_written(self) -> None:
+        linked = self.source.parent / "linked"
+        self.git("worktree", "add", "-q", "--detach", str(linked), self.first)
+        refused = self.install(self.first, ok=False, cwd=linked)
+        assert f"Run install.py from the main checkout {self.source}, not a worktree" in refused
+        assert not (self.root / "harness").exists()
+        assert not (self.root / "releases").exists()
+        assert not (self.root / "repository.json").exists()
+        self.operator_data_kept()
 
     def test_refuses_dirty_unreviewed_busy_or_foreign_installs(self) -> None:
         (self.source / "AGENTS.md").write_text("Uncommitted.\n")

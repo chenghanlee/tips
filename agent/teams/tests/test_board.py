@@ -188,6 +188,39 @@ class BoardTest(Harness):
             tester + "fixture-test | 10 | 5 | 100 | 20 |",
         ]
 
+    def test_usage_takes_an_unknown_launch_session_from_the_clients_next_comment(self) -> None:
+        launch = "launched codex in /a; allocation g1-sol-tester"
+        self.update(
+            comments={
+                "29": [
+                    comment(1, 0, event("tester", "team-1-sol-tester", "unknown", launch)),
+                    comment(2, 1, event("dispatcher", "dispatcher", "s-d", "board changed")),
+                    comment(3, 2, event("tester", "team-1-sol-tester", "unknown", "stopped")),
+                    comment(4, 3, "HANDOFF tester team-1-sol-tester s-sol\nReady for review"),
+                    comment(5, 4, "HANDOFF tester team-1-sol-tester s-other\nlater"),
+                    # A relaunch whose client never posted keeps its unknown session.
+                    comment(6, 5, event("tester", "team-1-sol-tester", "unknown", launch)),
+                ]
+            }
+        )
+        codex = self.root / "home/.codex/sessions/2026/10/12"
+        codex.mkdir(parents=True)
+        usage = {"input_tokens": 30, "cached_input_tokens": 10, "output_tokens": 4}
+        (codex / "rollout-2026-10-12T10-00-00-s-sol.jsonl").write_text(
+            json.dumps({"type": "turn_context", "payload": {"model": "fixture-sol"}})
+            + "\n"
+            + json.dumps(
+                {"type": "token_usage_record", "payload": {"response_id": "r1", "usage": usage}}
+            )
+            + "\n"
+        )
+        home = {"HOME": str(self.root / "home")}
+        rows = self.board("usage", "29", env=home).stdout.splitlines()
+        assert rows[2:] == [
+            "| team-1-sol-tester | tester | s-sol | fixture-sol | 20 | 4 | 10 | 0 |",
+            "| team-1-sol-tester | tester | unknown | no logs found | 0 | 0 | 0 | 0 |",
+        ]
+
 
 if __name__ == "__main__":
     unittest.main()

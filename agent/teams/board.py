@@ -199,15 +199,31 @@ def codex_tokens(session: str) -> dict[str, list[int]]:
 
 
 def launched_sessions(issues: list[str]) -> list[tuple[str, str, str]]:
-    """Return unique (name, role, session) tuples from launch EVENTs, sorted by name."""
+    """Return unique (name, role, session) tuples from launch EVENTs, sorted by name.
+
+    Codex reports its session to Herdr only after startup, so its launch EVENT may say
+    "unknown" (#451). The client's next comment on the issue carries the real session in
+    its header, and that session replaces "unknown"; without one, "unknown" stays.
+    """
     found: set[tuple[str, str, str]] = set()
     for issue in issues:
+        pending: dict[str, str] = {}
         for comment in issue_comments(issue):
             lines = str(comment.get("body") or "").splitlines()
             match = HEADER.match(lines[0]) if lines else None
+            if not match:
+                continue
+            name, role, session = match["name"], match["role"], match["session"]
             launched = len(lines) > 1 and lines[1].split()[:1] == ["launched"]
-            if match and match["type"] == "EVENT" and launched:
-                found.add((match["name"], match["role"], match["session"]))
+            if match["type"] == "EVENT" and launched:
+                pending.pop(name, None)
+                if session == "unknown":
+                    pending[name] = role
+                else:
+                    found.add((name, role, session))
+            elif name in pending and session != "unknown":
+                found.add((name, pending.pop(name), session))
+        found.update((name, role, "unknown") for name, role in pending.items())
     return sorted(found)
 
 

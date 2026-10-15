@@ -669,9 +669,11 @@ elif a[:2] == ["pane", "rename"]:
     pane(a[2])["label"] = a[3]
 elif a[:2] == ["pane", "process-info"]:
     x = pane(opt("--pane"))
-    leader = 200 if x.get("agent") or x.get("busy") else 100
+    # An exited client may still be listed as an agent while its shell leads again.
+    live = (x.get("agent") or x.get("busy")) and not x.get("exited")
+    leader = 200 if live else 100
     processes = [{"pid": leader, "cwd": x["cwd"]}]
-    if x.get("agent"):
+    if live:
         # An LSP child shares the foreground group but runs elsewhere.
         processes.append({"pid": 201, "cwd": "/opt/homebrew/lsp-child"})
     result = {
@@ -2109,6 +2111,35 @@ class RetirementTest(Harness):
         assert self.recorded_briefs() == {"30"}
         assert self.pane("team-2-impl")["agent"] == "codex"
         assert "nothing removed" in self.team("stop", "29").stdout
+
+    def test_stop_skips_a_stale_listing_of_its_exited_client_but_not_a_new_occupant(self) -> None:
+        self.merged_pair()
+        self.retire("team-1-impl", "team-1-tester")
+        self.clients_exit(1)
+        state = self.state()
+        impl = next(x for x in state["panes"] if x.get("label") == "team-1-impl")
+
+        def occupy(**agent: object) -> None:
+            state = self.state()
+            pane = next(x for x in state["panes"] if x["pane_id"] == impl["pane_id"])
+            for key in ("name", "exited"):
+                pane.pop(key, None)
+            pane.update(agent)
+            self.save(state)
+
+        # A live unnamed client, or a client with another name, in the recorded pane.
+        occupy(agent="claude")
+        refused = self.team("stop", "29", ok=False)
+        assert f"Conflicting live agent in {self.project('team-1-impl').parent}" in refused.stderr
+        occupy(agent="claude", name="visitor", exited=True)
+        refused = self.team("stop", "29", ok=False)
+        assert "Conflicting live agent" in refused.stderr
+        assert ": visitor; preserved" in refused.stderr
+        assert self.recorded_briefs() == {"29"}
+        # Herdr still lists the exited client, unnamed, while its shell leads the pane.
+        occupy(agent="claude", exited=True)
+        assert "slot 1 released" in self.team("stop", "29").stdout
+        assert self.recorded_briefs() == set()
 
     def test_a_report_from_an_earlier_launch_is_no_evidence_for_the_current_one(self) -> None:
         self.merged_pair()
