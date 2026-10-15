@@ -139,9 +139,11 @@ and its [role files](roles/dispatcher.md), read by the launcher before start.
 
 A restricted client reports no session to Herdr. The launcher execs the client, which
 keeps the launcher's process ID, so it records that ID, its start time, the pane and the
-session in `state/dispatcher.json` under the [harness root](#install-a-harness-release). It names the pane
-`dispatcher` only when Herdr's foreground client is that process. It refuses to start
-while that process runs, or while an unrecorded agent is named `dispatcher`.
+session in `state/dispatcher.json` under the [harness root](#install-a-harness-release). When Herdr shows
+that process in the pane, ready for input, it names the pane `dispatcher` and sends the
+first prompt, `Begin.`, through Herdr. If that does not happen within
+`timeouts.launch_seconds`, a Herdr notification names the command to run. It refuses to
+start while that process runs, or while an unrecorded agent is named `dispatcher`.
 
 From a plain shell in a Herdr pane (`HERDR_ENV=1`) at the main checkout:
 

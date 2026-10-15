@@ -48,7 +48,10 @@ if Path(sys.argv[0]).name == "herdr":
     elif args[:2] == ["agent", "list"]:
         result = {"agents": agents}
     elif args[:2] == ["agent", "get"]:
-        result = {"agent": {"pane_id": args[2], "agent": "claude"}}
+        status = os.environ.get("AGENT_STATUS", "idle")
+        result = {"agent": {"pane_id": args[2], "agent": "claude", "agent_status": status}}
+    elif args[:2] == ["agent", "prompt"] and os.environ.get("PROMPT_FAILS"):
+        sys.exit("agent_prompt_stalled")
     elif args[:2] == ["pane", "process-info"]:
         leader = int(client.read_text()) if client.exists() else 1
         leader = 1 if os.environ.get("FOREIGN_CLIENT") else leader
@@ -116,15 +119,14 @@ class DispatchTest(unittest.TestCase):
     def launch_record(self) -> dict[str, Any]:
         return json.loads((self.state / "dispatcher.json").read_text())
 
-    def renamed(self, seconds: float = 10) -> list[list[Any]]:
-        """Wait for the detached namer's rename; return the rename calls."""
+    def herdr_calls(self, *prefix: str, seconds: float = 10) -> list[list[Any]]:
+        """Wait for the detached starter's Herdr calls with this prefix; return them."""
         deadline = time.monotonic() + seconds
-        while time.monotonic() < deadline:
-            renames = [c for c in self.calls("herdr") if c[1][:2] == ["agent", "rename"]]
-            if renames:
-                return renames
+        while True:
+            calls = [c[1] for c in self.calls("herdr") if c[1][: len(prefix)] == list(prefix)]
+            if calls or time.monotonic() >= deadline:
+                return calls
             time.sleep(0.05)
-        return []
 
     def test_new_pane_runs_the_launcher_there_with_the_callers_config(self) -> None:
         self.dispatch("--new-pane")
@@ -162,9 +164,9 @@ class DispatchTest(unittest.TestCase):
         prompt = args[args.index("--system-prompt") + 1]
         for name in DOCUMENTS:
             assert f"Trusted {name} text." in prompt, name
-        # No instruction asks a tool-less model to rename itself or read files.
-        assert args[-1] == "Begin."
-        assert "herdr" not in args[-1]
+        # No command-line prompt: the first turn waits for the client to be ready.
+        assert args[-2] == "--system-prompt"
+        assert "Begin." not in args
         assert env["CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"] == "42"
         assert cwd == str(self.root)
         assert args[args.index("--model") + 1] == "test-model"
@@ -181,7 +183,15 @@ class DispatchTest(unittest.TestCase):
         assert record["started"]
         session = self.calls("claude")[-1][1]
         assert record["session"] == session[session.index("--session-id") + 1]
-        assert [call[1] for call in self.renamed()] == [["agent", "rename", "caller", "dispatcher"]]
+        assert self.herdr_calls("agent", "prompt") == [["agent", "prompt", "caller", "Begin."]]
+        # Named first, then prompted through Herdr, once each.
+        started = [c[1] for c in self.calls("herdr") if c[1][0] == "agent" and c[1][1] != "get"]
+        assert started == [
+            ["agent", "list"],
+            ["agent", "rename", "caller", "dispatcher"],
+            ["agent", "prompt", "caller", "Begin."],
+        ]
+        assert not self.herdr_calls("notification", seconds=0)
 
     def test_the_root_is_created_on_first_use_and_must_name_the_repository(self) -> None:
         root = self.state.parent
@@ -221,9 +231,26 @@ class DispatchTest(unittest.TestCase):
         assert not self.calls("claude")
         assert not self.calls("herdr")
 
-    def test_the_namer_leaves_a_pane_whose_client_is_not_the_launched_process(self) -> None:
+    def test_the_starter_leaves_a_pane_whose_client_is_not_the_launched_process(self) -> None:
         self.dispatch(CLIENT_SECONDS="3", FOREIGN_CLIENT="1")
-        assert not self.renamed(seconds=4)
+        assert not self.herdr_calls("agent", "rename", seconds=4)
+        assert not self.herdr_calls("agent", "prompt", seconds=0)
+
+    def test_a_client_never_ready_or_a_failed_prompt_names_the_operator_command(self) -> None:
+        self.config.write_text(
+            self.config.read_text().replace("launch_seconds = 120", "launch_seconds = 2")
+        )
+        command = 'herdr agent prompt caller "Begin."'
+        # (case, Herdr's agent status, whether the prompt fails)
+        for case, status, fails in (("never ready", "unknown", ""), ("fails", "idle", "1")):
+            with self.subTest(case=case):
+                self.log.unlink(missing_ok=True)
+                self.dispatch(CLIENT_SECONDS="4", AGENT_STATUS=status, PROMPT_FAILS=fails)
+                shown = self.herdr_calls("notification", "show", seconds=6)
+                assert len(shown) == 1 and command in shown[0][-1], shown
+                prompts = self.herdr_calls("agent", "prompt", seconds=0)
+                sent = [] if case == "never ready" else [["agent", "prompt", "caller", "Begin."]]
+                assert prompts == sent, prompts
 
     def test_model_setting_controls_model_and_advisor(self) -> None:
         for model in ("claude-fable-5-1", ""):
