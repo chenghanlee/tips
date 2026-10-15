@@ -188,6 +188,50 @@ class BoardTest(Harness):
             tester + "fixture-test | 10 | 5 | 100 | 20 |",
         ]
 
+    def test_usage_takes_an_unknown_launch_session_from_the_clients_later_comments(self) -> None:
+        tester = "launched codex in /a; allocation g1-sol-tester"
+        critic = "launched codex in /b; allocation g1-critic"
+        self.update(
+            comments={
+                # Launch EVENTs go on the brief; a reset's replacement posts the same body,
+                # which is deduplicated, so the brief shows one launch for both clients.
+                "29": [
+                    comment(1, 1, event("tester", "team-1-sol-tester", "unknown", tester)),
+                    comment(2, 2, event("critic", "team-1-critic", "unknown", critic)),
+                    comment(3, 3, event("tester", "team-1-sol-tester", "unknown", "stopped")),
+                ],
+                # The clients post on the PR. An earlier comment under the name is no launch.
+                "30": [
+                    comment(10, 0, event("tester", "team-1-sol-tester", "s-old", "earlier")),
+                    comment(11, 4, event("tester", "team-1-sol-tester", "s-sol", "Done")),
+                    comment(12, 5, event("dispatcher", "dispatcher", "s-d", "board changed")),
+                    comment(13, 6, "HANDOFF tester team-1-sol-tester s-sol\nReady"),
+                    comment(14, 7, event("tester", "team-1-sol-tester", "s-new", "Done again")),
+                ],
+            }
+        )
+        codex = self.root / "home/.codex/sessions/2026/10/12"
+        codex.mkdir(parents=True)
+        usage = {"input_tokens": 30, "cached_input_tokens": 10, "output_tokens": 4}
+        (codex / "rollout-2026-10-12T10-00-00-s-sol.jsonl").write_text(
+            json.dumps({"type": "turn_context", "payload": {"model": "fixture-sol"}})
+            + "\n"
+            + json.dumps(
+                {"type": "token_usage_record", "payload": {"response_id": "r1", "usage": usage}}
+            )
+            + "\n"
+        )
+        home = {"HOME": str(self.root / "home")}
+        rows = self.board("usage", "29", "30", env=home).stdout.splitlines()
+        assert rows[2:] == [
+            "| team-1-critic | critic | unknown | no logs found | 0 | 0 | 0 | 0 |",
+            "| team-1-sol-tester | tester | s-new | no logs found | 0 | 0 | 0 | 0 |",
+            "| team-1-sol-tester | tester | s-sol | fixture-sol | 20 | 4 | 10 | 0 |",
+        ]
+        # The brief alone has no client comments: the tester stays unknown.
+        rows = self.board("usage", "29", env=home).stdout.splitlines()
+        assert "| team-1-sol-tester | tester | unknown | no logs found | 0 | 0 | 0 | 0 |" in rows
+
 
 if __name__ == "__main__":
     unittest.main()

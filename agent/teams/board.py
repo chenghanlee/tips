@@ -199,15 +199,34 @@ def codex_tokens(session: str) -> dict[str, list[int]]:
 
 
 def launched_sessions(issues: list[str]) -> list[tuple[str, str, str]]:
-    """Return unique (name, role, session) tuples from launch EVENTs, sorted by name."""
+    """Return unique (name, role, session) tuples from launch EVENTs, sorted by name.
+
+    Codex reports its session to Herdr only after startup, so its launch EVENT may say
+    "unknown" (#451). Its client's later comment headers, on any of the issues or PRs
+    given, carry the real session: every known session in them counts, so a replacement
+    client after a reset counts too. With none, the "unknown" row stays.
+    """
+    comments = [c for issue in issues for c in issue_comments(issue)]
+    comments.sort(key=lambda c: (str(c.get("created_at")), int(str(c.get("id")))))
     found: set[tuple[str, str, str]] = set()
-    for issue in issues:
-        for comment in issue_comments(issue):
-            lines = str(comment.get("body") or "").splitlines()
-            match = HEADER.match(lines[0]) if lines else None
-            launched = len(lines) > 1 and lines[1].split()[:1] == ["launched"]
-            if match and match["type"] == "EVENT" and launched:
-                found.add((match["name"], match["role"], match["session"]))
+    unresolved: dict[str, str] = {}
+    roles: dict[str, str] = {}
+    for comment in comments:
+        lines = str(comment.get("body") or "").splitlines()
+        match = HEADER.match(lines[0]) if lines else None
+        if not match:
+            continue
+        name, role, session = match["name"], match["role"], match["session"]
+        launched = len(lines) > 1 and lines[1].split()[:1] == ["launched"]
+        if match["type"] == "EVENT" and launched and session == "unknown":
+            roles[name] = role
+            unresolved.setdefault(name, role)
+        elif match["type"] == "EVENT" and launched:
+            found.add((name, role, session))
+        elif name in roles and session != "unknown":
+            found.add((name, roles[name], session))
+            unresolved.pop(name, None)
+    found.update((name, role, "unknown") for name, role in unresolved.items())
     return sorted(found)
 
 

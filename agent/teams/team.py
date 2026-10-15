@@ -1237,10 +1237,20 @@ def inside(path: Path, root: Path) -> bool:
     return path == root or root in path.parents
 
 
-def refuse_foreign_owner(roots: list[Path], names: list[str]) -> None:
-    """Only the assigned clients may work in their allocations."""
+def refuse_foreign_owner(
+    roots: list[Path], names: list[str], recorded: frozenset[str] = frozenset()
+) -> None:
+    """Only the assigned clients may work in their allocations.
+
+    Herdr keeps listing a just-stopped client as an unnamed agent for a while (#451). That
+    stale entry is skipped only in a recorded pane whose shell again leads the foreground,
+    so no client process runs there; any other live agent is still refused.
+    """
     for agent in herdr("agent", "list")["agents"]:
-        cwd = pane_occupant(agent["pane_id"])[0]
+        pane = agent["pane_id"]
+        cwd, occupied = pane_occupant(pane)
+        if pane in recorded and not agent.get("name") and not occupied:
+            continue
         for root in roots:
             if agent.get("name") not in names and inside(cwd, root):
                 owner = agent.get("name") or agent["pane_id"]
@@ -2288,7 +2298,8 @@ def stop_brief(brief: str) -> None:
         paths = [retirement_paths(a) for a in record["agents"].values()]
         roots = [root for root, *_ in paths]
         names = [a["name"] for a in record["agents"].values()]
-        refuse_foreign_owner(roots, names)
+        panes = frozenset(a["pane"] for a in record["agents"].values())
+        refuse_foreign_owner(roots, names, panes)
         reports = retirement_reports(record)
         present = {
             e: a for e, a in record["agents"].items() if running_client(record, a) is not None
@@ -2310,7 +2321,7 @@ def stop_brief(brief: str) -> None:
         verify_present(present)
         for allocation in present.values():
             stop(allocation["pane"], allocation["root"])
-        refuse_foreign_owner(roots, names)
+        refuse_foreign_owner(roots, names, panes)
         # Rechecked at the close itself: a pane may have arrived during the shutdown.
         if require_only_recorded_panes(record):
             herdr("workspace", "close", record["workspace"])

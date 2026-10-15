@@ -163,6 +163,12 @@ def main() -> None:
     source = Path.cwd().resolve()
     if Path(git(source, "rev-parse", "--show-toplevel")).resolve() != source:
         raise RuntimeError("Run install.py from the root of the main checkout")
+    # A linked worktree would record itself as the source the release reads (#451).
+    own = Path(git(source, "rev-parse", "--absolute-git-dir")).resolve()
+    common = Path(git(source, "rev-parse", "--path-format=absolute", "--git-common-dir"))
+    if own != common.resolve():
+        main_checkout = common.resolve().parent
+        raise RuntimeError(f"Run install.py from the main checkout {main_checkout}, not a worktree")
     release = install(source, args.commit, args.root)
     print(f"Installed {release}; {release.parent.parent / 'harness'} points at it")
 
