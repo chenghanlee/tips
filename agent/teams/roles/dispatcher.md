@@ -42,7 +42,8 @@ implementer's `blocked` with both run links.
    set Kind, Feature and Phase (`project_set_field`). Briefs are added the same way.
    Post your own session with `board_post`, type EVENT, body `launched claude`;
    the header carries your session. `usage_summary` counts every session a `launched`
-   EVENT names. Write the agent set in the body: designers and the lead, testers and the
+   EVENT names. A Codex launch may name its session `unknown`; the client's own comments
+   show it, so pass the briefs' PRs with the issues. Write the agent set in the body: designers and the lead, testers and the
    merge-confirming tester, the reviewing designer, each an `[agents.<entry>]` entry.
 2. Launch each designer with `start_design` (spec, entry). Each gets its own allocation
    and clone, with its own database suffix and port, and its launch EVENT on the spec.
