@@ -2122,7 +2122,7 @@ class RetirementTest(Harness):
         def occupy(**agent: object) -> None:
             state = self.state()
             pane = next(x for x in state["panes"] if x["pane_id"] == impl["pane_id"])
-            for key in ("name", "exited"):
+            for key in ("agent", "name", "exited"):
                 pane.pop(key, None)
             pane.update(agent)
             self.save(state)
@@ -2136,6 +2136,20 @@ class RetirementTest(Harness):
         assert "Conflicting live agent" in refused.stderr
         assert ": visitor; preserved" in refused.stderr
         assert self.recorded_briefs() == {"29"}
+        occupy()
+        # The same listing in a pane the record does not hold is refused.
+        stray = {
+            "pane_id": "wX:p9",
+            "workspace_id": "wX",
+            "agent": "claude",
+            "exited": True,
+            "cwd": str(self.project("team-1-impl")),
+        }
+        self.update(strays=[stray])
+        refused = self.team("stop", "29", ok=False)
+        assert "Conflicting live agent" in refused.stderr
+        assert ": wX:p9; preserved" in refused.stderr
+        self.update(strays=[])
         # Herdr still lists the exited client, unnamed, while its shell leads the pane.
         occupy(agent="claude", exited=True)
         assert "slot 1 released" in self.team("stop", "29").stdout
