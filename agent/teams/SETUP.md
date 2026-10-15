@@ -34,7 +34,7 @@ gh project field-create <number> --owner <owner> --name Implementer --data-type 
 
 The dispatcher edits fields with `gh project item-edit`. The `gh` token needs the `project` scope.
 
-Install Python 3.12 and the [configured client CLIs](config.toml). Authenticate the clients and the GitHub CLI (`gh`) for this repository. Agents also need GNU `timeout` (macOS: `brew install coreutils`) and `unbuffer` (Expect): the Elixir skill requires it on Mix commands. Testers use `agent-browser` for manual browser review.
+Install Python 3.12 and the [configured client CLIs](config.toml). Create the dispatcher's locked environment once per checkout, as in [development](development.md#dependencies-and-test-isolation), or install a harness release (below). Authenticate the clients and the GitHub CLI (`gh`) for this repository. Agents also need GNU `timeout` (macOS: `brew install coreutils`) and `unbuffer` (Expect): the Elixir skill requires it on Mix commands. Testers use `agent-browser` for manual browser review.
 
 The user maintains third-party skills in these Git-ignored directories in the main checkout:
 
@@ -130,6 +130,34 @@ permission flow. See [Claude auto-mode configuration](https://code.claude.com/do
 
 ## Start the dispatcher
 
+The launcher starts Claude in restricted mode with no built-in tools (`--restricted
+--tools ""`) and one MCP server, [adapter.py](adapter.py), under `--strict-mcp-config`.
+The launcher sets the server, `--settings`, the session ID and the environment. User,
+project and local settings files, CLAUDE.md files, other MCP servers and Remote Control
+are not loaded. The dispatcher's system prompt is AGENTS.md, the [workflow](README.md)
+and its [role files](roles/dispatcher.md), read by the launcher before start.
+
+A restricted client reports no session to Herdr. The launcher execs the client, which
+keeps the launcher's process ID, so it records that ID, its start time, the pane and the
+session in `state/dispatcher.json` under the [harness root](#install-a-harness-release). When Herdr shows
+that process in the pane, ready for input, it names the pane `dispatcher` and sends the
+first prompt, `Begin.`, through Herdr, once the adapter has listed its tools to that
+session (`state/dispatcher.ready`). If that does not happen within
+`timeouts.launch_seconds`, or naming or prompting fails, a Herdr notification and
+`team.py status` say what happened and what to run. Check the pane, then run them
+yourself:
+
+```bash
+herdr agent rename <pane> dispatcher
+herdr agent prompt <pane> "Begin."
+```
+
+If the prompt itself failed, `Begin.` may still have arrived: send it again only if the
+pane shows no `Begin.` turn.
+
+It refuses to start while that process runs, or while an unrecorded agent is named
+`dispatcher`.
+
 From a plain shell in a Herdr pane (`HERDR_ENV=1`) at the main checkout:
 
 ```bash
@@ -156,7 +184,7 @@ type `board changed` in its pane. Answer its product and scope questions there.
 Each message gives the dispatcher full context, so it compacts at the configured
 threshold (`dispatcher.compact_percent`) and reloads state from GitHub.
 
-The dispatcher runs `team.py` from the main checkout. Clients start in their
+The dispatcher's tools run `team.py` from the main checkout. Clients start in their
 allocation directory, so a client may ask whether to trust it. On 2026-10-14, a fresh
 allocation under `../agent_teams/tips/` on this machine showed no trust or import
 dialog for Claude Code 2.1.299 or Codex 0.162.1; Codex only warned that `-c` overrides
@@ -164,10 +192,37 @@ run without its shared background server. If a trust prompt appears, it stops th
 launch: inspect it and decide; do not trust a directory you did not expect. If an
 approval prompt stops launch, inspect it and follow the active approval policy.
 
+## Install a harness release
+
+Run this once per harness release, with no team running, from the main checkout:
+
+```bash
+python3 agent/teams/install.py <commit>
+```
+
+The commit must be merged into `origin/main`, and the checkout's tracked files must be
+clean. The command copies AGENTS.md and `agent/teams` from that commit, creates the
+locked environment (`--require-hashes`, wheels only) and records the commit, the
+repository, this checkout's path and the root in `install.json`. The root defaults to
+`agent_teams/<name>/` in the main checkout's parent directory, where `<name>` is the
+repository name in `github.repository` (`agent_teams/tips/`); `--root` selects another
+directory. The root is created on first use, and its `repository.json` must name the
+configured repository. `TIPS_TEAM_HARNESS`, an absolute `<root>/harness` path, overrides
+the root for the launcher and `team.py`. The install is a copy; it does not protect the
+root from writes.
+`releases/<commit>-<time>/` holds each release and `harness` points at the current one.
+The switch is one atomic rename. A failed install deletes only its own unfinished
+release, so the previous one keeps working. The install never changes `state/` or
+`allocations/`, and it refuses while the target root's `state/` holds a team record or an
+allocation that is neither recorded nor retired. Earlier releases stay on disk; to roll back, install the earlier commit again.
+Start the installed dispatcher with `<root>/harness/agent/teams/dispatch`.
+
 ## Configuration
 
 Edit [config.toml](config.toml) for slots, agent and dispatcher settings, resource
-allocation, permissions and time limits. Each `[agents.<entry>]` defines a role,
+allocation, permissions and time limits. `[github]` names the repository every GitHub
+call uses, and for each project the dispatcher may edit, the fields it may set.
+`timeouts.github_seconds` (default 30) bounds each GitHub call. Each `[agents.<entry>]` defines a role,
 client, model, effort, optional advisor and persona, database suffix and port offset.
 Briefs name entries in `Implementer:` and `Required reviews:`.
 
@@ -177,8 +232,10 @@ resources, and the team's Herdr workspace and tabs, in `<root>/state/<slot>.json
 `github.repository` names the repository and the root; `team.clone_url` is what each
 client clones; `team.psql` is the fixed argv `stop` uses to list and drop a retired
 team's databases (the shipped value is the compose database's local development
-connection). Scripts use the main checkout's config unless
-`TIPS_TEAM_CONFIG=/absolute/path` selects another file. Settings apply at the next launch;
+connection). A checkout's scripts use the main checkout's config; an installed harness
+uses its release's config, `<root>/harness/agent/teams/config.toml`.
+`TIPS_TEAM_CONFIG=/absolute/path` selects another file. Launched clients get the file the
+launcher read. Settings apply at the next launch;
 a relaunched client keeps its recorded database, port and client kind and takes its
 model, effort, advisor and persona from the current file.
 

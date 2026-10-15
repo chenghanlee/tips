@@ -2,8 +2,14 @@
 # An empty model uses the client's configured default.
 # GitHub calls name this repository instead of reading it from a checkout. Trusted state
 # lives beside the main checkout, in <checkout parent>/agent_teams/<repository name>/.
+# The dispatcher adapter may read the listed projects, add items to them and set only the
+# listed fields.
 [github]
 repository = "chenghanlee/tips"
+
+[github.projects]
+15 = ["Status"]
+16 = ["Kind", "Feature", "Phase", "Implementer"]
 
 [team]
 # Each allocation clones this URL itself.

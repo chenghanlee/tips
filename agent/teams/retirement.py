@@ -6,12 +6,19 @@ A worker runs this under its own authority when the dispatcher asks it to retire
 a `TEAM_RETIREMENT` line naming its launch: whether the clone is clean, how many local
 commits no origin branch holds, whether HEAD is merged into origin/main, and HEAD.
 `team.py stop` reads the latest report as advisory evidence before it drops any database.
-This script never calls Herdr, never deletes a file and never resets the clone.
+
+The dispatcher's turns start only on messages, so this script then tells it:
+`herdr agent prompt dispatcher "<report URL> retired"`. If the report cannot be made, it
+posts a BLOCKED comment with the error and sends `"<comment URL> blocked"` (the issue URL
+when even that comment fails). When the prompt cannot be sent, as outside Herdr or with no
+dispatcher running, it prints the command instead. It never deletes a file and never
+resets the clone.
 """
 
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -21,6 +28,7 @@ from team import RETIREMENT, comment_header, execute, object_fields
 
 GIT_SECONDS = 120
 GITHUB_SECONDS = 60
+HERDR_SECONDS = 30
 IDENT = re.compile(r"g[0-9]+-[a-z0-9][a-z0-9-]*")
 
 
@@ -91,20 +99,13 @@ def clone_state(project: Path) -> dict[str, object]:
     }
 
 
-def report() -> str:
-    issue, allocation, settings, project = own_allocation()
-    launch = allocation["launch"]
-    fields = {"v": 1, "id": allocation["id"], "launch": launch, **clone_state(project)}
+def header(kind: str, allocation: dict[str, object]) -> str:
     role = str(allocation.get("role", "")).split()[-1]
-    header = comment_header(
-        "EVENT", role, str(allocation.get("name")), str(allocation.get("session") or "")
-    )
-    summary = (
-        f"retirement report for {project}: clean {fields['clean']}, unpushed commits "
-        f"{fields['unpushed']}, merged into origin/main {fields['merged']}"
-    )
-    body = f"{header}\n{RETIREMENT}{json.dumps(fields, separators=(',', ':'))}\n{summary}"
-    repository = str(settings.get("repository"))
+    name, session = str(allocation.get("name")), str(allocation.get("session") or "")
+    return comment_header(kind, role, name, session)
+
+
+def post(issue: str, repository: str, project: Path, body: str) -> str:
     args = ["gh", "issue", "comment", issue, "--repo", repository, "--body-file", "-"]
     try:
         result = execute(args, cwd=project.parent, timeout=GITHUB_SECONDS, input_text=body)
@@ -115,12 +116,52 @@ def report() -> str:
     return result.stdout.strip()
 
 
+def report(issue: str, allocation: dict[str, object], repository: str, project: Path) -> str:
+    fields = {"v": 1, "id": allocation["id"], "launch": allocation["launch"]}
+    fields.update(clone_state(project))
+    summary = (
+        f"retirement report for {project}: clean {fields['clean']}, unpushed commits "
+        f"{fields['unpushed']}, merged into origin/main {fields['merged']}"
+    )
+    evidence = f"{RETIREMENT}{json.dumps(fields, separators=(',', ':'))}"
+    return post(issue, repository, project, f"{header('EVENT', allocation)}\n{evidence}\n{summary}")
+
+
+def tell_dispatcher(text: str) -> None:
+    """Wake the dispatcher; without one to tell, print the command for the operator."""
+    command = ["herdr", "agent", "prompt", "dispatcher", text]
+    try:
+        sent = os.environ.get("HERDR_ENV") == "1" and not execute(
+            command, timeout=HERDR_SECONDS
+        ).returncode
+    except (RuntimeError, OSError, subprocess.TimeoutExpired):
+        sent = False
+    if sent:
+        print("Notified dispatcher")
+    else:
+        print(f"No dispatcher was notified; run: {shlex.join(command)}")
+
+
 def main() -> None:
     try:
-        print(f"Retirement reported: {report()}")
+        issue, allocation, settings, project = own_allocation()
     except (RetirementError, OSError, ValueError) as error:
         print(f"retirement: {error}", file=sys.stderr)
         sys.exit(1)
+    repository = str(settings.get("repository"))
+    try:
+        url = report(issue, allocation, repository, project)
+    except (RetirementError, OSError, ValueError) as error:
+        print(f"retirement: {error}", file=sys.stderr)
+        body = f"{header('BLOCKED', allocation)}\nRetirement report failed: {error}"
+        try:
+            blocked = post(issue, repository, project, body)
+        except RetirementError:
+            blocked = f"https://github.com/{repository}/issues/{issue}"
+        tell_dispatcher(f"{blocked} blocked")
+        sys.exit(1)
+    print(f"Retirement reported: {url}")
+    tell_dispatcher(f"{url} retired")
 
 
 if __name__ == "__main__":

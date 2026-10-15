@@ -43,12 +43,14 @@ from team import (
     HEADER,
     comment_header,
     event_role,
+    github_seconds,
     herdr,
     issue_comments,
     object_fields,
     object_list,
     post_comment,
     records,
+    repo_args,
     run,
     session_id,
 )
@@ -79,31 +81,48 @@ def identity(args: argparse.Namespace) -> tuple[str, str, str]:
     return role, name, session_id(agent)
 
 
-def post(args: argparse.Namespace) -> None:
-    role, name, session = identity(args)
-    header = comment_header(args.type, role, name, session)
-    body = sys.stdin.read().strip()
+def post_as(issue: str, kind: str, poster: tuple[str, str, str], text: str) -> str:
+    """Post text under the `<TYPE> <role> <name> <session>` header; return the comment URL."""
+    header = comment_header(kind, *poster)
+    body = text.strip()
     if not body:
-        raise RuntimeError("Comment text on stdin is empty")
+        raise RuntimeError("Comment text is empty")
     words = len(body.split())
     if words > WORD_LIMIT:
         print(
             f"{words} words, above {WORD_LIMIT}: state the reason in the comment", file=sys.stderr
         )
-    print(post_comment(args.issue, f"{header}\n{body}"))
+    return post_comment(issue, f"{header}\n{body}")
+
+
+def post(args: argparse.Namespace) -> None:
+    print(post_as(args.issue, args.type, identity(args), sys.stdin.read()))
+
+
+def read_text(issue: str, after: int | None) -> str:
+    """The issue URL and body, then every comment; with `after`, the URL and only the
+    comments after that comment id, so new comments stay reachable on a long issue."""
+    output = run(
+        "gh", "issue", "view", issue, *repo_args(), "--json", "url,body", timeout=github_seconds()
+    )
+    view = json.loads(output)
+    comments = issue_comments(issue)
+    if after is not None:
+        comments = [c for c in comments if int(str(c["id"])) > after]
+    parts = [view["url"] if after is not None else f"{view['url']}\n{view['body']}"]
+    for comment in comments:
+        parts.append(f"\n--- {comment['html_url']} {comment['created_at']}\n{comment['body']}")
+    return "\n".join(parts)
 
 
 def read(args: argparse.Namespace) -> None:
-    view = json.loads(run("gh", "issue", "view", args.issue, "--json", "url,body"))
-    comments = issue_comments(args.issue)
+    after = None
     if args.after:
         match = re.search(r"#issuecomment-(\d+)$", args.after)
         if not match:
             raise RuntimeError("--after takes a comment link (#issuecomment-id)")
-        comments = [c for c in comments if int(str(c["id"])) > int(match.group(1))]
-    print(f"{view['url']}\n{view['body']}")
-    for comment in comments:
-        print(f"\n--- {comment['html_url']} {comment['created_at']}\n{comment['body']}")
+        after = int(match.group(1))
+    print(read_text(args.issue, after))
 
 
 def log_entries(files: list[Path]) -> Iterator[dict[str, object]]:
@@ -192,14 +211,19 @@ def launched_sessions(issues: list[str]) -> list[tuple[str, str, str]]:
     return sorted(found)
 
 
-def usage(args: argparse.Namespace) -> None:
+def usage_table(issues: list[str]) -> str:
+    """A Markdown table of token counts by model for each session the issues' launch EVENTs name."""
     columns = ("Agent", "Role", "Session", "Model", *COUNTS)
-    print("| " + " | ".join(columns) + " |")
-    print("|" + "---|" * len(columns))
-    for name, role, session in launched_sessions(args.issues):
+    rows = ["| " + " | ".join(columns) + " |", "|" + "---|" * len(columns)]
+    for name, role, session in launched_sessions(issues):
         tokens = claude_tokens(session) or codex_tokens(session) or {"no logs found": [0, 0, 0, 0]}
         for model, counts in sorted(tokens.items()):
-            print("| " + " | ".join([name, role, session, model, *map(str, counts)]) + " |")
+            rows.append("| " + " | ".join([name, role, session, model, *map(str, counts)]) + " |")
+    return "\n".join(rows)
+
+
+def usage(args: argparse.Namespace) -> None:
+    print(usage_table(args.issues))
 
 
 def main() -> None:

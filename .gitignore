@@ -10,6 +10,7 @@
 /agent/elixir-agent-tools/
 .worktrees/
 /agent/teams/allocations/
+/agent/teams/.venv/
 __pycache__/
 *.pyc
 docs/implementation/communication/

@@ -2,8 +2,10 @@
 
 GitHub issues, PRs and reviews store the workflow state. Herdr messages start turns. One
 dispatcher chooses work, opens features, starts pairs and launches reviewers and
-designers. Every launched client gets its own [allocation](#allocations) and its own clone
-of the repository; no two clients share a checkout. Follow
+designers. It has no shell or file tools: it acts only through the fixed operations of
+[adapter.py](adapter.py), which call the commands below. Every launched client gets its
+own [allocation](#allocations) and its own clone of the repository; no two clients share
+a checkout. Follow
 [AGENTS.md](../../AGENTS.md) and the skill for your task:
 [design-software](../skills/design-software/SKILL.md),
 [implement-software](../skills/implement-software/SKILL.md),
@@ -75,7 +77,9 @@ generation reuses another's databases.
 ## Commands
 
 Run worker commands from your own allocation. The dispatcher runs `start`, `design`,
-`review` and `stop` from the main checkout. Only the operator (the user) runs `reset`.
+`review`, `stop` and `status` through its `start_pair`, `start_design`,
+`launch_reviewer`, `retire_team` and `status` tools, from the main checkout. Only the
+operator (the user) runs `reset`.
 
 | Command | Caller | Effect |
 |---|---|---|
@@ -86,11 +90,12 @@ Run worker commands from your own allocation. The dispatcher runs `start`, `desi
 | `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create its allocation, configured for the PR head, with its own database suffix and port, and launch the reviewer in the team's workspace. |
 | `agent/teams/team.py reset <issue> <entry>` | Operator | Record the operator's decision, after checking a stopped client's work on the issue and PR, that `start`, `design` or `review` may launch a replacement in the same allocation that gets the task again. Refuse a running client. |
 | `agent/teams/team.py stop <issue>` | Dispatcher | See [Retirement](#retirement). |
+| `agent/teams/team.py status` | Dispatcher, user | Every allocation record with each client's live Herdr pane, name, kind, state and session, and whether the recorded dispatcher process runs. |
 | `agent/teams/team.py clean` | Operator | List retained allocations with their reasons. Deletes nothing. |
 | `python3 <harness>/bootstrap.py [--commit <sha>]` | Launched client | Prepare your own clone, as [Allocations](#allocations) says. |
-| `python3 <harness>/retirement.py` | Launched client | Fetch origin, then post your clone's state on the issue: clean, unpushed commits, HEAD merged into `origin/main`. Changes nothing. |
+| `python3 <harness>/retirement.py` | Launched client | Fetch origin, then post your clone's state on the issue: clean, unpushed commits, HEAD merged into `origin/main`. Then prompt the dispatcher with `<report URL> retired`. If the report fails, post a BLOCKED comment and prompt `<comment URL> blocked`. With no dispatcher to tell, print that command. Changes nothing else. |
 | `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. |
-| `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment or only those after a checkpoint. |
+| `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment; with `--after`, only the comments after that checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | Tokens per launched session and model, from the session logs. |
 | `agent/teams/pr_review.py list <pr>` | Any agent | Recent reviews and every unresolved thread. Display only. |
 | `agent/teams/pr_review.py observe <pr>` | Launched client | Read the head, base, mergeability, checks and reviews within one 30-second deadline; refuse a read during which the head or base changed. Required checks are the contexts the base branch's effective rules require; a required check that has not reported blocks, and other checks are only shown. Record each failure once as a FINDING on the PR; append a resolution naming the finding comment's ID when passing evidence for the same check appears; a resolution closes only the findings that the observation read as open. Unavailable evidence records and resolves nothing. Exit 0 only when the PR can merge at this head. |
@@ -98,6 +103,7 @@ Run worker commands from your own allocation. The dispatcher runs `start`, `desi
 | `herdr agent prompt team-<slot>-<entry> "<review URL>"` | Other reviewer | Tell the merge-confirming tester a review exists. |
 | `herdr agent prompt dispatcher "<URL> done"` | Tester | The PR merged. |
 | `herdr agent prompt dispatcher "<comment URL> blocked"` | Turn holder | A blocker is recorded. |
+| `herdr agent prompt dispatcher "<report URL> retired"` | `retirement.py` | A retirement report is posted; the dispatcher calls `retire_team` again. |
 
 ### Herdr layout
 
@@ -126,7 +132,8 @@ report from an earlier launch does not count. A client that never launched, with
 launch id and its task never submitted, has no session and needs no report. Until each
 has one, it changes nothing: it asks each running client to run `retirement.py`, prints
 the command the operator runs for a stopped client, and keeps every resource reserved.
-With every report, it:
+Each `retirement.py` run prompts the dispatcher with its report URL, so the next `stop`
+follows without polling. With every report, it:
 
 1. Refuses, stopping nothing and keeping the record, databases, files and reservation,
    unless every report shows a clean clone with no unpushed commits and, for a brief,
@@ -304,7 +311,10 @@ you cannot answer. Record the answer on the issue. Set Active and notify the age
 not run or retry a denied command on another agent's behalf.
 
 If an implementer's failing check also fails on the latest `main` run, the implementer
-reports `blocked` with both run links. The dispatcher opens the revert with `gh pr revert <pr>` and merges it after checks pass. Then fix the original issue.
+reports `blocked` with both run links. The dispatcher asks the merge-confirming tester
+of the affected brief to revert the PR that broke `main` with its
+[revert task](roles/tester.md#revert-a-broken-main). Diagnosis that needs access outside
+the tester's allocation goes to the user. Then fix the original issue.
 
 ## Constraints
 

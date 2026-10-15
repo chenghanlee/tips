@@ -216,7 +216,7 @@ def resolve(thread_id: str) -> None:
 
 def view(number: int, deadline: float) -> dict[str, str]:
     fields = "url,headRefOid,baseRefOid,baseRefName,mergeable"
-    command = ["gh", "pr", "view", str(number), "--json", fields]
+    command = ["gh", "pr", "view", str(number), *team.repo_args(), "--json", fields]
     pr = object_fields(json.loads(github(command, deadline, f"PR {number}")), f"PR {number}")
     for key in fields.split(","):
         team.require_type(pr.get(key), str, f"PR {number} {key}")
@@ -241,7 +241,8 @@ def configured_checks(repo: str, base_ref: str, deadline: float) -> list[str]:
 
 def reported_checks(number: int, deadline: float) -> list[dict[str, object]]:
     """Every check reported on the PR head."""
-    command = ["gh", "pr", "checks", str(number), "--json", "name,workflow,bucket,link"]
+    fields = "name,workflow,bucket,link"
+    command = ["gh", "pr", "checks", str(number), *team.repo_args(), "--json", fields]
     left = deadline - time.monotonic()
     try:
         result = execute(command, timeout=left) if left > 0 else None

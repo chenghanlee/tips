@@ -46,6 +46,8 @@ class AgentSpec(TypedDict):
 
 class GitHubSettings(TypedDict):
     repository: str
+    # Project number -> field names the dispatcher may set.
+    projects: dict[str, list[str]]
 
 
 class TeamSettings(TypedDict):
@@ -460,13 +462,30 @@ def release_name(pane: str, current: Entity) -> None:
                 # Herdr already released it between list and clear.
 
 
-def load_config() -> tuple[Path, Config]:
-    script = Path(__file__).resolve()
+def checkout_root(script: Path) -> Path:
     common = Path(
         run("git", "-C", script.parent, "rev-parse", "--path-format=absolute", "--git-common-dir")
     )
-    canonical = common.parent.resolve()
-    path = Path(os.environ.get("TIPS_TEAM_CONFIG", canonical / "agent/teams/config.toml"))
+    return common.parent.resolve()
+
+
+def config_location() -> tuple[Path, Path]:
+    """The main checkout and the configuration file: TIPS_TEAM_CONFIG, else the default.
+    Workers get the same file (agent_env)."""
+    source = installed_source()
+    if source is None:
+        canonical = checkout_root(Path(__file__).resolve())
+        default = canonical / "agent/teams/config.toml"
+    else:
+        # The installed harness reads its own reviewed configuration, by the stable link
+        # its workers' scripts use (harness()).
+        canonical = source
+        default = cast(Path, installed("root")) / "harness/agent/teams/config.toml"
+    return canonical, Path(os.environ.get("TIPS_TEAM_CONFIG", default))
+
+
+def load_config() -> tuple[Path, Config]:
+    canonical, path = config_location()
     with path.open("rb") as f:
         value = cast(Config, tomllib.load(f))
     validate_config_fields(path, value)
@@ -482,10 +501,7 @@ def validate_config_fields(path: Path, value: Config) -> None:
         require_type(settings.get(key), int, f"{path}: team.{key}")
     for key in ("db_suffix_prefix", "clone_url"):
         require_type(settings.get(key), str, f"{path}: team.{key}")
-    github = object_fields(fields.get("github"), f"{path}: github")
-    require_type(github.get("repository"), str, f"{path}: github.repository")
-    if not re.fullmatch(REPOSITORY, str(github["repository"])):
-        raise RuntimeError(f"{path}: github.repository must be owner/name")
+    validate_github(path, fields.get("github"))
     validate_argv(f"{path}: team.psql", settings.get("psql"))
     if not Path(cast(list[str], settings["psql"])[0]).is_absolute():
         raise RuntimeError(f"{path}: team.psql must start with an absolute executable path")
@@ -498,6 +514,18 @@ def validate_config_fields(path: Path, value: Config) -> None:
         raise RuntimeError(f"{path}: agents must name at least one entry")
     for name, entry in agents.items():
         validate_agent_fields(f"{path}: agents.{name}", name, entry)
+
+
+def validate_github(path: Path, value: object) -> None:
+    github = object_fields(value, f"{path}: github")
+    require_type(github.get("repository"), str, f"{path}: github.repository")
+    if not re.fullmatch(REPOSITORY, str(github["repository"])):
+        raise RuntimeError(f"{path}: github.repository must be owner/name")
+    for number, names in object_fields(github.get("projects"), f"{path}: github.projects").items():
+        if not number.isdecimal() or not isinstance(names, list):
+            raise RuntimeError(f"{path}: github.projects maps a project number to field names")
+        for name in cast(list[object], names):
+            require_type(name, str, f"{path}: github.projects.{number}")
 
 
 def validate_agent_fields(label: str, name: str, entry: object) -> None:
@@ -597,6 +625,11 @@ def installed(key: str) -> Path | None:
     return Path(str(value))
 
 
+def installed_source() -> Path | None:
+    """The main checkout an installed harness names, or None in a checkout."""
+    return installed("source")
+
+
 def repo_key(repository: str) -> str:
     """The root's directory name: the repository name without its owner."""
     return repository.split("/")[-1]
@@ -607,10 +640,20 @@ def default_root(checkout: Path, repository: str) -> Path:
     return checkout.resolve().parent / "agent_teams" / repo_key(repository)
 
 
-def claim_root(root: Path, repository: str) -> Path:
+def claim_root(root: Path, repository: str, checkout: Path) -> Path:
     """Create the root for this repository on first use, or refuse one that names another,
-    including another owner's repository with the same name. The root is not
-    write-protected; repository.json only keeps two repositories apart."""
+    including another owner's repository with the same name. The root must be a real path
+    outside the checkout and outside temporary directories. It is not write-protected;
+    repository.json only keeps two repositories apart."""
+    temporary = [Path(p).resolve() for p in (*TEMPORARY, os.environ.get("TMPDIR", "/tmp"))]
+    if root.resolve() != root:
+        raise RuntimeError(f"Harness root {root} passes through a symlink; refused")
+    for parent in (checkout.resolve(), *temporary):
+        if root == parent or parent in root.parents:
+            raise RuntimeError(f"Harness root {root} is inside {parent}; refused")
+    # Checked before the identity is published and before any record, lock or allocation
+    # is written through them.
+    directories = [contained(root / name, root) for name in ("state", "allocations")]
     identity = root / "repository.json"
     if not identity.exists():
         # Publish a complete identity with one exclusive link: of two first callers, the
@@ -627,9 +670,8 @@ def claim_root(root: Path, repository: str) -> Path:
     fields = object_fields(json.loads(identity.read_text()), str(identity))
     if fields.get("repository") != repository:
         raise RuntimeError(f"{root} belongs to {fields.get('repository')}, not {repository}")
-    # Checked before any record, lock or allocation is written through them.
-    for directory in ("state", "allocations"):
-        contained(root / directory, root).mkdir(exist_ok=True)
+    for directory in directories:
+        directory.mkdir(exist_ok=True)
     return root
 
 
@@ -644,13 +686,7 @@ def harness_root() -> Path:
         root = Path(override).parent
     else:
         root = installed("root") or default_root(main, cfg["github"]["repository"])
-    temporary = [Path(p).resolve() for p in (*TEMPORARY, os.environ.get("TMPDIR", "/tmp"))]
-    if root.resolve() != root:
-        raise RuntimeError(f"Harness root {root} passes through a symlink; refused")
-    for parent in (main, *temporary):
-        if root == parent or parent in root.parents:
-            raise RuntimeError(f"Harness root {root} is inside {parent}; refused")
-    return claim_root(root, cfg["github"]["repository"])
+    return claim_root(root, cfg["github"]["repository"], main)
 
 
 def state_dir() -> Path:
@@ -851,7 +887,8 @@ def roster(brief: str) -> tuple[str, list[str], list[str]]:
     Read reviewer names from `Required reviews:`. Keep testers in the listed order;
     the first tester confirms the merge. Return testers and designers separately.
     """
-    body = str(json.loads(run("gh", "issue", "view", brief, "--json", "body")).get("body") or "")
+    command = ["gh", "issue", "view", brief, *repo_args(), "--json", "body"]
+    body = str(json.loads(github(command, deadline_from_now(), f"#{brief}")).get("body") or "")
     implementer = issue_line(body, "Implementer")
     reviews = issue_line(body, "Required reviews")
     if implementer is None or reviews is None:
@@ -914,10 +951,35 @@ def deadline_from_now() -> float:
     return time.monotonic() + READ_SECONDS
 
 
+def github_settings() -> GitHubSettings | None:
+    """The configured repository settings; None before configure()."""
+    try:
+        return cfg["github"]
+    except NameError:
+        return None
+
+
+def github_seconds() -> int:
+    """The deadline of one adapter or review GitHub call; timeouts.github_seconds overrides it."""
+    try:
+        return cfg["timeouts"].get("github_seconds", READ_SECONDS)
+    except NameError:
+        return READ_SECONDS
+
+
 def repository(deadline: float | None = None) -> str:
-    command = ["gh", "repo", "view", "--json", "nameWithOwner"]
-    output = github(command, deadline or deadline_from_now(), "repository")
-    return str(json.loads(output)["nameWithOwner"])
+    """The configured owner/name; never discovered from a working directory. A module that
+    imports team.py without configure(), such as pr_review.py under `team.py turn`, reads
+    the same configuration file."""
+    del deadline
+    try:
+        return cfg["github"]["repository"]
+    except NameError:
+        return load_config()[1]["github"]["repository"]
+
+
+def repo_args() -> list[str]:
+    return ["--repo", repository()]
 
 
 def issue_comments(issue: str, deadline: float | None = None) -> list[dict[str, object]]:
@@ -949,7 +1011,7 @@ def post_comment(issue: str, text: str, deadline: float | None = None) -> str:
 
 def add_comment(issue: str, text: str, deadline: float) -> str:
     """Post a comment without a duplicate check; the caller has already read the issue."""
-    command = ["gh", "issue", "comment", issue, "--body-file", "-"]
+    command = ["gh", "issue", "comment", issue, *repo_args(), "--body-file", "-"]
     return github(command, deadline, f"comment on #{issue}", input_text=text)
 
 
@@ -1014,13 +1076,17 @@ def test_port(entry: str, slot: int) -> int:
 
 
 def harness() -> Path:
-    """The directory of the harness code that is running; workers call its helpers."""
+    """The harness scripts workers call: <root>/harness/agent/teams for an installed
+    harness, so commands keep working after the link moves to a new release; otherwise
+    the running checkout's scripts."""
+    if installed("root") is not None:
+        return harness_root() / "harness/agent/teams"
     return Path(__file__).resolve().parent
 
 
 def agent_env(allocation: Allocation) -> dict[str, str]:
     """Build the client's environment from its recorded allocation."""
-    config = Path(os.environ.get("TIPS_TEAM_CONFIG", main / "agent/teams/config.toml")).resolve()
+    config = config_location()[1].absolute()  # the file this command read
     project = project_of(allocation)
     env = {
         "PGPORT": str(cfg["team"]["postgres_port"]),
@@ -1316,7 +1382,7 @@ def dexter_brief(wrapper: Path) -> str:
         "check empty results with rg. Leave the daemon running on exit. "
         "Do not run git clean -x; it deletes the wrapper and index. When the dispatcher asks "
         f"you to retire, run python3 {harness() / 'retirement.py'} and end your turn: it "
-        "posts your clone's state to the issue and changes nothing."
+        "posts your clone's state to the issue, tells the dispatcher and changes nothing."
     )
 
 
@@ -1661,7 +1727,8 @@ def design(spec: str, entry: str) -> None:
 
 def pull_request(pr: str) -> tuple[str, str, list[str]]:
     """The PR's URL, head commit and closing-reference issue numbers."""
-    command = ["gh", "pr", "view", pr, "--json", "headRefOid,url,closingIssuesReferences"]
+    fields = "headRefOid,url,closingIssuesReferences"
+    command = ["gh", "pr", "view", pr, *repo_args(), "--json", fields]
     view = object_fields(json.loads(github(command, deadline_from_now(), f"PR {pr}")), f"PR {pr}")
     references = object_list(view.get("closingIssuesReferences") or [], f"PR {pr} closing issues")
     briefs = [str(issue.get("number")) for issue in references]
@@ -2080,11 +2147,11 @@ def merged_brief(brief: str) -> bool:
             ) from error
 
     fields = "state,closedByPullRequestsReferences"
-    view = object_fields(read("gh", "issue", "view", brief, "--json", fields), brief)
+    view = object_fields(read("gh", "issue", "view", brief, *repo_args(), "--json", fields), brief)
     if view.get("state") != "CLOSED":
         return False
     for pr in object_list(view.get("closedByPullRequestsReferences") or [], f"#{brief} PRs"):
-        state = read("gh", "pr", "view", str(pr.get("number")), "--json", "state")
+        state = read("gh", "pr", "view", str(pr.get("number")), *repo_args(), "--json", "state")
         if object_fields(state, "PR state").get("state") == "MERGED":
             return True
     return False
@@ -2276,6 +2343,156 @@ def require_only_recorded_panes(record: Record) -> bool:
     return bool(panes)
 
 
+def client_state(allocation: Allocation, panes: set[str], agents: dict[str, Entity]) -> str:
+    """One recorded client's live state: Herdr's pane and agent identity, not the record alone."""
+    pane, session = allocation["pane"], allocation["session"] or "none"
+    kind = f"{allocation['role']}, {allocation['kind']}"
+    head = f"{allocation['entry']} ({kind}) {allocation['name']}"
+    if pane not in panes:
+        return f"{head}: pane {pane or 'none'} missing; recorded session {session}"
+    agent = agents.get(pane)
+    if agent is None:
+        return f"{head}: pane {pane} at the shell, client exited; recorded session {session}"
+    if agent.get("name") != allocation["name"] or agent.get("agent") != allocation["kind"]:
+        holder = f"{agent.get('name') or 'unnamed'} ({agent.get('agent')})"
+        return f"{head}: pane {pane} holds {holder}, not the recorded client; preserved"
+    live = session_id(agent) or "unknown"
+    state = agent.get("agent_status") or "unknown"
+    started = "running" if allocation["session"] else "startup incomplete"
+    return f"{head}: {started} in {pane}, {state}; live session {live}, recorded {session}"
+
+
+class DispatcherLaunch(TypedDict):
+    """The launched dispatcher client: its process id and start time, pane and session.
+
+    A restricted client reports no session to Herdr, so this record is its identity: the
+    launcher execs the client, which keeps the launcher's process id.
+    """
+
+    pid: int
+    started: str
+    pane: str
+    session: str
+
+
+def dispatcher_path() -> Path:
+    return harness_root() / "state/dispatcher.json"
+
+
+# Written by the adapter when it first lists its tools: the client has them.
+DISPATCHER_READY = "dispatcher.ready"
+# Written by the dispatcher's starter when it could not send the first prompt.
+DISPATCHER_RECOVERY = "dispatcher.recovery"
+
+
+def dispatcher_note(name: str, session: str) -> str | None:
+    """The text of a ready or recovery note written for this launch's session, else None."""
+    path = dispatcher_path().with_name(name)
+    try:
+        fields = object_fields(json.loads(path.read_text()), str(path))
+    except (OSError, ValueError, RuntimeError):
+        return None
+    return str(fields.get("text", "")) if fields.get("session") == session else None
+
+
+def dispatcher_launch() -> DispatcherLaunch | None:
+    path = dispatcher_path()
+    if not path.exists():
+        return None
+    fields = object_fields(json.loads(path.read_text()), str(path))
+    require_type(fields.get("pid"), int, f"{path} pid")
+    for key in ("started", "pane", "session"):
+        require_type(fields.get(key), str, f"{path} {key}")
+    return cast(DispatcherLaunch, fields)
+
+
+def start_time(pid: int) -> str | None:
+    """The process's start time as ps prints it, spacing normalized; None if not running."""
+    row = processes().get(pid)
+    return " ".join(row[1].split()) if row else None
+
+
+def dispatcher_running(launch: DispatcherLaunch) -> bool:
+    """Whether the recorded process still runs: the same process id and start time."""
+    return start_time(launch["pid"]) == " ".join(launch["started"].split())
+
+
+def record_dispatcher(pane: str, session: str) -> DispatcherLaunch:
+    """Record this process, which is about to exec the client, as the dispatcher."""
+    pid = os.getpid()
+    started = start_time(pid)
+    if started is None:
+        raise RuntimeError(f"ps does not list this process ({pid})")
+    launch = DispatcherLaunch(pid=pid, started=started, pane=pane, session=session)
+    path = dispatcher_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    staged = path.with_suffix(".next")
+    staged.write_text(json.dumps(launch) + "\n")
+    staged.replace(path)
+    return launch
+
+
+def dispatcher_status(named: Entity | None) -> str:
+    launch = dispatcher_launch()
+    if launch and dispatcher_running(launch):
+        held = f"pid {launch['pid']} in {launch['pane']}, session {launch['session']}"
+        state = named.get("agent_status") if named else None
+        if named and named.get("pane_id") != launch["pane"]:
+            return f"dispatcher: {held}; the agent named dispatcher is in {named['pane_id']}"
+        # The starter's note when it could not start this launch; the next launch clears it.
+        recovery = dispatcher_note(DISPATCHER_RECOVERY, launch["session"])
+        hint = f"; starter note: {recovery}" if recovery else ""
+        return f"dispatcher: running, {held}, {state or 'no Herdr name'}{hint}"
+    if named:
+        return f"dispatcher: {named['pane_id']} is named dispatcher but is not the recorded launch"
+    return "dispatcher: not running"
+
+
+def status() -> None:
+    """Print every allocation record with each client's live Herdr state and the dispatcher's."""
+    agents = {a["pane_id"]: a for a in herdr("agent", "list")["agents"]}
+    named = {a.get("name"): a for a in agents.values()}
+    print(dispatcher_status(named.get("dispatcher")))
+    found = records()
+    if not found:
+        print("No allocation records.")
+    for slot, record in sorted(found.items()):
+        panes = {p["pane_id"] for p in live_panes(record["workspace"])}
+        workspace = record["workspace"] or "none"
+        if record["workspace"] and not panes:
+            workspace += " (closed)"
+        print(f"slot {slot}: brief #{record['brief']}, workspace {workspace}")
+        for _, allocation in sorted(record["agents"].items()):
+            print("  " + client_state(allocation, panes, agents))
+
+
+def prompt_agent(brief: str, entry: str, text: str) -> None:
+    """Send text to a recorded client of the brief once its pane holds that same client.
+
+    The target is a recorded role, never a pane: an unrecorded or replaced client is refused.
+    Any failure of the prompt call, including Herdr's own timeout, may come after the text
+    reached the client, so the error says delivery is unknown and not to resend blindly.
+    """
+    record = record_for(brief)
+    if record is None:
+        raise RuntimeError(f"Brief #{brief} has no allocation record")
+    allocation = record["agents"].get(entry)
+    if allocation is None:
+        raise RuntimeError(f"Brief #{brief} has no launched {entry}")
+    if allocation["pane"] not in {p["pane_id"] for p in live_panes(record["workspace"])}:
+        raise RuntimeError(f"{allocation['name']}: recorded pane {allocation['pane']} is gone")
+    if running_client(record, allocation) is None:
+        raise RuntimeError(f"{allocation['name']} is not running in {allocation['pane']}")
+    try:
+        herdr("agent", "prompt", allocation["name"], text)
+    except (subprocess.TimeoutExpired, RuntimeError, ValueError) as error:
+        raise RuntimeError(
+            f"Prompt to {allocation['name']} failed ({error}); it may have been delivered. "
+            "Read the agent's records before sending it again."
+        ) from error
+    print(f"Prompted {allocation['name']}")
+
+
 def configure() -> None:
     global main, cfg
     if os.environ.get("HERDR_ENV") != "1":
@@ -2298,8 +2515,11 @@ def cli() -> None:
     usage = (
         "Usage: agent/teams/team.py start <brief> | design <spec> <entry> | "
         "turn <pr> <entry> | review <pr> <entry> | reset <issue> <entry> | stop <issue> | "
-        "clean"
+        "clean | status"
     )
+    if args == ["status"]:
+        status()
+        return
     if args == ["clean"]:
         list_retained()
         return

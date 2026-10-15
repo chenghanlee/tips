@@ -87,14 +87,16 @@ class BoardTest(Harness):
             with self.subTest(args=args):
                 assert message in self.board("post", "29", *args, body=body, ok=False).stderr
         assert len(self.bodies()) == count
-        # read gives the current body with every comment, or only those after a checkpoint.
+        # read gives the current body with every comment, or only the comments after a
+        # checkpoint, without the body.
         self.update(issues={**self.state()["issues"], "29": "Revised brief\n"})
         whole = self.board("read", "29").stdout
         first = self.comments("29")[0]
         assert whole.startswith(f"{ISSUE}\nRevised brief\n")
         assert f"--- {first['html_url']} {first['created_at']}\n{first['body']}" in whole
         after = self.board("read", "29", "--after", url.stdout.strip()).stdout
-        assert after.startswith(f"{ISSUE}\nRevised brief\n")
+        assert after.startswith(f"{ISSUE}\n\n--- ")
+        assert "Revised brief" not in after
         assert "Which port?" not in after
         assert after.count("\n--- ") == count - 3
         assert "comment link" in self.board("read", "29", "--after", ISSUE, ok=False).stderr

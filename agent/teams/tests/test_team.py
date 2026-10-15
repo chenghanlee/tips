@@ -29,6 +29,9 @@ CONFIG = """\
 [github]
 repository = "o/r"
 
+[github.projects]
+16 = ["Phase", "Feature"]
+
 [team]
 clone_url = "/fixture/origin.git"
 psql = ["/fixture/psql", "fixture-dsn"]
@@ -461,6 +464,8 @@ from pathlib import Path
 path = Path(os.environ["HERDR_FIXTURE"])
 s = json.loads(path.read_text())
 a = sys.argv[1:]
+if a[0] in ("pr", "issue") and ["--repo", "o/r"] not in [a[i : i + 2] for i in range(len(a))]:
+    sys.exit("fixture gh: no --repo o/r in " + repr(a))  # never the working directory's remote
 s.setdefault("events", []).append(["gh", *a])
 comments = s.setdefault("comments", {})
 out, code = "", 0
@@ -534,8 +539,6 @@ elif a[:2] == ["api", "graphql"]:
     name = "reviewThreads" if "reviewThreads" in query else "reviews"
     page = {"pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": s.get(name, [])}
     out = json.dumps({"data": {"repository": {"pullRequest": {name: page}}}})
-elif a[:2] == ["repo", "view"]:
-    out = json.dumps({"nameWithOwner": "o/r"})
 elif a[0] == "api" and "/rules/branches/" in a[1]:
     required = [{"context": name} for name in s.get("required", ["checks", "release"])]
     rule = {"type": "required_status_checks", "parameters": {"required_status_checks": required}}
@@ -1474,6 +1477,8 @@ class PairLifecycleTest(Harness):
             ('db_suffix = "c"', 'db_suffix = "c"\nprobe = ["make"]', "unknown keys ['probe']"),
             ('psql = ["/fixture/psql", "fixture-dsn"]', "psql = []", "psql must hold 1 to 16"),
             ('db_suffix_prefix = "_t"', 'db_suffix_prefix = "_' + "t" * 50 + '"', "exceed 63"),
+            ('[github.projects]\n16 = ["Phase", "Feature"]\n', "", "github.projects must be"),
+            ('16 = ["Phase", "Feature"]', '16 = ["Phase", 7]', "github.projects.16 must be str"),
         )
         for original, edited, message in cases:
             with self.subTest(edited=edited):
@@ -1989,6 +1994,30 @@ class RetirementTest(Harness):
         self.merge(head)
         return head
 
+    def test_a_report_wakes_the_dispatcher_and_a_failed_one_reports_a_blocker(self) -> None:
+        # A posted report tells the dispatcher its URL: retire_team runs again on that turn.
+        reported = self.worker("team-1-impl", "retirement.py")
+        url = self.comments("29")[-1]["html_url"]
+        assert f"Retirement reported: {url}" in reported.stdout
+        assert self.prompts("dispatcher") == [f"{url} retired"]
+        # A report that cannot be made posts a BLOCKED comment and sends its URL instead.
+        missing = str(self.root / "missing.git")
+        self.git("remote", "set-url", "origin", missing, cwd=self.project("team-1-tester"))
+        failed = self.worker("team-1-tester", "retirement.py", ok=False)
+        blocked = self.comments("29")[-1]
+        assert blocked["body"].startswith("BLOCKED tester team-1-tester ")
+        assert "Retirement report failed: git fetch -q origin failed" in blocked["body"]
+        assert "git fetch -q origin failed" in failed.stderr
+        assert self.prompts("dispatcher")[-1] == f"{blocked['html_url']} blocked"
+        # Without a dispatcher to tell, the command is printed for the operator.
+        self.update(dispatcher_down=True)
+        tester = self.project("team-1-tester")
+        self.git("remote", "set-url", "origin", str(self.origin), cwd=tester)
+        alone = self.worker("team-1-tester", "retirement.py")
+        url = self.comments("29")[-1]["html_url"]
+        command = f"herdr agent prompt dispatcher '{url} retired'"
+        assert f"No dispatcher was notified; run: {command}" in alone.stdout
+
     def test_stop_waits_for_every_report_then_releases_merged_work(self) -> None:
         self.team("start", "30")
         self.merged_pair()
@@ -2496,7 +2525,7 @@ class RepositoryConfigTest(unittest.TestCase):
 
             def claim(repository: str) -> str:
                 try:
-                    claim_root(root, repository)
+                    claim_root(root, repository, Path(directory).resolve() / "tips")
                     return "claimed"
                 except RuntimeError as error:
                     return str(error)
