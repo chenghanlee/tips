@@ -332,3 +332,4 @@ Use dispatched events or the required button path to test drag reordering.
 Use branded Google Chrome for real Stream playback: Cloudflare's
 [player documentation](https://developers.cloudflare.com/stream/viewing-videos/using-the-stream-player/)
 notes H.264 requirements.
+This line exists only for a harness test and is never merged.
