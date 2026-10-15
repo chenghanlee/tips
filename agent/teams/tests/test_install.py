@@ -94,6 +94,18 @@ class InstallTest(unittest.TestCase):
         assert sorted((self.root / "releases").iterdir()) == [release]
         self.operator_data_kept()
 
+    def test_a_package_for_another_platform_is_skipped_not_demanded(self) -> None:
+        # pip skips a requirement whose environment marker fails here, so the check after
+        # the install must not demand it; 2026-10-15 the real lock's emscripten-only
+        # `httpx2-jsfetch` made every macOS install fail after pip had succeeded.
+        marker = "; sys_platform == 'emscripten'" if os.name != "nt" else "; os_name == 'posix'"
+        lock = self.source / "agent/teams/requirements.lock"
+        lock.write_text(f"nonexistent-package==1.0 {marker} --hash=sha256:{'0' * 64}\n")
+        marked = self.commit("release with a marked package")
+        self.git("update-ref", "refs/remotes/origin/main", "HEAD")
+        self.install(marked)
+        execute([self.installed() / "agent/teams/.venv/bin/python", "-c", "pass"], check=True)
+
     def test_refuses_dirty_unreviewed_busy_or_foreign_installs(self) -> None:
         (self.source / "AGENTS.md").write_text("Uncommitted.\n")
         assert "uncommitted tracked changes" in self.install(self.first, ok=False)
