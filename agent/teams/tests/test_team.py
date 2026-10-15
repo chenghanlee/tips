@@ -1994,6 +1994,30 @@ class RetirementTest(Harness):
         self.merge(head)
         return head
 
+    def test_a_report_wakes_the_dispatcher_and_a_failed_one_reports_a_blocker(self) -> None:
+        # A posted report tells the dispatcher its URL: retire_team runs again on that turn.
+        reported = self.worker("team-1-impl", "retirement.py")
+        url = self.comments("29")[-1]["html_url"]
+        assert f"Retirement reported: {url}" in reported.stdout
+        assert self.prompts("dispatcher") == [f"{url} retired"]
+        # A report that cannot be made posts a BLOCKED comment and sends its URL instead.
+        missing = str(self.root / "missing.git")
+        self.git("remote", "set-url", "origin", missing, cwd=self.project("team-1-tester"))
+        failed = self.worker("team-1-tester", "retirement.py", ok=False)
+        blocked = self.comments("29")[-1]
+        assert blocked["body"].startswith("BLOCKED tester team-1-tester ")
+        assert "Retirement report failed: git fetch -q origin failed" in blocked["body"]
+        assert "git fetch -q origin failed" in failed.stderr
+        assert self.prompts("dispatcher")[-1] == f"{blocked['html_url']} blocked"
+        # Without a dispatcher to tell, the command is printed for the operator.
+        self.update(dispatcher_down=True)
+        tester = self.project("team-1-tester")
+        self.git("remote", "set-url", "origin", str(self.origin), cwd=tester)
+        alone = self.worker("team-1-tester", "retirement.py")
+        url = self.comments("29")[-1]["html_url"]
+        command = f"herdr agent prompt dispatcher '{url} retired'"
+        assert f"No dispatcher was notified; run: {command}" in alone.stdout
+
     def test_stop_waits_for_every_report_then_releases_merged_work(self) -> None:
         self.team("start", "30")
         self.merged_pair()

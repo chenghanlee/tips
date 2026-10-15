@@ -93,7 +93,7 @@ operator (the user) runs `reset`.
 | `agent/teams/team.py status` | Dispatcher, user | Every allocation record with each client's live Herdr pane, name, kind, state and session, and whether the recorded dispatcher process runs. |
 | `agent/teams/team.py clean` | Operator | List retained allocations with their reasons. Deletes nothing. |
 | `python3 <harness>/bootstrap.py [--commit <sha>]` | Launched client | Prepare your own clone, as [Allocations](#allocations) says. |
-| `python3 <harness>/retirement.py` | Launched client | Fetch origin, then post your clone's state on the issue: clean, unpushed commits, HEAD merged into `origin/main`. Changes nothing. |
+| `python3 <harness>/retirement.py` | Launched client | Fetch origin, then post your clone's state on the issue: clean, unpushed commits, HEAD merged into `origin/main`. Then prompt the dispatcher with `<report URL> retired`. If the report fails, post a BLOCKED comment and prompt `<comment URL> blocked`. With no dispatcher to tell, print that command. Changes nothing else. |
 | `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. |
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment; with `--after`, only the comments after that checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | Tokens per launched session and model, from the session logs. |
@@ -103,6 +103,7 @@ operator (the user) runs `reset`.
 | `herdr agent prompt team-<slot>-<entry> "<review URL>"` | Other reviewer | Tell the merge-confirming tester a review exists. |
 | `herdr agent prompt dispatcher "<URL> done"` | Tester | The PR merged. |
 | `herdr agent prompt dispatcher "<comment URL> blocked"` | Turn holder | A blocker is recorded. |
+| `herdr agent prompt dispatcher "<report URL> retired"` | `retirement.py` | A retirement report is posted; the dispatcher calls `retire_team` again. |
 
 ### Herdr layout
 
@@ -131,7 +132,8 @@ report from an earlier launch does not count. A client that never launched, with
 launch id and its task never submitted, has no session and needs no report. Until each
 has one, it changes nothing: it asks each running client to run `retirement.py`, prints
 the command the operator runs for a stopped client, and keeps every resource reserved.
-With every report, it:
+Each `retirement.py` run prompts the dispatcher with its report URL, so the next `stop`
+follows without polling. With every report, it:
 
 1. Refuses, stopping nothing and keeping the record, databases, files and reservation,
    unless every report shows a clean clone with no unpushed commits and, for a brief,

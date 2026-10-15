@@ -1382,7 +1382,7 @@ def dexter_brief(wrapper: Path) -> str:
         "check empty results with rg. Leave the daemon running on exit. "
         "Do not run git clean -x; it deletes the wrapper and index. When the dispatcher asks "
         f"you to retire, run python3 {harness() / 'retirement.py'} and end your turn: it "
-        "posts your clone's state to the issue and changes nothing."
+        "posts your clone's state to the issue, tells the dispatcher and changes nothing."
     )
 
 
