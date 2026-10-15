@@ -90,7 +90,15 @@ def export(source: Path, commit: str, release: Path) -> None:
 
 
 def locked_packages(lock: Path) -> list[str]:
-    return re.findall(r"^([A-Za-z0-9_.-]+)==", lock.read_text(), re.MULTILINE)
+    """Names of the locked packages that install on every platform. A requirement with
+    an environment marker (`name==1.0 ; sys_platform == 'win32'`) installs only where the
+    marker holds, and pip decides that; this check does not demand it."""
+    names: list[str] = []
+    for line in lock.read_text().splitlines():
+        match = re.match(r"([A-Za-z0-9_.-]+)==", line)
+        if match and ";" not in line:
+            names.append(match.group(1))
+    return names
 
 
 def build_environment(teams: Path) -> None:
