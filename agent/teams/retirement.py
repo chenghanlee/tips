@@ -10,8 +10,8 @@ commits no origin branch holds, whether HEAD is merged into origin/main, and HEA
 The dispatcher's turns start only on messages, so this script then tells it:
 `herdr agent prompt dispatcher "<report URL> retired"`. If the report cannot be made, it
 posts a BLOCKED comment with the error and sends `"<comment URL> blocked"` (the issue URL
-when even that comment fails). With no dispatcher to tell, as when the operator reports for
-a stopped client, it prints that command instead. It never deletes a file and never
+when even that comment fails). When the prompt cannot be sent, as outside Herdr or with no
+dispatcher running, it prints the command instead. It never deletes a file and never
 resets the clone.
 """
 

@@ -1,6 +1,7 @@
 """The harness root: where it may be, and the stable path workers name. The concurrent
 first-claim test is RepositoryConfigTest in test_team.py."""
 
+import json
 import os
 import tempfile
 import unittest
@@ -81,6 +82,21 @@ class ClaimRootTest(unittest.TestCase):
             os.environ["TIPS_TEAM_CONFIG"] = str(self.base / "other.toml")
             env = team.agent_env(cast(team.Allocation, allocation))
             assert env["TIPS_TEAM_CONFIG"] == str(self.base / "other.toml")
+
+    def test_status_shows_the_starters_note_for_the_running_launch_only(self) -> None:
+        state = self.base / "state"
+        state.mkdir()
+        launch = {"pid": 1, "started": "x", "pane": "w1:p1", "session": "s1"}
+        note = {"session": "s1", "text": "Dispatcher in w1:p1: run this"}
+        (state / "dispatcher.recovery").write_text(json.dumps(note))
+        with (
+            mock.patch.object(team, "dispatcher_launch", return_value=launch),
+            mock.patch.object(team, "dispatcher_running", return_value=True),
+            mock.patch.object(team, "dispatcher_path", return_value=state / "dispatcher.json"),
+        ):
+            assert team.dispatcher_status(None).endswith("; starter note: " + note["text"])
+            launch["session"] = "s2"
+            assert "starter note" not in team.dispatcher_status(None)
 
     def test_a_symlinked_state_directory_refuses_before_the_identity_is_published(self) -> None:
         root = self.base / "agent_teams/tips"

@@ -141,9 +141,22 @@ A restricted client reports no session to Herdr. The launcher execs the client, 
 keeps the launcher's process ID, so it records that ID, its start time, the pane and the
 session in `state/dispatcher.json` under the [harness root](#install-a-harness-release). When Herdr shows
 that process in the pane, ready for input, it names the pane `dispatcher` and sends the
-first prompt, `Begin.`, through Herdr. If that does not happen within
-`timeouts.launch_seconds`, a Herdr notification names the command to run. It refuses to
-start while that process runs, or while an unrecorded agent is named `dispatcher`.
+first prompt, `Begin.`, through Herdr, once the adapter has listed its tools to that
+session (`state/dispatcher.ready`). If that does not happen within
+`timeouts.launch_seconds`, or naming or prompting fails, a Herdr notification and
+`team.py status` say what happened and what to run. Check the pane, then run them
+yourself:
+
+```bash
+herdr agent rename <pane> dispatcher
+herdr agent prompt <pane> "Begin."
+```
+
+If the prompt itself failed, `Begin.` may still have arrived: send it again only if the
+pane shows no `Begin.` turn.
+
+It refuses to start while that process runs, or while an unrecorded agent is named
+`dispatcher`.
 
 From a plain shell in a Herdr pane (`HERDR_ENV=1`) at the main checkout:
 

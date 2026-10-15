@@ -2379,6 +2379,22 @@ def dispatcher_path() -> Path:
     return harness_root() / "state/dispatcher.json"
 
 
+# Written by the adapter when it first lists its tools: the client has them.
+DISPATCHER_READY = "dispatcher.ready"
+# Written by the dispatcher's starter when it could not send the first prompt.
+DISPATCHER_RECOVERY = "dispatcher.recovery"
+
+
+def dispatcher_note(name: str, session: str) -> str | None:
+    """The text of a ready or recovery note written for this launch's session, else None."""
+    path = dispatcher_path().with_name(name)
+    try:
+        fields = object_fields(json.loads(path.read_text()), str(path))
+    except (OSError, ValueError, RuntimeError):
+        return None
+    return str(fields.get("text", "")) if fields.get("session") == session else None
+
+
 def dispatcher_launch() -> DispatcherLaunch | None:
     path = dispatcher_path()
     if not path.exists():
@@ -2423,7 +2439,10 @@ def dispatcher_status(named: Entity | None) -> str:
         state = named.get("agent_status") if named else None
         if named and named.get("pane_id") != launch["pane"]:
             return f"dispatcher: {held}; the agent named dispatcher is in {named['pane_id']}"
-        return f"dispatcher: running, {held}, {state or 'no Herdr name'}"
+        # The starter's note when it could not start this launch; the next launch clears it.
+        recovery = dispatcher_note(DISPATCHER_RECOVERY, launch["session"])
+        hint = f"; starter note: {recovery}" if recovery else ""
+        return f"dispatcher: running, {held}, {state or 'no Herdr name'}{hint}"
     if named:
         return f"dispatcher: {named['pane_id']} is named dispatcher but is not the recorded launch"
     return "dispatcher: not running"

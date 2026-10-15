@@ -155,9 +155,14 @@ class AdapterTest(Harness):
         return text
 
     def test_tools_are_the_fixed_inventory_and_reject_malformed_requests(self) -> None:
+        ready = self.trusted / "state/dispatcher.ready"
+
         async def steps(client: Any) -> None:
+            assert not ready.exists()
             tools = (await client.list_tools()).tools
             assert {tool.name for tool in tools} == TOOLS
+            # Listing the tools tells the launcher this session's client has them.
+            assert json.loads(ready.read_text())["session"] == "dispatcher-session"
             for tool in tools:
                 names = set(tool.input_schema.get("properties", {}))
                 assert not names & {"path", "command", "cmd", "args", "profile", "cwd", "pane"}

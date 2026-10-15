@@ -38,7 +38,16 @@ if Path(sys.argv[0]).name == "claude":
         except BlockingIOError:
             held = "held"
     Path(os.environ["DISPATCH_LOG"] + ".lock").write_text(held)
-    time.sleep(float(os.environ.get("CLIENT_SECONDS", "0")))
+    # The adapter lists its tools to this session after READY_SECONDS, or never.
+    ready = os.environ.get("READY_SECONDS", "0")
+    session = args[args.index("--session-id") + 1]
+    note = Path(os.environ["LOCK_PATH"]).with_name("dispatcher.ready")
+    seconds = float(os.environ.get("CLIENT_SECONDS", "0"))
+    if ready != "never":
+        time.sleep(float(ready))
+        note.write_text(json.dumps({"session": session, "text": "tools listed"}))
+        seconds -= float(ready)
+    time.sleep(max(seconds, 0))
 if Path(sys.argv[0]).name == "herdr":
     agents = json.loads(os.environ.get("LIVE_AGENTS", "[]"))
     if args[:2] == ["pane", "layout"]:
@@ -50,8 +59,21 @@ if Path(sys.argv[0]).name == "herdr":
     elif args[:2] == ["agent", "get"]:
         status = os.environ.get("AGENT_STATUS", "idle")
         result = {"agent": {"pane_id": args[2], "agent": "claude", "agent_status": status}}
-    elif args[:2] == ["agent", "prompt"] and os.environ.get("PROMPT_FAILS"):
-        sys.exit("agent_prompt_stalled")
+    elif args[:2] == ["agent", "rename"] and os.environ.get("RENAME_FAILS"):
+        sys.exit("agent_not_found")
+    elif args[:2] == ["agent", "prompt"]:
+        # Record whether this session's ready note existed when the prompt was sent.
+        state = Path(os.environ["LOCK_PATH"]).parent
+        session = json.loads((state / "dispatcher.json").read_text())["session"]
+        note = state / "dispatcher.ready"
+        seen = note.exists() and json.loads(note.read_text())["session"] == session
+        with open(os.environ["DISPATCH_LOG"] + ".prompted", "a") as output:
+            output.write(json.dumps(seen) + "\\n")
+        if os.environ.get("PROMPT_FAILS") == "hang":
+            time.sleep(5)
+        if os.environ.get("PROMPT_FAILS"):
+            sys.exit("agent_prompt_stalled")
+        result = {}
     elif args[:2] == ["pane", "process-info"]:
         leader = int(client.read_text()) if client.exists() else 1
         leader = 1 if os.environ.get("FOREIGN_CLIENT") else leader
@@ -236,21 +258,54 @@ class DispatchTest(unittest.TestCase):
         assert not self.herdr_calls("agent", "rename", seconds=4)
         assert not self.herdr_calls("agent", "prompt", seconds=0)
 
+    def test_begin_waits_for_the_adapters_ready_note_for_this_session(self) -> None:
+        # A note left by an earlier session is removed before the client starts.
+        self.state.mkdir(parents=True)
+        (self.state / "dispatcher.ready").write_text('{"session": "old", "text": "tools listed"}')
+        self.dispatch(CLIENT_SECONDS="5", READY_SECONDS="2")
+        assert self.herdr_calls("agent", "prompt") == [["agent", "prompt", "caller", "Begin."]]
+        # Herdr showed the client idle from the start; Begin. still waited for the note.
+        prompted = (self.root / "calls.prompted").read_text().split()
+        assert prompted == ["true"], prompted
+
     def test_a_client_never_ready_or_a_failed_prompt_names_the_operator_command(self) -> None:
         self.config.write_text(
             self.config.read_text().replace("launch_seconds = 120", "launch_seconds = 2")
         )
-        command = 'herdr agent prompt caller "Begin."'
-        # (case, Herdr's agent status, whether the prompt fails)
-        for case, status, fails in (("never ready", "unknown", ""), ("fails", "idle", "1")):
+        prompt = 'herdr agent prompt caller "Begin."'
+        both = f"herdr agent rename caller dispatcher && {prompt}"
+        # (case, fake Herdr and client settings, Begin. prompts sent, what the note says)
+        cases: list[tuple[str, dict[str, str], int, list[str]]] = [
+            ("never idle", {"AGENT_STATUS": "unknown"}, 0, ["not ready within 2 s", both]),
+            ("no tools", {"READY_SECONDS": "never"}, 0, ["not ready within 2 s", both]),
+            ("rename fails", {"RENAME_FAILS": "1"}, 0, ["naming it failed", both]),
+            ("prompt fails", {"PROMPT_FAILS": "1"}, 1, ["may or may not", "only if", prompt]),
+            ("prompt hangs", {"PROMPT_FAILS": "hang"}, 1, ["may or may not", "timed out"]),
+        ]
+        for case, extra, sent, says in cases:
             with self.subTest(case=case):
                 self.log.unlink(missing_ok=True)
-                self.dispatch(CLIENT_SECONDS="4", AGENT_STATUS=status, PROMPT_FAILS=fails)
-                shown = self.herdr_calls("notification", "show", seconds=6)
-                assert len(shown) == 1 and command in shown[0][-1], shown
+                (self.state / "dispatcher.recovery").unlink(missing_ok=True)
+                env = {"AGENT_STATUS": "idle", "READY_SECONDS": "0", "RENAME_FAILS": ""}
+                env = {**env, "PROMPT_FAILS": "", **extra}
+                self.dispatch(
+                    CLIENT_SECONDS="6",
+                    AGENT_STATUS=env["AGENT_STATUS"],
+                    READY_SECONDS=env["READY_SECONDS"],
+                    RENAME_FAILS=env["RENAME_FAILS"],
+                    PROMPT_FAILS=env["PROMPT_FAILS"],
+                )
+                shown = self.herdr_calls("notification", "show", seconds=8)
+                assert len(shown) == 1, shown
                 prompts = self.herdr_calls("agent", "prompt", seconds=0)
-                sent = [] if case == "never ready" else [["agent", "prompt", "caller", "Begin."]]
-                assert prompts == sent, prompts
+                assert prompts == [["agent", "prompt", "caller", "Begin."]] * sent, prompts
+                # team.py status shows the same text from the recovery note.
+                note = json.loads((self.state / "dispatcher.recovery").read_text())
+                assert note["session"] == self.launch_record()["session"]
+                for text in says:
+                    assert text in shown[0][-1] and text in note["text"], (text, note)
+                if case in ("prompt fails", "prompt hangs"):
+                    assert both not in note["text"]
 
     def test_model_setting_controls_model_and_advisor(self) -> None:
         for model in ("claude-fable-5-1", ""):

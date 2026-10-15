@@ -3,11 +3,13 @@
 The dispatcher is Claude in restricted mode with no built-in tools and one MCP server,
 adapter.py, under strict MCP configuration. Its trusted role and workflow text is the
 system prompt, read here before start: the dispatcher cannot read files or run commands.
-The launcher assigns the session ID. Once Herdr shows the launched client ready for input,
-it names the pane `dispatcher` and sends the first prompt, `Begin.`, through Herdr.
+The launcher assigns the session ID. Once the adapter has listed its tools to this session
+(state/dispatcher.ready) and Herdr shows the launched client ready for input, it names the
+pane `dispatcher` and sends the first prompt, `Begin.`, through Herdr.
 Settings are [dispatcher] in config.toml.
 """
 
+import contextlib
 import fcntl
 import json
 import os
@@ -96,18 +98,46 @@ def client_args(settings: dict[str, object], session: str, config: Path) -> list
         if "fable" not in model:
             args += ["--advisor", "fable"]
     # No command-line prompt: a first turn started with the process could run before the
-    # adapter's tools connect. The starter sends it once the client is ready.
+    # adapter's tools connect. The starter sends it once the adapter has listed them.
     return [*args, "--system-prompt", system_prompt()]
 
 
-def ready_client(pane: str, launch: team.DispatcherLaunch, seconds: float) -> bool:
-    """Whether Herdr sees the recorded launched process in the pane, ready for input."""
-    info = team.execute(["herdr", "pane", "process-info", "--pane", pane], timeout=seconds)
-    agent = team.execute(["herdr", "agent", "get", pane], timeout=seconds)
-    if info.returncode or agent.returncode:
+def note(state: Path, name: str, session: str) -> bool:
+    """Whether state/<name> was written for this session."""
+    try:
+        fields = team.object_fields(json.loads((state / name).read_text()), name)
+    except (OSError, ValueError, RuntimeError):
         return False
-    leader = team.parse_herdr(info.stdout)["process_info"]["foreground_process_group_id"]
-    fields = team.parse_herdr(agent.stdout)["agent"]
+    return fields.get("session") == session
+
+
+def call(args: list[str], seconds: float) -> str | None:
+    """Run one Herdr command; None on success, else the failure with its cause."""
+    try:
+        result = team.execute(args, timeout=seconds)
+    except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
+        return f"{' '.join(args[:3])}: {error}"
+    if result.returncode:
+        cause = (result.stderr or result.stdout).strip() or f"exit {result.returncode}"
+        return f"{' '.join(args[:3])}: {cause}"
+    return None
+
+
+def ready_client(state: Path, launch: team.DispatcherLaunch, seconds: float) -> bool:
+    """Whether the adapter has listed its tools to this session and Herdr sees the recorded
+    launched process in the pane, ready for input. A failed read counts as not ready."""
+    if not note(state, team.DISPATCHER_READY, launch["session"]):
+        return False
+    pane = launch["pane"]
+    try:
+        info = team.execute(["herdr", "pane", "process-info", "--pane", pane], timeout=seconds)
+        agent = team.execute(["herdr", "agent", "get", pane], timeout=seconds)
+        if info.returncode or agent.returncode:
+            return False
+        leader = team.parse_herdr(info.stdout)["process_info"]["foreground_process_group_id"]
+        fields = team.parse_herdr(agent.stdout)["agent"]
+    except (OSError, RuntimeError, ValueError, KeyError, subprocess.TimeoutExpired):
+        return False
     return (
         fields.get("agent") == "claude"
         and fields.get("agent_status") in ("idle", "done")
@@ -116,28 +146,45 @@ def ready_client(pane: str, launch: team.DispatcherLaunch, seconds: float) -> bo
     )
 
 
-def start_when_ready(launch: team.DispatcherLaunch, seconds: float) -> int:
-    """Once Herdr shows the launched process ready for input, name it `dispatcher` and send
-    `Begin.`, the same Herdr prompt path team.py uses for workers. If it is not ready by the
-    deadline, or the prompt fails, show the operator the command to run instead."""
+def start_when_ready(state: Path, launch: team.DispatcherLaunch, seconds: float) -> int:
+    """Once the client has the tools and is ready for input, name it `dispatcher` and send
+    `Begin.`, the same Herdr prompt path team.py uses for workers. Otherwise tell the
+    operator what happened and what to run, in a Herdr notification and in
+    state/dispatcher.recovery, which `team.py status` shows. A failed prompt may still have
+    been delivered, so its note asks the operator to check the pane before sending again."""
     pane = launch["pane"]
+    prompt = f'herdr agent prompt {pane} "Begin."'
+    both = f"herdr agent rename {pane} dispatcher && {prompt}"
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
-        if ready_client(pane, launch, seconds):
-            team.execute(["herdr", "agent", "rename", pane, "dispatcher"], timeout=seconds)
-            prompt = team.execute(["herdr", "agent", "prompt", pane, "Begin."], timeout=seconds)
-            if prompt.returncode == 0:
+        if ready_client(state, launch, seconds):
+            failed = call(["herdr", "agent", "rename", pane, "dispatcher"], seconds)
+            if failed:
+                return give_up(
+                    state, launch, seconds, f"naming it failed ({failed}); Begin. was not sent. "
+                    f"Check the pane, then run: {both}"
+                )
+            failed = call(["herdr", "agent", "prompt", pane, "Begin."], seconds)
+            if failed is None:
                 return 0
-            break
+            return give_up(
+                state, launch, seconds, f"Begin. may or may not have reached it ({failed}). "
+                f"Check the pane; only if it shows no Begin. turn, run: {prompt}"
+            )
         time.sleep(0.5)
-    command = f'herdr agent prompt {pane} "Begin."'
-    message = (
-        f"The dispatcher in {pane} did not get its first prompt. Check the pane, then run: "
-        f"{command}"
+    return give_up(
+        state, launch, seconds, f"it was not ready within {seconds:g} s; Begin. was not sent. "
+        f"Check the pane, then run: {both}"
     )
+
+
+def give_up(state: Path, launch: team.DispatcherLaunch, seconds: float, what: str) -> int:
+    message = f"Dispatcher in {launch['pane']}: {what}"
+    with contextlib.suppress(OSError):
+        recovery = state / team.DISPATCHER_RECOVERY
+        recovery.write_text(json.dumps({"session": launch["session"], "text": message}) + "\n")
     show = ["herdr", "notification", "show", "Dispatcher not started", "--body", message]
-    team.execute(show, timeout=seconds)
-    print(f"dispatch: {message}", file=sys.stderr)
+    call(show, seconds)
     return 1
 
 
@@ -184,13 +231,16 @@ def start_here(settings: dict[str, object], main: Path, config: Path, launch_sec
         )
     session = str(uuid.uuid4())
     args = client_args(settings, session, config)
+    state = team.dispatcher_path().parent
+    for name in (team.DISPATCHER_READY, team.DISPATCHER_RECOVERY):
+        (state / name).unlink(missing_ok=True)
     # This process becomes the client through exec, so its id and start time identify it.
     launch = team.record_dispatcher(pane, session)
     # The starter outlives this process; it stops at its deadline.
     # Reviewed S603: fixed argv of this script, no shell.
     starter = [sys.executable, "-E", "-s", str(Path(__file__).resolve()), "--start"]
     subprocess.Popen(  # noqa: S603
-        [*starter, json.dumps(launch), str(launch_seconds)],
+        [*starter, str(state), json.dumps(launch), str(launch_seconds)],
         start_new_session=True,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
@@ -230,9 +280,9 @@ def start_in_new_pane(main: Path, config: Path, launch_seconds: int) -> None:
 
 
 def main(argv: list[str]) -> None:
-    if argv[:1] == ["--start"] and len(argv) == 3:
-        launch = team.object_fields(json.loads(argv[1]), "launch")
-        sys.exit(start_when_ready(cast(team.DispatcherLaunch, launch), float(argv[2])))
+    if argv[:1] == ["--start"] and len(argv) == 4:
+        launch = cast(team.DispatcherLaunch, team.object_fields(json.loads(argv[2]), "launch"))
+        sys.exit(start_when_ready(Path(argv[1]), launch, float(argv[3])))
     if argv not in ([], ["--new-pane"]):
         raise SystemExit("Usage: agent/teams/dispatch [--new-pane]")
     if os.environ.get("HERDR_ENV") != "1":

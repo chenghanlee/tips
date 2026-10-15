@@ -58,7 +58,16 @@ AMBIGUOUS = (
 
 
 class FixedServer(MCPServer):
-    """Reject arguments a tool does not declare; the SDK would otherwise ignore them."""
+    """Reject arguments a tool does not declare; the SDK would otherwise ignore them.
+    The first tool listing writes the ready note the launcher waits for."""
+
+    ready = False
+
+    async def list_tools(self) -> Any:
+        tools = await super().list_tools()
+        if not self.ready:
+            self.ready = mark_ready()
+        return tools
 
     async def call_tool(
         self, name: str, arguments: dict[str, Any], context: Any = None
@@ -70,6 +79,20 @@ class FixedServer(MCPServer):
             if unknown:
                 raise ToolError(f"{name} does not accept {', '.join(unknown)}")
         return await super().call_tool(name, arguments, context)
+
+
+def mark_ready() -> bool:
+    """Tell the launcher this session's client has listed the tools, so its first prompt
+    can be sent: state/dispatcher.ready names the session. False if it cannot be written."""
+    try:
+        path = team.dispatcher_path().with_name(team.DISPATCHER_READY)
+        staged = path.with_suffix(".next-ready")
+        session = os.environ.get("TIPS_DISPATCHER_SESSION", "")
+        staged.write_text(json.dumps({"session": session, "text": "tools listed"}) + "\n")
+        staged.replace(path)
+    except (OSError, RuntimeError, ValueError):
+        return False
+    return True
 
 
 server = FixedServer(
