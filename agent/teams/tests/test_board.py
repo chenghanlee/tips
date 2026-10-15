@@ -232,5 +232,6 @@ class BoardTest(Harness):
         rows = self.board("usage", "29", env=home).stdout.splitlines()
         assert "| team-1-sol-tester | tester | unknown | no logs found | 0 | 0 | 0 | 0 |" in rows
 
+
 if __name__ == "__main__":
     unittest.main()
