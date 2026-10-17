@@ -81,7 +81,7 @@ def git(project: Path, *args: str, ok: tuple[int, ...] = (0,)) -> tuple[int, str
     if result.returncode not in ok:
         detail = (result.stderr or result.stdout).strip()
         raise RetirementError(f"git {' '.join(args)} failed: {detail}")
-    return result.returncode, result.stdout.strip()
+    return result.returncode, result.stdout.rstrip("\n")  # porcelain lines start with a space
 
 
 def clone_state(project: Path) -> dict[str, object]:
