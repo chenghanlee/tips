@@ -131,7 +131,7 @@ then needs a retirement report from every client of the team, from its current l
 report from an earlier launch does not count. A client that never launched, with no
 launch id and its task never submitted, has no session and needs no report. Until each
 has one, it changes nothing: it asks each running client to run `retirement.py`, prints
-the command the operator runs for a stopped client, names each rejected report and why,
+the command the operator runs for a stopped client, says how many reports were rejected and why,
 and keeps every resource reserved.
 Each `retirement.py` run prompts the dispatcher with its report URL, so the next `stop`
 follows without polling. With every report, it:
