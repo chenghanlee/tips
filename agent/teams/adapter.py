@@ -119,8 +119,11 @@ def page(text: str, offset: int) -> str:
     return kept
 
 
-def operate(action: Callable[[], str | None], *, writes: bool = False) -> str:
-    """Run one harness operation at a time and return its printed output, capped.
+def operate(
+    action: Callable[[], str | None], *, writes: bool = False, offset: int | None = None
+) -> str:
+    """Run one harness operation at a time and return its printed output, capped, or the
+    page from `offset` for a tool that takes one.
 
     Harness functions print progress; stdout is the MCP wire, so it is captured here.
     A failed operation reports what it printed first; a timed-out write is ambiguous.
@@ -135,7 +138,8 @@ def operate(action: Callable[[], str | None], *, writes: bool = False) -> str:
             raise ToolError(cap(f"{output.getvalue()}Error: {error}.{note}")) from error
     if result is not None:
         output.write(result)
-    return cap(output.getvalue() or "done")
+    text = output.getvalue() or "done"
+    return cap(text) if offset is None else page(text, offset)
 
 
 def dispatcher() -> tuple[str, str, str]:
@@ -260,18 +264,20 @@ def pr_checks(pr: Number) -> str:
 
 
 @server.tool()
-def pr_list(state: PrState) -> str:
-    """Up to 100 PRs in the given state: number, title, branch, head and URL."""
+def pr_list(state: PrState, offset: Offset = 0) -> str:
+    """Up to 100 PRs in the given state: number, title, branch, head and URL, from a
+    character offset. A long result ends with the offset to read the rest from."""
     fields = "number,title,headRefName,headRefOid,state,url"
     repository = settings()["repository"]
     args = ["pr", "list", "--repo", repository, "--state", state, "--limit", "100"]
-    return operate(lambda: gh(*args, "--json", fields))
+    return operate(lambda: gh(*args, "--json", fields), offset=offset)
 
 
 @server.tool()
-def pr_read(pr: Number) -> str:
-    """Recent reviews and every unresolved review thread of the PR (pr_review.py list)."""
-    return operate(lambda: pr_review.show(pr, False))
+def pr_read(pr: Number, offset: Offset = 0) -> str:
+    """Recent reviews and every unresolved review thread of the PR (pr_review.py list),
+    from a character offset. A long result ends with the offset to read the rest from."""
+    return operate(lambda: pr_review.show(pr, False), offset=offset)
 
 
 # Issues and board
@@ -284,7 +290,7 @@ def issue_read(issue: Number, offset: Offset = 0) -> str:
     fields = "number,title,state,labels,url,body"
     repository = settings()["repository"]
     args = ["issue", "view", str(issue), "--repo", repository, "--json", fields]
-    return operate(lambda: page(gh(*args), offset))
+    return operate(lambda: gh(*args), offset=offset)
 
 
 @server.tool()
@@ -299,7 +305,7 @@ def issue_create(title: Title, body: Body) -> str:
 def board_read(issue: Number, after_comment_id: GitHubId | None = None, offset: Offset = 0) -> str:
     """An issue body and its comments, or only the comments after the given comment id,
     from a character offset. A long result ends with the offset to read the rest from."""
-    return operate(lambda: page(board.read_text(str(issue), after_comment_id), offset))
+    return operate(lambda: board.read_text(str(issue), after_comment_id), offset=offset)
 
 
 @server.tool()
@@ -320,18 +326,20 @@ def usage_summary(
 
 
 @server.tool()
-def project_read(project: Number) -> str:
-    """A configured project's items: issue number, title and the approved field values."""
+def project_read(project: Number, offset: Offset = 0) -> str:
+    """A configured project's items that are not Done: issue number, title and the approved
+    field values, from a character offset. A long result ends with the offset to read the
+    rest from."""
 
     def read() -> str:
         fields = approved_fields(project)
         items = project_items(project)
-        lines = [item_line(item, fields) for item in items]
+        lines = [item_line(item, fields) for item in items if item.get("status") != "Done"]
         if len(items) >= PROJECT_ITEMS:
             lines.append(f"[incomplete: stopped at {PROJECT_ITEMS} items]")
         return "\n".join(lines) or "no items"
 
-    return operate(read)
+    return operate(read, offset=offset)
 
 
 def item_line(item: dict[str, object], fields: list[str]) -> str:
