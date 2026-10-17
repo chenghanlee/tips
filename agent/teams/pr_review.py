@@ -15,21 +15,22 @@ import json
 import re
 import subprocess
 import sys
-import time
 from dataclasses import dataclass
 from typing import Any, cast
 
 import config as conf
 import team
-from commands import execute, object_fields, object_list, require_type
-from config import HEADER, READ_PAGES, READ_SECONDS
+from commands import object_fields, object_list, require_type
+from config import READ_PAGES
 from github import (
     add_comment,
+    call,
     comment_header,
     deadline_from_now,
     github,
     issue_comments,
     poster,
+    prefixed_json,
     pull_request,
     repo_args,
 )
@@ -243,13 +244,7 @@ def reported_checks(number: int, deadline: float) -> list[dict[str, object]]:
     """Every check reported on the PR head."""
     fields = "name,workflow,bucket,link"
     command = ["gh", "pr", "checks", str(number), *repo_args(), "--json", fields]
-    left = deadline - time.monotonic()
-    try:
-        result = execute(command, timeout=left) if left > 0 else None
-    except subprocess.TimeoutExpired:
-        result = None
-    if result is None:
-        raise RefusalError(f"checks read incomplete after {READ_SECONDS}s")
+    result = call(command, deadline, f"PR {number} checks")
     # gh exits 1 when a check failed and 8 when one is pending; the rows say which.
     if result.stdout.lstrip().startswith("["):
         return object_list(json.loads(result.stdout), "checks")
@@ -374,22 +369,14 @@ def comment_id(url: str) -> int:
 
 def markers(comment: dict[str, object]) -> list[dict[str, Any]]:
     """The TEAM_FINDING markers of a FINDING comment; a malformed one blocks the fold."""
-    lines = str(comment.get("body") or "").splitlines()
-    header = HEADER.match(lines[0]) if lines else None
-    if not header or header["type"] != "FINDING":
-        return []
-    found: list[dict[str, Any]] = []
-    for line in lines[1:]:
-        if line.startswith(MARKER):
-            label = f"TEAM_FINDING in {comment.get('html_url')}"
-            try:
-                fields = object_fields(json.loads(line[len(MARKER) :]), label)
-            except ValueError as error:
-                raise RefusalError(f"Malformed {label}: {error}") from error
-            if not valid_marker(fields):
-                raise RefusalError(f"Malformed {label}")
-            found.append(fields)
-    return found
+    label = f"TEAM_FINDING in {comment.get('html_url')}"
+    try:
+        found = list(prefixed_json(comment, "FINDING", MARKER))
+    except ValueError as error:
+        raise RefusalError(f"Malformed {label}: {error}") from error
+    if not all(valid_marker(fields) for fields in found):
+        raise RefusalError(f"Malformed {label}")
+    return cast(list[dict[str, Any]], found)  # valid_marker checked each field's type
 
 
 def findings(number: int, deadline: float) -> History:
@@ -569,9 +556,7 @@ def print_state(state: PrState, known: dict[Finding, str]) -> None:
 def observe_command(number: int) -> None:
     conf.configure()
     caller, me = team.caller_record()
-    _, _, briefs = pull_request(str(number))
-    if caller["brief"] not in briefs:
-        raise RefusalError(f"PR {number} does not close your brief #{caller['brief']}")
+    pull_request(str(number)).require_closes(caller["brief"])
     state, known = observe(number, poster(caller["agents"][me]))
     print_state(state, known)
     reasons = blockers(state, team.required_reviewers(caller), known)

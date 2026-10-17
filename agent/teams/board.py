@@ -39,9 +39,18 @@ from pathlib import Path
 from typing import cast
 
 import config as conf
-from commands import object_fields, object_list, run
-from config import HEADER, github_seconds
-from github import comment_header, event_role, issue_comments, post_comment, repo_args
+from commands import object_fields, object_list
+from github import (
+    comment_header,
+    deadline_from_now,
+    event_role,
+    github,
+    header_session,
+    issue_comments,
+    parse_comment,
+    post_comment,
+    repo_args,
+)
 from herdr import herdr, session_id
 from team import records
 
@@ -92,11 +101,10 @@ def post(args: argparse.Namespace) -> None:
 def read_text(issue: str, after: int | None) -> str:
     """The issue URL and body, then every comment; with `after`, the URL and only the
     comments after that comment id, so new comments stay reachable on a long issue."""
-    output = run(
-        "gh", "issue", "view", issue, *repo_args(), "--json", "url,body", timeout=github_seconds()
-    )
-    view = json.loads(output)
-    comments = issue_comments(issue)
+    deadline = deadline_from_now()
+    command = ["gh", "issue", "view", issue, *repo_args(), "--json", "url,body"]
+    view = json.loads(github(command, deadline, f"#{issue}"))
+    comments = issue_comments(issue, deadline)
     if after is not None:
         comments = [c for c in comments if int(str(c["id"])) > after]
     parts = [view["url"] if after is not None else f"{view['url']}\n{view['body']}"]
@@ -198,25 +206,26 @@ def launched_sessions(issues: list[str]) -> list[tuple[str, str, str]]:
     """
     comments = [c for issue in issues for c in issue_comments(issue)]
     comments.sort(key=lambda c: (str(c.get("created_at")), int(str(c.get("id")))))
+    unknown = header_session("")
     found: set[tuple[str, str, str]] = set()
     unresolved: dict[str, str] = {}
     roles: dict[str, str] = {}
     for comment in comments:
-        lines = str(comment.get("body") or "").splitlines()
-        match = HEADER.match(lines[0]) if lines else None
-        if not match:
+        parsed = parse_comment(comment)
+        if not parsed:
             continue
+        match, lines = parsed
         name, role, session = match["name"], match["role"], match["session"]
-        launched = len(lines) > 1 and lines[1].split()[:1] == ["launched"]
-        if match["type"] == "EVENT" and launched and session == "unknown":
+        launched = bool(lines) and lines[0].split()[:1] == ["launched"]
+        if match["type"] == "EVENT" and launched and session == unknown:
             roles[name] = role
             unresolved.setdefault(name, role)
         elif match["type"] == "EVENT" and launched:
             found.add((name, role, session))
-        elif name in roles and session != "unknown":
+        elif name in roles and session != unknown:
             found.add((name, roles[name], session))
             unresolved.pop(name, None)
-    found.update((name, role, "unknown") for name, role in unresolved.items())
+    found.update((name, role, unknown) for name, role in unresolved.items())
     return sorted(found)
 
 

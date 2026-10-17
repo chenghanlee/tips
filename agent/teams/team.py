@@ -75,6 +75,7 @@ from config import (
 )
 from dexter import stop_daemon, tools
 from github import (
+    PullRequest,
     event_posted,
     merged_brief,
     post_event,
@@ -343,6 +344,7 @@ def configure_bootstrap(record: Record, allocation: Allocation, branch: str, com
         "logs": str(logs),
         "clone_url": conf.settings()["team"]["clone_url"],
         "repository": conf.settings()["github"]["repository"],
+        "github_seconds": conf.github_seconds(),
         "startup_seconds": conf.settings()["timeouts"]["dexter_startup_seconds"],
         "branch": branch,
         "commit": commit,
@@ -746,18 +748,20 @@ def design(spec: str, entry: str) -> None:
     print(f"Spec {spec}: {entry} in slot {record['slot']}, {allocation['root']}")
 
 
-def brief_record(pr: str, briefs: list[str]) -> Record:
-    found = [r for brief in briefs if (r := record_for(brief))]
+def brief_record(pr: PullRequest) -> Record:
+    found = [r for brief in pr.briefs if (r := record_for(brief))]
     if len(found) != 1:
-        raise RuntimeError(f"PR {pr} must close exactly one started brief; closes {briefs}")
+        raise RuntimeError(
+            f"PR {pr.number} must close exactly one started brief; closes {pr.briefs}"
+        )
     return found[0]
 
 
-def review(pr: str, entry: str) -> None:
+def review(number: str, entry: str) -> None:
     """Launch a required reviewer in its own allocation, configured for the PR head."""
-    url, head, briefs = pull_request(pr)
+    pr = pull_request(number)
     with store_lock():
-        record = brief_record(pr, briefs)
+        record = brief_record(pr)
         testers, designers = current_roster(record)
         if entry not in testers + designers:
             raise RuntimeError(
@@ -766,7 +770,7 @@ def review(pr: str, entry: str) -> None:
             )
         duty = "reviewing designer" if entry in designers else "additional tester"
         allocation = record["agents"].get(entry) or add_allocation(record, entry, duty)
-        allocation["pr"] = pr
+        allocation["pr"] = number
         save_record(record)
         refuse_foreign_owner([Path(allocation["root"])], [allocation["name"]])
         agent = reconcile(record, allocation)
@@ -775,12 +779,12 @@ def review(pr: str, entry: str) -> None:
             print(f"Already running: {allocation['name']} at {allocation.get('head')}")
             adopt(record, allocation, agent)
             return
-        allocation["pr"], allocation["head"] = pr, head
-        configure_bootstrap(record, allocation, "", head)
+        allocation["pr"], allocation["head"] = number, pr.head
+        configure_bootstrap(record, allocation, "", pr.head)
         save_record(record)
         open_pane(record, allocation)
-        launch(record, allocation, reviewer_brief(record, entry, duty, url, head))
-    print(f"PR {pr}: {entry} reviews {head} from {project_of(allocation)}")
+        launch(record, allocation, reviewer_brief(record, entry, duty, pr))
+    print(f"PR {number}: {entry} reviews {pr.head} from {project_of(allocation)}")
 
 
 def reset(brief: str, entry: str) -> None:
@@ -841,50 +845,48 @@ def required_reviewers(record: Record) -> list[str]:
     return [record["tester"], *testers, *designers]
 
 
-def observe_pr(pr: str, head: str, allocation: Allocation) -> tuple[list[tuple[str, str]], str]:
-    """Record the PR's failures at this head as the caller. Return each open finding's check
+def observe_pr(pr: PullRequest, allocation: Allocation) -> tuple[list[tuple[str, str]], str]:
+    """Record the PR's failures at its head as the caller. Return each open finding's check
     and URL, and the conflict the current read shows: "current", "unknown" or ""."""
     import pr_review  # pr_review imports this module, so load it only when needed.
 
-    state, known = pr_review.observe(int(pr), poster(allocation), head)
+    state, known = pr_review.observe(int(pr.number), poster(allocation), pr.head)
     conflict = {"CONFLICTING": "current", pr_review.UNAVAILABLE: "unknown"}
     return [(f.check, url) for f, url in known.items()], conflict.get(state.mergeable, "")
 
 
-def request_launch(
-    record: Record, me: str, pr: str, url: str, head: str, missing: list[str]
-) -> list[str]:
+def request_launch(record: Record, me: str, pr: PullRequest, missing: list[str]) -> list[str]:
     """Record a pending notice on the PR and ask the dispatcher to launch the reviewers."""
     failed: list[str] = []
     try:
         post_event(
-            pr,
+            pr.number,
             record["agents"][me],
-            f"pending review of {head} by {', '.join(missing)}: not launched; "
+            f"pending review of {pr.head} by {', '.join(missing)}: not launched; "
             "launch requested from the dispatcher",
         )
     except RuntimeError as error:
         failed.append(str(error))
-    commands = "; ".join(f"agent/teams/team.py review {pr} {entry}" for entry in missing)
-    return failed + deliver([("dispatcher", f"{url} review: run {commands}")])
+    commands = "; ".join(f"agent/teams/team.py review {pr.number} {entry}" for entry in missing)
+    return failed + deliver([("dispatcher", f"{pr.url} review: run {commands}")])
 
 
 def hand_to_reviewers(
-    record: Record, me: str, pr: str, url: str, head: str, known: list[tuple[str, str]]
+    record: Record, me: str, pr: PullRequest, known: list[tuple[str, str]]
 ) -> None:
     """Notify every required reviewer of one head; request launch of the missing ones."""
     reviewers = required_reviewers(record)
     missing = [entry for entry in reviewers if entry not in record["agents"]]
     tester = live_name(record["slot"], record["tester"])
-    sends = [(tester, tester_message(record, pr, url, head, missing, known))]
+    sends = [(tester, tester_message(record, pr, missing, known))]
     sends += [
-        (live_name(record["slot"], entry), reviewer_notice(record, entry, url, head))
+        (live_name(record["slot"], entry), reviewer_notice(record, entry, pr))
         for entry in reviewers[1:]
         if entry in record["agents"]
     ]
     failed = deliver(sends)
     if missing:
-        failed += request_launch(record, me, pr, url, head, missing)
+        failed += request_launch(record, me, pr, missing)
     if failed:
         raise RuntimeError(
             "Handoff incomplete; failed sends: " + "; ".join(failed) + ". Report blocked with "
@@ -892,7 +894,7 @@ def hand_to_reviewers(
         )
 
 
-def turn(pr: str, recipient: str) -> None:
+def turn(number: str, recipient: str) -> None:
     """Hand a pushed head to every required reviewer, or hand findings to the implementer.
 
     Both directions first record the PR's failures; a failure that cannot be recorded
@@ -905,27 +907,23 @@ def turn(pr: str, recipient: str) -> None:
             f"turn hands work between {record['implementer'] or 'no implementer'} and "
             f"{record['tester'] or 'no tester'}; this pane is {me}"
         )
-    url, head, briefs = pull_request(pr)
-    if record["brief"] not in briefs:
-        raise RuntimeError(
-            f"PR {pr} does not close brief #{record['brief']} (closes {briefs or 'nothing'}); "
-            "fix the PR's closing reference first"
-        )
+    pr = pull_request(number)
+    pr.require_closes(record["brief"])
     if recipient == record["tester"]:
         # The handed-off commit is the implementer's own clean, pushed HEAD.
-        problem = checkout_problem(project_of(record["agents"][me]), head)
+        problem = checkout_problem(project_of(record["agents"][me]), pr.head)
         if problem:
             raise RuntimeError(f"{problem} Commit and push, then hand over.")
-    known, conflict = observe_pr(pr, head, record["agents"][me])
+    known, conflict = observe_pr(pr, record["agents"][me])
     conflicts = [link for check, link in known if check == "mergeability"]
     if recipient == record["tester"] and conflicts:
-        raise RuntimeError(conflict_refusal(head, conflicts, conflict))
+        raise RuntimeError(conflict_refusal(pr.head, conflicts, conflict))
     if recipient == record["implementer"]:
         partner = live_name(record["slot"], recipient)
-        herdr("agent", "prompt", partner, implementer_message(pr, url, known))
+        herdr("agent", "prompt", partner, implementer_message(pr, known))
         print(f"Notified {partner}")
     else:
-        hand_to_reviewers(record, me, pr, url, head, known)
+        hand_to_reviewers(record, me, pr, known)
     print("End your turn now.")
 
 

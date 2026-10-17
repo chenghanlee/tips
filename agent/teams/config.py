@@ -571,10 +571,10 @@ def agent_spec(allocation: Allocation) -> AgentSpec:
 
 
 def github_seconds() -> int:
-    """The deadline of one adapter or review GitHub call; timeouts.github_seconds overrides it."""
-    if cfg is None:
-        return READ_SECONDS
-    return cfg["timeouts"].get("github_seconds", READ_SECONDS)
+    """The deadline of each GitHub operation: timeouts.github_seconds, else READ_SECONDS.
+    Before configure(), as repository() does, it reads the configuration file."""
+    timeouts = (cfg or load_config()[1])["timeouts"]
+    return timeouts.get("github_seconds", READ_SECONDS)
 
 
 def repository() -> str:
