@@ -322,6 +322,33 @@ class AdapterTest(Harness):
 
         self.session(steps)
 
+    def test_a_long_project_reads_to_the_end_without_done_items(self) -> None:
+        def item(number: int) -> dict[str, Any]:
+            status = "Done" if number % 3 == 0 else "Backlog"
+            content = {"number": number, "url": f"https://github.com/o/r/issues/{number}"}
+            fields = {"title": f"Issue {number}", "status": status, "phase": "Design"}
+            return {"id": f"I_{number}", **fields, "content": content}
+
+        self.update(items=[item(number) for number in range(1, 301)])
+        pages: list[str] = []
+
+        async def steps(client: Any) -> None:
+            offset = 0
+            while True:
+                text = await self.call(client, "project_read", project=16, offset=offset)
+                assert len(text.encode()) <= 8192
+                pages.append(text)
+                if "[more: call again with offset=" not in text:
+                    return
+                offset = int(text.rsplit("offset=", 1)[1].split("]")[0])
+
+        self.session(steps)
+        assert len(pages) > 1
+        read = "".join(page.split("\n[more:")[0] for page in pages)
+        assert "#299 Issue 299 | Phase: Design | Feature: " in read
+        assert "#300 Issue" not in read
+        assert len(read.splitlines()) == 200
+
     def test_an_error_after_a_prompt_is_sent_is_reported_as_ambiguous(self) -> None:
         # Herdr reports its own timeout after the text may have reached the client.
         herdr = self.bin / "herdr"
