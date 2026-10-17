@@ -47,7 +47,6 @@ from config import (
     NAME_BYTES,
     NATIVE_LSP_PLUGINS,
     NEVER_SUBMITTED,
-    PARTITION_DIGITS,
     RECORD_VERSION,
     SUBMITTED,
     TABS,
@@ -58,14 +57,21 @@ from config import (
     Record,
     Reports,
     agent_spec,
+    allocation_id,
     allocation_paths,
+    allocation_port,
     config_location,
     contained,
     database_stem,
     harness,
+    is_partition,
     live_name,
+    names_fit,
     overlapping,
     project_of,
+    slot_record_paths,
+    unretired_allocations,
+    within,
 )
 from dexter import stop_daemon, tools
 from github import (
@@ -174,8 +180,7 @@ def store_lock() -> Generator[None]:
 def records() -> dict[int, Record]:
     """Every slot's record; slot discovery reads these, not Herdr."""
     found: dict[int, Record] = {}
-    # Slot records are <slot>.json; other files there, such as dispatcher.json, are not.
-    for path in sorted(p for p in conf.state_dir().glob("*.json") if p.stem.isdecimal()):
+    for path in slot_record_paths(conf.state_dir()):
         record = load_record(path)
         if path.stem != str(record["slot"]):
             raise RuntimeError(f"{path}: file name does not match slot {record['slot']}")
@@ -208,12 +213,8 @@ def reserved() -> list[Allocation]:
 
 
 def test_port(entry: str, slot: int) -> int:
-    team = conf.settings()["team"]
-    return (
-        team["port_base"]
-        + team["port_stride"] * slot
-        + conf.settings()["agents"][entry]["port_offset"]
-    )
+    offset = conf.settings()["agents"][entry]["port_offset"]
+    return allocation_port(conf.settings()["team"], slot, offset)
 
 
 def agent_env(allocation: Allocation) -> dict[str, str]:
@@ -257,9 +258,9 @@ def allocate(record: Record, entry: str, role: str) -> Allocation:
                 f"{entry}: database {suffix} or port {port} collides with {held['name']}'s "
                 f"allocation ({held['db_suffix']}, {held['port']})"
             )
-    if len((max(DATABASE_BASES, key=len) + suffix).encode()) + PARTITION_DIGITS > NAME_BYTES:
+    if not names_fit(suffix):
         raise RuntimeError(f"{entry}: database names for {suffix} exceed {NAME_BYTES} bytes")
-    ident = f"g{generation}-{entry}"
+    ident = allocation_id(generation, entry)
     root = conf.harness_root()
     for directory in allocation_paths(ident):
         # Checked before creation too: a symlinked parent would put the new directory
@@ -296,14 +297,12 @@ def earlier_launch(record: Record, entry: str) -> list[str]:
     """
     held = {a["id"] for r in [*records().values(), record] for a in r["agents"].values()}
     found: list[str] = []
-    for path in sorted(conf.state_dir().glob("*/bootstrap.json")):
+    for config in unretired_allocations(conf.state_dir()):
+        path = config / "bootstrap.json"
         settings = object_fields(json.loads(path.read_text()), str(path))
-        if (
-            (settings.get("issue"), settings.get("entry")) == (record["brief"], entry)
-            and path.parent.name not in held
-            and not (path.parent / "retired.json").exists()
-        ):
-            found.append(f"allocation {path.parent.name}")
+        issue_entry = (settings.get("issue"), settings.get("entry"))
+        if issue_entry == (record["brief"], entry) and config.name not in held:
+            found.append(f"allocation {config.name}")
     label = re.compile(rf"team-[0-9]+-{re.escape(record['brief'])}")
     found += [
         f"Herdr workspace {w['label']}"
@@ -356,10 +355,6 @@ def configure_bootstrap(record: Record, allocation: Allocation, branch: str, com
     write_file(config / "bootstrap.json", json.dumps(settings, indent=2, sort_keys=True) + "\n")
 
 
-def inside(path: Path, root: Path) -> bool:
-    return path == root or root in path.parents
-
-
 def refuse_foreign_owner(
     roots: list[Path], names: list[str], recorded: frozenset[str] = frozenset()
 ) -> None:
@@ -375,7 +370,7 @@ def refuse_foreign_owner(
         if pane in recorded and not agent.get("name") and not occupied:
             continue
         for root in roots:
-            if agent.get("name") not in names and inside(cwd, root):
+            if agent.get("name") not in names and within(cwd, root):
                 owner = agent.get("name") or agent["pane_id"]
                 raise RuntimeError(f"Conflicting live agent in {root}: {owner}; preserved")
 
@@ -1103,7 +1098,7 @@ def preservation_gaps(record: Record, reports: Reports) -> dict[str, str]:
 def recorded_databases(name: str, suffixes: list[str]) -> bool:
     """Whether the database is one of the recorded stems or a numbered partition of one."""
     stems = [base + suffix for base in DATABASE_BASES for suffix in suffixes]
-    return any(re.fullmatch(re.escape(stem) + r"[0-9]*", name) for stem in stems)
+    return any(is_partition(stem, name) for stem in stems)
 
 
 def drop_databases(suffixes: list[str]) -> list[str]:

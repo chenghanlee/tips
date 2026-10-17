@@ -109,3 +109,27 @@ class ClaimRootTest(unittest.TestCase):
             conf.claim_root(root, "o/tips", self.checkout)
         assert sorted(p.name for p in root.iterdir()) == ["state"]
         assert not any(outside.iterdir())
+
+    def test_a_client_names_its_launch_only_with_a_canonical_state_path(self) -> None:
+        state = self.base / "agent_teams/tips/state"
+        state.mkdir(parents=True)
+        link = self.base / "state-link"
+        link.symlink_to(state, target_is_directory=True)
+        cases = {
+            "are not set": {"TIPS_TEAM_ALLOCATION_ID": "g1-impl"},
+            "not set": {"TIPS_TEAM_ALLOCATION_ID": "impl", "TIPS_TEAM_STATE": str(state)},
+            "is not a canonical absolute path": {
+                "TIPS_TEAM_ALLOCATION_ID": "g1-impl",
+                "TIPS_TEAM_STATE": str(link),
+            },
+        }
+        for message, env in cases.items():
+            with (
+                self.subTest(message=message),
+                mock.patch.dict(os.environ, env, clear=True),
+                self.assertRaisesRegex(ValueError, message),
+            ):
+                conf.launch_identity()
+        env = {"TIPS_TEAM_ALLOCATION_ID": "g12-impl", "TIPS_TEAM_STATE": str(state)}
+        with mock.patch.dict(os.environ, env, clear=True):
+            assert conf.launch_identity() == ("g12-impl", state)
