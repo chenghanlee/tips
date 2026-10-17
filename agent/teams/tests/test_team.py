@@ -2451,6 +2451,37 @@ class LaunchRecoveryTest(Harness):
         assert "team-3-tester: task submission is unknown; nothing was resent" in rerun
         assert self.prompts("team-3-tester") == ["Begin."]  # only the call the crash cut short
 
+    def test_stop_records_the_session_of_a_client_whose_launch_stopped_before_one(self) -> None:
+        # The launcher dies after the Codex client started: the record has no session.
+        self.fault("agent start", "team-1-impl", "crash_after")
+        self.team("start", "29", ok=False)
+        assert self.record(1)["agents"]["impl"]["session"] == ""
+        self.bootstrap("team-1-impl")
+        self.merge(self.push("team-1-impl"))
+        # Reports posted before the session was recorded carry the header session unknown.
+        self.retire("team-1-impl", "team-1-impl")
+        assert self.comments("29")[-1]["body"].startswith("EVENT implementer team-1-impl unknown")
+        refused = self.team("stop", "29", ok=False).stderr
+        assert (
+            "No retirement report yet from team-1-impl. 2 reports for team-1-impl rejected: "
+            "header session unknown, recorded session-team-1-impl. Asked: team-1-impl" in refused
+        )
+        # stop recorded the live client's session before it read the reports.
+        assert self.record(1)["agents"]["impl"]["session"] == "session-team-1-impl"
+        self.retire("team-1-impl")
+        self.clients_exit(1)
+        assert "slot 1 released" in self.team("stop", "29").stdout
+
+    def test_a_stopped_client_with_no_recorded_session_retires_by_its_operator_report(self) -> None:
+        self.fault("agent start", "team-1-impl", "crash_after")
+        self.team("start", "29", ok=False)
+        self.bootstrap("team-1-impl")
+        self.merge(self.push("team-1-impl"))
+        self.clients_exit(1)
+        # The operator's report has the header session unknown, matching the empty record.
+        self.retire("team-1-impl")
+        assert "slot 1 released" in self.team("stop", "29").stdout
+
     def test_task_done_and_client_exited_before_the_record_update_is_never_replayed(self) -> None:
         self.fault("agent start", "team-1-tester", "timeout_exited")
         self.team("start", "29", ok=False)
