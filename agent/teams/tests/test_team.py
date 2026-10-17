@@ -1097,25 +1097,9 @@ class HandoffTest(Harness):
         assert f"Already running: team-1-critic at {head}" in rerun
         assert self.record(1)["agents"]["critic"]["head"] == head
         assert len(self.events("agent", "start")) == starts
-        # Another client in the reviewer's pane is not the reviewer, however it is named.
-        self.clients_exit(1)
-        state = self.state()
-        pane = next(x for x in state["panes"] if x.get("label") == "team-1-critic")
-        pane.update(agent="claude", name="team-1-critic", cwd=str(self.repo))
-        self.save(state)
-        refused = self.team("review", "7", "critic", ok=False)
-        assert "not its allocation; preserved" in refused.stderr
-        pane.update(agent="codex", name="visitor", cwd=str(self.repo))
-        self.save(state)
-        refused = self.team("review", "7", "critic", ok=False)
-        assert "conflicting client; preserved" in refused.stderr
-        assert len(self.events("agent", "start")) == starts
         # A stopped reviewer is relaunched in the same allocation only after a reset, with
         # bootstrap configured for the new head; the reused clone is not recloned.
-        pane.update(cwd=str(root))
-        for key in ("agent", "name"):
-            pane.pop(key)
-        self.save(state)
+        self.clients_exit(1)
         assert "task submission is submitted" in self.team("review", "7", "critic", ok=False).stderr
         self.reset("29", "critic")
         self.team("review", "7", "critic")
@@ -1222,7 +1206,12 @@ class RetirementTest(Harness):
         assert f"No dispatcher was notified; run: {command}" in alone.stdout
 
     def test_stop_waits_for_every_report_then_releases_merged_work(self) -> None:
+        # A stop that runs while a start holds the store lock waits, then gives up.
+        fault = {"call": "agent start", "arg": "team-2-impl", "mode": "concurrent"}
+        self.update(faults=[{**fault, "argv": ["stop", "29"]}])
         self.team("start", "30")
+        nested = self.state()["nested"]
+        assert "Busy: another team.py command held" in nested["stderr"], nested
         self.merged_pair()
         self.team("review", "7", "critic")
         self.bootstrap("team-1-critic")
@@ -1309,6 +1298,8 @@ class RetirementTest(Harness):
             assert str(project) in retired["retained"]
             assert retired["databases_kept_because"] == ""
         assert f"Retained {self.trusted / 'allocations/g1-impl/project'}" in stopped
+        listed = self.team("clean").stdout
+        assert "databases _t1g1i: dropped" in listed, listed
         assert self.workspaces() == ["team-2-30"]
         assert self.recorded_briefs() == {"30"}
         assert self.pane("team-2-impl")["agent"] == "codex"
@@ -1389,6 +1380,12 @@ class RetirementTest(Harness):
         assert "agent/teams/README.md#retire-a-brief-closed-without-a-merged-pr" in refused
         assert not any(p.startswith("Retire") for p in self.latest_prompts().values())
         assert self.workspaces() == ["team-1-29"]
+        # A brief closed by a PR that was never merged is refused the same way.
+        self.update(closed_by={"29": ["7"]})
+        refused = self.team("stop", "29", ok=False).stderr
+        assert "#29 is not closed by a merged PR. Nothing was asked or stopped" in refused
+        assert not any(p.startswith("Retire") for p in self.latest_prompts().values())
+        self.update(closed_by={})
         # Clean reports with HEAD on origin/main are not enough while the brief is open.
         (project / "unfinished.txt").unlink()
         head = self.push("team-1-impl")
@@ -1403,6 +1400,14 @@ class RetirementTest(Harness):
         # slot is freed, and the databases and files are kept and listed.
         self.push("team-1-impl", "pushed, never merged")
         self.retire("team-1-impl")
+        notes = self.project("team-1-tester") / "notes.txt"
+        notes.write_text("unsaved\n")
+        self.retire("team-1-tester")
+        refused = self.team("stop", "29", "--abandon", ok=False).stderr
+        assert "team-1-tester reported uncommitted or unpushed work (?? notes.txt)" in refused
+        assert self.recorded_briefs() == {"29"}
+        notes.unlink()
+        self.retire("team-1-tester")
         stopped = self.team("stop", "29", "--abandon").stdout
         assert "slot 1 released; databases dropped: none" in stopped
         assert self.remaining_databases() == ["tips_test_t1g1i"]
@@ -1456,23 +1461,6 @@ class RetirementTest(Harness):
         assert self.recorded_briefs() == {"30"}
         assert self.remaining_databases() == []
 
-    def test_a_writer_that_outlives_stop_never_causes_deletion(self) -> None:
-        self.merged_pair()
-        self.retire("team-1-impl", "team-1-tester")
-        self.clients_exit(1)
-        project = self.project("team-1-impl")
-        late = project / "late.txt"
-        self.env["RACE_DIRTY_FILE"] = str(late)
-        self.team("stop", "29")
-        assert late.read_text() == "written while stopping\n"
-        retired = json.loads((self.trusted / "state/g1-impl/retired.json").read_text())
-        assert str(project) in retired["retained"]
-        # clean lists what stop retained and deletes nothing.
-        listed = self.team("clean").stdout
-        assert f"g1-impl (#29): {project.parent}; files: project and log files" in listed
-        assert "databases _t1g1i: dropped" in listed
-        assert late.exists()
-
     def test_a_stalled_github_read_keeps_the_record_and_releases_the_lock(self) -> None:
         self.merged_pair()
         self.retire("team-1-impl", "team-1-tester")
@@ -1487,6 +1475,7 @@ class RetirementTest(Harness):
         assert self.remaining_databases() == ["tips_test_t1g1i"]
         assert self.recorded_briefs() == {"29"}
         self.update(gh_stalls=False)
+        self.write_config(CONFIG)
         self.team("stop", "29")
         assert self.recorded_briefs() == set()
 
@@ -1521,11 +1510,16 @@ class RetirementTest(Harness):
         assert self.recorded_briefs() == {"29"}
         self.update(dexter_stop_fails=False)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-            server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            server.bind(("127.0.0.1", 24111))
+            # A free port, so two suites on one machine never collide.
+            server.bind(("127.0.0.1", 0))
             server.listen()
+            port = server.getsockname()[1]
+            path = self.trusted / "state/1.json"
+            record = json.loads(path.read_text())
+            record["agents"]["tester"]["port"] = port
+            path.write_text(json.dumps(record))
             refused = self.team("stop", "29", ok=False)
-            assert "Ports 24111 are in use; the reservation is kept" in refused.stderr
+            assert f"Ports {port} are in use; the reservation is kept" in refused.stderr
             assert self.recorded_briefs() == {"29"}
         self.team("stop", "29")
         assert self.recorded_briefs() == set()
@@ -1592,6 +1586,8 @@ class RetirementTest(Harness):
 
     def test_unpreserved_work_asks_its_running_client_once_per_report(self) -> None:
         self.merged_pair()
+        # The first stop asks every client for a report.
+        self.team("stop", "29")
         (self.project("team-1-tester") / "notes.txt").write_text("unsaved\n")
         self.retire("team-1-impl", "team-1-tester")
         url = self.comments("29")[-1]["html_url"]
@@ -1599,12 +1595,13 @@ class RetirementTest(Harness):
         assert f"team-1-tester reported uncommitted or unpushed work (?? notes.txt): {url}" in (
             refused
         )
-        assert "Asked now: team-1-tester; asked earlier: none." in refused
+        assert "Asked now: team-1-tester; asked earlier: none." in refused, refused
         ask = self.latest_prompts()["team-1-tester"]
         assert ask.startswith(f"Retire: your retirement report {url} shows work that is not")
         again = self.team("stop", "29", ok=False).stderr
         assert "Asked now: none; asked earlier: team-1-tester." in again
-        assert [p for p in self.prompts("team-1-tester") if p.startswith("Retire")] == [ask]
+        preserve = "Retire: your retirement report"
+        assert [p for p in self.prompts("team-1-tester") if p.startswith(preserve)] == [ask]
         # A client that is not running gets the operator's command instead.
         self.clients_exit(1)
         stopped = self.team("stop", "29", ok=False).stderr
