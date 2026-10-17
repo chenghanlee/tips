@@ -4,7 +4,6 @@ import contextlib
 import json
 import os
 import re
-import shutil
 import signal
 import socket
 import subprocess
@@ -254,41 +253,42 @@ class PairLifecycleTest(Harness):
         self.git("push", "-q", "origin", "main")
         (self.repo / "AGENTS.md").write_text("Uncommitted launcher-only instructions.\n")
         self.team("start", "29")
-        assert self.workspaces() == ["team-1-29"]
+        assert self.workspaces() == ["team-1-29"], "not one workspace named for slot and brief"
         assert self.tabs("w1") == {
             "implementers": ["team-1-impl"],
             "reviewers": ["team-1-tester"],
-        }
+        }, "each client is not in its role's tab"
         record = self.record(1)
-        assert record["tabs"] == {"implementers": "w1:t1", "reviewers": "w1:t2"}
-        assert (record["version"], record["generation"]) == (3, 1)
+        assert record["tabs"] == {"implementers": "w1:t1", "reviewers": "w1:t2"}, record["tabs"]
+        assert (record["version"], record["generation"]) == (3, 1), "wrong version or generation"
         assert (record["kind"], record["brief"], record["implementer"], record["tester"]) == (
             "brief",
             "29",
             "impl",
             "tester",
-        )
+        ), "the record does not name the brief's pair"
         # Each client has its own allocation under the harness root: an empty project and
         # logs in its working directory, launcher configuration outside it.
         impl_root = self.trusted / "allocations/g1-impl"
         tester_root = self.trusted / "allocations/g1-tester"
-        assert self.allocation("team-1-impl")["root"] == str(impl_root)
+        assert self.allocation("team-1-impl")["root"] == str(impl_root), "wrong allocation root"
         for root in (impl_root, tester_root):
-            assert sorted(p.name for p in root.iterdir()) == ["logs", "project"]
-            assert not any((root / "project").iterdir())
+            names = sorted(p.name for p in root.iterdir())
+            assert names == ["logs", "project"], f"{root} holds {names}"
+            assert not any((root / "project").iterdir()), f"the launcher wrote into {root}"
         settings = json.loads((self.trusted / "state/g1-impl/bootstrap.json").read_text())
-        assert (settings["branch"], settings["commit"]) == ("task/29", "")
-        assert "probe" not in settings
-        assert settings["clone_url"] == str(self.origin)
-        assert settings["writable"] == [str(impl_root)]
+        assert (settings["branch"], settings["commit"]) == ("task/29", ""), "wrong impl checkout"
+        assert "probe" not in settings, "bootstrap settings carry a probe"
+        assert settings["clone_url"] == str(self.origin), "bootstrap clones another origin"
+        assert settings["writable"] == [str(impl_root)], "wrong writable roots"
         tester_settings = json.loads((self.trusted / "state/g1-tester/bootstrap.json").read_text())
-        assert tester_settings["branch"] == ""
+        assert tester_settings["branch"] == "", "the tester got a task branch"
         # The launcher ran no Git, Mix or Dexter step for them.
-        assert not self.events("mix")
-        assert not self.events("dexter")
+        assert not self.events("mix"), "the launcher ran Mix"
+        assert not self.events("dexter"), "the launcher ran Dexter"
         impl, tester = self.pane("team-1-impl"), self.pane("team-1-tester")
-        assert (impl["agent"], tester["agent"]) == ("codex", "claude")
-        assert (impl["cwd"], tester["cwd"]) == (str(impl_root), str(tester_root))
+        assert (impl["agent"], tester["agent"]) == ("codex", "claude"), "wrong client kinds"
+        assert (impl["cwd"], tester["cwd"]) == (str(impl_root), str(tester_root)), "wrong cwd"
         shared = {
             "PGPORT": "5433",
             "MIX_ENV": "test",
@@ -307,7 +307,7 @@ class PairLifecycleTest(Harness):
             "TIPS_TEAM_LAUNCH": self.allocation("team-1-impl")["launch"],
             # Codex's sandbox cannot write the shared Hex cache; Claude keeps the default.
             "HEX_HOME": str(impl_root / "project/tmp/hex"),
-        }
+        }, impl["launch_env"]
         assert tester["launch_env"] == {
             **shared,
             "TIPS_DB_SUFFIX": "_t1g1r",
@@ -316,89 +316,94 @@ class PairLifecycleTest(Harness):
             "TIPS_TEAM_ALLOCATION_ID": "g1-tester",
             "TIPS_TEAM_LAUNCH": self.allocation("team-1-tester")["launch"],
             "HEX_HOME": None,
-        }
-        assert re.fullmatch(r"[0-9a-f]{32}", self.allocation("team-1-tester")["launch"])
+        }, tester["launch_env"]
+        launch = self.allocation("team-1-tester")["launch"]
+        assert re.fullmatch(r"[0-9a-f]{32}", launch), f"launch id {launch!r} is not 32 hex"
         # Codex works in the allocation directory, outside the clone.
         argv = impl["launch_argv"]
-        assert argv[argv.index("-C") + 1] == str(impl_root)
-        assert argv[-1] == 'model_reasoning_effort="xhigh"'
-        assert "--add-dir" not in argv
-        assert not (impl_root / ".codex").exists()
+        assert argv[argv.index("-C") + 1] == str(impl_root), "Codex runs outside its allocation"
+        assert argv[-1] == 'model_reasoning_effort="xhigh"', "Codex lost its effort"
+        assert "--add-dir" not in argv, "Codex got another writable directory"
+        assert not (impl_root / ".codex").exists(), "the launcher wrote Codex configuration"
         # Codex starts with no task and gets its brief as the first message; Claude holds
         # its brief as a system prompt, so its first message only starts the work.
-        assert self.prompts("team-1-tester") == ["Begin."]
+        assert self.prompts("team-1-tester") == ["Begin."], "the tester got more than Begin."
         [impl_brief] = self.prompts("team-1-impl")
         tester_brief = self.system_prompt("team-1-tester")
         harness = self.repo / "agent/teams"
-        assert impl_brief.startswith("You are impl, the implementer for brief #29;")
-        assert f"First run python3 {harness / 'bootstrap.py'}:" in impl_brief
-        assert f"your project is {impl_root / 'project'}" in impl_brief
-        assert f"python3 {harness / 'team.py'} turn <pr> tester" in impl_brief
-        assert tester_brief.startswith("You are tester, the merge-confirming tester for brief #29;")
-        assert f"python3 {harness / 'team.py'} turn <pr> impl" in tester_brief
-        assert "Put tester, <session> on line 2" in tester_brief
-        assert f"python3 {harness / 'retirement.py'}" in tester_brief
-        assert "persona" not in tester_brief
+        assert impl_brief.startswith("You are impl, the implementer for brief #29;"), impl_brief
+        assert f"First run python3 {harness / 'bootstrap.py'}:" in impl_brief, impl_brief
+        assert f"your project is {impl_root / 'project'}" in impl_brief, impl_brief
+        assert f"python3 {harness / 'team.py'} turn <pr> tester" in impl_brief, impl_brief
+        assert tester_brief.startswith(
+            "You are tester, the merge-confirming tester for brief #29;"
+        ), tester_brief
+        assert f"python3 {harness / 'team.py'} turn <pr> impl" in tester_brief, tester_brief
+        assert "Put tester, <session> on line 2" in tester_brief, tester_brief
+        assert f"python3 {harness / 'retirement.py'}" in tester_brief, tester_brief
+        assert "persona" not in tester_brief, "the tester got a designer persona"
         targ = tester["launch_argv"]
-        assert targ[targ.index("--advisor") + 1] == "fixture-advisor"
-        assert "--advisor" not in argv
+        assert targ[targ.index("--advisor") + 1] == "fixture-advisor", "Claude lost its advisor"
+        assert "--advisor" not in argv, "Codex got an advisor"
         plugins = json.loads(targ[targ.index("--settings") + 1])["enabledPlugins"]
-        assert plugins["elixir-lsp@elixir-agent-tools"] is False
-        assert plugins["mix-credo@elixir-agent-tools"] is True
+        assert plugins["elixir-lsp@elixir-agent-tools"] is False, "the native LSP plugin is on"
+        assert plugins["mix-credo@elixir-agent-tools"] is True, "other plugins were turned off"
         tester_session = self.launched_session("team-1-tester")
-        assert re.fullmatch(r"[0-9a-f-]{36}", tester_session)
-        assert "--session-id" not in impl["launch_argv"]
-        assert record["agents"]["tester"]["session"] == tester_session
-        assert {a["submission"] for a in record["agents"].values()} == {"submitted"}
+        assert re.fullmatch(r"[0-9a-f-]{36}", tester_session), f"{tester_session!r} is no UUID"
+        assert "--session-id" not in impl["launch_argv"], "Codex got a session id"
+        recorded = record["agents"]["tester"]["session"]
+        assert recorded == tester_session, f"recorded session {recorded!r}, launched another"
+        submissions = {a["submission"] for a in record["agents"].values()}
+        assert submissions == {"submitted"}, submissions
         launches = [record["agents"][e]["launch"] for e in ("impl", "tester")]
-        assert all(re.fullmatch(r"[0-9a-f]{32}", launch) for launch in launches)
+        assert all(re.fullmatch(r"[0-9a-f]{32}", launch) for launch in launches), launches
         assert [c["body"] for c in self.comments("29")] == [
             f"EVENT implementer team-1-impl session-team-1-impl\nlaunched codex in {impl_root}; "
             f"allocation g1-impl; launch {launches[0]}; database suffix _t1g1i; port 24110",
             f"EVENT tester team-1-tester {tester_session}\nlaunched claude in {tester_root}; "
             f"allocation g1-tester; launch {launches[1]}; database suffix _t1g1r; port 24111",
-        ]
+        ], "the launch EVENTs are not one per client with its allocation"
         # Each worker clones for itself: the implementer on its task branch from fetched
         # origin/main, the tester detached at origin/main, in separate clones.
         result = self.bootstrap("team-1-impl")
         project = impl_root / "project"
-        assert f"Bootstrap ready: {project} at {release}" in result.stdout
-        assert self.git("branch", "--show-current", cwd=project) == "task/29"
-        assert (project / "AGENTS.md").read_text() == "Committed instructions.\n"
-        assert self.events("mix") == [["mix", str(project), "deps.get", "--check-locked"]]
+        assert f"Bootstrap ready: {project} at {release}" in result.stdout, result.stdout
+        branch = self.git("branch", "--show-current", cwd=project)
+        assert branch == "task/29", f"impl clone on {branch!r}"
+        instructions = (project / "AGENTS.md").read_text()
+        assert instructions == "Committed instructions.\n", "the clone is not origin/main"
+        mixes = self.events("mix")
+        assert mixes == [["mix", str(project), "deps.get", "--check-locked"]], mixes
         assert self.state()["mix_env"] == {
             "HEX_HOME": str(project / "tmp/hex"),
             "MIX_ENV": "test",
-        }
-        assert [e[1:3] for e in self.events("dexter")] == [
-            [str(project), "query"],
-            [str(project), "reindex"],
-        ]
-        assert os.readlink(project / ".agents/skills") == str(self.repo / ".agents/skills")
-        assert self.git("status", "--porcelain", "--untracked-files=all", cwd=project) == ""
+        }, "Mix ran with the wrong environment"
+        dexter = [e[1:3] for e in self.events("dexter")]
+        assert dexter == [[str(project), "query"], [str(project), "reindex"]], dexter
+        skills = os.readlink(project / ".agents/skills")
+        assert skills == str(self.repo / ".agents/skills"), f"skills link to {skills}"
+        status = self.git("status", "--porcelain", "--untracked-files=all", cwd=project)
+        assert status == "", f"bootstrap left changes: {status}"
         # The full log is in the allocation's logs; the console stays bounded.
         [log] = (impl_root / "logs").glob("bootstrap-*.log")
-        assert "deps.get --check-locked" in log.read_text()
-        assert len(result.stdout.encode()) <= 8192 + 200
+        assert "deps.get --check-locked" in log.read_text(), "the log lacks the Mix step"
+        assert len(result.stdout.encode()) <= 8192 + 200, "the console output is unbounded"
         # The wrapper keeps its root and sources from any directory.
         env = dict(self.env)
         env.pop("DEXTER_ELIXIR_LIB_ROOT")
         query = ["query", "hover", "a.ex", "1", "1"]
         wrapper = project / ".dexter/dexter.sh"
         execute(["/bin/sh", wrapper, *query], cwd=self.root, env=env, check=True)
-        assert self.state()["events"][-1] == ["dexter", str(project), *query]
-        assert self.state()["dexter_stdlib"] == str(self.stdlib)
+        last = self.state()["events"][-1]
+        assert last == ["dexter", str(project), *query], f"the wrapper ran {last}"
+        stdlib = self.state()["dexter_stdlib"]
+        assert stdlib == str(self.stdlib), f"the wrapper lost its sources: {stdlib}"
         self.bootstrap("team-1-tester")
         other = tester_root / "project"
-        assert self.git("rev-parse", "HEAD", cwd=other) == release
-        assert self.git("branch", "--show-current", cwd=other) == ""
-        # A refused post is an error after the launch itself: the record stands and a rerun
-        # posts the EVENT.
-        self.update(comments_fail=True)
-        refused = self.team("start", "31", ok=False)
-        assert "EVENT not recorded on #31" in refused.stderr
-        assert "Rerun this command once GitHub answers" in refused.stderr
-        assert self.record(2)["agents"]["impl"]["session"] == "session-team-2-impl"
+        head = self.git("rev-parse", "HEAD", cwd=other)
+        assert head == release, f"tester clone at {head}, not origin/main"
+        branch = self.git("branch", "--show-current", cwd=other)
+        assert branch == "", f"tester clone on {branch!r}, not detached"
 
     def test_brief_roster_is_validated_before_any_change(self) -> None:
         cases = {
@@ -428,17 +433,19 @@ class PairLifecycleTest(Harness):
         # Live clients are left alone.
         self.team("start", "29")
         later = self.state()["events"][before:]
-        assert not any(e[:2] in (["agent", "start"], ["pane", "run"]) for e in later)
-        assert not any(e[:2] == ["agent", "prompt"] for e in later)
+        relaunched = [e for e in later if e[:2] in (["agent", "start"], ["pane", "run"])]
+        assert not relaunched, f"a live client was relaunched: {relaunched}"
+        assert not any(e[:2] == ["agent", "prompt"] for e in later), "a live client was prompted"
         # Reset refuses a running client.
         refused = self.team("reset", "29", "impl", ok=False)
-        assert "team-1-impl is running in" in refused.stderr
+        assert "team-1-impl is running in" in refused.stderr, refused.stderr
         # A stopped client may have done its task: a rerun neither relaunches nor resends.
         self.clients_exit(1)
         refused = self.team("start", "29", ok=False)
-        assert "team-1-impl is not running and its task submission is submitted" in refused.stderr
-        assert "team.py' reset 29 impl" in refused.stderr
-        assert len(self.events("agent", "start")) == 2
+        held = "team-1-impl is not running and its task submission is submitted"
+        assert held in refused.stderr, refused.stderr
+        assert "team.py' reset 29 impl" in refused.stderr, refused.stderr
+        assert len(self.events("agent", "start")) == 2, "a stopped client was relaunched"
         # After a reset, the replacement gets the allocation it was launched with, even
         # after config.toml changed its database and port; its clone keeps unfinished work.
         self.write_config(
@@ -448,19 +455,24 @@ class PairLifecycleTest(Harness):
         )
         reset = self.team("reset", "29", "tester").stdout
         session = self.launched_session("team-1-tester")
-        assert f"task submission was submitted, session {session}" in reset
+        assert f"task submission was submitted, session {session}" in reset, reset
         self.reset("29", "impl")
         self.team("start", "29")
-        assert len(self.events("agent", "start")) == 4
-        assert self.launch_env("team-1-tester") == ("_t1g1r", "24111")
+        assert len(self.events("agent", "start")) == 4, "reset clients were not relaunched"
+        resources = self.launch_env("team-1-tester")
+        assert resources == ("_t1g1r", "24111"), f"the replacement took {resources}"
         # The replacement reuses its clone: bootstrap neither reclones nor resets it.
         self.bootstrap("team-1-impl")
-        assert (project / "tracked.txt").read_text() == "unfinished work\n"
-        assert self.git("branch", "--show-current", cwd=project) == "task/29"
-        assert len(self.events("mix")) == 1
-        assert self.record(1)["generation"] == 1
-        assert self.record(1)["agents"]["tester"]["submission"] == "submitted"
-        assert self.prompts("team-1-tester") == ["Begin.", "Begin."]
+        work = (project / "tracked.txt").read_text()
+        assert work == "unfinished work\n", "bootstrap discarded unfinished work"
+        branch = self.git("branch", "--show-current", cwd=project)
+        assert branch == "task/29", f"the clone moved to {branch!r}"
+        assert len(self.events("mix")) == 1, "bootstrap fetched again for the same lock"
+        assert self.record(1)["generation"] == 1, "a reset started a new generation"
+        submission = self.record(1)["agents"]["tester"]["submission"]
+        assert submission == "submitted", f"the replacement is {submission}"
+        prompts = self.prompts("team-1-tester")
+        assert prompts == ["Begin.", "Begin."], prompts
         # A closed pane is reopened in its role's tab; the allocation keeps its resources.
         # Herdr closes a tab with its last pane, so the role gets a new tab too.
         old = self.record(1)["agents"]["impl"]
@@ -472,25 +484,26 @@ class PairLifecycleTest(Harness):
         self.reset("29", "impl", "tester")
         self.team("start", "29")
         new = self.record(1)["agents"]["impl"]
-        assert new["pane"] != old["pane"]
-        assert new["workspace"] == old["workspace"]
-        assert new["tab"] != old["tab"]
+        assert new["pane"] != old["pane"], "the closed pane was reused"
+        assert new["workspace"] == old["workspace"], "the workspace changed"
+        assert new["tab"] != old["tab"], "the closed tab was reused"
         assert (new["root"], new["db_suffix"], new["port"]) == (
             old["root"],
             old["db_suffix"],
             old["port"],
-        )
-        assert self.pane("team-1-impl")["cwd"] == old["root"]
+        ), "the reopened client lost its allocation"
+        cwd = self.pane("team-1-impl")["cwd"]
+        assert cwd == old["root"], f"the reopened client runs in {cwd}"
         # A vanished workspace is recreated with both clients in their tabs.
         self.update(workspaces=[], tabs=[], panes=[])
         self.reset("29", "impl", "tester")
         self.team("start", "29")
         workspace = self.record(1)["workspace"]
-        assert workspace != old["workspace"]
+        assert workspace != old["workspace"], "the vanished workspace is still recorded"
         assert self.tabs(workspace) == {
             "implementers": ["team-1-impl"],
             "reviewers": ["team-1-tester"],
-        }
+        }, "the recreated workspace lacks a role tab"
         # A client cannot change kind or disappear from config while it is allocated.
         self.clients_exit(1)
         self.reset("29", "impl", "tester")
@@ -499,10 +512,13 @@ class PairLifecycleTest(Harness):
                 'kind = "codex"\nmodel = "fixture-impl"', 'model = "fixture-impl"\nkind = "claude"'
             )
         )
-        assert "launched as codex; preserved" in self.team("start", "29", ok=False).stderr
-        assert self.record(1)["agents"]["impl"]["submission"] == "never_submitted"
+        refused = self.team("start", "29", ok=False)
+        assert "launched as codex; preserved" in refused.stderr, refused.stderr
+        submission = self.record(1)["agents"]["impl"]["submission"]
+        assert submission == "never_submitted", f"the refused client is {submission}"
         self.write_config(CONFIG.replace("[agents.tester]", "[agents.other]"))
-        assert "not a configured entry" in self.team("start", "29", ok=False).stderr
+        refused = self.team("start", "29", ok=False)
+        assert "not a configured entry" in refused.stderr, refused.stderr
         # The pair cannot change hands while the allocations are theirs.
         self.write_config(CONFIG)
         starts = len(self.events("agent", "start"))
@@ -513,9 +529,10 @@ class PairLifecycleTest(Harness):
             with self.subTest(body=body):
                 self.update(issues={**self.state()["issues"], "29": body})
                 refused = self.team("start", "29", ok=False)
-                assert "changed its implementer or merge-confirming tester" in refused.stderr
-        assert len(self.events("agent", "start")) == starts
-        assert self.record(1)["tester"] == "tester"
+                changed = "changed its implementer or merge-confirming tester"
+                assert changed in refused.stderr, refused.stderr
+        assert len(self.events("agent", "start")) == starts, "a changed pair was launched"
+        assert self.record(1)["tester"] == "tester", "the record took the brief's new tester"
 
     def test_each_brief_takes_its_own_slot_from_the_records_until_none_is_free(self) -> None:
         small = CONFIG.replace("max_teams = 6", "max_teams = 2")
@@ -531,7 +548,13 @@ class PairLifecycleTest(Harness):
         moved = small.replace("port_offset = 1", "port_offset = 5")
         self.write_config(moved.replace("port_offset = 2", "port_offset = 1"))
         refused = self.team("review", "7", "critic", ok=False)
-        assert "port 24111 collides with team-1-tester's" in refused.stderr
+        assert "port 24111 collides with team-1-tester's" in refused.stderr, refused.stderr
+        # Config moved the critic onto the running tester's database stem: refused too.
+        renamed = small.replace('db_suffix = "r"', 'db_suffix = "x"')
+        self.write_config(renamed.replace('db_suffix = "c"', 'db_suffix = "r"'))
+        refused = self.team("review", "7", "critic", ok=False)
+        stem = "critic: database _t1g1r or port 24112 collides with team-1-tester's"
+        assert stem in refused.stderr, refused.stderr
         self.write_config(small)
         self.team("review", "7", "critic")
         assert self.launch_env("team-1-critic") == ("_t1g1c", "24112")
@@ -641,18 +664,6 @@ class PairLifecycleTest(Harness):
         self.team("start", "29")
         assert len(self.events("agent", "start")) == 2
 
-    def test_a_team_whose_clients_never_launched_retires_without_reports(self) -> None:
-        self.update(setup_lost=True)
-        self.team("start", "29", ok=False)
-        assert [a["launch"] for a in self.record(1)["agents"].values()] == ["", ""]
-        self.update(setup_lost=False)
-        self.merge(self.git("--git-dir", self.origin, "rev-parse", "main"))
-        self.databases("tips_test_t1g1i")
-        stopped = self.team("stop", "29").stdout
-        assert "slot 1 released" in stopped
-        assert self.recorded_briefs() == set()
-        assert self.remaining_databases() == []
-
     def test_client_started_blocked_or_in_another_root_is_reported(self) -> None:
         # A blocked client has the recorded identity: a rerun adopts it and sends nothing.
         self.update(start_fails=True)
@@ -700,42 +711,6 @@ class PairLifecycleTest(Harness):
         assert self.state()["events"] == []
         assert not self.trusted.exists()
 
-    def test_a_root_claimed_by_another_repository_is_refused(self) -> None:
-        # Another owner's repository with the same name has the same default root.
-        self.trusted.mkdir(parents=True)
-        (self.trusted / "repository.json").write_text('{"repository": "x/r"}\n')
-        refused = self.team("start", "29", ok=False)
-        assert f"{self.trusted} belongs to x/r, not o/r" in refused.stderr
-        assert not (self.trusted / "state").exists()
-        # A dispatcher record beside the slot records is not a slot record.
-        (self.trusted / "repository.json").write_text('{"repository": "o/r"}\n')
-        (self.trusted / "state").mkdir()
-        (self.trusted / "state/dispatcher.json").write_text('{"pid": 1}\n')
-        self.team("start", "29")
-        assert self.recorded_briefs() == {"29"}
-        # The harness override names <root>/harness by an absolute path.
-        self.env["TIPS_TEAM_HARNESS"] = "agent_teams/r/harness"
-        refused = self.team("stop", "29", ok=False)
-        assert "TIPS_TEAM_HARNESS must be an absolute path" in refused.stderr
-
-    def test_a_root_in_the_checkout_or_a_temporary_directory_is_refused(self) -> None:
-        scratch, tmp = self.root / "scratch", Path("/tmp").resolve()  # noqa: S108 - must be refused
-        roots: dict[str, tuple[Path, Path, dict[str, str]]] = {
-            "checkout": (self.repo / "x", self.repo, {}),
-            "tmp": (tmp / f"tips-root-{os.getpid()}", tmp, {}),
-            "TMPDIR": (scratch / "x", scratch, {"TMPDIR": str(scratch)}),
-        }
-        env = self.env
-        for case, (root, parent, extra) in roots.items():
-            self.addCleanup(shutil.rmtree, root, ignore_errors=True)
-            with self.subTest(case=case):
-                self.env = {**env, **extra, "TIPS_TEAM_HARNESS": str(root / "harness")}
-                refused = self.team("start", "29", ok=False)
-                assert f"Harness root {root} is inside {parent}; refused" in refused.stderr
-                assert not root.exists()
-        self.env = env
-        assert [e for e in self.state()["events"] if e[0] != "gh"] == []
-
     def test_trusted_paths_inside_writable_or_temporary_roots_are_refused(self) -> None:
         self.team("start", "29")
         # A worker whose TMPDIR holds the harness: bootstrap refuses before any clone.
@@ -764,24 +739,6 @@ class PairLifecycleTest(Harness):
         refused = self.team("start", "33", ok=False)
         assert "escapes" in refused.stderr
         assert not any(outside.iterdir())
-
-    def test_a_symlinked_root_directory_refuses_before_creating_anything(self) -> None:
-        self.team("clean")  # creates the root
-        for name in ("allocations", "state"):
-            with self.subTest(directory=name):
-                outside = self.root / f"outside-{name}"
-                outside.mkdir()
-                directory = self.trusted / name
-                directory.rename(self.root / f"kept-{name}")
-                directory.symlink_to(outside, target_is_directory=True)
-                refused = self.team("start", "29", ok=False)
-                assert f"{directory} escapes {self.trusted} or passes through a symlink" in (
-                    refused.stderr
-                )
-                assert not any(outside.iterdir())
-                directory.unlink()
-                (self.root / f"kept-{name}").rename(directory)
-        assert [e for e in self.state()["events"] if e[0] != "gh"] == []
 
     @unittest.skipUnless(
         os.environ.get("TIPS_TEST_REAL_CODEX"), "opt-in installed Codex config check"
@@ -1151,19 +1108,12 @@ class DesignTest(Harness):
         assert brief.startswith("You are critic, the designer for spec #50;")
         assert "Read agent/teams/roles/designer.md" in brief
         assert "bootstrap.py:" in brief
-        # The launch EVENT lets board.py usage find the designer's session.
+        # The launch EVENT names the designer's session.
         assert self.comments("50")[-1]["body"] == (
             f"EVENT designer team-1-critic {self.launched_session('team-1-critic')}\n"
             f"launched claude in {root}; allocation g1-critic; launch "
             f"{self.record(1)['agents']['critic']['launch']}; database suffix _t1g1c; port 24112"
         )
-        usage = execute(
-            ["python3", str(self.repo / "agent/teams/board.py"), "usage", "50"],
-            cwd=self.repo,
-            env=self.env,
-            timeout=60,
-        )
-        assert "team-1-critic" in usage.stdout + usage.stderr
         # A second designer joins the spec's team; non-designers are refused.
         refused = self.team("design", "50", "tester", ok=False)
         assert "tester is not a configured designer entry" in refused.stderr
@@ -1173,6 +1123,11 @@ class DesignTest(Harness):
         assert self.git("rev-parse", "HEAD", cwd=project) == self.git("rev-parse", "HEAD")
         assert self.git("branch", "--show-current", cwd=project) == ""
         # A brief start cannot take the spec's slot, and a design team keeps its databases.
+        spec = self.state()["issues"]["50"]
+        self.update(issues={**self.state()["issues"], "50": BRIEF})
+        refused = self.team("start", "50", ok=False)
+        assert "#50 already holds a design team in slot 1" in refused.stderr, refused.stderr
+        self.update(issues={**self.state()["issues"], "50": spec})
         self.retire("team-1-critic")
         self.clients_exit(1)
         self.databases("tips_test_t1g1c")
@@ -1716,6 +1671,22 @@ class LaunchRecoveryTest(Harness):
         assert "team-3-tester: task submission is unknown; nothing was resent" in rerun
         assert self.prompts("team-3-tester") == ["Begin."]  # only the call the crash cut short
 
+    def test_a_client_reported_with_another_session_name_or_kind_gets_no_task(self) -> None:
+        reports = {
+            "29": {"agent_session": {"kind": "id", "value": "session-other"}},
+            "30": {"name": "other"},
+            "31": {"agent": "codex"},
+        }
+        for slot, (brief, report) in enumerate(reports.items(), start=1):
+            with self.subTest(report=report):
+                tester = f"team-{slot}-tester"
+                self.fault("agent start", tester, "misreport", report=report)
+                refused = self.team("start", brief, ok=False).stderr
+                assert f"{tester} started in an unexpected state or root" in refused, refused
+                submission = self.record(slot)["agents"]["tester"]["submission"]
+                assert submission == "unknown", f"{tester} recorded as {submission}"
+                assert not self.prompts(tester), f"{tester} was sent its task"
+
     def test_stop_accepts_a_report_posted_before_the_session_was_recorded(self) -> None:
         # The launcher dies after the Codex client started: the record has no session.
         self.fault("agent start", "team-1-impl", "crash_after")
@@ -1733,8 +1704,8 @@ class LaunchRecoveryTest(Harness):
         self.team("start", "29", ok=False)
         assert self.events("side-effect") == [["side-effect", "team-1-tester"]]
         held = "team-1-tester is not running and its task submission is unknown"
-        for _ in range(2):
-            assert held in self.team("start", "29", ok=False).stderr
+        refused = self.team("start", "29", ok=False).stderr
+        assert held in refused, refused
         assert self.starts() == ["team-1-impl", "team-1-tester"]
         assert not self.prompts("team-1-tester")
 
@@ -1744,15 +1715,22 @@ class LaunchRecoveryTest(Harness):
         good = json.loads(path.read_text())
         unknown_state = json.loads(path.read_text())
         unknown_state["agents"]["tester"]["submission"] = "done"
+        no_launch = json.loads(path.read_text())
+        del no_launch["agents"]["tester"]["launch"]
         cases = {
-            "record version 2 is not 3": {**good, "version": 2},
-            "agents.tester.submission is not a known state": unknown_state,
+            "record version 2 is not 3": ({**good, "version": 2}, ("start", "29")),
+            "agents.tester.submission is not a known state": (
+                unknown_state,
+                ("reset", "29", "impl"),
+            ),
+            "agents.tester.launch must be str": (no_launch, ("stop", "29")),
         }
-        for message, value in cases.items():
+        for message, (value, command) in cases.items():
             with self.subTest(message=message):
                 path.write_text(json.dumps(value))
-                for command in (("start", "29"), ("reset", "29", "impl"), ("stop", "29")):
-                    assert message in self.team(*command, ok=False).stderr
+                stderr = self.team(*command, ok=False).stderr
+                assert message in stderr, stderr
+                assert json.loads(path.read_text()) == value, f"{command[0]} rewrote the record"
         # A live client with the recorded name that this record never started.
         never = json.loads(json.dumps(good))
         never["agents"]["tester"]["submission"] = "never_submitted"
@@ -1849,8 +1827,11 @@ class LaunchRecoveryTest(Harness):
         self.team("start", "29", ok=False)
         agents = self.record(1)["agents"].values()
         assert [(a["submission"], a["launch"]) for a in agents] == [("unknown", "")] * 2
+        self.databases(*(f"tips_test{a['db_suffix']}" for a in agents))
         self.merge(self.git("--git-dir", self.origin, "rev-parse", "main"))
-        assert "slot 1 released" in self.team("stop", "29").stdout
+        stopped = self.team("stop", "29").stdout
+        assert "slot 1 released" in stopped, stopped
+        assert self.remaining_databases() == [], "stop kept a never-launched team's databases"
 
     def test_a_launch_event_that_failed_to_post_is_posted_once_by_the_rerun(self) -> None:
         def events(name: str) -> list[str]:

@@ -545,6 +545,9 @@ elif a[:2] == ["agent", "start"]:
     x["agent_status"] = "blocked" if s.get("start_fails") else "idle"
     if s.get("wrong_start_root"):
         x["cwd"] = s["wrong_start_root"]
+    if mode == "misreport":
+        # Herdr reports another session, name or kind than the launcher asked for.
+        x.update(fault["report"])
     if mode == "timeout_live":
         finish("timed out waiting for " + a[2])
     result = {"agent": x}
