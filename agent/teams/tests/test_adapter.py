@@ -15,7 +15,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
-from tests.test_team import CONFIG, FAKE_GH, Harness
+from tests.test_team import CONFIG, Harness, fake
 
 TEAMS = Path(__file__).resolve().parents[1]
 HAS_SDK = importlib.util.find_spec("mcp") is not None
@@ -103,10 +103,8 @@ class AdapterTest(Harness):
         self.write_config(config)
         self.commit("adapter")
         self.git("push", "-q", "origin", "main")
-        (self.bin / "gh-base").write_text(FAKE_GH)
-        (self.bin / "gh").write_text(ADAPTER_GH)
-        for name in ("gh", "gh-base"):
-            (self.bin / name).chmod(0o755)
+        (self.bin / "gh").rename(self.bin / "gh-base")
+        (self.bin / "gh").symlink_to(fake("adapter-gh", ADAPTER_GH))
         git = shutil.which("git", path=self.env["PATH"])
         assert git
         self.git_log = self.root / "git-calls"
