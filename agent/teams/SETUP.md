@@ -3,20 +3,7 @@
 This page is for the repository owner. Run these commands from the repository root.
 Agents follow the [pair workflow](README.md).
 
-## How it runs
-
-```
-USER         set goals · answer product questions · start the dispatcher once · report an agent that has stopped
-DISPATCHER   open a feature → team.py design <spec> <entry> → designers agree on a spec and briefs → team.py start <brief>
-EVERY CLIENT bootstrap.py prepares its own clone before its first task
-IMPLEMENTER  ask questions only when answers affect the work → code → push → PR "Closes #<brief>" → team.py turn <pr> <tester>
-             (notifies every required reviewer of the head; asks the dispatcher to launch missing ones)
-DISPATCHER   team.py review <pr> <entry> for each requested reviewer
-REVIEWERS    bootstrap.py --commit <head> → review the head → notify the tester with the review URL
-TESTER       any review with findings → team.py turn <pr> <implementer>   (repeat until no P0 or P1)
-TESTER       pr_review.py observe <pr> reports ready → gh pr merge → "done"
-DISPATCHER   team.py stop <brief> → every client runs retirement.py → team.py stop <brief> → next
-```
+The workflow and its diagram are in the [README](README.md#how-it-runs).
 
 ## One-time setup
 
@@ -34,6 +21,14 @@ gh project field-create <number> --owner <owner> --name Implementer --data-type 
 
 The dispatcher edits fields with `gh project item-edit`. The `gh` token needs the `project` scope.
 
+### Before you fork
+
+Everything owner-specific is in these places. Commit the changes before installing a release: `install.py` reads the repository identity from the commit it installs, and the harness root refuses a repository it was not created for.
+
+- [config.toml](config.toml): `github.repository`, `github.projects`, `team.clone_url`, `team.psql` (an absolute executable and the connection of your compose database), and the models in every `[agents.<entry>]` and `[dispatcher]`.
+- [roles/dispatcher.md](roles/dispatcher.md): the trial issue in the introduction and the Project 15 and 16 links. [roles/designer.md](roles/designer.md): the Project 15 reference. These files are the agents' prompts; issue links kept as evidence can stay.
+- Prerequisites on the machine: Herdr with its session hook, the Dexter build and matching Elixir sources ([LSP guide](../lsp/README.md)), the skills below, and the application and database from [local development](../../docs/development/local-development.md).
+
 Install Python 3.12 and the [configured client CLIs](config.toml). Create the dispatcher's locked environment once per checkout, as in [development](development.md#dependencies-and-test-isolation), or install a harness release (below). Authenticate the clients and the GitHub CLI (`gh`) for this repository. Agents also need GNU `timeout` (macOS: `brew install coreutils`) and `unbuffer` (Expect): the Elixir skill requires it on Mix commands. Testers use `agent-browser` for manual browser review.
 
 The user maintains third-party skills in these Git-ignored directories in the main checkout:
@@ -43,7 +38,7 @@ The user maintains third-party skills in these Git-ignored directories in the ma
 
 Keep the Codex and Claude skill copies in sync. `team.py` checks that the main checkout's `.agents/skills/` exists, and `bootstrap.py` links it into each clone.
 
-The repository tracks five skills: the [Dexter reference](../skills/dexter/SKILL.md), [design-software](../skills/design-software/SKILL.md), [implement-software](../skills/implement-software/SKILL.md) and [review-software-correctness](../skills/review-software-correctness/SKILL.md). Link them once into both locations from the main checkout:
+The repository tracks five skills: the [Dexter reference](../skills/dexter/SKILL.md), [design-software](../skills/design-software/SKILL.md), [implement-software](../skills/implement-software/SKILL.md), [review-software-correctness](../skills/review-software-correctness/SKILL.md) and [review-software-design](../skills/review-software-design/SKILL.md). Link them once into both locations from the main checkout:
 
 ```bash
 for skill in dexter design-software implement-software review-software-correctness review-software-design; do
@@ -184,7 +179,7 @@ type `board changed` in its pane. Answer its product and scope questions there.
 Each message gives the dispatcher full context, so it compacts at the configured
 threshold (`dispatcher.compact_percent`) and reloads state from GitHub.
 
-The dispatcher's tools run `team.py` from the main checkout. Clients start in their
+The dispatcher's tools run the `team.py` beside its adapter: the installed release's, or the checkout's when started from a checkout. Clients start in their
 allocation directory, so a client may ask whether to trust it. On 2026-10-14, a fresh
 allocation under `../agent_teams/tips/` on this machine showed no trust or import
 dialog for Claude Code 2.1.299 or Codex 0.162.1; Codex only warned that `-c` overrides
@@ -194,7 +189,7 @@ approval prompt stops launch, inspect it and follow the active approval policy.
 
 ## Install a harness release
 
-Run this once per harness release, with no team running, from the main checkout:
+Run this once per harness release from the main checkout, after draining every team and stopping the dispatcher (`/exit` in its pane). A running dispatcher keeps the old release's modules in memory while its configuration reads come through the new `harness` link. Restart it from the new release afterwards:
 
 ```bash
 python3 agent/teams/install.py <commit>
@@ -310,10 +305,6 @@ the `team.py` that wrote it:
   allocations; the implementer's clone checks out the pushed `task/<brief>`. Remove the
   old worktree by hand once its work is pushed.
 
-## Changing these scripts
+## Development
 
-Follow [development](development.md). For optional local checks, install Ruff and Pyright yourself; agents never install them.
-
-## Milestones
-
-Read the [Project 15 readme](https://github.com/users/chenghanlee/projects/15) with `gh project view 15 --owner chenghanlee`. Keep milestones and gate issues there; do not copy them here.
+Follow [development](development.md). For optional local checks, install Ruff and Pyright yourself; agents never install them. Milestones and gate issues live in the [Project 15 readme](https://github.com/users/chenghanlee/projects/15) (`gh project view 15 --owner chenghanlee`); do not copy them here.
