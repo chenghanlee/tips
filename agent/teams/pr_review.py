@@ -160,16 +160,16 @@ def place(thread: Any) -> str:
     return f"{thread['path']}:{thread['line'] or thread['originalLine']}"
 
 
-def reviewer(body: str) -> str:
-    """The role and session line of a review body: its first line, or the one after LGTM."""
+def review_author(body: str) -> str:
+    """The reviewer entry of a review body: line 2 is `<entry>, <session>`; "" without one."""
     lines = [line.strip() for line in body.splitlines() if line.strip()]
-    return next((line for line in lines if line != "LGTM"), "")
+    return lines[1].split(",")[0].strip() if len(lines) > 1 else ""
 
 
 def show_thread(thread: Any, owners: dict[str, str]) -> None:
     first, *replies = thread["comments"]["nodes"]
     opened: Any = first["pullRequestReview"] or {}
-    owner = owners.get(str(opened.get("url")), "unknown reviewer")
+    owner = owners.get(str(opened.get("url"))) or "unknown reviewer"
     print(f"\nthread {thread['id']} reply-to {first['databaseId']} {place(thread)} by {owner}")
     print(first["body"].strip())
     for reply in replies:
@@ -197,7 +197,7 @@ def show(number: int, every_head: bool) -> None:
         if review["commit"]["oid"] in recent:
             print(f"\nreview {review['url']} {review['commit']['oid'][:7]}")
             print(review["body"].strip())
-    owners = {review["url"]: reviewer(review["body"]) for review in reviews}
+    owners = {review["url"]: review_author(review["body"]) for review in reviews}
     for thread in state.threads:
         show_thread(thread, owners)
 
@@ -293,10 +293,11 @@ def latest_reviews(reviews: list[Any], head: str) -> dict[str, Review]:
     """Each reviewer entry's latest submitted review of this head; older heads do not count."""
     latest: dict[str, Review] = {}
     for review in reviews:
-        lines = [line.strip() for line in str(review["body"]).splitlines() if line.strip()]
+        body = str(review["body"]).strip()
+        author = review_author(body)
         commit: Any = review.get("commit") or {}
-        if review["state"] != "PENDING" and len(lines) > 1 and commit.get("oid") == head:
-            latest[lines[1].split(",")[0].strip()] = Review(lines[0] == "LGTM", review["url"])
+        if review["state"] != "PENDING" and author and commit.get("oid") == head:
+            latest[author] = Review(body.splitlines()[0].strip() == "LGTM", review["url"])
     return latest
 
 
@@ -601,9 +602,6 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         main()
-    except (RefusalError, RuntimeError, OSError, ValueError, KeyError) as error:
-        print(f"pr_review: {error}", file=sys.stderr)
-        sys.exit(1)
-    except subprocess.TimeoutExpired as error:
+    except (RuntimeError, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as error:
         print(f"pr_review: {error}", file=sys.stderr)
         sys.exit(1)
