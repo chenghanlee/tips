@@ -79,7 +79,7 @@ generation reuses another's databases.
 Run worker commands from your own allocation. The dispatcher runs `start`, `design`,
 `review`, `stop` and `status` through its `start_pair`, `start_design`,
 `launch_reviewer`, `retire_team` and `status` tools, from the main checkout. Only the
-operator (the user) runs `reset`.
+operator (the user) runs `reset` and `stop --abandon`.
 
 | Command | Caller | Effect |
 |---|---|---|
@@ -90,6 +90,7 @@ operator (the user) runs `reset`.
 | `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create its allocation, configured for the PR head, with its own database suffix and port, and launch the reviewer in the team's workspace. |
 | `agent/teams/team.py reset <issue> <entry>` | Operator | Record the operator's decision, after checking a stopped client's work on the issue and PR, that `start`, `design` or `review` may launch a replacement in the same allocation that gets the task again. Refuse a running client. |
 | `agent/teams/team.py stop <issue>` | Dispatcher | See [Retirement](#retirement). |
+| `agent/teams/team.py stop <issue> --abandon` | Operator | Retire a brief closed without a merged PR ([steps](#retire-a-brief-closed-without-a-merged-pr)). |
 | `agent/teams/team.py status` | Dispatcher, user | Every allocation record with each client's live Herdr pane, name, kind, state and session, and whether the recorded dispatcher process runs. |
 | `agent/teams/team.py clean` | Operator | List retained allocations with their reasons. Deletes nothing. |
 | `python3 <harness>/bootstrap.py [--commit <sha>]` | Launched client | Prepare your own clone, as [Allocations](#allocations) says. |
@@ -137,8 +138,8 @@ Each `retirement.py` run prompts the dispatcher with its report URL, so the next
 follows without polling. With every report, it:
 
 1. Refuses, stopping nothing and keeping the record, databases, files and reservation,
-   unless every report shows a clean clone with no unpushed commits and, for a brief,
-   HEAD merged into `origin/main`. It asks each running client whose report shows such
+   unless every report shows a clean clone with no unpushed commits and, for a brief
+   not abandoned, HEAD merged into `origin/main`. It asks each running client whose report shows such
    work, once per report, to preserve it and report again, and prints the operator's
    command for a stopped one. Rerun stop after the new reports.
 2. Refuses a pane in the workspace that the record does not name, and another client in
@@ -148,7 +149,7 @@ follows without polling. With every report, it:
 5. Keeps the reservation while any of the team's ports still answers.
 6. Drops the team's databases and their numbered partitions with the configured
    `team.psql`, without `FORCE`. A refused drop keeps the rest and the reservation. A
-   design team keeps its databases.
+   design team and an abandoned brief keep their databases.
 7. Removes only empty allocation directories, writes `state/<id>/retired.json` with the
    retained paths and reasons, and deletes the record.
 
@@ -162,25 +163,11 @@ unsure, keep it.
 #### Retire a brief closed without a merged PR
 
 `stop` refuses a brief that was cancelled or closed without a merged PR, so its slot
-stays taken until the operator retires it by hand. While no `team.py` command runs:
-
-1. Have each client push or record what should be kept, exit it, and close the team's
-   workspace (`herdr workspace close <workspace>` from `state/<slot>.json`).
-2. Stop each clone's Dexter daemon with the binary and sources that
-   `<root>/state/<id>/bootstrap.json` names, never the clone's own wrapper:
-   `DEXTER_ELIXIR_LIB_ROOT=<sources> <dexter> --root <root>/allocations/<id>/project stop`.
-   Stop any other daemon the allocations own and confirm that every `port` in the record
-   is free; if either is uncertain, stop here and keep the record and the slot.
-3. For each allocation in the record, write `<root>/state/<id>/retired.json`:
-   `{"id": "<id>", "issue": "<issue>", "db_suffix": "<db_suffix>", "reason": "brief
-   closed without a merged PR", "databases_kept_because": "brief closed without a merged
-   PR"}`. `clean` then lists it, and a later `start` of the issue no longer reports it as
-   an earlier launch.
-4. Confirm that `herdr agent list` shows no `team-<slot>-*` client and `herdr workspace
-   list` shows no `team-<slot>-<issue>` workspace. A surviving client would share its name
-   with the next team's client in the slot.
-5. Rename `<root>/state/<slot>.json` to `<root>/state/<slot>.closed`. This frees the
-   slot; files and databases stay.
+stays taken until the operator runs `agent/teams/team.py stop <issue> --abandon`. It is
+`stop` without the merged-PR checks: it needs the same reports, each showing a clean clone
+with nothing unpushed, and accepts pushed work that is not merged. It keeps the team's
+databases, as for a design team, and records why in each `retired.json`; `clean` lists
+them. The dispatcher has no tool for it.
 
 ## Turns
 

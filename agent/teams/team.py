@@ -1074,10 +1074,10 @@ def port_in_use(port: int) -> bool:
         return probe.connect_ex(("127.0.0.1", port)) != errno.ECONNREFUSED
 
 
-def preservation_gaps(record: Record, reports: Reports) -> dict[str, str]:
+def preservation_gaps(record: Record, reports: Reports, need_merge: bool) -> dict[str, str]:
     """Each client whose report does not show its work preserved, with why. Preserved means
-    a clean clone with nothing unpushed and, for a brief, a HEAD merged into origin/main. A
-    design team commits nothing, so it needs no merge."""
+    a clean clone with nothing unpushed and, when stop drops the databases, a HEAD merged
+    into origin/main."""
     gaps: dict[str, str] = {}
     for entry, allocation in record["agents"].items():
         if never_launched(allocation):
@@ -1090,7 +1090,7 @@ def preservation_gaps(record: Record, reports: Reports) -> dict[str, str]:
             gaps[entry] = (
                 f"{allocation['name']} reported uncommitted or unpushed work{paths}: {url}"
             )
-        elif record["kind"] != "design" and fields.get("merged") is not True:
+        elif need_merge and fields.get("merged") is not True:
             gaps[entry] = f"{allocation['name']} reported a HEAD not merged into origin/main: {url}"
     return gaps
 
@@ -1183,27 +1183,39 @@ def list_retained() -> None:
         print("No retained allocations")
 
 
-def stop_brief(brief: str) -> None:
+def kept_databases(record: Record, abandon: bool) -> str:
+    """Why stop keeps the team's databases, or "" when merged work lets it drop them."""
+    if record["kind"] == "design":
+        return "a design team's databases are kept"
+    if abandon:
+        return "brief closed without a merged PR (stop --abandon)"
+    return ""
+
+
+def stop_brief(brief: str, *, abandon: bool = False) -> None:
     """Stop a team's recorded clients and Dexter daemons and release its slot.
 
-    A brief must be closed by a merged PR before any client is asked. Every client then
-    posts a retirement report from its current launch. Work that the reports do not show
-    preserved keeps everything: nothing is stopped and the record stays. Databases are
-    dropped only for merged work; project and log files are always retained. A conflict, a
-    failed stop or a busy port keeps the reservation, so stop can run again.
+    A brief must be closed by a merged PR before any client is asked, unless the operator
+    abandons it. Every client then posts a retirement report from its current launch. Work
+    that the reports do not show preserved keeps everything: nothing is stopped and the
+    record stays. Databases are dropped only for merged work; project and log files are
+    always retained. A conflict, a failed stop or a busy port keeps the reservation, so stop
+    can run again.
     """
     with store_lock():
         record = record_for(brief)
         if record is None:
             print(f"#{brief}: no allocation record; nothing removed")
             return
+        kept = kept_databases(record, abandon)
         # A brief still in progress is never interrupted: a wrong issue number asks no one.
-        if record["kind"] != "design" and not merged_brief(brief):
+        if not kept and not merged_brief(brief):
+            command = harness_command("team.py", "stop", brief, "--abandon")
             raise RuntimeError(
                 f"#{brief} is not closed by a merged PR. Nothing was asked or stopped; the "
                 "record, databases, files and reservation are kept. If the brief was closed "
-                "without a merged PR, the operator retires it by hand; until then the slot "
-                "stays taken: agent/teams/README.md#retire-a-brief-closed-without-a-merged-pr"
+                f"without a merged PR, the operator runs {command}; until then the slot stays "
+                "taken: agent/teams/README.md#retire-a-brief-closed-without-a-merged-pr"
             )
         require_only_recorded_panes(record)
         paths = [retirement_paths(a) for a in record["agents"].values()]
@@ -1221,7 +1233,7 @@ def stop_brief(brief: str) -> None:
         if missing:
             wait_for_reports(record, missing, set(present))
             return
-        gaps = preservation_gaps(record, reports)
+        gaps = preservation_gaps(record, reports, need_merge=not kept)
         if gaps:
             refuse_unpreserved(record, gaps, reports, set(present))
         verify_present(record, present)
@@ -1236,7 +1248,6 @@ def stop_brief(brief: str) -> None:
         busy = [str(a["port"]) for a in record["agents"].values() if port_in_use(a["port"])]
         if busy:
             raise RuntimeError(f"Ports {', '.join(busy)} are in use; the reservation is kept")
-        kept = "a design team's databases are kept" if record["kind"] == "design" else ""
         suffixes = [a["db_suffix"] for a in record["agents"].values()]
         dropped = [] if kept else drop_databases(suffixes)
         retain_files(record, dropped, kept, reports)
@@ -1396,7 +1407,9 @@ def cli() -> None:
     usage = (
         "Usage: agent/teams/team.py start <brief> | design <spec> <entry> | "
         "turn <pr> <entry> | review <pr> <entry> | reset <issue> <entry> | stop <issue> | "
-        "clean | status"
+        "stop <issue> --abandon | clean | status. Only the operator runs reset and "
+        "stop --abandon, which retires a brief closed without a merged PR: it accepts pushed "
+        "but unmerged work and keeps the databases."
     )
     if args == ["status"]:
         status()
@@ -1409,8 +1422,8 @@ def cli() -> None:
     named = len(args) == 3 and re.fullmatch(ENTRY, args[2]) is not None
     if args[0] == "start" and len(args) == 2:
         start(args[1])
-    elif args[0] == "stop" and len(args) == 2:
-        stop_brief(args[1])
+    elif args[0] == "stop" and args[2:] in ([], ["--abandon"]):
+        stop_brief(args[1], abandon=args[2:] == ["--abandon"])
     elif args[0] == "turn" and named:
         turn(args[1], args[2])
     elif args[0] == "design" and named:
