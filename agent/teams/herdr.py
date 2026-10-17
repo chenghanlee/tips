@@ -105,7 +105,7 @@ def pane_occupant(pane: str) -> tuple[Path, bool]:
 def stop(pane: str, root: str | Path) -> None:
     root = Path(root)
     if not root.is_absolute():
-        raise RuntimeError("stop_agent requires an absolute worktree root")
+        raise RuntimeError("stop requires an absolute allocation root")
     root = root.resolve()
     current = herdr("pane", "get", pane)["pane"]
     info = herdr("pane", "process-info", "--pane", pane)["process_info"]

@@ -209,7 +209,7 @@ root from writes.
 The switch is one atomic rename. A failed install deletes only its own unfinished
 release, so the previous one keeps working. The install never changes `state/` or
 `allocations/`, and it refuses while the target root's `state/` holds a team record or an
-allocation that is neither recorded nor retired. Earlier releases stay on disk; to roll back, install the earlier commit again.
+allocation that is neither recorded nor retired, or while a dispatcher or a `team.py` command runs (`state/dispatcher.lock` or `state/.lock` is held). Earlier releases stay on disk; to roll back, install the earlier commit again.
 Start the installed dispatcher with `<root>/harness/agent/teams/dispatch`.
 
 ## Configuration
@@ -289,21 +289,6 @@ command that waits longer than `timeouts.lock_seconds` stops with a `Busy` error
 it when the other command has finished. The lock is released when its holder exits,
 including after a crash. Keep the root on a local filesystem: the
 lock and the durable record writes are not reliable on a network filesystem.
-
-### Records from an older team.py
-
-Earlier versions kept records in the main checkout's `agent/teams/allocations/` and
-shared one worktree per pair. While any `agent/teams/allocations/*.json` exists, this
-version refuses every launch and stop. Before you install it, drain each old record with
-the `team.py` that wrote it:
-
-- Merged brief: run its `stop`.
-- Brief in progress: push the worktree's work, write down each client's name and session
-  (the brief's launch EVENTs show them, so `board.py usage` still counts them), exit its
-  clients, close its Herdr workspace and move the record out of
-  `agent/teams/allocations/`. With this version, `start` launches new clients in new
-  allocations; the implementer's clone checks out the pushed `task/<brief>`. Remove the
-  old worktree by hand once its work is pushed.
 
 ## Development
 

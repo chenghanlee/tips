@@ -10,7 +10,7 @@ import re
 import tempfile
 import tomllib
 from pathlib import Path
-from typing import NotRequired, TypedDict, cast
+from typing import Literal, NotRequired, TypedDict, cast, get_args
 
 from commands import object_fields, require_type, run
 
@@ -85,12 +85,11 @@ class Allocation(TypedDict):
 
 
 class Record(TypedDict):
-    """A slot's record: its ID and generation, the brief (or spec for a design team), the
-    pair, its Herdr workspace and tabs, and every launched client. A slot number is reused;
-    the ID and generation are not. A design team has no pair."""
+    """A slot's record: its generation, the brief (or spec for a design team), the pair,
+    its Herdr workspace and tabs, and every launched client. A slot number is reused; the
+    generation is not. A design team has no pair."""
 
     version: int
-    id: str
     slot: int
     generation: int
     kind: str
@@ -165,10 +164,6 @@ ARGV_ARG_CHARS = 256
 NAME_BYTES = 63
 PARTITION_DIGITS = 3
 DATABASE_BASES = ("tips_test", "tips_dev")
-# Dexter's query gives up this long after --wait: its allowance to reach the daemon.
-DEXTER_CONNECT_SECONDS = 30
-# A cold Hex cache downloads every package; anything slower is a hung fetch.
-DEPS_FETCH_SECONDS = 300
 # Each GitHub read takes at most this many pages of 100 entries within this many seconds.
 # Initial defaults, not measurements: widen them only after a legitimate read exceeds one.
 READ_PAGES = 10
@@ -181,7 +176,7 @@ NATIVE_LSP_PLUGINS = {
 }
 
 
-COMMENT_TYPES = (
+CommentType = Literal[
     "PROPOSAL",
     "CRITIQUE",
     "QUESTION",
@@ -191,7 +186,8 @@ COMMENT_TYPES = (
     "BLOCKED",
     "DONE",
     "EVENT",
-)
+]
+COMMENT_TYPES: tuple[str, ...] = get_args(CommentType)
 HEADER = re.compile(r"^(?P<type>[A-Z]+) (?P<role>\S+) (?P<name>\S+) (?P<session>\S+)$")
 
 
@@ -518,13 +514,6 @@ def agent_spec(allocation: Allocation) -> AgentSpec:
     return spec
 
 
-def github_settings() -> GitHubSettings | None:
-    """The configured repository settings; None before configure()."""
-    if cfg is None:
-        return None
-    return cfg["github"]
-
-
 def github_seconds() -> int:
     """The deadline of one adapter or review GitHub call; timeouts.github_seconds overrides it."""
     if cfg is None:
@@ -532,10 +521,9 @@ def github_seconds() -> int:
     return cfg["timeouts"].get("github_seconds", READ_SECONDS)
 
 
-def repository(deadline: float | None = None) -> str:
+def repository() -> str:
     """The configured owner/name; never discovered from a working directory. Before
     configure(), such as under `pr_review.py list`, it reads the configuration file."""
-    del deadline
     if cfg is None:
         return load_config()[1]["github"]["repository"]
     return cfg["github"]["repository"]
