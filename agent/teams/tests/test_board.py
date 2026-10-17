@@ -1,10 +1,11 @@
 """The board script: attributed posts, reading after a checkpoint, and the usage table."""
 
 import json
+import subprocess
 import unittest
 from typing import Any
 
-from team import execute
+from commands import execute
 from tests.test_team import Harness
 
 ISSUE = "https://github.com/o/r/issues/29"
@@ -31,7 +32,7 @@ class BoardTest(Harness):
         ok: bool = True,
         pane: str | None = None,
         env: dict[str, str] | None = None,
-    ):
+    ) -> subprocess.CompletedProcess[str]:
         extra = dict(env or {})
         if pane:
             extra["HERDR_PANE_ID"] = pane
@@ -91,9 +92,9 @@ class BoardTest(Harness):
         # checkpoint, without the body.
         self.update(issues={**self.state()["issues"], "29": "Revised brief\n"})
         whole = self.board("read", "29").stdout
-        first = self.comments("29")[0]
+        oldest = self.comments("29")[0]
         assert whole.startswith(f"{ISSUE}\nRevised brief\n")
-        assert f"--- {first['html_url']} {first['created_at']}\n{first['body']}" in whole
+        assert f"--- {oldest['html_url']} {oldest['created_at']}\n{oldest['body']}" in whole
         after = self.board("read", "29", "--after", url.stdout.strip()).stdout
         assert after.startswith(f"{ISSUE}\n\n--- ")
         assert "Revised brief" not in after

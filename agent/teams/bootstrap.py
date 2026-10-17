@@ -25,7 +25,9 @@ import sys
 from pathlib import Path
 from typing import IO, cast
 
-from team import TEMPORARY, dexter_invocation, execute
+from commands import execute
+from config import TEMPORARY
+from team import dexter_invocation
 
 CONSOLE_BYTES = 8192
 GIT_SECONDS = 300
@@ -128,7 +130,7 @@ def trusted_layout(state: Path, writable: list[object]) -> None:
     """Refuse a layout in which the harness or the trusted state sits in a temporary
     directory or under a directory the launch lets this worker write. This detects a layout
     error; it does not enforce the client's sandbox."""
-    temporary = [Path(p).resolve() for p in (*TEMPORARY, os.environ.get("TMPDIR", "/tmp"))]
+    temporary = [Path(p).resolve() for p in (*TEMPORARY, os.environ.get("TMPDIR", "/tmp"))]  # noqa: S108 - refused roots
     grants = [Path(str(p)).resolve() for p in writable]
     for trusted in (Path(__file__).resolve().parent, state.resolve()):
         for parent in (*temporary, *grants):
@@ -249,7 +251,7 @@ def wrapper_text(binary: str, root: Path, sources: str) -> str:
     """The project's Dexter wrapper: the trusted binary bound to the project and sources."""
     argv, env = dexter_invocation(binary, root, sources)
     exports = "".join(f"export {key}={shlex.quote(value)}\n" for key, value in env.items())
-    return f"#!/bin/sh\n{exports}exec {shlex.join(argv)} \"$@\"\n"
+    return f'#!/bin/sh\n{exports}exec {shlex.join(argv)} "$@"\n'
 
 
 def write_helpers(console: Console, settings: dict[str, object], project: Path) -> Path:

@@ -21,7 +21,9 @@ import tarfile
 import tomllib
 from pathlib import Path
 
-from team import REPOSITORY, claim_root, default_root, execute, load_record, run
+from commands import execute, run
+from config import REPOSITORY, claim_root, default_root
+from team import load_record
 
 # Creating the environment and fetching locked wheels; the same budget as dependency fetches.
 INSTALL_SECONDS = 300
@@ -106,8 +108,15 @@ def build_environment(teams: Path) -> None:
     venv, lock = teams / ".venv", teams / "requirements.lock"
     run(sys.executable, "-m", "venv", venv, timeout=INSTALL_SECONDS)
     python = venv / "bin/python"
-    pip = [python, "-m", "pip", "install", "--quiet", "--disable-pip-version-check"]
-    locked = ["--require-hashes", "--no-deps", "--only-binary=:all:", "-r", lock]
+    pip: list[str | Path] = [
+        python,
+        "-m",
+        "pip",
+        "install",
+        "--quiet",
+        "--disable-pip-version-check",
+    ]
+    locked: list[str | Path] = ["--require-hashes", "--no-deps", "--only-binary=:all:", "-r", lock]
     run(*pip, *locked, timeout=INSTALL_SECONDS)
     names = locked_packages(lock)
     check = "import importlib.metadata as m, sys; [m.version(n) for n in sys.argv[1:]]"

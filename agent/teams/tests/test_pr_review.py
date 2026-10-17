@@ -5,13 +5,14 @@ import subprocess
 import unittest
 from typing import Any
 
-from team import execute
+from commands import execute
 from tests.test_team import Harness
 
 
 def marker(body: str) -> dict[str, Any]:
     line = next(line for line in body.splitlines() if line.startswith("TEAM_FINDING "))
-    return json.loads(line.removeprefix("TEAM_FINDING "))
+    finding: dict[str, Any] = json.loads(line.removeprefix("TEAM_FINDING "))
+    return finding
 
 
 def check(name: str, bucket: str, run: int = 1) -> dict[str, str]:

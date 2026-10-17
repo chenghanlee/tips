@@ -19,7 +19,8 @@ from typing import Any
 from unittest import mock
 
 from bootstrap import wrapper_text
-from team import claim_root, command_args, execute
+from commands import command_args, execute
+from config import claim_root
 
 SCRIPT = Path(__file__).resolve().parents[1] / "team.py"
 # Deliberately fixed test data: changing production defaults must not rewrite tests.
@@ -388,7 +389,15 @@ while True: time.sleep(.05)
     def test_client_stop_leaves_real_daemons_started_by_a_client_query(self) -> None:
         (self.root / "mix.exs").write_text(MIX_PROJECT)
         wrapper = real_bound_command(self.root)
-        query = ["/bin/sh", wrapper, "query", "workspace-symbols", "--wait", "20s", "MixProject"]
+        query: list[str | Path] = [
+            "/bin/sh",
+            wrapper,
+            "query",
+            "workspace-symbols",
+            "--wait",
+            "20s",
+            "MixProject",
+        ]
         # A client's query starts the daemon and ends; the daemon is then nobody's child.
         client = self.client(child=query)
         child = int((self.root / "child").read_text())
@@ -786,6 +795,7 @@ if "args=" in sys.argv:
         print("/fixture/vendor/dexter daemon " + root)
 """
 
+
 class Harness(unittest.TestCase):
     """A harness checkout and a bare origin, with fake Herdr, gh, Mix, psql, ps, Codex and
     Dexter on PATH. The harness root is the checkout's sibling `agent_teams/r`."""
@@ -853,8 +863,8 @@ class Harness(unittest.TestCase):
             ".codex/\n.agents/\n.dexter/\n.worktrees/\nagent/lsp/dexter/vendor/\n"
             "agent/teams/allocations/\ndeps/\ntmp/\n"
         )
-        for script in ("team.py", "board.py", "pr_review.py", "bootstrap.py", "retirement.py"):
-            (self.repo / "agent/teams" / script).write_text((SCRIPT.parent / script).read_text())
+        for script in [*sorted(SCRIPT.parent.glob("*.py")), SCRIPT.parent / "dispatch"]:
+            (self.repo / "agent/teams" / script.name).write_text(script.read_text())
         self.write_config(CONFIG)
         (self.repo / "tracked.txt").write_text("base\n")
         binary = self.repo / "agent/lsp/dexter/vendor/dexter"
@@ -882,7 +892,8 @@ class Harness(unittest.TestCase):
         return self.git("rev-parse", "HEAD", cwd=cwd)
 
     def state(self) -> dict[str, Any]:
-        return json.loads(self.state_path.read_text())
+        state: dict[str, Any] = json.loads(self.state_path.read_text())
+        return state
 
     def save(self, state: dict[str, Any]) -> None:
         self.state_path.write_text(json.dumps(state))
@@ -910,7 +921,8 @@ class Harness(unittest.TestCase):
         }
 
     def record(self, slot: int) -> dict[str, Any]:
-        return json.loads((self.trusted / f"state/{slot}.json").read_text())
+        record: dict[str, Any] = json.loads((self.trusted / f"state/{slot}.json").read_text())
+        return record
 
     def recorded_briefs(self) -> set[str]:
         files = (p for p in (self.trusted / "state").glob("*.json") if p.stem.isdecimal())
@@ -918,7 +930,9 @@ class Harness(unittest.TestCase):
 
     def allocation(self, name: str) -> dict[str, Any]:
         for path in (self.trusted / "state").glob("[0-9]*.json"):
-            for allocation in json.loads(path.read_text())["agents"].values():
+            record: dict[str, Any] = json.loads(path.read_text())
+            agents: dict[str, dict[str, Any]] = record["agents"]
+            for allocation in agents.values():
                 if allocation["name"] == name:
                     return allocation
         raise AssertionError(f"No allocation named {name}")
@@ -1017,7 +1031,7 @@ class Harness(unittest.TestCase):
 
     def launched_session(self, label: str) -> str:
         """The session id the launcher assigned to a Claude client."""
-        argv = self.pane(label)["launch_argv"]
+        argv: list[str] = self.pane(label)["launch_argv"]
         return argv[argv.index("--session-id") + 1]
 
     def launch_env(self, label: str) -> tuple[str, str]:
@@ -1025,11 +1039,12 @@ class Harness(unittest.TestCase):
         return env["TIPS_DB_SUFFIX"], env["TIPS_TEST_PORT"]
 
     def system_prompt(self, label: str) -> str:
-        argv = self.pane(label)["launch_argv"]
+        argv: list[str] = self.pane(label)["launch_argv"]
         return argv[argv.index("--append-system-prompt") + 1]
 
     def comments(self, issue: str) -> list[dict[str, Any]]:
-        return self.state().get("comments", {}).get(issue, [])
+        comments: list[dict[str, Any]] = self.state().get("comments", {}).get(issue, [])
+        return comments
 
 
 class PairLifecycleTest(Harness):
@@ -1508,7 +1523,7 @@ class PairLifecycleTest(Harness):
         assert "TIPS_TEAM_HARNESS must be an absolute path" in refused.stderr
 
     def test_a_root_in_the_checkout_or_a_temporary_directory_is_refused(self) -> None:
-        scratch, tmp = self.root / "scratch", Path("/tmp").resolve()
+        scratch, tmp = self.root / "scratch", Path("/tmp").resolve()  # noqa: S108 - must be refused
         roots: dict[str, tuple[Path, Path, dict[str, str]]] = {
             "checkout": (self.repo / "x", self.repo, {}),
             "tmp": (tmp / f"tips-root-{os.getpid()}", tmp, {}),
@@ -2466,9 +2481,9 @@ class LaunchRecoveryTest(Harness):
         tester = next(x for x in state["panes"] if x.get("label") == "team-1-tester")
         tester["agent_session"] = {"kind": "id", "value": "session-replacement"}
         self.save(state)
-        refused = self.team("start", "29", ok=False).stderr
+        stderr = self.team("start", "29", ok=False).stderr
         session = self.launched_session("team-1-tester")
-        assert f"runs session session-replacement, not {session}; preserved" in refused
+        assert f"runs session session-replacement, not {session}; preserved" in stderr
         assert self.record(1)["agents"]["tester"]["session"] == session
         tester["agent_session"] = {"kind": "id", "value": session}
         self.save(state)
@@ -2489,16 +2504,16 @@ class LaunchRecoveryTest(Harness):
         session = self.launched_session("team-2-tester")
         assert self.record(2)["agents"]["tester"]["session"] == session
         assert self.record(2)["agents"]["impl"]["session"] == "unknown"
-        refused = self.team("start", "30", ok=False).stderr
-        assert "team-2-impl reports no session; cannot confirm the recorded client" in refused
-        assert "only the operator decides" in refused
+        stderr = self.team("start", "30", ok=False).stderr
+        assert "team-2-impl reports no session; cannot confirm the recorded client" in stderr
+        assert "only the operator decides" in stderr
         state = self.state()
         for pane in state["panes"]:
             if pane.get("label") == "team-2-impl":
                 pane["agent_session"] = {"kind": "id", "value": "session-team-2-impl"}
         self.save(state)
-        refused = self.team("start", "30", ok=False).stderr
-        assert "team-2-tester reports no session; cannot confirm the recorded client" in refused
+        stderr = self.team("start", "30", ok=False).stderr
+        assert "team-2-tester reports no session; cannot confirm the recorded client" in stderr
         state = self.state()
         tester = next(x for x in state["panes"] if x.get("label") == "team-2-tester")
         tester["agent_session"] = {"kind": "id", "value": "session-replacement"}
@@ -2537,8 +2552,8 @@ class LaunchRecoveryTest(Harness):
         record = json.loads(path.read_text())
         del record["agents"]["critic"]
         path.write_text(json.dumps(record))
-        refused = self.team("review", "7", "critic", ok=False).stderr
-        assert "team-1-critic is not running and its task submission is unknown" in refused
+        stderr = self.team("review", "7", "critic", ok=False).stderr
+        assert "team-1-critic is not running and its task submission is unknown" in stderr
         assert self.starts().count("team-1-critic") == 1
 
 
@@ -2590,7 +2605,7 @@ class RepositoryConfigTest(unittest.TestCase):
 
     def test_shipped_configuration_validates(self) -> None:
         env = dict(os.environ, TIPS_TEAM_CONFIG=str(SCRIPT.parent / "config.toml"))
-        code = "import sys; sys.path.insert(0,sys.argv[1]); from team import load_config; "
+        code = "import sys; sys.path.insert(0,sys.argv[1]); from config import load_config; "
         result = execute(["python3", "-c", code + "load_config()", str(SCRIPT.parent)], env=env)
         assert result.returncode == 0, result.stderr
 

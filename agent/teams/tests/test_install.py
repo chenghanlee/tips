@@ -10,7 +10,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from team import execute, repo_key
+from commands import execute
+from config import repo_key
 from tests.test_team import TEST_RUNS
 
 TEAMS = Path(__file__).resolve().parents[1]
@@ -30,8 +31,8 @@ class InstallTest(unittest.TestCase):
         teams = self.source / "agent/teams"
         teams.mkdir(parents=True)
         self.git("init", "-q", "-b", "main", ".")
-        for name in ("team.py", "install.py"):
-            (teams / name).write_text((TEAMS / name).read_text())
+        for script in [*sorted(TEAMS.glob("*.py")), TEAMS / "dispatch"]:
+            (teams / script.name).write_text(script.read_text())
         (teams / "config.toml").write_text(CONFIG)
         (teams / "requirements.lock").write_text("# no packages\n")
         (self.source / "AGENTS.md").write_text("Release one.\n")

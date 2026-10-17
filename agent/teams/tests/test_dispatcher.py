@@ -11,7 +11,8 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-from team import execute, repo_key
+from commands import execute
+from config import repo_key
 from tests.test_team import CONFIG, TEST_RUNS
 
 TEAMS = Path(__file__).resolve().parents[1]
@@ -97,8 +98,8 @@ class DispatchTest(unittest.TestCase):
         self.state = Path(self.tmp.name).resolve() / "agent_teams" / repo_key("o/r") / "state"
         self.scripts = self.root / "agent/teams"
         (self.scripts / "roles").mkdir(parents=True)
-        for name in ("dispatch", "dispatcher.py", "team.py"):
-            shutil.copy2(TEAMS / name, self.scripts / name)
+        for script in [*sorted(TEAMS.glob("*.py")), TEAMS / "dispatch"]:
+            shutil.copy2(script, self.scripts / script.name)
         for name in ("README.md", "roles/common.md", "roles/dispatcher.md"):
             (self.scripts / name).write_text(f"Trusted {name} text.\n")
         (self.root / "AGENTS.md").write_text("Trusted AGENTS.md text.\n")
@@ -139,7 +140,8 @@ class DispatchTest(unittest.TestCase):
         return result.stdout + result.stderr
 
     def launch_record(self) -> dict[str, Any]:
-        return json.loads((self.state / "dispatcher.json").read_text())
+        launch: dict[str, Any] = json.loads((self.state / "dispatcher.json").read_text())
+        return launch
 
     def herdr_calls(self, *prefix: str, seconds: float = 10) -> list[list[Any]]:
         """Wait for the detached starter's Herdr calls with this prefix; return them."""
@@ -236,8 +238,8 @@ class DispatchTest(unittest.TestCase):
         command = [self.scripts / "dispatch"]
         env = {**self.env, "CLIENT_SECONDS": "4"}
         pipe, merged = subprocess.PIPE, subprocess.STDOUT
-        first = subprocess.Popen(command, env=env, stdout=pipe, stderr=merged)
-        second = subprocess.Popen(command, env=env, stdout=pipe, stderr=merged)
+        first = subprocess.Popen(command, env=env, stdout=pipe, stderr=merged)  # noqa: S603
+        second = subprocess.Popen(command, env=env, stdout=pipe, stderr=merged)  # noqa: S603
         outputs = [p.communicate(timeout=30)[0].decode() for p in (first, second)]
         codes = sorted(p.returncode for p in (first, second))
         assert codes == [0, 1], outputs
@@ -303,7 +305,8 @@ class DispatchTest(unittest.TestCase):
                 note = json.loads((self.state / "dispatcher.recovery").read_text())
                 assert note["session"] == self.launch_record()["session"]
                 for text in says:
-                    assert text in shown[0][-1] and text in note["text"], (text, note)
+                    assert text in shown[0][-1], (text, note)
+                    assert text in note["text"], (text, note)
                 if case in ("prompt fails", "prompt hangs"):
                     assert both not in note["text"]
 
