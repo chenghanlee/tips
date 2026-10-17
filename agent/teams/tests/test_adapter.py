@@ -28,7 +28,6 @@ TOOLS = {
     "prompt_agent",
     "retire_team",
     "pr_state",
-    "pr_checks",
     "pr_list",
     "pr_read",
     "issue_read",
