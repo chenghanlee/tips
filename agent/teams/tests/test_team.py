@@ -326,7 +326,7 @@ while True: time.sleep(.05)
                 "python3",
                 "-c",
                 "import sys; sys.path.insert(0,sys.argv[1]); "
-                'from team import stop_agent; stop_agent("wT:p1",sys.argv[2])',
+                'import config, herdr; config.configure(); herdr.stop("wT:p1",sys.argv[2])',
                 str(SCRIPT.parent),
                 str(root or self.root),
             ],
@@ -1083,7 +1083,7 @@ class PairLifecycleTest(Harness):
         }
         record = self.record(1)
         assert record["tabs"] == {"implementers": "w1:t1", "reviewers": "w1:t2"}
-        assert (record["version"], len(record["id"]), record["generation"]) == (3, 32, 1)
+        assert (record["version"], record["generation"]) == (3, 1)
         assert (record["kind"], record["brief"], record["implementer"], record["tester"]) == (
             "brief",
             "29",
@@ -1556,16 +1556,6 @@ class PairLifecycleTest(Harness):
                 assert f"Harness root {root} is inside {parent}; refused" in refused.stderr
                 assert not root.exists()
         self.env = env
-        assert [e for e in self.state()["events"] if e[0] != "gh"] == []
-
-    def test_records_from_a_shared_worktree_team_py_refuse_every_command(self) -> None:
-        legacy = self.repo / "agent/teams/allocations/1.json"
-        legacy.parent.mkdir()
-        legacy.write_text('{"slot": 1, "brief": "29"}\n')
-        for command in (("start", "29"), ("design", "50", "critic"), ("stop", "29")):
-            with self.subTest(command=command):
-                refused = self.team(*command, ok=False)
-                assert "used shared worktrees; refusing every launch and stop" in refused.stderr
         assert [e for e in self.state()["events"] if e[0] != "gh"] == []
 
     def test_trusted_paths_inside_writable_or_temporary_roots_are_refused(self) -> None:
@@ -2557,9 +2547,7 @@ class LaunchRecoveryTest(Harness):
         unknown_state = json.loads(path.read_text())
         unknown_state["agents"]["tester"]["submission"] = "done"
         cases = {
-            "without record versions": {k: v for k, v in good.items() if k != "version"},
             "record version 2 is not 3": {**good, "version": 2},
-            "allocation id must be 32 hex digits": {**good, "id": "slot-1"},
             "agents.tester.submission is not a known state": unknown_state,
         }
         for message, value in cases.items():

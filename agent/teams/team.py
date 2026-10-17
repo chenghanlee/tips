@@ -4,8 +4,8 @@
 Configured agents are `[agents.<entry>]` in config.toml. Every client gets an allocation with
 a generation ID that never repeats: an empty project directory it clones into itself with
 bootstrap.py, a logs directory, and launcher configuration, all under the harness root
-`~/.local/share/tips-agent-teams/<repo-key>/`. The slot's record in the root's `state/`
-holds the record version and ID, the brief or spec, its roster, and every launched client's
+`agent_teams/<repository name>/` beside the main checkout. The slot's record in the root's
+`state/` holds the record version, the brief or spec, its roster, and every launched client's
 Herdr name, kind, project, database suffix, port, pane, session and task-submission state.
 Restart, handoff and retirement use that record. One lock on `state/.lock` serializes start,
 design, review, reset and stop. This controller never runs Git, builds or a worker-provided
@@ -97,20 +97,11 @@ def next_generation() -> int:
 
 
 def require_current_record(path: Path, fields: dict[str, object]) -> None:
-    """Refuse a record another team.py version wrote, or one without a valid allocation ID."""
-    if "version" not in fields:
+    """Refuse a record another team.py version wrote."""
+    if fields.get("version") != RECORD_VERSION:
         raise RuntimeError(
-            f"{path} was written by a team.py without record versions; refusing every launch "
-            "and stop. Drain it with the team.py that wrote it, as agent/teams/SETUP.md "
-            '"Records from an older team.py" says.'
+            f"{path}: record version {fields.get('version')!r} is not {RECORD_VERSION}; preserved"
         )
-    if fields["version"] != RECORD_VERSION:
-        raise RuntimeError(
-            f"{path}: record version {fields['version']!r} is not {RECORD_VERSION}; preserved"
-        )
-    allocation_id = fields.get("id")
-    if not isinstance(allocation_id, str) or not re.fullmatch(r"[0-9a-f]{32}", allocation_id):
-        raise RuntimeError(f"{path}: allocation id must be 32 hex digits; preserved")
 
 
 def load_record(path: Path) -> Record:
@@ -194,13 +185,6 @@ def store_lock() -> Generator[None]:
 
 def records() -> dict[int, Record]:
     """Every slot's record; slot discovery reads these, not Herdr."""
-    legacy = sorted((conf.main_checkout() / "agent/teams/allocations").glob("*.json"))
-    if legacy:
-        raise RuntimeError(
-            f"{legacy[0]} was written by a team.py that used shared worktrees; refusing every "
-            "launch and stop. Drain it with the team.py that wrote it, as agent/teams/SETUP.md "
-            '"Records from an older team.py" says.'
-        )
     found: dict[int, Record] = {}
     # Slot records are <slot>.json; other files there, such as dispatcher.json, are not.
     for path in sorted(p for p in conf.state_dir().glob("*.json") if p.stem.isdecimal()):
@@ -712,7 +696,6 @@ def team_record(issue: str, kind: str, implementer: str, tester: str) -> Record:
         return record
     record = Record(
         version=RECORD_VERSION,
-        id=uuid.uuid4().hex,
         slot=slot,
         generation=next_generation(),
         kind=kind,
@@ -1413,15 +1396,6 @@ def prompt_agent(brief: str, entry: str, text: str) -> None:
             "Read the agent's records before sending it again."
         ) from error
     print(f"Prompted {allocation['name']}")
-
-
-def stop_agent(pane: str, root: str | Path) -> None:
-    """Stop the client gracefully; raise an error if its exit is uncertain.
-
-    The caller must keep the checkout.
-    """
-    conf.configure()
-    stop(pane, root)
 
 
 def cli() -> None:

@@ -106,7 +106,7 @@ def issue_comments(issue: str, deadline: float | None = None) -> list[dict[str, 
     Deduplication and finding folds need every comment, so a truncated read raises.
     """
     deadline = deadline or deadline_from_now()
-    path = f"repos/{repository(deadline)}/issues/{issue}/comments?per_page=100"
+    path = f"repos/{repository()}/issues/{issue}/comments?per_page=100"
     found: list[dict[str, object]] = []
     for page in range(1, READ_PAGES + 1):
         output = github(["gh", "api", f"{path}&page={page}"], deadline, f"#{issue} comments")
