@@ -1,6 +1,8 @@
 """Brief lifecycle tests: real Git and process trees, fake Herdr; never a live pane or client."""
 
+import atexit
 import contextlib
+import functools
 import json
 import os
 import re
@@ -37,7 +39,7 @@ repository = "o/r"
 clone_url = "/fixture/origin.git"
 psql = ["/fixture/psql", "fixture-dsn"]
 max_teams = 6
-port_base = 4100
+port_base = 24100
 port_stride = 10
 postgres_port = 5433
 db_suffix_prefix = "_t"
@@ -108,6 +110,26 @@ MIX_PROJECT = (
     "defmodule Fixture.MixProject do\n  use Mix.Project\n"
     '  def project, do: [app: :fixture, version: "0.1.0"]\nend\n'
 )
+
+
+@functools.cache
+def fakes() -> Path:
+    """This test process's directory of fake programs, removed when the process exits."""
+    directory = Path(tempfile.mkdtemp(prefix="tips-test-fakes-"))
+    atexit.register(shutil.rmtree, directory, ignore_errors=True)
+    return directory
+
+
+def fake(name: str, body: str) -> Path:
+    """The fake program `name`, written once per test process. macOS scans each new
+    executable on its first run (about 0.5 s), so tests symlink to one copy instead of
+    writing their own. Per-test state comes from environment variables such as
+    HERDR_FIXTURE. Replace a link before writing: writing through it changes every test."""
+    path = fakes() / name
+    if not path.exists():
+        path.write_text(body)
+        path.chmod(0o755)
+    return path
 
 
 HERDR = r"""#!/usr/bin/env python3
@@ -211,8 +233,7 @@ class StopAgentTest(unittest.TestCase):
         self.root = Path(self.tmp.name).resolve()
         self.bin = self.root / "bin"
         self.bin.mkdir()
-        (self.bin / "herdr").write_text(HERDR)
-        (self.bin / "herdr").chmod(0o755)
+        (self.bin / "herdr").symlink_to(fake("stop-herdr", HERDR))
         self.config = self.root / "agent-team.toml"
         self.config.write_text(CONFIG.replace("shutdown_seconds = 15", "shutdown_seconds = 1"))
         self.env = dict(
@@ -846,7 +867,7 @@ class Harness(unittest.TestCase):
             directory.mkdir(parents=True)
         (self.stdlib / "elixir/lib/enum.ex").write_text("defmodule Enum do\nend\n")
         (self.stdlib.parent / "VERSION").write_text("1.2.3\n")
-        fakes = {
+        programs = {
             "herdr": PAIR_HERDR,
             "mix": FAKE_MIX,
             "gh": FAKE_GH,
@@ -854,9 +875,9 @@ class Harness(unittest.TestCase):
             "ps": FAKE_PS,
             "elixir": '#!/bin/sh\nprintf "1.2.3\\n"\n',
         }
-        for name, body in fakes.items():
-            (self.bin / name).write_text(body)
-            (self.bin / name).chmod(0o755)
+        # Per-test links, so a test can replace or remove one without touching the others.
+        for name, body in programs.items():
+            (self.bin / name).symlink_to(fake(name, body))
         execute(["git", "init", "-q", "-b", "main", str(self.repo)], env=self.env, check=True)
         execute(["git", "init", "-q", "--bare", "-b", "main", str(self.origin)], env=self.env)
         (self.repo / ".gitignore").write_text(
@@ -867,9 +888,7 @@ class Harness(unittest.TestCase):
             (self.repo / "agent/teams" / script.name).write_text(script.read_text())
         self.write_config(CONFIG)
         (self.repo / "tracked.txt").write_text("base\n")
-        binary = self.repo / "agent/lsp/dexter/vendor/dexter"
-        binary.write_text(FAKE_DEXTER)
-        binary.chmod(0o755)
+        (self.repo / "agent/lsp/dexter/vendor/dexter").symlink_to(fake("dexter", FAKE_DEXTER))
         self.commit("base")
         self.git("remote", "add", "origin", str(self.origin))
         self.git("push", "-q", "origin", "main")
@@ -1104,7 +1123,7 @@ class PairLifecycleTest(Harness):
         assert impl["launch_env"] == {
             **shared,
             "TIPS_DB_SUFFIX": "_t1g1i",
-            "TIPS_TEST_PORT": "4110",
+            "TIPS_TEST_PORT": "24110",
             "TIPS_DEXTER": str(impl_root / "project/.dexter/dexter.sh"),
             "TIPS_TEAM_ALLOCATION_ID": "g1-impl",
             "TIPS_TEAM_LAUNCH": self.allocation("team-1-impl")["launch"],
@@ -1114,7 +1133,7 @@ class PairLifecycleTest(Harness):
         assert tester["launch_env"] == {
             **shared,
             "TIPS_DB_SUFFIX": "_t1g1r",
-            "TIPS_TEST_PORT": "4111",
+            "TIPS_TEST_PORT": "24111",
             "TIPS_DEXTER": str(tester_root / "project/.dexter/dexter.sh"),
             "TIPS_TEAM_ALLOCATION_ID": "g1-tester",
             "TIPS_TEAM_LAUNCH": self.allocation("team-1-tester")["launch"],
@@ -1155,9 +1174,9 @@ class PairLifecycleTest(Harness):
         assert {a["submission"] for a in record["agents"].values()} == {"submitted"}
         assert [c["body"] for c in self.comments("29")] == [
             f"EVENT implementer team-1-impl session-team-1-impl\nlaunched codex in {impl_root}; "
-            "allocation g1-impl; database suffix _t1g1i; port 4110",
+            "allocation g1-impl; database suffix _t1g1i; port 24110",
             f"EVENT tester team-1-tester {tester_session}\nlaunched claude in "
-            f"{tester_root}; allocation g1-tester; database suffix _t1g1r; port 4111",
+            f"{tester_root}; allocation g1-tester; database suffix _t1g1r; port 24111",
         ]
         # Each worker clones for itself: the implementer on its task branch from fetched
         # origin/main, the tester detached at origin/main, in separate clones.
@@ -1256,7 +1275,7 @@ class PairLifecycleTest(Harness):
         self.reset("29", "impl")
         self.team("start", "29")
         assert len(self.events("agent", "start")) == 4
-        assert self.launch_env("team-1-tester") == ("_t1g1r", "4111")
+        assert self.launch_env("team-1-tester") == ("_t1g1r", "24111")
         # The replacement reuses its clone: bootstrap neither reclones nor resets it.
         self.bootstrap("team-1-impl")
         assert (project / "tracked.txt").read_text() == "unfinished work\n"
@@ -1326,7 +1345,7 @@ class PairLifecycleTest(Harness):
         self.write_config(small)
         self.team("start", "29")
         self.team("start", "30")
-        assert self.launch_env("team-2-impl") == ("_t2g2i", "4120")
+        assert self.launch_env("team-2-impl") == ("_t2g2i", "24120")
         assert self.pane("team-2-impl")["cwd"] == str(self.trusted / "allocations/g2-impl")
         # A new allocation never takes a recorded port, even after configuration changes.
         self.bootstrap("team-1-impl")
@@ -1335,10 +1354,10 @@ class PairLifecycleTest(Harness):
         moved = small.replace("port_offset = 1", "port_offset = 5")
         self.write_config(moved.replace("port_offset = 2", "port_offset = 1"))
         refused = self.team("review", "7", "critic", ok=False)
-        assert "port 4111 collides with team-1-tester's" in refused.stderr
+        assert "port 24111 collides with team-1-tester's" in refused.stderr
         self.write_config(small)
         self.team("review", "7", "critic")
-        assert self.launch_env("team-1-critic") == ("_t1g1c", "4112")
+        assert self.launch_env("team-1-critic") == ("_t1g1c", "24112")
         self.update(issues={**self.state()["issues"], "32": BRIEF})
         assert "No free slot" in self.team("start", "32", ok=False).stderr
         # Slots come from the records, so a slot whose workspaces are gone is still taken.
@@ -1484,7 +1503,7 @@ class PairLifecycleTest(Harness):
 
     def test_invalid_config_refuses_before_herdr(self) -> None:
         cases = (
-            ("port_base = 4100", 'port_base = "wrong"', "team.port_base must be int"),
+            ("port_base = 24100", 'port_base = "wrong"', "team.port_base must be int"),
             ('role = "designer"', 'role = "architect"', "agents.critic.role must be one of"),
             ('advisor = "fixture-advisor"', 'adviser = "x"', "unknown keys ['adviser']"),
             ('model = "fixture-impl"', 'model = "x"\nadvisor = "y"', "advisor applies to Claude"),
@@ -1873,7 +1892,7 @@ class HandoffTest(Harness):
         root = self.trusted / "allocations/g1-critic"
         critic = self.pane("team-1-critic")
         assert critic["cwd"] == str(root)
-        assert self.launch_env("team-1-critic") == ("_t1g1c", "4112")
+        assert self.launch_env("team-1-critic") == ("_t1g1c", "24112")
         brief = self.system_prompt("team-1-critic")
         assert brief.startswith("You are critic, the reviewing designer for brief #29;")
         assert "Your persona: operations: failure and recovery paths." in brief
@@ -1896,7 +1915,7 @@ class HandoffTest(Harness):
         self.team("review", "7", "second")
         second = self.pane("team-1-second")
         assert second["agent"] == "codex"
-        assert self.launch_env("team-1-second") == ("_t1g1s", "4113")
+        assert self.launch_env("team-1-second") == ("_t1g1s", "24113")
         assert "the additional tester for brief #29" in self.prompts("team-1-second")[0]
         assert self.tabs("w1") == {
             "implementers": ["team-1-impl"],
@@ -1969,7 +1988,7 @@ class DesignTest(Harness):
         assert self.comments("50")[-1]["body"] == (
             f"EVENT designer team-1-critic {self.launched_session('team-1-critic')}\n"
             f"launched claude in {root}; "
-            "allocation g1-critic; database suffix _t1g1c; port 4112"
+            "allocation g1-critic; database suffix _t1g1c; port 24112"
         )
         usage = execute(
             ["python3", str(self.repo / "agent/teams/board.py"), "usage", "50"],
@@ -2333,10 +2352,10 @@ class RetirementTest(Harness):
         self.update(dexter_stop_fails=False)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
             server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            server.bind(("127.0.0.1", 4111))
+            server.bind(("127.0.0.1", 24111))
             server.listen()
             refused = self.team("stop", "29", ok=False)
-            assert "Ports 4111 are in use; the reservation is kept" in refused.stderr
+            assert "Ports 24111 are in use; the reservation is kept" in refused.stderr
             assert self.recorded_briefs() == {"29"}
         self.team("stop", "29")
         assert self.recorded_briefs() == set()
@@ -2351,7 +2370,7 @@ class RetirementTest(Harness):
         self.update(closed_by={}, merged=[])
         self.team("start", "29")
         assert self.record(1)["generation"] == 2
-        assert self.launch_env("team-1-impl") == ("_t1g2i", "4110")
+        assert self.launch_env("team-1-impl") == ("_t1g2i", "24110")
         assert self.pane("team-1-impl")["cwd"] == str(self.trusted / "allocations/g2-impl")
         assert (old / "project/tracked.txt").exists()
         # A forged record pointing at another allocation's directory is refused at stop.
