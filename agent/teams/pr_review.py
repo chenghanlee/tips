@@ -602,9 +602,6 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         main()
-    except (RefusalError, RuntimeError, OSError, ValueError, KeyError) as error:
-        print(f"pr_review: {error}", file=sys.stderr)
-        sys.exit(1)
-    except subprocess.TimeoutExpired as error:
+    except (RuntimeError, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as error:
         print(f"pr_review: {error}", file=sys.stderr)
         sys.exit(1)

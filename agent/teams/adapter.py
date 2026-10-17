@@ -30,7 +30,7 @@ import team
 RESPONSE_BYTES = 8192
 # Project reads stop at 10 pages of 100 entries; more is reported as incomplete.
 PROJECT_ITEMS = 1000
-ENTRY_PATTERN = r"^[a-z0-9][a-z0-9-]*$"
+ENTRY_PATTERN = rf"^{conf.ENTRY}$"
 
 Number = Annotated[int, Field(ge=1, le=99_999_999)]
 Offset = Annotated[int, Field(ge=0, le=100_000_000)]
@@ -50,7 +50,6 @@ ERRORS = (
     OSError,
     ValueError,
     KeyError,
-    pr_review.RefusalError,
     subprocess.TimeoutExpired,
 )
 AMBIGUOUS = (
@@ -153,10 +152,7 @@ def gh(*args: str, input_text: str | None = None) -> str:
 
 
 def settings() -> conf.GitHubSettings:
-    configured = conf.github_settings()
-    if not configured:
-        raise RuntimeError("config.toml has no [github] table")
-    return configured
+    return conf.settings()["github"]
 
 
 def owner() -> str:
@@ -255,12 +251,6 @@ def required_checks(pr: int) -> str:
     except ValueError:
         return "required checks unavailable: " + (result.stderr.strip() or "no output")
     return result.stdout.strip()
-
-
-@server.tool()
-def pr_checks(pr: Number) -> str:
-    """The PR's required checks with state and link."""
-    return operate(lambda: required_checks(pr))
 
 
 @server.tool()
@@ -422,7 +412,6 @@ def sanitize_environment() -> None:
 def main() -> None:
     sanitize_environment()
     conf.configure()
-    settings()
     # Harness commands run from the configured main checkout, never the client's cwd.
     os.chdir(conf.main_checkout())
     server.run("stdio")
