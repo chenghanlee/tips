@@ -144,6 +144,8 @@ ROLES = ("designer", "implementer", "tester")
 # A team's workspace holds one tab per role; every client of that role is a pane in it.
 TABS = {"designer": "designers", "implementer": "implementers", "tester": "reviewers"}
 ENTRY = r"[a-z0-9][a-z0-9-]*"
+# An allocation ID: the generation, then the entry. It never repeats.
+ALLOCATION_ID = rf"g[0-9]+-{ENTRY}"
 # Version 3 records live in the harness root and name projects, not worktrees.
 RECORD_VERSION = 3
 NEVER_SUBMITTED, UNKNOWN, SUBMITTED = "never_submitted", "unknown", "submitted"
@@ -353,11 +355,65 @@ def validate_settings(path: Path, value: Config) -> None:
             raise RuntimeError(f"{path}: agents.{name}.advisor applies to Claude entries only")
 
 
+def allocation_id(generation: int, entry: str) -> str:
+    return f"g{generation}-{entry}"
+
+
+def launch_identity() -> tuple[str, Path]:
+    """The calling client's allocation ID and the trusted state directory, from the
+    environment its launch set; ValueError outside such a launch."""
+    ident = os.environ.get("TIPS_TEAM_ALLOCATION_ID", "")
+    state = os.environ.get("TIPS_TEAM_STATE", "")
+    if not re.fullmatch(ALLOCATION_ID, ident) or not state:
+        raise ValueError(
+            "TIPS_TEAM_ALLOCATION_ID and TIPS_TEAM_STATE are not set; run this from the pane "
+            "team.py launched"
+        )
+    if not Path(state).is_absolute() or Path(state).resolve() != Path(state):
+        raise ValueError(f"TIPS_TEAM_STATE {state} is not a canonical absolute path")
+    return ident, Path(state)
+
+
+def slot_record_paths(state: Path) -> list[Path]:
+    """The slot records, `<slot>.json`; other files there, such as dispatcher.json, are not."""
+    return sorted(p for p in state.glob("*.json") if p.stem.isdecimal())
+
+
+def unretired_allocations(state: Path) -> list[Path]:
+    """The launcher configuration directories of allocations that stop has not retired."""
+    return [
+        path.parent
+        for path in sorted(state.glob("*/bootstrap.json"))
+        if not (path.parent / "retired.json").exists()
+    ]
+
+
+def allocation_port(team: TeamSettings, slot: int, offset: int) -> int:
+    return team["port_base"] + slot * team["port_stride"] + offset
+
+
+def is_partition(stem: str, name: str) -> bool:
+    """Whether the database name is the stem or one of its numbered partitions."""
+    return re.fullmatch(re.escape(stem) + r"[0-9]*", name) is not None
+
+
 def overlapping(a: str, b: str) -> bool:
     """Whether one database stem is the other or one of its numbered partitions."""
-    return bool(
-        re.fullmatch(re.escape(a) + r"[0-9]*", b) or re.fullmatch(re.escape(b) + r"[0-9]*", a)
-    )
+    return is_partition(a, b) or is_partition(b, a)
+
+
+def names_fit(stem: str) -> bool:
+    """Whether every database name of the stem, partitions included, fits PostgreSQL."""
+    return len((max(DATABASE_BASES, key=len) + stem).encode()) + PARTITION_DIGITS <= NAME_BYTES
+
+
+def temporary_roots() -> list[Path]:
+    """Temporary directories, which never hold the harness or its state."""
+    return [Path(p).resolve() for p in (*TEMPORARY, os.environ.get("TMPDIR", "/tmp"))]  # noqa: S108 - refused roots
+
+
+def within(path: Path, parent: Path) -> bool:
+    return path == parent or parent in path.parents
 
 
 def database_stem(team: TeamSettings, slot: int, generation: int, suffix: str) -> str:
@@ -375,15 +431,13 @@ def validate_allocations(path: Path, value: Config) -> None:
     team = value["team"]
     for n in range(1, team["max_teams"] + 1):
         for spec in value["agents"].values():
-            port = team["port_base"] + n * team["port_stride"] + spec["port_offset"]
+            port = allocation_port(team, n, spec["port_offset"])
             stem = database_stem(team, n, 1, spec["db_suffix"])
             if port in ports or not 1 <= port <= 65535:
                 raise RuntimeError(f"{path}: overlapping or invalid test ports")
             if any(overlapping(stem, other) for other in stems):
                 raise RuntimeError(f"{path}: overlapping database suffix/partition allocation")
-            widest = database_stem(team, n, 10**6, spec["db_suffix"])
-            longest = max(DATABASE_BASES, key=len) + widest
-            if len(longest.encode()) + PARTITION_DIGITS > NAME_BYTES:
+            if not names_fit(database_stem(team, n, 10**6, spec["db_suffix"])):
                 raise RuntimeError(f"{path}: database names would exceed {NAME_BYTES} bytes")
             ports.add(port)
             stems.append(stem)
@@ -420,11 +474,10 @@ def claim_root(root: Path, repository: str, checkout: Path) -> Path:
     including another owner's repository with the same name. The root must be a real path
     outside the checkout and outside temporary directories. It is not write-protected;
     repository.json only keeps two repositories apart."""
-    temporary = [Path(p).resolve() for p in (*TEMPORARY, os.environ.get("TMPDIR", "/tmp"))]  # noqa: S108 - refused roots
     if root.resolve() != root:
         raise RuntimeError(f"Harness root {root} passes through a symlink; refused")
-    for parent in (checkout.resolve(), *temporary):
-        if root == parent or parent in root.parents:
+    for parent in (checkout.resolve(), *temporary_roots()):
+        if within(root, parent):
             raise RuntimeError(f"Harness root {root} is inside {parent}; refused")
     # Checked before the identity is published and before any record, lock or allocation
     # is written through them.

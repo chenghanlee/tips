@@ -18,7 +18,6 @@ resets the clone.
 
 import json
 import os
-import re
 import shlex
 import subprocess
 import sys
@@ -26,14 +25,13 @@ from pathlib import Path
 from typing import cast
 
 from commands import execute, object_fields
-from config import RETIREMENT
+from config import RETIREMENT, launch_identity, slot_record_paths
 from github import comment_header
 
 GIT_SECONDS = 120
 GITHUB_SECONDS = 60
 HERDR_SECONDS = 30
 DIRTY_PATHS = 5  # status lines kept in a report of a dirty clone
-IDENT = re.compile(r"g[0-9]+-[a-z0-9][a-z0-9-]*")
 
 
 class RetirementError(RuntimeError):
@@ -42,14 +40,8 @@ class RetirementError(RuntimeError):
 
 def own_allocation() -> tuple[str, dict[str, object], dict[str, object], Path]:
     """The issue, this client's recorded allocation, its bootstrap settings and project."""
-    ident = os.environ.get("TIPS_TEAM_ALLOCATION_ID", "")
-    state = Path(os.environ.get("TIPS_TEAM_STATE", "/nonexistent"))
-    if not IDENT.fullmatch(ident) or not state.is_absolute() or state.resolve() != state:
-        raise RetirementError(
-            "TIPS_TEAM_ALLOCATION_ID and TIPS_TEAM_STATE are not set; run this from the pane "
-            "team.py launched"
-        )
-    for path in sorted(p for p in state.glob("*.json") if p.stem.isdecimal()):
+    ident, state = launch_identity()
+    for path in slot_record_paths(state):
         record = object_fields(json.loads(path.read_text()), str(path))
         agents = object_fields(record.get("agents"), f"{path}: agents")
         for value in agents.values():

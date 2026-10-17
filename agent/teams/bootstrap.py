@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import IO, cast
 
 from commands import execute
-from config import TEMPORARY
+from config import launch_identity, temporary_roots, within
 from dexter import dexter_invocation
 
 CONSOLE_BYTES = 8192
@@ -36,7 +36,6 @@ DEPS_FETCH_SECONDS = 300
 # Dexter's query gives up this long after --wait: its allowance to reach the daemon.
 DEXTER_CONNECT_SECONDS = 30
 SHA = re.compile(r"[0-9a-f]{40}")
-IDENT = re.compile(r"g[0-9]+-[a-z0-9][a-z0-9-]*")
 SETTINGS = {
     "id": str,
     "kind": str,
@@ -82,17 +81,11 @@ class Console:
 
 def settings_path() -> tuple[str, Path]:
     """The allocation ID and its launcher configuration file, from the launch environment."""
-    ident = os.environ.get("TIPS_TEAM_ALLOCATION_ID", "")
-    state = os.environ.get("TIPS_TEAM_STATE", "")
-    if not IDENT.fullmatch(ident) or not state:
-        raise BootstrapError(
-            "TIPS_TEAM_ALLOCATION_ID and TIPS_TEAM_STATE are not set; run this from the pane "
-            "team.py launched"
-        )
-    state_dir = Path(state)
-    if not state_dir.is_absolute() or state_dir.resolve() != state_dir:
-        raise BootstrapError(f"TIPS_TEAM_STATE {state} is not a canonical absolute path")
-    return ident, state_dir / ident / "bootstrap.json"
+    try:
+        ident, state = launch_identity()
+    except ValueError as error:
+        raise BootstrapError(str(error)) from error
+    return ident, state / ident / "bootstrap.json"
 
 
 def load_settings() -> dict[str, object]:
@@ -130,11 +123,10 @@ def trusted_layout(state: Path, writable: list[object]) -> None:
     """Refuse a layout in which the harness or the trusted state sits in a temporary
     directory or under a directory the launch lets this worker write. This detects a layout
     error; it does not enforce the client's sandbox."""
-    temporary = [Path(p).resolve() for p in (*TEMPORARY, os.environ.get("TMPDIR", "/tmp"))]  # noqa: S108 - refused roots
     grants = [Path(str(p)).resolve() for p in writable]
     for trusted in (Path(__file__).resolve().parent, state.resolve()):
-        for parent in (*temporary, *grants):
-            if trusted == parent or parent in trusted.parents:
+        for parent in (*temporary_roots(), *grants):
+            if within(trusted, parent):
                 raise BootstrapError(f"Trusted {trusted} is inside {parent}; refused")
 
 
