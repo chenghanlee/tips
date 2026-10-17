@@ -5,7 +5,6 @@ import re
 import shlex
 import subprocess
 import time
-from collections import Counter
 from collections.abc import Sequence
 
 import config as conf
@@ -174,18 +173,11 @@ def poster(allocation: Allocation) -> tuple[str, str, str]:
     return event_role(allocation), allocation["name"], allocation["session"]
 
 
-def retirement_reports(record: Record) -> tuple[Reports, Counter[tuple[str, str]]]:
-    """Each allocation's latest retirement report on the issue from its current launch:
-    posted under the client's recorded name and session, naming the recorded launch. A
-    report from an earlier launch is no evidence. Reports are advisory evidence.
-
-    Also count the other reports that name a recorded allocation, by (id, why rejected)."""
-    current = {
-        a["id"]: (a["name"], header_session(a["session"]), a["launch"])
-        for a in record["agents"].values()
-    }
+def retirement_reports(record: Record) -> Reports:
+    """Each allocation's latest retirement report on the issue that names its recorded
+    launch; a report from an earlier launch is no evidence. Reports are advisory evidence."""
+    launches = {a["id"]: a["launch"] for a in record["agents"].values()}
     reports: Reports = {}
-    rejected: Counter[tuple[str, str]] = Counter()
     for comment in issue_comments(record["brief"]):
         lines = str(comment.get("body") or "").splitlines()
         header = HEADER.match(lines[0]) if lines else None
@@ -198,20 +190,9 @@ def retirement_reports(record: Record) -> tuple[Reports, Counter[tuple[str, str]
                 except ValueError:
                     continue  # a malformed report is no evidence
                 ident = str(fields.get("id"))
-                if ident not in current:
-                    continue
-                found = (header["name"], header["session"], str(fields.get("launch") or ""))
-                if found[2] and current[ident] == found:
+                if fields.get("launch") and launches.get(ident) == fields.get("launch"):
                     reports[ident] = (fields, str(comment["html_url"]))
-                else:
-                    labels = ("header name", "header session", "launch")
-                    why = "; ".join(
-                        f"{label} {got or 'none'}, recorded {want or 'none'}"
-                        for label, got, want in zip(labels, found, current[ident], strict=True)
-                        if got != want
-                    )
-                    rejected[ident, why or "no launch"] += 1
-    return reports, rejected
+    return reports
 
 
 def merged_brief(brief: str) -> bool:

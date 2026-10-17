@@ -24,7 +24,6 @@ import subprocess
 import sys
 import time
 import uuid
-from collections import Counter
 from collections.abc import Generator
 from pathlib import Path
 from typing import cast
@@ -594,19 +593,14 @@ def reconcile(record: Record, allocation: Allocation) -> Entity | None:
     return agent
 
 
-def record_session(record: Record, allocation: Allocation, agent: Entity) -> None:
-    """If the launch stopped before the record held a session, record the one the live
-    client reports; running_client refused any other mismatch."""
-    session = session_id(agent)
+def adopt(record: Record, allocation: Allocation, agent: Entity) -> None:
+    """Keep a live recorded client; never resend its task. If the launch stopped before the
+    record held a session, record the one the client reports; running_client refused any
+    other mismatch."""
+    name, session = allocation["name"], session_id(agent)
     if session and allocation["session"] in ("", "unknown"):
         allocation["session"] = session
         save_record(record)
-
-
-def adopt(record: Record, allocation: Allocation, agent: Entity) -> None:
-    """Keep a live recorded client and record its session; never resend its task."""
-    name = allocation["name"]
-    record_session(record, allocation, agent)
     if allocation["submission"] == SUBMITTED:
         return
     # The launch stopped before it finished; its EVENT may be missing. Posting is idempotent.
@@ -956,19 +950,10 @@ def never_launched(allocation: Allocation) -> bool:
     return not allocation["launch"] and allocation["submission"] == NEVER_SUBMITTED
 
 
-def request_reports(
-    record: Record, missing: list[str], running: set[str], rejected: Counter[tuple[str, str]]
-) -> None:
+def request_reports(record: Record, missing: list[str], running: set[str]) -> None:
     """Ask each running client without a report to post one, name the operator command for
-    each stopped one and the reports rejected for each missing one, then refuse: every
-    resource stays reserved until stop runs again."""
+    each stopped one, then refuse: every resource stays reserved until stop runs again."""
     command = f"python3 {harness() / 'retirement.py'}"
-    names = {record["agents"][e]["id"]: record["agents"][e]["name"] for e in missing}
-    why = "".join(
-        f" {count} report{'s' if count > 1 else ''} for {names[ident]} rejected: {reason}."
-        for (ident, reason), count in rejected.items()
-        if ident in names
-    )
     sends = [
         (record["agents"][e]["name"], f"Retire: run {command}, then end your turn.")
         for e in missing
@@ -982,8 +967,8 @@ def request_reports(
         if e in missing and e not in running
     ]
     raise RuntimeError(
-        f"No retirement report yet from {', '.join(names.values())}.{why} Asked: "
-        f"{', '.join(n for n, _ in sends) or 'none'}; failed sends: "
+        f"No retirement report yet from {', '.join(record['agents'][e]['name'] for e in missing)}."
+        f" Asked: {', '.join(n for n, _ in sends) or 'none'}; failed sends: "
         f"{'; '.join(failed) or 'none'}. Not running, so the operator reports for them: "
         f"{'; '.join(stopped) or 'none'}. Every resource stays reserved; run stop again after "
         "the reports are posted."
@@ -1131,21 +1116,6 @@ def list_retained() -> None:
         print("No retained allocations")
 
 
-def live_clients(record: Record) -> dict[str, Allocation]:
-    """The entries whose recorded client is live in its pane.
-
-    A launch may have stopped before the record held a session; each live client's is
-    recorded here, before stop reads the reports that the client posts under it.
-    """
-    present: dict[str, Allocation] = {}
-    for entry, allocation in record["agents"].items():
-        agent = running_client(record, allocation)
-        if agent is not None:
-            record_session(record, allocation, agent)
-            present[entry] = allocation
-    return present
-
-
 def stop_brief(brief: str) -> None:
     """Stop a team's recorded clients and Dexter daemons and release its slot.
 
@@ -1174,15 +1144,17 @@ def stop_brief(brief: str) -> None:
         names = [a["name"] for a in record["agents"].values()]
         panes = frozenset(a["pane"] for a in record["agents"].values())
         refuse_foreign_owner(roots, names, panes)
-        present = live_clients(record)
-        reports, rejected = retirement_reports(record)
+        reports = retirement_reports(record)
+        present = {
+            e: a for e, a in record["agents"].items() if running_client(record, a) is not None
+        }
         missing = [
             e
             for e, a in record["agents"].items()
             if a["id"] not in reports and (e in present or not never_launched(a))
         ]
         if missing:
-            request_reports(record, missing, set(present), rejected)
+            request_reports(record, missing, set(present))
         gap = preservation_gap(record, reports)
         if gap:
             raise RuntimeError(

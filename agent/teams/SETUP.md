@@ -281,9 +281,8 @@ After an interrupted `start` or `review`, rerun it:
 - Another client in a recorded pane, a live client the record never started, a client
   whose session differs from the recorded one, or a client that reports no session is
   refused. Inspect the pane. `team.py` assigns each Claude client's session id at
-  launch; a Codex client's is recorded when Herdr first reports it. `stop` records it
-  too, so a client whose launch stopped before Herdr reported a session can still
-  retire. Herdr reports sessions through the user hook, so keep that hook installed.
+  launch; a Codex client's is recorded when Herdr first reports it. Herdr reports
+  sessions through the user hook, so keep that hook installed.
 
 `start`, `design`, `review`, `reset` and `stop` hold a lock on `<root>/state/.lock`. A
 command that waits longer than `timeouts.lock_seconds` stops with a `Busy` error; rerun
