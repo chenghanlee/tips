@@ -24,6 +24,7 @@ from typing import cast
 
 import commands
 import config as conf
+import herdr
 import team
 
 HERE = Path(__file__).resolve().parent
@@ -136,8 +137,8 @@ def ready_client(state: Path, launch: conf.DispatcherLaunch, seconds: float) -> 
         agent = commands.execute(["herdr", "agent", "get", pane], timeout=seconds)
         if info.returncode or agent.returncode:
             return False
-        leader = team.parse_herdr(info.stdout)["process_info"]["foreground_process_group_id"]
-        fields = team.parse_herdr(agent.stdout)["agent"]
+        leader = herdr.parse_herdr(info.stdout)["process_info"]["foreground_process_group_id"]
+        fields = herdr.parse_herdr(agent.stdout)["agent"]
     except (OSError, RuntimeError, ValueError, KeyError, subprocess.TimeoutExpired):
         return False
     return (
@@ -233,7 +234,7 @@ def start_here(settings: dict[str, object], main: Path, config: Path, launch_sec
             f"The dispatcher is already running as pid {launch['pid']} in {launch['pane']}; "
             "start one only."
         )
-    listed = team.parse_herdr(commands.run("herdr", "agent", "list", timeout=launch_seconds))
+    listed = herdr.parse_herdr(commands.run("herdr", "agent", "list", timeout=launch_seconds))
     named = [a["pane_id"] for a in listed["agents"] if a.get("name") == "dispatcher"]
     if named:
         raise RuntimeError(
@@ -281,7 +282,7 @@ def start_in_new_pane(main: Path, config: Path, launch_seconds: int) -> None:
     direction = "right" if pane_width(layout, os.environ["HERDR_PANE_ID"]) >= 120 else "down"
     split = ["pane", "split", "--current", "--direction", direction, "--cwd", str(main)]
     created = commands.run("herdr", *split, "--no-focus", timeout=launch_seconds)
-    pane = team.parse_herdr(created)["pane"]["pane_id"]
+    pane = herdr.parse_herdr(created)["pane"]["pane_id"]
     command = f"TIPS_TEAM_CONFIG={shlex.quote(str(config))} {shlex.quote(str(HERE / 'dispatch'))}"
     commands.run("herdr", "pane", "run", pane, command, timeout=launch_seconds)
     print(

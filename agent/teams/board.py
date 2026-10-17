@@ -41,16 +41,9 @@ from typing import cast
 import config as conf
 from commands import object_fields, object_list, run
 from config import HEADER, github_seconds
-from team import (
-    comment_header,
-    event_role,
-    herdr,
-    issue_comments,
-    post_comment,
-    records,
-    repo_args,
-    session_id,
-)
+from github import comment_header, event_role, issue_comments, post_comment, repo_args
+from herdr import herdr, session_id
+from team import records
 
 WORD_LIMIT = 800
 COUNTS = ("Input", "Output", "Cache read", "Cache write")

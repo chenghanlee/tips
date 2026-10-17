@@ -27,7 +27,7 @@ from typing import IO, cast
 
 from commands import execute
 from config import TEMPORARY
-from team import dexter_invocation
+from dexter import dexter_invocation
 
 CONSOLE_BYTES = 8192
 GIT_SECONDS = 300
