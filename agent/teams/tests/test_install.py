@@ -4,6 +4,7 @@ pip runs offline (PIP_NO_INDEX): the fixture lock is empty, or names a package t
 cannot be found, which stands in for any failure while building the environment.
 """
 
+import fcntl
 import json
 import os
 import tempfile
@@ -139,6 +140,12 @@ class InstallTest(unittest.TestCase):
         (allocation / "bootstrap.json").write_text("{}\n")
         assert "g1-impl" in self.install(self.first, ok=False)
         (allocation / "retired.json").write_text("{}\n")
+        # A running dispatcher or team.py command holds its lock: refused, nothing written.
+        for name, busy in (("dispatcher.lock", "stop it first"), (".lock", "team.py command")):
+            with (self.root / "state" / name).open("a") as held:
+                fcntl.flock(held, fcntl.LOCK_EX)
+                assert busy in self.install(self.first, ok=False)
+        assert not list((self.root / "releases").iterdir())
         # A root inside the checkout or a temporary directory is refused before any write.
         inside = self.install(self.first, ok=False, root=self.source / "agent_teams/r")
         assert "inside" in inside
