@@ -13,7 +13,7 @@ from typing import Any
 
 from commands import execute
 from config import repo_key
-from tests.test_team import CONFIG, TEST_RUNS, fake
+from tests.harness import CONFIG, TEST_RUNS, fake
 
 TEAMS = Path(__file__).resolve().parents[1]
 DOCUMENTS = ("AGENTS.md", "README.md", "roles/common.md", "roles/dispatcher.md")

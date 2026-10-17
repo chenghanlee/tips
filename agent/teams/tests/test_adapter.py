@@ -15,7 +15,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
-from tests.test_team import CONFIG, Harness, fake
+from tests.harness import CONFIG, Harness, fake
 
 TEAMS = Path(__file__).resolve().parents[1]
 HAS_SDK = importlib.util.find_spec("mcp") is not None
