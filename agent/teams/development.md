@@ -77,8 +77,8 @@ shell, a resolved or test-owned executable, and fixed, caller-supplied or test-o
 arguments. The `# noqa: S606` in `start_here` replaces
 the launcher with the resolved `claude` executable and its fixed arguments, so the
 client is the pane's foreground process. The `# noqa: S108` exceptions apply only to
-`config.py:TEMPORARY`, the temporary-root lists in `config.py:claim_root` and
-`bootstrap.py:trusted_layout`, and the refused root in
+`config.py:TEMPORARY`, the temporary-root list in `config.py:temporary_roots`, and the
+refused root in
 `RepositoryConfigTest.test_a_root_in_the_checkout_or_a_temporary_directory_is_refused`.
 They name temporary directories to refuse them; nothing is written there.
 The `PT027` per-file ignore for `tests/**` allows `assertRaises`: the suite is unittest

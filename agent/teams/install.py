@@ -26,7 +26,15 @@ from collections.abc import Generator
 from pathlib import Path
 
 from commands import execute, run
-from config import REPOSITORY, claim_root, default_root
+from config import (
+    DISPATCHER_LOCK,
+    REPOSITORY,
+    STORE_LOCK,
+    claim_root,
+    default_root,
+    slot_record_paths,
+    unretired_allocations,
+)
 from team import load_record
 
 # Creating the environment and fetching locked wheels; the same budget as dependency fetches.
@@ -66,18 +74,14 @@ def require_drained(root: Path) -> None:
     allocation that is neither recorded nor retired."""
     state = root / "state"
     busy: list[str] = []
-    for path in sorted(p for p in state.glob("*.json") if p.stem.isdecimal()):
+    for path in slot_record_paths(state):
         try:
             busy.append(f"slot {path.stem} (#{load_record(path)['brief']})")
         except (RuntimeError, ValueError, KeyError, OSError) as error:
             busy.append(f"slot {path.stem} (unreadable: {error})")
     if busy:
         raise RuntimeError(f"Teams are running in {root}: {', '.join(busy)}; drain them first")
-    unfinished = [
-        path.parent.name
-        for path in sorted(state.glob("*/bootstrap.json"))
-        if not (path.parent / "retired.json").exists()
-    ]
+    unfinished = [path.name for path in unretired_allocations(state)]
     if unfinished:
         raise RuntimeError(
             f"Allocations {', '.join(unfinished)} in {root} are neither recorded nor retired; "
@@ -90,7 +94,7 @@ def quiet(root: Path) -> Generator[None]:
     """Refuse while a dispatcher or a team.py command runs in the root; otherwise hold both
     of their locks, so neither can start, and check that every team is drained."""
     state = root / "state"
-    with (state / "dispatcher.lock").open("a") as dispatcher, (state / ".lock").open("a") as store:
+    with (state / DISPATCHER_LOCK).open("a") as dispatcher, (state / STORE_LOCK).open("a") as store:
         for handle, busy in (
             (dispatcher, "a dispatcher is running; stop it first (/exit in its pane)"),
             (store, "a team.py command is running; rerun after it finishes"),

@@ -41,9 +41,6 @@ Message = Annotated[str, Field(min_length=1, max_length=RESPONSE_BYTES)]
 Title = Annotated[str, Field(min_length=1, max_length=256)]
 Body = Annotated[str, Field(min_length=1, max_length=60_000)]
 FieldValue = Annotated[str, Field(min_length=1, max_length=256)]
-CommentType = Literal[
-    "PROPOSAL", "CRITIQUE", "QUESTION", "ANSWER", "AGREE", "FINDING", "BLOCKED", "DONE", "EVENT"
-]
 PrState = Literal["open", "closed", "merged", "all"]
 ERRORS = (
     RuntimeError,
@@ -85,10 +82,8 @@ def mark_ready() -> bool:
     can be sent: state/dispatcher.ready names the session. False if it cannot be written."""
     try:
         path = team.dispatcher_path().with_name(conf.DISPATCHER_READY)
-        staged = path.with_suffix(".next-ready")
         session = os.environ.get("TIPS_DISPATCHER_SESSION", "")
-        staged.write_text(json.dumps({"session": session, "text": "tools listed"}) + "\n")
-        staged.replace(path)
+        commands.write_file(path, json.dumps({"session": session, "text": "tools listed"}) + "\n")
     except (OSError, RuntimeError, ValueError):
         return False
     return True
@@ -204,11 +199,11 @@ def prompt_agent(brief: Number, entry: Entry, text: Message) -> str:
 
 @server.tool()
 def retire_team(brief: Number) -> str:
-    """Retire a team (team.py stop). A brief must be closed by a merged PR; one closed
-    without a merged PR is retired by the user by hand. The first call asks each client
-    that launched for a retirement report and refuses. Each report messages you
-    `<report URL> retired`; call again then. A client that never launched needs no report.
-    Unpreserved work keeps everything."""
+    """Retire a team (team.py stop). A brief must be closed by a merged PR; the user
+    retires one closed without a merged PR with `team.py stop <brief> --abandon`. Until
+    every client that launched has reported, it asks each running client once and prints
+    whom it waits for. Each report messages you `<report URL> retired`; call again then.
+    A client that never launched needs no report. Unpreserved work keeps everything."""
     return operate(lambda: team.stop_brief(str(brief)), writes=True)
 
 
@@ -299,7 +294,7 @@ def board_read(issue: Number, after_comment_id: GitHubId | None = None, offset: 
 
 
 @server.tool()
-def board_post(issue: Number, comment_type: CommentType, body: Body) -> str:
+def board_post(issue: Number, comment_type: conf.CommentType, body: Body) -> str:
     """Post a board comment as the dispatcher, with its session in the header."""
     return operate(lambda: board.post_as(str(issue), comment_type, dispatcher(), body), writes=True)
 
