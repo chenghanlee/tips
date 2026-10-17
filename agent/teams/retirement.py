@@ -25,7 +25,7 @@ from pathlib import Path
 
 from commands import execute, object_fields
 from config import RETIREMENT
-from team import comment_header
+from github import comment_header
 
 GIT_SECONDS = 120
 GITHUB_SECONDS = 60

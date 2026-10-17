@@ -19,42 +19,42 @@ import json
 import os
 import re
 import shlex
-import signal
 import socket
 import subprocess
 import sys
 import time
 import uuid
-from collections.abc import Generator, Sequence
+from collections.abc import Generator
 from pathlib import Path
 from typing import cast
 
 import config as conf
-from commands import execute, object_fields, object_list, require_type, run
+from briefs import (
+    conflict_refusal,
+    design_brief,
+    implementer_message,
+    launch_text,
+    pair_brief,
+    reviewer_brief,
+    reviewer_notice,
+    tester_message,
+)
+from commands import execute, object_fields, require_type, run
 from config import (
-    COMMENT_TYPES,
     DATABASE_BASES,
     DISPATCHER_RECOVERY,
     ENTRY,
-    HEADER,
     NAME_BYTES,
     NATIVE_LSP_PLUGINS,
     NEVER_SUBMITTED,
     PARTITION_DIGITS,
-    READ_PAGES,
-    READ_SECONDS,
     RECORD_VERSION,
-    RETIREMENT,
-    ROLES,
     SUBMITTED,
     TABS,
     UNKNOWN,
     Allocation,
     DispatcherLaunch,
     Entity,
-    HerdrResult,
-    ProcessInfo,
-    ProcessRows,
     Record,
     Reports,
     agent_spec,
@@ -66,196 +66,10 @@ from config import (
     live_name,
     overlapping,
     project_of,
-    repository,
 )
-
-# --- Processes, JSON validation and Herdr ----------------------------------
-
-
-def entity_fields(value: object, label: str) -> None:
-    fields = object_fields(value, label)
-    for key, annotation in Entity.__annotations__.items():
-        if key in fields and fields[key] is not None:
-            if annotation is str:
-                require_type(fields[key], str, f"{label}.{key}")
-            else:
-                object_fields(fields[key], f"{label}.{key}")
-
-
-def parse_herdr(output: str) -> HerdrResult:
-    envelope = object_fields(json.loads(output), "Herdr response")
-    if "error" in envelope:
-        raise RuntimeError(str(envelope["error"]))
-    result = object_fields(envelope.get("result"), "Herdr result")
-    for key in ("agent", "pane", "root_pane", "workspace", "tab"):
-        if key in result:
-            entity_fields(result[key], f"Herdr {key}")
-    for key in ("agents", "panes", "workspaces"):
-        if key in result:
-            for item in object_list(result[key], f"Herdr {key}"):
-                entity_fields(item, f"Herdr {key} entry")
-    if "process_info" in result:
-        validate_process_info(result["process_info"])
-    return cast(HerdrResult, result)
-
-
-def validate_process_info(value: object) -> None:
-    info = object_fields(value, "Herdr process_info")
-    require_type(info.get("shell_pid"), int, "Herdr shell_pid")
-    require_type(info.get("foreground_process_group_id"), int, "Herdr foreground_process_group_id")
-    for process in object_list(info.get("foreground_processes"), "Herdr foreground_processes"):
-        require_type(process.get("pid"), int, "Herdr process pid")
-        if "cwd" in process:
-            require_type(process["cwd"], str, "Herdr process cwd")
-        if "argv0" in process:
-            require_type(process["argv0"], str, "Herdr process argv0")
-
-
-def herdr(*args: str) -> HerdrResult:
-    output = run("herdr", *args, timeout=conf.settings()["timeouts"]["launch_seconds"])
-    if args[:2] == ("pane", "run"):
-        return cast(HerdrResult, {})  # pane run succeeds with empty stdout.
-    return parse_herdr(output)
-
-
-def session_id(agent: Entity) -> str:
-    """The client's own session id as Herdr reports it; empty when Herdr has none yet."""
-    session = agent.get("agent_session")
-    value = session.get("value") if session else None
-    return value if isinstance(value, str) else ""
-
-
-def processes() -> ProcessRows:
-    # Find descendants through parent links. Expert engines may create their own process groups.
-    rows: ProcessRows = {}
-    for line in run("ps", "-axo", "pid=,ppid=,stat=,lstart=").splitlines():
-        pid, parent, state, started = line.split(None, 3)
-        if not state.startswith("Z"):
-            rows[int(pid)] = (int(parent), started)
-    return rows
-
-
-def descendants(rows: ProcessRows, root: int) -> set[int]:
-    owned = {root}
-    while True:
-        found = {pid for pid, (parent, _) in rows.items() if parent in owned}
-        if found <= owned:
-            return owned - {root}
-        owned |= found
-
-
-def occupant(pane: str, info: ProcessInfo) -> tuple[Path, bool]:
-    """A pane's root and whether a client holds it.
-
-    The client leads the pane's foreground process group; LSP servers and other children
-    share the group but may run elsewhere. A bare shell leads its own group.
-    """
-    leader = info["foreground_process_group_id"]
-    leaders = [p for p in info["foreground_processes"] if p["pid"] == leader and p.get("cwd")]
-    if len(leaders) != 1:
-        raise RuntimeError(f"{pane}: cannot identify the foreground client; preserved")
-    return Path(leaders[0]["cwd"]).resolve(), leader != info["shell_pid"]
-
-
-def pane_occupant(pane: str) -> tuple[Path, bool]:
-    return occupant(pane, herdr("pane", "process-info", "--pane", pane)["process_info"])
-
-
-def stop(pane: str, root: str | Path) -> None:
-    root = Path(root)
-    if not root.is_absolute():
-        raise RuntimeError("stop_agent requires an absolute worktree root")
-    root = root.resolve()
-    current = herdr("pane", "get", pane)["pane"]
-    info = herdr("pane", "process-info", "--pane", pane)["process_info"]
-    foreground = info["foreground_processes"]
-    shell = info["shell_pid"]
-    rows = processes()
-    clients = {p["pid"] for p in foreground if rows.get(p["pid"], (None,))[0] == shell}
-    client_info = [p for p in foreground if p["pid"] in clients or p["pid"] == shell]
-    if not client_info or any(Path(p.get("cwd", "")).resolve() != root for p in client_info):
-        raise RuntimeError(f"{pane}: client root does not match {root}; preserved")
-    owned = descendants(rows, shell)
-    if os.getpid() in owned:
-        raise RuntimeError(f"{pane}: cannot stop the calling agent; ask the dispatcher to stop it")
-    identity = {pid: rows[pid][1] for pid in owned if pid in rows}
-    signal_client(pane, current, clients, owned)
-    wait_for_exit(pane, shell, identity)
-    release_name(pane, current)
-    print(f"{pane}: client and owned descendants exited")
-
-
-def signal_client(pane: str, current: Entity, clients: set[int], owned: set[int]) -> None:
-    if clients:
-        if (
-            current.get("agent") not in ("claude", "codex")
-            or len(clients) != 1
-            or not clients <= owned
-        ):
-            raise RuntimeError(f"{pane}: cannot establish owned client; preserved")
-        for pid in clients:
-            # SIGTERM asks the client to exit; it is never sent to an LSP or BEAM group.
-            os.kill(pid, signal.SIGTERM)
-    elif current.get("agent"):
-        raise RuntimeError(f"{pane}: agent/process state disagrees; preserved")
-
-
-def wait_for_exit(pane: str, shell: int, identity: dict[int, str]) -> None:
-    deadline = time.monotonic() + conf.settings()["timeouts"]["shutdown_seconds"]
-    while True:
-        rows = processes()
-        # Include children born during graceful shutdown, while their parent is still known.
-        for parent in (shell, *identity):
-            if parent == shell or rows.get(parent, (None, None))[1] == identity[parent]:
-                for pid in descendants(rows, parent):
-                    identity.setdefault(pid, rows[pid][1])
-        alive = [
-            pid for pid, started in identity.items() if rows.get(pid, (None, None))[1] == started
-        ]
-        if not alive:
-            return
-        if time.monotonic() >= deadline:
-            raise RuntimeError(f"{pane}: surviving owned processes {alive}; resources preserved")
-        time.sleep(0.1)
-
-
-def release_name(pane: str, current: Entity) -> None:
-    # Process exit can precede Herdr's name release; retire only this stopped owner,
-    # never a replacement client that appeared after the verified exit.
-    for agent in herdr("agent", "list")["agents"]:
-        if agent.get("pane_id") == pane and agent.get("name"):
-            info = herdr("pane", "process-info", "--pane", pane)["process_info"]
-            occupied = occupant(pane, info)[1]
-            kind = agent.get("agent")
-            # Herdr can clear kind before name. Only accept that gap at the shell,
-            # after wait_for_exit verified the owned processes; snapshots are not atomic.
-            if kind not in (None, current.get("agent")) or occupied:
-                leader = info["foreground_process_group_id"]
-                argv0 = next(
-                    (
-                        p.get("argv0", "unknown")
-                        for p in info["foreground_processes"]
-                        if p["pid"] == leader
-                    ),
-                    "unknown",
-                )
-                raise RuntimeError(
-                    f"{pane}: owner changed during shutdown; preserved; "
-                    f"previous_kind={current.get('agent')!r}, listed_kind={kind!r}, "
-                    f"occupied={occupied}, leader_pid={leader}, leader_argv0={argv0!r}, "
-                    f"shell_pid={info['shell_pid']}"
-                )
-            try:
-                herdr("agent", "rename", pane, "--clear")
-            except RuntimeError as error:
-                try:
-                    code = json.loads(str(error)).get("error", {}).get("code")
-                except (ValueError, AttributeError) as decode_error:
-                    raise error from decode_error
-                if code != "agent_not_found":
-                    raise
-                # Herdr already released it between list and clear.
-
+from dexter import stop_daemon, tools
+from github import merged_brief, post_event, poster, pull_request, retirement_reports, roster
+from herdr import deliver, herdr, live_panes, pane_occupant, processes, session_id, stop
 
 # --- Records and allocations -----------------------------------------------
 
@@ -410,178 +224,7 @@ def reserved() -> list[Allocation]:
     return [a for record in records().values() for a in record["agents"].values()]
 
 
-def reviewer_names(value: str) -> list[str]:
-    """Return names from `Required reviews:`. Reject empty or duplicate names."""
-    names = [name.strip() for name in value.split(",")]
-    if not all(names) or len(set(names)) != len(names):
-        raise ValueError("empty or repeated name in Required reviews")
-    return names
-
-
-def issue_line(body: str, label: str) -> str | None:
-    match = re.search(rf"^{re.escape(label)}:[ \t]*(.*?)[ \t]*$", body, re.MULTILINE)
-    return match.group(1) if match else None
-
-
-def roster(brief: str) -> tuple[str, list[str], list[str]]:
-    """Read the brief's implementer, testers and reviewing designers from configured entries.
-
-    Read reviewer names from `Required reviews:`. Keep testers in the listed order;
-    the first tester confirms the merge. Return testers and designers separately.
-    """
-    command = ["gh", "issue", "view", brief, *repo_args(), "--json", "body"]
-    body = str(json.loads(github(command, deadline_from_now(), f"#{brief}")).get("body") or "")
-    implementer = issue_line(body, "Implementer")
-    reviews = issue_line(body, "Required reviews")
-    if implementer is None or reviews is None:
-        raise RuntimeError(f"Brief #{brief} needs an Implementer: and a Required reviews: line")
-    try:
-        names = reviewer_names(reviews)
-    except ValueError as error:
-        raise RuntimeError(f"Brief #{brief}: {error}") from error
-    for name in (implementer, *names):
-        if name not in conf.settings()["agents"]:
-            raise RuntimeError(f"Brief #{brief} names {name!r}, which is not a configured entry")
-    if conf.settings()["agents"][implementer]["role"] != "implementer":
-        raise RuntimeError(f"Brief #{brief}: Implementer {implementer} is not an implementer entry")
-    if implementer in names:
-        raise RuntimeError(f"Brief #{brief}: implementer {implementer} cannot review its own PR")
-    by_role = {
-        role: [n for n in names if conf.settings()["agents"][n]["role"] == role] for role in ROLES
-    }
-    if by_role["implementer"]:
-        raise RuntimeError(f"Brief #{brief}: Required reviews names implementer entries")
-    if not by_role["tester"]:
-        raise RuntimeError(f"Brief #{brief}: Required reviews names no tester")
-    return implementer, by_role["tester"], by_role["designer"]
-
-
-# --- GitHub comments -------------------------------------------------------
-
-
-def comment_header(kind: str, role: str, name: str, session: str) -> str:
-    """The attribution line `<TYPE> <role> <name> <session>`."""
-    if kind not in COMMENT_TYPES:
-        raise RuntimeError(f"Comment type must be one of {', '.join(COMMENT_TYPES)}")
-    return f"{kind} {role} {name} {session or 'unknown'}"
-
-
-def github(args: Sequence[str], deadline: float, label: str, input_text: str | None = None) -> str:
-    """Run one GitHub call within its whole operation's deadline; a late call is incomplete."""
-    incomplete = f"{label}: incomplete after the {READ_SECONDS}s deadline"
-    left = deadline - time.monotonic()
-    if left <= 0:
-        raise RuntimeError(incomplete)
-    try:
-        return run(*args, timeout=left, input_text=input_text)
-    except subprocess.TimeoutExpired as error:
-        raise RuntimeError(incomplete) from error
-
-
-def deadline_from_now() -> float:
-    return time.monotonic() + READ_SECONDS
-
-
-def repo_args() -> list[str]:
-    return ["--repo", repository()]
-
-
-def issue_comments(issue: str, deadline: float | None = None) -> list[dict[str, object]]:
-    """Return issue comments oldest first, with id, html_url, body and created_at fields.
-
-    Deduplication and finding folds need every comment, so a truncated read raises.
-    """
-    deadline = deadline or deadline_from_now()
-    path = f"repos/{repository(deadline)}/issues/{issue}/comments?per_page=100"
-    found: list[dict[str, object]] = []
-    for page in range(1, READ_PAGES + 1):
-        output = github(["gh", "api", f"{path}&page={page}"], deadline, f"#{issue} comments")
-        batch = object_list(json.loads(output), f"#{issue} comments")
-        found += batch
-        if len(batch) < 100:
-            return found
-    raise RuntimeError(f"#{issue} has over {READ_PAGES * 100} comments; read incomplete")
-
-
-def post_comment(issue: str, text: str, deadline: float | None = None) -> str:
-    """If the same comment exists, return its URL. Otherwise, post it. The read and the
-    write share one deadline."""
-    deadline = deadline or deadline_from_now()
-    for comment in issue_comments(issue, deadline):
-        if comment.get("body") == text:
-            return str(comment["html_url"])
-    return add_comment(issue, text, deadline)
-
-
-def add_comment(issue: str, text: str, deadline: float) -> str:
-    """Post a comment without a duplicate check; the caller has already read the issue."""
-    command = ["gh", "issue", "comment", issue, *repo_args(), "--body-file", "-"]
-    return github(command, deadline, f"comment on #{issue}", input_text=text)
-
-
-def event_role(allocation: Allocation) -> str:
-    return allocation["role"].split()[-1]
-
-
-def post_event(brief: str, allocation: Allocation, text: str) -> None:
-    """Record a launch on the brief as the launched client, with its session ID.
-
-    Usage reports match agent names to session logs through this EVENT. If posting fails
-    after the launch succeeds, the error includes the command needed to record the EVENT.
-    """
-    header = comment_header(
-        "EVENT", event_role(allocation), allocation["name"], allocation["session"]
-    )
-    try:
-        url = post_comment(brief, f"{header}\n{text}")
-    except (RuntimeError, OSError, ValueError, KeyError) as error:
-        raise RuntimeError(
-            f"EVENT not recorded on #{brief}: {error}. Post it: agent/teams/board.py post "
-            f"{brief} EVENT --as {event_role(allocation)} {allocation['name']} "
-            f"{allocation['session'] or 'unknown'} <<< {shlex.quote(text)}"
-        ) from error
-    print(f"Recorded on #{brief}: {url}")
-
-
 # --- Tools and the client environment --------------------------------------
-
-
-def dexter_binary() -> Path:
-    home = Path(
-        os.environ.get("TIPS_DEXTER_HOME", str(conf.main_checkout() / "agent/lsp/dexter"))
-    ).resolve()
-    binary = home / "vendor/dexter"
-    if not os.access(binary, os.X_OK):
-        raise RuntimeError(f"Missing executable: {binary}; run agent/lsp/dexter/build.sh.")
-    return binary
-
-
-def elixir_sources(cwd: Path) -> Path:
-    """The Elixir standard-library sources Dexter indexes for a project."""
-    version = run(
-        "elixir",
-        "--short-version",
-        cwd=cwd,
-        timeout=conf.settings()["timeouts"]["dexter_startup_seconds"],
-    )
-    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?", version):
-        raise RuntimeError(f"Unexpected Elixir version: {version!r}")
-    explicit = os.environ.get("DEXTER_ELIXIR_LIB_ROOT")
-    sources = (
-        Path(explicit)
-        if explicit
-        else conf.main_checkout() / "agent/lsp/vendor" / f"elixir-{version}" / "lib"
-    )
-    recorded = sources.parent / "VERSION"
-    if (
-        not (sources / "elixir/lib/enum.ex").is_file()
-        or not recorded.is_file()
-        or recorded.read_text().strip() != version
-    ):
-        raise RuntimeError(
-            f"Elixir {version} sources are missing at {sources}; see agent/lsp/README.md."
-        )
-    return sources.resolve()
 
 
 def test_port(entry: str, slot: int) -> int:
@@ -617,15 +260,6 @@ def agent_env(allocation: Allocation) -> dict[str, str]:
         # Codex's sandbox cannot write the shared Hex cache in the home directory.
         env["HEX_HOME"] = str(project / "tmp/hex")
     return env
-
-
-def tools() -> tuple[Path, Path, Path]:
-    """Check the shared tools before reserving anything; return the Dexter binary, the
-    shared skills and the Elixir sources."""
-    binary, skills = dexter_binary(), conf.main_checkout() / ".agents/skills"
-    if not skills.is_dir():
-        raise RuntimeError("Shared skills directory is missing.")
-    return binary, skills, elixir_sources(conf.main_checkout())
 
 
 def allocate(record: Record, entry: str, role: str) -> Allocation:
@@ -771,17 +405,6 @@ def refuse_foreign_owner(
 # --- Launch: panes, briefs, clients and recovery ---------------------------
 
 
-def live_workspaces() -> set[str]:
-    return {w["workspace_id"] for w in herdr("workspace", "list")["workspaces"]}
-
-
-def live_panes(workspace: str) -> list[Entity]:
-    """The panes of a recorded workspace; none when Herdr no longer has it."""
-    if not workspace or workspace not in live_workspaces():
-        return []
-    return herdr("pane", "list", "--workspace", workspace)["panes"]
-
-
 def open_pane(record: Record, allocation: Allocation) -> None:
     """Keep the client's recorded pane, or open one in its team's workspace and role tab.
 
@@ -874,101 +497,6 @@ def enter(pane: str, root: Path, env: dict[str, str]) -> None:
         "recent-unwrapped",
         "--timeout",
         str(conf.settings()["timeouts"]["shell_seconds"] * 1000),
-    )
-
-
-def bootstrap_brief(allocation: Allocation, commit: str) -> str:
-    """The first task: the worker prepares its own project. Startup loaded no repository
-    instructions: the client starts in the allocation directory, outside the clone."""
-    _, project, logs, _ = allocation_paths(allocation["id"])
-    command = f"python3 {harness() / 'bootstrap.py'}" + (f" --commit {commit}" if commit else "")
-    return (
-        f"Your allocation is {allocation['id']}; your project is {project}. First run "
-        f"{command}: it clones the repository into the project or reuses your clone, fetches "
-        "dependencies and starts Dexter. Its full log is in "
-        f"{logs}. If it fails, report blocked with its error and stop; do not prepare the "
-        f"project another way. Then work only in {project}: read its AGENTS.md and "
-        "agent/teams/README.md; they were not loaded at startup. "
-    )
-
-
-def dexter_brief(wrapper: Path) -> str:
-    # The binary is shared by every checkout and the guide is not, so the binary's own
-    # help defines the current syntax even when checkout docs are outdated.
-    return (
-        "Load the skills required by AGENTS.md from .agents/skills before reading Elixir code. "
-        "Follow its navigation table and function-use checks. "
-        f"Run TIPS_DEXTER={wrapper} through the shell for this project. "
-        'Read "$TIPS_DEXTER" query --help and "$TIPS_DEXTER" lookup --help once; '
-        "Their syntax and output override outdated checkout docs. "
-        'After fetching or changing dependencies, run "$TIPS_DEXTER" reindex. '
-        "Do not start another Elixir language server. The index may be outdated; "
-        "check empty results with rg. Leave the daemon running on exit. "
-        "Do not run git clean -x; it deletes the wrapper and index. When the dispatcher asks "
-        f"you to retire, run python3 {harness() / 'retirement.py'} and end your turn: it "
-        "posts your clone's state to the issue, tells the dispatcher and changes nothing."
-    )
-
-
-def identity(record: Record, entry: str, duty: str) -> str:
-    persona = agent_spec(record["agents"][entry]).get("persona")
-    issue = "spec" if record["kind"] == "design" else "brief"
-    text = f"You are {entry}, the {duty} for {issue} #{record['brief']}; your Herdr name is "
-    text += f"{live_name(record['slot'], entry)}. "
-    if persona:
-        text += f"Your persona: {persona}. "
-    return text
-
-
-def pair_brief(record: Record, entry: str, duty: str) -> str:
-    # A relaunched client gets this brief too, so it finds the turn instead of assuming it.
-    allocation = record["agents"][entry]
-    implementer, tester = record["implementer"], record["tester"]
-    if entry == implementer:
-        handoff = f"After each push, hand the head to the reviewers with {turn_command(tester)}. "
-    else:
-        handoff = f"Hand findings to the implementer with {turn_command(implementer)}. "
-    return (
-        identity(record, entry, duty)
-        + bootstrap_brief(allocation, "")
-        + f"Then read the brief with gh issue view {record['brief']}. Use the README restart "
-        "rule to find whose turn it is. If yours, continue the workflow; otherwise end your "
-        "turn and wait for a message. "
-        + handoff
-        + f"Put {entry}, <session> on line 2 of each review record; replace <session> with "
-        "your session ID. " + dexter_brief(project_of(allocation) / ".dexter/dexter.sh")
-    )
-
-
-def turn_command(recipient: str) -> str:
-    return f"python3 {harness() / 'team.py'} turn <pr> {recipient}"
-
-
-def reviewer_brief(record: Record, entry: str, duty: str, pr: str, head: str) -> str:
-    allocation = record["agents"][entry]
-    tester = live_name(record["slot"], record["tester"])
-    return (
-        identity(record, entry, duty)
-        + bootstrap_brief(allocation, head)
-        + f"Review PR {pr} at {head} from your own clone. Follow the README reviewer steps. "
-        "Never run team.py turn. Submit the README review record with "
-        f"{entry}, <session> on line 2; replace <session> with your session ID. "
-        "Then notify the merge-confirming tester with "
-        f"herdr agent prompt {tester} '<your review URL>' and end your turn. "
-        "When notified of a new head, the notice names the bootstrap command that moves "
-        "your clone to it. " + dexter_brief(project_of(allocation) / ".dexter/dexter.sh")
-    )
-
-
-def design_brief(record: Record, entry: str) -> str:
-    allocation = record["agents"][entry]
-    return (
-        identity(record, entry, "designer")
-        + bootstrap_brief(allocation, "")
-        + "Read agent/teams/roles/designer.md, then the spec with "
-        f"gh issue view {record['brief']}; its body names the lead and the critics. Use "
-        "agent/teams/board.py to read and post. "
-        + dexter_brief(project_of(allocation) / ".dexter/dexter.sh")
     )
 
 
@@ -1083,13 +611,6 @@ def adopt(record: Record, allocation: Allocation, agent: Entity) -> None:
         "never got its task, the operator exits the client, runs "
         f"python3 {harness() / 'team.py'} reset {record['brief']} {allocation['entry']} and "
         "reruns this command."
-    )
-
-
-def launch_text(allocation: Allocation) -> str:
-    return (
-        f"launched {allocation['kind']} in {allocation['root']}; allocation "
-        f"{allocation['id']}; database suffix {allocation['db_suffix']}; port {allocation['port']}"
     )
 
 
@@ -1237,16 +758,6 @@ def design(spec: str, entry: str) -> None:
     print(f"Spec {spec}: {entry} in slot {record['slot']}, {allocation['root']}")
 
 
-def pull_request(pr: str) -> tuple[str, str, list[str]]:
-    """The PR's URL, head commit and closing-reference issue numbers."""
-    fields = "headRefOid,url,closingIssuesReferences"
-    command = ["gh", "pr", "view", pr, *repo_args(), "--json", fields]
-    view = object_fields(json.loads(github(command, deadline_from_now(), f"PR {pr}")), f"PR {pr}")
-    references = object_list(view.get("closingIssuesReferences") or [], f"PR {pr} closing issues")
-    briefs = [str(issue.get("number")) for issue in references]
-    return str(view.get("url")), str(view.get("headRefOid")), briefs
-
-
 def brief_record(pr: str, briefs: list[str]) -> Record:
     found = [r for brief in briefs if (r := record_for(brief))]
     if len(found) != 1:
@@ -1336,73 +847,10 @@ def caller_record() -> tuple[Record, str]:
     raise RuntimeError(f"This pane is {me or 'unnamed'}, not a launched client")
 
 
-def poster(allocation: Allocation) -> tuple[str, str, str]:
-    """The (role, name, session) attribution of comments the client posts."""
-    return event_role(allocation), allocation["name"], allocation["session"]
-
-
 def required_reviewers(record: Record) -> list[str]:
     """The brief's current `Required reviews:` entries, merge-confirming tester first."""
     testers, designers = current_roster(record)
     return [record["tester"], *testers, *designers]
-
-
-def findings_text(known: list[tuple[str, str]]) -> str:
-    if not known:
-        return ""
-    return "Open findings: " + "; ".join(f"{check} {url}" for check, url in known) + ". "
-
-
-def bootstrap_command(head: str) -> str:
-    return f"python3 {harness() / 'bootstrap.py'} --commit {head}"
-
-
-def tester_message(
-    record: Record, pr: str, url: str, head: str, missing: list[str], known: list[tuple[str, str]]
-) -> str:
-    implementer, tester = record["implementer"], record["tester"]
-    message = f"Your turn: review {url} at {head}. This handoff notified every launched "
-    message += "required reviewer of this head"
-    if missing:
-        message += f" and asked the dispatcher to launch {', '.join(missing)}"
-    message += ". " + findings_text(known)
-    message += (
-        f"Move your own clone to the head first: {bootstrap_command(head)}; it refuses a "
-        "dirty clone. Follow agent/teams/roles/tester.md and "
-        "agent/skills/review-software-correctness/SKILL.md from your clone and use the "
-        "README PR review record. "
-        f"Put {tester}, <session> on line 2; replace <session> with your session ID. "
-        "When your review or any required reviewer's latest review of this head has findings, "
-        f"run {turn_command(implementer).replace('<pr>', pr)}; do not wait for the other "
-        f"reviews. Follow the README merge step when python3 {harness() / 'pr_review.py'} "
-        f"observe {pr} reports ready to merge. After the merge, notify the dispatcher with "
-        f"herdr agent prompt dispatcher '{url} done'."
-    )
-    return message
-
-
-def reviewer_notice(record: Record, entry: str, url: str, head: str) -> str:
-    tester = live_name(record["slot"], record["tester"])
-    return (
-        f"New head to review on {url}: {head}. Move your own clone to it with "
-        f"{bootstrap_command(head)}; it refuses a dirty clone and never resets one. Review "
-        f"the changes since your last review. Submit the README review record with {entry}, "
-        f"<session> on line 2, then send its URL with herdr agent prompt {tester} "
-        "'<review URL>'."
-    )
-
-
-def implementer_message(pr: str, url: str, known: list[tuple[str, str]]) -> str:
-    tools = harness() / "pr_review.py"
-    message = f"Your turn on {url}: run python3 {tools} list {pr} and "
-    message += f"python3 {tools} observe {pr}. " + findings_text(known)
-    message += (
-        "Fix review findings, failed checks and open findings following "
-        "agent/skills/implement-software/SKILL.md from your clone. Push your changes, then "
-        "run turn to the tester again; it notifies every required reviewer. "
-        "If blocked, follow the README blocker procedure."
-    )
-    return message
 
 
 def observe_pr(pr: str, head: str, allocation: Allocation) -> tuple[list[tuple[str, str]], str]:
@@ -1413,19 +861,6 @@ def observe_pr(pr: str, head: str, allocation: Allocation) -> tuple[list[tuple[s
     state, known = pr_review.observe(int(pr), poster(allocation), head)
     conflict = {"CONFLICTING": "current", pr_review.UNAVAILABLE: "unknown"}
     return [(f.check, url) for f, url in known.items()], conflict.get(state.mergeable, "")
-
-
-def deliver(sends: list[tuple[str, str]]) -> list[str]:
-    """Send every message; return the failed sends with their errors."""
-    failed: list[str] = []
-    for name, message in sends:
-        try:
-            herdr("agent", "prompt", name, message)
-        except (RuntimeError, subprocess.TimeoutExpired) as error:
-            failed.append(f"{name}: {error}")
-        else:
-            print(f"Notified {name}")
-    return failed
 
 
 def request_launch(
@@ -1444,18 +879,6 @@ def request_launch(
         failed.append(str(error))
     commands = "; ".join(f"agent/teams/team.py review {pr} {entry}" for entry in missing)
     return failed + deliver([("dispatcher", f"{url} review: run {commands}")])
-
-
-def conflict_refusal(head: str, links: list[str], conflict: str) -> str:
-    if conflict == "unknown":
-        return (
-            f"Known merge conflict {', '.join(links)}, and GitHub has not reported "
-            f"mergeability for {head} yet: rerun turn shortly. Nobody was notified."
-        )
-    return (
-        f"Known merge conflict {', '.join(links)}: merge origin/main and push, or report "
-        "blocked. Nobody was notified."
-    )
 
 
 def hand_to_reviewers(
@@ -1521,30 +944,6 @@ def turn(pr: str, recipient: str) -> None:
 # --- Retirement and stop ---------------------------------------------------
 
 
-def retirement_reports(record: Record) -> Reports:
-    """Each allocation's latest retirement report on the issue from its current launch:
-    posted under the client's recorded name and session, naming the recorded launch. A
-    report from an earlier launch is no evidence. Reports are advisory evidence."""
-    current = {a["id"]: (a["name"], a["session"], a["launch"]) for a in record["agents"].values()}
-    reports: Reports = {}
-    for comment in issue_comments(record["brief"]):
-        lines = str(comment.get("body") or "").splitlines()
-        header = HEADER.match(lines[0]) if lines else None
-        if not header or header["type"] != "EVENT":
-            continue
-        for line in lines[1:]:
-            if line.startswith(RETIREMENT):
-                try:
-                    fields = object_fields(json.loads(line[len(RETIREMENT) :]), "report")
-                except ValueError:
-                    continue  # a malformed report is no evidence
-                ident = str(fields.get("id"))
-                found = (header["name"], header["session"], fields.get("launch"))
-                if fields.get("launch") and current.get(ident) == found:
-                    reports[ident] = (fields, str(comment["html_url"]))
-    return reports
-
-
 def never_launched(allocation: Allocation) -> bool:
     """No client was ever entered in the allocation: launch ids are saved only after one
     is, so there is no session to report and no work in its clone."""
@@ -1602,73 +1001,11 @@ def verify_present(present: dict[str, Allocation]) -> None:
                 raise RuntimeError(f"{allocation['pane']}: conflicting owner; preserved")
 
 
-def daemon_alive(project: Path) -> bool:
-    """Whether a Dexter daemon serves the project, by its process arguments."""
-    rows = run("ps", "-A", "-ww", "-o", "args=").splitlines()
-    return any(row.rstrip().endswith(f"dexter daemon {project}") for row in rows)
-
-
-def dexter_invocation(binary: str, root: Path, sources: str) -> tuple[list[str], dict[str, str]]:
-    """How to run Dexter for one project: its argv prefix and environment. bootstrap.py
-    writes this into the project's wrapper and stop runs it directly; keep both here."""
-    return [binary, "--root", str(root)], {"DEXTER_ELIXIR_LIB_ROOT": sources}
-
-
-def stop_daemon(project: Path, config: Path) -> None:
-    """Stop the project's Dexter daemon with the binary and sources its trusted bootstrap
-    configuration names, never the project's wrapper, and confirm that it exited."""
-    if not daemon_alive(project):
-        return
-    settings = object_fields(json.loads((config / "bootstrap.json").read_text()), "bootstrap")
-    argv, extra = dexter_invocation(str(settings["dexter"]), project, str(settings["sources"]))
-    result = execute(
-        [*argv, "stop"],
-        cwd=conf.state_dir(),
-        env={**os.environ, **extra},
-        timeout=conf.settings()["timeouts"]["dexter_startup_seconds"],
-        input_text="",
-    )
-    if result.returncode:
-        error = (result.stderr or result.stdout).strip()
-        raise RuntimeError(f"Dexter stop for {project} failed: {error}; the reservation is kept")
-    deadline = time.monotonic() + conf.settings()["timeouts"]["shutdown_seconds"]
-    while daemon_alive(project):
-        if time.monotonic() >= deadline:
-            raise RuntimeError(f"Dexter still serves {project}; the reservation is kept")
-        time.sleep(0.1)
-
-
 def port_in_use(port: int) -> bool:
     """Whether anything listens on the port; anything but a refused connection counts."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
         probe.settimeout(1)
         return probe.connect_ex(("127.0.0.1", port)) != errno.ECONNREFUSED
-
-
-def merged_brief(brief: str) -> bool:
-    """Whether GitHub reports the brief closed by a merged PR. stop holds the store lock, so
-    every read shares one timeouts.shell_seconds budget; a late answer keeps the record."""
-    seconds = conf.settings()["timeouts"]["shell_seconds"]
-    deadline = time.monotonic() + seconds
-
-    def read(*args: str) -> object:
-        try:
-            return json.loads(run(*args, timeout=max(deadline - time.monotonic(), 0.01)))
-        except subprocess.TimeoutExpired as error:
-            raise RuntimeError(
-                f"GitHub did not answer within {seconds} s whether #{brief} is closed by a "
-                "merged PR; the record and reservation are kept"
-            ) from error
-
-    fields = "state,closedByPullRequestsReferences"
-    view = object_fields(read("gh", "issue", "view", brief, *repo_args(), "--json", fields), brief)
-    if view.get("state") != "CLOSED":
-        return False
-    for pr in object_list(view.get("closedByPullRequestsReferences") or [], f"#{brief} PRs"):
-        state = read("gh", "pr", "view", str(pr.get("number")), *repo_args(), "--json", "state")
-        if object_fields(state, "PR state").get("state") == "MERGED":
-            return True
-    return False
 
 
 def preservation_gap(record: Record, reports: Reports) -> str:
