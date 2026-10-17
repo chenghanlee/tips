@@ -1172,11 +1172,13 @@ class PairLifecycleTest(Harness):
         assert "--session-id" not in impl["launch_argv"]
         assert record["agents"]["tester"]["session"] == tester_session
         assert {a["submission"] for a in record["agents"].values()} == {"submitted"}
+        launches = [record["agents"][e]["launch"] for e in ("impl", "tester")]
+        assert all(re.fullmatch(r"[0-9a-f]{32}", launch) for launch in launches)
         assert [c["body"] for c in self.comments("29")] == [
             f"EVENT implementer team-1-impl session-team-1-impl\nlaunched codex in {impl_root}; "
-            "allocation g1-impl; database suffix _t1g1i; port 24110",
-            f"EVENT tester team-1-tester {tester_session}\nlaunched claude in "
-            f"{tester_root}; allocation g1-tester; database suffix _t1g1r; port 24111",
+            f"allocation g1-impl; launch {launches[0]}; database suffix _t1g1i; port 24110",
+            f"EVENT tester team-1-tester {tester_session}\nlaunched claude in {tester_root}; "
+            f"allocation g1-tester; launch {launches[1]}; database suffix _t1g1r; port 24111",
         ]
         # Each worker clones for itself: the implementer on its task branch from fetched
         # origin/main, the tester detached at origin/main, in separate clones.
@@ -1212,15 +1214,12 @@ class PairLifecycleTest(Harness):
         other = tester_root / "project"
         assert self.git("rev-parse", "HEAD", cwd=other) == release
         assert self.git("branch", "--show-current", cwd=other) == ""
-        # A refused post is an error after the launch itself: the record stands and the
-        # message says how to post the EVENT by hand.
+        # A refused post is an error after the launch itself: the record stands and a rerun
+        # posts the EVENT.
         self.update(comments_fail=True)
         refused = self.team("start", "31", ok=False)
         assert "EVENT not recorded on #31" in refused.stderr
-        assert (
-            "board.py post 31 EVENT --as implementer team-2-impl session-team-2-impl"
-            in refused.stderr
-        )
+        assert "Rerun this command once GitHub answers" in refused.stderr
         assert self.record(2)["agents"]["impl"]["session"] == "session-team-2-impl"
 
     def test_brief_roster_is_validated_before_any_change(self) -> None:
@@ -1987,8 +1986,8 @@ class DesignTest(Harness):
         # The launch EVENT lets board.py usage find the designer's session.
         assert self.comments("50")[-1]["body"] == (
             f"EVENT designer team-1-critic {self.launched_session('team-1-critic')}\n"
-            f"launched claude in {root}; "
-            "allocation g1-critic; database suffix _t1g1c; port 24112"
+            f"launched claude in {root}; allocation g1-critic; launch "
+            f"{self.record(1)['agents']['critic']['launch']}; database suffix _t1g1c; port 24112"
         )
         usage = execute(
             ["python3", str(self.repo / "agent/teams/board.py"), "usage", "50"],
@@ -2666,6 +2665,52 @@ class LaunchRecoveryTest(Harness):
         assert [(a["submission"], a["launch"]) for a in agents] == [("unknown", "")] * 2
         self.merge(self.git("--git-dir", self.origin, "rev-parse", "main"))
         assert "slot 1 released" in self.team("stop", "29").stdout
+
+    def test_a_launch_event_that_failed_to_post_is_posted_once_by_the_rerun(self) -> None:
+        def events(name: str) -> list[str]:
+            bodies = [c["body"] for c in self.comments("29")]
+            return [b for b in bodies if b.startswith("EVENT ") and f" {name} " in b]
+
+        # GitHub refuses the implementer's EVENT after its task was submitted.
+        self.update(comments_fail=True)
+        refused = self.team("start", "29", ok=False).stderr
+        assert "EVENT not recorded on #29" in refused
+        assert "Rerun this command once GitHub answers" in refused
+        assert self.record(1)["agents"]["impl"]["submission"] == "submitted"
+        self.update(comments_fail=False)
+        self.team("start", "29")
+        self.team("start", "29")
+        assert len(events("team-1-impl")) == len(events("team-1-tester")) == 1
+        # A Codex session that Herdr reports only after the EVENT was posted adds no second
+        # EVENT: the record had no session, and the rerun records the one the client reports.
+        self.update(no_sessions=True)
+        self.team("start", "30")
+        assert self.record(2)["agents"]["impl"]["session"] == "unknown"
+        sessions = {"team-2-impl": "late", "team-2-tester": self.launched_session("team-2-tester")}
+        state = self.state()
+        for pane in state["panes"]:
+            if pane.get("label") in sessions:
+                pane["agent_session"] = {"kind": "id", "value": sessions[pane["label"]]}
+        self.save(state)
+        self.team("start", "30")
+        assert self.record(2)["agents"]["impl"]["session"] == "late"
+        bodies = [c["body"] for c in self.comments("30")]
+        assert [b.split("\n")[0] for b in bodies if " team-2-impl " in b] == [
+            "EVENT implementer team-2-impl unknown"
+        ]
+
+    def test_a_failed_tab_rename_leaves_no_unrecorded_pane(self) -> None:
+        self.fault("tab rename", "implementers", "crash_before")
+        self.team("start", "29", ok=False)
+        assert self.record(1)["agents"]["impl"]["pane"] == "w1:p1"
+        self.team("start", "29")
+        assert not self.events("pane", "split")
+        recorded = {a["pane"] for a in self.record(1)["agents"].values()}
+        assert {p["pane_id"] for p in self.state()["panes"]} == recorded
+        self.clients_exit(1)
+        self.merge(self.git("--git-dir", self.origin, "rev-parse", "main"))
+        waiting = self.team("stop", "29").stdout
+        assert "waiting for retirement reports from team-1-impl, team-1-tester" in waiting
 
 
 class RepositoryConfigTest(unittest.TestCase):

@@ -2,7 +2,6 @@
 
 import json
 import re
-import shlex
 import subprocess
 import time
 from collections.abc import Sequence
@@ -141,8 +140,8 @@ def event_role(allocation: Allocation) -> str:
 def post_event(brief: str, allocation: Allocation, text: str) -> None:
     """Record a launch on the brief as the launched client, with its session ID.
 
-    Usage reports match agent names to session logs through this EVENT. If posting fails
-    after the launch succeeds, the error includes the command needed to record the EVENT.
+    Usage reports match agent names to session logs through this EVENT. Posting is
+    idempotent, and a rerun of the command posts an EVENT that is still missing.
     """
     header = comment_header(
         "EVENT", event_role(allocation), allocation["name"], allocation["session"]
@@ -151,11 +150,23 @@ def post_event(brief: str, allocation: Allocation, text: str) -> None:
         url = post_comment(brief, f"{header}\n{text}")
     except (RuntimeError, OSError, ValueError, KeyError) as error:
         raise RuntimeError(
-            f"EVENT not recorded on #{brief}: {error}. Post it: agent/teams/board.py post "
-            f"{brief} EVENT --as {event_role(allocation)} {allocation['name']} "
-            f"{header_session(allocation['session'])} <<< {shlex.quote(text)}"
+            f"EVENT not recorded on #{brief}: {error}. Rerun this command once GitHub answers; "
+            "it posts the EVENT if it is still missing"
         ) from error
     print(f"Recorded on #{brief}: {url}")
+
+
+def event_posted(brief: str, allocation: Allocation, text: str) -> bool:
+    """Whether the client's EVENT with this text is on the brief, under any session: a
+    Codex session resolved after launch must not post a second EVENT."""
+    name = allocation["name"]
+    for comment in issue_comments(brief):
+        lines = str(comment.get("body") or "").splitlines()
+        header = HEADER.match(lines[0]) if lines else None
+        client = header is not None and (header["type"], header["name"]) == ("EVENT", name)
+        if client and lines[1:2] == [text]:
+            return True
+    return False
 
 
 def pull_request(pr: str) -> tuple[str, str, list[str]]:
