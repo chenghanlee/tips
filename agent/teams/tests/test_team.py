@@ -2206,7 +2206,8 @@ class RetirementTest(Harness):
         (project / "unfinished.txt").write_text("in progress\n")
         refused = self.team("stop", "29", ok=False).stderr
         assert "#29 is not closed by a merged PR. Nothing was asked or stopped" in refused
-        assert "closed without a merged PR, the operator retires it by hand" in refused
+        abandon = f"python3 '{self.repo / 'agent/teams/team.py'}' stop 29 --abandon"
+        assert f"closed without a merged PR, the operator runs {abandon};" in refused
         assert "agent/teams/README.md#retire-a-brief-closed-without-a-merged-pr" in refused
         assert not any(p.startswith("Retire") for p in self.latest_prompts().values())
         assert self.workspaces() == ["team-1-29"]
@@ -2220,15 +2221,17 @@ class RetirementTest(Harness):
         assert "#29 is not closed by a merged PR" in refused
         assert self.remaining_databases() == ["tips_test_t1g1i"]
         assert self.recorded_briefs() == {"29"}
-        # The README's manual retirement of a brief closed without a merged PR frees the
-        # slot, keeps the files and lists them.
-        state = self.trusted / "state"
-        why = "brief closed without a merged PR"
-        for allocation in self.record(1)["agents"].values():
-            note = {"id": allocation["id"], "issue": "29", "db_suffix": allocation["db_suffix"]}
-            note |= {"reason": why, "databases_kept_because": why}
-            (state / allocation["id"] / "retired.json").write_text(json.dumps(note))
-        (state / "1.json").rename(state / "1.closed")
+        # The operator abandons the brief: pushed work that is not merged is accepted, the
+        # slot is freed, and the databases and files are kept and listed.
+        self.push("team-1-impl", "pushed, never merged")
+        self.retire("team-1-impl")
+        stopped = self.team("stop", "29", "--abandon").stdout
+        assert "slot 1 released; databases dropped: none" in stopped
+        assert self.remaining_databases() == ["tips_test_t1g1i"]
+        retired = json.loads((self.trusted / "state/g1-impl/retired.json").read_text())
+        assert retired["databases_kept_because"] == (
+            "brief closed without a merged PR (stop --abandon)"
+        )
         assert f"g1-impl (#29): {self.trusted / 'allocations/g1-impl'}" in self.team("clean").stdout
         self.team("start", "30")
         assert self.record(1)["brief"] == "30"
