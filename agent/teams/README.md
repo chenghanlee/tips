@@ -128,17 +128,19 @@ rejects changes to the implementer or merge-confirming tester.
 `team.py stop <issue>` for a brief first refuses, asking no client and changing nothing,
 unless GitHub shows the brief closed by a merged PR within `timeouts.shell_seconds`. It
 then needs a retirement report from every client of the team, from its current launch; a
-report from an earlier launch does not count. A client that never launched, with no
-launch id and its task never submitted, has no session and needs no report. Until each
-has one, it changes nothing: it asks each running client to run `retirement.py`, prints
-the command the operator runs for a stopped client, and keeps every resource reserved.
+report from an earlier launch does not count. A client with no launch id never
+launched: it has no session and needs no report. Until each has one, it changes nothing
+and prints what it waits for: it asks each running client to run `retirement.py`, once
+per launch, names the clients it asked earlier, prints the command the operator runs for
+a stopped client, and keeps every resource reserved. Only a failed send is an error.
 Each `retirement.py` run prompts the dispatcher with its report URL, so the next `stop`
 follows without polling. With every report, it:
 
 1. Refuses, stopping nothing and keeping the record, databases, files and reservation,
    unless every report shows a clean clone with no unpushed commits and, for a brief,
-   HEAD merged into `origin/main`. Preserve the work, have the client report again, then
-   rerun stop.
+   HEAD merged into `origin/main`. It asks each running client whose report shows such
+   work, once per report, to preserve it and report again, and prints the operator's
+   command for a stopped one. Rerun stop after the new reports.
 2. Refuses a pane in the workspace that the record does not name, and another client in
    an allocation.
 3. Stops the recorded clients and closes the workspace.
