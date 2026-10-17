@@ -101,9 +101,11 @@ def design_brief(record: Record, entry: str) -> str:
 
 
 def launch_text(allocation: Allocation) -> str:
+    """The launch EVENT's text. It names the launch, so each launch has its own EVENT."""
     return (
         f"launched {allocation['kind']} in {allocation['root']}; allocation "
-        f"{allocation['id']}; database suffix {allocation['db_suffix']}; port {allocation['port']}"
+        f"{allocation['id']}; launch {allocation['launch']}; database suffix "
+        f"{allocation['db_suffix']}; port {allocation['port']}"
     )
 
 

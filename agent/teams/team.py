@@ -68,7 +68,15 @@ from config import (
     project_of,
 )
 from dexter import stop_daemon, tools
-from github import merged_brief, post_event, poster, pull_request, retirement_reports, roster
+from github import (
+    event_posted,
+    merged_brief,
+    post_event,
+    poster,
+    pull_request,
+    retirement_reports,
+    roster,
+)
 from herdr import deliver, herdr, live_panes, pane_occupant, processes, session_id, stop
 
 # --- Records and allocations -----------------------------------------------
@@ -425,11 +433,8 @@ def open_pane(record: Record, allocation: Allocation) -> None:
             f"team-{record['slot']}-{record['brief']}",
             "--no-focus",
         )
-        # The workspace exists now; a failure below must still find it.
         record["workspace"] = created["workspace"]["workspace_id"]
         record["tabs"] = {label: created["tab"]["tab_id"]}
-        save_record(record)
-        herdr("tab", "rename", created["tab"]["tab_id"], label)
         pane = created["root_pane"]
     else:
         tab = record["tabs"].get(label, "")
@@ -460,10 +465,13 @@ def open_pane(record: Record, allocation: Allocation) -> None:
             )
             record["tabs"][label] = created["tab"]["tab_id"]
             pane = created["root_pane"]
+    # Recorded before any rename: a failure below must still find the workspace and pane.
     allocation["workspace"] = record["workspace"]
     allocation["tab"] = record["tabs"][label]
     allocation["pane"] = pane["pane_id"]
     save_record(record)
+    if not panes:
+        herdr("tab", "rename", record["tabs"][label], label)
     herdr("pane", "rename", allocation["pane"], allocation["name"])
 
 
@@ -601,15 +609,16 @@ def reconcile(record: Record, allocation: Allocation) -> Entity | None:
 def adopt(record: Record, allocation: Allocation, agent: Entity) -> None:
     """Keep a live recorded client; never resend its task. If the launch stopped before the
     record held a session, record the one the client reports; running_client refused any
-    other mismatch."""
+    other mismatch. Post the launch EVENT if the launch stopped before it was posted."""
     name, session = allocation["name"], session_id(agent)
     if session and allocation["session"] in ("", "unknown"):
         allocation["session"] = session
         save_record(record)
+    text = launch_text(allocation)
+    if not event_posted(record["brief"], allocation, text):
+        post_event(record["brief"], allocation, text)
     if allocation["submission"] == SUBMITTED:
         return
-    # The launch stopped before it finished; its EVENT may be missing. Posting is idempotent.
-    post_event(record["brief"], allocation, launch_text(allocation))
     print(
         f"{name}: task submission is {allocation['submission']}; nothing was resent. Only the "
         f"operator decides whether to replay it: if {allocation['pane']} shows that the client "
