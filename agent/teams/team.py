@@ -159,7 +159,7 @@ def store_lock() -> Generator[None]:
     opens the file non-inheritable and `subprocess` closes other descriptors by default, so
     a child does not receive it.
     """
-    path = conf.state_dir() / ".lock"
+    path = conf.state_dir() / conf.STORE_LOCK
     seconds = conf.settings()["timeouts"]["lock_seconds"]
     with path.open("a") as handle:
         deadline = time.monotonic() + seconds

@@ -209,7 +209,7 @@ def hold_start_lock() -> int:
     descriptor, runs. That serializes check, record and exec, and the kernel releases it
     when they exit, so a crash leaves nothing to clean up.
     """
-    path = conf.harness_root() / "state/dispatcher.lock"
+    path = conf.harness_root() / "state" / conf.DISPATCHER_LOCK
     descriptor = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
     try:
         fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)

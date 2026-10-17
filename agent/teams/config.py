@@ -210,6 +210,9 @@ class DispatcherLaunch(TypedDict):
     session: str
 
 
+# Held by a running dispatcher and by a running team.py command; install.py checks both.
+DISPATCHER_LOCK = "dispatcher.lock"
+STORE_LOCK = ".lock"
 # Written by the adapter when it first lists its tools: the client has them.
 DISPATCHER_READY = "dispatcher.ready"
 # Written by the dispatcher's starter when it could not send the first prompt.
