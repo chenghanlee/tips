@@ -301,8 +301,6 @@ def main(argv: list[str]) -> None:
         raise RuntimeError("Run inside Herdr (HERDR_ENV=1)")
     main_checkout, config = conf.config_location()
     conf.configure()
-    if not conf.github_settings():
-        raise RuntimeError(f"{config} has no [github] table; the adapter needs it")
     with config.open("rb") as file:
         settings = tomllib.load(file)["dispatcher"]
     launch_seconds = conf.settings()["timeouts"]["launch_seconds"]

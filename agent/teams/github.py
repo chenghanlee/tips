@@ -69,11 +69,16 @@ def roster(brief: str) -> tuple[str, list[str], list[str]]:
     return implementer, by_role["tester"], by_role["designer"]
 
 
+def header_session(session: str) -> str:
+    """The session word of a comment header: `unknown` when no session is recorded."""
+    return session or "unknown"
+
+
 def comment_header(kind: str, role: str, name: str, session: str) -> str:
     """The attribution line `<TYPE> <role> <name> <session>`."""
     if kind not in COMMENT_TYPES:
         raise RuntimeError(f"Comment type must be one of {', '.join(COMMENT_TYPES)}")
-    return f"{kind} {role} {name} {session or 'unknown'}"
+    return f"{kind} {role} {name} {header_session(session)}"
 
 
 def github(args: Sequence[str], deadline: float, label: str, input_text: str | None = None) -> str:
@@ -148,7 +153,7 @@ def post_event(brief: str, allocation: Allocation, text: str) -> None:
         raise RuntimeError(
             f"EVENT not recorded on #{brief}: {error}. Post it: agent/teams/board.py post "
             f"{brief} EVENT --as {event_role(allocation)} {allocation['name']} "
-            f"{allocation['session'] or 'unknown'} <<< {shlex.quote(text)}"
+            f"{header_session(allocation['session'])} <<< {shlex.quote(text)}"
         ) from error
     print(f"Recorded on #{brief}: {url}")
 
@@ -169,10 +174,9 @@ def poster(allocation: Allocation) -> tuple[str, str, str]:
 
 
 def retirement_reports(record: Record) -> Reports:
-    """Each allocation's latest retirement report on the issue from its current launch:
-    posted under the client's recorded name and session, naming the recorded launch. A
-    report from an earlier launch is no evidence. Reports are advisory evidence."""
-    current = {a["id"]: (a["name"], a["session"], a["launch"]) for a in record["agents"].values()}
+    """Each allocation's latest retirement report on the issue that names its recorded
+    launch; a report from an earlier launch is no evidence. Reports are advisory evidence."""
+    launches = {a["id"]: a["launch"] for a in record["agents"].values()}
     reports: Reports = {}
     for comment in issue_comments(record["brief"]):
         lines = str(comment.get("body") or "").splitlines()
@@ -186,8 +190,7 @@ def retirement_reports(record: Record) -> Reports:
                 except ValueError:
                     continue  # a malformed report is no evidence
                 ident = str(fields.get("id"))
-                found = (header["name"], header["session"], fields.get("launch"))
-                if fields.get("launch") and current.get(ident) == found:
+                if fields.get("launch") and launches.get(ident) == fields.get("launch"):
                     reports[ident] = (fields, str(comment["html_url"]))
     return reports
 

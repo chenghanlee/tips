@@ -2470,6 +2470,18 @@ class LaunchRecoveryTest(Harness):
         assert "team-3-tester: task submission is unknown; nothing was resent" in rerun
         assert self.prompts("team-3-tester") == ["Begin."]  # only the call the crash cut short
 
+    def test_stop_accepts_a_report_posted_before_the_session_was_recorded(self) -> None:
+        # The launcher dies after the Codex client started: the record has no session.
+        self.fault("agent start", "team-1-impl", "crash_after")
+        self.team("start", "29", ok=False)
+        assert self.record(1)["agents"]["impl"]["session"] == ""
+        self.bootstrap("team-1-impl")
+        self.merge(self.push("team-1-impl"))
+        self.retire("team-1-impl")
+        assert self.comments("29")[-1]["body"].startswith("EVENT implementer team-1-impl unknown")
+        self.clients_exit(1)
+        assert "slot 1 released" in self.team("stop", "29").stdout
+
     def test_task_done_and_client_exited_before_the_record_update_is_never_replayed(self) -> None:
         self.fault("agent start", "team-1-tester", "timeout_exited")
         self.team("start", "29", ok=False)
