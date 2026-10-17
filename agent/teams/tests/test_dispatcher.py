@@ -13,13 +13,15 @@ from typing import Any
 
 from commands import execute
 from config import repo_key
-from tests.test_team import CONFIG, TEST_RUNS
+from tests.test_team import CONFIG, TEST_RUNS, fake
 
 TEAMS = Path(__file__).resolve().parents[1]
 DOCUMENTS = ("AGENTS.md", "README.md", "roles/common.md", "roles/dispatcher.md")
 
 # Logs every call with its arguments and the variables the launcher sets. The client stub
-# records its process id, which Herdr's fake reports as the pane's foreground client.
+# records its process id, which Herdr's fake reports as the pane's foreground client. It
+# runs until the starter has prompted it or given up, which the fake Herdr marks with the
+# done file, or for CLIENT_SECONDS at most.
 STUB = """#!/usr/bin/env python3
 import json, os, sys, time
 from pathlib import Path
@@ -28,7 +30,10 @@ env = {k: os.environ.get(k) for k in ("CLAUDE_AUTOCOMPACT_PCT_OVERRIDE", "TIPS_T
 with open(os.environ["DISPATCH_LOG"], "a") as output:
     output.write(json.dumps([Path(sys.argv[0]).name, args, env, os.getcwd()]) + "\\n")
 client = Path(os.environ["DISPATCH_LOG"] + ".client")
+done = Path(os.environ["DISPATCH_LOG"] + ".done")
 if Path(sys.argv[0]).name == "claude":
+    done.unlink(missing_ok=True)
+    deadline = time.monotonic() + float(os.environ.get("CLIENT_SECONDS", "0"))
     client.write_text(str(os.getpid()))
     # A fresh descriptor cannot lock the file while the inherited one holds it.
     import fcntl
@@ -43,12 +48,11 @@ if Path(sys.argv[0]).name == "claude":
     ready = os.environ.get("READY_SECONDS", "0")
     session = args[args.index("--session-id") + 1]
     note = Path(os.environ["LOCK_PATH"]).with_name("dispatcher.ready")
-    seconds = float(os.environ.get("CLIENT_SECONDS", "0"))
     if ready != "never":
         time.sleep(float(ready))
         note.write_text(json.dumps({"session": session, "text": "tools listed"}))
-        seconds -= float(ready)
-    time.sleep(max(seconds, 0))
+    while time.monotonic() < deadline and not done.exists():
+        time.sleep(0.05)
 if Path(sys.argv[0]).name == "herdr":
     agents = json.loads(os.environ.get("LIVE_AGENTS", "[]"))
     if args[:2] == ["pane", "layout"]:
@@ -70,6 +74,7 @@ if Path(sys.argv[0]).name == "herdr":
         seen = note.exists() and json.loads(note.read_text())["session"] == session
         with open(os.environ["DISPATCH_LOG"] + ".prompted", "a") as output:
             output.write(json.dumps(seen) + "\\n")
+        done.touch()
         if os.environ.get("PROMPT_FAILS") == "hang":
             time.sleep(5)
         if os.environ.get("PROMPT_FAILS"):
@@ -81,6 +86,9 @@ if Path(sys.argv[0]).name == "herdr":
         process = {"pid": leader, "cwd": "/"}
         result = {"process_info": {"shell_pid": 1, "foreground_process_group_id": leader,
                                    "foreground_processes": [process]}}
+    elif args[:2] == ["notification", "show"]:
+        done.touch()
+        result = {}
     else:
         result = {}
     if args[:2] != ["pane", "run"]:
@@ -98,8 +106,10 @@ class DispatchTest(unittest.TestCase):
         self.state = Path(self.tmp.name).resolve() / "agent_teams" / repo_key("o/r") / "state"
         self.scripts = self.root / "agent/teams"
         (self.scripts / "roles").mkdir(parents=True)
-        for script in [*sorted(TEAMS.glob("*.py")), TEAMS / "dispatch"]:
+        for script in sorted(TEAMS.glob("*.py")):
             shutil.copy2(script, self.scripts / script.name)
+        # A link, not a new executable: macOS scans each new one on its first run.
+        (self.scripts / "dispatch").symlink_to(TEAMS / "dispatch")
         for name in ("README.md", "roles/common.md", "roles/dispatcher.md"):
             (self.scripts / name).write_text(f"Trusted {name} text.\n")
         (self.root / "AGENTS.md").write_text("Trusted AGENTS.md text.\n")
@@ -114,8 +124,7 @@ class DispatchTest(unittest.TestCase):
         bin_dir.mkdir()
         self.log = self.root / "calls"
         for name in ("herdr", "claude"):
-            (bin_dir / name).write_text(STUB)
-            (bin_dir / name).chmod(0o755)
+            (bin_dir / name).symlink_to(fake("dispatch-stub", STUB))
         self.env = dict(
             os.environ,
             PATH=f"{bin_dir}:{os.environ['PATH']}",
@@ -126,9 +135,10 @@ class DispatchTest(unittest.TestCase):
             LOCK_PATH=str(self.state / "dispatcher.lock"),
         )
 
-    def write_config(self, model: str) -> None:
+    def write_config(self, model: str, launch_seconds: int = 120) -> None:
         dispatcher = f'\n[dispatcher]\nmodel="{model}"\neffort="high"\ncompact_percent=42\n'
-        self.config.write_text(CONFIG + dispatcher)
+        launch = f"launch_seconds = {launch_seconds}"
+        self.config.write_text(CONFIG.replace("launch_seconds = 120", launch) + dispatcher)
 
     def calls(self, name: str) -> list[list[Any]]:
         lines = self.log.read_text().splitlines() if self.log.exists() else []
@@ -236,7 +246,9 @@ class DispatchTest(unittest.TestCase):
         assert (self.root / "calls.lock").read_text() == "held"
         # Two launchers at once: one client starts, the other is refused while it runs.
         command = [self.scripts / "dispatch"]
-        env = {**self.env, "CLIENT_SECONDS": "4"}
+        # Ready after a second, the winner's client still holds the lock when the other
+        # launcher reaches it.
+        env = {**self.env, "CLIENT_SECONDS": "4", "READY_SECONDS": "1"}
         pipe, merged = subprocess.PIPE, subprocess.STDOUT
         first = subprocess.Popen(command, env=env, stdout=pipe, stderr=merged)  # noqa: S603
         second = subprocess.Popen(command, env=env, stdout=pipe, stderr=merged)  # noqa: S603
@@ -256,36 +268,39 @@ class DispatchTest(unittest.TestCase):
         assert not self.calls("herdr")
 
     def test_the_starter_leaves_a_pane_whose_client_is_not_the_launched_process(self) -> None:
+        self.write_config("test-model", launch_seconds=1)
         self.dispatch(CLIENT_SECONDS="3", FOREIGN_CLIENT="1")
-        assert not self.herdr_calls("agent", "rename", seconds=4)
+        # The starter gave up without naming or prompting the pane's client.
+        assert len(self.herdr_calls("notification", "show")) == 1
+        assert not self.herdr_calls("agent", "rename", seconds=0)
         assert not self.herdr_calls("agent", "prompt", seconds=0)
 
     def test_begin_waits_for_the_adapters_ready_note_for_this_session(self) -> None:
         # A note left by an earlier session is removed before the client starts.
         self.state.mkdir(parents=True)
         (self.state / "dispatcher.ready").write_text('{"session": "old", "text": "tools listed"}')
-        self.dispatch(CLIENT_SECONDS="5", READY_SECONDS="2")
+        self.dispatch(CLIENT_SECONDS="5", READY_SECONDS="1")
         assert self.herdr_calls("agent", "prompt") == [["agent", "prompt", "caller", "Begin."]]
         # Herdr showed the client idle from the start; Begin. still waited for the note.
         prompted = (self.root / "calls.prompted").read_text().split()
         assert prompted == ["true"], prompted
 
     def test_a_client_never_ready_or_a_failed_prompt_names_the_operator_command(self) -> None:
-        self.config.write_text(
-            self.config.read_text().replace("launch_seconds = 120", "launch_seconds = 2")
-        )
         prompt = 'herdr agent prompt caller "Begin."'
         both = f"herdr agent rename caller dispatcher && {prompt}"
         # (case, fake Herdr and client settings, Begin. prompts sent, what the note says)
         cases: list[tuple[str, dict[str, str], int, list[str]]] = [
-            ("never idle", {"AGENT_STATUS": "unknown"}, 0, ["not ready within 2 s", both]),
-            ("no tools", {"READY_SECONDS": "never"}, 0, ["not ready within 2 s", both]),
+            ("never idle", {"AGENT_STATUS": "unknown"}, 0, ["not ready within 1 s", both]),
+            ("no tools", {"READY_SECONDS": "never"}, 0, ["not ready within 1 s", both]),
             ("rename fails", {"RENAME_FAILS": "1"}, 0, ["naming it failed", both]),
             ("prompt fails", {"PROMPT_FAILS": "1"}, 1, ["may or may not", "only if", prompt]),
             ("prompt hangs", {"PROMPT_FAILS": "hang"}, 1, ["may or may not", "timed out"]),
         ]
         for case, extra, sent, says in cases:
             with self.subTest(case=case):
+                # A client that is never ready keeps the starter until its deadline.
+                never_ready = case in ("never idle", "no tools")
+                self.write_config("test-model", launch_seconds=1 if never_ready else 2)
                 self.log.unlink(missing_ok=True)
                 (self.state / "dispatcher.recovery").unlink(missing_ok=True)
                 env = {"AGENT_STATUS": "idle", "READY_SECONDS": "0", "RENAME_FAILS": ""}

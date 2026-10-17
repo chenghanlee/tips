@@ -230,5 +230,22 @@ class ObserveTest(Harness):
         assert f"ready to merge at {new}" in self.observe().stdout
 
 
+class ListTest(Harness):
+    def test_a_thread_names_the_reviewer_that_opened_it(self) -> None:
+        findings = review("critic", "a" * 40, "Request changes: 1 P1 finding", n=2)
+        comment = {"databaseId": 11, "body": "P1: fix it", "pullRequestReview": findings}
+        thread = {"id": "T_1", "isResolved": False, "path": "a.ex", "line": 3}
+        nodes = {"totalCount": 1, "nodes": [comment]}
+        self.update(reviews=[findings], reviewThreads=[{**thread, "comments": nodes}])
+        result = execute(
+            ["python3", str(self.repo / "agent/teams/pr_review.py"), "list", "7"],
+            cwd=self.repo,
+            env=self.env,
+            timeout=60,
+        )
+        assert result.returncode == 0, result.stderr
+        assert "thread T_1 reply-to 11 a.ex:3 by critic\n" in result.stdout, result.stdout
+
+
 if __name__ == "__main__":
     unittest.main()

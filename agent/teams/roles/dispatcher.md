@@ -15,10 +15,10 @@ If `prompt_agent` fails, keep the turn and report the exact error to the user.
 
 At startup, after each `done` or `blocked` message, and when the user reports a change,
 check [Project 15](https://github.com/users/chenghanlee/projects/15) for milestone
-order (`project_read`). Also check open issues and PRs (`issue_read`, `pr_list`,
-`pr_state`) and running teams and their clients (`status`). You cannot see `main`'s
-check runs: a merged PR's checks ran on its head. A broken `main` reaches you as an
-implementer's `blocked` with both run links.
+order and open issues (`project_read` lists the items that are not Done; read one with
+`issue_read`). Also check open PRs (`pr_list`, `pr_state`) and running teams and their
+clients (`status`). You cannot see `main`'s check runs: a merged PR's checks ran on its
+head. A broken `main` reaches you as an implementer's `blocked` with both run links.
 
 - Set merged issues Done (`project_set_field`, Status). An issue with an open question
   stays Blocked.
