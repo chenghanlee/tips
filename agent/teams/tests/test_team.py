@@ -2445,6 +2445,20 @@ class RetirementTest(Harness):
             assert ran.returncode == 0, ran.stdout + ran.stderr
         assert "slot 1 released" in self.team("stop", "29").stdout
 
+    def test_stop_gives_its_own_next_step_for_a_client_it_cannot_confirm(self) -> None:
+        self.merged_pair()
+        state = self.state()
+        tester = next(x for x in state["panes"] if x.get("label") == "team-1-tester")
+        tester["agent_session"] = None
+        self.save(state)
+        refused = self.team("stop", "29", ok=False).stderr
+        assert (
+            "team-1-tester reports no session; cannot confirm the recorded client; preserved. "
+            "Nothing was asked or stopped. The operator inspects the pane" in refused
+        )
+        assert "resent" not in refused
+        assert not any(p.startswith("Retire") for p in self.latest_prompts().values())
+
 
 class LaunchRecoveryTest(Harness):
     """Interrupted launches through `team.py start`, with faults injected into fake Herdr."""
@@ -2489,6 +2503,9 @@ class LaunchRecoveryTest(Harness):
         self.fault("agent start", "team-1-tester", "timeout_live")
         assert "timed out waiting for team-1-tester" in self.team("start", "29", ok=False).stderr
         assert self.record(1)["agents"]["tester"]["submission"] == "unknown"
+        status = self.team("status").stdout
+        assert "team-1-tester: startup incomplete in" in status
+        assert "team-1-impl: running in" in status
         rerun = self.team("start", "29").stdout
         assert "team-1-tester: task submission is unknown; nothing was resent" in rerun
         assert f"python3 '{self.repo / 'agent/teams/team.py'}' reset 29 tester and" in rerun
@@ -2589,7 +2606,7 @@ class LaunchRecoveryTest(Harness):
         self.team("start", "30")
         session = self.launched_session("team-2-tester")
         assert self.record(2)["agents"]["tester"]["session"] == session
-        assert self.record(2)["agents"]["impl"]["session"] == "unknown"
+        assert self.record(2)["agents"]["impl"]["session"] == ""
         stderr = self.team("start", "30", ok=False).stderr
         assert "team-2-impl reports no session; cannot confirm the recorded client" in stderr
         assert "only the operator decides" in stderr
@@ -2673,7 +2690,7 @@ class LaunchRecoveryTest(Harness):
         # EVENT: the record had no session, and the rerun records the one the client reports.
         self.update(no_sessions=True)
         self.team("start", "30")
-        assert self.record(2)["agents"]["impl"]["session"] == "unknown"
+        assert self.record(2)["agents"]["impl"]["session"] == ""
         sessions = {"team-2-impl": "late", "team-2-tester": self.launched_session("team-2-tester")}
         state = self.state()
         for pane in state["panes"]:
