@@ -76,12 +76,11 @@ shellcheck agent/teams/dispatch
 ## Lint exceptions
 
 The reviewed `# noqa: S603` exceptions apply only to `commands.py:execute`,
-`StopAgentTest.client`, the namer that `dispatcher.py:start_here` starts and the two
-concurrent launchers in `DispatchTest`. These calls use variable argument lists, no
-shell, a resolved or test-owned executable, and fixed, caller-supplied or test-owned
-arguments. The `# noqa: S606` in `start_here` replaces
-the launcher with the resolved `claude` executable and its fixed arguments, so the
-client is the pane's foreground process. The `# noqa: S108` exceptions apply only to
+`StopAgentTest.client` and the namer that `dispatcher.py:start_here` starts. These
+calls use variable argument lists, no shell, a resolved or test-owned executable, and
+fixed, caller-supplied or test-owned arguments. The `# noqa: S606` in `start_here`
+replaces the launcher with the resolved `claude` executable and its fixed arguments, so
+the client is the pane's foreground process. The `# noqa: S108` exceptions apply only to
 `config.py:TEMPORARY`, the temporary-root list in `config.py:temporary_roots`, and the
 refused root in
 `ClaimRootTest.test_a_root_inside_the_checkout_a_temporary_directory_or_a_symlink_is_refused`.
