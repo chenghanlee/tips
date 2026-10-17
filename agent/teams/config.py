@@ -60,6 +60,9 @@ class Allocation(TypedDict):
     NEVER_SUBMITTED until launch writes UNKNOWN, durably, before the client can accept any
     input; SUBMITTED only after the task prompt's positive transport result. SUBMITTED does
     not mean the task is done; the brief, PR and reviews record its outcome.
+    `retire_asked` is what stop last asked the client about: its launch when it asked for a
+    retirement report, or the report's URL when it asked it to preserve work and report
+    again. stop asks once per launch and once per report.
     """
 
     id: str
@@ -78,6 +81,7 @@ class Allocation(TypedDict):
     submission: str
     pr: NotRequired[str]
     head: NotRequired[str]
+    retire_asked: NotRequired[str]
 
 
 class Record(TypedDict):

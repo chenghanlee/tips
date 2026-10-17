@@ -1260,7 +1260,7 @@ class PairLifecycleTest(Harness):
         self.clients_exit(1)
         refused = self.team("start", "29", ok=False)
         assert "team-1-impl is not running and its task submission is submitted" in refused.stderr
-        assert "team.py reset 29 impl" in refused.stderr
+        assert "team.py' reset 29 impl" in refused.stderr
         assert len(self.events("agent", "start")) == 2
         # After a reset, the replacement gets the allocation it was launched with, even
         # after config.toml changed its database and port; its clone keeps unfinished work.
@@ -2070,22 +2070,22 @@ class RetirementTest(Harness):
         )
         # Without reports nothing is stopped, dropped or released; running clients are
         # asked to report.
-        refused = self.team("stop", "29", ok=False)
-        assert "No retirement report yet from team-1-critic, team-1-impl, team-1-tester" in (
-            refused.stderr
+        waiting = self.team("stop", "29").stdout
+        assert "waiting for retirement reports from team-1-critic, team-1-impl, team-1-tester" in (
+            waiting
         )
-        assert "Every resource stays reserved" in refused.stderr
+        assert "Every resource stays reserved" in waiting
         ask = self.latest_prompts()["team-1-impl"]
-        assert ask == f"Retire: run python3 {self.repo / 'agent/teams/retirement.py'}, then " + (
+        assert ask == f"Retire: run python3 '{self.repo / 'agent/teams/retirement.py'}', then " + (
             "end your turn."
         )
         assert not self.psql_calls()
         assert self.workspaces() == ["team-1-29", "team-2-30"]
         # A stopped client without a report gets an operator command, not a guess.
         self.clients_exit(1)
-        refused = self.team("stop", "29", ok=False)
+        waiting = self.team("stop", "29").stdout
         launch = self.allocation("team-1-impl")["launch"]
-        assert f"TIPS_TEAM_ALLOCATION_ID=g1-impl TIPS_TEAM_LAUNCH={launch}" in refused.stderr
+        assert f"TIPS_TEAM_ALLOCATION_ID=g1-impl TIPS_TEAM_LAUNCH={launch}" in waiting
         # A process whose environment names another launch cannot report for this one.
         stale = self.worker("team-1-impl", "retirement.py", ok=False, TIPS_TEAM_LAUNCH="0" * 32)
         assert f"is not g1-impl's current launch {launch}" in stale.stderr
@@ -2200,8 +2200,8 @@ class RetirementTest(Harness):
         (self.project("team-1-tester") / "unfinished.txt").write_text("new session work\n")
         self.databases("tips_test_t1g1r")
         self.clients_exit(1)
-        refused = self.team("stop", "29", ok=False)
-        assert "No retirement report yet from team-1-impl, team-1-tester" in refused.stderr
+        waiting = self.team("stop", "29").stdout
+        assert "waiting for retirement reports from team-1-impl, team-1-tester" in waiting
         assert self.remaining_databases() == ["tips_test_t1g1r"]
         assert self.recorded_briefs() == {"29"}
         # A report from the current launch is accepted, and it shows the unpreserved work.
@@ -2397,6 +2397,65 @@ class RetirementTest(Harness):
         assert any(outside.iterdir())
         assert self.recorded_briefs() == {"29"}
 
+    def test_stop_asks_each_client_once_per_launch(self) -> None:
+        self.merged_pair()
+        first = self.team("stop", "29").stdout
+        assert "Asked now: team-1-impl, team-1-tester; asked earlier: none." in first
+        # A report wakes the dispatcher; the next stop asks no client it already asked.
+        self.retire("team-1-impl")
+        second = self.team("stop", "29").stdout
+        assert "waiting for retirement reports from team-1-tester." in second
+        assert "Asked now: none; asked earlier: team-1-tester." in second
+        for name in ("team-1-impl", "team-1-tester"):
+            assert [p for p in self.prompts(name) if p.startswith("Retire")] == [
+                self.latest_prompts()[name]
+            ]
+        # A replacement is a new launch, so it is asked again.
+        state = self.state()
+        tester = next(x for x in state["panes"] if x.get("label") == "team-1-tester")
+        for key in ("agent", "name", "agent_status", "agent_session"):
+            tester.pop(key, None)
+        self.save(state)
+        self.reset("29", "tester")
+        self.team("start", "29")
+        assert "Asked now: team-1-tester;" in self.team("stop", "29").stdout
+
+    def test_unpreserved_work_asks_its_running_client_once_per_report(self) -> None:
+        self.merged_pair()
+        (self.project("team-1-tester") / "notes.txt").write_text("unsaved\n")
+        self.retire("team-1-impl", "team-1-tester")
+        url = self.comments("29")[-1]["html_url"]
+        refused = self.team("stop", "29", ok=False).stderr
+        assert f"team-1-tester reported uncommitted or unpushed work (?? notes.txt): {url}" in (
+            refused
+        )
+        assert "Asked now: team-1-tester; asked earlier: none." in refused
+        ask = self.latest_prompts()["team-1-tester"]
+        assert ask.startswith(f"Retire: your retirement report {url} shows work that is not")
+        again = self.team("stop", "29", ok=False).stderr
+        assert "Asked now: none; asked earlier: team-1-tester." in again
+        assert [p for p in self.prompts("team-1-tester") if p.startswith("Retire")] == [ask]
+        # A client that is not running gets the operator's command instead.
+        self.clients_exit(1)
+        stopped = self.team("stop", "29", ok=False).stderr
+        assert "Not running, so the operator reports for them:\nteam-1-tester: cd " in stopped
+        assert self.recorded_briefs() == {"29"}
+
+    def test_the_printed_operator_command_reports_for_a_stopped_client(self) -> None:
+        self.merged_pair()
+        self.clients_exit(1)
+        waiting = self.team("stop", "29").stdout
+        lines = waiting.split("Not running, so the operator reports for them:\n")[1].splitlines()
+        commands = dict(line.split(": ", 1) for line in lines)
+        assert list(commands) == ["team-1-impl", "team-1-tester"]
+        # The operator runs each command in a shell from elsewhere, with none of the pane's
+        # environment; the fixture path has a space.
+        assert " " in str(self.trusted)
+        for command in commands.values():
+            ran = execute(["bash", "-c", command], cwd=self.root, env=self.env, timeout=60)
+            assert ran.returncode == 0, ran.stdout + ran.stderr
+        assert "slot 1 released" in self.team("stop", "29").stdout
+
 
 class LaunchRecoveryTest(Harness):
     """Interrupted launches through `team.py start`, with faults injected into fake Herdr."""
@@ -2443,7 +2502,7 @@ class LaunchRecoveryTest(Harness):
         assert self.record(1)["agents"]["tester"]["submission"] == "unknown"
         rerun = self.team("start", "29").stdout
         assert "team-1-tester: task submission is unknown; nothing was resent" in rerun
-        assert f"python3 {self.repo / 'agent/teams/team.py'} reset 29 tester and" in rerun
+        assert f"python3 '{self.repo / 'agent/teams/team.py'}' reset 29 tester and" in rerun
         assert self.starts() == ["team-1-impl", "team-1-tester"]
         assert not self.prompts("team-1-tester")
         tester = self.record(1)["agents"]["tester"]
@@ -2572,7 +2631,7 @@ class LaunchRecoveryTest(Harness):
         for attempt in range(2):
             refused = self.team("start", "29", ok=False)
             assert held in refused.stderr, refused.stderr
-            assert "team.py reset 29 impl" in refused.stderr
+            assert "team.py' reset 29 impl" in refused.stderr
             if not attempt:
                 assert "these remain: allocation g1-impl" in refused.stdout, refused.stdout
         assert self.starts() == ["team-1-impl", "team-1-tester"]
@@ -2595,6 +2654,18 @@ class LaunchRecoveryTest(Harness):
         stderr = self.team("review", "7", "critic", ok=False).stderr
         assert "team-1-critic is not running and its task submission is unknown" in stderr
         assert self.starts().count("team-1-critic") == 1
+
+    def test_an_allocation_with_no_launch_id_retires_without_a_report(self) -> None:
+        # The record is lost while the earlier allocations remain: the new ones are recorded
+        # as unknown and refused before any client is entered in them.
+        self.team("start", "29")
+        self.clients_exit(1)
+        (self.trusted / "state/1.json").unlink()
+        self.team("start", "29", ok=False)
+        agents = self.record(1)["agents"].values()
+        assert [(a["submission"], a["launch"]) for a in agents] == [("unknown", "")] * 2
+        self.merge(self.git("--git-dir", self.origin, "rev-parse", "main"))
+        assert "slot 1 released" in self.team("stop", "29").stdout
 
 
 class RepositoryConfigTest(unittest.TestCase):

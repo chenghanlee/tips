@@ -228,8 +228,8 @@ class AdapterTest(Harness):
         self.merge(head)
 
         async def first(client: Any) -> None:
-            refused = await self.call(client, "retire_team", ok=False, brief=29)
-            assert "No retirement report yet" in refused
+            waiting = await self.call(client, "retire_team", brief=29)
+            assert "waiting for retirement reports" in waiting
 
         self.session(first)
         self.retire("team-2-impl", "team-2-tester", "team-2-critic")

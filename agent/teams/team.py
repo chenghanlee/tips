@@ -565,6 +565,11 @@ def running_client(record: Record, allocation: Allocation) -> Entity | None:
     return agent
 
 
+def harness_command(script: str, *args: str) -> str:
+    """The shell command that runs a harness script, quoted for the operator or a client."""
+    return shlex.join(["python3", str(harness() / script), *args])
+
+
 def reconcile(record: Record, allocation: Allocation) -> Entity | None:
     """Return the live recorded client to adopt, or None when a launch may send the task.
 
@@ -583,12 +588,12 @@ def reconcile(record: Record, allocation: Allocation) -> Entity | None:
             f"{name} is live in {allocation['pane']}, but this record never started it; preserved"
         )
     if agent is None and state != NEVER_SUBMITTED:
+        reset = harness_command("team.py", "reset", record["brief"], allocation["entry"])
         raise RuntimeError(
             f"{name} is not running and its task submission is {state}. It may have done the "
             "task before it exited, so nothing was launched or resent; only the operator "
             "decides whether to replay it: after checking its work on the brief and PR, the "
-            f"operator runs python3 {harness() / 'team.py'} reset {record['brief']} "
-            f"{allocation['entry']}, then reruns this command."
+            f"operator runs {reset}, then reruns this command."
         )
     return agent
 
@@ -609,7 +614,7 @@ def adopt(record: Record, allocation: Allocation, agent: Entity) -> None:
         f"{name}: task submission is {allocation['submission']}; nothing was resent. Only the "
         f"operator decides whether to replay it: if {allocation['pane']} shows that the client "
         "never got its task, the operator exits the client, runs "
-        f"python3 {harness() / 'team.py'} reset {record['brief']} {allocation['entry']} and "
+        f"{harness_command('team.py', 'reset', record['brief'], allocation['entry'])} and "
         "reruns this command."
     )
 
@@ -945,33 +950,102 @@ def turn(pr: str, recipient: str) -> None:
 
 
 def never_launched(allocation: Allocation) -> bool:
-    """No client was ever entered in the allocation: launch ids are saved only after one
-    is, so there is no session to report and no work in its clone."""
-    return not allocation["launch"] and allocation["submission"] == NEVER_SUBMITTED
+    """No client was ever entered in the allocation: launch saves the launch id before any
+    client starts, so an empty one means no session to report and no work in its clone."""
+    return not allocation["launch"]
 
 
-def request_reports(record: Record, missing: list[str], running: set[str]) -> None:
-    """Ask each running client without a report to post one, name the operator command for
-    each stopped one, then refuse: every resource stays reserved until stop runs again."""
-    command = f"python3 {harness() / 'retirement.py'}"
-    sends = [
-        (record["agents"][e]["name"], f"Retire: run {command}, then end your turn.")
-        for e in missing
-        if e in running
+def operator_report(allocation: Allocation) -> str:
+    """The command the operator runs to report for a client that is not running."""
+    env = {
+        "TIPS_TEAM_STATE": str(conf.state_dir()),
+        "TIPS_TEAM_ALLOCATION_ID": allocation["id"],
+        "TIPS_TEAM_LAUNCH": allocation["launch"],
+    }
+    assignments = " ".join(f"{key}={shlex.quote(value)}" for key, value in env.items())
+    command = harness_command("retirement.py")
+    return f"cd {shlex.quote(allocation['root'])} && {assignments} {command}"
+
+
+def ask_clients(
+    record: Record, asks: dict[str, tuple[str, str]], running: set[str]
+) -> tuple[list[str], list[str]]:
+    """Send each running client its ask once. `asks` maps an entry to the subject of the ask
+    (its launch, or the URL of the report that showed unpreserved work) and the message; a
+    client already asked about that subject is skipped. Return the lines that name who was
+    asked now and earlier and the operator's command for each client not running, and the
+    failed sends."""
+    now: list[str] = []
+    earlier: list[str] = []
+    failed: list[str] = []
+    commands: list[str] = []
+    for entry, (subject, message) in asks.items():
+        allocation = record["agents"][entry]
+        if entry not in running:
+            commands.append(f"{allocation['name']}: {operator_report(allocation)}")
+        elif allocation.get("retire_asked") == subject:
+            earlier.append(allocation["name"])
+        elif errors := deliver([(allocation["name"], message)]):
+            failed += errors
+        else:
+            allocation["retire_asked"] = subject
+            now.append(allocation["name"])
+    if now:
+        save_record(record)
+    lines = [
+        f"Asked now: {', '.join(now) or 'none'}; asked earlier: {', '.join(earlier) or 'none'}."
     ]
-    failed = deliver(sends)
-    stopped = [
-        f"{a['name']}: cd {a['root']} && TIPS_TEAM_STATE={conf.state_dir()} "
-        f"TIPS_TEAM_ALLOCATION_ID={a['id']} TIPS_TEAM_LAUNCH={a['launch']} {command}"
-        for e, a in record["agents"].items()
-        if e in missing and e not in running
-    ]
+    if failed:
+        lines.append(f"Failed sends: {'; '.join(failed)}.")
+    if commands:
+        lines += ["Not running, so the operator reports for them:", *commands]
+    return lines, failed
+
+
+def wait_for_reports(record: Record, missing: list[str], running: set[str]) -> None:
+    """Ask each running client without a report for one, once per launch, and print what
+    stop waits for; every resource stays reserved until stop runs again. Only a failed send
+    is an error."""
+    ask = f"Retire: run {harness_command('retirement.py')}, then end your turn."
+    asks = {e: (record["agents"][e]["launch"], ask) for e in missing}
+    lines, failed = ask_clients(record, asks, running)
+    names = ", ".join(record["agents"][e]["name"] for e in missing)
+    text = "\n".join(
+        [
+            f"#{record['brief']}: waiting for retirement reports from {names}. Every resource "
+            "stays reserved; run stop again after the reports are posted.",
+            *lines,
+        ]
+    )
+    if failed:
+        raise RuntimeError(text)
+    print(text)
+
+
+def refuse_unpreserved(
+    record: Record, gaps: dict[str, str], reports: Reports, running: set[str]
+) -> None:
+    """Ask each running client whose report shows unpreserved work, once per report, to
+    preserve it and report again; then refuse, keeping everything."""
+    command = harness_command("retirement.py")
+    asks: dict[str, tuple[str, str]] = {}
+    for entry in gaps:
+        url = reports[record["agents"][entry]["id"]][1]
+        asks[entry] = (
+            url,
+            f"Retire: your retirement report {url} shows work that is not preserved. Preserve "
+            f"it (commit, push and merge it), run {command} again, then end your turn.",
+        )
+    lines, _ = ask_clients(record, asks, running)
     raise RuntimeError(
-        f"No retirement report yet from {', '.join(record['agents'][e]['name'] for e in missing)}."
-        f" Asked: {', '.join(n for n, _ in sends) or 'none'}; failed sends: "
-        f"{'; '.join(failed) or 'none'}. Not running, so the operator reports for them: "
-        f"{'; '.join(stopped) or 'none'}. Every resource stays reserved; run stop again after "
-        "the reports are posted."
+        "\n".join(
+            [
+                f"#{record['brief']}: {'; '.join(gaps.values())}. Nothing was stopped; the record, "
+                "databases, files and reservation are kept. Preserve the work (commit, push and "
+                "merge it), have each client report again, then rerun stop.",
+                *lines,
+            ]
+        )
     )
 
 
@@ -1008,11 +1082,12 @@ def port_in_use(port: int) -> bool:
         return probe.connect_ex(("127.0.0.1", port)) != errno.ECONNREFUSED
 
 
-def preservation_gap(record: Record, reports: Reports) -> str:
-    """Why the reports do not show the team's work preserved, or "": every client reported
+def preservation_gaps(record: Record, reports: Reports) -> dict[str, str]:
+    """Each client whose report does not show its work preserved, with why. Preserved means
     a clean clone with nothing unpushed and, for a brief, a HEAD merged into origin/main. A
     design team commits nothing, so it needs no merge."""
-    for allocation in record["agents"].values():
+    gaps: dict[str, str] = {}
+    for entry, allocation in record["agents"].items():
         if never_launched(allocation):
             continue
         fields, url = reports[allocation["id"]]
@@ -1020,10 +1095,12 @@ def preservation_gap(record: Record, reports: Reports) -> str:
             dirty = fields.get("dirty")
             names = [str(p) for p in cast(list[object], dirty)] if isinstance(dirty, list) else []
             paths = f" ({', '.join(names)})" if names else ""
-            return f"{allocation['name']} reported uncommitted or unpushed work{paths}: {url}"
-        if record["kind"] != "design" and fields.get("merged") is not True:
-            return f"{allocation['name']} reported a HEAD not merged into origin/main: {url}"
-    return ""
+            gaps[entry] = (
+                f"{allocation['name']} reported uncommitted or unpushed work{paths}: {url}"
+            )
+        elif record["kind"] != "design" and fields.get("merged") is not True:
+            gaps[entry] = f"{allocation['name']} reported a HEAD not merged into origin/main: {url}"
+    return gaps
 
 
 def recorded_databases(name: str, suffixes: list[str]) -> bool:
@@ -1154,14 +1231,11 @@ def stop_brief(brief: str) -> None:
             if a["id"] not in reports and (e in present or not never_launched(a))
         ]
         if missing:
-            request_reports(record, missing, set(present))
-        gap = preservation_gap(record, reports)
-        if gap:
-            raise RuntimeError(
-                f"#{brief}: {gap}. Nothing was stopped; the record, databases, files and "
-                "reservation are kept. Preserve the work (commit, push and merge it), have the "
-                "client report again, then rerun stop."
-            )
+            wait_for_reports(record, missing, set(present))
+            return
+        gaps = preservation_gaps(record, reports)
+        if gaps:
+            refuse_unpreserved(record, gaps, reports, set(present))
         verify_present(present)
         for allocation in present.values():
             stop(allocation["pane"], allocation["root"])
