@@ -6,7 +6,7 @@ import unittest
 from typing import Any
 
 from commands import execute
-from tests.test_team import Harness
+from tests.harness import Harness
 
 
 def marker(body: str) -> dict[str, Any]:
