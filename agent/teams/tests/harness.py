@@ -326,10 +326,12 @@ elif a[:2] == ["pr", "view"]:
     }
     out = json.dumps({key: view[key] for key in a[a.index("--json") + 1].split(",")})
 elif a[:2] == ["pr", "checks"]:
-    # The head can move, or another observer can post, while a reader is between its
-    # first and last view.
+    # The head or base can move, or another observer can post, while a reader is between
+    # its first and last view.
     if "head_after_checks" in s:
         s["pr_head"] = s.pop("head_after_checks")
+    if "base_after_checks" in s:
+        s["pr_base"] = s.pop("base_after_checks")
     posts = s.pop("post_on_checks", [])
     for body in [posts] if isinstance(posts, str) else posts:
         n = sum(len(c) for c in comments.values()) + 1
