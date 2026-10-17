@@ -3,6 +3,8 @@ name; the shipped configuration."""
 
 import json
 import os
+import re
+import shutil
 import tempfile
 import threading
 import unittest
@@ -31,15 +33,58 @@ class ClaimRootTest(unittest.TestCase):
     ) -> None:
         link = self.base / "link"
         link.symlink_to(self.base / "agent_teams")
-        with tempfile.TemporaryDirectory() as temporary:
-            for root in (
-                self.checkout / "agent_teams/tips",
-                Path(temporary).resolve() / "tips",
-                link / "tips",
-            ):
-                with self.subTest(root=root), self.assertRaises(RuntimeError):
-                    conf.claim_root(root, "o/tips", self.checkout)
-                assert not root.exists()
+        scratch = self.base / "scratch"
+        tmp = Path("/tmp").resolve()  # noqa: S108 - must be refused
+        cases = {
+            "checkout": (self.checkout / "agent_teams/tips", f"is inside {self.checkout}"),
+            "tmp": (tmp / f"tips-root-{os.getpid()}", f"is inside {tmp}"),
+            "TMPDIR": (scratch / "tips", f"is inside {scratch}"),
+            "symlink": (link / "tips", "passes through a symlink"),
+        }
+        # TMPDIR names scratch, so only the fixed list refuses /tmp.
+        with mock.patch.dict(os.environ, {"TMPDIR": str(scratch)}):
+            for case, (root, message) in cases.items():
+                self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+                with self.subTest(case=case):
+                    with self.assertRaisesRegex(RuntimeError, re.escape(message)):
+                        conf.claim_root(root, "o/tips", self.checkout)
+                    assert not root.exists(), f"the refused root {root} was created"
+        # The override names <root>/harness; its root is checked the same way.
+        override = self.checkout / "agent_teams/tips/harness"
+        with (
+            mock.patch.dict(os.environ, {"TIPS_TEAM_HARNESS": str(override)}),
+            mock.patch.object(conf, "cfg", {"github": {"repository": "o/tips"}}),
+            mock.patch.object(conf, "main", self.checkout),
+            self.assertRaisesRegex(RuntimeError, re.escape(f"is inside {self.checkout}")),
+        ):
+            conf.harness_root()
+
+    def test_a_relative_harness_override_is_refused(self) -> None:
+        with (
+            mock.patch.dict(os.environ, {"TIPS_TEAM_HARNESS": "agent_teams/tips/harness"}),
+            self.assertRaisesRegex(RuntimeError, "TIPS_TEAM_HARNESS must be an absolute path"),
+        ):
+            conf.harness_root()
+
+    def test_a_root_claimed_by_another_repository_is_refused(self) -> None:
+        # Another owner's repository with the same name has the same default root.
+        root = self.base / "agent_teams/tips"
+        root.mkdir(parents=True)
+        (root / "repository.json").write_text('{"repository": "x/tips"}\n')
+        with self.assertRaisesRegex(
+            RuntimeError, re.escape(f"{root} belongs to x/tips, not o/tips")
+        ):
+            conf.claim_root(root, "o/tips", self.checkout)
+        assert [p.name for p in root.iterdir()] == ["repository.json"], (
+            "a refused claim created state or allocations"
+        )
+
+    def test_only_numbered_files_in_the_state_directory_are_slot_records(self) -> None:
+        state = self.base / "state"
+        state.mkdir()
+        for name in ("1.json", "dispatcher.json"):
+            (state / name).write_text("{}\n")
+        assert conf.slot_record_paths(state) == [state / "1.json"], "dispatcher.json read as a slot"
 
     def test_workers_name_the_stable_harness_path_of_an_installed_harness(self) -> None:
         root = self.base / "agent_teams/tips"
@@ -102,16 +147,21 @@ class ClaimRootTest(unittest.TestCase):
             launch["session"] = "s2"
             assert "starter note" not in team.dispatcher_status(None)
 
-    def test_a_symlinked_state_directory_refuses_before_the_identity_is_published(self) -> None:
-        root = self.base / "agent_teams/tips"
-        root.mkdir(parents=True)
-        outside = self.base / "outside"
-        outside.mkdir()
-        (root / "state").symlink_to(outside, target_is_directory=True)
-        with self.assertRaises(RuntimeError):
-            conf.claim_root(root, "o/tips", self.checkout)
-        assert sorted(p.name for p in root.iterdir()) == ["state"]
-        assert not any(outside.iterdir())
+    def test_a_symlinked_state_or_allocations_directory_refuses_before_publishing(
+        self,
+    ) -> None:
+        for name in ("state", "allocations"):
+            with self.subTest(directory=name):
+                root = self.base / name / "agent_teams/tips"
+                root.mkdir(parents=True)
+                outside = self.base / name / "outside"
+                outside.mkdir()
+                (root / name).symlink_to(outside, target_is_directory=True)
+                link = f"{root / name} escapes {root} or passes through a symlink"
+                with self.assertRaisesRegex(RuntimeError, re.escape(link)):
+                    conf.claim_root(root, "o/tips", self.checkout)
+                assert [p.name for p in root.iterdir()] == [name], "the identity was published"
+                assert not any(outside.iterdir()), f"a file was written through the {name} link"
 
     def test_a_client_names_its_launch_only_with_a_canonical_state_path(self) -> None:
         state = self.base / "agent_teams/tips/state"

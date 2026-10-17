@@ -84,7 +84,7 @@ the launcher with the resolved `claude` executable and its fixed arguments, so t
 client is the pane's foreground process. The `# noqa: S108` exceptions apply only to
 `config.py:TEMPORARY`, the temporary-root list in `config.py:temporary_roots`, and the
 refused root in
-`PairLifecycleTest.test_a_root_in_the_checkout_or_a_temporary_directory_is_refused`.
+`ClaimRootTest.test_a_root_inside_the_checkout_a_temporary_directory_or_a_symlink_is_refused`.
 They name temporary directories to refuse them; nothing is written there.
 The `PT027` per-file ignore for `tests/**` allows `assertRaises`: the suite is unittest
 by design, and CI runs `python -m unittest`.
