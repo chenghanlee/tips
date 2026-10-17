@@ -11,7 +11,8 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-from team import execute, repo_key
+from commands import execute
+from config import repo_key
 from tests.test_team import CONFIG, TEST_RUNS
 
 TEAMS = Path(__file__).resolve().parents[1]
@@ -97,8 +98,8 @@ class DispatchTest(unittest.TestCase):
         self.state = Path(self.tmp.name).resolve() / "agent_teams" / repo_key("o/r") / "state"
         self.scripts = self.root / "agent/teams"
         (self.scripts / "roles").mkdir(parents=True)
-        for name in ("dispatch", "dispatcher.py", "team.py"):
-            shutil.copy2(TEAMS / name, self.scripts / name)
+        for script in [*sorted(TEAMS.glob("*.py")), TEAMS / "dispatch"]:
+            shutil.copy2(script, self.scripts / script.name)
         for name in ("README.md", "roles/common.md", "roles/dispatcher.md"):
             (self.scripts / name).write_text(f"Trusted {name} text.\n")
         (self.root / "AGENTS.md").write_text("Trusted AGENTS.md text.\n")

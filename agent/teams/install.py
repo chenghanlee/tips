@@ -21,7 +21,9 @@ import tarfile
 import tomllib
 from pathlib import Path
 
-from team import REPOSITORY, claim_root, default_root, execute, load_record, run
+from commands import execute, run
+from config import REPOSITORY, claim_root, default_root
+from team import load_record
 
 # Creating the environment and fetching locked wheels; the same budget as dependency fetches.
 INSTALL_SECONDS = 300

@@ -25,7 +25,9 @@ import sys
 from pathlib import Path
 from typing import IO, cast
 
-from team import TEMPORARY, dexter_invocation, execute
+from commands import execute
+from config import TEMPORARY
+from team import dexter_invocation
 
 CONSOLE_BYTES = 8192
 GIT_SECONDS = 300

@@ -54,7 +54,7 @@ Run these additional tests for the listed changes:
 
 ## Lint exceptions
 
-The reviewed `# noqa: S603` exceptions apply only to `team.py:execute`,
+The reviewed `# noqa: S603` exceptions apply only to `commands.py:execute`,
 `StopAgentTest.client` and the namer that `dispatcher.py:start_here` starts. These calls
 use variable argument lists, no shell, a resolved executable, and fixed,
 caller-supplied or test-owned arguments. The `# noqa: S606` in `start_here` replaces

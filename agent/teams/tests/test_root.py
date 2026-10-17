@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, cast
 from unittest import mock
 
+import config as conf
 import team
 from tests.test_team import TEST_RUNS
 
@@ -34,18 +35,18 @@ class ClaimRootTest(unittest.TestCase):
                 link / "tips",
             ):
                 with self.subTest(root=root), self.assertRaises(RuntimeError):
-                    team.claim_root(root, "o/tips", self.checkout)
+                    conf.claim_root(root, "o/tips", self.checkout)
                 assert not root.exists()
 
     def test_workers_name_the_stable_harness_path_of_an_installed_harness(self) -> None:
         root = self.base / "agent_teams/tips"
         recorded = {"root": root}
         with (
-            mock.patch.object(team, "installed", side_effect=recorded.get),
-            mock.patch.object(team, "harness_root", return_value=root),
+            mock.patch.object(conf, "installed", side_effect=recorded.get),
+            mock.patch.object(conf, "harness_root", return_value=root),
         ):
-            assert team.harness() == root / "harness/agent/teams"
-        assert team.harness() == Path(team.__file__).resolve().parent
+            assert conf.harness() == root / "harness/agent/teams"
+        assert conf.harness() == Path(team.__file__).resolve().parent
 
     def test_workers_get_the_config_the_installed_harness_reads(self) -> None:
         root = self.base / "agent_teams/tips"
@@ -67,20 +68,20 @@ class ClaimRootTest(unittest.TestCase):
         environ = {k: v for k, v in os.environ.items() if k != "TIPS_TEAM_CONFIG"}
         with (
             mock.patch.dict(os.environ, environ, clear=True),
-            mock.patch.object(team, "installed", side_effect=recorded.get),
-            mock.patch.object(team, "harness_root", return_value=root),
-            mock.patch.object(team, "state_dir", return_value=root / "state"),
-            mock.patch.object(team, "main", self.checkout, create=True),
-            mock.patch.object(team, "cfg", settings, create=True),
+            mock.patch.object(conf, "installed", side_effect=recorded.get),
+            mock.patch.object(conf, "harness_root", return_value=root),
+            mock.patch.object(conf, "state_dir", return_value=root / "state"),
+            mock.patch.object(conf, "main", self.checkout),
+            mock.patch.object(conf, "cfg", settings),
         ):
             # The stable link path, not the release it resolves to today.
             config = root / "harness/agent/teams/config.toml"
             assert config.resolve() == (release / "config.toml").resolve()
-            assert team.config_location() == (self.checkout, config)
-            env = team.agent_env(cast(team.Allocation, allocation))
+            assert conf.config_location() == (self.checkout, config)
+            env = team.agent_env(cast(conf.Allocation, allocation))
             assert env["TIPS_TEAM_CONFIG"] == str(config)
             os.environ["TIPS_TEAM_CONFIG"] = str(self.base / "other.toml")
-            env = team.agent_env(cast(team.Allocation, allocation))
+            env = team.agent_env(cast(conf.Allocation, allocation))
             assert env["TIPS_TEAM_CONFIG"] == str(self.base / "other.toml")
 
     def test_status_shows_the_starters_note_for_the_running_launch_only(self) -> None:
@@ -105,6 +106,6 @@ class ClaimRootTest(unittest.TestCase):
         outside.mkdir()
         (root / "state").symlink_to(outside, target_is_directory=True)
         with self.assertRaises(RuntimeError):
-            team.claim_root(root, "o/tips", self.checkout)
+            conf.claim_root(root, "o/tips", self.checkout)
         assert sorted(p.name for p in root.iterdir()) == ["state"]
         assert not any(outside.iterdir())

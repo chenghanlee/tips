@@ -19,19 +19,16 @@ import time
 from dataclasses import dataclass
 from typing import Any, cast
 
+import config as conf
 import team
+from commands import execute, object_fields, object_list, require_type
+from config import HEADER, READ_PAGES, READ_SECONDS
 from team import (
-    HEADER,
-    READ_PAGES,
-    READ_SECONDS,
     add_comment,
     comment_header,
     deadline_from_now,
-    execute,
     github,
     issue_comments,
-    object_fields,
-    object_list,
 )
 
 QUERY = """
@@ -219,7 +216,7 @@ def view(number: int, deadline: float) -> dict[str, str]:
     command = ["gh", "pr", "view", str(number), *team.repo_args(), "--json", fields]
     pr = object_fields(json.loads(github(command, deadline, f"PR {number}")), f"PR {number}")
     for key in fields.split(","):
-        team.require_type(pr.get(key), str, f"PR {number} {key}")
+        require_type(pr.get(key), str, f"PR {number} {key}")
     return {key: str(pr[key]) for key in fields.split(",")}
 
 
@@ -566,7 +563,7 @@ def print_state(state: PrState, known: dict[Finding, str]) -> None:
 
 
 def observe_command(number: int) -> None:
-    team.configure()
+    conf.configure()
     caller, me = team.caller_record()
     _, _, briefs = team.pull_request(str(number))
     if caller["brief"] not in briefs:

@@ -24,7 +24,9 @@ import sys
 from pathlib import Path
 
 
-from team import RETIREMENT, comment_header, execute, object_fields
+from commands import execute, object_fields
+from config import RETIREMENT
+from team import comment_header
 
 GIT_SECONDS = 120
 GITHUB_SECONDS = 60

@@ -21,6 +21,8 @@ from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import Field
 
 import board
+import commands
+import config as conf
 import pr_review
 import team
 
@@ -85,7 +87,7 @@ def mark_ready() -> bool:
     """Tell the launcher this session's client has listed the tools, so its first prompt
     can be sent: state/dispatcher.ready names the session. False if it cannot be written."""
     try:
-        path = team.dispatcher_path().with_name(team.DISPATCHER_READY)
+        path = team.dispatcher_path().with_name(conf.DISPATCHER_READY)
         staged = path.with_suffix(".next-ready")
         session = os.environ.get("TIPS_DISPATCHER_SESSION", "")
         staged.write_text(json.dumps({"session": session, "text": "tools listed"}) + "\n")
@@ -145,11 +147,11 @@ def dispatcher() -> tuple[str, str, str]:
 
 def gh(*args: str, input_text: str | None = None) -> str:
     """Run gh with a fixed operation shape, the configured repository and the GitHub deadline."""
-    return team.run("gh", *args, input_text=input_text, timeout=team.github_seconds())
+    return commands.run("gh", *args, input_text=input_text, timeout=conf.github_seconds())
 
 
-def settings() -> team.GitHubSettings:
-    configured = team.github_settings()
+def settings() -> conf.GitHubSettings:
+    configured = conf.github_settings()
     if not configured:
         raise RuntimeError("config.toml has no [github] table")
     return configured
@@ -232,7 +234,7 @@ def pr_state(pr: Number) -> str:
 
 def required_checks(pr: int) -> str:
     """Required checks as JSON; gh exits nonzero while checks fail or are pending."""
-    result = team.execute(
+    result = commands.execute(
         [
             "gh",
             "pr",
@@ -244,7 +246,7 @@ def required_checks(pr: int) -> str:
             "--json",
             "name,state,bucket,link",
         ],
-        timeout=team.github_seconds(),
+        timeout=conf.github_seconds(),
     )
     try:
         json.loads(result.stdout)
@@ -337,7 +339,7 @@ def project_read(project: Number) -> str:
 
 
 def item_line(item: dict[str, object], fields: list[str]) -> str:
-    content = team.object_fields(item.get("content") or {}, "item content")
+    content = commands.object_fields(item.get("content") or {}, "item content")
     values = [f"{name}: {item.get(name.lower(), '')}" for name in fields]
     return " | ".join([f"#{content.get('number', '?')} {item.get('title', '')}", *values])
 
@@ -367,13 +369,15 @@ def set_field(project: int, issue: int, field: str, value: str) -> str:
     number, account = str(project), owner()
     view = json.loads(gh("project", "view", number, "--owner", account, "--format", "json"))
     listed = json.loads(gh("project", "field-list", number, "--owner", account, "--format", "json"))
-    definitions = team.object_list(team.object_fields(listed, "fields").get("fields"), "fields")
+    definitions = commands.object_list(
+        commands.object_fields(listed, "fields").get("fields"), "fields"
+    )
     definition = next((d for d in definitions if d.get("name") == field), None)
     if definition is None:
         raise RuntimeError(f"Project {project} has no field {field!r}")
     item = project_item(project, issue)
     target = ["--id", item, "--project-id", str(view["id"]), "--field-id", str(definition["id"])]
-    options = team.object_list(definition.get("options") or [], "options")
+    options = commands.object_list(definition.get("options") or [], "options")
     if options:
         option = next((o for o in options if o.get("name") == value), None)
         if option is None:
@@ -388,14 +392,14 @@ def set_field(project: int, issue: int, field: str, value: str) -> str:
 def project_items(project: int) -> list[dict[str, object]]:
     args = ["project", "item-list", str(project), "--owner", owner(), "--format", "json"]
     output = json.loads(gh(*args, "--limit", str(PROJECT_ITEMS)))
-    return team.object_list(team.object_fields(output, "project").get("items"), "items")
+    return commands.object_list(commands.object_fields(output, "project").get("items"), "items")
 
 
 def project_item(project: int, issue: int) -> str:
     items = project_items(project)
     repository = f"https://github.com/{settings()['repository']}/issues/{issue}"
     for item in items:
-        content = team.object_fields(item.get("content") or {}, "item content")
+        content = commands.object_fields(item.get("content") or {}, "item content")
         if content.get("url") == repository:
             return str(item["id"])
     if len(items) >= PROJECT_ITEMS:
@@ -413,10 +417,10 @@ def sanitize_environment() -> None:
 
 def main() -> None:
     sanitize_environment()
-    team.configure()
+    conf.configure()
     settings()
     # Harness commands run from the configured main checkout, never the client's cwd.
-    os.chdir(team.main)
+    os.chdir(conf.main_checkout())
     server.run("stdio")
 
 

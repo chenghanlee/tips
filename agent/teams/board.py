@@ -38,20 +38,17 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import cast
 
-import team
+import config as conf
+from commands import object_fields, object_list, run
+from config import HEADER, github_seconds
 from team import (
-    HEADER,
     comment_header,
     event_role,
-    github_seconds,
     herdr,
     issue_comments,
-    object_fields,
-    object_list,
     post_comment,
     records,
     repo_args,
-    run,
     session_id,
 )
 
@@ -264,7 +261,7 @@ def main() -> None:
     meter.add_argument("issues", nargs="+")
     meter.set_defaults(handler=usage)
     args = parser.parse_args()
-    team.configure()
+    conf.configure()
     args.handler(args)
 
 

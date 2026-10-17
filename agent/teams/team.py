@@ -19,259 +19,57 @@ import json
 import os
 import re
 import shlex
-import shutil
 import signal
 import socket
 import subprocess
 import sys
-import tempfile
 import time
-import tomllib
 import uuid
 from collections.abc import Generator, Sequence
 from pathlib import Path
-from typing import NotRequired, TypedDict, cast
+from typing import cast
 
-
-class AgentSpec(TypedDict):
-    role: str
-    kind: str
-    model: str
-    effort: str
-    advisor: NotRequired[str]
-    persona: NotRequired[str]
-    port_offset: int
-    db_suffix: str
-
-
-class GitHubSettings(TypedDict):
-    repository: str
-    # Project number -> field names the dispatcher may set.
-    projects: dict[str, list[str]]
-
-
-class TeamSettings(TypedDict):
-    clone_url: str
-    psql: list[str]
-    max_teams: int
-    port_base: int
-    port_stride: int
-    postgres_port: int
-    db_suffix_prefix: str
-
-
-class Config(TypedDict):
-    github: GitHubSettings
-    team: TeamSettings
-    timeouts: dict[str, int]
-    launch: dict[str, str]
-    agents: dict[str, AgentSpec]
-
-
-class Allocation(TypedDict):
-    """One launched client and its allocation, whose `id` never repeats. `pr` and `head` are
-    set for reviewers of a pushed PR; `head` is the commit its bootstrap configuration names.
-
-    `pane`, `name`, `kind`, `root` and `session` identify the client process. `launch` is
-    new for each launch; a retirement report counts only for the launch it names.
-    `submission` is the task-submission state, separate from whether a process runs:
-    NEVER_SUBMITTED until launch writes UNKNOWN, durably, before the client can accept any
-    input; SUBMITTED only after the task prompt's positive transport result. SUBMITTED does
-    not mean the task is done; the brief, PR and reviews record its outcome.
-    """
-
-    id: str
-    entry: str
-    role: str
-    name: str
-    kind: str
-    root: str
-    db_suffix: str
-    port: int
-    workspace: str
-    tab: str
-    pane: str
-    session: str
-    launch: str
-    submission: str
-    pr: NotRequired[str]
-    head: NotRequired[str]
-
-
-class Record(TypedDict):
-    """A slot's record: its ID and generation, the brief (or spec for a design team), the
-    pair, its Herdr workspace and tabs, and every launched client. A slot number is reused;
-    the ID and generation are not. A design team has no pair."""
-
-    version: int
-    id: str
-    slot: int
-    generation: int
-    kind: str
-    brief: str
-    implementer: str
-    tester: str
-    workspace: str
-    tabs: dict[str, str]
-    agents: dict[str, Allocation]
-
-
-class Process(TypedDict):
-    pid: int
-    cwd: str
-    argv0: NotRequired[str]
-
-
-class ProcessInfo(TypedDict):
-    shell_pid: int
-    foreground_process_group_id: int
-    foreground_processes: list[Process]
-
-
-# Herdr commands return different subsets. Callers access only the requested fields.
-class Entity(TypedDict):
-    pane_id: str
-    tab_id: str
-    workspace_id: str
-    label: str
-    name: str
-    agent: str
-    agent_status: str
-    cwd: str
-    foreground_cwd: str
-    agent_session: dict[str, object]
-
-
-class HerdrResult(TypedDict):
-    pane: Entity
-    root_pane: Entity
-    workspace: Entity
-    tab: Entity
-    agent: Entity
-    panes: list[Entity]
-    workspaces: list[Entity]
-    agents: list[Entity]
-    process_info: ProcessInfo
-
-
-ProcessRows = dict[int, tuple[int, str]]
-ROLES = ("designer", "implementer", "tester")
-# A team's workspace holds one tab per role; every client of that role is a pane in it.
-TABS = {"designer": "designers", "implementer": "implementers", "tester": "reviewers"}
-ENTRY = r"[a-z0-9][a-z0-9-]*"
-# Version 3 records live in the harness root and name projects, not worktrees.
-RECORD_VERSION = 3
-NEVER_SUBMITTED, UNKNOWN, SUBMITTED = "never_submitted", "unknown", "submitted"
-AGENT_FIELDS = {
-    "role",
-    "kind",
-    "model",
-    "effort",
-    "advisor",
-    "persona",
-    "port_offset",
-    "db_suffix",
-}
-# team.psql is a short argv list, never shell text.
-ARGV_ARGS = 16
-ARGV_ARG_CHARS = 256
-# PostgreSQL truncates identifiers longer than this; partitions append up to three digits.
-NAME_BYTES = 63
-PARTITION_DIGITS = 3
-DATABASE_BASES = ("tips_test", "tips_dev")
-# Dexter's query gives up this long after --wait: its allowance to reach the daemon.
-DEXTER_CONNECT_SECONDS = 30
-# A cold Hex cache downloads every package; anything slower is a hung fetch.
-DEPS_FETCH_SECONDS = 300
-# Each GitHub read takes at most this many pages of 100 entries within this many seconds.
-# Initial defaults, not measurements: widen them only after a legitimate read exceeds one.
-READ_PAGES = 10
-REPOSITORY = r"[A-Za-z0-9-]+/[A-Za-z0-9._-]+"
-TEMPORARY = ("/tmp", "/var/tmp")
-READ_SECONDS = 30
-# Disable alternate language paths in launched clients, without editing user settings.
-NATIVE_LSP_PLUGINS = {
-    "elixir-lsp@elixir-agent-tools": False,
-}
-main: Path
-cfg: Config
-
+import config as conf
+from commands import execute, object_fields, object_list, require_type, run
+from config import (
+    COMMENT_TYPES,
+    DATABASE_BASES,
+    DISPATCHER_RECOVERY,
+    ENTRY,
+    HEADER,
+    NAME_BYTES,
+    NATIVE_LSP_PLUGINS,
+    NEVER_SUBMITTED,
+    PARTITION_DIGITS,
+    READ_PAGES,
+    READ_SECONDS,
+    RECORD_VERSION,
+    RETIREMENT,
+    ROLES,
+    SUBMITTED,
+    TABS,
+    UNKNOWN,
+    Allocation,
+    DispatcherLaunch,
+    Entity,
+    HerdrResult,
+    ProcessInfo,
+    ProcessRows,
+    Record,
+    Reports,
+    agent_spec,
+    allocation_paths,
+    config_location,
+    contained,
+    database_stem,
+    harness,
+    live_name,
+    overlapping,
+    project_of,
+    repository,
+)
 
 # --- Processes, JSON validation and Herdr ----------------------------------
-
-def command_args(
-    args: Sequence[str | Path | int],
-    *,
-    path: str | None = None,
-    cwd: str | Path | None = None,
-) -> list[str]:
-    """Resolve the executable on PATH; keep every argument separate."""
-    if not args:
-        raise ValueError("Expected a nonempty command")
-    command = list(map(str, args))
-    directory = Path(cwd or Path.cwd()).resolve()
-    search_path = os.environ.get("PATH", os.defpath) if path is None else path
-    search_path = os.pathsep.join(str(directory / entry) for entry in search_path.split(os.pathsep))
-    program = str(directory / command[0]) if os.path.dirname(command[0]) else command[0]
-    executable = shutil.which(program, path=search_path)
-    if executable is None:
-        raise FileNotFoundError(f"Executable not found: {command[0]}")
-    command[0] = executable
-    return command
-
-
-def execute(
-    args: Sequence[str | Path | int],
-    *,
-    cwd: str | Path | None = None,
-    env: dict[str, str] | None = None,
-    timeout: float | None = None,
-    check: bool = False,
-    input_text: str | None = None,
-) -> subprocess.CompletedProcess[str]:
-    """Run a resolved executable without a shell and capture its output."""
-    # Reviewed S603: callers pass fixed tool names; command_args resolves argv[0], no shell.
-    return subprocess.run(  # noqa: S603
-        command_args(args, path=env.get("PATH", os.defpath) if env is not None else None, cwd=cwd),
-        cwd=cwd,
-        env=env,
-        timeout=timeout,
-        check=check,
-        text=True,
-        capture_output=True,
-        input=input_text,
-    )
-
-
-def run(
-    *args: str | Path | int,
-    cwd: str | Path | None = None,
-    timeout: float | None = None,
-    env: dict[str, str] | None = None,
-    input_text: str | None = None,
-) -> str:
-    p = execute(args, cwd=cwd, timeout=timeout, env=env, input_text=input_text)
-    if p.returncode:
-        raise RuntimeError(p.stderr.strip() or p.stdout.strip() or f"Command failed: {args}")
-    return p.stdout.strip()
-
-
-def object_fields(value: object, label: str) -> dict[str, object]:
-    """Validate external object keys before interpreting their values."""
-    if not isinstance(value, dict):
-        raise ValueError(f"{label} must be an object; received {value!r}")
-    fields = cast(dict[object, object], value)
-    if not all(isinstance(key, str) for key in fields):
-        raise ValueError(f"{label} must have string keys; received {value!r}")
-    return cast(dict[str, object], fields)
-
-
-def require_type(
-    value: object, expected: type[str] | type[int] | type[list[object]], label: str
-) -> None:
-    if type(value) is not expected:
-        raise ValueError(f"{label} must be {expected.__name__}; received {value!r}")
-
 
 def entity_fields(value: object, label: str) -> None:
     fields = object_fields(value, label)
@@ -281,12 +79,6 @@ def entity_fields(value: object, label: str) -> None:
                 require_type(fields[key], str, f"{label}.{key}")
             else:
                 object_fields(fields[key], f"{label}.{key}")
-
-
-def object_list(value: object, label: str) -> list[dict[str, object]]:
-    if not isinstance(value, list):
-        raise ValueError(f"{label} must be a list; received {value!r}")
-    return [object_fields(item, label) for item in cast(list[object], value)]
 
 
 def parse_herdr(output: str) -> HerdrResult:
@@ -319,7 +111,7 @@ def validate_process_info(value: object) -> None:
 
 
 def herdr(*args: str) -> HerdrResult:
-    output = run("herdr", *args, timeout=cfg["timeouts"]["launch_seconds"])
+    output = run("herdr", *args, timeout=conf.settings()["timeouts"]["launch_seconds"])
     if args[:2] == ("pane", "run"):
         return cast(HerdrResult, {})  # pane run succeeds with empty stdout.
     return parse_herdr(output)
@@ -408,7 +200,7 @@ def signal_client(pane: str, current: Entity, clients: set[int], owned: set[int]
 
 
 def wait_for_exit(pane: str, shell: int, identity: dict[int, str]) -> None:
-    deadline = time.monotonic() + cfg["timeouts"]["shutdown_seconds"]
+    deadline = time.monotonic() + conf.settings()["timeouts"]["shutdown_seconds"]
     while True:
         rows = processes()
         # Include children born during graceful shutdown, while their parent is still known.
@@ -463,270 +255,15 @@ def release_name(pane: str, current: Entity) -> None:
                     raise
                 # Herdr already released it between list and clear.
 
-
-# --- Configuration and the harness root ------------------------------------
-
-def checkout_root(script: Path) -> Path:
-    common = Path(
-        run("git", "-C", script.parent, "rev-parse", "--path-format=absolute", "--git-common-dir")
-    )
-    return common.parent.resolve()
-
-
-def config_location() -> tuple[Path, Path]:
-    """The main checkout and the configuration file: TIPS_TEAM_CONFIG, else the default.
-    Workers get the same file (agent_env)."""
-    source = installed_source()
-    if source is None:
-        canonical = checkout_root(Path(__file__).resolve())
-        default = canonical / "agent/teams/config.toml"
-    else:
-        # The installed harness reads its own reviewed configuration, by the stable link
-        # its workers' scripts use (harness()).
-        canonical = source
-        default = cast(Path, installed("root")) / "harness/agent/teams/config.toml"
-    return canonical, Path(os.environ.get("TIPS_TEAM_CONFIG", default))
-
-
-def load_config() -> tuple[Path, Config]:
-    canonical, path = config_location()
-    with path.open("rb") as f:
-        value = cast(Config, tomllib.load(f))
-    validate_config_fields(path, value)
-    validate_settings(path, value)
-    validate_allocations(path, value)
-    return canonical, value
-
-
-def validate_config_fields(path: Path, value: Config) -> None:
-    fields = object_fields(value, str(path))
-    settings = object_fields(fields.get("team"), f"{path}: team")
-    for key in ("max_teams", "port_base", "port_stride", "postgres_port"):
-        require_type(settings.get(key), int, f"{path}: team.{key}")
-    for key in ("db_suffix_prefix", "clone_url"):
-        require_type(settings.get(key), str, f"{path}: team.{key}")
-    validate_github(path, fields.get("github"))
-    validate_argv(f"{path}: team.psql", settings.get("psql"))
-    if not Path(cast(list[str], settings["psql"])[0]).is_absolute():
-        raise RuntimeError(f"{path}: team.psql must start with an absolute executable path")
-    object_fields(fields.get("timeouts"), f"{path}: timeouts")
-    policies = object_fields(fields.get("launch"), f"{path}: launch")
-    for key in ("codex_approval", "claude_permission_mode"):
-        require_type(policies.get(key), str, f"{path}: launch.{key}")
-    agents = object_fields(fields.get("agents"), f"{path}: agents")
-    if not agents:
-        raise RuntimeError(f"{path}: agents must name at least one entry")
-    for name, entry in agents.items():
-        validate_agent_fields(f"{path}: agents.{name}", name, entry)
-
-
-def validate_github(path: Path, value: object) -> None:
-    github = object_fields(value, f"{path}: github")
-    require_type(github.get("repository"), str, f"{path}: github.repository")
-    if not re.fullmatch(REPOSITORY, str(github["repository"])):
-        raise RuntimeError(f"{path}: github.repository must be owner/name")
-    for number, names in object_fields(github.get("projects"), f"{path}: github.projects").items():
-        if not number.isdecimal() or not isinstance(names, list):
-            raise RuntimeError(f"{path}: github.projects maps a project number to field names")
-        for name in cast(list[object], names):
-            require_type(name, str, f"{path}: github.projects.{number}")
-
-
-def validate_agent_fields(label: str, name: str, entry: object) -> None:
-    if not re.fullmatch(ENTRY, name):
-        raise RuntimeError(f"{label} must match {ENTRY}")
-    spec = object_fields(entry, label)
-    unknown = set(spec) - AGENT_FIELDS
-    if unknown:
-        raise RuntimeError(f"{label} has unknown keys {sorted(unknown)}")
-    for key in ("role", "kind", "model", "effort", "db_suffix"):
-        require_type(spec.get(key), str, f"{label}.{key}")
-    for key in ("advisor", "persona"):
-        if key in spec:
-            require_type(spec[key], str, f"{label}.{key}")
-    require_type(spec.get("port_offset"), int, f"{label}.port_offset")
-    if not re.fullmatch(r"[^0-9]\S*", str(spec["db_suffix"])):
-        raise RuntimeError(f"{label}.db_suffix must be nonempty and start with a non-digit")
-
-
-def validate_argv(label: str, value: object) -> None:
-    """1 to ARGV_ARGS nonempty strings; argv[0] names the program."""
-    require_type(value, list, label)
-    args = cast(list[object], value)
-    if not 1 <= len(args) <= ARGV_ARGS:
-        raise RuntimeError(f"{label} must hold 1 to {ARGV_ARGS} arguments")
-    for arg in args:
-        if not isinstance(arg, str) or not 0 < len(arg) <= ARGV_ARG_CHARS or "\0" in arg:
-            raise RuntimeError(f"{label} arguments must be strings of 1 to {ARGV_ARG_CHARS} chars")
-
-
-def validate_settings(path: Path, value: Config) -> None:
-    for key in (
-        "launch_seconds",
-        "shutdown_seconds",
-        "shell_seconds",
-        "checks_minutes",
-        "dexter_startup_seconds",
-        "lock_seconds",
-    ):
-        if type(value["timeouts"][key]) is not int or value["timeouts"][key] <= 0:
-            raise RuntimeError(f"{path}: timeouts.{key} must be a positive integer")
-    if value["team"]["max_teams"] < 1:
-        raise RuntimeError(f"{path}: team.max_teams must be positive")
-    for name, spec in value["agents"].items():
-        if spec["role"] not in ROLES:
-            raise RuntimeError(f"{path}: agents.{name}.role must be one of {', '.join(ROLES)}")
-        if spec["kind"] not in ("codex", "claude"):
-            raise RuntimeError(f"{path}: agents.{name}.kind must be claude or codex")
-        if spec.get("advisor") and spec["kind"] != "claude":
-            raise RuntimeError(f"{path}: agents.{name}.advisor applies to Claude entries only")
-
-
-def overlapping(a: str, b: str) -> bool:
-    """Whether one database stem is the other or one of its numbered partitions."""
-    return bool(
-        re.fullmatch(re.escape(a) + r"[0-9]*", b) or re.fullmatch(re.escape(b) + r"[0-9]*", a)
-    )
-
-
-def database_stem(team: TeamSettings, slot: int, generation: int, suffix: str) -> str:
-    """The slot, then the generation after a non-digit, then the entry's suffix, which starts
-    with a non-digit: numbered partitions of one stem never equal another stem."""
-    return f"{team['db_suffix_prefix']}{slot}g{generation}{suffix}"
-
-
-def validate_allocations(path: Path, value: Config) -> None:
-    """Ports and database stems of every slot are distinct, and a long generation still fits
-    PostgreSQL's identifier length. Generations differ after the non-digit separator, so one
-    generation's stems decide."""
-    ports: set[int] = set()
-    stems: list[str] = []
-    team = value["team"]
-    for n in range(1, team["max_teams"] + 1):
-        for spec in value["agents"].values():
-            port = team["port_base"] + n * team["port_stride"] + spec["port_offset"]
-            stem = database_stem(team, n, 1, spec["db_suffix"])
-            if port in ports or not 1 <= port <= 65535:
-                raise RuntimeError(f"{path}: overlapping or invalid test ports")
-            if any(overlapping(stem, other) for other in stems):
-                raise RuntimeError(f"{path}: overlapping database suffix/partition allocation")
-            widest = database_stem(team, n, 10**6, spec["db_suffix"])
-            longest = max(DATABASE_BASES, key=len) + widest
-            if len(longest.encode()) + PARTITION_DIGITS > NAME_BYTES:
-                raise RuntimeError(f"{path}: database names would exceed {NAME_BYTES} bytes")
-            ports.add(port)
-            stems.append(stem)
-
-
-def installed(key: str) -> Path | None:
-    """A path install.json records for an operator-installed harness, or None in a checkout.
-    install.py writes install.json beside the installed scripts."""
-    record = Path(__file__).resolve().parent / "install.json"
-    if not record.is_file():
-        return None
-    value = object_fields(json.loads(record.read_text()), str(record)).get(key)
-    require_type(value, str, f"{record}: {key}")
-    return Path(str(value))
-
-
-def installed_source() -> Path | None:
-    """The main checkout an installed harness names, or None in a checkout."""
-    return installed("source")
-
-
-def repo_key(repository: str) -> str:
-    """The root's directory name: the repository name without its owner."""
-    return repository.split("/")[-1]
-
-
-def default_root(checkout: Path, repository: str) -> Path:
-    """The harness and state root: agent_teams/<repository name>/ beside the checkout."""
-    return checkout.resolve().parent / "agent_teams" / repo_key(repository)
-
-
-def claim_root(root: Path, repository: str, checkout: Path) -> Path:
-    """Create the root for this repository on first use, or refuse one that names another,
-    including another owner's repository with the same name. The root must be a real path
-    outside the checkout and outside temporary directories. It is not write-protected;
-    repository.json only keeps two repositories apart."""
-    temporary = [Path(p).resolve() for p in (*TEMPORARY, os.environ.get("TMPDIR", "/tmp"))]
-    if root.resolve() != root:
-        raise RuntimeError(f"Harness root {root} passes through a symlink; refused")
-    for parent in (checkout.resolve(), *temporary):
-        if root == parent or parent in root.parents:
-            raise RuntimeError(f"Harness root {root} is inside {parent}; refused")
-    # Checked before the identity is published and before any record, lock or allocation
-    # is written through them.
-    directories = [contained(root / name, root) for name in ("state", "allocations")]
-    identity = root / "repository.json"
-    if not identity.exists():
-        # Publish a complete identity with one exclusive link: of two first callers, the
-        # second finds the first one's file and is refused below.
-        root.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile("w", dir=root, prefix=".repository.", delete=False) as f:
-            f.write(json.dumps({"repository": repository}) + "\n")
-        try:
-            os.link(f.name, identity)
-        except FileExistsError:
-            pass
-        finally:
-            os.unlink(f.name)
-    fields = object_fields(json.loads(identity.read_text()), str(identity))
-    if fields.get("repository") != repository:
-        raise RuntimeError(f"{root} belongs to {fields.get('repository')}, not {repository}")
-    for directory in directories:
-        directory.mkdir(exist_ok=True)
-    return root
-
-
-def harness_root() -> Path:
-    """The parent of TIPS_TEAM_HARNESS, else the installed harness's recorded root, else
-    the default beside the main checkout; created on first use. It must be a real path
-    outside the repository and outside temporary directories."""
-    override = os.environ.get("TIPS_TEAM_HARNESS")
-    if override:
-        if not Path(override).is_absolute():
-            raise RuntimeError("TIPS_TEAM_HARNESS must be an absolute path")
-        root = Path(override).parent
-    else:
-        root = installed("root") or default_root(main, cfg["github"]["repository"])
-    return claim_root(root, cfg["github"]["repository"], main)
-
-
-def state_dir() -> Path:
-    return harness_root() / "state"
-
-
-def contained(path: Path, parent: Path) -> Path:
-    """Refuse a path that leaves its trusted parent or passes through a symlink."""
-    if path.resolve() != path or parent not in path.parents:
-        raise RuntimeError(f"{path} escapes {parent} or passes through a symlink; refused")
-    return path
-
-
 # --- Records and allocations -----------------------------------------------
 
-def allocation_paths(ident: str) -> tuple[Path, Path, Path, Path]:
-    """The allocation's directory, its project and logs, and its launcher configuration.
-
-    The allocation directory is the client's working root, so a Codex sandbox can write the
-    clone's `.git`; the launcher configuration is outside it."""
-    root = harness_root()
-    base = root / "allocations" / ident
-    return base, base / "project", base / "logs", root / "state" / ident
-
-
-def project_of(allocation: Allocation) -> Path:
-    return Path(allocation["root"]) / "project"
-
-
 def record_path(slot: int) -> Path:
-    return state_dir() / f"{slot}.json"
+    return conf.state_dir() / f"{slot}.json"
 
 
 def next_generation() -> int:
     """A generation this store never handed out before; call it under the lock."""
-    path = state_dir() / "generation"
+    path = conf.state_dir() / "generation"
     last = int(path.read_text()) if path.is_file() else 0
     staged = path.with_suffix(".tmp")
     staged.write_text(f"{last + 1}\n")
@@ -812,8 +349,8 @@ def store_lock() -> Generator[None]:
     opens the file non-inheritable and `subprocess` closes other descriptors by default, so
     a child does not receive it.
     """
-    path = state_dir() / ".lock"
-    seconds = cfg["timeouts"]["lock_seconds"]
+    path = conf.state_dir() / ".lock"
+    seconds = conf.settings()["timeouts"]["lock_seconds"]
     with path.open("a") as handle:
         deadline = time.monotonic() + seconds
         while True:
@@ -832,7 +369,7 @@ def store_lock() -> Generator[None]:
 
 def records() -> dict[int, Record]:
     """Every slot's record; slot discovery reads these, not Herdr."""
-    legacy = sorted((main / "agent/teams/allocations").glob("*.json"))
+    legacy = sorted((conf.main_checkout() / "agent/teams/allocations").glob("*.json"))
     if legacy:
         raise RuntimeError(
             f"{legacy[0]} was written by a team.py that used shared worktrees; refusing every "
@@ -841,7 +378,7 @@ def records() -> dict[int, Record]:
         )
     found: dict[int, Record] = {}
     # Slot records are <slot>.json; other files there, such as dispatcher.json, are not.
-    for path in sorted(p for p in state_dir().glob("*.json") if p.stem.isdecimal()):
+    for path in sorted(p for p in conf.state_dir().glob("*.json") if p.stem.isdecimal()):
         record = load_record(path)
         if path.stem != str(record["slot"]):
             raise RuntimeError(f"{path}: file name does not match slot {record['slot']}")
@@ -859,14 +396,10 @@ def find_slot(brief: str) -> tuple[int, Record | None]:
     for slot, record in taken.items():
         if record["brief"] == brief:
             return slot, record
-    for slot in range(1, cfg["team"]["max_teams"] + 1):
+    for slot in range(1, conf.settings()["team"]["max_teams"] + 1):
         if slot not in taken:
             return slot, None
-    raise RuntimeError(f"No free slot: team.max_teams is {cfg['team']['max_teams']}")
-
-
-def live_name(slot: int, entry: str) -> str:
-    return f"team-{slot}-{entry}"
+    raise RuntimeError(f"No free slot: team.max_teams is {conf.settings()['team']['max_teams']}")
 
 
 def reserved() -> list[Allocation]:
@@ -904,13 +437,15 @@ def roster(brief: str) -> tuple[str, list[str], list[str]]:
     except ValueError as error:
         raise RuntimeError(f"Brief #{brief}: {error}") from error
     for name in (implementer, *names):
-        if name not in cfg["agents"]:
+        if name not in conf.settings()["agents"]:
             raise RuntimeError(f"Brief #{brief} names {name!r}, which is not a configured entry")
-    if cfg["agents"][implementer]["role"] != "implementer":
+    if conf.settings()["agents"][implementer]["role"] != "implementer":
         raise RuntimeError(f"Brief #{brief}: Implementer {implementer} is not an implementer entry")
     if implementer in names:
         raise RuntimeError(f"Brief #{brief}: implementer {implementer} cannot review its own PR")
-    by_role = {role: [n for n in names if cfg["agents"][n]["role"] == role] for role in ROLES}
+    by_role = {
+        role: [n for n in names if conf.settings()["agents"][n]["role"] == role] for role in ROLES
+    }
     if by_role["implementer"]:
         raise RuntimeError(f"Brief #{brief}: Required reviews names implementer entries")
     if not by_role["tester"]:
@@ -919,20 +454,6 @@ def roster(brief: str) -> tuple[str, list[str], list[str]]:
 
 
 # --- GitHub comments -------------------------------------------------------
-
-COMMENT_TYPES = (
-    "PROPOSAL",
-    "CRITIQUE",
-    "QUESTION",
-    "ANSWER",
-    "AGREE",
-    "FINDING",
-    "BLOCKED",
-    "DONE",
-    "EVENT",
-)
-HEADER = re.compile(r"^(?P<type>[A-Z]+) (?P<role>\S+) (?P<name>\S+) (?P<session>\S+)$")
-
 
 def comment_header(kind: str, role: str, name: str, session: str) -> str:
     """The attribution line `<TYPE> <role> <name> <session>`."""
@@ -957,33 +478,6 @@ def github(
 
 def deadline_from_now() -> float:
     return time.monotonic() + READ_SECONDS
-
-
-def github_settings() -> GitHubSettings | None:
-    """The configured repository settings; None before configure()."""
-    try:
-        return cfg["github"]
-    except NameError:
-        return None
-
-
-def github_seconds() -> int:
-    """The deadline of one adapter or review GitHub call; timeouts.github_seconds overrides it."""
-    try:
-        return cfg["timeouts"].get("github_seconds", READ_SECONDS)
-    except NameError:
-        return READ_SECONDS
-
-
-def repository(deadline: float | None = None) -> str:
-    """The configured owner/name; never discovered from a working directory. A module that
-    imports team.py without configure(), such as pr_review.py under `team.py turn`, reads
-    the same configuration file."""
-    del deadline
-    try:
-        return cfg["github"]["repository"]
-    except NameError:
-        return load_config()[1]["github"]["repository"]
 
 
 def repo_args() -> list[str]:
@@ -1050,7 +544,9 @@ def post_event(brief: str, allocation: Allocation, text: str) -> None:
 # --- Tools and the client environment --------------------------------------
 
 def dexter_binary() -> Path:
-    home = Path(os.environ.get("TIPS_DEXTER_HOME", str(main / "agent/lsp/dexter"))).resolve()
+    home = Path(
+        os.environ.get("TIPS_DEXTER_HOME", str(conf.main_checkout() / "agent/lsp/dexter"))
+    ).resolve()
     binary = home / "vendor/dexter"
     if not os.access(binary, os.X_OK):
         raise RuntimeError(f"Missing executable: {binary}; run agent/lsp/dexter/build.sh.")
@@ -1060,13 +556,18 @@ def dexter_binary() -> Path:
 def elixir_sources(cwd: Path) -> Path:
     """The Elixir standard-library sources Dexter indexes for a project."""
     version = run(
-        "elixir", "--short-version", cwd=cwd, timeout=cfg["timeouts"]["dexter_startup_seconds"]
+        "elixir",
+        "--short-version",
+        cwd=cwd,
+        timeout=conf.settings()["timeouts"]["dexter_startup_seconds"],
     )
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?", version):
         raise RuntimeError(f"Unexpected Elixir version: {version!r}")
     explicit = os.environ.get("DEXTER_ELIXIR_LIB_ROOT")
     sources = (
-        Path(explicit) if explicit else main / "agent/lsp/vendor" / f"elixir-{version}" / "lib"
+        Path(explicit)
+        if explicit
+        else conf.main_checkout() / "agent/lsp/vendor" / f"elixir-{version}" / "lib"
     )
     recorded = sources.parent / "VERSION"
     if (
@@ -1081,17 +582,12 @@ def elixir_sources(cwd: Path) -> Path:
 
 
 def test_port(entry: str, slot: int) -> int:
-    team = cfg["team"]
-    return team["port_base"] + team["port_stride"] * slot + cfg["agents"][entry]["port_offset"]
-
-
-def harness() -> Path:
-    """The harness scripts workers call: <root>/harness/agent/teams for an installed
-    harness, so commands keep working after the link moves to a new release; otherwise
-    the running checkout's scripts."""
-    if installed("root") is not None:
-        return harness_root() / "harness/agent/teams"
-    return Path(__file__).resolve().parent
+    team = conf.settings()["team"]
+    return (
+        team["port_base"]
+        + team["port_stride"] * slot
+        + conf.settings()["agents"][entry]["port_offset"]
+    )
 
 
 def agent_env(allocation: Allocation) -> dict[str, str]:
@@ -1099,20 +595,20 @@ def agent_env(allocation: Allocation) -> dict[str, str]:
     config = config_location()[1].absolute()  # the file this command read
     project = project_of(allocation)
     env = {
-        "PGPORT": str(cfg["team"]["postgres_port"]),
+        "PGPORT": str(conf.settings()["team"]["postgres_port"]),
         "TIPS_DB_SUFFIX": allocation["db_suffix"],
         "TIPS_TEST_PORT": str(allocation["port"]),
         "MIX_ENV": "test",
-        "TIPS_CHECK_TIMEOUT_SECONDS": str(cfg["timeouts"]["checks_minutes"] * 60),
+        "TIPS_CHECK_TIMEOUT_SECONDS": str(conf.settings()["timeouts"]["checks_minutes"] * 60),
         "TIPS_TEAM_CONFIG": str(config),
         # Provider settings are read by path from the main checkout; nothing is copied.
-        "TIPS_PROVIDER_ENV_FILE": str(main / ".env"),
+        "TIPS_PROVIDER_ENV_FILE": str(conf.main_checkout() / ".env"),
         "TIPS_DEXTER": str(project / ".dexter/dexter.sh"),
         # Worker-side commands resolve the same root, as PR5's install layout defines it.
-        "TIPS_TEAM_HARNESS": str(harness_root() / "harness"),
+        "TIPS_TEAM_HARNESS": str(conf.harness_root() / "harness"),
         "TIPS_TEAM_ALLOCATION_ID": allocation["id"],
         "TIPS_TEAM_LAUNCH": allocation["launch"],
-        "TIPS_TEAM_STATE": str(state_dir()),
+        "TIPS_TEAM_STATE": str(conf.state_dir()),
     }
     if allocation["kind"] == "codex":
         # Codex's sandbox cannot write the shared Hex cache in the home directory.
@@ -1123,10 +619,10 @@ def agent_env(allocation: Allocation) -> dict[str, str]:
 def tools() -> tuple[Path, Path, Path]:
     """Check the shared tools before reserving anything; return the Dexter binary, the
     shared skills and the Elixir sources."""
-    binary, skills = dexter_binary(), main / ".agents/skills"
+    binary, skills = dexter_binary(), conf.main_checkout() / ".agents/skills"
     if not skills.is_dir():
         raise RuntimeError("Shared skills directory is missing.")
-    return binary, skills, elixir_sources(main)
+    return binary, skills, elixir_sources(conf.main_checkout())
 
 
 def allocate(record: Record, entry: str, role: str) -> Allocation:
@@ -1134,7 +630,9 @@ def allocate(record: Record, entry: str, role: str) -> Allocation:
     empty project and logs, and its launcher configuration directory, under the trusted
     root."""
     slot, generation = record["slot"], record["generation"]
-    suffix = database_stem(cfg["team"], slot, generation, cfg["agents"][entry]["db_suffix"])
+    suffix = database_stem(
+        conf.settings()["team"], slot, generation, conf.settings()["agents"][entry]["db_suffix"]
+    )
     port = test_port(entry, slot)
     for held in reserved():
         if overlapping(suffix, held["db_suffix"]) or port == held["port"]:
@@ -1145,7 +643,7 @@ def allocate(record: Record, entry: str, role: str) -> Allocation:
     if len((max(DATABASE_BASES, key=len) + suffix).encode()) + PARTITION_DIGITS > NAME_BYTES:
         raise RuntimeError(f"{entry}: database names for {suffix} exceed {NAME_BYTES} bytes")
     ident = f"g{generation}-{entry}"
-    root = harness_root()
+    root = conf.harness_root()
     for directory in allocation_paths(ident):
         # Checked before creation too: a symlinked parent would put the new directory
         # outside the root before the check after it could refuse.
@@ -1157,7 +655,7 @@ def allocate(record: Record, entry: str, role: str) -> Allocation:
         entry=entry,
         role=role,
         name=live_name(slot, entry),
-        kind=cfg["agents"][entry]["kind"],
+        kind=conf.settings()["agents"][entry]["kind"],
         root=str(allocation_paths(ident)[0]),
         db_suffix=suffix,
         port=port,
@@ -1181,7 +679,7 @@ def earlier_launch(record: Record, entry: str) -> list[str]:
     """
     held = {a["id"] for r in [*records().values(), record] for a in r["agents"].values()}
     found: list[str] = []
-    for path in sorted(state_dir().glob("*/bootstrap.json")):
+    for path in sorted(conf.state_dir().glob("*/bootstrap.json")):
         settings = object_fields(json.loads(path.read_text()), str(path))
         if (
             (settings.get("issue"), settings.get("entry")) == (record["brief"], entry)
@@ -1227,9 +725,9 @@ def configure_bootstrap(record: Record, allocation: Allocation, branch: str, com
         "kind": allocation["kind"],
         "project": str(project),
         "logs": str(logs),
-        "clone_url": cfg["team"]["clone_url"],
-        "repository": cfg["github"]["repository"],
-        "startup_seconds": cfg["timeouts"]["dexter_startup_seconds"],
+        "clone_url": conf.settings()["team"]["clone_url"],
+        "repository": conf.settings()["github"]["repository"],
+        "startup_seconds": conf.settings()["timeouts"]["dexter_startup_seconds"],
         "branch": branch,
         "commit": commit,
         "dexter": str(binary),
@@ -1286,7 +784,7 @@ def open_pane(record: Record, allocation: Allocation) -> None:
     The team shares one workspace, labelled after its slot and brief. Each role has one
     tab; a second client of the role is a split of the tab's last pane.
     """
-    label = TABS[cfg["agents"][allocation["entry"]]["role"]]
+    label = TABS[conf.settings()["agents"][allocation["entry"]]["role"]]
     panes = live_panes(record["workspace"])
     if allocation["pane"] in {p["pane_id"] for p in panes}:
         return
@@ -1371,7 +869,7 @@ def enter(pane: str, root: Path, env: dict[str, str]) -> None:
         "--source",
         "recent-unwrapped",
         "--timeout",
-        str(cfg["timeouts"]["shell_seconds"] * 1000),
+        str(conf.settings()["timeouts"]["shell_seconds"] * 1000),
     )
 
 
@@ -1472,16 +970,6 @@ def design_brief(record: Record, entry: str) -> str:
     )
 
 
-def agent_spec(allocation: Allocation) -> AgentSpec:
-    """The entry's current model settings; its kind and resources stay as recorded."""
-    spec = cfg["agents"].get(allocation["entry"])
-    if spec is None:
-        raise RuntimeError(f"{allocation['entry']} was removed from config.toml; restore it first")
-    if spec["kind"] != allocation["kind"]:
-        raise RuntimeError(f"{allocation['entry']} was launched as {allocation['kind']}; preserved")
-    return spec
-
-
 def client_args(allocation: Allocation, prompt: str, session: str) -> list[str]:
     """Client arguments. Claude keeps the brief as its system prompt and waits for its first
     message; it runs the session id the launcher assigned, because Herdr learns session ids
@@ -1489,7 +977,7 @@ def client_args(allocation: Allocation, prompt: str, session: str) -> list[str]:
     documented signal shows that it accepted a task passed at start, so launch sends its
     brief as the first message. Both start in the allocation directory, which holds the
     project and its logs."""
-    spec, policies = agent_spec(allocation), cfg["launch"]
+    spec, policies = agent_spec(allocation), conf.settings()["launch"]
     if spec["kind"] == "codex":
         args = ["-a", policies["codex_approval"], "-C", allocation["root"]]
         if spec["model"]:
@@ -1633,7 +1121,7 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
         "--pane",
         pane,
         "--timeout",
-        str(cfg["timeouts"]["launch_seconds"] * 1000),
+        str(conf.settings()["timeouts"]["launch_seconds"] * 1000),
         "--",
         *args,
     )
@@ -1731,7 +1219,7 @@ def start(brief: str) -> None:
 
 def design(spec: str, entry: str) -> None:
     """Launch a designer for the spec in its own allocation, through the same lifecycle."""
-    agent = cfg["agents"].get(entry)
+    agent = conf.settings()["agents"].get(entry)
     if agent is None or agent["role"] != "designer":
         raise RuntimeError(f"{entry} is not a configured designer entry")
     tools()
@@ -2029,10 +1517,6 @@ def turn(pr: str, recipient: str) -> None:
 
 # --- Retirement and stop ---------------------------------------------------
 
-RETIREMENT = "TEAM_RETIREMENT "
-Reports = dict[str, tuple[dict[str, object], str]]
-
-
 def retirement_reports(record: Record) -> Reports:
     """Each allocation's latest retirement report on the issue from its current launch:
     posted under the client's recorded name and session, naming the recorded launch. A
@@ -2074,7 +1558,7 @@ def request_reports(record: Record, missing: list[str], running: set[str]) -> No
     ]
     failed = deliver(sends)
     stopped = [
-        f"{a['name']}: cd {a['root']} && TIPS_TEAM_STATE={state_dir()} "
+        f"{a['name']}: cd {a['root']} && TIPS_TEAM_STATE={conf.state_dir()} "
         f"TIPS_TEAM_ALLOCATION_ID={a['id']} TIPS_TEAM_LAUNCH={a['launch']} {command}"
         for e, a in record["agents"].items()
         if e in missing and e not in running
@@ -2097,7 +1581,7 @@ def retirement_paths(allocation: Allocation) -> tuple[Path, Path, Path, Path]:
             f"{allocation['name']}: recorded allocation {allocation['root']} is not "
             f"{paths[0]}; preserved"
         )
-    trusted = harness_root()
+    trusted = conf.harness_root()
     for directory in paths:
         if directory.exists() or directory.is_symlink():
             contained(directory, trusted)
@@ -2135,15 +1619,15 @@ def stop_daemon(project: Path, config: Path) -> None:
     argv, extra = dexter_invocation(str(settings["dexter"]), project, str(settings["sources"]))
     result = execute(
         [*argv, "stop"],
-        cwd=state_dir(),
+        cwd=conf.state_dir(),
         env={**os.environ, **extra},
-        timeout=cfg["timeouts"]["dexter_startup_seconds"],
+        timeout=conf.settings()["timeouts"]["dexter_startup_seconds"],
         input_text="",
     )
     if result.returncode:
         error = (result.stderr or result.stdout).strip()
         raise RuntimeError(f"Dexter stop for {project} failed: {error}; the reservation is kept")
-    deadline = time.monotonic() + cfg["timeouts"]["shutdown_seconds"]
+    deadline = time.monotonic() + conf.settings()["timeouts"]["shutdown_seconds"]
     while daemon_alive(project):
         if time.monotonic() >= deadline:
             raise RuntimeError(f"Dexter still serves {project}; the reservation is kept")
@@ -2160,7 +1644,7 @@ def port_in_use(port: int) -> bool:
 def merged_brief(brief: str) -> bool:
     """Whether GitHub reports the brief closed by a merged PR. stop holds the store lock, so
     every read shares one timeouts.shell_seconds budget; a late answer keeps the record."""
-    seconds = cfg["timeouts"]["shell_seconds"]
+    seconds = conf.settings()["timeouts"]["shell_seconds"]
     deadline = time.monotonic() + seconds
 
     def read(*args: str) -> object:
@@ -2208,10 +1692,10 @@ def drop_databases(suffixes: list[str]) -> list[str]:
     """Drop exactly the recorded databases and their numbered partitions with the trusted
     psql command: no FORCE, no project compose or configuration. The first refusal stops
     the drop and keeps the reservation."""
-    psql = [*cfg["team"]["psql"], "-X", "-v", "ON_ERROR_STOP=1"]
-    timeout = cfg["timeouts"]["launch_seconds"]
+    psql = [*conf.settings()["team"]["psql"], "-X", "-v", "ON_ERROR_STOP=1"]
+    timeout = conf.settings()["timeouts"]["launch_seconds"]
     listing = execute(
-        [*psql, "-Atc", "SELECT datname FROM pg_database"], cwd=state_dir(), timeout=timeout
+        [*psql, "-Atc", "SELECT datname FROM pg_database"], cwd=conf.state_dir(), timeout=timeout
     )
     if listing.returncode:
         raise RuntimeError(f"psql could not list databases: {listing.stderr.strip()}; preserved")
@@ -2220,7 +1704,7 @@ def drop_databases(suffixes: list[str]) -> list[str]:
         if recorded_databases(db, suffixes):
             # Without FORCE, a remaining connection makes PostgreSQL refuse the drop.
             statement = 'DROP DATABASE "' + db.replace('"', '""') + '"'
-            result = execute([*psql, "-c", statement], cwd=state_dir(), timeout=timeout)
+            result = execute([*psql, "-c", statement], cwd=conf.state_dir(), timeout=timeout)
             if result.returncode:
                 raise RuntimeError(
                     f"PostgreSQL refused to drop {db}: {result.stderr.strip()}. Dropped: "
@@ -2273,7 +1757,7 @@ def list_retained() -> None:
     established that the work is preserved and every writer has stopped, deletes an
     allocation by its ID."""
     found = False
-    for path in sorted(state_dir().glob("*/retired.json")):
+    for path in sorted(conf.state_dir().glob("*/retired.json")):
         note = object_fields(json.loads(path.read_text()), str(path))
         root = allocation_paths(str(note.get("id")))[0]
         if not root.exists():
@@ -2391,27 +1875,8 @@ def client_state(allocation: Allocation, panes: set[str], agents: dict[str, Enti
 
 # --- Dispatcher record, status and CLI -------------------------------------
 
-class DispatcherLaunch(TypedDict):
-    """The launched dispatcher client: its process id and start time, pane and session.
-
-    A restricted client reports no session to Herdr, so this record is its identity: the
-    launcher execs the client, which keeps the launcher's process id.
-    """
-
-    pid: int
-    started: str
-    pane: str
-    session: str
-
-
 def dispatcher_path() -> Path:
-    return harness_root() / "state/dispatcher.json"
-
-
-# Written by the adapter when it first lists its tools: the client has them.
-DISPATCHER_READY = "dispatcher.ready"
-# Written by the dispatcher's starter when it could not send the first prompt.
-DISPATCHER_RECOVERY = "dispatcher.recovery"
+    return conf.harness_root() / "state/dispatcher.json"
 
 
 def dispatcher_note(name: str, session: str) -> str | None:
@@ -2522,24 +1987,17 @@ def prompt_agent(brief: str, entry: str, text: str) -> None:
     print(f"Prompted {allocation['name']}")
 
 
-def configure() -> None:
-    global main, cfg
-    if os.environ.get("HERDR_ENV") != "1":
-        raise RuntimeError("Run inside Herdr (HERDR_ENV=1)")
-    main, cfg = load_config()
-
-
 def stop_agent(pane: str, root: str | Path) -> None:
     """Stop the client gracefully; raise an error if its exit is uncertain.
 
     The caller must keep the checkout.
     """
-    configure()
+    conf.configure()
     stop(pane, root)
 
 
 def cli() -> None:
-    configure()
+    conf.configure()
     args = sys.argv[1:]
     usage = (
         "Usage: agent/teams/team.py start <brief> | design <spec> <entry> | "

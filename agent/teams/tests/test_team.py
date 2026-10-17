@@ -19,7 +19,8 @@ from typing import Any
 from unittest import mock
 
 from bootstrap import wrapper_text
-from team import claim_root, command_args, execute
+from commands import command_args, execute
+from config import claim_root
 
 SCRIPT = Path(__file__).resolve().parents[1] / "team.py"
 # Deliberately fixed test data: changing production defaults must not rewrite tests.
@@ -853,8 +854,8 @@ class Harness(unittest.TestCase):
             ".codex/\n.agents/\n.dexter/\n.worktrees/\nagent/lsp/dexter/vendor/\n"
             "agent/teams/allocations/\ndeps/\ntmp/\n"
         )
-        for script in ("team.py", "board.py", "pr_review.py", "bootstrap.py", "retirement.py"):
-            (self.repo / "agent/teams" / script).write_text((SCRIPT.parent / script).read_text())
+        for script in [*sorted(SCRIPT.parent.glob("*.py")), SCRIPT.parent / "dispatch"]:
+            (self.repo / "agent/teams" / script.name).write_text(script.read_text())
         self.write_config(CONFIG)
         (self.repo / "tracked.txt").write_text("base\n")
         binary = self.repo / "agent/lsp/dexter/vendor/dexter"
@@ -2590,7 +2591,7 @@ class RepositoryConfigTest(unittest.TestCase):
 
     def test_shipped_configuration_validates(self) -> None:
         env = dict(os.environ, TIPS_TEAM_CONFIG=str(SCRIPT.parent / "config.toml"))
-        code = "import sys; sys.path.insert(0,sys.argv[1]); from team import load_config; "
+        code = "import sys; sys.path.insert(0,sys.argv[1]); from config import load_config; "
         result = execute(["python3", "-c", code + "load_config()", str(SCRIPT.parent)], env=env)
         assert result.returncode == 0, result.stderr
 

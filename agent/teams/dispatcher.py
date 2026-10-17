@@ -22,6 +22,8 @@ import uuid
 from pathlib import Path
 from typing import cast
 
+import commands
+import config as conf
 import team
 
 HERE = Path(__file__).resolve().parent
@@ -105,7 +107,7 @@ def client_args(settings: dict[str, object], session: str, config: Path) -> list
 def note(state: Path, name: str, session: str) -> bool:
     """Whether state/<name> was written for this session."""
     try:
-        fields = team.object_fields(json.loads((state / name).read_text()), name)
+        fields = commands.object_fields(json.loads((state / name).read_text()), name)
     except (OSError, ValueError, RuntimeError):
         return False
     return fields.get("session") == session
@@ -114,7 +116,7 @@ def note(state: Path, name: str, session: str) -> bool:
 def call(args: list[str], seconds: float) -> str | None:
     """Run one Herdr command; None on success, else the failure with its cause."""
     try:
-        result = team.execute(args, timeout=seconds)
+        result = commands.execute(args, timeout=seconds)
     except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
         return f"{' '.join(args[:3])}: {error}"
     if result.returncode:
@@ -123,15 +125,15 @@ def call(args: list[str], seconds: float) -> str | None:
     return None
 
 
-def ready_client(state: Path, launch: team.DispatcherLaunch, seconds: float) -> bool:
+def ready_client(state: Path, launch: conf.DispatcherLaunch, seconds: float) -> bool:
     """Whether the adapter has listed its tools to this session and Herdr sees the recorded
     launched process in the pane, ready for input. A failed read counts as not ready."""
-    if not note(state, team.DISPATCHER_READY, launch["session"]):
+    if not note(state, conf.DISPATCHER_READY, launch["session"]):
         return False
     pane = launch["pane"]
     try:
-        info = team.execute(["herdr", "pane", "process-info", "--pane", pane], timeout=seconds)
-        agent = team.execute(["herdr", "agent", "get", pane], timeout=seconds)
+        info = commands.execute(["herdr", "pane", "process-info", "--pane", pane], timeout=seconds)
+        agent = commands.execute(["herdr", "agent", "get", pane], timeout=seconds)
         if info.returncode or agent.returncode:
             return False
         leader = team.parse_herdr(info.stdout)["process_info"]["foreground_process_group_id"]
@@ -146,7 +148,7 @@ def ready_client(state: Path, launch: team.DispatcherLaunch, seconds: float) -> 
     )
 
 
-def start_when_ready(state: Path, launch: team.DispatcherLaunch, seconds: float) -> int:
+def start_when_ready(state: Path, launch: conf.DispatcherLaunch, seconds: float) -> int:
     """Once the client has the tools and is ready for input, name it `dispatcher` and send
     `Begin.`, the same Herdr prompt path team.py uses for workers. Otherwise tell the
     operator what happened and what to run, in a Herdr notification and in
@@ -178,10 +180,10 @@ def start_when_ready(state: Path, launch: team.DispatcherLaunch, seconds: float)
     )
 
 
-def give_up(state: Path, launch: team.DispatcherLaunch, seconds: float, what: str) -> int:
+def give_up(state: Path, launch: conf.DispatcherLaunch, seconds: float, what: str) -> int:
     message = f"Dispatcher in {launch['pane']}: {what}"
     with contextlib.suppress(OSError):
-        recovery = state / team.DISPATCHER_RECOVERY
+        recovery = state / conf.DISPATCHER_RECOVERY
         recovery.write_text(json.dumps({"session": launch["session"], "text": message}) + "\n")
     show = ["herdr", "notification", "show", "Dispatcher not started", "--body", message]
     call(show, seconds)
@@ -197,7 +199,7 @@ def hold_start_lock() -> int:
     descriptor, runs. That serializes check, record and exec, and the kernel releases it
     when they exit, so a crash leaves nothing to clean up.
     """
-    path = team.harness_root() / "state/dispatcher.lock"
+    path = conf.harness_root() / "state/dispatcher.lock"
     descriptor = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
     try:
         fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -222,7 +224,7 @@ def start_here(settings: dict[str, object], main: Path, config: Path, launch_sec
             f"The dispatcher is already running as pid {launch['pid']} in {launch['pane']}; "
             "start one only."
         )
-    listed = team.parse_herdr(team.run("herdr", "agent", "list", timeout=launch_seconds))
+    listed = team.parse_herdr(commands.run("herdr", "agent", "list", timeout=launch_seconds))
     named = [a["pane_id"] for a in listed["agents"] if a.get("name") == "dispatcher"]
     if named:
         raise RuntimeError(
@@ -232,7 +234,7 @@ def start_here(settings: dict[str, object], main: Path, config: Path, launch_sec
     session = str(uuid.uuid4())
     args = client_args(settings, session, config)
     state = team.dispatcher_path().parent
-    for name in (team.DISPATCHER_READY, team.DISPATCHER_RECOVERY):
+    for name in (conf.DISPATCHER_READY, conf.DISPATCHER_RECOVERY):
         (state / name).unlink(missing_ok=True)
     # This process becomes the client through exec, so its id and start time identify it.
     launch = team.record_dispatcher(pane, session)
@@ -249,16 +251,16 @@ def start_here(settings: dict[str, object], main: Path, config: Path, launch_sec
     os.chdir(main)
     env = dict(os.environ, CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=str(settings["compact_percent"]))
     print(f"Dispatcher session {session}", flush=True)
-    os.execvpe(team.command_args(args)[0], args, env)  # noqa: S606
+    os.execvpe(commands.command_args(args)[0], args, env)  # noqa: S606
 
 
 def pane_width(layout: str, pane: str) -> int:
-    result = team.object_fields(json.loads(layout), "Herdr layout").get("result")
-    panes = team.object_fields(team.object_fields(result, "result").get("layout"), "layout")
-    for entry in team.object_list(panes.get("panes"), "panes"):
+    result = commands.object_fields(json.loads(layout), "Herdr layout").get("result")
+    panes = commands.object_fields(commands.object_fields(result, "result").get("layout"), "layout")
+    for entry in commands.object_list(panes.get("panes"), "panes"):
         if entry.get("pane_id") == pane:
-            width = team.object_fields(entry.get("rect"), "rect").get("width")
-            team.require_type(width, int, "pane width")
+            width = commands.object_fields(entry.get("rect"), "rect").get("width")
+            commands.require_type(width, int, "pane width")
             return int(str(width))
     raise RuntimeError(f"Herdr layout has no pane {pane}")
 
@@ -266,13 +268,13 @@ def pane_width(layout: str, pane: str) -> int:
 def start_in_new_pane(main: Path, config: Path, launch_seconds: int) -> None:
     if not os.environ.get("HERDR_PANE_ID"):
         raise RuntimeError("--new-pane requires a session running inside Herdr.")
-    layout = team.run("herdr", "pane", "layout", "--current", timeout=launch_seconds)
+    layout = commands.run("herdr", "pane", "layout", "--current", timeout=launch_seconds)
     direction = "right" if pane_width(layout, os.environ["HERDR_PANE_ID"]) >= 120 else "down"
     split = ["pane", "split", "--current", "--direction", direction, "--cwd", str(main)]
-    created = team.run("herdr", *split, "--no-focus", timeout=launch_seconds)
+    created = commands.run("herdr", *split, "--no-focus", timeout=launch_seconds)
     pane = team.parse_herdr(created)["pane"]["pane_id"]
     command = f"TIPS_TEAM_CONFIG={shlex.quote(str(config))} {shlex.quote(str(HERE / 'dispatch'))}"
-    team.run("herdr", "pane", "run", pane, command, timeout=launch_seconds)
+    commands.run("herdr", "pane", "run", pane, command, timeout=launch_seconds)
     print(
         f"Dispatcher launch submitted to Herdr pane {pane}. "
         "Check that pane for startup or approval prompts."
@@ -281,19 +283,19 @@ def start_in_new_pane(main: Path, config: Path, launch_seconds: int) -> None:
 
 def main(argv: list[str]) -> None:
     if argv[:1] == ["--start"] and len(argv) == 4:
-        launch = cast(team.DispatcherLaunch, team.object_fields(json.loads(argv[2]), "launch"))
+        launch = cast(conf.DispatcherLaunch, commands.object_fields(json.loads(argv[2]), "launch"))
         sys.exit(start_when_ready(Path(argv[1]), launch, float(argv[3])))
     if argv not in ([], ["--new-pane"]):
         raise SystemExit("Usage: agent/teams/dispatch [--new-pane]")
     if os.environ.get("HERDR_ENV") != "1":
         raise RuntimeError("Run inside Herdr (HERDR_ENV=1)")
-    main_checkout, config = team.config_location()
-    team.main, team.cfg = team.load_config()
-    if not team.github_settings():
+    main_checkout, config = conf.config_location()
+    conf.configure()
+    if not conf.github_settings():
         raise RuntimeError(f"{config} has no [github] table; the adapter needs it")
     with config.open("rb") as file:
         settings = tomllib.load(file)["dispatcher"]
-    launch_seconds = team.cfg["timeouts"]["launch_seconds"]
+    launch_seconds = conf.settings()["timeouts"]["launch_seconds"]
     if argv == ["--new-pane"]:
         start_in_new_pane(main_checkout, config, launch_seconds)
     else:
