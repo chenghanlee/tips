@@ -2083,6 +2083,7 @@ class RetirementTest(Harness):
             "launch": launch,
             "cloned": True,
             "clean": True,
+            "dirty": [],
             "unpushed": 0,
             "merged": True,
             "head": before,
@@ -2187,7 +2188,9 @@ class RetirementTest(Harness):
         # A report from the current launch is accepted, and it shows the unpreserved work.
         self.retire("team-1-impl", "team-1-tester")
         refused = self.team("stop", "29", ok=False)
-        assert "team-1-tester reported uncommitted or unpushed work" in refused.stderr
+        assert "team-1-tester reported uncommitted or unpushed work (?? unfinished.txt)" in (
+            refused.stderr
+        )
 
     def test_an_open_brief_is_refused_before_any_client_is_asked(self) -> None:
         self.databases("tips_test_t1g1i")
@@ -2231,8 +2234,11 @@ class RetirementTest(Harness):
         self.retire("team-1-impl", "team-1-tester")
         self.clients_exit(1)
         refused = self.team("stop", "29", ok=False).stderr
-        assert "team-1-impl reported uncommitted or unpushed work" in refused
+        assert "team-1-impl reported uncommitted or unpushed work (?? uncommitted)" in refused
         assert "the record, databases, files and reservation are kept" in refused
+        report = self.comments("29")[-2]["body"].splitlines()
+        assert json.loads(report[1].removeprefix("TEAM_RETIREMENT "))["dirty"] == ["?? uncommitted"]
+        assert report[2].endswith("; dirty: ?? uncommitted")
         assert self.remaining_databases() == ["tips_test_t1g1i", "tips_test_t1g1r"]
         assert (project / "uncommitted").read_text() == "keep"
         assert self.recorded_briefs() == {"29"}
