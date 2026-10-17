@@ -45,8 +45,11 @@ ADAPTER_GH = r"""#!/usr/bin/env python3
 import json, os, sys, time
 from pathlib import Path
 a = sys.argv[1:]
-if a[0] in ("pr", "issue") and ["--repo", "o/r"] not in [a[i : i + 2] for i in range(len(a))]:
+pairs = [a[i : i + 2] for i in range(len(a))]
+if a[0] in ("pr", "issue") and ["--repo", "o/r"] not in pairs:
     sys.exit("fixture gh: no --repo o/r in " + repr(a))
+if a[0] == "project" and a[1] != "item-edit" and ["--owner", "o"] not in pairs:
+    sys.exit("fixture gh: no --owner o in " + repr(a))
 path = Path(os.environ["HERDR_FIXTURE"])
 s = json.loads(path.read_text())
 base = str(Path(sys.argv[0]).with_name("gh-base"))
@@ -98,8 +101,6 @@ class AdapterTest(Harness):
     def setUp(self) -> None:
         super().setUp()
         (self.repo / "agent/teams/adapter.py").write_text((TEAMS / "adapter.py").read_text())
-        config = CONFIG.replace("checks_minutes = 30", "checks_minutes = 30\ngithub_seconds = 2")
-        self.write_config(config)
         self.commit("adapter")
         self.git("push", "-q", "origin", "main")
         (self.bin / "gh").rename(self.bin / "gh-base")
@@ -117,13 +118,24 @@ class AdapterTest(Harness):
         from mcp.client.session import ClientSession
         from mcp.client.stdio import StdioServerParameters, stdio_client
 
+        # A cwd-relative PATH entry and Python path injection must not reach commands. The
+        # relative entry names a planted gh and git under the client's cwd and under the
+        # main checkout (in its ignored tmp/); each records that it ran.
+        marker = self.root / "relative-bin-ran"
+        for cwd in (self.root, self.repo):
+            planted = cwd / "tmp/relative-bin"
+            planted.mkdir(parents=True, exist_ok=True)
+            for name, real in (("gh", self.bin / "gh"), ("git", self.adapter_bin / "git")):
+                script = f'#!/bin/sh\necho {name} >> "{marker}"\nexec "{real}" "$@"\n'
+                (planted / name).write_text(script)
+                (planted / name).chmod(0o755)
         env = {
             **self.env,
             "TIPS_DISPATCHER_SESSION": "dispatcher-session",
-            # A cwd-relative PATH entry and Python path injection must not reach commands.
-            "PATH": os.pathsep.join(("relative-bin", str(self.adapter_bin), self.env["PATH"])),
+            "PATH": os.pathsep.join(("tmp/relative-bin", str(self.adapter_bin), self.env["PATH"])),
             "PYTHONPATH": str(self.root),
         }
+        self.git_log.unlink(missing_ok=True)
         params = StdioServerParameters(
             command=sys.executable,
             args=["-E", "-s", str(self.repo / "agent/teams/adapter.py")],
@@ -143,6 +155,10 @@ class AdapterTest(Harness):
         assert calls  # the harness's own startup git ran through the wrapper
         allocations = str(self.trusted / "allocations")
         assert not [c for c in calls if any(allocations in part for part in c)], calls
+        assert not marker.exists(), f"a cwd-relative PATH entry ran: {marker.read_text()}"
+        # Startup git runs from the client's cwd; every later command from the main checkout.
+        cwds = [c[0] for c in calls[1:]]
+        assert all(cwd == str(self.repo) for cwd in cwds), f"ran outside the checkout: {cwds}"
 
     @staticmethod
     async def call(client: Any, name: str, ok: bool = True, **arguments: Any) -> str:
@@ -181,6 +197,8 @@ class AdapterTest(Harness):
             assert "not configured" in other
             design = await self.call(client, "start_design", ok=False, spec=40, entry="impl")
             assert "not a configured designer entry" in design
+            # GitHub comment ids already exceed 32 bits.
+            await self.call(client, "board_read", issue=29, after_comment_id=6151732486)
 
         self.session(steps)
         assert not self.events("agent", "start")
@@ -214,34 +232,13 @@ class AdapterTest(Harness):
             state = await self.call(client, "pr_state", pr=7)
             assert head in state
             assert '"bucket": "pending"' in state
+            # Stop itself is test_team's; this proves retire_team reaches it.
+            refused = await self.call(client, "retire_team", ok=False, brief=29)
+            assert "not closed by a merged PR" in refused
 
         self.session(review)
         assert len(self.events("mix")) == mixes
         assert not any(self.project("team-2-critic").iterdir())
-        self.bootstrap("team-2-critic")
-
-        async def unmerged(client: Any) -> None:
-            refused = await self.call(client, "retire_team", ok=False, brief=29)
-            assert "not closed by a merged PR" in refused
-
-        self.session(unmerged)
-        self.merge(head)
-
-        async def first(client: Any) -> None:
-            waiting = await self.call(client, "retire_team", brief=29)
-            assert "waiting for retirement reports" in waiting
-
-        self.session(first)
-        self.retire("team-2-impl", "team-2-tester", "team-2-critic")
-        self.clients_exit(2)
-
-        async def second(client: Any) -> None:
-            status = await self.call(client, "status")
-            assert "at the shell, client exited" in status, status
-            assert "slot 2 released" in await self.call(client, "retire_team", brief=29)
-
-        self.session(second)
-        assert self.recorded_briefs() == {"40"}
 
     def test_board_issue_and_project_writes_name_the_repository_and_dispatcher(self) -> None:
         content = {"number": 29, "url": "https://github.com/o/r/issues/29"}
@@ -272,6 +269,11 @@ class AdapterTest(Harness):
         assert all(c[:2] != ["repo", "view"] for c in calls)
 
     def test_timeout_after_an_issue_create_reports_ambiguity_and_does_not_repeat(self) -> None:
+        # Only this test shortens the GitHub deadline: under load, a 2 s deadline also
+        # failed reads in the other tests.
+        config = CONFIG.replace("checks_minutes = 30", "checks_minutes = 30\ngithub_seconds = 2")
+        self.write_config(config)
+        self.commit("github deadline")
         self.update(gh_sleep=5)
 
         async def steps(client: Any) -> None:
@@ -299,12 +301,6 @@ class AdapterTest(Harness):
 
         self.session(steps)
 
-    def test_real_github_comment_ids_are_accepted(self) -> None:
-        async def steps(client: Any) -> None:
-            await self.call(client, "board_read", issue=29, after_comment_id=6151732486)
-
-        self.session(steps)
-
     def test_a_long_issue_body_continues_from_an_offset(self) -> None:
         self.update(issues={"29": "x" * 9000 + "TAIL"})
 
@@ -326,7 +322,7 @@ class AdapterTest(Harness):
             fields = {"title": f"Issue {number}", "status": status, "phase": "Design"}
             return {"id": f"I_{number}", **fields, "content": content}
 
-        self.update(items=[item(number) for number in range(1, 301)])
+        self.update(items=[item(number) for number in range(1, 601)])
         pages: list[str] = []
 
         async def steps(client: Any) -> None:
@@ -337,14 +333,16 @@ class AdapterTest(Harness):
                 pages.append(text)
                 if "[more: call again with offset=" not in text:
                     return
-                offset = int(text.rsplit("offset=", 1)[1].split("]")[0])
+                following = int(text.rsplit("offset=", 1)[1].split("]")[0])
+                assert following > offset, f"page {len(pages)} points back to {following}"
+                offset = following
 
         self.session(steps)
-        assert len(pages) > 1
+        assert len(pages) >= 3, len(pages)
         read = "".join(page.split("\n[more:")[0] for page in pages)
-        assert "#299 Issue 299 | Phase: Design | Feature: " in read
-        assert "#300 Issue" not in read
-        assert len(read.splitlines()) == 200
+        assert "#599 Issue 599 | Phase: Design | Feature: " in read
+        numbers = [int(line.split()[0][1:]) for line in read.splitlines()]
+        assert numbers == [n for n in range(1, 601) if n % 3], "missing, repeated or Done items"
 
     def test_an_error_after_a_prompt_is_sent_is_reported_as_ambiguous(self) -> None:
         # Herdr reports its own timeout after the text may have reached the client.
