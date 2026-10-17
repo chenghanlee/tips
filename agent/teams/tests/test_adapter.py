@@ -8,6 +8,7 @@ import asyncio
 import importlib.util
 import json
 import os
+import re
 import shutil
 import sys
 import unittest
@@ -72,7 +73,8 @@ elif a[:2] == ["pr", "view"]:
     print(json.dumps({"number": int(a[2]), "state": s.get("pr_state", "OPEN"),
                       "headRefOid": s.get("pr_head", ""), "mergeable": "MERGEABLE"}))
 elif a[:2] == ["pr", "checks"]:
-    print(json.dumps([{"name": "checks", "state": "PENDING", "bucket": "pending", "link": "L"}]))
+    check = {"name": "checks", "state": "PENDING", "bucket": "pending", "link": "L"}
+    print(json.dumps([check] * int(s.get("checks_count", 1))))
     sys.exit(8)
 elif a[:2] == ["pr", "list"]:
     print(json.dumps([{"number": 7, "title": "Brief 29", "state": "OPEN"}]))
@@ -232,6 +234,14 @@ class AdapterTest(Harness):
             state = await self.call(client, "pr_state", pr=7)
             assert head in state
             assert '"bucket": "pending"' in state
+            # A tool without an offset keeps a response prefix and says what it dropped.
+            self.update(checks_count=200)
+            capped = await self.call(client, "pr_state", pr=7)
+            kept, notice = capped.rsplit("\n", 1)
+            assert len(kept.encode()) == 8192, f"kept {len(kept.encode())} bytes, not 8192"
+            assert head in kept, "the response prefix is lost"
+            assert '"bucket": "pending"' in kept, "the response prefix is lost"
+            assert re.fullmatch(r"\[truncated: \d+ more bytes\]", notice), capped[-120:]
             # Stop itself is test_team's; this proves retire_team reaches it.
             refused = await self.call(client, "retire_team", ok=False, brief=29)
             assert "not closed by a merged PR" in refused
