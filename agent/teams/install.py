@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """Install a reviewed harness release for the operator: `install.py <commit> [--root DIR]`.
 
-Run from the main checkout with teams drained. The commit must be merged into origin/main
-and the checkout's tracked files clean. The release holds AGENTS.md and agent/teams from
-that commit, plus the locked adapter environment, under <root>/releases/. <root>/harness
-then points at it; the switch is one atomic rename. state/ and allocations/ are never
-touched. A failed install removes only its own unfinished release, so the previous
-harness keeps running. Default root: agent_teams/<repository name>/ in the main checkout's
-parent directory, created on first use. The root is a copy target, not write-protected.
+Run from the main checkout with teams drained and the dispatcher stopped. The commit must
+be merged into origin/main and the checkout's tracked files clean. The release holds
+AGENTS.md and agent/teams from that commit, plus the locked adapter environment, under
+<root>/releases/. <root>/harness then points at it; the switch is one atomic rename.
+state/ and allocations/ are never touched. A failed install removes only its own
+unfinished release, so the previous harness keeps running. Default root:
+agent_teams/<repository name>/ in the main checkout's parent directory, created on first
+use. The root is a copy target, not write-protected.
 """
 
 import argparse
+import contextlib
 import datetime
+import fcntl
 import json
 import re
 import shutil
@@ -19,6 +22,7 @@ import subprocess
 import sys
 import tarfile
 import tomllib
+from collections.abc import Generator
 from pathlib import Path
 
 from commands import execute, run
@@ -81,6 +85,24 @@ def require_drained(root: Path) -> None:
         )
 
 
+@contextlib.contextmanager
+def quiet(root: Path) -> Generator[None]:
+    """Refuse while a dispatcher or a team.py command runs in the root; otherwise hold both
+    of their locks, so neither can start, and check that every team is drained."""
+    state = root / "state"
+    with (state / "dispatcher.lock").open("a") as dispatcher, (state / ".lock").open("a") as store:
+        for handle, busy in (
+            (dispatcher, "a dispatcher is running; stop it first (/exit in its pane)"),
+            (store, "a team.py command is running; rerun after it finishes"),
+        ):
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise RuntimeError(f"Busy: {busy}") from None
+        require_drained(root)
+        yield
+
+
 def export(source: Path, commit: str, release: Path) -> None:
     archive = release.with_suffix(".tar")
     try:
@@ -141,26 +163,26 @@ def install(source: Path, name: str, root: Path | None) -> Path:
     root = (root or default_root(source, repo)).absolute()
     claim_root(root, repo, source)
     (root / "releases").mkdir(exist_ok=True)
-    require_drained(root)
-    stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
-    release = root / "releases" / f"{commit[:12]}-{stamp}"
-    release.mkdir()
-    try:
-        export(source, commit, release)
-        teams = release / "agent/teams"
-        build_environment(teams)
-        record = {
-            "commit": commit,
-            "repository": repo,
-            "source": str(source),
-            "root": str(root),
-            "installed": stamp,
-        }
-        (teams / "install.json").write_text(json.dumps(record, indent=2) + "\n")
-        switch(root, release)
-    except BaseException:
-        shutil.rmtree(release)
-        raise
+    with quiet(root):
+        stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
+        release = root / "releases" / f"{commit[:12]}-{stamp}"
+        release.mkdir()
+        try:
+            export(source, commit, release)
+            teams = release / "agent/teams"
+            build_environment(teams)
+            record = {
+                "commit": commit,
+                "repository": repo,
+                "source": str(source),
+                "root": str(root),
+                "installed": stamp,
+            }
+            (teams / "install.json").write_text(json.dumps(record, indent=2) + "\n")
+            switch(root, release)
+        except BaseException:
+            shutil.rmtree(release)
+            raise
     return release
 
 
