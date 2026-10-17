@@ -16,7 +16,8 @@ Run these commands in your checkout before pushing if Ruff and Pyright are on
 `PATH`. Otherwise, use CI. Locally, use the locked environment below instead of the
 first line: `pyright --pythonpath agent/teams/.venv/bin/python --project
 agent/teams/pyproject.toml`, and run the tests with `agent/teams/.venv/bin/python`.
-With another Python the adapter tests are skipped and say so.
+With another Python the adapter tests are skipped and say so. To run one module, give
+its file name as the pattern, for example `-p test_pr_review.py`.
 
 Run these additional tests for the listed changes:
 
@@ -59,9 +60,13 @@ shellcheck agent/teams/dispatch
   `uv pip compile pyproject.toml --generate-hashes --python-version 3.12 --universal -o requirements.lock`.
 - Tests use disposable Git repositories with a bare origin, fake Herdr, `gh`, Mix,
   `psql`, `ps` and Dexter executables, and child processes that the tests start and own.
-  Fixtures live in the checkout's ignored `tmp/team-tests/`, not in a temporary
+  Fixture directories live in the checkout's ignored `tmp/team-tests/`, not in a temporary
   directory, because the harness root refuses temporary directories.
   Never use live pairs in tests.
+- [tests/harness.py](tests/harness.py) holds the shared fixtures: the fixture
+  configuration, the fake programs and the `Harness` base class. Test modules import
+  them from there. Test what one function decides in-process, as `ObserveTest` does; keep
+  a `Harness` test for behaviour that needs a started pair.
 - The fake Herdr injects launch faults on request: a killed launcher, a start timeout,
   a client that exits, a second concurrent `team.py`. Use these instead of sleeps.
 - The harness root, with its records and lock, must be on a local filesystem: `team.py` relies
@@ -79,7 +84,7 @@ the launcher with the resolved `claude` executable and its fixed arguments, so t
 client is the pane's foreground process. The `# noqa: S108` exceptions apply only to
 `config.py:TEMPORARY`, the temporary-root list in `config.py:temporary_roots`, and the
 refused root in
-`RepositoryConfigTest.test_a_root_in_the_checkout_or_a_temporary_directory_is_refused`.
+`PairLifecycleTest.test_a_root_in_the_checkout_or_a_temporary_directory_is_refused`.
 They name temporary directories to refuse them; nothing is written there.
 The `PT027` per-file ignore for `tests/**` allows `assertRaises`: the suite is unittest
 by design, and CI runs `python -m unittest`.

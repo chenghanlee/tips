@@ -13,10 +13,9 @@ from pathlib import Path
 
 from commands import execute
 from config import repo_key
-from tests.test_team import TEST_RUNS
+from tests.harness import IDENTITY, TEST_RUNS
 
 TEAMS = Path(__file__).resolve().parents[1]
-IDENTITY = ["-c", "user.name=Test", "-c", "user.email=test@example.invalid"]
 CONFIG = '[github]\nrepository = "o/r"\n'
 MISSING = "nonexistent-package==1.0 --hash=sha256:" + "0" * 64 + "\n"
 
