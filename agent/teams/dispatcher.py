@@ -163,20 +163,29 @@ def start_when_ready(state: Path, launch: conf.DispatcherLaunch, seconds: float)
             failed = call(["herdr", "agent", "rename", pane, "dispatcher"], seconds)
             if failed:
                 return give_up(
-                    state, launch, seconds, f"naming it failed ({failed}); Begin. was not sent. "
-                    f"Check the pane, then run: {both}"
+                    state,
+                    launch,
+                    seconds,
+                    f"naming it failed ({failed}); Begin. was not sent. "
+                    f"Check the pane, then run: {both}",
                 )
             failed = call(["herdr", "agent", "prompt", pane, "Begin."], seconds)
             if failed is None:
                 return 0
             return give_up(
-                state, launch, seconds, f"Begin. may or may not have reached it ({failed}). "
-                f"Check the pane; only if it shows no Begin. turn, run: {prompt}"
+                state,
+                launch,
+                seconds,
+                f"Begin. may or may not have reached it ({failed}). "
+                f"Check the pane; only if it shows no Begin. turn, run: {prompt}",
             )
         time.sleep(0.5)
     return give_up(
-        state, launch, seconds, f"it was not ready within {seconds:g} s; Begin. was not sent. "
-        f"Check the pane, then run: {both}"
+        state,
+        launch,
+        seconds,
+        f"it was not ready within {seconds:g} s; Begin. was not sent. "
+        f"Check the pane, then run: {both}",
     )
 
 

@@ -11,7 +11,8 @@ select = ["B", "C4", "C90", "D100", "D104", "E", "F", "I", "N", "PT", "RUF", "S"
 max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101"]
+# The suite is unittest by design: CI runs `python -m unittest`, so assertRaises is correct.
+"tests/**/*.py" = ["S101", "PT027"]
 
 [tool.ruff.format]
 quote-style = "double"

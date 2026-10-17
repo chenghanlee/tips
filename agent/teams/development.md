@@ -26,6 +26,22 @@ Run these additional tests for the listed changes:
 | Codex launch arguments | Installed-Codex tests, with `TIPS_TEST_REAL_CODEX=1`. | Run locally and record the result on the PR. CI has no Codex client. |
 | Dispatcher launch arguments or adapter tools | The real restricted client with the launcher's arguments against a disposable copy, fake `gh` and a refusing fake `herdr`: it lists only the adapter tools and a read tool works. | Run locally and record the transcript summary on the PR. CI has no Claude client. |
 
+### Additional local analyzers
+
+CI does not run these. Run them before pushing and fix or record each finding. They are
+not in the locked `.venv`; any environment with them will do. Versions used today: mypy
+2.3.1, pylint 3.3.9, bandit 1.9.4, vulture 2.16, pip-audit 2.10.1, shellcheck 0.11.0. Run the
+first four from `agent/teams`, the last two from the repository root:
+
+```sh
+mypy --python-executable .venv/bin/python --strict --warn-unreachable --ignore-missing-imports .
+pylint --disable=all --enable=similarities --min-similarity-lines=10 --ignore-comments=y --ignore-docstrings=y --ignore-imports=y *.py tests/*.py
+bandit -q -r . -x ./tests,./.venv
+vulture . --min-confidence 60 --exclude .venv
+pip-audit -r agent/teams/requirements.lock --require-hashes --disable-pip --strict
+shellcheck agent/teams/dispatch
+```
+
 ## Dependencies and test isolation
 
 - Scripts use only the Python standard library, except [adapter.py](adapter.py). It
@@ -55,11 +71,18 @@ Run these additional tests for the listed changes:
 ## Lint exceptions
 
 The reviewed `# noqa: S603` exceptions apply only to `commands.py:execute`,
-`StopAgentTest.client` and the namer that `dispatcher.py:start_here` starts. These calls
-use variable argument lists, no shell, a resolved executable, and fixed,
-caller-supplied or test-owned arguments. The `# noqa: S606` in `start_here` replaces
+`StopAgentTest.client`, the namer that `dispatcher.py:start_here` starts and the two
+concurrent launchers in `DispatchTest`. These calls use variable argument lists, no
+shell, a resolved or test-owned executable, and fixed, caller-supplied or test-owned
+arguments. The `# noqa: S606` in `start_here` replaces
 the launcher with the resolved `claude` executable and its fixed arguments, so the
-client is the pane's foreground process.
+client is the pane's foreground process. The `# noqa: S108` exceptions apply only to
+`config.py:TEMPORARY`, the temporary-root lists in `config.py:claim_root` and
+`bootstrap.py:trusted_layout`, and the refused root in
+`RepositoryConfigTest.test_a_root_in_the_checkout_or_a_temporary_directory_is_refused`.
+They name temporary directories to refuse them; nothing is written there.
+The `PT027` per-file ignore for `tests/**` allows `assertRaises`: the suite is unittest
+by design, and CI runs `python -m unittest`.
 
 When changing any of these calls, review the executable selection and arguments for
 safety. Lint does not verify their safety. Do not suppress other warnings.

@@ -71,9 +71,7 @@ class FixedServer(MCPServer):
             self.ready = mark_ready()
         return tools
 
-    async def call_tool(
-        self, name: str, arguments: dict[str, Any], context: Any = None
-    ) -> Any:
+    async def call_tool(self, name: str, arguments: dict[str, Any], context: Any = None) -> Any:
         declared = {tool.name: tool.input_schema for tool in await self.list_tools()}
         if name in declared:
             allowed = set(cast(dict[str, object], declared[name].get("properties", {})))
@@ -298,9 +296,7 @@ def issue_create(title: Title, body: Body) -> str:
 
 
 @server.tool()
-def board_read(
-    issue: Number, after_comment_id: GitHubId | None = None, offset: Offset = 0
-) -> str:
+def board_read(issue: Number, after_comment_id: GitHubId | None = None, offset: Offset = 0) -> str:
     """An issue body and its comments, or only the comments after the given comment id,
     from a character offset. A long result ends with the offset to read the rest from."""
     return operate(lambda: page(board.read_text(str(issue), after_comment_id), offset))

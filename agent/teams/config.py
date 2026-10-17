@@ -169,7 +169,7 @@ DEPS_FETCH_SECONDS = 300
 # Initial defaults, not measurements: widen them only after a legitimate read exceeds one.
 READ_PAGES = 10
 REPOSITORY = r"[A-Za-z0-9-]+/[A-Za-z0-9._-]+"
-TEMPORARY = ("/tmp", "/var/tmp")
+TEMPORARY = ("/tmp", "/var/tmp")  # noqa: S108 - roots refused, never written
 READ_SECONDS = 30
 # Disable alternate language paths in launched clients, without editing user settings.
 NATIVE_LSP_PLUGINS = {
@@ -420,7 +420,7 @@ def claim_root(root: Path, repository: str, checkout: Path) -> Path:
     including another owner's repository with the same name. The root must be a real path
     outside the checkout and outside temporary directories. It is not write-protected;
     repository.json only keeps two repositories apart."""
-    temporary = [Path(p).resolve() for p in (*TEMPORARY, os.environ.get("TMPDIR", "/tmp"))]
+    temporary = [Path(p).resolve() for p in (*TEMPORARY, os.environ.get("TMPDIR", "/tmp"))]  # noqa: S108 - refused roots
     if root.resolve() != root:
         raise RuntimeError(f"Harness root {root} passes through a symlink; refused")
     for parent in (checkout.resolve(), *temporary):

@@ -287,7 +287,6 @@ class AdapterTest(Harness):
         create = ["issue", "create", "--repo", "o/r", "--title", "Spec", "--body-file", "-"]
         assert creates == [["gh", *create]]
 
-
     def test_board_read_after_a_comment_reaches_new_comments_on_a_long_issue(self) -> None:
         self.update(issues={"29": "spec " * 2000})
 

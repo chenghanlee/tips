@@ -71,6 +71,7 @@ from config import (
 
 # --- Processes, JSON validation and Herdr ----------------------------------
 
+
 def entity_fields(value: object, label: str) -> None:
     fields = object_fields(value, label)
     for key, annotation in Entity.__annotations__.items():
@@ -255,7 +256,9 @@ def release_name(pane: str, current: Entity) -> None:
                     raise
                 # Herdr already released it between list and clear.
 
+
 # --- Records and allocations -----------------------------------------------
+
 
 def record_path(slot: int) -> Path:
     return conf.state_dir() / f"{slot}.json"
@@ -455,6 +458,7 @@ def roster(brief: str) -> tuple[str, list[str], list[str]]:
 
 # --- GitHub comments -------------------------------------------------------
 
+
 def comment_header(kind: str, role: str, name: str, session: str) -> str:
     """The attribution line `<TYPE> <role> <name> <session>`."""
     if kind not in COMMENT_TYPES:
@@ -462,9 +466,7 @@ def comment_header(kind: str, role: str, name: str, session: str) -> str:
     return f"{kind} {role} {name} {session or 'unknown'}"
 
 
-def github(
-    args: Sequence[str], deadline: float, label: str, input_text: str | None = None
-) -> str:
+def github(args: Sequence[str], deadline: float, label: str, input_text: str | None = None) -> str:
     """Run one GitHub call within its whole operation's deadline; a late call is incomplete."""
     incomplete = f"{label}: incomplete after the {READ_SECONDS}s deadline"
     left = deadline - time.monotonic()
@@ -542,6 +544,7 @@ def post_event(brief: str, allocation: Allocation, text: str) -> None:
 
 
 # --- Tools and the client environment --------------------------------------
+
 
 def dexter_binary() -> Path:
     home = Path(
@@ -767,6 +770,7 @@ def refuse_foreign_owner(
 
 # --- Launch: panes, briefs, clients and recovery ---------------------------
 
+
 def live_workspaces() -> set[str]:
     return {w["workspace_id"] for w in herdr("workspace", "list")["workspaces"]}
 
@@ -932,8 +936,7 @@ def pair_brief(record: Record, entry: str, duty: str) -> str:
         "turn and wait for a message. "
         + handoff
         + f"Put {entry}, <session> on line 2 of each review record; replace <session> with "
-        "your session ID. "
-        + dexter_brief(project_of(allocation) / ".dexter/dexter.sh")
+        "your session ID. " + dexter_brief(project_of(allocation) / ".dexter/dexter.sh")
     )
 
 
@@ -953,8 +956,7 @@ def reviewer_brief(record: Record, entry: str, duty: str, pr: str, head: str) ->
         "Then notify the merge-confirming tester with "
         f"herdr agent prompt {tester} '<your review URL>' and end your turn. "
         "When notified of a new head, the notice names the bootstrap command that moves "
-        "your clone to it. "
-        + dexter_brief(project_of(allocation) / ".dexter/dexter.sh")
+        "your clone to it. " + dexter_brief(project_of(allocation) / ".dexter/dexter.sh")
     )
 
 
@@ -1309,6 +1311,7 @@ def reset(brief: str, entry: str) -> None:
 
 # --- Handoff and turns -----------------------------------------------------
 
+
 def checkout_problem(project: Path, head: str) -> str | None:
     """Why the caller's own clone is not the pushed PR head, or None. Runs only from the
     worker's own turn, under its authority."""
@@ -1516,6 +1519,7 @@ def turn(pr: str, recipient: str) -> None:
 
 
 # --- Retirement and stop ---------------------------------------------------
+
 
 def retirement_reports(record: Record) -> Reports:
     """Each allocation's latest retirement report on the issue from its current launch:
@@ -1874,6 +1878,7 @@ def client_state(allocation: Allocation, panes: set[str], agents: dict[str, Enti
 
 
 # --- Dispatcher record, status and CLI -------------------------------------
+
 
 def dispatcher_path() -> Path:
     return conf.harness_root() / "state/dispatcher.json"

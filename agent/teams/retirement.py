@@ -23,7 +23,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 from commands import execute, object_fields
 from config import RETIREMENT
 from team import comment_header
@@ -77,8 +76,8 @@ def git(project: Path, *args: str, ok: tuple[int, ...] = (0,)) -> tuple[int, str
     except subprocess.TimeoutExpired as error:
         raise RetirementError(f"git {args[0]} did not finish within {GIT_SECONDS} s") from error
     if result.returncode not in ok:
-        error = (result.stderr or result.stdout).strip()
-        raise RetirementError(f"git {' '.join(args)} failed: {error}")
+        detail = (result.stderr or result.stdout).strip()
+        raise RetirementError(f"git {' '.join(args)} failed: {detail}")
     return result.returncode, result.stdout.strip()
 
 
@@ -133,9 +132,10 @@ def tell_dispatcher(text: str) -> None:
     """Wake the dispatcher; without one to tell, print the command for the operator."""
     command = ["herdr", "agent", "prompt", "dispatcher", text]
     try:
-        sent = os.environ.get("HERDR_ENV") == "1" and not execute(
-            command, timeout=HERDR_SECONDS
-        ).returncode
+        sent = (
+            os.environ.get("HERDR_ENV") == "1"
+            and not execute(command, timeout=HERDR_SECONDS).returncode
+        )
     except (RuntimeError, OSError, subprocess.TimeoutExpired):
         sent = False
     if sent:
