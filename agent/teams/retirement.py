@@ -3,8 +3,9 @@
 
 A worker runs this under its own authority when the dispatcher asks it to retire:
 `python3 <harness>/retirement.py`. It fetches origin, then posts one EVENT on its issue with
-a `TEAM_RETIREMENT` line naming its launch: whether the clone is clean, how many local
-commits no origin branch holds, whether HEAD is merged into origin/main, and HEAD.
+a `TEAM_RETIREMENT` line naming its launch: whether the clone is clean and its first dirty
+paths, how many local commits no origin branch holds, whether HEAD is merged into
+origin/main, and HEAD.
 `team.py stop` reads the latest report as advisory evidence before it drops any database.
 
 The dispatcher's turns start only on messages, so this script then tells it:
@@ -22,6 +23,7 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
+from typing import cast
 
 from commands import execute, object_fields
 from config import RETIREMENT
@@ -30,6 +32,7 @@ from github import comment_header
 GIT_SECONDS = 120
 GITHUB_SECONDS = 60
 HERDR_SECONDS = 30
+DIRTY_PATHS = 5  # status lines kept in a report of a dirty clone
 IDENT = re.compile(r"g[0-9]+-[a-z0-9][a-z0-9-]*")
 
 
@@ -78,22 +81,30 @@ def git(project: Path, *args: str, ok: tuple[int, ...] = (0,)) -> tuple[int, str
     if result.returncode not in ok:
         detail = (result.stderr or result.stdout).strip()
         raise RetirementError(f"git {' '.join(args)} failed: {detail}")
-    return result.returncode, result.stdout.strip()
+    return result.returncode, result.stdout.rstrip("\n")  # porcelain lines start with a space
 
 
 def clone_state(project: Path) -> dict[str, object]:
-    """Clean, unpushed and merged evidence. A project with no clone holds no work only
-    when it is empty."""
+    """Clean, unpushed and merged evidence, with the first dirty status lines so a refusal
+    names its cause. A project with no clone holds no work only when it is empty."""
     if not (project / ".git").exists():
         empty = not project.exists() or not any(project.iterdir())
-        return {"cloned": False, "clean": empty, "unpushed": 0, "merged": empty, "head": ""}
+        return {
+            "cloned": False,
+            "clean": empty,
+            "dirty": [],
+            "unpushed": 0,
+            "merged": empty,
+            "head": "",
+        }
     git(project, "fetch", "-q", "origin")
-    dirty = git(project, "status", "--porcelain", "--untracked-files=all")[1]
+    dirty = git(project, "status", "--porcelain", "--untracked-files=all")[1].splitlines()
     unpushed = git(project, "rev-list", "--count", "HEAD", "--branches", "--not", "--remotes")
     merged = git(project, "merge-base", "--is-ancestor", "HEAD", "origin/main", ok=(0, 1))[0]
     return {
         "cloned": True,
         "clean": not dirty,
+        "dirty": dirty[:DIRTY_PATHS],
         "unpushed": int(unpushed[1]),
         "merged": merged == 0,
         "head": git(project, "rev-parse", "HEAD")[1],
@@ -118,12 +129,14 @@ def post(issue: str, repository: str, project: Path, body: str) -> str:
 
 
 def report(issue: str, allocation: dict[str, object], repository: str, project: Path) -> str:
-    fields = {"v": 1, "id": allocation["id"], "launch": allocation["launch"]}
-    fields.update(clone_state(project))
+    state = clone_state(project)
+    fields = {"v": 1, "id": allocation["id"], "launch": allocation["launch"], **state}
     summary = (
-        f"retirement report for {project}: clean {fields['clean']}, unpushed commits "
-        f"{fields['unpushed']}, merged into origin/main {fields['merged']}"
+        f"retirement report for {project}: clean {state['clean']}, unpushed commits "
+        f"{state['unpushed']}, merged into origin/main {state['merged']}"
     )
+    if dirty := cast(list[str], state["dirty"]):
+        summary += f"; dirty: {', '.join(dirty)}"
     evidence = f"{RETIREMENT}{json.dumps(fields, separators=(',', ':'))}"
     return post(issue, repository, project, f"{header('EVENT', allocation)}\n{evidence}\n{summary}")
 

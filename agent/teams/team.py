@@ -1017,7 +1017,10 @@ def preservation_gap(record: Record, reports: Reports) -> str:
             continue
         fields, url = reports[allocation["id"]]
         if fields.get("clean") is not True or fields.get("unpushed") != 0:
-            return f"{allocation['name']} reported uncommitted or unpushed work: {url}"
+            dirty = fields.get("dirty")
+            names = [str(p) for p in cast(list[object], dirty)] if isinstance(dirty, list) else []
+            paths = f" ({', '.join(names)})" if names else ""
+            return f"{allocation['name']} reported uncommitted or unpushed work{paths}: {url}"
         if record["kind"] != "design" and fields.get("merged") is not True:
             return f"{allocation['name']} reported a HEAD not merged into origin/main: {url}"
     return ""
@@ -1374,13 +1377,7 @@ def cli() -> None:
 if __name__ == "__main__":
     try:
         cli()
-    except (
-        RuntimeError,
-        OSError,
-        ValueError,
-        TypeError,
-        KeyError,
-        subprocess.TimeoutExpired,
-    ) as error:
+    except (RuntimeError, OSError, ValueError, subprocess.TimeoutExpired) as error:
+        # A TypeError or KeyError is a harness bug: its traceback stays visible.
         print(f"team: {error}", file=sys.stderr)
         sys.exit(1)

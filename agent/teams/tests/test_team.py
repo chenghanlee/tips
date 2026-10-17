@@ -2083,6 +2083,7 @@ class RetirementTest(Harness):
             "launch": launch,
             "cloned": True,
             "clean": True,
+            "dirty": [],
             "unpushed": 0,
             "merged": True,
             "head": before,
@@ -2187,7 +2188,9 @@ class RetirementTest(Harness):
         # A report from the current launch is accepted, and it shows the unpreserved work.
         self.retire("team-1-impl", "team-1-tester")
         refused = self.team("stop", "29", ok=False)
-        assert "team-1-tester reported uncommitted or unpushed work" in refused.stderr
+        assert "team-1-tester reported uncommitted or unpushed work (?? unfinished.txt)" in (
+            refused.stderr
+        )
 
     def test_an_open_brief_is_refused_before_any_client_is_asked(self) -> None:
         self.databases("tips_test_t1g1i")
@@ -2228,17 +2231,23 @@ class RetirementTest(Harness):
         self.databases("tips_test_t1g1i", "tips_test_t1g1r")
         project = self.project("team-1-impl")
         (project / "uncommitted").write_text("keep")
+        (project / "tracked.txt").write_text("edited\n")
         self.retire("team-1-impl", "team-1-tester")
         self.clients_exit(1)
         refused = self.team("stop", "29", ok=False).stderr
-        assert "team-1-impl reported uncommitted or unpushed work" in refused
+        dirty = " M tracked.txt, ?? uncommitted"
+        assert f"team-1-impl reported uncommitted or unpushed work ({dirty})" in refused
         assert "the record, databases, files and reservation are kept" in refused
+        report = self.comments("29")[-2]["body"].splitlines()
+        assert json.loads(report[1].removeprefix("TEAM_RETIREMENT "))["dirty"] == dirty.split(", ")
+        assert report[2].endswith(f"; dirty: {dirty}")
         assert self.remaining_databases() == ["tips_test_t1g1i", "tips_test_t1g1r"]
         assert (project / "uncommitted").read_text() == "keep"
         assert self.recorded_briefs() == {"29"}
         assert not (self.trusted / "state/g1-impl/retired.json").exists()
         # Committed but unpushed work is kept the same way; another brief takes another slot.
         (project / "uncommitted").unlink()
+        (project / "tracked.txt").write_text("base\n")
         self.commit("local only", cwd=project)
         self.retire("team-1-impl")
         assert "reported uncommitted or unpushed work" in self.team("stop", "29", ok=False).stderr

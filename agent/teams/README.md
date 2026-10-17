@@ -93,7 +93,7 @@ operator (the user) runs `reset`.
 | `agent/teams/team.py status` | Dispatcher, user | Every allocation record with each client's live Herdr pane, name, kind, state and session, and whether the recorded dispatcher process runs. |
 | `agent/teams/team.py clean` | Operator | List retained allocations with their reasons. Deletes nothing. |
 | `python3 <harness>/bootstrap.py [--commit <sha>]` | Launched client | Prepare your own clone, as [Allocations](#allocations) says. |
-| `python3 <harness>/retirement.py` | Launched client | Fetch origin, then post your clone's state on the issue: clean, unpushed commits, HEAD merged into `origin/main`. Then prompt the dispatcher with `<report URL> retired`. If the report fails, post a BLOCKED comment and prompt `<comment URL> blocked`. With no dispatcher to tell, print that command. Changes nothing else. |
+| `python3 <harness>/retirement.py` | Launched client | Fetch origin, then post your clone's state on the issue: clean (with the first dirty paths), unpushed commits, HEAD merged into `origin/main`. Then prompt the dispatcher with `<report URL> retired`. If the report fails, post a BLOCKED comment and prompt `<comment URL> blocked`. With no dispatcher to tell, print that command. Changes nothing else. |
 | `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. |
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment; with `--after`, only the comments after that checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | Tokens per launched session and model, from the session logs. |
