@@ -4,15 +4,15 @@ import json
 import re
 import subprocess
 import time
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from typing import NamedTuple
 
 import config as conf
-from commands import object_fields, object_list, run
+from commands import execute, object_fields, object_list, run
 from config import (
     COMMENT_TYPES,
     HEADER,
     READ_PAGES,
-    READ_SECONDS,
     RETIREMENT,
     ROLES,
     Allocation,
@@ -20,6 +20,20 @@ from config import (
     Reports,
     repository,
 )
+
+
+class PullRequest(NamedTuple):
+    number: str
+    url: str
+    head: str
+    briefs: list[str]  # the issues the PR closes
+
+    def require_closes(self, brief: str) -> None:
+        if brief not in self.briefs:
+            raise RuntimeError(
+                f"PR {self.number} does not close brief #{brief} (closes "
+                f"{self.briefs or 'nothing'}); fix the PR's closing reference first"
+            )
 
 
 def reviewer_names(value: str) -> list[str]:
@@ -80,20 +94,32 @@ def comment_header(kind: str, role: str, name: str, session: str) -> str:
     return f"{kind} {role} {name} {header_session(session)}"
 
 
-def github(args: Sequence[str], deadline: float, label: str, input_text: str | None = None) -> str:
-    """Run one GitHub call within its whole operation's deadline; a late call is incomplete."""
-    incomplete = f"{label}: incomplete after the {READ_SECONDS}s deadline"
+def call(
+    args: Sequence[str], deadline: float, label: str, input_text: str | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Run one GitHub call within its whole operation's deadline, whatever its exit status;
+    a late call is incomplete."""
+    incomplete = f"{label}: incomplete after the {conf.github_seconds()}s deadline"
     left = deadline - time.monotonic()
     if left <= 0:
         raise RuntimeError(incomplete)
     try:
-        return run(*args, timeout=left, input_text=input_text)
+        return execute(args, timeout=left, input_text=input_text)
     except subprocess.TimeoutExpired as error:
         raise RuntimeError(incomplete) from error
 
 
+def github(args: Sequence[str], deadline: float, label: str, input_text: str | None = None) -> str:
+    """Run one GitHub call within its operation's deadline; a failed call raises its error."""
+    result = call(args, deadline, label, input_text)
+    if result.returncode:
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or f"{label} failed")
+    return result.stdout.strip()
+
+
 def deadline_from_now() -> float:
-    return time.monotonic() + READ_SECONDS
+    """The deadline of one GitHub operation, however many calls it makes."""
+    return time.monotonic() + conf.github_seconds()
 
 
 def repo_args() -> list[str]:
@@ -143,9 +169,7 @@ def post_event(brief: str, allocation: Allocation, text: str) -> None:
     Usage reports match agent names to session logs through this EVENT. Posting is
     idempotent, and a rerun of the command posts an EVENT that is still missing.
     """
-    header = comment_header(
-        "EVENT", event_role(allocation), allocation["name"], allocation["session"]
-    )
+    header = comment_header("EVENT", *poster(allocation))
     try:
         url = post_comment(brief, f"{header}\n{text}")
     except (RuntimeError, OSError, ValueError, KeyError) as error:
@@ -159,24 +183,44 @@ def post_event(brief: str, allocation: Allocation, text: str) -> None:
 def event_posted(brief: str, allocation: Allocation, text: str) -> bool:
     """Whether the client's EVENT with this text is on the brief, under any session: a
     Codex session resolved after launch must not post a second EVENT."""
-    name = allocation["name"]
+    client = ("EVENT", allocation["name"])
     for comment in issue_comments(brief):
-        lines = str(comment.get("body") or "").splitlines()
-        header = HEADER.match(lines[0]) if lines else None
-        client = header is not None and (header["type"], header["name"]) == ("EVENT", name)
-        if client and lines[1:2] == [text]:
+        parsed = parse_comment(comment)
+        if parsed and (parsed[0]["type"], parsed[0]["name"]) == client and parsed[1][:1] == [text]:
             return True
     return False
 
 
-def pull_request(pr: str) -> tuple[str, str, list[str]]:
+def parse_comment(comment: dict[str, object]) -> tuple[re.Match[str], list[str]] | None:
+    """The `<TYPE> <role> <name> <session>` header of a comment and its later lines; None
+    for a comment without one."""
+    lines = str(comment.get("body") or "").splitlines()
+    header = HEADER.match(lines[0]) if lines else None
+    return (header, lines[1:]) if header else None
+
+
+def prefixed_json(
+    comment: dict[str, object], kind: str, prefix: str
+) -> Iterator[dict[str, object]]:
+    """The JSON object after `prefix` on each line of a `kind` comment. A malformed one
+    raises ValueError; the caller decides whether that blocks or is no evidence."""
+    parsed = parse_comment(comment)
+    if not parsed or parsed[0]["type"] != kind:
+        return
+    for line in parsed[1]:
+        if line.startswith(prefix):
+            yield object_fields(json.loads(line[len(prefix) :]), prefix.strip())
+
+
+def pull_request(number: str) -> PullRequest:
     """The PR's URL, head commit and closing-reference issue numbers."""
     fields = "headRefOid,url,closingIssuesReferences"
-    command = ["gh", "pr", "view", pr, *repo_args(), "--json", fields]
-    view = object_fields(json.loads(github(command, deadline_from_now(), f"PR {pr}")), f"PR {pr}")
-    references = object_list(view.get("closingIssuesReferences") or [], f"PR {pr} closing issues")
+    command = ["gh", "pr", "view", number, *repo_args(), "--json", fields]
+    label = f"PR {number}"
+    view = object_fields(json.loads(github(command, deadline_from_now(), label)), label)
+    references = object_list(view.get("closingIssuesReferences") or [], f"{label} closing issues")
     briefs = [str(issue.get("number")) for issue in references]
-    return str(view.get("url")), str(view.get("headRefOid")), briefs
+    return PullRequest(number, str(view.get("url")), str(view.get("headRefOid")), briefs)
 
 
 def poster(allocation: Allocation) -> tuple[str, str, str]:
@@ -190,19 +234,14 @@ def retirement_reports(record: Record) -> Reports:
     launches = {a["id"]: a["launch"] for a in record["agents"].values()}
     reports: Reports = {}
     for comment in issue_comments(record["brief"]):
-        lines = str(comment.get("body") or "").splitlines()
-        header = HEADER.match(lines[0]) if lines else None
-        if not header or header["type"] != "EVENT":
-            continue
-        for line in lines[1:]:
-            if line.startswith(RETIREMENT):
-                try:
-                    fields = object_fields(json.loads(line[len(RETIREMENT) :]), "report")
-                except ValueError:
-                    continue  # a malformed report is no evidence
-                ident = str(fields.get("id"))
-                if fields.get("launch") and launches.get(ident) == fields.get("launch"):
-                    reports[ident] = (fields, str(comment["html_url"]))
+        try:
+            found = list(prefixed_json(comment, "EVENT", RETIREMENT))
+        except ValueError:
+            continue  # a comment with a malformed report is no evidence
+        for fields in found:
+            ident = str(fields.get("id"))
+            if fields.get("launch") and launches.get(ident) == fields.get("launch"):
+                reports[ident] = (fields, str(comment["html_url"]))
     return reports
 
 

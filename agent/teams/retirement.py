@@ -25,11 +25,10 @@ from pathlib import Path
 from typing import cast
 
 from commands import execute, object_fields
-from config import RETIREMENT, launch_identity, slot_record_paths
-from github import comment_header
+from config import RETIREMENT, Allocation, launch_identity, slot_record_paths
+from github import comment_header, poster
 
 GIT_SECONDS = 120
-GITHUB_SECONDS = 60
 HERDR_SECONDS = 30
 DIRTY_PATHS = 5  # status lines kept in a report of a dirty clone
 
@@ -104,15 +103,16 @@ def clone_state(project: Path) -> dict[str, object]:
 
 
 def header(kind: str, allocation: dict[str, object]) -> str:
-    role = str(allocation.get("role", "")).split()[-1]
-    name, session = str(allocation.get("name")), str(allocation.get("session") or "")
-    return comment_header(kind, role, name, session)
+    return comment_header(kind, *poster(cast(Allocation, allocation)))
 
 
-def post(issue: str, repository: str, project: Path, body: str) -> str:
-    args = ["gh", "issue", "comment", issue, "--repo", repository, "--body-file", "-"]
+def post(issue: str, settings: dict[str, object], project: Path, body: str) -> str:
+    """Post as the client within the launch's timeouts.github_seconds."""
+    args = ["gh", "issue", "comment", issue, "--repo", str(settings["repository"])]
+    args += ["--body-file", "-"]
+    seconds = cast(int, settings["github_seconds"])
     try:
-        result = execute(args, cwd=project.parent, timeout=GITHUB_SECONDS, input_text=body)
+        result = execute(args, cwd=project.parent, timeout=seconds, input_text=body)
     except subprocess.TimeoutExpired as error:
         raise RetirementError(f"Posting on #{issue} timed out; it may have posted") from error
     if result.returncode:
@@ -120,7 +120,9 @@ def post(issue: str, repository: str, project: Path, body: str) -> str:
     return result.stdout.strip()
 
 
-def report(issue: str, allocation: dict[str, object], repository: str, project: Path) -> str:
+def report(
+    issue: str, allocation: dict[str, object], settings: dict[str, object], project: Path
+) -> str:
     state = clone_state(project)
     fields = {"v": 1, "id": allocation["id"], "launch": allocation["launch"], **state}
     summary = (
@@ -130,7 +132,7 @@ def report(issue: str, allocation: dict[str, object], repository: str, project: 
     if dirty := cast(list[str], state["dirty"]):
         summary += f"; dirty: {', '.join(dirty)}"
     evidence = f"{RETIREMENT}{json.dumps(fields, separators=(',', ':'))}"
-    return post(issue, repository, project, f"{header('EVENT', allocation)}\n{evidence}\n{summary}")
+    return post(issue, settings, project, f"{header('EVENT', allocation)}\n{evidence}\n{summary}")
 
 
 def tell_dispatcher(text: str) -> None:
@@ -155,16 +157,15 @@ def main() -> None:
     except (RetirementError, OSError, ValueError) as error:
         print(f"retirement: {error}", file=sys.stderr)
         sys.exit(1)
-    repository = str(settings.get("repository"))
     try:
-        url = report(issue, allocation, repository, project)
+        url = report(issue, allocation, settings, project)
     except (RetirementError, OSError, ValueError) as error:
         print(f"retirement: {error}", file=sys.stderr)
         body = f"{header('BLOCKED', allocation)}\nRetirement report failed: {error}"
         try:
-            blocked = post(issue, repository, project, body)
+            blocked = post(issue, settings, project, body)
         except RetirementError:
-            blocked = f"https://github.com/{repository}/issues/{issue}"
+            blocked = f"https://github.com/{settings['repository']}/issues/{issue}"
         tell_dispatcher(f"{blocked} blocked")
         sys.exit(1)
     print(f"Retirement reported: {url}")

@@ -217,7 +217,9 @@ Start the installed dispatcher with `<root>/harness/agent/teams/dispatch`.
 Edit [config.toml](config.toml) for slots, agent and dispatcher settings, resource
 allocation, permissions and time limits. `[github]` names the repository every GitHub
 call uses, and for each project the dispatcher may edit, the fields it may set.
-`timeouts.github_seconds` (default 30) bounds each GitHub call. Each `[agents.<entry>]` defines a role,
+`timeouts.github_seconds` (default 30) bounds each GitHub operation, all its calls
+together. The one exception is stop's check for a merged PR, which holds the store lock
+and so uses `timeouts.shell_seconds`. Each `[agents.<entry>]` defines a role,
 client, model, effort, optional advisor and persona, database suffix and port offset.
 Briefs name entries in `Implementer:` and `Required reviews:`.
 
