@@ -271,7 +271,7 @@ class ObserveCommandTest(Harness):
 
         # A PR that does not close the caller's brief is refused and nothing is recorded.
         self.update(pr_briefs={"7": ["30"]}, checks=[check("checks", "fail")])
-        assert "PR 7 does not close your brief #29" in observe(ok=False).stderr
+        assert "PR 7 does not close brief #29" in observe(ok=False).stderr
         assert self.comments("7") == []
         # Findings carry the caller's launched session; brief 29 requires tester and critic.
         self.update(pr_briefs={"7": ["29"]})
