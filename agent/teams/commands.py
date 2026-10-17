@@ -65,6 +65,22 @@ def run(
     return p.stdout.strip()
 
 
+def write_file(path: Path, text: str) -> None:
+    """Replace the file atomically and durably: once this returns, a crash keeps the new
+    text. The directory must be on a local filesystem."""
+    staged = path.with_name(path.name + ".tmp")
+    with staged.open("w") as handle:
+        handle.write(text)
+        handle.flush()
+        os.fsync(handle.fileno())
+    staged.replace(path)
+    directory = os.open(path.parent, os.O_RDONLY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+
+
 def object_fields(value: object, label: str) -> dict[str, object]:
     """Validate external object keys before interpreting their values."""
     if not isinstance(value, dict):

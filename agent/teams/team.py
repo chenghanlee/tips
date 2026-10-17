@@ -39,7 +39,7 @@ from briefs import (
     reviewer_notice,
     tester_message,
 )
-from commands import execute, object_fields, require_type, run
+from commands import execute, object_fields, require_type, run, write_file
 from config import (
     DATABASE_BASES,
     DISPATCHER_RECOVERY,
@@ -90,9 +90,7 @@ def next_generation() -> int:
     """A generation this store never handed out before; call it under the lock."""
     path = conf.state_dir() / "generation"
     last = int(path.read_text()) if path.is_file() else 0
-    staged = path.with_suffix(".tmp")
-    staged.write_text(f"{last + 1}\n")
-    staged.replace(path)
+    write_file(path, f"{last + 1}\n")
     return last + 1
 
 
@@ -139,21 +137,11 @@ def load_record(path: Path) -> Record:
 
 
 def save_record(record: Record) -> None:
-    """Replace the slot's record atomically and durably: once this returns, a launcher crash
-    or timeout keeps the new record. The directory must be on a local filesystem."""
+    """Replace the slot's record durably: once this returns, a launcher crash or timeout
+    keeps the new record."""
     path = record_path(record["slot"])
     path.parent.mkdir(parents=True, exist_ok=True)
-    staged = path.with_suffix(".json.tmp")
-    with staged.open("w") as handle:
-        handle.write(json.dumps(record, indent=2, sort_keys=True) + "\n")
-        handle.flush()
-        os.fsync(handle.fileno())
-    staged.replace(path)
-    directory = os.open(path.parent, os.O_RDONLY)
-    try:
-        os.fsync(directory)
-    finally:
-        os.close(directory)
+    write_file(path, json.dumps(record, indent=2, sort_keys=True) + "\n")
 
 
 @contextlib.contextmanager
@@ -365,9 +353,7 @@ def configure_bootstrap(record: Record, allocation: Allocation, branch: str, com
         # What the launch lets the worker write; bootstrap refuses trusted paths inside it.
         "writable": [allocation["root"]],
     }
-    staged = config / "bootstrap.json.tmp"
-    staged.write_text(json.dumps(settings, indent=2, sort_keys=True) + "\n")
-    staged.replace(config / "bootstrap.json")
+    write_file(config / "bootstrap.json", json.dumps(settings, indent=2, sort_keys=True) + "\n")
 
 
 def inside(path: Path, root: Path) -> bool:
@@ -533,7 +519,8 @@ def running_client(record: Record, allocation: Allocation) -> Entity | None:
 
     A live client with another name, kind, root or session makes the pane's owner
     uncertain: refused, and so is one that reports no session, since nothing then shows
-    which client is live. Only a record with no session yet accepts the live one's.
+    which client is live. Only a record with no session yet accepts the live one's. A
+    refusal states the fact; checked_client adds the caller's next step.
     """
     name, pane = allocation["name"], allocation["pane"]
     if pane not in {p["pane_id"] for p in live_panes(record["workspace"])}:
@@ -549,12 +536,19 @@ def running_client(record: Record, allocation: Allocation) -> Entity | None:
     recorded, live_session = allocation["session"], session_id(agent)
     if not live_session:
         raise RuntimeError(
-            f"{pane}: {name} reports no session; cannot confirm the recorded client; preserved. "
-            "Nothing was resent; only the operator decides what happens to it."
+            f"{pane}: {name} reports no session; cannot confirm the recorded client; preserved"
         )
-    if recorded not in ("", "unknown") and live_session != recorded:
+    if recorded and live_session != recorded:
         raise RuntimeError(f"{pane}: {name} runs session {live_session}, not {recorded}; preserved")
     return agent
+
+
+def checked_client(record: Record, allocation: Allocation, step: str) -> Entity | None:
+    """running_client, with the caller's next step added to a refusal."""
+    try:
+        return running_client(record, allocation)
+    except RuntimeError as error:
+        raise RuntimeError(f"{error}. {step}") from error
 
 
 def harness_command(script: str, *args: str) -> str:
@@ -573,7 +567,9 @@ def reconcile(record: Record, allocation: Allocation) -> Entity | None:
     | none | never submitted | launch |
     | none | unknown or submitted | refuse: the client may have done the task, then exited |
     """
-    agent = running_client(record, allocation)
+    agent = checked_client(
+        record, allocation, "Nothing was resent; only the operator decides what happens to it."
+    )
     name, state = allocation["name"], allocation["submission"]
     if agent and state == NEVER_SUBMITTED:
         raise RuntimeError(
@@ -595,7 +591,7 @@ def adopt(record: Record, allocation: Allocation, agent: Entity) -> None:
     record held a session, record the one the client reports; running_client refused any
     other mismatch. Post the launch EVENT if the launch stopped before it was posted."""
     name, session = allocation["name"], session_id(agent)
-    if session and allocation["session"] in ("", "unknown"):
+    if session and not allocation["session"]:
         allocation["session"] = session
         save_record(record)
     text = launch_text(allocation)
@@ -649,7 +645,7 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
     started = herdr("agent", "get", pane)["agent"]
     reported = session_id(started)
     if not session:
-        allocation["session"] = reported or "unknown"
+        allocation["session"] = reported
         save_record(record)
     if (
         pane_occupant(pane) != (root, True)
@@ -663,7 +659,7 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
     herdr("agent", "prompt", name, "Begin." if kind == "claude" else prompt)
     allocation["submission"] = SUBMITTED
     save_record(record)
-    print(f"Launched {name}: {kind} in {root}, session {allocation['session']}")
+    print(f"Launched {name}: {kind} in {root}, session {allocation['session'] or 'unknown'}")
     post_event(record["brief"], allocation, launch_text(allocation))
 
 
@@ -803,7 +799,7 @@ def reset(brief: str, entry: str) -> None:
         allocation = record["agents"].get(entry) if record else None
         if record is None or allocation is None:
             raise RuntimeError(f"#{brief} has no recorded client {entry}")
-        if running_client(record, allocation):
+        if checked_client(record, allocation, "Nothing was reset."):
             raise RuntimeError(
                 f"{allocation['name']} is running in {allocation['pane']}; exit it first"
             )
@@ -1057,14 +1053,23 @@ def retirement_paths(allocation: Allocation) -> tuple[Path, Path, Path, Path]:
     return paths
 
 
-def verify_present(present: dict[str, Allocation]) -> None:
-    """Validate every recorded pane before stopping any client."""
+# stop's next step when a recorded pane holds a client it cannot confirm.
+STOP_STEP = (
+    "Nothing was asked or stopped. The operator inspects the pane; once that client has "
+    "exited, stop prints the operator's retirement command for it."
+)
+
+
+def live_clients(record: Record) -> dict[str, Allocation]:
+    """The recorded clients running in their panes; any other client in a recorded pane
+    refuses."""
+    return {e: a for e, a in record["agents"].items() if checked_client(record, a, STOP_STEP)}
+
+
+def verify_present(record: Record, present: dict[str, Allocation]) -> None:
+    """Recheck every running client with the same rule before stopping any."""
     for allocation in present.values():
-        root, live = pane_occupant(allocation["pane"])
-        if live:
-            agent = herdr("agent", "get", allocation["pane"])["agent"]
-            if agent.get("name") != allocation["name"] or root != Path(allocation["root"]):
-                raise RuntimeError(f"{allocation['pane']}: conflicting owner; preserved")
+        checked_client(record, allocation, STOP_STEP)
 
 
 def port_in_use(port: int) -> bool:
@@ -1157,9 +1162,7 @@ def retain_files(record: Record, dropped: list[str], kept: str, reports: Reports
             "databases_dropped": own,
             "databases_kept_because": kept,
         }
-        staged = config / "retired.json.tmp"
-        staged.write_text(json.dumps(note, indent=2, sort_keys=True) + "\n")
-        staged.replace(config / "retired.json")
+        write_file(config / "retired.json", json.dumps(note, indent=2, sort_keys=True) + "\n")
         for path in retained:
             print(f"Retained {path}: {note['reason']}; see {config / 'retired.json'}")
 
@@ -1214,9 +1217,7 @@ def stop_brief(brief: str) -> None:
         panes = frozenset(a["pane"] for a in record["agents"].values())
         refuse_foreign_owner(roots, names, panes)
         reports = retirement_reports(record)
-        present = {
-            e: a for e, a in record["agents"].items() if running_client(record, a) is not None
-        }
+        present = live_clients(record)
         missing = [
             e
             for e, a in record["agents"].items()
@@ -1228,7 +1229,7 @@ def stop_brief(brief: str) -> None:
         gaps = preservation_gaps(record, reports)
         if gaps:
             refuse_unpreserved(record, gaps, reports, set(present))
-        verify_present(present)
+        verify_present(record, present)
         for allocation in present.values():
             stop(allocation["pane"], allocation["root"])
         refuse_foreign_owner(roots, names, panes)
@@ -1279,7 +1280,7 @@ def client_state(allocation: Allocation, panes: set[str], agents: dict[str, Enti
         return f"{head}: pane {pane} holds {holder}, not the recorded client; preserved"
     live = session_id(agent) or "unknown"
     state = agent.get("agent_status") or "unknown"
-    started = "running" if allocation["session"] else "startup incomplete"
+    started = "running" if allocation["submission"] == SUBMITTED else "startup incomplete"
     return f"{head}: {started} in {pane}, {state}; live session {live}, recorded {session}"
 
 
@@ -1331,9 +1332,7 @@ def record_dispatcher(pane: str, session: str) -> DispatcherLaunch:
     launch = DispatcherLaunch(pid=pid, started=started, pane=pane, session=session)
     path = dispatcher_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    staged = path.with_suffix(".next")
-    staged.write_text(json.dumps(launch) + "\n")
-    staged.replace(path)
+    write_file(path, json.dumps(launch) + "\n")
     return launch
 
 
@@ -1384,9 +1383,7 @@ def prompt_agent(brief: str, entry: str, text: str) -> None:
     allocation = record["agents"].get(entry)
     if allocation is None:
         raise RuntimeError(f"Brief #{brief} has no launched {entry}")
-    if allocation["pane"] not in {p["pane_id"] for p in live_panes(record["workspace"])}:
-        raise RuntimeError(f"{allocation['name']}: recorded pane {allocation['pane']} is gone")
-    if running_client(record, allocation) is None:
+    if checked_client(record, allocation, "Nothing was sent.") is None:
         raise RuntimeError(f"{allocation['name']} is not running in {allocation['pane']}")
     try:
         herdr("agent", "prompt", allocation["name"], text)
