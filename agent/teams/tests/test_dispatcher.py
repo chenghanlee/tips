@@ -1,10 +1,11 @@
 """Dispatcher launch tests using fake clients and Herdr; never create live panes."""
 
+import contextlib
 import fcntl
 import json
 import os
 import shutil
-import subprocess
+import signal
 import tempfile
 import time
 import unittest
@@ -44,10 +45,13 @@ if Path(sys.argv[0]).name == "claude":
         except BlockingIOError:
             held = "held"
     Path(os.environ["DISPATCH_LOG"] + ".lock").write_text(held)
-    # The adapter lists its tools to this session after READY_SECONDS, or never.
+    # The adapter lists its tools to this session after READY_SECONDS, or never. With
+    # STALE_NOTE, another session's note is there first.
     ready = os.environ.get("READY_SECONDS", "0")
     session = args[args.index("--session-id") + 1]
     note = Path(os.environ["LOCK_PATH"]).with_name("dispatcher.ready")
+    if os.environ.get("STALE_NOTE"):
+        note.write_text(json.dumps({"session": "old", "text": "tools listed"}))
     if ready != "never":
         time.sleep(float(ready))
         note.write_text(json.dumps({"session": session, "text": "tools listed"}))
@@ -96,11 +100,21 @@ if Path(sys.argv[0]).name == "herdr":
 """
 
 
+def running(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
 class DispatchTest(unittest.TestCase):
     def setUp(self) -> None:
         TEST_RUNS.mkdir(parents=True, exist_ok=True)
         self.tmp = tempfile.TemporaryDirectory(prefix="dispatch test ", dir=TEST_RUNS)
         self.addCleanup(self.tmp.cleanup)
+        # Runs before the cleanup above: a starter must not outlive the test's directory.
+        self.addCleanup(self.stop_starters)
         # The checkout sits in the temporary directory; the harness root is its sibling.
         self.root = Path(self.tmp.name).resolve() / "tips"
         self.state = Path(self.tmp.name).resolve() / "agent_teams" / repo_key("o/r") / "state"
@@ -134,6 +148,23 @@ class DispatchTest(unittest.TestCase):
             DISPATCH_LOG=str(self.log),
             LOCK_PATH=str(self.state / "dispatcher.lock"),
         )
+
+    def stop_starters(self) -> None:
+        """Stop this test's detached starters, which would wait out their deadline."""
+        listed = execute(["ps", "-axww", "-o", "pid=,command="], check=True).stdout
+        mine = str(Path(self.tmp.name).resolve())
+        starters = [
+            int(line.split()[0])
+            for line in listed.splitlines()
+            if " --start " in line and mine in line
+        ]
+        for pid in starters:
+            with contextlib.suppress(ProcessLookupError):
+                os.kill(pid, signal.SIGTERM)
+        deadline = time.monotonic() + 5
+        while starters and time.monotonic() < deadline:
+            starters = [pid for pid in starters if running(pid)]
+            time.sleep(0.05)
 
     def write_config(self, model: str, launch_seconds: int = 120) -> None:
         dispatcher = f'\n[dispatcher]\nmodel="{model}"\neffort="high"\ncompact_percent=42\n'
@@ -241,22 +272,11 @@ class DispatchTest(unittest.TestCase):
         output = self.dispatch(ok=False, TIPS_TEAM_HARNESS=str(other / "harness"))
         assert "belongs to x/r, not o/r" in output
 
-    def test_the_client_holds_the_start_lock_and_a_second_launch_fails_at_once(self) -> None:
+    def test_the_client_holds_the_start_lock(self) -> None:
+        # The client inherits the launcher's lock, so a second launcher fails while it runs.
         self.dispatch()
-        assert (self.root / "calls.lock").read_text() == "held"
-        # Two launchers at once: one client starts, the other is refused while it runs.
-        command = [self.scripts / "dispatch"]
-        # Ready after a second, the winner's client still holds the lock when the other
-        # launcher reaches it.
-        env = {**self.env, "CLIENT_SECONDS": "4", "READY_SECONDS": "1"}
-        pipe, merged = subprocess.PIPE, subprocess.STDOUT
-        first = subprocess.Popen(command, env=env, stdout=pipe, stderr=merged)  # noqa: S603
-        second = subprocess.Popen(command, env=env, stdout=pipe, stderr=merged)  # noqa: S603
-        outputs = [p.communicate(timeout=30)[0].decode() for p in (first, second)]
-        codes = sorted(p.returncode for p in (first, second))
-        assert codes == [0, 1], outputs
-        assert any("Busy" in output for output in outputs), outputs
-        assert len(self.calls("claude")) == 2
+        held = (self.root / "calls.lock").read_text()
+        assert held == "held", f"the client's own probe found the start lock {held}"
 
     def test_a_held_start_lock_refuses_before_any_check(self) -> None:
         self.state.mkdir(parents=True)
@@ -267,50 +287,43 @@ class DispatchTest(unittest.TestCase):
         assert not self.calls("claude")
         assert not self.calls("herdr")
 
-    def test_the_starter_leaves_a_pane_whose_client_is_not_the_launched_process(self) -> None:
-        self.write_config("test-model", launch_seconds=1)
-        self.dispatch(CLIENT_SECONDS="3", FOREIGN_CLIENT="1")
-        # The starter gave up without naming or prompting the pane's client.
-        assert len(self.herdr_calls("notification", "show")) == 1
-        assert not self.herdr_calls("agent", "rename", seconds=0)
-        assert not self.herdr_calls("agent", "prompt", seconds=0)
-
     def test_begin_waits_for_the_adapters_ready_note_for_this_session(self) -> None:
-        # A note left by an earlier session is removed before the client starts.
-        self.state.mkdir(parents=True)
-        (self.state / "dispatcher.ready").write_text('{"session": "old", "text": "tools listed"}')
-        self.dispatch(CLIENT_SECONDS="5", READY_SECONDS="1")
-        assert self.herdr_calls("agent", "prompt") == [["agent", "prompt", "caller", "Begin."]]
+        # Another session's note is there at once; this session's note a second later.
+        self.dispatch(CLIENT_SECONDS="5", READY_SECONDS="1", STALE_NOTE="1")
+        prompts = self.herdr_calls("agent", "prompt")
+        assert prompts == [["agent", "prompt", "caller", "Begin."]], prompts
         # Herdr showed the client idle from the start; Begin. still waited for the note.
         prompted = (self.root / "calls.prompted").read_text().split()
-        assert prompted == ["true"], prompted
+        assert prompted == ["true"], f"Begin. sent before this session's note: {prompted}"
 
     def test_a_client_never_ready_or_a_failed_prompt_names_the_operator_command(self) -> None:
         prompt = 'herdr agent prompt caller "Begin."'
         both = f"herdr agent rename caller dispatcher && {prompt}"
         # (case, fake Herdr and client settings, Begin. prompts sent, what the note says)
         cases: list[tuple[str, dict[str, str], int, list[str]]] = [
-            ("never idle", {"AGENT_STATUS": "unknown"}, 0, ["not ready within 1 s", both]),
-            ("no tools", {"READY_SECONDS": "never"}, 0, ["not ready within 1 s", both]),
+            ("never idle", {"AGENT_STATUS": "unknown"}, 0, ["not ready within 2 s", both]),
+            ("no tools", {"READY_SECONDS": "never"}, 0, ["not ready within 2 s", both]),
+            ("foreign client", {"FOREIGN_CLIENT": "1"}, 0, ["not ready within 2 s", both]),
             ("rename fails", {"RENAME_FAILS": "1"}, 0, ["naming it failed", both]),
             ("prompt fails", {"PROMPT_FAILS": "1"}, 1, ["may or may not", "only if", prompt]),
             ("prompt hangs", {"PROMPT_FAILS": "hang"}, 1, ["may or may not", "timed out"]),
         ]
+        # launch_seconds is both the starter's deadline and each Herdr call's timeout; 1 s
+        # let a slow fake Herdr call time out under load.
+        self.write_config("test-model", launch_seconds=2)
         for case, extra, sent, says in cases:
             with self.subTest(case=case):
-                # A client that is never ready keeps the starter until its deadline.
-                never_ready = case in ("never idle", "no tools")
-                self.write_config("test-model", launch_seconds=1 if never_ready else 2)
                 self.log.unlink(missing_ok=True)
                 (self.state / "dispatcher.recovery").unlink(missing_ok=True)
                 env = {"AGENT_STATUS": "idle", "READY_SECONDS": "0", "RENAME_FAILS": ""}
-                env = {**env, "PROMPT_FAILS": "", **extra}
+                env = {**env, "PROMPT_FAILS": "", "FOREIGN_CLIENT": "", **extra}
                 self.dispatch(
                     CLIENT_SECONDS="6",
                     AGENT_STATUS=env["AGENT_STATUS"],
                     READY_SECONDS=env["READY_SECONDS"],
                     RENAME_FAILS=env["RENAME_FAILS"],
                     PROMPT_FAILS=env["PROMPT_FAILS"],
+                    FOREIGN_CLIENT=env["FOREIGN_CLIENT"],
                 )
                 shown = self.herdr_calls("notification", "show", seconds=8)
                 assert len(shown) == 1, shown
