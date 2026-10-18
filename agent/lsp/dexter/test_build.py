@@ -1,5 +1,6 @@
 """Exercise build installation with isolated tool and process snapshots."""
 
+import hashlib
 import os
 import shutil
 import subprocess
@@ -31,6 +32,8 @@ class BuildSafetyTest(unittest.TestCase):
             + """
 import os, pathlib, sys, tarfile
 tool = pathlib.Path(sys.argv[0]).name
+with open(os.environ["TOOL_LOG"], "a") as log:
+    log.write(tool + "\\n")
 if tool == "ps":
     marker = pathlib.Path(os.environ["PS_MARKER"])
     key = "PS_AFTER" if marker.exists() else "PS_BEFORE"
@@ -41,6 +44,8 @@ if tool == "ps":
 elif tool == "git" and "archive" in sys.argv:
     with tarfile.open(fileobj=sys.stdout.buffer, mode="w|"):
         pass
+elif tool == "dexter":
+    print("local_build_id wrong-PATH-binary")
 elif tool == "go":
     if sys.argv[1] == "version":
         print("go version fixture")
@@ -53,12 +58,13 @@ elif tool == "go":
 """
         )
         stub.chmod(0o755)
-        for name in ("ps", "git", "go"):
+        for name in ("ps", "git", "go", "dexter"):
             (tools / name).symlink_to(stub)
         self.env = dict(
             os.environ,
             PATH=f"{tools}:{os.environ['PATH']}",
             PS_MARKER=str(self.root / "ps-called"),
+            TOOL_LOG=str(self.root / "tools-called"),
         )
 
     def run_build(self, before="", after=""):
@@ -102,6 +108,50 @@ elif tool == "go":
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("local_build_id", self.binary.read_text())
         self.assertIn('"sha256"', self.metadata.read_text())
+
+    def check_binary(self, binary, cwd=None):
+        return subprocess.run(
+            ["bash", str(self.root / "build.sh"), "--check", str(binary)],
+            env=self.env,
+            cwd=cwd,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+    def test_check_reuses_the_selected_binary_without_build_tools_or_writes(self):
+        self.assertEqual(self.run_build().returncode, 0)
+        selected = self.root / "other home" / "dexter"
+        selected.parent.mkdir()
+        self.binary.rename(selected)
+        calls = Path(self.env["TOOL_LOG"])
+        calls.unlink()
+        before = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        result = self.check_binary(selected)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(str(selected), result.stdout)
+        result = self.check_binary(selected.name, cwd=selected.parent)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(calls.exists(), "check must not invoke git, go or ps")
+        after = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        self.assertEqual(before, after)
+
+    def test_check_rejects_missing_or_wrong_identity(self):
+        # The expected value comes from the build identity contract, not build.sh output.
+        pin = "c4b62b788bbe38f0af507a79f0d6de46dd812b51"
+        patch_sha = hashlib.sha256(b"fixture patch\n").hexdigest()
+        expected = hashlib.sha256(f"{pin}\n{patch_sha}\n".encode()).hexdigest()
+        self.binary.unlink()
+        missing = self.check_binary(self.binary)
+        self.assertNotEqual(missing.returncode, 0)
+        for output in ("local_build_id wrong", f"prefix local_build_id {expected}"):
+            with self.subTest(output=output):
+                self.binary.write_text(f"#!/bin/sh\nprintf '%s\\n' '{output}'\n")
+                self.binary.chmod(0o755)
+                result = self.check_binary(self.binary)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected, result.stderr)
+        self.assertFalse(Path(self.env["TOOL_LOG"]).exists())
 
 
 if __name__ == "__main__":

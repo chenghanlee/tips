@@ -1,19 +1,20 @@
 name: Dexter
-# Not a required status check (ruleset 'Reviewed main' requires checks and release),
-# so a path-skipped run leaves nothing pending. Elixir-only changes skip it.
+# Tooling changes run the full suite; harness-only changes run real-daemon integration.
+# A clean CI runner builds the binary for either scope. Markdown-only changes skip it.
+# Keep Dexter optional in branch rules so path-skipped runs do not block merging.
 on:
   pull_request:
     paths:
       - 'agent/lsp/**'
       - 'agent/teams/**'
-      - '.github/workflows/**'
+      - '.github/workflows/dexter.yml'
       - '!**.md'
   push:
     branches: [main]
     paths:
       - 'agent/lsp/**'
       - 'agent/teams/**'
-      - '.github/workflows/**'
+      - '.github/workflows/dexter.yml'
       - '!**.md'
 permissions:
   contents: read
@@ -24,6 +25,30 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Select Dexter coverage
+        id: scope
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            range="origin/$GITHUB_BASE_REF...HEAD"
+          elif [ -z "$BEFORE" ] || ! git rev-parse --verify "$BEFORE^{commit}" >/dev/null 2>&1; then
+            echo 'Push base unavailable; selecting full Dexter coverage.'
+            echo 'full=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          else
+            range="$BEFORE..HEAD"
+          fi
+          if git diff --quiet --no-renames "$range" -- agent/lsp .github/workflows/dexter.yml ':(exclude)*.md'; then
+            full=false
+          else
+            status=$?
+            [ "$status" -eq 1 ] || exit "$status"
+            full=true
+          fi
+          echo "full=$full" >> "$GITHUB_OUTPUT"
       - name: Fetch the pinned Dexter source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -42,10 +67,9 @@ jobs:
       - name: Build the pinned source plus the local patch
         run: agent/lsp/dexter/build.sh tmp/dexter-upstream --keep tmp/dexter-source
       - name: Check the packaged binary identity
-        run: |
-          agent/lsp/dexter/vendor/dexter version
-          ! agent/lsp/dexter/vendor/dexter version | grep -q 'local_build_id dev'
+        run: bash agent/lsp/dexter/build.sh --check
       - name: Go tests, including the real-daemon integration
+        if: steps.scope.outputs.full == 'true'
         working-directory: tmp/dexter-source
         run: go test ./...
       - name: Fetch the Elixir sources matching the toolchain
@@ -58,6 +82,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Build script safety against running daemons and failed inspection
+        if: steps.scope.outputs.full == 'true'
         run: python3 agent/lsp/dexter/test_build.py
       - name: Team provisioning and client stop against the built binary and real sources
         env:
