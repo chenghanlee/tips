@@ -61,7 +61,8 @@ def pair_brief(record: Record, entry: str, duty: str) -> str:
         identity(record, entry, duty)
         + bootstrap_brief(allocation, "")
         + f"Then read the brief with gh issue view {record['brief']}. Use the README restart "
-        "rule to find whose turn it is. If yours, continue the workflow; otherwise end your "
+        "rule, including pending decisions and current issue comments, to find whose turn "
+        "it is. If yours, continue the workflow; otherwise end your "
         "turn and wait for a message. "
         + handoff
         + f"Put {entry}, <session> on line 2 of each review record; replace <session> with "
@@ -91,11 +92,20 @@ def reviewer_brief(record: Record, entry: str, duty: str, pr: PullRequest) -> st
 
 def design_brief(record: Record, entry: str) -> str:
     allocation = record["agents"][entry]
+    assignment = (
+        "Read the assigned QUESTION and its evidence. For a named source SHA, run "
+        f"python3 {harness() / 'bootstrap.py'} --commit <sha> in your own clone before "
+        "deciding. Follow the designer role's bounded-question steps. "
+        if record["kind"] == "brief"
+        else "Follow the designer role's initial-design steps. "
+    )
     return (
         identity(record, entry, "designer")
         + bootstrap_brief(allocation, "")
-        + "Read agent/teams/roles/designer.md, then the spec with "
-        f"gh issue view {record['brief']}; its body names the lead and the critics. Use "
+        + "Read agent/teams/roles/designer.md, then the issue with "
+        f"gh issue view {record['brief']}; it names the lead and any critics. "
+        + assignment
+        + "Use "
         "agent/teams/board.py to read and post. "
         + dexter_brief(project_of(allocation) / ".dexter/dexter.sh")
     )
@@ -132,7 +142,8 @@ def tester_message(
     message += (
         f"Move your own clone to the head first: {bootstrap_command(pr.head)}; it refuses a "
         "dirty clone. Follow agent/teams/roles/tester.md and "
-        "agent/skills/review-software-correctness/SKILL.md from your clone and use the "
+        "both agent/skills/review-software-correctness/SKILL.md and "
+        "agent/skills/review-software-design/SKILL.md from your clone and use the "
         "README PR review record. "
         f"Put {tester}, <session> on line 2; replace <session> with your session ID. "
         "When your review or any required reviewer's latest review of this head has findings, "
@@ -148,8 +159,10 @@ def reviewer_notice(record: Record, entry: str, pr: PullRequest) -> str:
     tester = live_name(record["slot"], record["tester"])
     return (
         f"New head to review on {pr.url}: {pr.head}. Move your own clone to it with "
-        f"{bootstrap_command(pr.head)}; it refuses a dirty clone and never resets one. Review "
-        f"the changes since your last review. Submit the README review record with {entry}, "
+        f"{bootstrap_command(pr.head)}; it refuses a dirty clone and never resets one. Follow "
+        "your role's PR review steps. Review the full relevant PR change on your first "
+        "review; otherwise review the changes since your last actual review. Earlier "
+        f"design advice is not a PR review. Submit the README review record with {entry}, "
         f"<session> on line 2, then send its URL with herdr agent prompt {tester} "
         "'<review URL>'."
     )

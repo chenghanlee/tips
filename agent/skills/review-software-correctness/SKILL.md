@@ -1,6 +1,6 @@
 ---
 name: review-software-correctness
-description: Guides the tester's review of a tips PR for correctness against its brief. Covers affected code, running the scenarios, a mutation check, data checks, the proof standard for findings, severity and the review record. Design quality, smells and test value belong to review-software-design.
+description: Guides the correctness part of a tips PR review. The combined tester also applies review-software-design in the same investigation and review record.
 ---
 
 # Review software correctness
@@ -10,12 +10,13 @@ conclusion.
 
 Scope limits:
 
-- Do not review design, smells, conventions or test value. Those reviews use
-  [review-software-design](../review-software-design/SKILL.md).
+- Also apply [review-software-design](../review-software-design/SKILL.md). Reuse the
+  same affected-code investigation and review record; correctness does not replace
+  assessment of responsibility, dependencies, state ownership or test value.
 - Ask for a test only for a scenario, or for an existing contract the affected code
   reaches that no surviving test proves (step 5).
-- Deferrals follow the [severity rule](../../teams/README.md#severity): a recorded
-  deferral settles P2 on that point, never P0 or P1.
+- Deferrals follow the [severity rule](../../teams/README.md#severity), including
+  reconsideration when its trigger occurs or evidence invalidates its assumptions.
 - One pass. Report every P0 and P1. Report at most three P2 findings, the ones with the
   greatest consequence. Combine findings only when they share a cause and fix.
 
@@ -121,7 +122,8 @@ For each entry point in the affected code:
    side effects.
 4. If the path reaches an existing contract that no surviving test proves for the
    changed case, file P1 "missing coverage for affected contract `path:line`" with the
-   uncovered case. Have the lead add the scenario. Prefer extending an existing test.
+   uncovered case. The implementer records the case and supplies the missing evidence;
+   only an unsettled contract needs a designer decision. Prefer extending an existing test.
 
 Probes, by change type:
 
@@ -204,7 +206,9 @@ Review body, in this order:
 6. `Not run`: what you did not run and why, and any step marked not applicable. For a
    required check, link the [substitution or waiver](../../teams/roles/common.md#authority)
    that removed it.
-7. Findings outside the diff, each with `path:line`.
+7. Design assessment and consequential tradeoffs from the shared investigation; no
+   duplicate affected-code list or generic declaration is needed.
+8. Findings outside the diff, each with `path:line`.
 
 "No findings" is valid when every scenario is proven and every step above is recorded.
 

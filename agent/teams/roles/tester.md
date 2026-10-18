@@ -1,6 +1,6 @@
 # Tester
 
-Review one PR for correctness. The first tester on the brief's `Required reviews:` line
+Review one PR for correctness and design. The first tester on the brief's `Required reviews:` line
 confirms the merge. Every tester works in its own clone and moves it to a handed-off
 head with the `bootstrap.py --commit <head>` command the handoff names; it refuses a
 dirty clone and never resets one.
@@ -8,7 +8,11 @@ dirty clone and never resets one.
 ## Read
 
 1. [Common rules](common.md) and the [workflow](../README.md).
-2. [review-software-correctness](../../skills/review-software-correctness/SKILL.md).
+2. [review-software-correctness](../../skills/review-software-correctness/SKILL.md) and
+   [review-software-design](../../skills/review-software-design/SKILL.md). Reuse one
+   source investigation and review record for both concerns. Assess responsibility,
+   dependencies and state ownership as well as behavior; a generic design sentence
+   does not substitute for evidence in the diff and affected callers.
 3. The brief, then the diff, then the [PR body](../README.md#pr-body).
 
 ## Steps
@@ -21,7 +25,8 @@ dirty clone and never resets one.
    open a browser; it replaces no later check.
 3. Record the head SHA and your first concerns before reading the PR body or another
    review.
-4. Follow the skill with your own database and port: affected code, scenarios and their controls, mutation check, entry points, data, checks.
+4. Follow both skills with your own database and port: affected code, design,
+   scenarios and their controls, mutation check, entry points, data, checks.
    Wallaby browser tests (`TIPS_BROWSER=1`, `test/tips_web/features`): a Codex client
    cannot run them; the macOS sandbox kills chromedriver's Chrome and each attempt
    leaves a crash dialog ([#432](https://github.com/chenghanlee/tips/issues/432)). If
@@ -38,7 +43,21 @@ dirty clone and never resets one.
    the head has findings, send `turn` to the implementer. Do not wait for the other
    reviews. When `agent/teams/pr_review.py observe <pr>` reports ready, follow the
    [merge step](../README.md#merge). Then send `done` to the dispatcher.
-7. A new head invalidates every LGTM. Review the changes since your last review.
+7. A new head invalidates every LGTM. Follow the [review record](../README.md#pr-review-record)
+   for first-review coverage and later changes.
+
+## Questions and changed decisions
+
+You may answer bounded source or verification questions before a PR, using evidence
+from your own clone and an ANSWER on the brief. This is optional help. A consequential
+decision needing independent technical judgment goes to the appropriate designer;
+checking conformity with your own answer is not independent validation of that decision.
+
+A changed binding decision requires review against the adopted decision even at the
+same head. Follow [Changed binding decisions](../README.md#changed-binding-decisions):
+record the non-LGTM hold before treating a requested pause as established. Do not clear
+it merely because a new code head arrived. A harmless clarification or ordinary
+internal placement within the existing contract needs no hold.
 
 ## Revert a broken main
 
@@ -62,9 +81,8 @@ Merge-confirming tester, when the dispatcher asks you to revert PR `<pr>`:
 
 ## Do not
 
-- Do not review design, smells or test value. The reviewing designer is
-  responsible for them.
-- Do not ask for tests beyond the brief's scenarios.
+- Do not turn an affected-code review into an audit of unrelated smells. Ask for
+  verification when an affected contract's relevant evidence is missing.
 - Do not run `team.py turn` unless you confirm the merge.
 - Do not merge with an unresolved thread, a missing LGTM or a failed check.
 - Codex client: do not run `mix test` with `TIPS_BROWSER=1`. Use `agent-browser` for manual checks.

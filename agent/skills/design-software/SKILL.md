@@ -5,12 +5,16 @@ description: Guides the design lead and the design critic of a tips feature. Cov
 
 # Design software
 
-Lead: write the spec and briefs. Critic: assess them from a different persona. The
+For an unresolved consequential design choice, the lead owns the decision and a
+critic challenges it from a different persona when that judgment is useful. The
 [designer role](../../teams/roles/designer.md) defines turns, messages, the round limit
 and the AGREE condition. Use this skill to write and assess the design.
 
-Build Tips as a new MVP to test product demand. Design the smallest change that
-satisfies the contracts. Let the user decide which product capabilities are required.
+Build Tips as a new MVP to test product demand. Learn through working software with
+the simplest sufficient engineering. Let the user decide the product capabilities.
+Settled bounded work uses the ordinary brief path, without a ceremonial design round.
+The implementer applies [Design during delivery](../implement-software/SKILL.md#design-during-delivery);
+designers integrate discoveries that change consequential technical commitments.
 
 Scope limits:
 
@@ -64,7 +68,8 @@ Explain your decision.
 
 ## Step 4: Spec
 
-One spec per feature. Sections:
+A shared spec is useful when several briefs depend on one contract. It is not required
+solely to launch a designer for a question on a started brief. When needed, sections:
 
 1. Product question and signal.
 2. Briefs in dependency order, each with its agents.
@@ -77,28 +82,23 @@ Lead: edit the body. Other agents: use comments.
 
 ## Step 5: Briefs
 
-One brief per PR. Aim for 900 words. Split only at contracts that can ship
-independently. Sections, in order:
+One brief per PR. Keep it short; split only at contracts that can ship independently.
+Start with the agreed outcome, genuine constraints, acceptance examples and roster:
+`Implementer: <entry>` and `Required reviews: <entries>`, merge-confirming tester first.
+The default is one independent tester covering correctness and design. Add reviewers
+only for an identified contribution.
 
-1. **Outcome.** One paragraph: what a user or operator can do afterwards.
-2. **Implementer and Required reviews.** `Implementer: <entry>` and `Required reviews: <entries>`, testers first.
-3. **Contracts.** Give the `path:line` each contract applies to. For new code, name the
-   module and function. List limits, states and transitions. Name which module writes
-   each fact.
-   State required performance limits and workload assumptions that affect the design,
-   and link any existing contract that defines them.
-4. **Acceptance scenarios.** Numbered. Each names the input, the action and the
-   observable result. These are the test list. Mark a scenario `Masking risk:` when
-   its test could pass with the defect it exists to catch, and name that defect: the
-   distinguishing defect. Prompts, not a complete list: the test crosses a boundary,
-   uses a stub or double, waits on async work or a timer, or drives a browser.
-5. **Test budget.** The expected net test change: tests added, one to two per scenario,
-   and existing tests deleted or replaced, by name, each with a reason.
-6. **Decisions and deferrals.** The rows of the spec table that apply to this brief.
-7. **Smallest version.** What this brief leaves out and why that is safe.
-8. **Restrictions.** Files or behaviour the implementer must not touch.
-9. **Design sections.** Links, quoting only the sentence a contract depends on, with the
-   doc revision.
+The implementer inspects source and maintains the technical detail after launch:
+affected contracts and links, relevant state/failure/ownership facts, proposed checks,
+and decisions or deferrals with their reasons and revisit triggers. Reference a shared
+decision instead of copying it. Initial file/function placement is guidance, not frozen
+scope. Explicit restrictions and agreed contracts remain binding.
+
+Number acceptance scenarios with input, action and observable result. Mark `Masking
+risk:` where a test could pass with its intended defect, and name that defect. Explain
+expected test additions/replacements when useful, and update the budget as evidence
+changes; a source-informed contract check does not require advance designer permission.
+Link relevant design sections and their revision rather than copying whole documents.
 
 ## Required rules
 
@@ -133,16 +133,17 @@ Classify a violation as P2 and record a decision.
   the same check in the LiveView, the context and the query with no reason.
 - **Simplest mechanism.** Choose the simplest mechanism that meets the contract's
   lifetime, durability and consistency needs. Use existing facilities first. State the
-  workload or failure that justifies each new mechanism. Problem example: a scheduler,
-  cache or abstraction with one user.
+  present benefit that justifies each new mechanism. Problem example: a scheduler or
+  cache whose lifetime or complexity has no present benefit. One caller does not
+  by itself make a structural abstraction unnecessary.
 - **Reuse existing code.** Use existing modules, Oban and Ecto first. Problem example: a
   wrapper where the dependency has the feature.
 - **Code that supports tests.** Put side effects behind a function a test can replace.
   Pass time and randomness as inputs. Problem example: tests that need sleeps or a real
   provider.
-- **Change stays local.** Keep a feature's changes in its module and its callers. Do not
-  change shared config or unrelated tests. Problem example: merge conflicts in
-  `config/config.exs`.
+- **Change stays local.** Keep repairs within the affected flow, including necessary
+  modules, callers and tests. Respect concurrent ownership and explicit restrictions;
+  do not broaden a delivery into unrelated cleanup.
 - **Readable at the call site.** Name a function for its operation and side effects. Use
   arguments to identify the inputs. Do not add flags that change behaviour. Problem
   example: an `opts` list with five keys.
@@ -191,12 +192,12 @@ Use the brief to determine test additions.
   database raises, tests of cases that cannot happen. A test of how the application
   handles a constraint error, or of an invariant under concurrent writes, is allowed
   when a scenario names it.
-- Allowed without a brief line: one regression test per fixed bug; one race or property
-  test where the brief names a concurrency contract.
+- Verification without a prior brief line follows the implementation skill's
+  [Tests](../implement-software/SKILL.md#tests): explain the affected contract and gap.
 - When a feature replaces behaviour, the brief names the tests to delete. Delete a test
   only when surviving tests cover its distinct required cases.
-- Critic: name the uncovered contract when adding a scenario. The budget must reflect
-  the added scenario.
+- Critic: name the uncovered contract when adding a scenario. The brief's writer
+  updates the budget; unsettled contracts go to their decision owner.
 
 ## Step 6: Critique
 
@@ -230,5 +231,7 @@ Name a Haiku implementer only when all hold:
 - No schema, migration, process or external service is added.
 - A mechanical check proves the result.
 
-Otherwise name an Opus entry and say which condition failed. Do not change the design to
-meet these conditions.
+Otherwise name an Opus entry and say which condition failed. The dispatcher applies
+this to the available task evidence for an ordinary brief. Do not manufacture a larger
+design artifact to qualify a task for a model. Count implementation, advisor, review
+and repair work when assessing the choice.

@@ -243,6 +243,19 @@ class AdapterTest(Harness):
         self.session(second)
         assert self.recorded_briefs() == {"40"}
 
+    def test_start_design_can_join_a_started_brief_without_a_spare_slot(self) -> None:
+        self.write_config(CONFIG.replace("max_teams = 6", "max_teams = 1"))
+
+        async def steps(client: Any) -> None:
+            await self.call(client, "start_pair", brief=29)
+            await self.call(client, "start_design", spec=29, entry="critic")
+            await self.call(client, "prompt_agent", brief=29, entry="critic", text="Read QUESTION")
+
+        self.session(steps)
+        assert self.recorded_briefs() == {"29"}
+        assert self.record(1)["kind"] == "brief"
+        assert self.prompts("team-1-critic")[-1] == "Read QUESTION"
+
     def test_board_issue_and_project_writes_name_the_repository_and_dispatcher(self) -> None:
         content = {"number": 29, "url": "https://github.com/o/r/issues/29"}
         item = {"id": "I_29", "title": "Brief", "phase": "Design", "content": content}

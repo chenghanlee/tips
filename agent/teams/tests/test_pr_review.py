@@ -247,6 +247,10 @@ class ObserveTest(FakeState, unittest.TestCase):
         reviews.append(review("critic", new, n=5))
         self.update(reviews=reviews, reviewThreads=[{"isResolved": True}])
         assert f"head {new}" in self.observe(ready=True).printed
+        # A binding decision can invalidate acceptance without changing the code SHA.
+        reviews.append(review("tester", new, "Hold: pending decision", n=6))
+        self.update(reviews=reviews)
+        assert "tester's latest review of this head has findings" in self.observe().blockers
 
 
 class ObserveCommandTest(Harness):

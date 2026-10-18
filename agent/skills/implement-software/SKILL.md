@@ -1,44 +1,69 @@
 ---
 name: implement-software
-description: Guides implementing a tips brief in the Phoenix/Elixir repository. Covers the MVP scope, code rules, state and failure, data changes, tests and the test budget, deferrals and when to stop. Code reviews use review-software-correctness and review-software-design, which link to this skill's contract and failure sections.
+description: Guides implementing a brief for the Tips application and its agent harness (agent/teams). Covers the MVP scope, code rules, state and failure, data changes, tests and the test budget, deferrals and when to stop. Code reviews use review-software-correctness and review-software-design, which link to this skill's contract and failure sections.
 ---
 
 # Implement software
 
-Implement one brief in one PR. Use its acceptance scenarios to determine completion.
+Implement one brief in one PR. Deliver its required behavior with coherent affected
+structure and evidence proportionate to the contracts and uncertainty.
 [AGENTS.md](../../../AGENTS.md) defines repository boundaries, navigation, stack skills
 and checks. [design-software](../design-software/SKILL.md#required-rules) defines the
 architecture rules. Follow this skill to write code and tests.
 
 ## MVP scope
 
-Build Tips as a new MVP to test product demand. Ship the smallest change that makes
-every scenario in the brief pass. Implement the scope agreed in the brief. Ask the lead
-about a missing requirement. Do not add scope.
+Build the Tips application and its agent harness (`agent/teams`) as an MVP to test
+product demand. Ship the simplest sufficient working change. Preserve the agreed outcome and constraints; missing product requirements go
+to the user through the dispatcher. Maintain the brief's source-derived technical
+detail without inventing scope.
 
 Classify each choice before you make it:
 
 - Cheap to reverse: code, config, queries, jobs, module layout. Make the choice and
   implement it. Explain it in the PR if a reviewer could ask why.
 - Expensive to reverse: schema, stored data, public URLs, provider contracts, new hex
-  dependencies. Follow the brief. If the brief does not cover it, post a blocker. Do not
-  guess.
+  dependencies. Follow the agreed contract. An unresolved consequential choice goes
+  through the [designer route](../../teams/roles/dispatcher.md#decisions-during-implementation).
+  Continue unaffected work; do not guess at the missing decision.
+
+## Design during delivery
+
+The implementer owns the coherent working change. Repair a structural problem in the
+affected flow when its explainable present benefit to understanding, maintenance,
+change, extension, reuse or verification justifies the work. Include necessary modules,
+callers and tests. A failing scenario, prewritten refactor instruction, second caller
+or smaller diff is not required. A cosmetic extraction is not required either.
+
+Choose clear responsibilities, dependencies and ownership of state. Use small coherent
+steps and prompt feedback; keep structural and behavioral effects distinguishable.
+Separate commits or PRs when the review or verification benefit justifies the extra
+coordination, not automatically. Keep observable behavior unless an authorized decision
+changes it. Close the relevant evidence gap before trusting a preservation claim.
+
+Internal placement is not frozen scope. Shared/public contracts, persistent or recovery
+meaning, authority boundaries, expensive commitments and active ownership still bind.
+When new facts invalidate one, raise the specific decision and evidence through the
+workflow; only dependent work waits. Reversible exploration can establish missing facts.
+Use existing PR Decisions/Affected code for consequential choices, not a smell inventory.
 
 ## Scope
 
-Read these sources in order. Then stop:
+Start with these sources, then follow the affected flow as needed:
 
 1. The brief: outcome, contracts, scenarios, test budget, decisions table, restrictions.
 2. The stack skills AGENTS.md names for the files you will change.
 3. Each `path:line` the brief names and its callers, found with the [navigation rules](../../../AGENTS.md#elixir-navigation).
 4. The existing tests for the changed modules.
 
-State a one-line reason for reading beyond this list. If the brief is missing something
-you need, post the question through the pair workflow and continue with the parts that
-do not depend on it.
+Inspect necessary callers and existing mechanisms rather than treating the initial path
+list as complete. Fill source-derived gaps in the brief; route unresolved requirements
+or consequential decisions through the workflow and continue independent work.
 
-The brief's decisions table is binding. Do not reopen a decision in code. Do not add
-capabilities the brief does not name.
+Binding decisions change through their decision owner, not silently in code. Reconsider
+a deferral when its trigger occurs or evidence invalidates its assumptions; its owner
+can repair, revise or renew it with a current reason. This does not upgrade severity
+or authorize unrelated cleanup. Do not add unagreed product capabilities.
 
 ## Code rules
 
@@ -67,11 +92,12 @@ Apply these rules in every change. Use the examples to identify violations.
 - Name a function for its operation and side effects. Use arguments to identify the
   inputs. Do not add options that change behaviour. Problem example: an `opts` list with
   five keys.
-- Keep each function within one screen. A module has one reason to change. Problem
-  example: a context module with thirty public functions.
+- Keep responsibilities and dependencies understandable at the call site. Split a
+  function or module when that improves the affected design, not to meet a line count.
 - Use existing modules, Ecto, Oban and Phoenix features before creating your own. State
-  in the PR which workload or failure requires a new process, cache, GenServer,
-  scheduler or abstraction. Problem example: a wrapper with one user.
+  in the PR what present benefit justifies a new process, cache, GenServer,
+  scheduler or abstraction. A present structural benefit can justify a helper with one
+  caller; a wrapper that merely repeats a dependency's API does not establish a benefit.
 - Use Ecto's query, changeset and migration DSLs. Use raw SQL or `fragment` only for
   what they cannot express. Bind runtime values as parameters.
 - When you rely on a dependency's behaviour, check it at the installed version and link
@@ -171,7 +197,9 @@ Order of work:
    action. Extend it. Add a new test only when none can.
 4. Write the scenario test before the implementation. Run it. Confirm it fails for the
    reason the scenario describes.
-5. Implement until it passes. Stop.
+5. Make the scenario work, then inspect the affected design under
+   [Design during delivery](#design-during-delivery). Repair a justified problem or
+   record the consequential tradeoff. Stop when the working change is coherent and verified.
 
 Rules:
 
@@ -182,8 +210,10 @@ Rules:
   database raises, tests of cases that cannot happen. A test of how the application
   handles a constraint error, or of an invariant under concurrent writes, is allowed
   when a scenario names it.
-- Allowed without a brief line: one regression test per fixed bug; one race or property
-  test where the brief names a concurrency contract.
+- Allowed without a prior brief line: a regression test for a fixed bug, or relevant
+  verification of an existing affected contract, including preservation during a
+  refactor. Explain the uncovered case; extend an existing test where possible. Test
+  gaps do not require a new designer approval unless the contract itself is unsettled.
 - Delete a test only when surviving tests cover its distinct required cases. Name them
   in the PR body.
 - Test through public entry points: the context function, the LiveView, the job. Add a
@@ -215,8 +245,8 @@ existing operation.
 Apply the [performance principles](../design-software/SKILL.md#performance-principles)
 at the expected MVP workload. Link the brief's relevant limits and assumptions.
 Record new evidence and any implementation trade-off or discovery that affects the
-design in the PR body. If it changes an agreed contract, return it to the design lead
-for a brief update.
+design in the PR body. If it changes an agreed contract, obtain the decision through
+the designer route and incorporate the linked answer before resuming affected work.
 
 Measure only when a limit is stated or the cost could change the design. Before
 measuring, read [performance measurement](references/performance-measurement.md).
@@ -225,9 +255,10 @@ or measurement evidence. Say whether a number is an estimate or a measurement.
 
 ## Deferrals
 
-When the work reveals a problem the brief's budget does not cover:
+For unrelated improvements or wider work whose cost is not justified in this delivery:
 
-- Do not fix it.
+- Keep it out of the current PR. Bounded repairs in the affected flow follow
+  [Design during delivery](#design-during-delivery), not this exclusion.
 - Put it in one follow-up issue for this PR: the problem, the `path:line`, the trigger
   that makes it worth fixing. Link the issue from the PR body.
 - If it breaks a scenario or a required rule, post a blocker instead.
@@ -240,18 +271,18 @@ and fix them in the same PR. When the fix changes how a fact is stored, list its
 as [Trace the affected contract](#trace-the-affected-contract) says. Verify the whole
 contract, not only the reported case.
 
-Refactor only when the brief requires it, or when the current code blocks a scenario or
-its test. Name the blocking problem in the PR. Keep the refactor inside the affected
-flow. Stop when the problem is resolved.
+Structural repairs follow [Design during delivery](#design-during-delivery); a passing
+scenario does not rule out a worthwhile repair. Stop when the affected problem is resolved.
 
 ## Finish
 
 Finish only when every scenario has a test. Confirm the tests and the [required checks](../../../AGENTS.md#checks) pass.
 
-- Inspect the diff. Remove anything whose absence would not fail a scenario or make the
-  code harder to read.
+- Inspect the diff for required behavior and coherent structure. Remove additions
+  whose benefit does not justify their cost; retain justified repairs even when the
+  scenarios passed before them.
 - Delete superseded code, tests and docs in the same PR.
-- Update the docs the brief names. Do not add docs the brief did not ask for.
+- Update affected contract and usage docs so they describe the resulting behavior.
 - Fill the [PR body](../../teams/README.md#pr-body): outcome, scenario table, affected
   code, tests without a scenario line, decisions, follow-up issue, checks not run by CI.
 - Hand off through the [pair workflow](../../teams/README.md).

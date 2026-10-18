@@ -730,14 +730,16 @@ def start(brief: str) -> None:
     print(f"Brief {brief}: pair in slot {record['slot']}, generation {record['generation']}")
 
 
-def design(spec: str, entry: str) -> None:
-    """Launch a designer for the spec in its own allocation, through the same lifecycle."""
+def design(issue: str, entry: str) -> None:
+    """Join a started brief or a spec with a designer in its own allocation."""
     agent = conf.settings()["agents"].get(entry)
     if agent is None or agent["role"] != "designer":
         raise RuntimeError(f"{entry} is not a configured designer entry")
     tools()
     with store_lock():
-        record = team_record(spec, "design", "", "")
+        record = record_for(issue) or team_record(issue, "design", "", "")
+        if record["kind"] == "brief":
+            current_roster(record)
         if entry not in record["agents"]:
             configure_bootstrap(record, add_allocation(record, entry, "designer"), "", "")
             save_record(record)
@@ -745,7 +747,7 @@ def design(spec: str, entry: str) -> None:
         refuse_foreign_owner([Path(allocation["root"])], [allocation["name"]])
         open_pane(record, allocation)
         launch(record, allocation, design_brief(record, entry))
-    print(f"Spec {spec}: {entry} in slot {record['slot']}, {allocation['root']}")
+    print(f"Issue {issue}: {entry} in slot {record['slot']}, {allocation['root']}")
 
 
 def brief_record(pr: PullRequest) -> Record:
@@ -1403,7 +1405,7 @@ def cli() -> None:
     conf.configure()
     args = sys.argv[1:]
     usage = (
-        "Usage: agent/teams/team.py start <brief> | design <spec> <entry> | "
+        "Usage: agent/teams/team.py start <brief> | design <issue> <entry> | "
         "turn <pr> <entry> | review <pr> <entry> | reset <issue> <entry> | stop <issue> | "
         "stop <issue> --abandon | clean | status. Only the operator runs reset and "
         "stop --abandon, which retires a brief closed without a merged PR: it accepts pushed "

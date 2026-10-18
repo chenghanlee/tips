@@ -98,3 +98,18 @@ Lint and type-check settings are in [pyproject.toml](pyproject.toml).
 
 If the same failure occurs twice during a pair's work, fix the tool or its error
 message before adding a workflow rule.
+
+## Trial measurement
+
+Inspect actual decisions, code and correctness/design review alongside elapsed time,
+waits and repair work. Include every participant, including dispatcher, advisors and
+designers. `board.py usage` (the dispatcher's `usage_summary`) separates uncached input,
+output, cache reads and writes. Counts cover whole sessions: compare before/after totals
+when sessions are reused. Check coverage and category overlap before converting counts
+to costs; missing logs are unknown, not zero cost.
+
+Useful same-task context and stable role material can help reuse; session continuity
+does not guarantee a cache hit. Do not retain stale context or unnecessary agents merely
+to improve the hit rate. Use ordinary issue/PR evidence, without a new dashboard or
+numeric quality score. A task with no structural decision is inconclusive about repair
+authority; a passing test suite does not demonstrate better design judgment or efficiency.

@@ -1,6 +1,6 @@
 ---
 name: review-software-design
-description: Guides the reviewing designer's pass over a tips PR. Covers compliance with the brief's contracts, the required rules, simplicity, code and architecture smells, performance and test value. Acceptance scenarios, checks and merging belong to review-software-correctness.
+description: Guides the design assessment of a tips PR, by the combined tester or an additional designer. Covers contracts, responsibility, dependencies, state ownership, simplicity, performance and test value.
 ---
 
 # Review software design
@@ -10,12 +10,17 @@ Check whether a simpler implementation could satisfy the brief's contracts. The
 
 Scope limits:
 
-- Do not review scenarios, checks or the merge. Those reviews use
-  [review-software-correctness](../review-software-correctness/SKILL.md).
+- The combined tester applies this and
+  [review-software-correctness](../review-software-correctness/SKILL.md) in one source
+  investigation and review record. An additional designer covers design; the tester
+  remains responsible for scenarios, checks and merge. Reuse shared evidence, not
+  duplicate passes or reports. Apply the P2 limit across the combined review.
 - One pass. Report every P0 and P1. Report at most three P2 findings, the ones with the
   greatest consequence. Combine findings only when they share a cause and fix.
 - Deferrals follow the [severity rule](../../teams/README.md#severity): a recorded
-  deferral settles P2 on that point, never P0 or P1. A shortcut the brief did not accept
+  deferral settles P2 while its assumptions hold; a reached trigger or invalidating
+  evidence returns it to its decision owner, without automatically raising severity.
+  It never settles P0 or P1. A shortcut the brief did not accept
   is a P2 with a proposed deferral, not a demand for completeness.
 - For a local review with no PR, use the user's brief and report in the form the user
   asked for. Do not publish a GitHub review.
@@ -35,10 +40,12 @@ Scope limits:
 
 - Check that each contract in the brief has one implementation at its specified
   `path:line`. If it moved, check that the PR body states where and why.
-- If the implementation differs from the brief but is simpler and preserves the
-  contract, report a finding against the brief. Propose the brief edit.
-- Require a workload or failure to justify an mechanism the brief did not ask for. Without
-  one, report P2 to remove the mechanism.
+- Internal layout may evolve under
+  [Design during delivery](../implement-software/SKILL.md#design-during-delivery).
+  Check the benefit and preserved contracts; do not demand another design approval
+  for a bounded repair. Keep the current contract record accurate where it matters.
+- Require an explainable present benefit to justify an added mechanism, including
+  structural understanding, changeability and verification as well as workload/failure.
 - For each shortcut the brief accepted, check that the diff matches its decision row.
   Check what fails if the shortcut is wrong. Check how the failure is detected. Accept a
   job that retries and logs for the MVP. Do not accept silent data loss. Report only a
@@ -69,7 +76,8 @@ writers, or a failure path is hidden. Report each as P2 with a proposed change, 
 a line for the follow-up issue.
 
 Examples from this repository: a module that writes another module's facts; a
-boundary check repeated inside; a process, cache or abstraction with one user; a job
+boundary check repeated without a distinct obligation; a mechanism with no justified
+present benefit; a job
 that does what a query could; an `opts` list that changes behaviour; a wrapper over a
 dependency feature; a default that hides a failure.
 
@@ -86,7 +94,7 @@ depends on it. Severity follows the [severity table](../../teams/README.md#sever
 
 Limit tests to the brief's scenarios and contracts.
 
-- Map each new test to a scenario or contract line, or to a reason in the PR body's
+- Map each new test to a scenario or affected contract, or to a reason in the PR body's
   tests-without-a-scenario-line section. If neither applies, report P2 to delete it.
 - Each test fails if its contract breaks, and passes for one reason. Ask to delete a
   test only when surviving tests cover its distinct required cases. Name them.

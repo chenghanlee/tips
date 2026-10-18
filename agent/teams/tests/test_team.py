@@ -1139,6 +1139,66 @@ class HandoffTest(Harness):
 
 
 class DesignTest(Harness):
+    def test_a_designer_joins_a_full_brief_then_reviews_and_retires_with_it(self) -> None:
+        self.write_config(CONFIG.replace("max_teams = 6", "max_teams = 1"))
+        ordinary = "Implementer: impl\nRequired reviews: tester\n"
+        self.update(issues={**self.state()["issues"], "29": ordinary})
+        self.team("start", "29")
+        self.team("design", "29", "critic")
+        record = self.record(1)
+        assert (record["kind"], record["generation"]) == ("brief", 1)
+        assert (record["implementer"], record["tester"]) == ("impl", "tester")
+        assert self.recorded_briefs() == {"29"}
+        assert self.launch_env("team-1-critic") == ("_t1g1c", "24112")
+        assert "No free slot" in self.team("start", "30", ok=False).stderr
+        assert "not a configured designer" in self.team("design", "29", "tester", ok=False).stderr
+        starts = len(self.events("agent", "start"))
+        prompts = len(self.prompts("team-1-critic"))
+        assert "Already running" in self.team("design", "29", "critic").stdout
+        assert len(self.events("agent", "start")) == starts
+        assert len(self.prompts("team-1-critic")) == prompts
+
+        self.bootstrap("team-1-impl")
+        self.bootstrap("team-1-tester")
+        question_head = self.push("team-1-impl", "question evidence")
+        self.bootstrap("team-1-critic", "--commit", question_head)
+        assert self.git("rev-parse", "HEAD", cwd=self.project("team-1-critic")) == question_head
+        # Advice does not add a required reviewer or submit a review. The body writer
+        # adds the reviewer, then the ordinary turn sends the current head once.
+        self.update(issues={**self.state()["issues"], "29": BRIEF})
+        before = len(self.events("agent", "prompt"))
+        self.team("turn", "7", "tester", pane=self.pane("team-1-impl")["pane_id"])
+        notices = self.events("agent", "prompt")[before:]
+        assert [e[2] for e in notices] == ["team-1-tester", "team-1-critic"]
+        assert all(question_head in e[3] for e in notices)
+        assert len(self.events("agent", "start")) == starts
+
+        # A later inspection commit that never merges must not escape preservation.
+        unmerged = self.push("team-1-impl", "unmerged investigation")
+        self.bootstrap("team-1-critic", "--commit", unmerged)
+        self.merge(question_head)
+        self.bootstrap("team-1-impl", "--commit", question_head)
+        self.retire("team-1-impl", "team-1-tester", "team-1-critic")
+        held = self.team("stop", "29", ok=False).stderr
+        assert "HEAD not merged" in held
+        assert self.recorded_briefs() == {"29"}
+        self.bootstrap("team-1-critic", "--commit", question_head)
+        self.retire("team-1-critic")
+        self.clients_exit(1)
+        assert "slot 1 released" in self.team("stop", "29").stdout
+
+    def test_attaching_a_designer_checks_the_existing_pair_ownership(self) -> None:
+        self.team("start", "29")
+        self.update(
+            issues={
+                **self.state()["issues"],
+                "29": WIDE.replace("tester, second", "second, tester"),
+            }
+        )
+        refused = self.team("design", "29", "critic", ok=False)
+        assert "changed its implementer or merge-confirming tester" in refused.stderr
+        assert "critic" not in self.record(1)["agents"]
+
     def test_a_designer_uses_the_same_allocation_lifecycle(self) -> None:
         self.team("design", "50", "critic")
         record = self.record(1)
@@ -1649,6 +1709,18 @@ class LaunchRecoveryTest(Harness):
 
     def starts(self) -> list[str]:
         return [e[2] for e in self.events("agent", "start")]
+
+    def test_attached_designer_after_launch_timeout_is_adopted_without_resend(self) -> None:
+        self.team("start", "29")
+        self.fault("agent start", "team-1-critic", "timeout_live")
+        assert "timed out" in self.team("design", "29", "critic", ok=False).stderr
+        allocation = self.record(1)["agents"]["critic"]
+        assert allocation["submission"] == "unknown"
+        starts = self.starts()
+        assert "nothing was resent" in self.team("design", "29", "critic").stdout
+        assert self.starts() == starts
+        assert not self.prompts("team-1-critic")
+        assert self.record(1)["agents"]["critic"]["id"] == allocation["id"]
 
     def test_two_concurrent_starts_launch_each_client_once(self) -> None:
         # The second start runs while the first is starting the implementer.
