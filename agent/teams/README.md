@@ -273,7 +273,8 @@ with the reason, or "none".
 Issue URL for deferred work, or "none".
 
 ## Checks not run by CI
-Command and result, or "none".
+During the CI pause: commands, tested SHA, results, environment and retained log paths
+for all applicable local checks. Otherwise, checks CI does not cover, or "none".
 ```
 
 Reviewers: read the brief and the diff before the PR body. Verify the body's claims
@@ -313,13 +314,22 @@ records; `observe` does not interpret issue comments as merge blockers.
 
 ### Merge
 
-Merge-confirming tester: wait for the required checks, then merge only when `observe`
+During the [CI pause](../../AGENTS.md#github-ci-pause), first verify the PR's applicable
+local check evidence and independent correctness/design review at the current head.
+`observe` reads GitHub state; it does not verify local test logs. An empty required-check
+list is not proof that local checks ran. Skip `gh pr checks --watch --required` while
+no GitHub checks are required. If a required-status rule still expects a paused job,
+report it to the user; do not bypass it or weaken other protections.
+
+Merge-confirming tester: satisfy the applicable check policy, then merge only when `observe`
 reports the PR ready at the head: every reviewer in `Required reviews:` has an LGTM as its
 latest review of that head, every thread is resolved, the required checks pass, GitHub
 reports it mergeable and no FINDING is open.
 
 ```sh
+# When CI is active and GitHub checks are required:
 timeout "$TIPS_CHECK_TIMEOUT_SECONDS" gh pr checks <pr> --watch --required
+# In either mode, after verifying applicable evidence:
 agent/teams/pr_review.py observe <pr>
 gh pr merge <pr> --merge --match-head-commit <sha>
 ```
@@ -328,6 +338,11 @@ If a check failed or `observe` records a finding, run
 `agent/teams/team.py turn <pr> <implementer entry>` to notify the implementer. If `observe`
 reports evidence unavailable, run it again later; unavailable never counts as ready. If
 merge is refused for another reason, report `blocked` with the exact error.
+
+A pause-related CI-only hold can be replaced by a current-head review only after the
+reviewer verifies the replacement local evidence. Preserve real test failures. For an
+existing CI-only FINDING, link the pause policy and local evidence when resolving it
+with the procedure below; disabled Actions alone does not resolve findings.
 
 A finding that no later check can resolve, for example after a required check was renamed
 or removed, is resolved by hand. Post a FINDING whose first body line is the finding's
@@ -348,9 +363,11 @@ the answer on the issue; the implementer incorporates it before affected work re
 Set Active and notify the agent when the blocker is resolved. Do
 not run or retry a denied command on another agent's behalf.
 
-If an implementer's failing check also fails on the latest `main` run, the implementer
-reports `blocked` with both run links. The dispatcher asks the merge-confirming tester
-of the affected brief to revert the PR that broke `main` with its
+If an implementer's failing check also fails on fetched `main`, the implementer
+reports `blocked` with evidence for both SHAs. During the CI pause, reproduce locally
+in an isolated checkout with owned test resources; otherwise link the CI runs. Do not
+attribute a billing or unavailable-run failure to the code. The dispatcher routes the
+revert of the PR that broke `main` through the
 [revert task](roles/tester.md#revert-a-broken-main). Diagnosis that needs access outside
 the tester's allocation goes to the user. Then fix the original issue.
 

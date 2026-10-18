@@ -59,8 +59,9 @@ Read this and your role file at launch and after compaction.
 
 ## Evidence and scope
 
-- Support a verification claim with the CI run URL or `path:line`. For a check CI does
-  not run, say what you ran and its result. Otherwise mark it unverified.
+- Support a source claim with `path:line` at its commit. For execution evidence use the
+  CI run URL, or during the [CI pause](../../../AGENTS.md#github-ci-pause), the local
+  command, tested SHA, result, environment and log path. Otherwise mark it unverified.
 - Use the [README scale](../README.md#severity). A designer P1 and a tester P1 both
   block progress.
 - Open a new issue for any improvement outside the brief. Keep that work out of the

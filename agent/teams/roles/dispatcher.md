@@ -18,7 +18,9 @@ check [Project 15](https://github.com/users/chenghanlee/projects/15) for milesto
 order and open issues (`project_read` lists the items that are not Done; read one with
 `issue_read`). Also check open PRs (`pr_list`, `pr_state`) and running teams and their
 clients (`status`). You cannot see `main`'s check runs: a merged PR's checks ran on its
-head. A broken `main` reaches you as an implementer's `blocked` with both run links.
+head. A broken `main` reaches you as an implementer's `blocked` with evidence for both
+the task and main SHAs, using local reproductions during the
+[CI pause](../../../AGENTS.md#github-ci-pause). Do not wait for paused workflows.
 
 - Set merged issues Done (`project_set_field`, Status). An issue with an open question
   stays Blocked.
@@ -111,9 +113,11 @@ allocating a separate spec team. Follow the shared-decision and retirement rules
 
 ## Revert a broken main
 
-When an implementer reports `blocked` because its failing check also fails on the
-latest `main` run, find the PR that broke `main`. Ask the merge-confirming tester of
-the affected brief, with `prompt_agent`, to run its
+When an implementer reports `blocked` because its failing check also fails on
+fetched `main` (local evidence during the CI pause), find the PR that broke `main`.
+During the pause, give the revert an ordinary brief and independent reviewer so it
+follows the local-check and review requirements. Otherwise ask the affected brief's
+merge-confirming tester, with `prompt_agent`, to run its
 [revert task](tester.md#revert-a-broken-main) for that PR. If the tester reports
 `blocked` because the cause needs diagnosis outside its allocation, report it to the user.
 

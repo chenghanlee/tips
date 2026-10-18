@@ -63,6 +63,11 @@ internal placement within the existing contract needs no hold.
 
 Merge-confirming tester, when the dispatcher asks you to revert PR `<pr>`:
 
+During the [CI pause](../../../AGENTS.md#github-ci-pause), handle the revert through an
+ordinary brief and PR with applicable local checks and an independent reviewer. The
+author of the revert cannot supply its independent review. Follow the normal merge
+procedure; the CI-only shortcut below applies only when CI is active.
+
 1. From your own checkout, run `gh pr revert <pr>`. It opens a revert PR; do not edit it.
 2. Wait for its required checks:
    `timeout "$TIPS_CHECK_TIMEOUT_SECONDS" gh pr checks <revert> --watch --required`.

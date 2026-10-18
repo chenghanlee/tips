@@ -164,6 +164,11 @@ Run the [required checks](../../../AGENTS.md#checks) for the kinds of files the 
 changed, in your own database and port. When application code, tests or
 behaviour-changing config changed, run the full application test suite once.
 
+During the [CI pause](../../../AGENTS.md#github-ci-pause), verify the recorded local
+commands, tested SHA, results and logs. Record which evidence you ran yourself and
+which you inspected. Apply the policy's rule for carrying evidence across a later diff;
+an absent CI run is not a pass and does not replace local verification.
+
 - Rerun a failing test once. If it passes the second time, report it as flaky with the
   test name. Do not hide it.
 - Report: which checks passed, which failed with the failing lines only, which you did

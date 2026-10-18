@@ -2,7 +2,9 @@
 
 ## Required checks
 
-For Python changes in `agent/teams`, the required CI job `checks` runs:
+For Python changes in `agent/teams`, run these checks locally under the
+[CI pause policy](../../AGENTS.md#github-ci-pause). The retained `checks` workflow uses
+the same commands:
 
 ```sh
 python -m pip install --require-hashes --no-deps -r agent/teams/requirements.lock
@@ -12,8 +14,9 @@ pyright --project agent/teams/pyproject.toml
 python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
 ```
 
-Run these commands in your checkout before pushing if Ruff and Pyright are on
-`PATH`. Otherwise, use CI. Locally, use the locked environment below instead of the
+Run these commands in your checkout before pushing. If a tool is missing, use an
+available task-local environment or report the prerequisite; do not fall back to
+paused CI. Use the locked environment below instead of the
 first line: `pyright --pythonpath agent/teams/.venv/bin/python --project
 agent/teams/pyproject.toml`, and run the tests with `agent/teams/.venv/bin/python`.
 With another Python the adapter tests are skipped and say so. To run one module, give
@@ -23,7 +26,7 @@ Run these additional tests for the listed changes:
 
 | Change | Required tests | Execution and evidence |
 |---|---|---|
-| `bootstrap.py`, retirement or client stopping | Real-daemon tests (`-k real_daemons`), with `TIPS_TEST_REAL_DEXTER` and `DEXTER_ELIXIR_LIB_ROOT` set. See the [LSP guide](../lsp/README.md). | CI runs these in the `dexter` job against the newly built binary. |
+| `bootstrap.py`, retirement or client stopping | Real-daemon tests (`-k real_daemons`), with `TIPS_TEST_REAL_DEXTER` and `DEXTER_ELIXIR_LIB_ROOT` set. See the [LSP guide](../lsp/README.md). | Run locally against the matching built binary and record the result. The retained `dexter` workflow also runs these when CI resumes. |
 | Codex launch arguments | Installed-Codex tests, with `TIPS_TEST_REAL_CODEX=1`. | Run locally and record the result on the PR. CI has no Codex client. |
 | Dispatcher launch arguments or adapter tools | The real restricted client with the launcher's arguments against a disposable copy, fake `gh` and a refusing fake `herdr`: it lists only the adapter tools and a read tool works. | Run locally and record the transcript summary on the PR. CI has no Claude client. |
 

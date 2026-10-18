@@ -305,7 +305,9 @@ input border/focus styles. Each test uses an isolated SQL sandbox; inserts are
 rolled back and mail uses the Swoosh test adapter. The 390×844 viewport does not
 prove responsive layout, keyboard traversal or mobile-browser behaviour.
 
-The required `checks` CI job runs documentation validation,
+During the [GitHub CI pause](../../AGENTS.md#github-ci-pause), run applicable checks
+locally and retain logs/screenshots for independent review. There are no hosted run
+artifacts to wait for. The retained `checks` workflow, when enabled, runs documentation validation,
 introduced-commit secret scanning, locked dependencies, compilation with
 warnings as errors, formatting, `mix credo --strict`, assets, migrations and the
 full suite including these browser tests. It uses the pinned runtime, database
