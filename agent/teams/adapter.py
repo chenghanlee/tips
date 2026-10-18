@@ -173,7 +173,7 @@ def status() -> str:
 
 @server.tool()
 def start_pair(brief: Number) -> str:
-    """Launch a released brief's implementer and merge-confirming tester (team.py start)."""
+    """Launch an eligible brief's implementer and merge-confirming reviewer (team.py start)."""
     return operate(lambda: team.start(str(brief)), writes=True)
 
 
@@ -185,8 +185,9 @@ def launch_reviewer(pr: Number, entry: Entry) -> str:
 
 @server.tool()
 def start_design(spec: Number, entry: Entry) -> str:
-    """Launch a configured designer entry for a spec in its own allocation (team.py design).
-    The spec body names the lead and the critics."""
+    """Launch a configured designer for the issue numbered by spec (team.py design).
+    A started brief uses its existing team slot; otherwise create or join a spec team.
+    The issue names the lead, any critics and the question or design assignment."""
     return operate(lambda: team.design(str(spec), entry), writes=True)
 
 

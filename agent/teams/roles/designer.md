@@ -1,8 +1,10 @@
 # Designer
 
-Design one feature with the other designers. Then review its PRs. One designer is the
-lead. The others are critics. The dispatcher's launch prompt names your role and
-persona.
+Own the affected technical direction and integrate material discoveries. Join a
+brief for a consequential question, or design a feature whose choices are not settled.
+The assignment names a lead and any critics. Independent challenge is useful for an
+unresolved alternative or risk; two-designer agreement is not required for every task.
+The default tester still reviews the resulting code for correctness and design.
 
 ## Read
 
@@ -11,6 +13,28 @@ persona.
    the required rules, test budgets, critique.
 3. The feature's issue on Project 15, the design sections the [design index](../../../docs/design/README.md) names, and the affected code in your own
    clone. Make no source changes there.
+
+## Bounded questions
+
+1. Read the brief's current body, assigned QUESTION and relevant comments. Inspect the
+   named reachable revision in your own clone with `bootstrap.py --commit <sha>`.
+   A sufficient supplied excerpt may support a bounded answer; distinguish it from an
+   independently inspected checkout. Obtain missing caller or state-path evidence.
+2. Compare alternatives only where a consequential choice remains. Ask a critic for
+   orthogonal judgment when the alternative or risk warrants it. Reversible exploration
+   can supply evidence; do not change product scope or waive required rules.
+3. Post an ANSWER linking the QUESTION, evidence and decision, then notify the
+   implementer. It incorporates the decision into its brief before affected work
+   resumes. If relevant facts changed while waiting, check applicability first.
+4. For shared decisions, maintain one authoritative spec/issue and identify affected
+   briefs. Follow [Changed binding decisions](../README.md#changed-binding-decisions)
+   before making a revised contract operative. The dispatcher routes work; it does not
+   replace source-informed technical judgment. Unresolved disputes use the blocker route.
+
+## Initial design
+
+Use the lead and critic steps below when initial consequential choices need a design
+round. A settled ordinary brief follows the dispatcher's release path directly.
 
 ## Steps: lead
 
@@ -21,20 +45,19 @@ persona.
    critic names a distinct alternative, compare it as a candidate.
 2. Post a PROPOSAL titled `Choice`: the chosen candidate and why you rejected the
    others.
-3. Write the spec body and one brief issue per PR in the skill's format. Post a PROPOSAL
-   that says what it covers. Notify each critic.
+3. Write a shared spec when several briefs need one contract, and one brief per PR in
+   the skill's format. Before launch, maintain these bodies; after launch, the
+   implementer maintains its brief and incorporates your linked decisions. Post a
+   PROPOSAL that says what it covers. Notify each critic.
 4. Read every CRITIQUE. Revise the bodies. Post a PROPOSAL that says what changed and
    why. State when a substantive change invalidates earlier AGREEs. Hold at most three
    rounds after `Choice`. Then every critic has AGREEd, or you record each open P2 as a
    decision and ask for AGREE, or you post BLOCKED.
 5. When every critic has AGREEd, send `done` to the dispatcher with the final PROPOSAL
    URL and the brief URLs.
-6. If a shared contract changes, pause the briefs that depend on it until you update the
-   spec.
-7. Answer the implementer's QUESTIONs. Involve critics only when the answer changes an
-   agreed contract. Post one joint ANSWER.
-8. Review a PR only when the reviewing designer and the implementer disagree with
-   evidence on both sides.
+6. Handle discoveries through the bounded-question steps, including shared decisions.
+7. Review a PR if deliberately named in its `Required reviews:`. Design advice is
+   neither a review baseline nor an LGTM. The combined tester remains independent.
 
 ## Steps: critic
 
@@ -49,14 +72,30 @@ persona.
 
 ## Steps: reviewing designer
 
-1. The dispatcher launches you with `team.py review <pr> <entry>` in your own
-   allocation. Run the `bootstrap.py --commit <head>` command your brief names.
+1. A PR handoff gives you review duties when you are named in `Required reviews:`.
+   An already attached designer receives the ordinary implementer handoff; otherwise
+   the dispatcher launches you with `team.py review <pr> <entry>`. Run the
+   `bootstrap.py --commit <head>` command in your own allocation.
 2. Read the brief, then the diff, then the [PR body](../README.md#pr-body). Follow
    [review-software-design](../../skills/review-software-design/SKILL.md).
 3. Submit the [review record](../README.md#pr-review-record). Resolve only your own
    threads. Send the review URL to the merge-confirming tester.
 4. When notified of a new head, run the `bootstrap.py --commit <head>` command the notice
-   names. Review the changes since your last review.
+   names. Your first actual PR review covers the full relevant change and affected
+   contracts; later reviews can start from your last actual review.
+
+## Retirement
+
+Before the host team retires, complete your bounded assignment and necessary decision
+handoffs, or record an accepted handoff to a reachable lead on an affected team. Do
+not retain this slot until all dependent features merge. If responsibility is still
+unresolved, report the blocker; a clean clone is not proof the assignment is finished.
+
+When ready to report retirement, if your clean clone still points to an unmerged
+inspection revision, fetch origin and run `bootstrap.py --commit <merged-sha>` for a
+suitable merged revision such as the fetched `origin/main`. Then run the requested
+retirement command. Never reset dirty work or waive preservation checks; report the
+precise blocker instead. No switch is needed after each answer.
 
 ## Messages you send
 
@@ -67,7 +106,8 @@ persona.
 
 ## Do not
 
-- Critics and reviewers do not edit spec or brief bodies. Only the lead does.
+- Follow the [body ownership rules](common.md#comments); a launched brief belongs to
+  its implementer, a shared spec to its lead.
 - The reviewing designer does not run `team.py turn`, review scenarios, run checks or
   merge. The tester is responsible for those tasks.
 - Do not treat silence as agreement.

@@ -66,6 +66,27 @@ Before pushing, run the checks for each kind of file you changed:
 
 Fix the findings your change introduces; report the others.
 
+### GitHub CI pause
+
+By the user's decision on 2026-10-18, use local checks and independent review while
+GitHub Actions is paused. This replaces GitHub-hosted execution and passing CI status
+as delivery requirements; it does not remove the applicable checks above or the
+[local equivalents of CI-only checks](docs/development/local-development.md#local-verification-during-the-ci-pause).
+
+- Run applicable checks locally before handoff. Missing tools, denied execution and
+  skipped required tests are blockers, not passes; report them without bypassing denial.
+- In the PR, record commands, tested commit, results, relevant environment and retained
+  log paths. The independent reviewer verifies that evidence and covers correctness
+  and design before submitting a current-head review. Self-review is insufficient.
+- After a change, rerun affected checks. A reviewer may carry forward earlier evidence
+  only after checking the intervening diff and recording why it still applies.
+- Follow the [merge procedure](agent/teams/README.md#merge). Do not wait for paused
+  workflows or call their billing failures code failures. Keep review, thread,
+  mergeability and merge-authorization requirements. Report any remaining GitHub
+  required-status rule to the user; do not bypass it.
+- Keep workflow files for restoration. When the user resumes CI, restore its execution
+  and merge requirements and update this policy together.
+
 ## Writing
 
 - No mannered prose. The user has ADHD.
@@ -82,4 +103,4 @@ Fix the findings your change introduces; report the others.
 - Review replies: only ask or answer a question the finding leaves open, link the commit that fixes it, or explain why you will not make the requested change. The reviewer who opened the thread resolves it.
 - Blockers: state what is blocked, the exact error or question, and who must act. In a pair, follow the [blocker procedure](agent/teams/README.md#report-and-resolve-blockers).
 - Decisions: say what you decided and why in one or two sentences.
-- Evidence: link code at its commit SHA and CI at its run URL. When quoting check output, quote only the failing lines. In PR descriptions and reviews, report checks that failed, are pending or were not run, and results of local checks that CI does not cover. Omit passing CI checks.
+- Evidence: link code at its commit SHA and CI at its run URL when used. During the [CI pause](#github-ci-pause), record local check evidence instead. When quoting check output, quote only the failing lines. Report checks that failed, are pending or were not run, and local results; omit passing CI checks.

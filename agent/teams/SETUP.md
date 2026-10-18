@@ -212,6 +212,12 @@ release, so the previous one keeps working. The install never changes `state/` o
 allocation that is neither recorded nor retired, or while a dispatcher or a `team.py` command runs (`state/dispatcher.lock` or `state/.lock` is held). Earlier releases stay on disk; to roll back, install the earlier commit again.
 Start the installed dispatcher with `<root>/harness/agent/teams/dispatch`.
 
+Workers read tracked roles and skills from their own checkout. Work and review heads
+used with a changed workflow release must include that workflow change. If continuing
+an older branch, merge `origin/main` into it before handing it to the new release;
+do not rebase or force-push. A newly opened PR can still have old instructions, so its
+opening date is not evidence of compatibility. Do not upgrade running teams in place.
+
 ## Configuration
 
 Edit [config.toml](config.toml) for slots, agent and dispatcher settings, resource

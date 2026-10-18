@@ -20,12 +20,13 @@ lists your responsibilities: [dispatcher](roles/dispatcher.md),
 
 ```
 USER         set goals · answer product questions · start the dispatcher once · report an agent that has stopped
-DISPATCHER   open a feature → team.py design <spec> <entry> → designers agree on a spec and briefs → team.py start <brief>
+DISPATCHER   record a bounded outcome, constraints, examples and roster → team.py start <brief>
+DESIGN      unresolved consequential choice → team.py design <issue> <entry> → decision reaches affected work
 EVERY CLIENT bootstrap.py prepares its own clone before its first task
 IMPLEMENTER  ask questions only when answers affect the work → code → push → PR "Closes #<brief>" → team.py turn <pr> <tester>
              (notifies every required reviewer of the head; asks the dispatcher to launch missing ones)
 DISPATCHER   team.py review <pr> <entry> for each requested reviewer
-REVIEWERS    bootstrap.py --commit <head> → review the head → notify the tester with the review URL
+REVIEWERS    bootstrap.py --commit <head> → review correctness and design → notify tester if additional reviewer
 TESTER       any review with findings → team.py turn <pr> <implementer>   (repeat until no P0 or P1)
 TESTER       pr_review.py observe <pr> reports ready → gh pr merge → "done"
 DISPATCHER   team.py stop <brief> → every client runs retirement.py → team.py stop <brief> → next
@@ -38,6 +39,21 @@ Herdr; records use the entry name. Launches are recorded in the harness root's
 `state/<slot>.json`, with each client's allocation and task-submission state.
 `start`, `design`, `review`, `reset` and `stop` read this record and run one at a time
 ([launch recovery](SETUP.md#launch-recovery)).
+
+The ordinary path uses one implementer and one independent tester covering correctness
+and design. The implementer maintains the brief's technical detail and owns a coherent
+working change, including justified bounded repairs under
+[Design during delivery](../skills/implement-software/SKILL.md#design-during-delivery).
+Working behavior and changeability are both delivery concerns. No compulsory refactor
+or advance two-designer consensus is needed for settled work.
+
+The reviewer can help with local source or verification questions when useful.
+Consequential decisions go to a named designer, with independent challenge when the
+unresolved alternative or risk warrants it. `design` joins a started brief in its
+existing slot before a PR, including at full capacity; otherwise it creates or joins
+a standalone design team. Use a shared spec when several briefs need one contract.
+The [body ownership rules](roles/common.md#comments) separate recording a decision
+from authority to make it. Only affected work waits for a missing decision.
 
 ### Allocations
 
@@ -84,7 +100,7 @@ operator (the user) runs `reset` and `stop --abandon`.
 | Command | Caller | Effect |
 |---|---|---|
 | `agent/teams/team.py start <brief>` | Dispatcher | Read `Implementer:` and `Required reviews:`. Create an allocation for the implementer (bootstrap branch `task/<brief>`) and the merge-confirming tester. Launch both in the team's workspace (see [Herdr layout](#herdr-layout)), write the record, and post one EVENT per launch on the brief. |
-| `agent/teams/team.py design <spec> <entry>` | Dispatcher | Launch a designer entry for the spec issue in its own allocation, in the spec's team workspace, and post its launch EVENT on the spec. The spec body names the lead and the critics. |
+| `agent/teams/team.py design <issue> <entry>` | Dispatcher | Launch a configured designer in its own allocation. A started brief reuses its team slot; otherwise create or join a spec team. The issue names the lead, any critics and the question or design assignment. Post its launch EVENT on that issue. The adapter keeps the argument name `spec` for either issue number. |
 | `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require your own clone to be clean at the PR head and the PR to close the brief. Record the PR's failures (see `observe`); refuse while a merge conflict finding is open. Notify every launched required reviewer of the head and the `bootstrap.py --commit` command that moves its clone there. For each reviewer not launched, post a pending EVENT on the PR and ask the dispatcher to run its `review` command. Try every send; report each failed one. |
 | `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Record the PR's failures, then notify the implementer with the open findings. Your clone's state does not block it. |
 | `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create its allocation, configured for the PR head, with its own database suffix and port, and launch the reviewer in the team's workspace. |
@@ -134,6 +150,11 @@ launched: it has no session and needs no report. Until each has one, it changes 
 and prints what it waits for: it asks each running client to run `retirement.py`, once
 per launch, names the clients it asked earlier, prints the command the operator runs for
 a stopped client, and keeps every resource reserved. Only a failed send is an error.
+Before requesting retirement, the dispatcher checks any attached designer's bounded
+assignment is complete or explicitly handed off to a reachable owner. Designers follow
+their [retirement steps](roles/designer.md#retirement), including an unmerged inspection
+checkout. A preservation report does not prove decision work is finished.
+
 Each `retirement.py` run prompts the dispatcher with its report URL, so the next `stop`
 follows without polling. With every report, it:
 
@@ -179,12 +200,15 @@ or the linked record. After sending, end your turn. If sending fails, keep the t
 Report `blocked` with the exact command and error. Do not deliver a denied message
 another way.
 
-No label shows who has the turn. After a restart, read the PR, reviews of its current
-head and the required checks. Use the first matching row:
+No label shows who has the turn. After a restart, read the current brief body and
+relevant comments as well as the PR, current-head reviews and required checks. Use the
+first matching row:
 
 | Condition | Turn |
 |---|---|
-| No PR | Implementer: open it. |
+| A consequential QUESTION is unanswered, or its ANSWER is not incorporated | Hold affected work. The assigned decision owner answers; the implementer incorporates the linked decision. Notify the dispatcher if the owner is missing. |
+| A changed binding decision has a review hold | Tester: review against the adopted decision before clearing it, even at the same head. |
+| No PR | Implementer: continue the eligible brief and open the PR when ready. |
 | A required check failed, or a FINDING is open | Implementer: fix it. |
 | The latest review of the head by any reviewer in `Required reviews:` is not an LGTM | Implementer: address it. |
 | A required reviewer has not reviewed the head | That reviewer: review it. The handoff notified it or asked the dispatcher to launch it. |
@@ -208,7 +232,11 @@ gh api "repos/{owner}/{repo}/pulls/$PR/reviews" --input tmp/review.json --jq .ht
 Put either `LGTM` alone or the review decision on the first line of the body. Put
 `<entry>, <session>` on the second line. Record your initial findings before reading the
 PR body or another review. Resolve a thread only if you opened it. A new head
-invalidates every LGTM. Review the changes since your last review.
+invalidates every LGTM. Review changes since your last actual review; a first review
+covers the full relevant change and affected contracts. Earlier advice is not a review.
+
+The default tester assesses correctness and design in one investigation and record.
+An additional designer follows its design-review duties.
 
 ### PR body
 
@@ -245,7 +273,8 @@ with the reason, or "none".
 Issue URL for deferred work, or "none".
 
 ## Checks not run by CI
-Command and result, or "none".
+During the CI pause: commands, tested SHA, results, environment and retained log paths
+for all applicable local checks. Otherwise, checks CI does not cover, or "none".
 ```
 
 Reviewers: read the brief and the diff before the PR body. Verify the body's claims
@@ -262,17 +291,45 @@ rather than repeating the work it records.
 Implementer: fix every P0 and P1. For P2s, fix them, decline them with a reason, or
 defer them in one follow-up issue linked from the PR body. A deferral recorded in the
 brief's decisions table or in a linked follow-up issue settles P2 findings on that
-point. It never settles a P0 or P1 condition.
+point while its assumptions hold. A reached revisit trigger or new invalidating evidence
+returns the decision to its owner, who can repair, revise or renew it with a reason.
+Reconsideration alone does not upgrade severity or require unrelated repair. A deferral
+never settles a P0 or P1 condition.
+
+### Changed binding decisions
+
+When a binding contract changes, the lead identifies affected briefs and holds their
+dependent work. For each affected open PR, ask its merge-confirming tester to submit a
+non-LGTM review linked to the pending decision. Establish that recorded hold before
+making the changed shared contract operative; a sent pause is not an established hold.
+If the PR already merged, use that fact to decide the necessary follow-up instead of
+claiming the merge was prevented.
+
+The lead updates the authoritative shared decision; each implementer incorporates its
+link in the brief before resuming affected work. The tester reviews against the adopted
+decision before replacing its hold with LGTM, even if the code SHA is unchanged. An
+unrelated push does not resolve the question. Harmless clarification and ordinary
+internal placement within existing contracts need no hold. This uses existing review
+records; `observe` does not interpret issue comments as merge blockers.
 
 ### Merge
 
-Merge-confirming tester: wait for the required checks, then merge only when `observe`
+During the [CI pause](../../AGENTS.md#github-ci-pause), first verify the PR's applicable
+local check evidence and independent correctness/design review at the current head.
+`observe` reads GitHub state; it does not verify local test logs. An empty required-check
+list is not proof that local checks ran. Skip `gh pr checks --watch --required` while
+no GitHub checks are required. If a required-status rule still expects a paused job,
+report it to the user; do not bypass it or weaken other protections.
+
+Merge-confirming tester: satisfy the applicable check policy, then merge only when `observe`
 reports the PR ready at the head: every reviewer in `Required reviews:` has an LGTM as its
-latest review of that head, every thread is resolved, the required checks pass, GitHub
+latest review of that head, every thread is resolved, any GitHub-required checks pass, GitHub
 reports it mergeable and no FINDING is open.
 
 ```sh
+# When CI is active and GitHub checks are required:
 timeout "$TIPS_CHECK_TIMEOUT_SECONDS" gh pr checks <pr> --watch --required
+# In either mode, after verifying applicable evidence:
 agent/teams/pr_review.py observe <pr>
 gh pr merge <pr> --merge --match-head-commit <sha>
 ```
@@ -281,6 +338,11 @@ If a check failed or `observe` records a finding, run
 `agent/teams/team.py turn <pr> <implementer entry>` to notify the implementer. If `observe`
 reports evidence unavailable, run it again later; unavailable never counts as ready. If
 merge is refused for another reason, report `blocked` with the exact error.
+
+A pause-related CI-only hold can be replaced by a current-head review only after the
+reviewer verifies the replacement local evidence. Preserve real test failures. For an
+existing CI-only FINDING, link the pause policy and local evidence when resolving it
+with the procedure below; disabled Actions alone does not resolve findings.
 
 A finding that no later check can resolve, for example after a required check was renamed
 or removed, is resolved by hand. Post a FINDING whose first body line is the finding's
@@ -294,14 +356,18 @@ After the merge closes the brief and deletes the branch, notify the dispatcher w
 Report `blocked` if you have a product or scope question, if both sides of a finding
 have evidence but still disagree, or if the same finding remains after two fixes.
 Comment on the issue with your name, the question and the evidence. Notify the
-dispatcher with the comment URL. End your turn. Dispatcher: set Blocked. Answer
-technical questions from the cited code. Ask the user about product, scope or anything
-you cannot answer. Record the answer on the issue. Set Active and notify the agent. Do
+dispatcher with the comment URL. End your turn. Dispatcher: set Blocked. Route
+consequential technical questions through [designer assignment](roles/dispatcher.md#decisions-during-implementation).
+Ask the user about product, scope or tradeoffs needing the user's judgment. Record
+the answer on the issue; the implementer incorporates it before affected work resumes.
+Set Active and notify the agent when the blocker is resolved. Do
 not run or retry a denied command on another agent's behalf.
 
-If an implementer's failing check also fails on the latest `main` run, the implementer
-reports `blocked` with both run links. The dispatcher asks the merge-confirming tester
-of the affected brief to revert the PR that broke `main` with its
+If an implementer's failing check also fails on fetched `main`, the implementer
+reports `blocked` with evidence for both SHAs. During the CI pause, reproduce locally
+in an isolated checkout with owned test resources; otherwise link the CI runs. Do not
+attribute a billing or unavailable-run failure to the code. The dispatcher routes the
+revert of the PR that broke `main` through the
 [revert task](roles/tester.md#revert-a-broken-main). Diagnosis that needs access outside
 the tester's allocation goes to the user. Then fix the original issue.
 

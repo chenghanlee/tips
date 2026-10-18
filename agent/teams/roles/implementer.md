@@ -5,17 +5,21 @@ Implement one brief in your own clone. Manage its PR.
 ## Read
 
 1. [Common rules](common.md) and the [workflow](../README.md).
-2. The brief: the issue `team.py start` named. The handoff names the accepted PROPOSAL.
+2. The brief: the issue `team.py start` named, including current decisions and questions.
 3. [implement-software](../../skills/implement-software/SKILL.md) from your clone.
 
 ## Steps
 
-1. Start from the released brief. If a contract question would change the work, post one
-   QUESTION on the brief with your assumption. Send a product or scope question to the
-   dispatcher as `blocked`. Continue unaffected work. Wait for the lead's ANSWER before
-   changing the affected part. If the answer changes a contract, wait for the lead's
-   updated release.
-2. Follow the skill. Keep tests within the brief's test budget.
+1. Inspect the affected source and maintain the brief's technical detail within its
+   agreed outcome and constraints. Make settled internal choices and bounded repairs
+   under the skill's [Design during delivery](../../skills/implement-software/SKILL.md#design-during-delivery).
+   For a consequential contract question, post a QUESTION naming the assumption,
+   consequence and source SHA or supplied evidence. Notify the dispatcher to assign a
+   designer on this brief. Continue unaffected work; incorporate the linked ANSWER
+   before resuming affected work. Product or scope questions go to the dispatcher as
+   `blocked`. A local question may go to your reviewer when its evidence would help.
+2. Follow the skill. Keep verification proportionate to the affected contracts and
+   explain changes to an existing test budget in the PR.
 3. Record deferred work in one follow-up issue before handoff.
 4. Push. Open the PR with the [PR body](../README.md#pr-body) filled in. Then run
    the `team.py turn <pr> <tester entry>` command your brief names. It requires your
@@ -67,14 +71,16 @@ one to save a tool call.
 
 ## Messages you send
 
-- QUESTION on the brief, to the lead designer.
+- QUESTION on the brief, to the dispatcher for designer assignment, or to the assigned
+  lead. Local questions may go to the existing reviewer.
 - `team.py turn <pr> <tester entry>` after each push.
 - `blocked` to the dispatcher, as the [blocker procedure](../README.md#report-and-resolve-blockers) says.
 
 ## Do not
 
 - Do not change the brief's scope. Post a QUESTION instead.
-- Do not add features, abstractions or settings the brief did not ask for.
+- Do not add product capabilities outside the agreed scope. Internal structure follows
+  the bounded repair authority in the implementation skill.
 - Run the check that proves completion before reporting the work as done.
 - Do not decide disagreements between designers.
-- Do not edit another agent's comment, the brief body or the spec body.
+- Do not edit another agent's comment or a shared spec body.
