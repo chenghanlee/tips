@@ -270,7 +270,7 @@ verification from the retained workflow files, using their PR path filters:
 | Introduced-commit secret scan, every PR | Run Gitleaks as below, with redacted output. |
 | Application steps in `checks.yml` (changes beyond Markdown and `agent/`) | `mix deps.get --check-locked`, the [application checks](../../README.md#test-changes), `mix assets.setup && mix assets.build`, migration rollback/reapply below, and the [full browser suite](#browser-tests-and-ci), including both pinned version checks. |
 | Release job in `checks.yml` (any non-Markdown change) | `scripts/release_smoke.sh`; see [local application release](#local-application-release) for its exclusive resources and prerequisites. |
-| `dexter.yml` path match | Use the pinned build and verification commands in that workflow: patched Go tests, build-script tests and real-daemon harness tests. Follow the [LSP build guide](../../agent/lsp/README.md#build); never replace another team's active binary. |
+| `dexter.yml` path match | Follow [Dexter verification scope](../../agent/lsp/README.md#verification-scope): tooling changes run the full suite; harness-only changes run real-daemon integration against a verified matching binary. The workflow owns selection for both local and hosted runs. |
 | `db-image.yml` path match | `scripts/db_smoke.sh`; see [extension-enabled database](#extension-enabled-database). Image publication stays paused. |
 
 For migration rollback/reapply, use a disposable database with your own suffix and

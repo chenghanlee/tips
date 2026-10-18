@@ -186,6 +186,42 @@ it cannot inspect processes. Keep agents stopped until the build finishes.
 [patches/README.md](dexter/patches/README.md) records what the patch changes and
 the Go static-analysis rule for it.
 
+## Verification scope
+
+The [Dexter workflow](../../.github/workflows/dexter.yml) owns check selection. Compare
+the whole PR with its fetched base (`origin/<base>...HEAD`), including deletions and
+both sides of renames. Its event paths select whether Dexter checks apply; its
+`Select Dexter coverage` step selects the full suite:
+
+- Non-Markdown changes under `agent/lsp/` or to that workflow run the pinned build,
+  Go tests, build-script tests and real-daemon harness tests.
+- Non-Markdown changes under `agent/teams/` alone run the real-daemon harness tests.
+  Keep this conservative directory scope: shared configuration, process helpers and
+  fixtures can affect provisioning, isolation and stopping.
+- Markdown-only and unrelated changes need no Dexter checks. A new daemon operation
+  still needs a test of its contract if existing integration tests do not exercise it.
+
+For integration-only checks, reuse an existing binary after checking it against this
+checkout's pin and patch. Set `TIPS_TEST_REAL_DEXTER` to the absolute Dexter home whose
+`vendor/dexter` the tests will use, and `DEXTER_ELIXIR_LIB_ROOT` to the matching
+[Elixir sources](#elixir-sources), then run:
+
+```sh
+bash agent/lsp/dexter/build.sh --check "$TIPS_TEST_REAL_DEXTER/vendor/dexter"
+python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py' -k real_daemons -v
+```
+
+`--check` reads the executable's linked build id without building, writing files or
+inspecting/stopping daemons. Without an operand it checks this checkout's
+`agent/lsp/dexter/vendor/dexter`. A missing or mismatched binary needs an owned
+worktree build using the instructions above; never replace another team's active
+binary. A clean CI runner must build a binary even for integration-only checks.
+
+The id covers the upstream pin and patch, not the build script or Go toolchain, and
+does not prove tests passed. Full-scope changes keep the full suite. Carry earlier
+evidence only after the reviewer checks the changed inputs and records why it applies,
+under the [CI pause policy](../../AGENTS.md#github-ci-pause).
+
 ## Elixir sources
 
 Dexter indexes the Elixir standard library from source. Put the release matching

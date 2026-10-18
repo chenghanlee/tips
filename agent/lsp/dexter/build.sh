@@ -2,6 +2,7 @@
 # Build one Dexter binary: the pinned upstream revision plus the cumulative local patch.
 #
 #   build.sh <dexter-git-repository> [--keep <dir>]
+#   build.sh --check [<dexter-binary>]
 #
 # The repository only has to contain the pinned commit; its checkout is not read.
 # The patched source is prepared in a temporary copy (or in --keep <dir>, left in
@@ -27,6 +28,26 @@ check_idle_binary() {
   fi
 }
 
+test -s "$patch_file" || fail "missing $patch_file"
+patch_sha="$(sha256 "$patch_file")"
+build_id="$(printf '%s\n%s\n' "$upstream" "$patch_sha" | { if command -v sha256sum >/dev/null; then sha256sum; else shasum -a 256; fi; } | cut -d' ' -f1)"
+
+verify_binary() {
+  local version_output
+  test -x "$1" || fail "missing executable: $1 (expected local build id $build_id)"
+  version_output="$("$1" version)" || fail "cannot read version from $1"
+  printf '%s\n' "$version_output" | grep -qxF -- "local_build_id $build_id" \
+    || fail "$1 does not report local build id $build_id; 'dexter version' printed: $version_output"
+}
+
+if [ "${1:-}" = --check ]; then
+  [ "$#" -le 2 ] || fail "usage: build.sh --check [<dexter-binary>]"
+  binary="${2:-$vendor/dexter}"
+  verify_binary "$binary"
+  printf 'Verified %s: local_build_id %s\n' "$binary" "$build_id"
+  exit 0
+fi
+
 repository="${1:-}"
 keep=""
 shift || true
@@ -38,12 +59,8 @@ while [ $# -gt 0 ]; do
 done
 test -n "$repository" || fail "usage: build.sh <dexter-git-repository> [--keep <dir>]"
 git -C "$repository" cat-file -e "$upstream^{commit}" 2>/dev/null || fail "$repository does not contain upstream commit $upstream"
-test -s "$patch_file" || fail "missing $patch_file"
 command -v go >/dev/null || fail "go is not installed"
 check_idle_binary
-
-patch_sha="$(sha256 "$patch_file")"
-build_id="$(printf '%s\n%s\n' "$upstream" "$patch_sha" | { if command -v sha256sum >/dev/null; then sha256sum; else shasum -a 256; fi; } | cut -d' ' -f1)"
 
 if [ -n "$keep" ]; then
   mkdir -p "$keep"
@@ -62,9 +79,7 @@ git -C "$source_dir" apply "$patch_file"
 
 (cd "$source_dir" && go build -trimpath -buildvcs=false -ldflags "-X $ldflags_var=$build_id" -o "$source_dir/dexter" ./cmd/)
 
-version_output="$("$source_dir/dexter" version)"
-printf '%s\n' "$version_output" | grep -qw -- "$build_id" \
-  || fail "built binary does not report local build id $build_id; 'dexter version' printed: $version_output"
+verify_binary "$source_dir/dexter"
 
 binary_sha="$(sha256 "$source_dir/dexter")"
 # Recheck after compilation, immediately before replacing the shared executable.
