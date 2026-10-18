@@ -22,6 +22,20 @@ agent/teams/pyproject.toml`, and run the tests with `agent/teams/.venv/bin/pytho
 With another Python the adapter tests are skipped and say so. To run one module, give
 its file name as the pattern, for example `-p test_pr_review.py`.
 
+If Ruff or Pyright is missing, provision check tools in an ignored environment using
+the existing CI pins (not the adapter's runtime lock or a machine-wide install):
+
+```sh
+python3.12 -m venv tmp/harness-checks
+tmp/harness-checks/bin/python -m pip install ruff==0.16.8 pyright==1.1.413
+tmp/harness-checks/bin/ruff check agent/teams
+tmp/harness-checks/bin/ruff format --check agent/teams
+tmp/harness-checks/bin/pyright --pythonpath agent/teams/.venv/bin/python --project agent/teams/pyproject.toml
+```
+
+An existing environment with those versions can be reused. A refused installation or
+unavailable prerequisite is a blocker; no fallback to paused CI or permission bypass.
+
 Run these additional tests for the listed changes:
 
 | Change | Required tests | Execution and evidence |

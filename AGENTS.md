@@ -70,7 +70,8 @@ Fix the findings your change introduces; report the others.
 
 By the user's decision on 2026-10-18, use local checks and independent review while
 GitHub Actions is paused. This replaces GitHub-hosted execution and passing CI status
-as delivery requirements; it does not remove the applicable checks above.
+as delivery requirements; it does not remove the applicable checks above or the
+[local equivalents of CI-only checks](docs/development/local-development.md#local-verification-during-the-ci-pause).
 
 - Run applicable checks locally before handoff. Missing tools, denied execution and
   skipped required tests are blockers, not passes; report them without bypassing denial.

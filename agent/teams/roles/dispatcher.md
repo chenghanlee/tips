@@ -17,8 +17,8 @@ At startup, after each `done` or `blocked` message, and when the user reports a 
 check [Project 15](https://github.com/users/chenghanlee/projects/15) for milestone
 order and open issues (`project_read` lists the items that are not Done; read one with
 `issue_read`). Also check open PRs (`pr_list`, `pr_state`) and running teams and their
-clients (`status`). You cannot see `main`'s check runs: a merged PR's checks ran on its
-head. A broken `main` reaches you as an implementer's `blocked` with evidence for both
+clients (`status`). A merged PR's evidence is in its body and reviews; it is not a run
+against today's `main`. A broken `main` reaches you as an implementer's `blocked` with evidence for both
 the task and main SHAs, using local reproductions during the
 [CI pause](../../../AGENTS.md#github-ci-pause). Do not wait for paused workflows.
 
@@ -120,6 +120,8 @@ follows the local-check and review requirements. Otherwise ask the affected brie
 merge-confirming tester, with `prompt_agent`, to run its
 [revert task](tester.md#revert-a-broken-main) for that PR. If the tester reports
 `blocked` because the cause needs diagnosis outside its allocation, report it to the user.
+If no slot is available for the revert, report the capacity blocker to the user, who
+can choose a manual revert or free a team; do not bypass allocation ownership.
 
 ## Liveness
 

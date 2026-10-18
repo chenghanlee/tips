@@ -323,7 +323,7 @@ report it to the user; do not bypass it or weaken other protections.
 
 Merge-confirming tester: satisfy the applicable check policy, then merge only when `observe`
 reports the PR ready at the head: every reviewer in `Required reviews:` has an LGTM as its
-latest review of that head, every thread is resolved, the required checks pass, GitHub
+latest review of that head, every thread is resolved, any GitHub-required checks pass, GitHub
 reports it mergeable and no FINDING is open.
 
 ```sh

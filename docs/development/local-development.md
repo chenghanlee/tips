@@ -259,6 +259,41 @@ with `psql -h 127.0.0.1 -p 5433 -U postgres -l`. `mix ecto.setup` and
 Only reset your own suffixed database. Do not reset another worktree's database
 or run `docker compose down -v`, which destroys the shared server's data.
 
+### Local verification during the CI pause
+
+The [pause policy](../../AGENTS.md#github-ci-pause) changes where checks run, not their
+coverage. In addition to the file-specific checks in AGENTS, run the applicable
+verification from the retained workflow files, using their PR path filters:
+
+| Retained check | Local execution |
+|---|---|
+| Introduced-commit secret scan, every PR | Run Gitleaks as below, with redacted output. |
+| Application steps in `checks.yml` (changes beyond Markdown and `agent/`) | `mix deps.get --check-locked`, the [application checks](../../README.md#test-changes), `mix assets.setup && mix assets.build`, migration rollback/reapply below, and the [full browser suite](#browser-tests-and-ci), including both pinned version checks. |
+| Release job in `checks.yml` (any non-Markdown change) | `scripts/release_smoke.sh`; see [local application release](#local-application-release) for its exclusive resources and prerequisites. |
+| `dexter.yml` path match | Use the pinned build and verification commands in that workflow: patched Go tests, build-script tests and real-daemon harness tests. Follow the [LSP build guide](../../agent/lsp/README.md#build); never replace another team's active binary. |
+| `db-image.yml` path match | `scripts/db_smoke.sh`; see [extension-enabled database](#extension-enabled-database). Image publication stays paused. |
+
+For migration rollback/reapply, use a disposable database with your own suffix and
+`MIX_ENV=test`: `mix ecto.create && mix ecto.migrate && mix ecto.rollback --all && mix ecto.migrate`.
+Never run this against another agent's or persistent development data. A check that
+cannot run is reported as blocked, not silently removed. Hosting, artifact upload and
+publication steps are not local verification and remain paused.
+
+For secret scanning, use [Gitleaks 8.30.1](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1).
+An existing binary can be used; otherwise download the matching platform archive and
+checksums from that release, verify its SHA-256 and extract it into ignored
+`tmp/gitleaks/`. This task-local provisioning does not require a machine install.
+Before pushing, fetch the PR base and scan every introduced commit (for base `main`):
+
+```sh
+git fetch origin main
+tmp/gitleaks/gitleaks git --redact --log-opts="origin/main..HEAD" .
+```
+
+Adjust the executable path for an existing binary. Keep output redacted; never publish
+a detected secret. Record the tool version, base/head SHAs and result in the PR. This
+does not scan uncommitted edits, so commit and scan them before pushing.
+
 ### Browser tests and CI
 
 `mix test` excludes tests tagged `:browser`. To include them, install matching
