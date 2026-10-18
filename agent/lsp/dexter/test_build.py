@@ -44,6 +44,8 @@ if tool == "ps":
 elif tool == "git" and "archive" in sys.argv:
     with tarfile.open(fileobj=sys.stdout.buffer, mode="w|"):
         pass
+elif tool == "dexter":
+    print("local_build_id wrong-PATH-binary")
 elif tool == "go":
     if sys.argv[1] == "version":
         print("go version fixture")
@@ -56,7 +58,7 @@ elif tool == "go":
 """
         )
         stub.chmod(0o755)
-        for name in ("ps", "git", "go"):
+        for name in ("ps", "git", "go", "dexter"):
             (tools / name).symlink_to(stub)
         self.env = dict(
             os.environ,
@@ -107,10 +109,11 @@ elif tool == "go":
         self.assertIn("local_build_id", self.binary.read_text())
         self.assertIn('"sha256"', self.metadata.read_text())
 
-    def check_binary(self, binary):
+    def check_binary(self, binary, cwd=None):
         return subprocess.run(
             ["bash", str(self.root / "build.sh"), "--check", str(binary)],
             env=self.env,
+            cwd=cwd,
             text=True,
             capture_output=True,
             check=False,
@@ -127,6 +130,8 @@ elif tool == "go":
         result = self.check_binary(selected)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(str(selected), result.stdout)
+        result = self.check_binary(selected.name, cwd=selected.parent)
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(calls.exists(), "check must not invoke git, go or ps")
         after = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
         self.assertEqual(before, after)

@@ -1,6 +1,7 @@
 name: Dexter
 # Tooling changes run the full suite; harness-only changes run real-daemon integration.
 # A clean CI runner builds the binary for either scope. Markdown-only changes skip it.
+# Keep Dexter optional in branch rules so path-skipped runs do not block merging.
 on:
   pull_request:
     paths:

@@ -189,8 +189,8 @@ the Go static-analysis rule for it.
 ## Verification scope
 
 The [Dexter workflow](../../.github/workflows/dexter.yml) owns check selection. Compare
-the whole PR with its fetched base (`origin/<base>...HEAD`), including deletions and
-both sides of renames. Its event paths select whether Dexter checks apply; its
+the whole PR with its fetched base (`origin/<base>...HEAD`), treating renames as a
+deletion and an addition. Its event paths select whether Dexter checks apply; its
 `Select Dexter coverage` step selects the full suite:
 
 - Non-Markdown changes under `agent/lsp/` or to that workflow run the pinned build,

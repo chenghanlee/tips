@@ -43,6 +43,7 @@ verify_binary() {
 if [ "${1:-}" = --check ]; then
   [ "$#" -le 2 ] || fail "usage: build.sh --check [<dexter-binary>]"
   binary="${2:-$vendor/dexter}"
+  case $binary in */*) ;; *) binary="./$binary" ;; esac
   verify_binary "$binary"
   printf 'Verified %s: local_build_id %s\n' "$binary" "$build_id"
   exit 0
