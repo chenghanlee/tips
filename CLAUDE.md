@@ -72,3 +72,11 @@ skips searches, checks or completion. Asking for a short answer does not reduce 
   Children never post to GitHub. Follow the [pair workflow](agent/teams/README.md).
 - Inspect changes and check results before use. Checks must exercise the change;
   a failed launch is not a check. Resolve missing evidence yourself.
+
+# Compact instructions
+
+Keep: the task's intent and agreed outcome; open decisions and questions with their
+owner; constraints; the next step; evidence pointers (issue and PR numbers, branch,
+head SHA, `path:line`, comment URLs); failed hypotheses that were expensive to establish.
+Drop: file contents, tool output and command logs. Live Git and GitHub state wins over
+the summary; reread the role file and its workflow sections, then reload skills before use.

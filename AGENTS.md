@@ -3,9 +3,9 @@
 | When | Read or do |
 |---|---|
 | Every task | Read the issue or the user's brief and its linked design sections; the [design index](docs/design/README.md) names the sections to read for a trigger or feature |
-| On pair or dispatcher launch | Read the [pair workflow](agent/teams/README.md) |
+| On pair or dispatcher launch | Read the [common rules](agent/teams/roles/common.md) and your role file; it names the [pair workflow](agent/teams/README.md) sections you read |
 | Changing the repository alone | Use an isolated worktree and a PR; the [checks](#checks) and [review](agent/teams/README.md#pr-review-record) still apply. Merge only with the user's authorization. Read-only reviews and disposable output in ignored `tmp/` need neither |
-| After context compaction | If paired or dispatching, reread the pair workflow. Reload each required skill before its next use |
+| After context compaction | If paired or dispatching, reread your role file and its workflow sections. Reload each required skill before its next use |
 | Repository context | [README](README.md): product, requirements and file locations |
 | Fresh checkout, browser tests or worktree isolation | [Local development](docs/development/local-development.md) |
 | Product behaviour or copy | [Glossary](docs/design/glossary.md) |
