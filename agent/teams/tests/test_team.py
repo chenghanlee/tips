@@ -10,11 +10,16 @@ import socket
 import subprocess
 import tempfile
 import time
+import tomllib
 import unittest
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
+from unittest import mock
 
+import config as conf
+import herdr as herdr_module
+import team
 from commands import command_args, execute
 from tests.harness import (
     BRIEF,
@@ -24,6 +29,7 @@ from tests.harness import (
     PORT_BASE,
     REAL_DEXTER,
     SCRIPT,
+    TEST_RUNS,
     WIDE,
     Harness,
     daemon_pid,
@@ -31,6 +37,9 @@ from tests.harness import (
     real_bound_command,
     wait_until_stopped,
 )
+
+# The shell and client process ids InProcessTeamTest's Herdr reports for a pane.
+SHELL, CLIENT = 100, 200
 
 
 class StopAgentTest(unittest.TestCase):
@@ -245,6 +254,149 @@ while True: time.sleep(.05)
         # Retirement stops it with the same bound command.
         execute(["/bin/sh", wrapper, "stop"], input_text="", check=True)
         wait_until_stopped(self.root)
+
+
+class InProcessTeamTest(unittest.TestCase):
+    """stop and prompt in this process: brief 29's record in slot 1 under a harness root,
+    with Herdr, GitHub, Dexter, psql and the port probe replaced. `self.calls` logs every
+    Herdr call and every client stop in order."""
+
+    def setUp(self) -> None:
+        TEST_RUNS.mkdir(parents=True, exist_ok=True)
+        directory = tempfile.TemporaryDirectory(prefix="stop test ", dir=TEST_RUNS)
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name).resolve() / "agent_teams/r"
+        self.calls: list[tuple[str, ...]] = []
+        # Panes that hold a client, and agents listed in a pane outside the team.
+        self.live = {"w1:p1", "w1:p2"}
+        self.strays: list[dict[str, Any]] = []
+        self.agents = {
+            "impl": self.allocation("impl", "implementer", "codex", "w1:p1"),
+            "tester": self.allocation("tester", "tester", "claude", "w1:p2"),
+        }
+        record = {
+            "version": conf.RECORD_VERSION,
+            "slot": 1,
+            "generation": 1,
+            "kind": "brief",
+            "brief": "29",
+            "implementer": "impl",
+            "tester": "tester",
+            "workspace": "w1",
+            "tabs": {},
+            "agents": self.agents,
+        }
+        (self.root / "state/1.json").write_text(json.dumps(record))
+        self.drop = mock.Mock(return_value=["tips_test_t1g1i"])
+        patch = mock.patch.object
+        self.enterContext(patch(conf, "cfg", cast(conf.Config, tomllib.loads(CONFIG))))
+        self.enterContext(patch(conf, "harness_root", return_value=self.root))
+        self.enterContext(patch(team, "herdr", self.herdr))
+        self.enterContext(patch(herdr_module, "herdr", self.herdr))
+        self.enterContext(patch(team, "stop", self.stop))
+        self.enterContext(patch(team, "merged_brief", return_value=True))
+        self.enterContext(patch(team, "stop_daemon"))
+        self.enterContext(patch(team, "port_in_use", return_value=False))
+        self.enterContext(patch(team, "drop_databases", self.drop))
+
+    def stop(self, pane: str, root: str | Path) -> None:
+        self.calls.append(("stop", pane, str(root)))
+
+    def allocation(self, entry: str, role: str, kind: str, pane: str) -> dict[str, Any]:
+        ident = f"g1-{entry}"
+        root = self.root / "allocations" / ident
+        for directory in (root / "project", root / "logs", self.root / "state" / ident):
+            directory.mkdir(parents=True)
+        return {
+            "id": ident,
+            "entry": entry,
+            "role": role,
+            "name": f"team-1-{entry}",
+            "kind": kind,
+            "root": str(root),
+            "db_suffix": f"_t1g1{entry[0]}",
+            "port": 24110,
+            "workspace": "w1",
+            "tab": "w1:t1",
+            "pane": pane,
+            "session": f"session-{entry}",
+            "launch": f"launch-{entry}",
+            "submission": "submitted",
+        }
+
+    def by_pane(self, pane: str) -> dict[str, Any]:
+        return next(a for a in self.agents.values() if a["pane"] == pane)
+
+    def herdr(self, *args: str) -> dict[str, Any]:
+        self.calls.append(args)
+        if args[:2] == ("workspace", "list"):
+            return {"workspaces": [{"workspace_id": "w1"}]}
+        if args[:2] == ("pane", "list"):
+            return {"panes": [{"pane_id": a["pane"]} for a in self.agents.values()]}
+        if args[:2] == ("pane", "process-info"):
+            pane = args[3]
+            stray = next((s for s in self.strays if s["pane_id"] == pane), None)
+            cwd = stray["cwd"] if stray else self.by_pane(pane)["root"]
+            leader = CLIENT if stray or pane in self.live else SHELL
+            info = {"pid": leader, "cwd": cwd}
+            return {
+                "process_info": {
+                    "shell_pid": SHELL,
+                    "foreground_process_group_id": leader,
+                    "foreground_processes": [info],
+                }
+            }
+        if args[:2] == ("agent", "get"):
+            allocation = self.by_pane(args[2])
+            session = {"kind": "id", "value": allocation["session"]}
+            return {
+                "agent": {"name": allocation["name"], "agent": allocation["kind"]}
+                | {"pane_id": args[2], "agent_session": session}
+            }
+        if args[:2] == ("agent", "list"):
+            listed = [
+                {"pane_id": a["pane"], "name": a["name"], "agent": a["kind"]}
+                for a in self.agents.values()
+                if a["pane"] in self.live
+            ]
+            return {"agents": listed + self.strays}
+        if args[:2] in (("workspace", "close"), ("agent", "prompt")):
+            return {}
+        raise AssertionError(f"Unexpected Herdr call {args}")
+
+    def effects(self) -> list[tuple[str, ...]]:
+        """The stops, workspace closes and prompts, in order."""
+        kept = ("stop", "close", "prompt")
+        return [c for c in self.calls if c[0] in kept or (len(c) > 1 and c[1] in kept)]
+
+    def test_an_agent_that_enters_an_allocation_during_the_stops_keeps_everything(self) -> None:
+        stopped: list[str] = []
+
+        def stop(pane: str, root: str | Path) -> None:
+            # A client starts in the implementer's allocation while stop shuts the team down.
+            stopped.append(pane)
+            self.calls.append(("stop", pane, str(root)))
+            cwd = self.agents["impl"]["root"]
+            self.strays[:] = [{"pane_id": "w9:p1", "name": "visitor", "agent": "codex", "cwd": cwd}]
+
+        self.enterContext(mock.patch.object(team, "stop", stop))
+        with self.assertRaises(RuntimeError) as refused:
+            team.stop_brief("29")
+        root = self.agents["impl"]["root"]
+        assert f"Conflicting live agent in {root}: visitor; preserved" in str(refused.exception), (
+            refused.exception
+        )
+        assert stopped == ["w1:p1", "w1:p2"], stopped
+        assert ("workspace", "close", "w1") not in self.calls, "the workspace stays open"
+        self.drop.assert_not_called()
+        assert (self.root / "state/1.json").exists(), "the record is kept"
+
+    def test_an_exited_client_is_refused_and_nothing_is_sent(self) -> None:
+        self.live.discard("w1:p2")
+        with self.assertRaises(RuntimeError) as refused:
+            team.prompt_agent("29", "tester", "late")
+        assert "team-1-tester is not running in w1:p2" in str(refused.exception), refused.exception
+        assert self.effects() == [], f"no prompt is sent to an exited client: {self.effects()}"
 
 
 class PairLifecycleTest(Harness):
@@ -545,6 +697,12 @@ class PairLifecycleTest(Harness):
         self.write_config(moved.replace("port_offset = 2", "port_offset = 1"))
         refused = self.team("review", "7", "critic", ok=False)
         assert f"port {PORT_BASE + 11} collides with team-1-tester's" in refused.stderr
+        # Config moved the critic onto the running tester's database stem: refused too.
+        renamed = small.replace('db_suffix = "r"', 'db_suffix = "x"')
+        self.write_config(renamed.replace('db_suffix = "c"', 'db_suffix = "r"'))
+        refused = self.team("review", "7", "critic", ok=False)
+        stem = f"critic: database _t1g1r or port {PORT_BASE + 12} collides with team-1-tester's"
+        assert stem in refused.stderr, refused.stderr
         self.write_config(small)
         self.team("review", "7", "critic")
         assert self.launch_env("team-1-critic") == ("_t1g1c", str(PORT_BASE + 12))
@@ -1232,6 +1390,11 @@ class DesignTest(Harness):
         assert self.git("rev-parse", "HEAD", cwd=project) == self.git("rev-parse", "HEAD")
         assert self.git("branch", "--show-current", cwd=project) == ""
         # A brief start cannot take the spec's slot, and a design team keeps its databases.
+        spec = self.state()["issues"]["50"]
+        self.update(issues={**self.state()["issues"], "50": BRIEF})
+        refused = self.team("start", "50", ok=False)
+        assert "#50 already holds a design team in slot 1" in refused.stderr, refused.stderr
+        self.update(issues={**self.state()["issues"], "50": spec})
         self.clients_exit(1)
         self.databases("tips_test_t1g1c")
         self.team("stop", "50")
@@ -1256,7 +1419,12 @@ class RetirementTest(Harness):
         return head
 
     def test_stop_releases_merged_work_of_exited_clients(self) -> None:
+        # A stop that runs while a start holds the store lock waits, then gives up.
+        fault = {"call": "agent start", "arg": "team-2-impl", "mode": "concurrent"}
+        self.update(faults=[{**fault, "argv": ["stop", "29"]}])
         self.team("start", "30")
+        nested = self.state()["nested"]
+        assert "Busy: another team.py command held" in nested["stderr"], nested
         self.merged_pair()
         self.team("review", "7", "critic")
         self.bootstrap("team-1-critic")
@@ -1424,6 +1592,11 @@ except RuntimeError as error:
         abandon = f"python3 '{self.repo / 'agent/teams/team.py'}' stop 29 --abandon"
         assert f"closed without a merged PR, the operator runs {abandon};" in refused
         assert "agent/teams/README.md#retire-a-brief-closed-without-a-merged-pr" in refused
+        # A brief closed by a PR that was never merged is refused the same way.
+        self.update(closed_by={"29": ["7"]})
+        refused = self.team("stop", "29", ok=False).stderr
+        assert "#29 is not closed by a merged PR. Nothing was stopped" in refused, refused
+        self.update(closed_by={})
         assert self.workspaces() == ["team-1-29"]
         assert self.remaining_databases() == ["tips_test_t1g1i"]
         assert self.recorded_briefs() == {"29"}
@@ -1473,6 +1646,8 @@ except RuntimeError as error:
         assert self.remaining_databases() == ["tips_test_t1g1i"]
         assert self.recorded_briefs() == {"29"}
         self.update(gh_stalls=False)
+        # The retry gets the usual deadline: 1 s for its GitHub reads fails under load.
+        self.write_config(CONFIG)
         self.team("stop", "29")
         assert self.recorded_briefs() == set()
 
@@ -1505,11 +1680,16 @@ except RuntimeError as error:
         assert self.recorded_briefs() == {"29"}
         self.update(dexter_stop_fails=False)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-            server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            server.bind(("127.0.0.1", PORT_BASE + 11))
+            # A free port, so two suites on one machine never collide.
+            server.bind(("127.0.0.1", 0))
             server.listen()
+            port = server.getsockname()[1]
+            path = self.trusted / "state/1.json"
+            record = json.loads(path.read_text())
+            record["agents"]["tester"]["port"] = port
+            path.write_text(json.dumps(record))
             refused = self.team("stop", "29", ok=False)
-            assert f"Ports {PORT_BASE + 11} are in use; the reservation is kept" in refused.stderr
+            assert f"Ports {port} are in use; the reservation is kept" in refused.stderr
             assert self.recorded_briefs() == {"29"}
         self.team("stop", "29")
         assert self.recorded_briefs() == set()
@@ -1651,6 +1831,22 @@ class LaunchRecoveryTest(Harness):
         assert "team-3-tester: task submission is unknown; nothing was resent" in rerun
         assert self.prompts("team-3-tester") == ["Begin."]  # only the call the crash cut short
 
+    def test_a_client_reported_with_another_session_name_or_kind_gets_no_task(self) -> None:
+        reports = {
+            "29": {"agent_session": {"kind": "id", "value": "session-other"}},
+            "30": {"name": "other"},
+            "31": {"agent": "codex"},
+        }
+        for slot, (brief, report) in enumerate(reports.items(), start=1):
+            with self.subTest(report=report):
+                tester = f"team-{slot}-tester"
+                self.fault("agent start", tester, "misreport", report=report)
+                refused = self.team("start", brief, ok=False).stderr
+                assert f"{tester} started in an unexpected state or root" in refused, refused
+                submission = self.record(slot)["agents"]["tester"]["submission"]
+                assert submission == "unknown", f"{tester} recorded as {submission}"
+                assert not self.prompts(tester), f"{tester} was sent its task"
+
     def test_stop_retires_a_client_whose_session_was_never_recorded(self) -> None:
         # The launcher dies after the Codex client started: the record has no session.
         self.fault("agent start", "team-1-impl", "crash_after")
@@ -1677,9 +1873,12 @@ class LaunchRecoveryTest(Harness):
         good = json.loads(path.read_text())
         unknown_state = json.loads(path.read_text())
         unknown_state["agents"]["tester"]["submission"] = "done"
+        no_launch = json.loads(path.read_text())
+        del no_launch["agents"]["tester"]["launch"]
         cases = {
             "record version 2 is not 3": {**good, "version": 2},
             "agents.tester.submission is not a known state": unknown_state,
+            "agents.tester.launch must be str": no_launch,
         }
         for message, value in cases.items():
             with self.subTest(message=message):

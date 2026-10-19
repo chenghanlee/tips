@@ -44,10 +44,13 @@ if Path(sys.argv[0]).name == "claude":
         except BlockingIOError:
             held = "held"
     Path(os.environ["DISPATCH_LOG"] + ".lock").write_text(held)
-    # The adapter lists its tools to this session after READY_SECONDS, or never.
+    # The adapter lists its tools to this session after READY_SECONDS, or never. With
+    # STALE_NOTE, another session's note is there first.
     ready = os.environ.get("READY_SECONDS", "0")
     session = args[args.index("--session-id") + 1]
     note = Path(os.environ["LOCK_PATH"]).with_name("dispatcher.ready")
+    if os.environ.get("STALE_NOTE"):
+        note.write_text(json.dumps({"session": "old", "text": "tools listed"}))
     if ready != "never":
         time.sleep(float(ready))
         note.write_text(json.dumps({"session": session, "text": "tools listed"}))
@@ -279,14 +282,16 @@ class DispatchTest(unittest.TestCase):
         assert not self.herdr_calls("agent", "prompt", seconds=0)
 
     def test_begin_waits_for_the_adapters_ready_note_for_this_session(self) -> None:
-        # A note left by an earlier session is removed before the client starts.
+        # A note left by an earlier session is removed before the client starts; another
+        # session's note written after the start is there at once, this session's a second
+        # later.
         self.state.mkdir(parents=True)
         (self.state / "dispatcher.ready").write_text('{"session": "old", "text": "tools listed"}')
-        self.dispatch(CLIENT_SECONDS="5", READY_SECONDS="1")
+        self.dispatch(CLIENT_SECONDS="5", READY_SECONDS="1", STALE_NOTE="1")
         assert self.herdr_calls("agent", "prompt") == [["agent", "prompt", "caller", "Begin."]]
         # Herdr showed the client idle from the start; Begin. still waited for the note.
         prompted = (self.root / "calls.prompted").read_text().split()
-        assert prompted == ["true"], prompted
+        assert prompted == ["true"], f"Begin. sent before this session's note: {prompted}"
 
     def test_a_client_never_ready_or_a_failed_prompt_names_the_operator_command(self) -> None:
         prompt = 'herdr agent prompt caller "Begin."'
