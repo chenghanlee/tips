@@ -845,10 +845,6 @@ class Harness(FakeState, unittest.TestCase):
         """The messages Herdr sent to the named client, oldest first."""
         return [e[3] for e in self.events("agent", "prompt") if e[2] == name]
 
-    def latest_prompts(self) -> dict[str, str]:
-        """The latest prompt each recipient received."""
-        return {e[2]: e[3] for e in self.events("agent", "prompt")}
-
     def launched_session(self, label: str) -> str:
         """The session id the launcher assigned to a Claude client."""
         argv: list[str] = self.pane(label)["launch_argv"]
