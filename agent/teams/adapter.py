@@ -213,40 +213,13 @@ def retire_team(brief: Number) -> str:
 
 @server.tool()
 def pr_state(pr: Number) -> str:
-    """The PR's state, head and base, mergeability, closing issues and required checks."""
-
-    def read() -> str:
-        fields = (
-            "number,url,state,isDraft,headRefOid,baseRefName,baseRefOid,mergeable,"
-            "mergeStateStatus,closingIssuesReferences"
-        )
-        view = gh("pr", "view", str(pr), "--repo", settings()["repository"], "--json", fields)
-        return view + "\n" + required_checks(pr)
-
-    return operate(read)
-
-
-def required_checks(pr: int) -> str:
-    """Required checks as JSON; gh exits nonzero while checks fail or are pending."""
-    result = commands.execute(
-        [
-            "gh",
-            "pr",
-            "checks",
-            str(pr),
-            "--repo",
-            settings()["repository"],
-            "--required",
-            "--json",
-            "name,state,bucket,link",
-        ],
-        timeout=conf.github_seconds(),
+    """The PR's state, head and base, mergeability, merge state and closing issues."""
+    fields = (
+        "number,url,state,isDraft,headRefOid,baseRefName,baseRefOid,mergeable,"
+        "mergeStateStatus,closingIssuesReferences"
     )
-    try:
-        json.loads(result.stdout)
-    except ValueError:
-        return "required checks unavailable: " + (result.stderr.strip() or "no output")
-    return result.stdout.strip()
+    repository = settings()["repository"]
+    return operate(lambda: gh("pr", "view", str(pr), "--repo", repository, "--json", fields))
 
 
 @server.tool()
