@@ -111,7 +111,7 @@ operator (the user) runs `reset` and `stop --abandon`.
 | `agent/teams/team.py clean` | Operator | List retained allocations with their reasons. Deletes nothing. |
 | `python3 <harness>/bootstrap.py [--commit <sha>]` | Launched client | Prepare your own clone, as [Allocations](#allocations) says. |
 | `python3 <harness>/retirement.py` | Launched client | Fetch origin, then post your clone's state on the issue: clean (with the first dirty paths), unpushed commits, HEAD merged into `origin/main`. Then prompt the dispatcher with `<report URL> retired`. If the report fails, post a BLOCKED comment and prompt `<comment URL> blocked`. With no dispatcher to tell, print that command. Changes nothing else. |
-| `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. |
+| `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. A worker's BLOCKED post also notifies the dispatcher; the command reports a failed notification, and a rerun retries only the notification. |
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment; with `--after`, only the comments after that checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | Tokens per launched session and model, from the session logs. |
 | `agent/teams/pr_review.py list <pr>` | Any agent | Recent reviews and every unresolved thread. Display only. |
@@ -119,7 +119,6 @@ operator (the user) runs `reset` and `stop --abandon`.
 | `agent/teams/pr_review.py resolve <thread>` | Thread opener | Resolve your own thread. |
 | `herdr agent prompt team-<slot>-<entry> "<review URL>"` | Other reviewer | Tell the merge-confirming tester a review exists. |
 | `herdr agent prompt dispatcher "<URL> done"` | Tester | The PR merged. |
-| `herdr agent prompt dispatcher "<comment URL> blocked"` | Turn holder | A blocker is recorded. |
 | `herdr agent prompt dispatcher "<report URL> retired"` | `retirement.py` | A retirement report is posted; the dispatcher calls `retire_team` again. |
 
 ### Herdr layout
@@ -342,8 +341,9 @@ After the merge closes the brief and deletes the branch, notify the dispatcher w
 
 Report `blocked` if you have a product or scope question, if both sides of a finding
 have evidence but still disagree, or if the same finding remains after two fixes.
-Comment on the issue with your name, the question and the evidence. Notify the
-dispatcher with the comment URL. End your turn. Dispatcher: set Blocked. Route
+Post the question and the evidence on the issue with
+`agent/teams/board.py post <issue> BLOCKED`; the post notifies the dispatcher. End your
+turn. Dispatcher: set Blocked. Route
 consequential technical questions through [designer assignment](roles/dispatcher.md#decisions-during-implementation).
 Ask the user about product, scope or tradeoffs needing the user's judgment. Record
 the answer on the issue; the implementer incorporates it before affected work resumes.

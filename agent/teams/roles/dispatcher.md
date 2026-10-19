@@ -41,13 +41,14 @@ the task and main SHAs, using local reproductions during the
 For settled bounded work, create a brief directly with the user's outcome,
 constraints, acceptance examples and configured implementer/reviewer. The implementer
 inspects source and maintains its technical detail. Do not invent source facts or
-require a spec solely to obtain advance agreement. Add the brief to Project 16 and
+require a spec solely to obtain advance agreement. Add the brief to Project 15 and
 record your launch EVENT as in step 1 below. Use the steps below when actual
 initial design choices need designers; a shared spec is useful for common contracts.
 
 1. Create the spec issue (`issue_create`) and add it to
-   [Project 16](https://github.com/users/chenghanlee/projects/16) (`project_add_item`);
-   set Kind, Feature and Phase (`project_set_field`). Briefs are added the same way.
+   [Project 15](https://github.com/users/chenghanlee/projects/15) (`project_add_item`);
+   set Status and Kind (spec or brief) with `project_set_field`. Briefs are added the
+   same way.
    Post your own session with `board_post`, type EVENT, body `launched claude`;
    the header carries your session. `usage_summary` counts every session a `launched`
    EVENT names. A Codex launch may name its session `unknown`; the client's own comments
@@ -74,13 +75,14 @@ Start a brief only when all these conditions are met:
 - No product decision or consequential technical decision blocks the affected work;
   prerequisites and active ownership meet the eligibility rules above.
 - The brief has an outcome, constraints, acceptance examples, an `Implementer:` entry
-  and `Required reviews:` naming the merge-confirming tester and any deliberately
-  required additional reviewers once. A designer is optional. Link relevant known
+  and `Required reviews:` naming the merge-confirming tester and, once each, any
+  additional reviewer whose contribution the brief names. A designer is optional. Link relevant known
   contracts; the implementer fills source-derived details without changing scope.
 
 If a design round had one designer and no critic, check its PROPOSAL against these
-conditions; do not substitute dispatch judgment for missing technical evidence. Set
-the brief's Phase to Implement (`project_set_field`) and start the pair (`start_pair`).
+conditions; do not substitute dispatch judgment for missing technical evidence. Start
+the pair (`start_pair`) and set the brief's Agent to the implementer entry and its
+Status to Active (`project_set_field`).
 Send a design decision link with `prompt_agent` when one applies. When a tester asks,
 launch each additional required reviewer (`launch_reviewer`). After the
 merge-confirming tester reports `done`, confirm the merge (`pr_state`). Before retiring,
@@ -139,3 +141,31 @@ as approval.
 Use `usage_summary` for every participant, including dispatcher and designers;
 it separates uncached input, output, cache reads and writes. Missing logs mean unknown
 cost, not zero. Post the usage table on the spec when the final brief merges.
+
+## Rules carried from AGENTS.md and the README
+
+- Writing: plain, short English. Lead with the result and the next action. No
+  greetings, praise, acknowledgments or progress posts. State each decision once and
+  link its evidence. Never put secrets in issues, comments or prompts.
+- GitHub Actions is paused by the user's 2026-10-18 decision: local check evidence and
+  independent review replace CI. Do not wait for paused workflows. Report any
+  remaining required-status rule to the user.
+- Brief roster: `Implementer: <entry>` and `Required reviews: <entry>, ...`, testers
+  first; the first tester confirms the merge. Default: one implementer and one tester.
+  Add a reviewer only when the brief names what it adds, such as client or LiveView
+  state, timers or concurrency the tester's checks may not exercise.
+- A P2 is settled when it is fixed, declined with a reason, or deferred in a linked
+  follow-up issue. A deferral never settles a P0 or P1.
+- On `<URL> blocked`: set the issue Blocked. Route technical questions to the named
+  decision owner; ask the user about product, scope or tradeoffs. Record the answer on
+  the issue, set Active and notify the agent.
+- Whose turn, first matching row:
+  1. A consequential QUESTION is unanswered or its ANSWER is not incorporated: affected
+     work holds.
+  2. A changed binding decision has a review hold: the tester reviews against the
+     adopted decision.
+  3. A required check failed or the PR cannot merge: the implementer.
+  4. The latest review of the head by a required reviewer is not an LGTM: the
+     implementer.
+  5. A required reviewer has not reviewed the head: that reviewer.
+  6. `observe` reports ready: the merge-confirming tester.
