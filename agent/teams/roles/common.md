@@ -16,19 +16,13 @@ Read this and your role file at launch and after compaction.
   consultation is not a mandatory step. Only the user decides UI,
   UX, user-facing behaviour and PRD questions. Record those decisions on the board.
 - Silence, a timeout or a missing agent never counts as consent or approval.
-- An answer or instruction that touches a required check or its evidence says which
-  kind it is:
-  - Clarification: explains how to meet an obligation. It cannot change which checks
-    run or what evidence counts.
-  - Substitution: replaces a check or its evidence with another. It names the exact
-    obligation replaced, the replacement, the obligations that still apply, and its
-    authority.
-  - Waiver: removes an obligation. It names the exact obligation, the obligations that
-    still apply, and its authority.
-
-  Authority is a link to the record that allows the change: the user's decision, the
-  brief or its decisions table, or a rule in this workflow. Without it, or when the
-  kind or scope is unclear, the original obligation stands. A change only the user may
+- An answer or instruction that touches a required check or its evidence says whether
+  it is a clarification (how to meet an obligation, without changing which checks run
+  or what evidence counts), a substitution or a waiver. A substitution or waiver names
+  the obligations that still apply, the exact obligation it replaces or removes, any
+  replacement, and its authority: a link to the user's decision, the brief or its
+  decisions table, or a rule in this workflow; without it, or when the kind or scope
+  is unclear, the original obligation stands. A change only the user may
   make needs the user's own recorded decision. A role, a label or another agent's
   report of the user's view does not count.
 
@@ -37,7 +31,10 @@ Read this and your role file at launch and after compaction.
 - Append comments without editing earlier comments. The dispatcher or design lead
   creates a brief; after launch only its implementer maintains its body and PR body.
   The lead maintains a shared spec. Link authoritative decisions instead of copying
-  competing versions. Incorporate an ANSWER before resuming affected work.
+  competing versions: briefs link the source issue and the design sections at their
+  commit instead of copying them; for checks, they link
+  [AGENTS.md#checks](../../../AGENTS.md#checks) and list only additions or exceptions.
+  Incorporate an ANSWER before resuming affected work.
 - The implementer records agreed additional reviewers in `Required reviews:`. The
   pair's implementer and merge-confirming tester cannot change after launch. Body
   authorship does not permit removing required review or waiving a finding.
@@ -47,13 +44,10 @@ Read this and your role file at launch and after compaction.
   BLOCKED, DONE, EVENT. PR reviews use the [review record](../README.md#pr-review-record) instead.
 - Keep each comment under 400 words. If it has more than 800 words, the script warns.
   Explain why it needs that many words. Put logs and screenshots in a gist with `gh gist create <file>`. Link to CI runs by URL. Do not paste output.
-- Before compaction, restart or session end, or when your state is not already in a
-  posted PROPOSAL, review or PR body, save a checkpoint. The lead designer updates the
-  spec body. Everyone else posts a checkpoint comment or updates their PR body. Resume
-  by reading the current issue body with `gh issue view <issue>` and subsequent
-  comments with `agent/teams/board.py read <issue> --after <your checkpoint URL>`.
-  The latter omits the body. Resolve pending questions against their linked answers;
-  an absent or ambiguous answer leaves affected work waiting.
+- Before compaction, restart or session end, or a long step, record any decision or
+  finding not yet posted: the lead designer updates the spec body; everyone else posts
+  the decision or finding on GitHub. After a restart, reread the brief (`gh issue view <issue>`) and the PR as
+  [Turns](../README.md#turns) says.
 - Post the comment, then send the Herdr prompt as a separate step. If you repeat the
   post, the script returns the existing comment's URL.
 

@@ -27,12 +27,12 @@ Implement one brief in your own clone. Manage its PR.
 3. Record deferred work in one follow-up issue before handoff.
 4. Push. Open the PR with the [PR body](../README.md#pr-body) filled in. Then run
    the `team.py turn <pr> <tester entry>` command your brief names. It requires your
-   clone to be clean at the PR head, records the PR's failures and notifies every
-   required reviewer of the head. It refuses while a merge conflict finding is open:
+   clone to be clean at the PR head, names the PR's current failures and notifies every
+   required reviewer of the head. It refuses while the PR is not mergeable:
    merge `origin/main`, push and run it again, or report `blocked`. If it reports failed
    sends, report `blocked` with them. Reviewers work on the pushed head in their own
    clones, so you may keep working while they review.
-5. When reviewers report findings, fix every P0 and P1. Handle P2s as the [severity rule](../README.md#severity) says. Fix the open findings the handoff names. Update the
+5. When reviewers report findings, fix every P0 and P1. Handle P2s as the [severity rule](../README.md#severity) says. Fix the failures the handoff names. Update the
    PR body. Push and hand off again. The tester returns failed checks through the same
    handoff.
 
@@ -41,17 +41,20 @@ Implement one brief in your own clone. Manage its PR.
 Apply the matching rule before every test command, edit and source read. Do not skip
 one to save a tool call.
 
-1. **Tests.** For every `mix test` invocation, including one test, one file, browser
-   tests and reruns, run from your clone's root:
+1. **Tests.** For every `mix test` invocation, including one test, one file and reruns,
+   run from your clone's root:
    `mkdir -p tmp && mix test <args> --max-failures 1 > tmp/<name>.log 2>&1; echo "exit=$?"`.
    Use a new `<name>` per run. The printed `exit=` is the result. On `exit=0`, read
    `tail -n 10 tmp/<name>.log` and stop. On any other exit, run
    `grep -n -E 'failure|error|seed|\*\*' tmp/<name>.log | head -n 40`, then
    `sed -n` at most 60 lines around the first failure. Never `cat` or Read the whole log.
-   Run the browser suite yourself: `TIPS_BROWSER=1 mix test test/tips_web/features`
-   with the same logging. Keep that log; name its path, command and `exit=` line in the
-   PR body under "Checks not run by CI". A Codex tester cannot run browsers and verifies
-   your log instead ([#432](https://github.com/chenghanlee/tips/issues/432)).
+   Run the browser suite yourself: `TIPS_BROWSER=1 mix test test/tips_web/features --trace`
+   with the same logging but without `--max-failures 1`: the
+   [failed-check rule](../README.md#report-and-resolve-blockers) needs every failing
+   test name. Plain `mix test` covers the rest, so the unit suite runs once per head.
+   Keep that log; name its path, command and `exit=` line in the PR body under "Checks
+   not run by CI". A Codex tester verifies your log instead
+   ([manual browser review](../README.md#manual-browser-review)).
 2. **Edits.** With the client's edit tool, replace only the lines that must change plus
    the context needed to match them. Do not resend a whole function or file. If the
    client has no edit tool, apply a unified diff with `patch -p1`; a quoted heredoc may
