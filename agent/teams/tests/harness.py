@@ -18,7 +18,9 @@ from commands import execute
 
 SCRIPT = Path(__file__).resolve().parents[1] / "team.py"
 # Deliberately fixed test data: changing production defaults must not rewrite tests.
-CONFIG = """\
+# Each parallel test worker gets its own port range; see tests/parallel.py.
+PORT_BASE = int(os.environ.get("TIPS_TEST_PORT_BASE", "24100"))
+CONFIG = f"""\
 # Agent launch settings. Changes apply to newly started sessions.
 # An empty model uses the client's configured default.
 [github]
@@ -31,7 +33,7 @@ repository = "o/r"
 clone_url = "/fixture/origin.git"
 psql = ["/fixture/psql", "fixture-dsn"]
 max_teams = 6
-port_base = 24100
+port_base = {PORT_BASE}
 port_stride = 10
 postgres_port = 5433
 db_suffix_prefix = "_t"
