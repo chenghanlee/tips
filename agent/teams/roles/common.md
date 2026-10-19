@@ -17,13 +17,12 @@ Read this and your role file at launch and after compaction.
   UX, user-facing behaviour and PRD questions. Record those decisions on the board.
 - Silence, a timeout or a missing agent never counts as consent or approval.
 - An answer or instruction that touches a required check or its evidence says whether
-  it is a clarification (how to meet an obligation; it cannot change which checks run
-  or what evidence counts), a substitution (replaces a check or its evidence) or a
-  waiver (removes an obligation). A substitution or waiver names the obligations that
-  still apply, the exact obligation it replaces or removes, any replacement, and its
-  authority: a link to the record that allows the change, such as the user's decision,
-  the brief or its decisions table, or a rule in this workflow. Without it, or when the
-  kind or scope is unclear, the original obligation stands. A change only the user may
+  it is a clarification (how to meet an obligation, without changing which checks run
+  or what evidence counts), a substitution or a waiver. A substitution or waiver names
+  the obligations that still apply, the exact obligation it replaces or removes, any
+  replacement, and its authority: a link to the user's decision, the brief or its
+  decisions table, or a rule in this workflow; without it, or when the kind or scope
+  is unclear, the original obligation stands. A change only the user may
   make needs the user's own recorded decision. A role, a label or another agent's
   report of the user's view does not count.
 
