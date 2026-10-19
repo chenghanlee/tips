@@ -119,7 +119,7 @@ message before adding a workflow rule.
 ## Trial measurement
 
 Inspect actual decisions, code and correctness/design review alongside elapsed time,
-waits and repair work. Include every participant, including dispatcher, advisors and
+waits and repair work. Include every participant, including dispatcher and
 designers. `board.py usage` (the dispatcher's `usage_summary`) separates uncached input,
 output, cache reads and writes. Counts cover whole sessions: compare before/after totals
 when sessions are reused. Check coverage and category overlap before converting counts

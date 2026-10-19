@@ -27,6 +27,7 @@ from typing import cast
 from commands import execute, object_fields
 from config import RETIREMENT, Allocation, launch_identity, slot_record_paths
 from github import comment_header, poster
+from herdr import parse_herdr, session_id
 
 GIT_SECONDS = 120
 HERDR_SECONDS = 30
@@ -102,6 +103,26 @@ def clone_state(project: Path) -> dict[str, object]:
     }
 
 
+def with_live_session(allocation: dict[str, object]) -> dict[str, object]:
+    """The allocation with the session Herdr reports for this pane when none is recorded.
+
+    A Codex client reports its session only after launch, so its launch EVENT and record
+    may say `unknown` (#451). The retirement EVENT then carries the real session for
+    `board.py usage`. Herdr failures leave the record's value.
+    """
+    pane = os.environ.get("HERDR_PANE_ID", "")
+    if allocation.get("session") or not pane:
+        return allocation
+    try:
+        result = execute(["herdr", "agent", "get", pane], timeout=HERDR_SECONDS)
+        if result.returncode:
+            return allocation
+        session = session_id(parse_herdr(result.stdout)["agent"])
+    except (RuntimeError, OSError, ValueError, KeyError, subprocess.TimeoutExpired):
+        return allocation
+    return {**allocation, "session": session}
+
+
 def header(kind: str, allocation: dict[str, object]) -> str:
     return comment_header(kind, *poster(cast(Allocation, allocation)))
 
@@ -157,6 +178,7 @@ def main() -> None:
     except (RetirementError, OSError, ValueError) as error:
         print(f"retirement: {error}", file=sys.stderr)
         sys.exit(1)
+    allocation = with_live_session(allocation)
     try:
         url = report(issue, allocation, settings, project)
     except (RetirementError, OSError, ValueError) as error:

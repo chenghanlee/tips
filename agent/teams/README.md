@@ -395,7 +395,9 @@ succeeded from this machine's configured Codex client on 2026-10-14 (agent-brows
 [browser setup](SETUP.md#browser-access-for-the-tester) and that preflight in the
 tester's own session.
 
-Clients launch with `MIX_ENV=test`. Wait for `mix test` to exit, then start the app on
+Clients launch with `MIX_ENV=test`. Run Dialyzer as `MIX_ENV=dev mix dialyzer`: under
+`test` it analyzes `test/support` against a PLT without ExUnit and Wallaby and reports
+their calls as unknown functions. Wait for `mix test` to exit, then start the app on
 the same port:
 
 ```sh

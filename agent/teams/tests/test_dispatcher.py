@@ -205,7 +205,7 @@ class DispatchTest(unittest.TestCase):
         assert cwd == str(self.root)
         assert args[args.index("--model") + 1] == "test-model"
         assert args[args.index("--effort") + 1] == "high"
-        assert args[args.index("--advisor") + 1] == "fable"
+        assert "--advisor" not in args
 
     def test_the_launch_records_the_client_process_and_names_only_that_client(self) -> None:
         # The client keeps the launcher's process id: the record names the exact process.
@@ -325,7 +325,7 @@ class DispatchTest(unittest.TestCase):
                 if case in ("prompt fails", "prompt hangs"):
                     assert both not in note["text"]
 
-    def test_model_setting_controls_model_and_advisor(self) -> None:
+    def test_model_setting_controls_the_model_flag(self) -> None:
         for model in ("claude-fable-5-1", ""):
             with self.subTest(model=model):
                 self.write_config(model)

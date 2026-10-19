@@ -117,6 +117,10 @@ Keep the repository's other rules. Add this Tips-specific entry:
 > GitHub identity; the merge-confirming tester merges after reading the LGTM reviews.
 
 Preserve other settings and rule lists. Do not add a merge or handoff allow rule.
+Pair clients launch with allow rules for their own GitHub writes (`gh issue edit`,
+`gh issue comment`, `gh pr create`, `gh pr edit`, `gh pr comment`, `gh pr review`) and
+the harness scripts they run (`board.py`, `pr_review.py`, `retirement.py`); the
+classifier judges everything else, including the merge and the handoff.
 Run `claude auto-mode config` to inspect the active context and
 `claude auto-mode critique` to find contradictory rules, then start a new
 session. Correcting the context may not fix the handoff denial. An existing
@@ -226,7 +230,7 @@ call uses, and for each project the dispatcher may edit, the fields it may set.
 `timeouts.github_seconds` (default 30) bounds each GitHub operation, all its calls
 together. The one exception is stop's check for a merged PR, which holds the store lock
 and so uses `timeouts.shell_seconds`. Each `[agents.<entry>]` defines a role,
-client, model, effort, optional advisor and persona, database suffix and port offset.
+client, model, effort, optional persona, database suffix and port offset.
 Briefs name entries in `Implementer:` and `Required reviews:`.
 
 A configured entry can run in several allocations. Each launch records its
@@ -240,9 +244,7 @@ uses its release's config, `<root>/harness/agent/teams/config.toml`.
 `TIPS_TEAM_CONFIG=/absolute/path` selects another file. Launched clients get the file the
 launcher read. Settings apply at the next launch;
 a relaunched client keeps its recorded database, port and client kind and takes its
-model, effort, advisor and persona from the current file.
-
-A Claude entry launches with `--advisor <advisor>` when its `advisor` is set; this requires access to that model. Entries without one leave the advisor setting to the client. The dispatcher launches with `--advisor fable` when its model name is nonempty and does not contain Fable.
+model, effort and persona from the current file.
 
 | Allocation | Components |
 |---|---|

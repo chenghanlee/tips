@@ -12,6 +12,9 @@ import config as conf
 from commands import object_fields, object_list, require_type, run
 from config import Entity, HerdrResult, ProcessInfo, ProcessRows
 
+# How long a stopped client's leader may linger in Herdr's pane snapshot after its exit.
+STALE_SNAPSHOT_SECONDS = 5
+
 
 def entity_fields(value: object, label: str) -> None:
     fields = object_fields(value, label)
@@ -122,7 +125,7 @@ def stop(pane: str, root: str | Path) -> None:
     identity = {pid: rows[pid][1] for pid in owned if pid in rows}
     signal_client(pane, current, clients, owned)
     wait_for_exit(pane, shell, identity)
-    release_name(pane, current)
+    release_name(pane, current, set(identity))
     print(f"{pane}: client and owned descendants exited")
 
 
@@ -160,12 +163,27 @@ def wait_for_exit(pane: str, shell: int, identity: dict[int, str]) -> None:
         time.sleep(0.1)
 
 
-def release_name(pane: str, current: Entity) -> None:
+def settled_process_info(pane: str, stopped: set[int]) -> ProcessInfo:
+    """The pane's process-info once it no longer shows a stopped process as its leader.
+
+    Herdr's snapshot can lag the verified exit (#478); a leader that wait_for_exit saw
+    exit is stale, not a replacement. Any other occupant is returned for the owner check.
+    """
+    deadline = time.monotonic() + STALE_SNAPSHOT_SECONDS
+    while True:
+        info = herdr("pane", "process-info", "--pane", pane)["process_info"]
+        leader = info["foreground_process_group_id"]
+        if leader not in stopped or time.monotonic() >= deadline:
+            return info
+        time.sleep(0.1)
+
+
+def release_name(pane: str, current: Entity, stopped: set[int]) -> None:
     # Process exit can precede Herdr's name release; retire only this stopped owner,
     # never a replacement client that appeared after the verified exit.
     for agent in herdr("agent", "list")["agents"]:
         if agent.get("pane_id") == pane and agent.get("name"):
-            info = herdr("pane", "process-info", "--pane", pane)["process_info"]
+            info = settled_process_info(pane, stopped)
             occupied = occupant(pane, info)[1]
             kind = agent.get("agent")
             # Herdr can clear kind before name. Only accept that gap at the shell,
