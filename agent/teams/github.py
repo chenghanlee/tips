@@ -4,7 +4,7 @@ import json
 import re
 import subprocess
 import time
-from collections.abc import Iterator, Sequence
+from collections.abc import Sequence
 from typing import NamedTuple
 
 import config as conf
@@ -194,19 +194,6 @@ def parse_comment(comment: dict[str, object]) -> tuple[re.Match[str], list[str]]
     lines = str(comment.get("body") or "").splitlines()
     header = HEADER.match(lines[0]) if lines else None
     return (header, lines[1:]) if header else None
-
-
-def prefixed_json(
-    comment: dict[str, object], kind: str, prefix: str
-) -> Iterator[dict[str, object]]:
-    """The JSON object after `prefix` on each line of a `kind` comment. A malformed one
-    raises ValueError; the caller decides whether that blocks or is no evidence."""
-    parsed = parse_comment(comment)
-    if not parsed or parsed[0]["type"] != kind:
-        return
-    for line in parsed[1]:
-        if line.startswith(prefix):
-            yield object_fields(json.loads(line[len(prefix) :]), prefix.strip())
 
 
 def pull_request(number: str) -> PullRequest:
