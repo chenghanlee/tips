@@ -356,10 +356,10 @@ If a required check fails at the head, rerun only the failed tests, alone, at th
   - They pass on `main`: the failure is the PR's to fix unless the user grants a
     bounded exception.
 - They pass alone at the head: the failure is intermittent. Run the suite once more.
-  If it passes and an open issue already names the test as intermittent, record both
-  logs and the issue in the PR body; it is not a blocker. Otherwise the failure is the
-  PR's to fix unless the user grants a bounded exception. If the diff touches the
-  behaviour the test covers, the failure is the PR's to fix.
+  If it fails again, treat it as a deterministic failure above. If it passes and the
+  diff does not touch the behaviour the test covers, record both logs and the open
+  issue that names the test (open one if none) in the PR body; it is not a blocker. If
+  the diff touches that behaviour, the failure is the PR's to fix.
 
 ## Constraints
 
