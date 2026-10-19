@@ -8,8 +8,7 @@
 repository = "chenghanlee/tips"
 
 [github.projects]
-15 = ["Status"]
-16 = ["Kind", "Feature", "Phase", "Implementer"]
+15 = ["Status", "Kind", "Agent"]
 
 [team]
 # Each allocation clones this URL itself.
