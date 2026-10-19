@@ -1808,12 +1808,19 @@ class LaunchRecoveryTest(Harness):
         assert self.record(1)["agents"]["impl"]["session"] == ""
         self.bootstrap("team-1-impl")
         self.merge(self.push("team-1-impl"))
-        self.retire("team-1-impl")
-        # The report names the session Herdr knows by then, so usage can attribute it.
+        # The report names the session Herdr knows by then, so usage can attribute it,
+        # read from the client's own pane even when the operator reports from another.
         session = self.pane("team-1-impl")["agent_session"]["value"]
+        operator = self.worker("team-1-impl", "retirement.py", HERDR_PANE_ID="wX:p99")
+        assert operator.stderr == ""
         header = self.comments("29")[-1]["body"].splitlines()[0]
         assert header == f"EVENT implementer team-1-impl {session}"
         self.clients_exit(1)
+        # With the client gone the lookup fails visibly and the header stays unknown.
+        gone = self.worker("team-1-impl", "retirement.py")
+        assert "no session recorded for team-1-impl; Herdr lookup of its pane" in gone.stderr
+        header = self.comments("29")[-1]["body"].splitlines()[0]
+        assert header == "EVENT implementer team-1-impl unknown"
         assert "slot 1 released" in self.team("stop", "29").stdout
 
     def test_task_done_and_client_exited_before_the_record_update_is_never_replayed(self) -> None:

@@ -104,21 +104,32 @@ def clone_state(project: Path) -> dict[str, object]:
 
 
 def with_live_session(allocation: dict[str, object]) -> dict[str, object]:
-    """The allocation with the session Herdr reports for this pane when none is recorded.
+    """The allocation with the session Herdr reports for its own client when none is
+    recorded.
 
     A Codex client reports its session only after launch, so its launch EVENT and record
     may say `unknown` (#451). The retirement EVENT then carries the real session for
-    `board.py usage`. Herdr failures leave the record's value.
+    `board.py usage`. The lookup reads the allocation's recorded pane, not the caller's:
+    the operator's report command runs from another pane. A failed lookup, or another
+    client in that pane, keeps the record's value and says so on stderr.
     """
-    pane = os.environ.get("HERDR_PANE_ID", "")
-    if allocation.get("session") or not pane:
+    if allocation.get("session"):
         return allocation
+    pane, name = str(allocation.get("pane", "")), str(allocation.get("name", ""))
     try:
         result = execute(["herdr", "agent", "get", pane], timeout=HERDR_SECONDS)
         if result.returncode:
-            return allocation
-        session = session_id(parse_herdr(result.stdout)["agent"])
-    except (RuntimeError, OSError, ValueError, KeyError, subprocess.TimeoutExpired):
+            raise RetirementError((result.stderr or result.stdout).strip() or "nonzero exit")
+        agent = parse_herdr(result.stdout)["agent"]
+        if agent.get("name") != name:
+            raise RetirementError(f"pane holds {agent.get('name') or 'an unnamed client'}")
+        session = session_id(agent)
+    except (RuntimeError, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as error:
+        print(
+            f"retirement: no session recorded for {name}; Herdr lookup of its pane {pane} "
+            f"failed: {error}; the report header says unknown",
+            file=sys.stderr,
+        )
         return allocation
     return {**allocation, "session": session}
 
