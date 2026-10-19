@@ -28,14 +28,10 @@ import herdr
 import team
 
 HERE = Path(__file__).resolve().parent
-# The reviewed tree holding AGENTS.md: the checkout, or the installed harness.
+# The reviewed tree holding agent/teams: the checkout, or the installed harness.
 DOCUMENTS = HERE.parents[1]
-PROMPT_FILES = (
-    "AGENTS.md",
-    "agent/teams/README.md",
-    "agent/teams/roles/common.md",
-    "agent/teams/roles/dispatcher.md",
-)
+# The dispatcher has no file tools, so these two files must hold every rule it follows.
+PROMPT_FILES = ("agent/teams/roles/common.md", "agent/teams/roles/dispatcher.md")
 # The launcher owns every setting the client loads. Restricted mode ignores user, project
 # and local settings and CLAUDE.md; this turns off Remote Control, another input source.
 SETTINGS = {"remoteControlAtStartup": False}
