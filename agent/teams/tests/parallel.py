@@ -4,6 +4,7 @@ The suite is about 90 Harness tests that each build a repository, fakes and chil
 processes, so a serial run takes 4 to 5 minutes. This splits the discovered tests over
 worker processes, one `python -m unittest` each, and reports the combined result. The
 tests already isolate their files per test; the fakes are written once per process.
+Each worker gets its own port range through `TIPS_TEST_PORT_BASE`.
 The real-daemon and real-client opt-ins share ports, so they run in one worker.
 
     agent/teams/.venv/bin/python agent/teams/tests/parallel.py [-j N] [-k SUBSTRING]...
@@ -22,6 +23,8 @@ from pathlib import Path
 TESTS = Path(__file__).resolve().parent
 TEAMS = TESTS.parent
 SERIAL = "real_"
+PORT_BASE = 24100
+PORT_RANGE = 100  # six teams of ten ports each
 
 
 def test_ids(patterns: list[str]) -> list[str]:
@@ -50,13 +53,15 @@ def chunks(ids: list[str], jobs: int) -> list[list[str]]:
     return [g for g in [*groups, serial] if g]
 
 
-def start_worker(group: list[str], log: Path) -> subprocess.Popen[bytes]:
+def start_worker(group: list[str], log: Path, index: int) -> subprocess.Popen[bytes]:
     """Start one unittest process writing to a log file. A pipe would stay open while a
-    background child of a failed test still holds the inherited descriptors."""
+    background child of a failed test still holds the inherited descriptors. Each worker
+    gets its own port range: team tests bind and probe real ports."""
+    env = {**os.environ, "TIPS_TEST_PORT_BASE": str(PORT_BASE + PORT_RANGE * index)}
     with log.open("wb") as sink:
         # Reviewed S603: this interpreter and discovered test ids, no shell.
         return subprocess.Popen(  # noqa: S603
-            [sys.executable, "-m", "unittest", *group], cwd=TEAMS, stdout=sink, stderr=sink
+            [sys.executable, "-m", "unittest", *group], cwd=TEAMS, stdout=sink, stderr=sink, env=env
         )
 
 
@@ -74,7 +79,9 @@ def main() -> int:
     groups = chunks(ids, args.jobs)
     with tempfile.TemporaryDirectory(prefix="parallel-") as logs:
         files = [Path(logs) / f"{n}.log" for n in range(len(groups))]
-        workers = [start_worker(g, f) for g, f in zip(groups, files, strict=True)]
+        workers = [
+            start_worker(g, f, n) for n, (g, f) in enumerate(zip(groups, files, strict=True))
+        ]
         runs = [(w.wait(), f.read_text()) for w, f in zip(workers, files, strict=True)]
     ran = skipped = 0
     failed = False

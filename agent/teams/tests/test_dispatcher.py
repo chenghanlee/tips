@@ -290,17 +290,18 @@ class DispatchTest(unittest.TestCase):
         both = f"herdr agent rename caller dispatcher && {prompt}"
         # (case, fake Herdr and client settings, Begin. prompts sent, what the note says)
         cases: list[tuple[str, dict[str, str], int, list[str]]] = [
-            ("never idle", {"AGENT_STATUS": "unknown"}, 0, ["not ready within 1 s", both]),
-            ("no tools", {"READY_SECONDS": "never"}, 0, ["not ready within 1 s", both]),
+            ("never idle", {"AGENT_STATUS": "unknown"}, 0, ["not ready within 3 s", both]),
+            ("no tools", {"READY_SECONDS": "never"}, 0, ["not ready within 3 s", both]),
             ("rename fails", {"RENAME_FAILS": "1"}, 0, ["naming it failed", both]),
             ("prompt fails", {"PROMPT_FAILS": "1"}, 1, ["may or may not", "only if", prompt]),
             ("prompt hangs", {"PROMPT_FAILS": "hang"}, 1, ["may or may not", "timed out"]),
         ]
         for case, extra, sent, says in cases:
             with self.subTest(case=case):
-                # A client that is never ready keeps the starter until its deadline.
+                # A client that is never ready keeps the starter until its deadline. The
+                # deadline also bounds each Herdr call; 3 s survives a loaded parallel run.
                 never_ready = case in ("never idle", "no tools")
-                self.write_config("test-model", launch_seconds=1 if never_ready else 2)
+                self.write_config("test-model", launch_seconds=3 if never_ready else 2)
                 self.log.unlink(missing_ok=True)
                 (self.state / "dispatcher.recovery").unlink(missing_ok=True)
                 env = {"AGENT_STATUS": "idle", "READY_SECONDS": "0", "RENAME_FAILS": ""}
