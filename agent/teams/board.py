@@ -205,10 +205,11 @@ def codex_sessions_by_cwd() -> dict[str, set[str]]:
     for file in (Path.home() / ".codex/sessions").glob("*/*/*/rollout-*.jsonl"):
         try:
             with file.open() as lines:
-                entry = json.loads(lines.readline())
-            payload = entry["payload"] if entry.get("type") == "session_meta" else {}
+                entry = object_fields(json.loads(lines.readline()), str(file))
+            meta = entry if entry.get("type") == "session_meta" else {}
+            payload = object_fields(meta["payload"], f"{file} payload")
             found[str(payload["cwd"])].add(str(payload["id"]))
-        except (ValueError, KeyError, TypeError, AttributeError):
+        except (ValueError, KeyError):
             print(f"board: {file} has no session_meta first line; not counted", file=sys.stderr)
     return found
 
@@ -240,7 +241,7 @@ def launched_sessions(issues: list[str]) -> list[tuple[str, str, list[str]]]:
     unknown = header_session("")
     rows: list[tuple[str, str, list[str]]] = []
     for key, sessions in sorted(clients.items()):
-        started = by_cwd.get(roots[key], set()) if key in roots else set()
+        started: set[str] = by_cwd.get(roots[key], set()) if key in roots else set()
         found = (sessions | started) - {unknown}
         rows.append((key[0], key[1], sorted(found or sessions)))
     return rows
