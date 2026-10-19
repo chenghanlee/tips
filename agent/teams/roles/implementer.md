@@ -49,6 +49,7 @@ one to save a tool call.
    `grep -n -E 'failure|error|seed|\*\*' tmp/<name>.log | head -n 40`, then
    `sed -n` at most 60 lines around the first failure. Never `cat` or Read the whole log.
    Run the browser suite yourself: `TIPS_BROWSER=1 mix test test/tips_web/features --trace`
+   ([serial, timeouts off](../../../docs/development/local-development.md#browser-tests-and-ci))
    with the same logging but without `--max-failures 1`: the
    [failed-check rule](../README.md#report-and-resolve-blockers) needs every failing
    test name. Plain `mix test` covers the rest, so the unit suite runs once per head.
