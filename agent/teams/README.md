@@ -29,7 +29,7 @@ DISPATCHER   team.py review <pr> <entry> for each requested reviewer
 REVIEWERS    bootstrap.py --commit <head> → review correctness and design → notify tester if additional reviewer
 TESTER       any review with findings → team.py turn <pr> <implementer>   (repeat until no P0 or P1)
 TESTER       pr_review.py observe <pr> reports ready → gh pr merge → "done"
-DISPATCHER   team.py stop <brief> → every client runs retirement.py → team.py stop <brief> → next
+DISPATCHER   team.py stop <brief> → next
 ```
 
 Agents are `[agents.<entry>]` entries in [config.toml](config.toml). A brief names its
@@ -110,7 +110,6 @@ operator (the user) runs `reset` and `stop --abandon`.
 | `agent/teams/team.py status` | Dispatcher, user | Every allocation record with each client's live Herdr pane, name, kind, state and session, and whether the recorded dispatcher process runs. |
 | `agent/teams/team.py clean` | Operator | List retained allocations with their reasons. Deletes nothing. |
 | `python3 <harness>/bootstrap.py [--commit <sha>]` | Launched client | Prepare your own clone, as [Allocations](#allocations) says. |
-| `python3 <harness>/retirement.py` | Launched client | Fetch origin, then post your clone's state on the issue: clean (with the first dirty paths), unpushed commits, HEAD merged into `origin/main`. Then prompt the dispatcher with `<report URL> retired`. If the report fails, post a BLOCKED comment and prompt `<comment URL> blocked`. With no dispatcher to tell, print that command. Changes nothing else. |
 | `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. |
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment; with `--after`, only the comments after that checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | Tokens per launched session and model, from the session logs. |
@@ -120,7 +119,6 @@ operator (the user) runs `reset` and `stop --abandon`.
 | `herdr agent prompt team-<slot>-<entry> "<review URL>"` | Other reviewer | Tell the merge-confirming tester a review exists. |
 | `herdr agent prompt dispatcher "<URL> done"` | Tester | The PR merged. |
 | `herdr agent prompt dispatcher "<comment URL> blocked"` | Turn holder | A blocker is recorded. |
-| `herdr agent prompt dispatcher "<report URL> retired"` | `retirement.py` | A retirement report is posted; the dispatcher calls `retire_team` again. |
 
 ### Herdr layout
 
@@ -142,53 +140,31 @@ rejects changes to the implementer or merge-confirming tester.
 
 ### Retirement
 
-`team.py stop <issue>` for a brief first refuses, asking no client and changing nothing,
-unless GitHub shows the brief closed by a merged PR within `timeouts.shell_seconds`. It
-then needs a retirement report from every client of the team, from its current launch; a
-report from an earlier launch does not count. A client with no launch id never
-launched: it has no session and needs no report. Until each has one, it changes nothing
-and prints what it waits for: it asks each running client to run `retirement.py`, once
-per launch, names the clients it asked earlier, prints the command the operator runs for
-a stopped client, and keeps every resource reserved. Only a failed send is an error.
-Before requesting retirement, the dispatcher checks any attached designer's bounded
-assignment is complete or explicitly handed off to a reachable owner. Designers follow
-their [retirement steps](roles/designer.md#retirement), including an unmerged inspection
-checkout. A preservation report does not prove decision work is finished.
+`team.py stop <issue>` retires a team in one call and asks no client anything. It
+refuses, changing nothing, unless GitHub shows the brief closed by a merged PR within
+`timeouts.shell_seconds`; a design team and `--abandon` skip that check. It refuses a
+pane in the workspace that the record does not name and another client in an
+allocation. Then it stops the recorded clients, closes the workspace and stops each
+project's Dexter daemon. It keeps the reservation while any of the team's ports still
+answers. It drops the databases of merged pair work and their numbered partitions with
+`team.psql`, without `FORCE`; a refused drop keeps the rest and the reservation. It
+removes only empty allocation directories, writes `state/<id>/retired.json` with the
+retained paths and reasons, and deletes the record.
 
-Each `retirement.py` run prompts the dispatcher with its report URL, so the next `stop`
-follows without polling. With every report, it:
-
-1. Refuses, stopping nothing and keeping the record, databases, files and reservation,
-   unless every report shows a clean clone with no unpushed commits and, for a brief
-   not abandoned, HEAD merged into `origin/main`. It asks each running client whose report shows such
-   work, once per report, to preserve it and report again, and prints the operator's
-   command for a stopped one. Rerun stop after the new reports.
-2. Refuses a pane in the workspace that the record does not name, and another client in
-   an allocation.
-3. Stops the recorded clients and closes the workspace.
-4. Stops each project's Dexter daemon with the binary that bootstrap used.
-5. Keeps the reservation while any of the team's ports still answers.
-6. Drops the team's databases and their numbered partitions with the configured
-   `team.psql`, without `FORCE`. A refused drop keeps the rest and the reservation. A
-   design team and an abandoned brief keep their databases.
-7. Removes only empty allocation directories, writes `state/<id>/retired.json` with the
-   retained paths and reasons, and deletes the record.
-
-Project and log files are never deleted: a process outside the pane can still write
-there. `agent/teams/team.py clean` lists each retained allocation with its reasons and
-deletes nothing. The operator deletes one by hand, naming its ID
-(`rm -rf <root>/allocations/<id>`), only after establishing that its work is preserved
-and every writer has stopped; an earlier listing or a closed pane is not enough. If
-unsure, keep it.
+stop runs no Git command in a project, so it does not report uncommitted or unpushed
+work, or work kept only in a database. It never deletes project or log files. Before
+retiring, the dispatcher checks that any attached designer's assignment is complete or
+handed off. `agent/teams/team.py clean` lists retained allocations and deletes nothing.
+Before deleting one (`rm -rf <root>/allocations/<id>`), the operator runs `git status`
+and `git log --branches --not --remotes` in its `project` clone and confirms every
+writer has stopped; an earlier listing or a closed pane is not enough. If unsure, keep it.
 
 #### Retire a brief closed without a merged PR
 
-`stop` refuses a brief that was cancelled or closed without a merged PR, so its slot
-stays taken until the operator runs `agent/teams/team.py stop <issue> --abandon`. It is
-`stop` without the merged-PR checks: it needs the same reports, each showing a clean clone
-with nothing unpushed, and accepts pushed work that is not merged. It keeps the team's
-databases, as for a design team, and records why in each `retired.json`; `clean` lists
-them. The dispatcher has no tool for it.
+`stop` refuses a brief closed without a merged PR, so its slot stays taken until the
+operator runs `agent/teams/team.py stop <issue> --abandon`. It skips the merged-PR check,
+keeps the team's databases and records why in each `retired.json`; `clean` lists them.
+The dispatcher has no tool for it.
 
 ## Turns
 
