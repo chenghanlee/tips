@@ -122,8 +122,21 @@ violations.
 
 ## Additional rules
 
-Apply the implementation skill's [code rules](../implement-software/SKILL.md#code-rules).
 Classify a violation as P2 and record a decision.
+
+- **Checks where they belong, reuse of existing code, readable at the call site.** Apply
+  the implementation skill's [code rules](../implement-software/SKILL.md#code-rules).
+- **Simplest mechanism.** Choose the simplest mechanism that meets the contract's
+  lifetime, durability and consistency needs. Use existing facilities first. State the
+  present benefit that justifies each new mechanism. Problem example: a scheduler or
+  cache whose lifetime or complexity has no present benefit. One caller does not
+  by itself make a structural abstraction unnecessary.
+- **Code that supports tests.** Put side effects behind a function a test can replace.
+  Pass time and randomness as inputs. Problem example: tests that need sleeps or a real
+  provider.
+- **Change stays local.** Keep repairs within the affected flow, including necessary
+  modules, callers and tests. Respect concurrent ownership and explicit restrictions;
+  do not broaden a delivery into unrelated cleanup.
 
 Follow the language and framework conventions in the stack skills listed in AGENTS.md.
 

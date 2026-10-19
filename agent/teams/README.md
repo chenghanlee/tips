@@ -351,15 +351,18 @@ Set Active and notify the agent when the blocker is resolved. Do
 not run or retry a denied command on another agent's behalf.
 
 If a required check fails at the head, rerun only the failed tests, alone, at the head.
-If they fail again, the failure is the PR's to fix unless the user grants a bounded
-exception. If they pass, rerun the same tests alone in a worktree of fetched
-`origin/main`:
 
-- They pass on `main`: the failure is the PR's to fix, with the same exception.
-- The same failure on `main`, and a linked open issue names those tests: the failure is
-  pre-existing. Record both logs and the issue in the PR body; it is not a blocker.
-- The failure reproduces alone on `main` with no PR-side cause and no such issue:
-  report `blocked` with both SHAs. The dispatcher opens a revert brief.
+- They fail again: rerun them alone in a worktree of fetched `origin/main`.
+  - The same failure there, and a linked open issue names those tests: the failure is
+    pre-existing. Record both logs and the issue in the PR body; it is not a blocker.
+  - The same failure there and no such issue: report `blocked` with both SHAs. The
+    dispatcher opens a revert brief.
+  - They pass on `main`: the failure is the PR's to fix unless the user grants a
+    bounded exception.
+- They pass alone at the head: the failure is intermittent. Run the suite once more.
+  If it passes, record both logs and the open issue that names the test (open one if
+  none) in the PR body; it is not a blocker. If the diff touches the behaviour the test
+  covers, the failure is the PR's to fix.
 
 ## Constraints
 
