@@ -342,7 +342,9 @@ class PairLifecycleTest(Harness):
         targ = tester["launch_argv"]
         assert targ[targ.index("--advisor") + 1] == "fixture-advisor"
         assert "--advisor" not in argv
-        plugins = json.loads(targ[targ.index("--settings") + 1])["enabledPlugins"]
+        settings = json.loads(targ[targ.index("--settings") + 1])
+        assert settings["promptSuggestionEnabled"] is False
+        plugins = settings["enabledPlugins"]
         assert plugins["elixir-lsp@elixir-agent-tools"] is False
         assert plugins["mix-credo@elixir-agent-tools"] is True
         tester_session = self.launched_session("team-1-tester")
