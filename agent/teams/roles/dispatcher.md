@@ -51,8 +51,8 @@ initial design choices need designers; a shared spec is useful for common contra
    same way.
    Post your own session with `board_post`, type EVENT, body `launched claude`;
    the header carries your session. `usage_summary` counts every session a `launched`
-   EVENT names. A Codex launch may name its session `unknown`; the client's own comments
-   show it, so pass the briefs' PRs with the issues. Write the agent set in the body: designers and the lead, testers and the
+   EVENT names. A Codex client's row sums every Codex session started in its allocation,
+   so an `unknown` launch session still counts. Write the agent set in the body: designers and the lead, testers and the
    merge-confirming tester, and any additional required reviewers, each an `[agents.<entry>]` entry.
 2. Launch each designer with `start_design` (spec, entry). Each gets its own allocation
    and clone, with its own database suffix and port, and its launch EVENT on the spec.
@@ -85,16 +85,10 @@ the pair (`start_pair`) and set the brief's Agent to the implementer entry and i
 Status to Active (`project_set_field`).
 Send a design decision link with `prompt_agent` when one applies. When a tester asks,
 launch each additional required reviewer (`launch_reviewer`). After the
-merge-confirming tester reports `done`, confirm the merge (`pr_state`). Before retiring,
-read any attached designer's assignment: it must be complete or explicitly accepted
-by a reachable successor. Then retire the team (`retire_team`). Until every client that launched has reported, it asks each
-running client once, prints whom it waits for and changes nothing. Each report messages
-you `<report URL> retired`: call `retire_team` again. If a client listed as asked earlier
-stalls, prompt it with `prompt_agent`. `<comment URL> blocked` from a client's
-retirement means its report failed: handle it as a blocker. A client that never
-launched needs no report. It refuses a brief no merged PR closes: if the brief was closed
-without a merged PR, ask the user to run `team.py stop <brief> --abandon`
-([abandon](../README.md#retire-a-brief-closed-without-a-merged-pr)).
+merge-confirming tester reports `done`, confirm the merge (`pr_state`). Once any attached
+designer's assignment is complete or handed off to a reachable successor, call
+`retire_team` once. If it refuses a brief closed without a merged PR, ask the user to run
+`team.py stop <brief> --abandon` ([abandon](../README.md#retire-a-brief-closed-without-a-merged-pr)).
 
 ## Decisions during implementation
 

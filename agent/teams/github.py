@@ -4,7 +4,7 @@ import json
 import re
 import subprocess
 import time
-from collections.abc import Iterator, Sequence
+from collections.abc import Sequence
 from typing import NamedTuple
 
 import config as conf
@@ -13,11 +13,8 @@ from config import (
     COMMENT_TYPES,
     HEADER,
     READ_PAGES,
-    RETIREMENT,
     ROLES,
     Allocation,
-    Record,
-    Reports,
     repository,
 )
 
@@ -199,19 +196,6 @@ def parse_comment(comment: dict[str, object]) -> tuple[re.Match[str], list[str]]
     return (header, lines[1:]) if header else None
 
 
-def prefixed_json(
-    comment: dict[str, object], kind: str, prefix: str
-) -> Iterator[dict[str, object]]:
-    """The JSON object after `prefix` on each line of a `kind` comment. A malformed one
-    raises ValueError; the caller decides whether that blocks or is no evidence."""
-    parsed = parse_comment(comment)
-    if not parsed or parsed[0]["type"] != kind:
-        return
-    for line in parsed[1]:
-        if line.startswith(prefix):
-            yield object_fields(json.loads(line[len(prefix) :]), prefix.strip())
-
-
 def pull_request(number: str) -> PullRequest:
     """The PR's URL, head commit and closing-reference issue numbers."""
     fields = "headRefOid,url,closingIssuesReferences"
@@ -226,23 +210,6 @@ def pull_request(number: str) -> PullRequest:
 def poster(allocation: Allocation) -> tuple[str, str, str]:
     """The (role, name, session) attribution of comments the client posts."""
     return event_role(allocation), allocation["name"], allocation["session"]
-
-
-def retirement_reports(record: Record) -> Reports:
-    """Each allocation's latest retirement report on the issue that names its recorded
-    launch; a report from an earlier launch is no evidence. Reports are advisory evidence."""
-    launches = {a["id"]: a["launch"] for a in record["agents"].values()}
-    reports: Reports = {}
-    for comment in issue_comments(record["brief"]):
-        try:
-            found = list(prefixed_json(comment, "EVENT", RETIREMENT))
-        except ValueError:
-            continue  # a comment with a malformed report is no evidence
-        for fields in found:
-            ident = str(fields.get("id"))
-            if fields.get("launch") and launches.get(ident) == fields.get("launch"):
-                reports[ident] = (fields, str(comment["html_url"]))
-    return reports
 
 
 def merged_brief(brief: str) -> bool:

@@ -394,7 +394,7 @@ result = {}
 ENV = [
     "PGPORT", "TIPS_DB_SUFFIX", "TIPS_TEST_PORT", "MIX_ENV", "TIPS_CHECK_TIMEOUT_SECONDS",
     "TIPS_TEAM_CONFIG", "TIPS_PROVIDER_ENV_FILE", "TIPS_DEXTER", "HEX_HOME",
-    "TIPS_TEAM_HARNESS", "TIPS_TEAM_ALLOCATION_ID", "TIPS_TEAM_STATE", "TIPS_TEAM_LAUNCH",
+    "TIPS_TEAM_HARNESS", "TIPS_TEAM_ALLOCATION_ID", "TIPS_TEAM_STATE",
 ]
 SNAPSHOT = (
     "\npython3 -c 'import os,json; "
@@ -661,7 +661,6 @@ class Harness(FakeState, unittest.TestCase):
             "TIPS_TEAM_STATE",
             "TIPS_TEAM_ALLOCATION_ID",
             "TIPS_TEAM_HARNESS",
-            "TIPS_TEAM_LAUNCH",
             "PGPORT",
             "MIX_ENV",
             "HEX_HOME",
@@ -801,10 +800,6 @@ class Harness(FakeState, unittest.TestCase):
     def bootstrap(self, name: str, *args: str, ok: bool = True) -> subprocess.CompletedProcess[str]:
         return self.worker(name, "bootstrap.py", *args, ok=ok)
 
-    def retire(self, *names: str) -> None:
-        for name in names:
-            self.worker(name, "retirement.py")
-
     def push(self, name: str, message: str = "work", pr: str = "7", brief: str = "29") -> str:
         """Commit in the client's clone, push it and report it as the PR's pushed head."""
         project = self.project(name)
@@ -841,10 +836,6 @@ class Harness(FakeState, unittest.TestCase):
     def prompts(self, name: str) -> list[str]:
         """The messages Herdr sent to the named client, oldest first."""
         return [e[3] for e in self.events("agent", "prompt") if e[2] == name]
-
-    def latest_prompts(self) -> dict[str, str]:
-        """The latest prompt each recipient received."""
-        return {e[2]: e[3] for e in self.events("agent", "prompt")}
 
     def launched_session(self, label: str) -> str:
         """The session id the launcher assigned to a Claude client."""

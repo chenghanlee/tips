@@ -83,12 +83,6 @@ handoffs, or record an accepted handoff to a reachable lead on an affected team.
 not retain this slot until all dependent features merge. If responsibility is still
 unresolved, report the blocker; a clean clone is not proof the assignment is finished.
 
-When ready to report retirement, if your clean clone still points to an unmerged
-inspection revision, fetch origin and run `bootstrap.py --commit <merged-sha>` for a
-suitable merged revision such as the fetched `origin/main`. Then run the requested
-retirement command. Never reset dirty work or waive preservation checks; report the
-precise blocker instead. No switch is needed after each answer.
-
 ## Messages you send
 
 - Lead: post PROPOSAL, ANSWER or BLOCKED on the spec or brief. Notify critics after each

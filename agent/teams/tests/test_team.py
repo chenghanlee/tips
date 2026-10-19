@@ -307,7 +307,6 @@ class PairLifecycleTest(Harness):
             "TIPS_TEST_PORT": str(PORT_BASE + 10),
             "TIPS_DEXTER": str(impl_root / "project/.dexter/dexter.sh"),
             "TIPS_TEAM_ALLOCATION_ID": "g1-impl",
-            "TIPS_TEAM_LAUNCH": self.allocation("team-1-impl")["launch"],
             # Codex's sandbox cannot write the shared Hex cache; Claude keeps the default.
             "HEX_HOME": str(impl_root / "project/tmp/hex"),
         }
@@ -317,7 +316,6 @@ class PairLifecycleTest(Harness):
             "TIPS_TEST_PORT": str(PORT_BASE + 11),
             "TIPS_DEXTER": str(tester_root / "project/.dexter/dexter.sh"),
             "TIPS_TEAM_ALLOCATION_ID": "g1-tester",
-            "TIPS_TEAM_LAUNCH": self.allocation("team-1-tester")["launch"],
             "HEX_HOME": None,
         }
         assert re.fullmatch(r"[0-9a-f]{32}", self.allocation("team-1-tester")["launch"])
@@ -344,7 +342,7 @@ class PairLifecycleTest(Harness):
         assert tester_brief.startswith("You are tester, the merge-confirming tester for brief #29;")
         assert f"python3 {harness / 'team.py'} turn <pr> impl" in tester_brief
         assert "Put tester, <session> on line 2" in tester_brief
-        assert f"python3 {harness / 'retirement.py'}" in tester_brief
+        assert "retirement.py" not in tester_brief
         assert "persona" not in tester_brief
         targ = tester["launch_argv"]
         assert "--advisor" not in targ + argv
@@ -353,7 +351,7 @@ class PairLifecycleTest(Harness):
         # The brief body is the implementer's to maintain; auto mode must not deny it.
         allowed = settings["permissions"]["allow"]
         assert "Bash(gh issue edit:*)" in allowed
-        assert f"Bash(python3 {harness / 'retirement.py'}:*)" in allowed
+        assert f"Bash(python3 {harness / 'pr_review.py'}:*)" in allowed
         assert not [rule for rule in allowed if "merge" in rule or "team.py" in rule]
         plugins = settings["enabledPlugins"]
         assert plugins["elixir-lsp@elixir-agent-tools"] is False
@@ -656,7 +654,7 @@ class PairLifecycleTest(Harness):
         self.team("start", "29")
         assert len(self.events("agent", "start")) == 2
 
-    def test_a_team_whose_clients_never_launched_retires_without_reports(self) -> None:
+    def test_a_team_whose_clients_never_launched_retires(self) -> None:
         self.update(setup_lost=True)
         self.team("start", "29", ok=False)
         assert [a["launch"] for a in self.record(1)["agents"].values()] == ["", ""]
@@ -872,7 +870,6 @@ class PairLifecycleTest(Harness):
         self.addCleanup(self.stop_real_daemon, self.project("team-1-tester"))
         assert daemon_pid(project)
         self.merge(self.push("team-1-impl"))
-        self.retire("team-1-impl", "team-1-tester")
         self.clients_exit(1)
         self.team("stop", "29")
         wait_until_stopped(project)
@@ -1176,19 +1173,11 @@ class DesignTest(Harness):
         assert all(question_head in e[3] for e in notices)
         assert len(self.events("agent", "start")) == starts
 
-        # A later inspection commit that never merges must not escape preservation.
-        unmerged = self.push("team-1-impl", "unmerged investigation")
-        self.bootstrap("team-1-critic", "--commit", unmerged)
+        # The attached designer retires with the pair once the brief is merged.
         self.merge(question_head)
-        self.bootstrap("team-1-impl", "--commit", question_head)
-        self.retire("team-1-impl", "team-1-tester", "team-1-critic")
-        held = self.team("stop", "29", ok=False).stderr
-        assert "HEAD not merged" in held
-        assert self.recorded_briefs() == {"29"}
-        self.bootstrap("team-1-critic", "--commit", question_head)
-        self.retire("team-1-critic")
         self.clients_exit(1)
         assert "slot 1 released" in self.team("stop", "29").stdout
+        assert self.recorded_briefs() == set()
 
     def test_attaching_a_designer_checks_the_existing_pair_ownership(self) -> None:
         self.team("start", "29")
@@ -1243,7 +1232,6 @@ class DesignTest(Harness):
         assert self.git("rev-parse", "HEAD", cwd=project) == self.git("rev-parse", "HEAD")
         assert self.git("branch", "--show-current", cwd=project) == ""
         # A brief start cannot take the spec's slot, and a design team keeps its databases.
-        self.retire("team-1-critic", "team-1-lead")
         self.clients_exit(1)
         self.databases("tips_test_t1g1c")
         self.team("stop", "50")
@@ -1267,31 +1255,7 @@ class RetirementTest(Harness):
         self.merge(head)
         return head
 
-    def test_a_report_wakes_the_dispatcher_and_a_failed_one_reports_a_blocker(self) -> None:
-        # A posted report tells the dispatcher its URL: retire_team runs again on that turn.
-        reported = self.worker("team-1-impl", "retirement.py")
-        url = self.comments("29")[-1]["html_url"]
-        assert f"Retirement reported: {url}" in reported.stdout
-        assert self.prompts("dispatcher") == [f"{url} retired"]
-        # A report that cannot be made posts a BLOCKED comment and sends its URL instead.
-        missing = str(self.root / "missing.git")
-        self.git("remote", "set-url", "origin", missing, cwd=self.project("team-1-tester"))
-        failed = self.worker("team-1-tester", "retirement.py", ok=False)
-        blocked = self.comments("29")[-1]
-        assert blocked["body"].startswith("BLOCKED tester team-1-tester ")
-        assert "Retirement report failed: git fetch -q origin failed" in blocked["body"]
-        assert "git fetch -q origin failed" in failed.stderr
-        assert self.prompts("dispatcher")[-1] == f"{blocked['html_url']} blocked"
-        # Without a dispatcher to tell, the command is printed for the operator.
-        self.update(dispatcher_down=True)
-        tester = self.project("team-1-tester")
-        self.git("remote", "set-url", "origin", str(self.origin), cwd=tester)
-        alone = self.worker("team-1-tester", "retirement.py")
-        url = self.comments("29")[-1]["html_url"]
-        command = f"herdr agent prompt dispatcher '{url} retired'"
-        assert f"No dispatcher was notified; run: {command}" in alone.stdout
-
-    def test_stop_waits_for_every_report_then_releases_merged_work(self) -> None:
+    def test_stop_releases_merged_work_of_exited_clients(self) -> None:
         self.team("start", "30")
         self.merged_pair()
         self.team("review", "7", "critic")
@@ -1305,45 +1269,6 @@ class RetirementTest(Harness):
             "tips_dev_t1g1r",
             "tips_test_t1g11i",
         )
-        # Without reports nothing is stopped, dropped or released; running clients are
-        # asked to report.
-        waiting = self.team("stop", "29").stdout
-        assert "waiting for retirement reports from team-1-critic, team-1-impl, team-1-tester" in (
-            waiting
-        )
-        assert "Every resource stays reserved" in waiting
-        ask = self.latest_prompts()["team-1-impl"]
-        assert ask == f"Retire: run python3 '{self.repo / 'agent/teams/retirement.py'}', then " + (
-            "end your turn."
-        )
-        assert not self.psql_calls()
-        assert self.workspaces() == ["team-1-29", "team-2-30"]
-        # A stopped client without a report gets an operator command, not a guess.
-        self.clients_exit(1)
-        waiting = self.team("stop", "29").stdout
-        launch = self.allocation("team-1-impl")["launch"]
-        assert f"TIPS_TEAM_ALLOCATION_ID=g1-impl TIPS_TEAM_LAUNCH={launch}" in waiting
-        # A process whose environment names another launch cannot report for this one.
-        stale = self.worker("team-1-impl", "retirement.py", ok=False, TIPS_TEAM_LAUNCH="0" * 32)
-        assert f"is not g1-impl's current launch {launch}" in stale.stderr
-        # Each worker reports its own clone; the report changes nothing.
-        before = self.git("rev-parse", "HEAD", cwd=self.project("team-1-impl"))
-        self.retire("team-1-impl", "team-1-tester", "team-1-critic")
-        assert self.git("rev-parse", "HEAD", cwd=self.project("team-1-impl")) == before
-        report = self.comments("29")[-3]["body"].splitlines()
-        assert report[0] == "EVENT implementer team-1-impl session-team-1-impl"
-        fields = json.loads(report[1].removeprefix("TEAM_RETIREMENT "))
-        assert fields == {
-            "v": 1,
-            "id": "g1-impl",
-            "launch": launch,
-            "cloned": True,
-            "clean": True,
-            "dirty": [],
-            "unpushed": 0,
-            "merged": True,
-            "head": before,
-        }
         # A visitor pane in the team's workspace keeps everything.
         visitor = {
             "pane_id": "w1:p9",
@@ -1359,6 +1284,7 @@ class RetirementTest(Harness):
         assert not self.psql_calls()
         self.update(strays=[])
         assert "nothing removed" in self.team("stop", "99").stdout
+        self.clients_exit(1)
         daemons = sorted(self.state()["daemons"])
         stopped = self.team("stop", "29").stdout
         # Exactly the recorded databases and their partitions are dropped, without FORCE
@@ -1378,15 +1304,77 @@ class RetirementTest(Harness):
             retired = json.loads((self.trusted / "state" / ident / "retired.json").read_text())
             assert str(project) in retired["retained"]
             assert retired["databases_kept_because"] == ""
+            assert "report" not in retired
         assert f"Retained {self.trusted / 'allocations/g1-impl/project'}" in stopped
         assert self.workspaces() == ["team-2-30"]
         assert self.recorded_briefs() == {"30"}
         assert self.pane("team-2-impl")["agent"] == "codex"
         assert "nothing removed" in self.team("stop", "29").stdout
 
+    def stop_with_double(self, refuse: str, ok: bool) -> subprocess.CompletedProcess[str]:
+        """Run `team.py stop 29` with herdr.stop replaced by a double. Each call logs the pane,
+        the root and what stop had already released; the double then clears the pane's
+        client, as a completed stop does, or raises for the pane named in `refuse`."""
+        code = """import json, os, sys
+sys.path.insert(0, sys.argv[1])
+import team
+log, refuse = sys.argv[2], sys.argv[3]
+def double(pane, root):
+    fixture = os.environ["HERDR_FIXTURE"]
+    state = json.load(open(fixture))
+    calls = open(os.environ["PSQL_LOG"]).read() if os.path.exists(os.environ["PSQL_LOG"]) else ""
+    seen = {"pane": pane, "root": str(root), "record": team.record_path(1).exists(),
+            "workspaces": [w["label"] for w in state["workspaces"]], "drops": "DROP" in calls}
+    open(log, "a").write(json.dumps(seen) + "\\n")
+    if pane == refuse:
+        raise RuntimeError(f"{pane}: double refused the stop; preserved")
+    for x in state["panes"]:
+        if x["pane_id"] == pane:
+            for key in ("agent", "name", "agent_status", "agent_session"):
+                x.pop(key, None)
+    json.dump(state, open(fixture, "w"))
+team.stop = double
+sys.argv = ["team.py", "stop", "29"]
+try:
+    team.cli()
+except RuntimeError as error:
+    print(f"team: {error}", file=sys.stderr)
+    sys.exit(1)
+"""
+        log = self.root / "stops.jsonl"
+        argv = ["python3", "-c", code, str(self.repo / "agent/teams"), str(log), refuse]
+        result = execute(argv, cwd=self.repo, env=self.env, timeout=60)
+        assert (result.returncode == 0) == ok, result.stdout + result.stderr
+        return result
+
+    def stops(self) -> list[dict[str, Any]]:
+        log = self.root / "stops.jsonl"
+        return [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+
+    def test_stop_stops_each_live_client_before_releasing_anything(self) -> None:
+        self.merged_pair()
+        self.databases("tips_test_t1g1i")
+        impl, tester = self.allocation("team-1-impl"), self.allocation("team-1-tester")
+        # A refused stop of a live client keeps the record, databases and workspace.
+        refused = self.stop_with_double(tester["pane"], ok=False)
+        assert f"{tester['pane']}: double refused the stop; preserved" in refused.stderr
+        assert self.recorded_briefs() == {"29"}
+        assert self.remaining_databases() == ["tips_test_t1g1i"]
+        assert self.workspaces() == ["team-1-29"]
+        # The rerun stops the client still running before closing, dropping or releasing.
+        self.stop_with_double("", ok=True)
+        unreleased = {"record": True, "workspaces": ["team-1-29"], "drops": False}
+        assert self.stops() == [
+            {"pane": impl["pane"], "root": impl["root"], **unreleased},
+            {"pane": tester["pane"], "root": tester["root"], **unreleased},
+            {"pane": tester["pane"], "root": tester["root"], **unreleased},
+        ]
+        assert self.recorded_briefs() == set()
+        assert self.remaining_databases() == []
+        assert self.workspaces() == []
+
     def test_stop_skips_a_stale_listing_of_its_exited_client_but_not_a_new_occupant(self) -> None:
         self.merged_pair()
-        self.retire("team-1-impl", "team-1-tester")
         self.clients_exit(1)
         state = self.state()
         impl = next(x for x in state["panes"] if x.get("label") == "team-1-impl")
@@ -1427,52 +1415,22 @@ class RetirementTest(Harness):
         assert "slot 1 released" in self.team("stop", "29").stdout
         assert self.recorded_briefs() == set()
 
-    def test_a_report_from_an_earlier_launch_is_no_evidence_for_the_current_one(self) -> None:
-        self.merged_pair()
-        self.retire("team-1-impl", "team-1-tester")
-        self.clients_exit(1)
-        # The operator replaces both clients; the new tester leaves work and no report.
-        self.reset("29", "impl", "tester")
-        self.team("start", "29")
-        (self.project("team-1-tester") / "unfinished.txt").write_text("new session work\n")
-        self.databases("tips_test_t1g1r")
-        self.clients_exit(1)
-        waiting = self.team("stop", "29").stdout
-        assert "waiting for retirement reports from team-1-impl, team-1-tester" in waiting
-        assert self.remaining_databases() == ["tips_test_t1g1r"]
-        assert self.recorded_briefs() == {"29"}
-        # A report from the current launch is accepted, and it shows the unpreserved work.
-        self.retire("team-1-impl", "team-1-tester")
-        refused = self.team("stop", "29", ok=False)
-        assert "team-1-tester reported uncommitted or unpushed work (?? unfinished.txt)" in (
-            refused.stderr
-        )
-
-    def test_an_open_brief_is_refused_before_any_client_is_asked(self) -> None:
+    def test_an_open_brief_is_refused_and_abandon_keeps_its_databases(self) -> None:
         self.databases("tips_test_t1g1i")
         project = self.project("team-1-impl")
         (project / "unfinished.txt").write_text("in progress\n")
         refused = self.team("stop", "29", ok=False).stderr
-        assert "#29 is not closed by a merged PR. Nothing was asked or stopped" in refused
+        assert "#29 is not closed by a merged PR. Nothing was stopped" in refused
         abandon = f"python3 '{self.repo / 'agent/teams/team.py'}' stop 29 --abandon"
         assert f"closed without a merged PR, the operator runs {abandon};" in refused
         assert "agent/teams/README.md#retire-a-brief-closed-without-a-merged-pr" in refused
-        assert not any(p.startswith("Retire") for p in self.latest_prompts().values())
         assert self.workspaces() == ["team-1-29"]
-        # Clean reports with HEAD on origin/main are not enough while the brief is open.
-        (project / "unfinished.txt").unlink()
-        head = self.push("team-1-impl")
-        self.git("--git-dir", self.origin, "update-ref", "refs/heads/main", head)
-        self.retire("team-1-impl", "team-1-tester")
-        self.clients_exit(1)
-        refused = self.team("stop", "29", ok=False).stderr
-        assert "#29 is not closed by a merged PR" in refused
         assert self.remaining_databases() == ["tips_test_t1g1i"]
         assert self.recorded_briefs() == {"29"}
-        # The operator abandons the brief: pushed work that is not merged is accepted, the
-        # slot is freed, and the databases and files are kept and listed.
+        # The operator abandons the brief: the slot is freed, and the databases and files,
+        # unfinished work included, are kept and listed.
         self.push("team-1-impl", "pushed, never merged")
-        self.retire("team-1-impl")
+        self.clients_exit(1)
         stopped = self.team("stop", "29", "--abandon").stdout
         assert "slot 1 released; databases dropped: none" in stopped
         assert self.remaining_databases() == ["tips_test_t1g1i"]
@@ -1484,51 +1442,10 @@ class RetirementTest(Harness):
         self.team("start", "30")
         assert self.record(1)["brief"] == "30"
         assert (project / "tracked.txt").exists()
-
-    def test_unpreserved_work_keeps_the_record_and_every_reservation(self) -> None:
-        self.merged_pair()
-        self.databases("tips_test_t1g1i", "tips_test_t1g1r")
-        project = self.project("team-1-impl")
-        (project / "uncommitted").write_text("keep")
-        (project / "tracked.txt").write_text("edited\n")
-        self.retire("team-1-impl", "team-1-tester")
-        self.clients_exit(1)
-        refused = self.team("stop", "29", ok=False).stderr
-        dirty = " M tracked.txt, ?? uncommitted"
-        assert f"team-1-impl reported uncommitted or unpushed work ({dirty})" in refused
-        assert "the record, databases, files and reservation are kept" in refused
-        report = self.comments("29")[-2]["body"].splitlines()
-        assert json.loads(report[1].removeprefix("TEAM_RETIREMENT "))["dirty"] == dirty.split(", ")
-        assert report[2].endswith(f"; dirty: {dirty}")
-        assert self.remaining_databases() == ["tips_test_t1g1i", "tips_test_t1g1r"]
-        assert (project / "uncommitted").read_text() == "keep"
-        assert self.recorded_briefs() == {"29"}
-        assert not (self.trusted / "state/g1-impl/retired.json").exists()
-        # Committed but unpushed work is kept the same way; another brief takes another slot.
-        (project / "uncommitted").unlink()
-        (project / "tracked.txt").write_text("base\n")
-        self.commit("local only", cwd=project)
-        self.retire("team-1-impl")
-        assert "reported uncommitted or unpushed work" in self.team("stop", "29", ok=False).stderr
-        assert self.git("log", "-1", "--format=%s", cwd=project) == "local only"
-        self.team("start", "30")
-        assert self.record(2)["brief"] == "30"
-        # A pushed HEAD that is not merged into origin/main is kept the same way.
-        head = self.push("team-1-impl", "pushed")
-        self.retire("team-1-impl")
-        refused = self.team("stop", "29", ok=False).stderr
-        assert "team-1-impl reported a HEAD not merged into origin/main" in refused
-        assert self.remaining_databases() == ["tips_test_t1g1i", "tips_test_t1g1r"]
-        # Once the work is merged and reported again, the brief retires.
-        self.merge(head)
-        self.retire("team-1-impl")
-        self.team("stop", "29")
-        assert self.recorded_briefs() == {"30"}
-        assert self.remaining_databases() == []
+        assert (project / "unfinished.txt").exists()
 
     def test_a_writer_that_outlives_stop_never_causes_deletion(self) -> None:
         self.merged_pair()
-        self.retire("team-1-impl", "team-1-tester")
         self.clients_exit(1)
         project = self.project("team-1-impl")
         late = project / "late.txt"
@@ -1545,7 +1462,6 @@ class RetirementTest(Harness):
 
     def test_a_stalled_github_read_keeps_the_record_and_releases_the_lock(self) -> None:
         self.merged_pair()
-        self.retire("team-1-impl", "team-1-tester")
         self.clients_exit(1)
         self.databases("tips_test_t1g1i")
         self.write_config(CONFIG.replace("shell_seconds = 15", "shell_seconds = 1"))
@@ -1562,7 +1478,6 @@ class RetirementTest(Harness):
 
     def test_refused_database_drop_keeps_the_rest_and_the_reservation(self) -> None:
         self.merged_pair()
-        self.retire("team-1-impl", "team-1-tester")
         self.clients_exit(1)
         self.databases("tips_test_t1g1i", "tips_test_t1g1r", "tips_dev_t1g1r")
         self.env["PSQL_REFUSE"] = "tips_test_t1g1r"
@@ -1583,7 +1498,6 @@ class RetirementTest(Harness):
 
     def test_busy_port_or_failed_daemon_stop_keeps_the_reservation(self) -> None:
         self.merged_pair()
-        self.retire("team-1-impl", "team-1-tester")
         self.clients_exit(1)
         self.update(dexter_stop_fails=True)
         refused = self.team("stop", "29", ok=False)
@@ -1602,7 +1516,6 @@ class RetirementTest(Harness):
 
     def test_generations_never_reuse_allocations_or_database_names(self) -> None:
         self.merged_pair()
-        self.retire("team-1-impl", "team-1-tester")
         self.clients_exit(1)
         self.team("stop", "29")
         old = self.trusted / "allocations/g1-impl"
@@ -1626,7 +1539,6 @@ class RetirementTest(Harness):
 
     def test_symlinked_allocation_paths_are_refused_at_retirement(self) -> None:
         self.merged_pair()
-        self.retire("team-1-impl", "team-1-tester")
         self.clients_exit(1)
         logs = self.trusted / "allocations/g1-impl/logs"
         outside = self.root / "outside-logs"
@@ -1637,65 +1549,6 @@ class RetirementTest(Harness):
         assert any(outside.iterdir())
         assert self.recorded_briefs() == {"29"}
 
-    def test_stop_asks_each_client_once_per_launch(self) -> None:
-        self.merged_pair()
-        first = self.team("stop", "29").stdout
-        assert "Asked now: team-1-impl, team-1-tester; asked earlier: none." in first
-        # A report wakes the dispatcher; the next stop asks no client it already asked.
-        self.retire("team-1-impl")
-        second = self.team("stop", "29").stdout
-        assert "waiting for retirement reports from team-1-tester." in second
-        assert "Asked now: none; asked earlier: team-1-tester." in second
-        for name in ("team-1-impl", "team-1-tester"):
-            assert [p for p in self.prompts(name) if p.startswith("Retire")] == [
-                self.latest_prompts()[name]
-            ]
-        # A replacement is a new launch, so it is asked again.
-        state = self.state()
-        tester = next(x for x in state["panes"] if x.get("label") == "team-1-tester")
-        for key in ("agent", "name", "agent_status", "agent_session"):
-            tester.pop(key, None)
-        self.save(state)
-        self.reset("29", "tester")
-        self.team("start", "29")
-        assert "Asked now: team-1-tester;" in self.team("stop", "29").stdout
-
-    def test_unpreserved_work_asks_its_running_client_once_per_report(self) -> None:
-        self.merged_pair()
-        (self.project("team-1-tester") / "notes.txt").write_text("unsaved\n")
-        self.retire("team-1-impl", "team-1-tester")
-        url = self.comments("29")[-1]["html_url"]
-        refused = self.team("stop", "29", ok=False).stderr
-        assert f"team-1-tester reported uncommitted or unpushed work (?? notes.txt): {url}" in (
-            refused
-        )
-        assert "Asked now: team-1-tester; asked earlier: none." in refused
-        ask = self.latest_prompts()["team-1-tester"]
-        assert ask.startswith(f"Retire: your retirement report {url} shows work that is not")
-        again = self.team("stop", "29", ok=False).stderr
-        assert "Asked now: none; asked earlier: team-1-tester." in again
-        assert [p for p in self.prompts("team-1-tester") if p.startswith("Retire")] == [ask]
-        # A client that is not running gets the operator's command instead.
-        self.clients_exit(1)
-        stopped = self.team("stop", "29", ok=False).stderr
-        assert "Not running, so the operator reports for them:\nteam-1-tester: cd " in stopped
-        assert self.recorded_briefs() == {"29"}
-
-    def test_the_printed_operator_command_reports_for_a_stopped_client(self) -> None:
-        self.merged_pair()
-        self.clients_exit(1)
-        waiting = self.team("stop", "29").stdout
-        lines = waiting.split("Not running, so the operator reports for them:\n")[1].splitlines()
-        commands = dict(line.split(": ", 1) for line in lines)
-        assert list(commands) == ["team-1-impl", "team-1-tester"]
-        # The operator runs each command in a shell from elsewhere, with none of the pane's
-        # environment; the fixture path has a space.
-        assert " " in str(self.trusted)
-        for command in commands.values():
-            ran = execute(["bash", "-c", command], cwd=self.root, env=self.env, timeout=60)
-            assert ran.returncode == 0, ran.stdout + ran.stderr
-        assert "slot 1 released" in self.team("stop", "29").stdout
-
     def test_stop_gives_its_own_next_step_for_a_client_it_cannot_confirm(self) -> None:
         self.merged_pair()
         state = self.state()
@@ -1705,10 +1558,10 @@ class RetirementTest(Harness):
         refused = self.team("stop", "29", ok=False).stderr
         assert (
             "team-1-tester reports no session; cannot confirm the recorded client; preserved. "
-            "Nothing was asked or stopped. The operator inspects the pane" in refused
+            "Nothing was stopped. The operator inspects the pane" in refused
         )
         assert "resent" not in refused
-        assert not any(p.startswith("Retire") for p in self.latest_prompts().values())
+        assert self.recorded_briefs() == {"29"}
 
 
 class LaunchRecoveryTest(Harness):
@@ -1798,26 +1651,14 @@ class LaunchRecoveryTest(Harness):
         assert "team-3-tester: task submission is unknown; nothing was resent" in rerun
         assert self.prompts("team-3-tester") == ["Begin."]  # only the call the crash cut short
 
-    def test_stop_accepts_a_report_posted_before_the_session_was_recorded(self) -> None:
+    def test_stop_retires_a_client_whose_session_was_never_recorded(self) -> None:
         # The launcher dies after the Codex client started: the record has no session.
         self.fault("agent start", "team-1-impl", "crash_after")
         self.team("start", "29", ok=False)
         assert self.record(1)["agents"]["impl"]["session"] == ""
         self.bootstrap("team-1-impl")
         self.merge(self.push("team-1-impl"))
-        # The report names the session Herdr knows by then, so usage can attribute it,
-        # read from the client's own pane even when the operator reports from another.
-        session = self.pane("team-1-impl")["agent_session"]["value"]
-        operator = self.worker("team-1-impl", "retirement.py", HERDR_PANE_ID="wX:p99")
-        assert operator.stderr == ""
-        header = self.comments("29")[-1]["body"].splitlines()[0]
-        assert header == f"EVENT implementer team-1-impl {session}"
         self.clients_exit(1)
-        # With the client gone the lookup fails visibly and the header stays unknown.
-        gone = self.worker("team-1-impl", "retirement.py")
-        assert "no session recorded for team-1-impl; Herdr lookup of its pane" in gone.stderr
-        header = self.comments("29")[-1]["body"].splitlines()[0]
-        assert header == "EVENT implementer team-1-impl unknown"
         assert "slot 1 released" in self.team("stop", "29").stdout
 
     def test_task_done_and_client_exited_before_the_record_update_is_never_replayed(self) -> None:
@@ -1932,7 +1773,7 @@ class LaunchRecoveryTest(Harness):
         assert "team-1-critic is not running and its task submission is unknown" in stderr
         assert self.starts().count("team-1-critic") == 1
 
-    def test_an_allocation_with_no_launch_id_retires_without_a_report(self) -> None:
+    def test_an_allocation_with_no_launch_id_retires(self) -> None:
         # The record is lost while the earlier allocations remain: the new ones are recorded
         # as unknown and refused before any client is entered in them.
         self.team("start", "29")
@@ -1985,10 +1826,14 @@ class LaunchRecoveryTest(Harness):
         assert not self.events("pane", "split")
         recorded = {a["pane"] for a in self.record(1)["agents"].values()}
         assert {p["pane_id"] for p in self.state()["panes"]} == recorded
-        self.clients_exit(1)
+        # Both clients exit, the implementer's in the pane the failed rename left unlabelled.
+        state = self.state()
+        for pane in state["panes"]:
+            for key in ("agent", "name", "agent_status", "agent_session"):
+                pane.pop(key, None)
+        self.save(state)
         self.merge(self.git("--git-dir", self.origin, "rev-parse", "main"))
-        waiting = self.team("stop", "29").stdout
-        assert "waiting for retirement reports from team-1-impl, team-1-tester" in waiting
+        assert "slot 1 released" in self.team("stop", "29").stdout
 
 
 if __name__ == "__main__":
