@@ -26,10 +26,8 @@ The default tester still reviews the resulting code for correctness and design.
 3. Post an ANSWER linking the QUESTION, evidence and decision, then notify the
    implementer. It incorporates the decision into its brief before affected work
    resumes. If relevant facts changed while waiting, check applicability first.
-4. For shared decisions, maintain one authoritative spec/issue and identify affected
-   briefs. Follow [Changed binding decisions](../README.md#changed-binding-decisions)
-   before making a revised contract operative. The dispatcher routes work; it does not
-   replace source-informed technical judgment. Unresolved disputes use the blocker route.
+4. For a shared decision, follow [Changed binding decisions](../README.md#changed-binding-decisions).
+   Unresolved disputes use the blocker route.
 
 ## Initial design
 

@@ -57,11 +57,7 @@ from your own clone and an ANSWER on the brief. This is optional help. A consequ
 decision needing independent technical judgment goes to the appropriate designer;
 checking conformity with your own answer is not independent validation of that decision.
 
-A changed binding decision requires review against the adopted decision even at the
-same head. Follow [Changed binding decisions](../README.md#changed-binding-decisions):
-record the non-LGTM hold before treating a requested pause as established. Do not clear
-it merely because a new code head arrived. A harmless clarification or ordinary
-internal placement within the existing contract needs no hold.
+For a changed binding decision, follow [Changed binding decisions](../README.md#changed-binding-decisions).
 
 ## Messages you send
 

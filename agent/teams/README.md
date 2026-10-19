@@ -302,15 +302,12 @@ When a binding contract changes, the lead identifies affected briefs and holds t
 dependent work. For each affected open PR, ask its merge-confirming tester to submit a
 non-LGTM review linked to the pending decision. Establish that recorded hold before
 making the changed shared contract operative; a sent pause is not an established hold.
-If the PR already merged, use that fact to decide the necessary follow-up instead of
-claiming the merge was prevented.
-
 The lead updates the authoritative shared decision; each implementer incorporates its
 link in the brief before resuming affected work. The tester reviews against the adopted
 decision before replacing its hold with LGTM, even if the code SHA is unchanged. An
 unrelated push does not resolve the question. Harmless clarification and ordinary
-internal placement within existing contracts need no hold. This uses existing review
-records; `observe` does not interpret issue comments as merge blockers.
+internal placement within existing contracts need no hold. `observe` does not
+interpret issue comments as merge blockers.
 
 ### Merge
 

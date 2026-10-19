@@ -50,13 +50,9 @@ Read this and your role file at launch and after compaction.
   BLOCKED, DONE, EVENT. PR reviews use the [review record](../README.md#pr-review-record) instead.
 - Keep each comment under 400 words. If it has more than 800 words, the script warns.
   Explain why it needs that many words. Put logs and screenshots in a gist with `gh gist create <file>`. Link to CI runs by URL. Do not paste output.
-- Before compaction, restart or session end, or when your state is not already in a
-  posted PROPOSAL, review or PR body, save a checkpoint. The lead designer updates the
-  spec body. Everyone else posts a checkpoint comment or updates their PR body. Resume
-  by reading the current issue body with `gh issue view <issue>` and subsequent
-  comments with `agent/teams/board.py read <issue> --after <your checkpoint URL>`.
-  The latter omits the body. Resolve pending questions against their linked answers;
-  an absent or ambiguous answer leaves affected work waiting.
+- Before compaction or a long step, record on GitHub any decision or finding not yet
+  posted. After a restart, reread the brief (`gh issue view <issue>`) and the PR as
+  [Turns](../README.md#turns) says.
 - Post the comment, then send the Herdr prompt as a separate step. If you repeat the
   post, the script returns the existing comment's URL.
 
