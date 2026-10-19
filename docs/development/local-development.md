@@ -273,6 +273,10 @@ verification from the retained workflow files, using their PR path filters:
 | `dexter.yml` path match | Follow [Dexter verification scope](../../agent/lsp/README.md#verification-scope): tooling changes run the full suite; harness-only changes run real-daemon integration against a verified matching binary. The workflow owns selection for both local and hosted runs. |
 | `db-image.yml` path match | `scripts/db_smoke.sh`; see [extension-enabled database](#extension-enabled-database). Image publication stays paused. |
 
+Run this verification once, at the PR head, before the push that opens or updates the
+PR. Do not repeat it on `main`: the merge-base already passed review. Per commit, run
+only the fast checks for the files you touched ([AGENTS.md](../../AGENTS.md#checks)).
+
 For migration rollback/reapply, use a disposable database with your own suffix and
 `MIX_ENV=test`: `mix ecto.create && mix ecto.migrate && mix ecto.rollback --all && mix ecto.migrate`.
 Never run this against another agent's or persistent development data. A check that

@@ -14,13 +14,27 @@ pyright --project agent/teams/pyproject.toml
 python3 -m unittest discover -s agent/teams/tests -t agent/teams -p 'test_*.py'
 ```
 
-Run these commands in your checkout before pushing. If a tool is missing, use an
-available task-local environment or report the prerequisite; do not fall back to
-paused CI. Use the locked environment below instead of the
-first line: `pyright --pythonpath agent/teams/.venv/bin/python --project
-agent/teams/pyproject.toml`, and run the tests with `agent/teams/.venv/bin/python`.
-With another Python the adapter tests are skipped and say so. To run one module, give
-its file name as the pattern, for example `-p test_pr_review.py`.
+Run these commands in your checkout once, at the PR head, before the push that opens
+or updates the PR. Per commit, run only `ruff check`, `ruff format --check` and the
+test module you changed. If a tool is missing, use an available task-local environment
+or report the prerequisite; do not fall back to paused CI. Use the locked environment
+below instead of the first line: `pyright --pythonpath agent/teams/.venv/bin/python
+--project agent/teams/pyproject.toml`, and run the tests with
+`agent/teams/.venv/bin/python`. With another Python the adapter tests are skipped and
+say so. To run one module, give its file name as the pattern, for example
+`-p test_pr_review.py`.
+
+The serial suite takes 4 to 5 minutes. The parallel runner splits it over worker
+processes and reports the combined result; it is the same suite, so it counts as the
+full run:
+
+```sh
+env -u MIX_ENV agent/teams/.venv/bin/python agent/teams/tests/parallel.py
+```
+
+`-j N` sets the worker count (default: the CPU count) and `-k SUBSTRING` selects tests
+by id. Tests whose id contains `real_` share ports, so they run in one worker. On a
+loaded machine, lower `-j`.
 
 If Ruff or Pyright is missing, provision check tools in an ignored environment using
 the existing CI pins (not the adapter's runtime lock or a machine-wide install):

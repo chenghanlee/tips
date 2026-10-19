@@ -55,7 +55,10 @@ These five are user-maintained files outside version control ([setup](agent/team
 
 ## Checks
 
-Before pushing, run the checks for each kind of file you changed:
+Per commit, run only the fast checks for the files you touched: the formatter, the
+linter and the changed test module or test file. Run the full checks below once, at the
+PR head, before the push that opens or updates the PR. Do not rerun them on `main` or on
+intermediate commits. Run the checks for each kind of file you changed:
 
 | Changed files | Run |
 |---|---|

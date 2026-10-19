@@ -98,8 +98,7 @@ class AdapterTest(Harness):
     def setUp(self) -> None:
         super().setUp()
         (self.repo / "agent/teams/adapter.py").write_text((TEAMS / "adapter.py").read_text())
-        config = CONFIG.replace("checks_minutes = 30", "checks_minutes = 30\ngithub_seconds = 2")
-        self.write_config(config)
+        self.write_config(self.github_config(10))
         self.commit("adapter")
         self.git("push", "-q", "origin", "main")
         (self.bin / "gh").rename(self.bin / "gh-base")
@@ -111,6 +110,12 @@ class AdapterTest(Harness):
         self.adapter_bin.mkdir()
         (self.adapter_bin / "git").write_text(LOGGING_GIT % (str(self.git_log), git, git))
         (self.adapter_bin / "git").chmod(0o755)
+
+    @staticmethod
+    def github_config(seconds: int) -> str:
+        """The fixture config with a GitHub deadline; 10 s survives a loaded parallel run."""
+        timeouts = f"checks_minutes = 30\ngithub_seconds = {seconds}"
+        return CONFIG.replace("checks_minutes = 30", timeouts)
 
     def session(self, steps: Callable[[Any], Awaitable[None]]) -> None:
         """Start the adapter as the dispatcher's client would and run steps against it."""
@@ -285,7 +290,9 @@ class AdapterTest(Harness):
         assert all(c[:2] != ["repo", "view"] for c in calls)
 
     def test_timeout_after_an_issue_create_reports_ambiguity_and_does_not_repeat(self) -> None:
-        self.update(gh_sleep=5)
+        # The fake must start and log its call within the deadline, even on a loaded machine.
+        self.write_config(self.github_config(5))
+        self.update(gh_sleep=10)
 
         async def steps(client: Any) -> None:
             error = await self.call(client, "issue_create", ok=False, title="Spec", body="Body")
