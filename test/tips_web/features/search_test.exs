@@ -69,10 +69,12 @@ defmodule TipsWeb.SearchFeatureTest do
         tip
       ])
 
+    # refute_has does not wait while the results are present, so wait for the
+    # tip page that replaces them before checking the results are gone.
     session
     |> click(css(tip))
-    |> refute_has(css("#results"))
     |> assert_has(css("h1", text: title))
+    |> refute_has(css("#results"))
     |> js("history.back()")
     |> assert_has(css("#result-rows li", count: 20))
     |> assert_scroll(bottom)
