@@ -644,6 +644,7 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
     enter(pane, root, agent_env(allocation))
     allocation["submission"], allocation["session"] = UNKNOWN, session
     save_record(record)
+    timeouts = conf.settings()["timeouts"]
     herdr(
         "agent",
         "start",
@@ -653,9 +654,11 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
         "--pane",
         pane,
         "--timeout",
-        str(conf.settings()["timeouts"]["launch_seconds"] * 1000),
+        str(timeouts["launch_seconds"] * 1000),
         "--",
         *args,
+        # Herdr's own launch timeout must answer before this one kills the command.
+        timeout=timeouts["launch_seconds"] + timeouts["shell_seconds"],
     )
     started = herdr("agent", "get", pane)["agent"]
     reported = session_id(started)
