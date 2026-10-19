@@ -1311,6 +1311,68 @@ class RetirementTest(Harness):
         assert self.pane("team-2-impl")["agent"] == "codex"
         assert "nothing removed" in self.team("stop", "29").stdout
 
+    def stop_with_double(self, refuse: str, ok: bool) -> subprocess.CompletedProcess[str]:
+        """Run `team.py stop 29` with herdr.stop replaced by a double. Each call logs the pane,
+        the root and what stop had already released; the double then clears the pane's
+        client, as a completed stop does, or raises for the pane named in `refuse`."""
+        code = """import json, os, sys
+sys.path.insert(0, sys.argv[1])
+import team
+log, refuse = sys.argv[2], sys.argv[3]
+def double(pane, root):
+    fixture = os.environ["HERDR_FIXTURE"]
+    state = json.load(open(fixture))
+    calls = open(os.environ["PSQL_LOG"]).read() if os.path.exists(os.environ["PSQL_LOG"]) else ""
+    seen = {"pane": pane, "root": str(root), "record": team.record_path(1).exists(),
+            "workspaces": [w["label"] for w in state["workspaces"]], "drops": "DROP" in calls}
+    open(log, "a").write(json.dumps(seen) + "\\n")
+    if pane == refuse:
+        raise RuntimeError(f"{pane}: double refused the stop; preserved")
+    for x in state["panes"]:
+        if x["pane_id"] == pane:
+            for key in ("agent", "name", "agent_status", "agent_session"):
+                x.pop(key, None)
+    json.dump(state, open(fixture, "w"))
+team.stop = double
+sys.argv = ["team.py", "stop", "29"]
+try:
+    team.cli()
+except RuntimeError as error:
+    print(f"team: {error}", file=sys.stderr)
+    sys.exit(1)
+"""
+        log = self.root / "stops.jsonl"
+        argv = ["python3", "-c", code, str(self.repo / "agent/teams"), str(log), refuse]
+        result = execute(argv, cwd=self.repo, env=self.env, timeout=60)
+        assert (result.returncode == 0) == ok, result.stdout + result.stderr
+        return result
+
+    def stops(self) -> list[dict[str, Any]]:
+        log = self.root / "stops.jsonl"
+        return [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+
+    def test_stop_stops_each_live_client_before_releasing_anything(self) -> None:
+        self.merged_pair()
+        self.databases("tips_test_t1g1i")
+        impl, tester = self.allocation("team-1-impl"), self.allocation("team-1-tester")
+        # A refused stop of a live client keeps the record, databases and workspace.
+        refused = self.stop_with_double(tester["pane"], ok=False)
+        assert f"{tester['pane']}: double refused the stop; preserved" in refused.stderr
+        assert self.recorded_briefs() == {"29"}
+        assert self.remaining_databases() == ["tips_test_t1g1i"]
+        assert self.workspaces() == ["team-1-29"]
+        # The rerun stops the client still running before closing, dropping or releasing.
+        self.stop_with_double("", ok=True)
+        unreleased = {"record": True, "workspaces": ["team-1-29"], "drops": False}
+        assert self.stops() == [
+            {"pane": impl["pane"], "root": impl["root"], **unreleased},
+            {"pane": tester["pane"], "root": tester["root"], **unreleased},
+            {"pane": tester["pane"], "root": tester["root"], **unreleased},
+        ]
+        assert self.recorded_briefs() == set()
+        assert self.remaining_databases() == []
+        assert self.workspaces() == []
+
     def test_stop_skips_a_stale_listing_of_its_exited_client_but_not_a_new_occupant(self) -> None:
         self.merged_pair()
         self.clients_exit(1)
