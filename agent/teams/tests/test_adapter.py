@@ -231,13 +231,6 @@ class AdapterTest(Harness):
 
         self.session(unmerged)
         self.merge(head)
-
-        async def first(client: Any) -> None:
-            waiting = await self.call(client, "retire_team", brief=29)
-            assert "waiting for retirement reports" in waiting
-
-        self.session(first)
-        self.retire("team-2-impl", "team-2-tester", "team-2-critic")
         self.clients_exit(2)
 
         async def second(client: Any) -> None:

@@ -55,7 +55,6 @@ from config import (
     DispatcherLaunch,
     Entity,
     Record,
-    Reports,
     agent_spec,
     allocation_id,
     allocation_paths,
@@ -81,7 +80,6 @@ from github import (
     post_event,
     poster,
     pull_request,
-    retirement_reports,
     roster,
 )
 from herdr import deliver, herdr, live_panes, pane_occupant, processes, session_id, stop
@@ -235,7 +233,6 @@ def agent_env(allocation: Allocation) -> dict[str, str]:
         # Worker-side commands resolve the same root, as PR5's install layout defines it.
         "TIPS_TEAM_HARNESS": str(conf.harness_root() / "harness"),
         "TIPS_TEAM_ALLOCATION_ID": allocation["id"],
-        "TIPS_TEAM_LAUNCH": allocation["launch"],
         "TIPS_TEAM_STATE": str(conf.state_dir()),
     }
     if allocation["kind"] == "codex":
@@ -475,8 +472,8 @@ def enter(pane: str, root: Path, env: dict[str, str]) -> None:
     )
 
 
-# Harness scripts a client runs under its own authority (common.md Comments, retirement).
-CLIENT_SCRIPTS = ("board.py", "pr_review.py", "retirement.py")
+# Harness scripts a client runs under its own authority (common.md Comments).
+CLIENT_SCRIPTS = ("board.py", "pr_review.py")
 # GitHub writes the roles assign: brief and PR body maintenance, comments and reviews.
 # The merge and the handoff stay with the client's permission mode (SETUP.md).
 GITHUB_WRITES = ("issue edit", "issue comment", "pr create", "pr edit", "pr comment", "pr review")
@@ -950,106 +947,6 @@ def turn(number: str, recipient: str) -> None:
 # --- Retirement and stop ---------------------------------------------------
 
 
-def never_launched(allocation: Allocation) -> bool:
-    """No client was ever entered in the allocation: launch saves the launch id before any
-    client starts, so an empty one means no session to report and no work in its clone."""
-    return not allocation["launch"]
-
-
-def operator_report(allocation: Allocation) -> str:
-    """The command the operator runs to report for a client that is not running."""
-    env = {
-        "TIPS_TEAM_STATE": str(conf.state_dir()),
-        "TIPS_TEAM_ALLOCATION_ID": allocation["id"],
-        "TIPS_TEAM_LAUNCH": allocation["launch"],
-    }
-    assignments = " ".join(f"{key}={shlex.quote(value)}" for key, value in env.items())
-    command = harness_command("retirement.py")
-    return f"cd {shlex.quote(allocation['root'])} && {assignments} {command}"
-
-
-def ask_clients(
-    record: Record, asks: dict[str, tuple[str, str]], running: set[str]
-) -> tuple[list[str], list[str]]:
-    """Send each running client its ask once. `asks` maps an entry to the subject of the ask
-    (its launch, or the URL of the report that showed unpreserved work) and the message; a
-    client already asked about that subject is skipped. Return the lines that name who was
-    asked now and earlier and the operator's command for each client not running, and the
-    failed sends."""
-    now: list[str] = []
-    earlier: list[str] = []
-    failed: list[str] = []
-    commands: list[str] = []
-    for entry, (subject, message) in asks.items():
-        allocation = record["agents"][entry]
-        if entry not in running:
-            commands.append(f"{allocation['name']}: {operator_report(allocation)}")
-        elif allocation.get("retire_asked") == subject:
-            earlier.append(allocation["name"])
-        elif errors := deliver([(allocation["name"], message)]):
-            failed += errors
-        else:
-            allocation["retire_asked"] = subject
-            now.append(allocation["name"])
-    if now:
-        save_record(record)
-    lines = [
-        f"Asked now: {', '.join(now) or 'none'}; asked earlier: {', '.join(earlier) or 'none'}."
-    ]
-    if failed:
-        lines.append(f"Failed sends: {'; '.join(failed)}.")
-    if commands:
-        lines += ["Not running, so the operator reports for them:", *commands]
-    return lines, failed
-
-
-def wait_for_reports(record: Record, missing: list[str], running: set[str]) -> None:
-    """Ask each running client without a report for one, once per launch, and print what
-    stop waits for; every resource stays reserved until stop runs again. Only a failed send
-    is an error."""
-    ask = f"Retire: run {harness_command('retirement.py')}, then end your turn."
-    asks = {e: (record["agents"][e]["launch"], ask) for e in missing}
-    lines, failed = ask_clients(record, asks, running)
-    names = ", ".join(record["agents"][e]["name"] for e in missing)
-    text = "\n".join(
-        [
-            f"#{record['brief']}: waiting for retirement reports from {names}. Every resource "
-            "stays reserved; run stop again after the reports are posted.",
-            *lines,
-        ]
-    )
-    if failed:
-        raise RuntimeError(text)
-    print(text)
-
-
-def refuse_unpreserved(
-    record: Record, gaps: dict[str, str], reports: Reports, running: set[str]
-) -> None:
-    """Ask each running client whose report shows unpreserved work, once per report, to
-    preserve it and report again; then refuse, keeping everything."""
-    command = harness_command("retirement.py")
-    asks: dict[str, tuple[str, str]] = {}
-    for entry in gaps:
-        url = reports[record["agents"][entry]["id"]][1]
-        asks[entry] = (
-            url,
-            f"Retire: your retirement report {url} shows work that is not preserved. Preserve "
-            f"it (commit, push and merge it), run {command} again, then end your turn.",
-        )
-    lines, _ = ask_clients(record, asks, running)
-    raise RuntimeError(
-        "\n".join(
-            [
-                f"#{record['brief']}: {'; '.join(gaps.values())}. Nothing was stopped; the record, "
-                "databases, files and reservation are kept. Preserve the work (commit, push and "
-                "merge it), have each client report again, then rerun stop.",
-                *lines,
-            ]
-        )
-    )
-
-
 def retirement_paths(allocation: Allocation) -> tuple[Path, Path, Path, Path]:
     """The allocation's directories, refused unless the record names its canonical
     allocation and no path leaves the harness root or passes through a symlink."""
@@ -1068,8 +965,8 @@ def retirement_paths(allocation: Allocation) -> tuple[Path, Path, Path, Path]:
 
 # stop's next step when a recorded pane holds a client it cannot confirm.
 STOP_STEP = (
-    "Nothing was asked or stopped. The operator inspects the pane; once that client has "
-    "exited, stop prints the operator's retirement command for it."
+    "Nothing was stopped. The operator inspects the pane and reruns stop once that client "
+    "has exited."
 )
 
 
@@ -1079,38 +976,11 @@ def live_clients(record: Record) -> dict[str, Allocation]:
     return {e: a for e, a in record["agents"].items() if checked_client(record, a, STOP_STEP)}
 
 
-def verify_present(record: Record, present: dict[str, Allocation]) -> None:
-    """Recheck every running client with the same rule before stopping any."""
-    for allocation in present.values():
-        checked_client(record, allocation, STOP_STEP)
-
-
 def port_in_use(port: int) -> bool:
     """Whether anything listens on the port; anything but a refused connection counts."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
         probe.settimeout(1)
         return probe.connect_ex(("127.0.0.1", port)) != errno.ECONNREFUSED
-
-
-def preservation_gaps(record: Record, reports: Reports, need_merge: bool) -> dict[str, str]:
-    """Each client whose report does not show its work preserved, with why. Preserved means
-    a clean clone with nothing unpushed and, when stop drops the databases, a HEAD merged
-    into origin/main."""
-    gaps: dict[str, str] = {}
-    for entry, allocation in record["agents"].items():
-        if never_launched(allocation):
-            continue
-        fields, url = reports[allocation["id"]]
-        if fields.get("clean") is not True or fields.get("unpushed") != 0:
-            dirty = fields.get("dirty")
-            names = [str(p) for p in cast(list[object], dirty)] if isinstance(dirty, list) else []
-            paths = f" ({', '.join(names)})" if names else ""
-            gaps[entry] = (
-                f"{allocation['name']} reported uncommitted or unpushed work{paths}: {url}"
-            )
-        elif need_merge and fields.get("merged") is not True:
-            gaps[entry] = f"{allocation['name']} reported a HEAD not merged into origin/main: {url}"
-    return gaps
 
 
 def recorded_databases(name: str, suffixes: list[str]) -> bool:
@@ -1156,7 +1026,7 @@ def remove_if_empty(directory: Path) -> None:
             raise
 
 
-def retain_files(record: Record, dropped: list[str], kept: str, reports: Reports) -> None:
+def retain_files(record: Record, dropped: list[str], kept: str) -> None:
     """Remove only empty residue; record in each allocation's launcher configuration what it
     leaves behind and why. Project files are never deleted."""
     for allocation in record["agents"].values():
@@ -1170,7 +1040,6 @@ def retain_files(record: Record, dropped: list[str], kept: str, reports: Reports
             "issue": record["brief"],
             "retained": retained,
             "reason": "project and log files are never deleted automatically",
-            "report": reports.get(allocation["id"], ({}, ""))[1],
             "db_suffix": allocation["db_suffix"],
             "databases_dropped": own,
             "databases_kept_because": kept,
@@ -1195,7 +1064,7 @@ def list_retained() -> None:
         kept = note.get("databases_kept_because") or "dropped"
         print(
             f"{note.get('id')} (#{note.get('issue')}): {root}; files: {note.get('reason')}; "
-            f"databases {note.get('db_suffix')}: {kept}; report: {note.get('report') or 'none'}"
+            f"databases {note.get('db_suffix')}: {kept}"
         )
     if not found:
         print("No retained allocations")
@@ -1213,12 +1082,10 @@ def kept_databases(record: Record, abandon: bool) -> str:
 def stop_brief(brief: str, *, abandon: bool = False) -> None:
     """Stop a team's recorded clients and Dexter daemons and release its slot.
 
-    A brief must be closed by a merged PR before any client is asked, unless the operator
-    abandons it. Every client then posts a retirement report from its current launch. Work
-    that the reports do not show preserved keeps everything: nothing is stopped and the
-    record stays. Databases are dropped only for merged work; project and log files are
-    always retained. A conflict, a failed stop or a busy port keeps the reservation, so stop
-    can run again.
+    A brief must be closed by a merged PR before anything stops, unless the operator abandons
+    it. stop runs no project Git command: databases are dropped only for merged pair work,
+    and project and log files are always retained for the operator to inspect. A conflict,
+    a failed stop or a busy port keeps the reservation, so stop can run again.
     """
     with store_lock():
         record = record_for(brief)
@@ -1226,11 +1093,11 @@ def stop_brief(brief: str, *, abandon: bool = False) -> None:
             print(f"#{brief}: no allocation record; nothing removed")
             return
         kept = kept_databases(record, abandon)
-        # A brief still in progress is never interrupted: a wrong issue number asks no one.
+        # A brief still in progress is never interrupted: a wrong issue number stops nothing.
         if not kept and not merged_brief(brief):
             command = harness_command("team.py", "stop", brief, "--abandon")
             raise RuntimeError(
-                f"#{brief} is not closed by a merged PR. Nothing was asked or stopped; the "
+                f"#{brief} is not closed by a merged PR. Nothing was stopped; the "
                 "record, databases, files and reservation are kept. If the brief was closed "
                 f"without a merged PR, the operator runs {command}; until then the slot stays "
                 "taken: agent/teams/README.md#retire-a-brief-closed-without-a-merged-pr"
@@ -1241,20 +1108,7 @@ def stop_brief(brief: str, *, abandon: bool = False) -> None:
         names = [a["name"] for a in record["agents"].values()]
         panes = frozenset(a["pane"] for a in record["agents"].values())
         refuse_foreign_owner(roots, names, panes)
-        reports = retirement_reports(record)
         present = live_clients(record)
-        missing = [
-            e
-            for e, a in record["agents"].items()
-            if a["id"] not in reports and (e in present or not never_launched(a))
-        ]
-        if missing:
-            wait_for_reports(record, missing, set(present))
-            return
-        gaps = preservation_gaps(record, reports, need_merge=not kept)
-        if gaps:
-            refuse_unpreserved(record, gaps, reports, set(present))
-        verify_present(record, present)
         for allocation in present.values():
             stop(allocation["pane"], allocation["root"])
         refuse_foreign_owner(roots, names, panes)
@@ -1268,7 +1122,7 @@ def stop_brief(brief: str, *, abandon: bool = False) -> None:
             raise RuntimeError(f"Ports {', '.join(busy)} are in use; the reservation is kept")
         suffixes = [a["db_suffix"] for a in record["agents"].values()]
         dropped = [] if kept else drop_databases(suffixes)
-        retain_files(record, dropped, kept, reports)
+        retain_files(record, dropped, kept)
         record_path(record["slot"]).unlink()
     summary = f"databases dropped: {', '.join(dropped) or 'none'}"
     if kept:
@@ -1426,8 +1280,8 @@ def cli() -> None:
         "Usage: agent/teams/team.py start <brief> | design <issue> <entry> | "
         "turn <pr> <entry> | review <pr> <entry> | reset <issue> <entry> | stop <issue> | "
         "stop <issue> --abandon | clean | status. Only the operator runs reset and "
-        "stop --abandon, which retires a brief closed without a merged PR: it accepts pushed "
-        "but unmerged work and keeps the databases."
+        "stop --abandon, which retires a brief closed without a merged PR and keeps the "
+        "databases."
     )
     if args == ["status"]:
         status()

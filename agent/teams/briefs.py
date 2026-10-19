@@ -33,9 +33,7 @@ def dexter_brief(wrapper: Path) -> str:
         'After fetching or changing dependencies, run "$TIPS_DEXTER" reindex. '
         "Do not start another Elixir language server. The index may be outdated; "
         "check empty results with rg. Leave the daemon running on exit. "
-        "Do not run git clean -x; it deletes the wrapper and index. When the dispatcher asks "
-        f"you to retire, run python3 {harness() / 'retirement.py'} and end your turn: it "
-        "posts your clone's state to the issue, tells the dispatcher and changes nothing."
+        "Do not run git clean -x; it deletes the wrapper and index."
     )
 
 

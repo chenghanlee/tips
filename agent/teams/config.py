@@ -54,14 +54,11 @@ class Allocation(TypedDict):
     set for reviewers of a pushed PR; `head` is the commit its bootstrap configuration names.
 
     `pane`, `name`, `kind`, `root` and `session` identify the client process. `launch` is
-    new for each launch; a retirement report counts only for the launch it names.
+    new for each launch.
     `submission` is the task-submission state, separate from whether a process runs:
     NEVER_SUBMITTED until launch writes UNKNOWN, durably, before the client can accept any
     input; SUBMITTED only after the task prompt's positive transport result. SUBMITTED does
     not mean the task is done; the brief, PR and reviews record its outcome.
-    `retire_asked` is what stop last asked the client about: its launch when it asked for a
-    retirement report, or the report's URL when it asked it to preserve work and report
-    again. stop asks once per launch and once per report.
     """
 
     id: str
@@ -80,7 +77,6 @@ class Allocation(TypedDict):
     submission: str
     pr: NotRequired[str]
     head: NotRequired[str]
-    retire_asked: NotRequired[str]
 
 
 class Record(TypedDict):
@@ -189,10 +185,6 @@ CommentType = Literal[
 ]
 COMMENT_TYPES: tuple[str, ...] = get_args(CommentType)
 HEADER = re.compile(r"^(?P<type>[A-Z]+) (?P<role>\S+) (?P<name>\S+) (?P<session>\S+)$")
-
-
-RETIREMENT = "TEAM_RETIREMENT "
-Reports = dict[str, tuple[dict[str, object], str]]
 
 
 class DispatcherLaunch(TypedDict):

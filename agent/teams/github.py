@@ -13,11 +13,8 @@ from config import (
     COMMENT_TYPES,
     HEADER,
     READ_PAGES,
-    RETIREMENT,
     ROLES,
     Allocation,
-    Record,
-    Reports,
     repository,
 )
 
@@ -226,23 +223,6 @@ def pull_request(number: str) -> PullRequest:
 def poster(allocation: Allocation) -> tuple[str, str, str]:
     """The (role, name, session) attribution of comments the client posts."""
     return event_role(allocation), allocation["name"], allocation["session"]
-
-
-def retirement_reports(record: Record) -> Reports:
-    """Each allocation's latest retirement report on the issue that names its recorded
-    launch; a report from an earlier launch is no evidence. Reports are advisory evidence."""
-    launches = {a["id"]: a["launch"] for a in record["agents"].values()}
-    reports: Reports = {}
-    for comment in issue_comments(record["brief"]):
-        try:
-            found = list(prefixed_json(comment, "EVENT", RETIREMENT))
-        except ValueError:
-            continue  # a comment with a malformed report is no evidence
-        for fields in found:
-            ident = str(fields.get("id"))
-            if fields.get("launch") and launches.get(ident) == fields.get("launch"):
-                reports[ident] = (fields, str(comment["html_url"]))
-    return reports
 
 
 def merged_brief(brief: str) -> bool:

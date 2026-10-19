@@ -402,7 +402,7 @@ result = {}
 ENV = [
     "PGPORT", "TIPS_DB_SUFFIX", "TIPS_TEST_PORT", "MIX_ENV", "TIPS_CHECK_TIMEOUT_SECONDS",
     "TIPS_TEAM_CONFIG", "TIPS_PROVIDER_ENV_FILE", "TIPS_DEXTER", "HEX_HOME",
-    "TIPS_TEAM_HARNESS", "TIPS_TEAM_ALLOCATION_ID", "TIPS_TEAM_STATE", "TIPS_TEAM_LAUNCH",
+    "TIPS_TEAM_HARNESS", "TIPS_TEAM_ALLOCATION_ID", "TIPS_TEAM_STATE",
 ]
 SNAPSHOT = (
     "\npython3 -c 'import os,json; "
@@ -669,7 +669,6 @@ class Harness(FakeState, unittest.TestCase):
             "TIPS_TEAM_STATE",
             "TIPS_TEAM_ALLOCATION_ID",
             "TIPS_TEAM_HARNESS",
-            "TIPS_TEAM_LAUNCH",
             "PGPORT",
             "MIX_ENV",
             "HEX_HOME",
@@ -808,10 +807,6 @@ class Harness(FakeState, unittest.TestCase):
 
     def bootstrap(self, name: str, *args: str, ok: bool = True) -> subprocess.CompletedProcess[str]:
         return self.worker(name, "bootstrap.py", *args, ok=ok)
-
-    def retire(self, *names: str) -> None:
-        for name in names:
-            self.worker(name, "retirement.py")
 
     def push(self, name: str, message: str = "work", pr: str = "7", brief: str = "29") -> str:
         """Commit in the client's clone, push it and report it as the PR's pushed head."""
