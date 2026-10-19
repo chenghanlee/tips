@@ -113,15 +113,9 @@ allocating a separate spec team. Follow the shared-decision and retirement rules
 
 ## Revert a broken main
 
-When an implementer reports `blocked` because its failing check also fails on
-fetched `main` (local evidence during the CI pause), find the PR that broke `main`.
-During the pause, give the revert an ordinary brief and independent reviewer so it
-follows the local-check and review requirements. Otherwise ask the affected brief's
-merge-confirming tester, with `prompt_agent`, to run its
-[revert task](tester.md#revert-a-broken-main) for that PR. If the tester reports
-`blocked` because the cause needs diagnosis outside its allocation, report it to the user.
-If no slot is available for the revert, report the capacity blocker to the user, who
-can choose a manual revert or free a team; do not bypass allocation ownership.
+An implementer's `blocked` report with failing evidence on both the task and main SHAs
+means `main` is broken. Open an ordinary revert brief for the PR that broke `main`. With
+no free slot, report the capacity blocker to the user.
 
 ## Liveness
 
