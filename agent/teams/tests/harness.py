@@ -61,7 +61,6 @@ role = "tester"
 kind = "claude"
 model = "fixture-test"
 effort = "xhigh"
-advisor = "fixture-advisor"
 db_suffix = "r"
 port_offset = 1
 
@@ -81,6 +80,14 @@ model = "fixture-second"
 effort = "high"
 db_suffix = "s"
 port_offset = 3
+
+[agents.lead]
+role = "designer"
+kind = "codex"
+model = "fixture-lead"
+effort = "high"
+db_suffix = "l"
+port_offset = 4
 
 """
 BRIEF = "Implementer: impl\nRequired reviews: tester, critic\n"
@@ -145,7 +152,13 @@ elif a[:2] == ["pane", "process-info"]:
         {"pid": s["pid"], "name": "codex", "argv0": "codex", "cwd": s["root"]},
         {"pid": s["child"], "name": "node", "argv0": "node", "cwd": s["root"]},
     ]
-    procs = [x for x in procs if alive(x["pid"])]
+    live = [x for x in procs if alive(x["pid"])]
+    if not live and s.get("stale_reads"):
+        # Herdr's snapshot lags the exit: the dead client still leads the pane (#478).
+        s["stale_reads"] -= 1
+        json.dump(s, open(os.environ["HERDR_FIXTURE"], "w"))
+    else:
+        procs = live
     if not procs and s.get("replacement"):
         procs = [{"pid": 424242, "name": "2.1.288", "argv0": "claude", "cwd": s["root"]}]
     if not procs:

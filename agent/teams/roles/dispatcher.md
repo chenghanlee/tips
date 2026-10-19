@@ -129,8 +129,12 @@ Do not count rounds or set deadlines. You receive no notification if an agent st
 without sending a message. The user reports the stopped agent with
 `herdr agent prompt dispatcher "<name> stopped"`. You may also discover it at your
 next turn. Then check the agent with `status`, which shows each recorded client's live
-pane, name, state and session, and read its records. Relaunch a stopped pair client
-with `start_pair`, a stopped advisor with `start_design`, and a stopped PR reviewer
+pane, name, state and session, and read its records. A live client that has posted
+nothing is working, not stopped: pair clients post no progress updates, and their
+checks run for minutes while the pane shows `idle`. Never resend a client's task or
+launch text; a repeat restarts its bootstrap and its work. Prompt a live client only
+with new information or a question. Relaunch a stopped pair client
+with `start_pair`, a stopped designer with `start_design`, and a stopped PR reviewer
 with `launch_reviewer`; each launch posts its EVENT. If a tool refuses because the client may already have done its task, ask the
 user; only the user runs `team.py reset`. If designers cannot agree, they post BLOCKED.
 Route the technical evidence to the named decision owner; ask the user for product,
@@ -139,7 +143,7 @@ as approval.
 
 ## Measurement
 
-Use `usage_summary` for every participant, including dispatcher, advisors and designers;
+Use `usage_summary` for every participant, including dispatcher and designers;
 it separates uncached input, output, cache reads and writes. Missing logs mean unknown
 cost, not zero. Follow [trial measurement](../development.md#trial-measurement) for
 session attribution and evaluating the result. For issue 399, record its measurement

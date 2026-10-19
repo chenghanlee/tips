@@ -49,13 +49,12 @@ compact_percent = 35
 # Each launch gets a database suffix (db_suffix_prefix + slot + "g" + generation + db_suffix;
 # db_suffix must start with a non-digit)
 # and a test port (port_base + slot * port_stride + port_offset).
-# `advisor` applies only to Claude entries. `persona` adds optional text to the launch prompt.
+# `persona` adds optional text to the launch prompt.
 [agents.opus-implementer]
 role = "implementer"
 kind = "claude"
 model = "claude-opus-5-5"
 effort = "high"
-advisor = "fable"
 db_suffix = "_opus"
 port_offset = 0
 
@@ -64,7 +63,6 @@ role = "implementer"
 kind = "claude"
 model = "claude-haiku-5-5"
 effort = "high"
-advisor = "opus"
 db_suffix = "_haiku"
 port_offset = 1
 

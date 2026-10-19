@@ -27,6 +27,7 @@ from typing import cast
 from commands import execute, object_fields
 from config import RETIREMENT, Allocation, launch_identity, slot_record_paths
 from github import comment_header, poster
+from herdr import parse_herdr, session_id
 
 GIT_SECONDS = 120
 HERDR_SECONDS = 30
@@ -102,6 +103,37 @@ def clone_state(project: Path) -> dict[str, object]:
     }
 
 
+def with_live_session(allocation: dict[str, object]) -> dict[str, object]:
+    """The allocation with the session Herdr reports for its own client when none is
+    recorded.
+
+    A Codex client reports its session only after launch, so its launch EVENT and record
+    may say `unknown` (#451). The retirement EVENT then carries the real session for
+    `board.py usage`. The lookup reads the allocation's recorded pane, not the caller's:
+    the operator's report command runs from another pane. A failed lookup, or another
+    client in that pane, keeps the record's value and says so on stderr.
+    """
+    if allocation.get("session"):
+        return allocation
+    pane, name = str(allocation.get("pane", "")), str(allocation.get("name", ""))
+    try:
+        result = execute(["herdr", "agent", "get", pane], timeout=HERDR_SECONDS)
+        if result.returncode:
+            raise RetirementError((result.stderr or result.stdout).strip() or "nonzero exit")
+        agent = parse_herdr(result.stdout)["agent"]
+        if agent.get("name") != name:
+            raise RetirementError(f"pane holds {agent.get('name') or 'an unnamed client'}")
+        session = session_id(agent)
+    except (RuntimeError, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as error:
+        print(
+            f"retirement: no session recorded for {name}; Herdr lookup of its pane {pane} "
+            f"failed: {error}; the report header says unknown",
+            file=sys.stderr,
+        )
+        return allocation
+    return {**allocation, "session": session}
+
+
 def header(kind: str, allocation: dict[str, object]) -> str:
     return comment_header(kind, *poster(cast(Allocation, allocation)))
 
@@ -157,6 +189,7 @@ def main() -> None:
     except (RetirementError, OSError, ValueError) as error:
         print(f"retirement: {error}", file=sys.stderr)
         sys.exit(1)
+    allocation = with_live_session(allocation)
     try:
         url = report(issue, allocation, settings, project)
     except (RetirementError, OSError, ValueError) as error:

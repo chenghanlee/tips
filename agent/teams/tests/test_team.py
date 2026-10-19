@@ -142,13 +142,15 @@ while True: time.sleep(.05)
     def test_graceful_stop_exits_owned_children_and_releases_the_name(self) -> None:
         """The client is signalled, its separate-group child exits on EOF, the name is cleared.
 
-        Herdr may list the kind as released or the name as already gone before the clear.
+        Herdr may list the kind as released or the name as already gone before the clear,
+        or still show the exited client as the pane's leader for a read or two (#478).
         """
         cases: list[dict[str, Any]] = [
             {},
             {"listed_kind": None, "omit_kind": False},
             {"listed_kind": None, "omit_kind": True},
             {"clear_error": "agent_not_found"},
+            {"stale_reads": 2},
         ]
         for flags in cases:
             with self.subTest(flags=flags):
@@ -340,10 +342,14 @@ class PairLifecycleTest(Harness):
         assert f"python3 {harness / 'retirement.py'}" in tester_brief
         assert "persona" not in tester_brief
         targ = tester["launch_argv"]
-        assert targ[targ.index("--advisor") + 1] == "fixture-advisor"
-        assert "--advisor" not in argv
+        assert "--advisor" not in targ + argv
         settings = json.loads(targ[targ.index("--settings") + 1])
         assert settings["promptSuggestionEnabled"] is False
+        # The brief body is the implementer's to maintain; auto mode must not deny it.
+        allowed = settings["permissions"]["allow"]
+        assert "Bash(gh issue edit:*)" in allowed
+        assert f"Bash(python3 {harness / 'retirement.py'}:*)" in allowed
+        assert not [rule for rule in allowed if "merge" in rule or "team.py" in rule]
         plugins = settings["enabledPlugins"]
         assert plugins["elixir-lsp@elixir-agent-tools"] is False
         assert plugins["mix-credo@elixir-agent-tools"] is True
@@ -684,8 +690,7 @@ class PairLifecycleTest(Harness):
         cases = (
             ("port_base = 24100", 'port_base = "wrong"', "team.port_base must be int"),
             ('role = "designer"', 'role = "architect"', "agents.critic.role must be one of"),
-            ('advisor = "fixture-advisor"', 'adviser = "x"', "unknown keys ['adviser']"),
-            ('model = "fixture-impl"', 'model = "x"\nadvisor = "y"', "advisor applies to Claude"),
+            ('model = "fixture-test"', 'model = "x"\nadviser = "y"', "unknown keys ['adviser']"),
             ('db_suffix = "r"', 'db_suffix = "9r"', "db_suffix must be nonempty and start"),
             ('repository = "o/r"', 'repository = "o"', "github.repository must be owner/name"),
             ('psql = ["/fixture/psql"', 'psql = ["psql"', "psql must start with an absolute"),
@@ -1226,16 +1231,22 @@ class DesignTest(Harness):
             timeout=60,
         )
         assert "team-1-critic" in usage.stdout + usage.stderr
-        # A second designer joins the spec's team; non-designers are refused.
+        # A second designer joins the spec's team in its own allocation; non-designers
+        # are refused.
         refused = self.team("design", "50", "tester", ok=False)
         assert "tester is not a configured designer entry" in refused.stderr
         assert "Already running: team-1-critic" in self.team("design", "50", "critic").stdout
+        self.team("design", "50", "lead")
+        assert self.record(1)["agents"]["lead"]["root"] == str(self.trusted / "allocations/g1-lead")
+        assert self.tabs("w1") == {"designers": ["team-1-critic", "team-1-lead"]}
+        assert self.prompts("team-1-lead")[0].startswith("You are lead, the designer for spec #50;")
+        assert self.comments("50")[-1]["body"].startswith("EVENT designer team-1-lead ")
         self.bootstrap("team-1-critic")
         project = root / "project"
         assert self.git("rev-parse", "HEAD", cwd=project) == self.git("rev-parse", "HEAD")
         assert self.git("branch", "--show-current", cwd=project) == ""
         # A brief start cannot take the spec's slot, and a design team keeps its databases.
-        self.retire("team-1-critic")
+        self.retire("team-1-critic", "team-1-lead")
         self.clients_exit(1)
         self.databases("tips_test_t1g1c")
         self.team("stop", "50")
@@ -1797,9 +1808,19 @@ class LaunchRecoveryTest(Harness):
         assert self.record(1)["agents"]["impl"]["session"] == ""
         self.bootstrap("team-1-impl")
         self.merge(self.push("team-1-impl"))
-        self.retire("team-1-impl")
-        assert self.comments("29")[-1]["body"].startswith("EVENT implementer team-1-impl unknown")
+        # The report names the session Herdr knows by then, so usage can attribute it,
+        # read from the client's own pane even when the operator reports from another.
+        session = self.pane("team-1-impl")["agent_session"]["value"]
+        operator = self.worker("team-1-impl", "retirement.py", HERDR_PANE_ID="wX:p99")
+        assert operator.stderr == ""
+        header = self.comments("29")[-1]["body"].splitlines()[0]
+        assert header == f"EVENT implementer team-1-impl {session}"
         self.clients_exit(1)
+        # With the client gone the lookup fails visibly and the header stays unknown.
+        gone = self.worker("team-1-impl", "retirement.py")
+        assert "no session recorded for team-1-impl; Herdr lookup of its pane" in gone.stderr
+        header = self.comments("29")[-1]["body"].splitlines()[0]
+        assert header == "EVENT implementer team-1-impl unknown"
         assert "slot 1 released" in self.team("stop", "29").stdout
 
     def test_task_done_and_client_exited_before_the_record_update_is_never_replayed(self) -> None:

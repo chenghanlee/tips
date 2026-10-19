@@ -475,6 +475,22 @@ def enter(pane: str, root: Path, env: dict[str, str]) -> None:
     )
 
 
+# Harness scripts a client runs under its own authority (common.md Comments, retirement).
+CLIENT_SCRIPTS = ("board.py", "pr_review.py", "retirement.py")
+# GitHub writes the roles assign: brief and PR body maintenance, comments and reviews.
+# The merge and the handoff stay with the client's permission mode (SETUP.md).
+GITHUB_WRITES = ("issue edit", "issue comment", "pr create", "pr edit", "pr comment", "pr review")
+
+
+def allowed_commands() -> list[str]:
+    """Permission rules for the role's own duties, which auto mode's classifier has
+    denied as external writes (`gh issue edit` on the client's brief)."""
+    return [
+        *(f"Bash(gh {command}:*)" for command in GITHUB_WRITES),
+        *(f"Bash(python3 {harness() / script}:*)" for script in CLIENT_SCRIPTS),
+    ]
+
+
 def client_args(allocation: Allocation, prompt: str, session: str) -> list[str]:
     """Client arguments. Claude keeps the brief as its system prompt and waits for its first
     message; it runs the session id the launcher assigned, because Herdr learns session ids
@@ -500,6 +516,7 @@ def client_args(allocation: Allocation, prompt: str, session: str) -> list[str]:
                 "enabledPlugins": {"mix-credo@elixir-agent-tools": True, **NATIVE_LSP_PLUGINS},
                 # No human reads a pair pane; a suggestion is a wasted request per turn.
                 "promptSuggestionEnabled": False,
+                "permissions": {"allow": allowed_commands()},
             }
         ),
         "--append-system-prompt",
@@ -509,9 +526,6 @@ def client_args(allocation: Allocation, prompt: str, session: str) -> list[str]:
     ]
     if spec["model"]:
         args += ["--model", spec["model"]]
-    advisor = spec.get("advisor")
-    if advisor:
-        args += ["--advisor", advisor]
     return args
 
 

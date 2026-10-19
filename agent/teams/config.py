@@ -20,7 +20,6 @@ class AgentSpec(TypedDict):
     kind: str
     model: str
     effort: str
-    advisor: NotRequired[str]
     persona: NotRequired[str]
     port_offset: int
     db_suffix: str
@@ -154,7 +153,6 @@ AGENT_FIELDS = {
     "kind",
     "model",
     "effort",
-    "advisor",
     "persona",
     "port_offset",
     "db_suffix",
@@ -317,9 +315,8 @@ def validate_agent_fields(label: str, name: str, entry: object) -> None:
         raise RuntimeError(f"{label} has unknown keys {sorted(unknown)}")
     for key in ("role", "kind", "model", "effort", "db_suffix"):
         require_type(spec.get(key), str, f"{label}.{key}")
-    for key in ("advisor", "persona"):
-        if key in spec:
-            require_type(spec[key], str, f"{label}.{key}")
+    if "persona" in spec:
+        require_type(spec["persona"], str, f"{label}.persona")
     require_type(spec.get("port_offset"), int, f"{label}.port_offset")
     if not re.fullmatch(r"[^0-9]\S*", str(spec["db_suffix"])):
         raise RuntimeError(f"{label}.db_suffix must be nonempty and start with a non-digit")
@@ -354,8 +351,6 @@ def validate_settings(path: Path, value: Config) -> None:
             raise RuntimeError(f"{path}: agents.{name}.role must be one of {', '.join(ROLES)}")
         if spec["kind"] not in ("codex", "claude"):
             raise RuntimeError(f"{path}: agents.{name}.kind must be claude or codex")
-        if spec.get("advisor") and spec["kind"] != "claude":
-            raise RuntimeError(f"{path}: agents.{name}.advisor applies to Claude entries only")
 
 
 def allocation_id(generation: int, entry: str) -> str:

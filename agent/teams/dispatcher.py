@@ -98,8 +98,6 @@ def client_args(settings: dict[str, object], session: str, config: Path) -> list
     ]
     if model:
         args += ["--model", model]
-        if "fable" not in model:
-            args += ["--advisor", "fable"]
     # No command-line prompt: a first turn started with the process could run before the
     # adapter's tools connect. The starter sends it once the adapter has listed them.
     return [*args, "--system-prompt", system_prompt()]
