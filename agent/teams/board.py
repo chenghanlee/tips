@@ -101,11 +101,11 @@ def post(args: argparse.Namespace) -> None:
     poster = identity(args)
     url = post_as(args.issue, args.type, poster, sys.stdin.read())
     print(url, flush=True)
-    if args.type != "BLOCKED" or poster[0] == "dispatcher":
+    if args.type != "BLOCKED":
         return
     try:
         herdr("agent", "prompt", "dispatcher", f"{url} blocked")
-    except (RuntimeError, subprocess.TimeoutExpired) as error:
+    except (RuntimeError, OSError, ValueError, subprocess.TimeoutExpired) as error:
         raise RuntimeError(
             f"posted {url}; notifying the dispatcher failed: {error}. The post reuses an "
             "identical comment, so rerun this command to retry only the notification"
