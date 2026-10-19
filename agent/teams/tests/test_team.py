@@ -337,6 +337,10 @@ class PairLifecycleTest(Harness):
         assert f"First run python3 {harness / 'bootstrap.py'}:" in impl_brief
         assert f"your project is {impl_root / 'project'}" in impl_brief
         assert f"python3 {harness / 'team.py'} turn <pr> tester" in impl_brief
+        # Each worker reads the common rules and its own role file, not the whole README.
+        assert "agent/teams/roles/common.md and agent/teams/roles/implementer.md;" in impl_brief
+        assert "agent/teams/roles/common.md and agent/teams/roles/tester.md;" in tester_brief
+        assert "the restart rule in the README Turns section" in impl_brief
         assert tester_brief.startswith("You are tester, the merge-confirming tester for brief #29;")
         assert f"python3 {harness / 'team.py'} turn <pr> impl" in tester_brief
         assert "Put tester, <session> on line 2" in tester_brief
@@ -1076,6 +1080,7 @@ class HandoffTest(Harness):
         assert f"bootstrap.py --commit {head}" in brief
         assert f"Review PR https://github.com/o/r/pull/7 at {head} from your own clone" in brief
         assert "herdr agent prompt team-1-tester" in brief
+        assert 'Follow "Steps: reviewing designer" in agent/teams/roles/designer.md' in brief
         allocation = self.record(1)["agents"]["critic"]
         assert (allocation["pr"], allocation["head"]) == ("7", head)
         assert allocation["session"] == self.launched_session("team-1-critic")
@@ -1094,6 +1099,7 @@ class HandoffTest(Harness):
         assert second["agent"] == "codex"
         assert self.launch_env("team-1-second") == ("_t1g1s", str(PORT_BASE + 13))
         assert "the additional tester for brief #29" in self.prompts("team-1-second")[0]
+        assert "review steps in agent/teams/roles/tester.md" in self.prompts("team-1-second")[0]
         assert self.tabs("w1") == {
             "implementers": ["team-1-impl"],
             "reviewers": ["team-1-tester", "team-1-second"],
@@ -1219,7 +1225,7 @@ class DesignTest(Harness):
         assert self.tabs("w1") == {"designers": ["team-1-critic"]}
         brief = self.system_prompt("team-1-critic")
         assert brief.startswith("You are critic, the designer for spec #50;")
-        assert "Read agent/teams/roles/designer.md" in brief
+        assert "agent/teams/roles/common.md and agent/teams/roles/designer.md;" in brief
         assert "bootstrap.py:" in brief
         # The launch EVENT lets board.py usage find the designer's session.
         assert self.comments("50")[-1]["body"] == (

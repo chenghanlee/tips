@@ -16,7 +16,7 @@ from config import repo_key
 from tests.harness import CONFIG, TEST_RUNS, fake
 
 TEAMS = Path(__file__).resolve().parents[1]
-DOCUMENTS = ("AGENTS.md", "README.md", "roles/common.md", "roles/dispatcher.md")
+DOCUMENTS = ("roles/common.md", "roles/dispatcher.md")
 
 # Logs every call with its arguments and the variables the launcher sets. The client stub
 # records its process id, which Herdr's fake reports as the pane's foreground client. It
@@ -198,6 +198,9 @@ class DispatchTest(unittest.TestCase):
         prompt = args[args.index("--system-prompt") + 1]
         for name in DOCUMENTS:
             assert f"Trusted {name} text." in prompt, name
+        # The role files carry the dispatcher's rules; AGENTS.md and the README do not load.
+        for name in ("AGENTS.md", "README.md"):
+            assert f"Trusted {name} text." not in prompt, name
         # No command-line prompt: the first turn waits for the client to be ready.
         assert args[-2] == "--system-prompt"
         assert "Begin." not in args

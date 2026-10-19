@@ -57,6 +57,7 @@ class BoardTest(Harness):
         assert url.stdout.strip() == f"{ISSUE}#issuecomment-3"
         question = "QUESTION implementer team-1-impl session-team-1-impl\nWhich port?"
         assert self.bodies() == [*launches, question]
+        assert not self.prompts("dispatcher")  # only BLOCKED wakes the dispatcher
         # A repeat after an uncertain post returns the existing URL, for EVENTs too.
         again = self.board("post", "29", "QUESTION", pane=impl, body="Which port?\n")
         assert again.stdout == url.stdout
@@ -101,6 +102,33 @@ class BoardTest(Harness):
         assert "Which port?" not in after
         assert after.count("\n--- ") == count - 3
         assert "comment link" in self.board("read", "29", "--after", ISSUE, ok=False).stderr
+
+    def test_a_worker_blocked_post_wakes_the_dispatcher(self) -> None:
+        self.team("start", "29")
+        impl = self.pane("team-1-impl")["pane_id"]
+        posted = self.board("post", "29", "BLOCKED", pane=impl, body="mix deps.get fails\n")
+        url = self.comments("29")[-1]["html_url"]
+        assert posted.stdout.startswith(f"{url}\n")
+        assert self.prompts("dispatcher") == [f"{url} blocked"]
+
+    def test_a_failed_blocked_notice_exits_nonzero_and_its_rerun_reuses_the_comment(
+        self,
+    ) -> None:
+        self.team("start", "29")
+        impl = self.pane("team-1-impl")["pane_id"]
+        self.update(dispatcher_down=True)
+        failed = self.board("post", "29", "BLOCKED", pane=impl, body="db down\n", ok=False)
+        url = self.comments("29")[-1]["html_url"]
+        assert failed.stdout.strip() == url
+        assert "agent_not_found: dispatcher" in failed.stderr
+        assert "rerun this command to retry only the notification" in failed.stderr
+        count = len(self.bodies())
+        self.update(dispatcher_down=False)
+        again = self.board("post", "29", "BLOCKED", pane=impl, body="db down\n")
+        assert again.stdout.startswith(f"{url}\n")
+        assert len(self.bodies()) == count
+        # The failed attempt and the rerun's delivered one.
+        assert self.prompts("dispatcher") == [f"{url} blocked"] * 2
 
     def test_usage_counts_each_launched_session_from_its_own_logs(self) -> None:
         self.update(

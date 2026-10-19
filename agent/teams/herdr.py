@@ -55,8 +55,10 @@ def validate_process_info(value: object) -> None:
             require_type(process["argv0"], str, "Herdr process argv0")
 
 
-def herdr(*args: str) -> HerdrResult:
-    output = run("herdr", *args, timeout=conf.settings()["timeouts"]["launch_seconds"])
+def herdr(*args: str, timeout: float | None = None) -> HerdrResult:
+    """Run Herdr within `timeout` seconds, by default timeouts.launch_seconds."""
+    seconds = conf.settings()["timeouts"]["launch_seconds"] if timeout is None else timeout
+    output = run("herdr", *args, timeout=seconds)
     if args[:2] == ("pane", "run"):
         return cast(HerdrResult, {})  # pane run succeeds with empty stdout.
     return parse_herdr(output)
