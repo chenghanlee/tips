@@ -27,7 +27,7 @@ Implement one brief in your own clone. Manage its PR.
 3. Record deferred work in one follow-up issue before handoff.
 4. Push. Open the PR with the [PR body](../README.md#pr-body) filled in. Then run
    the `team.py turn <pr> <tester entry>` command your brief names. It requires your
-   clone to be clean at the PR head, records the PR's failures and notifies every
+   clone to be clean at the PR head, names the PR's current failures and notifies every
    required reviewer of the head. It refuses while the PR is not mergeable:
    merge `origin/main`, push and run it again, or report `blocked`. If it reports failed
    sends, report `blocked` with them. Reviewers work on the pushed head in their own

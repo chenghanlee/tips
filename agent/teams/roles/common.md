@@ -44,8 +44,9 @@ Read this and your role file at launch and after compaction.
   BLOCKED, DONE, EVENT. PR reviews use the [review record](../README.md#pr-review-record) instead.
 - Keep each comment under 400 words. If it has more than 800 words, the script warns.
   Explain why it needs that many words. Put logs and screenshots in a gist with `gh gist create <file>`. Link to CI runs by URL. Do not paste output.
-- Before compaction or a long step, record on GitHub any decision or finding not yet
-  posted. After a restart, reread the brief (`gh issue view <issue>`) and the PR as
+- Before compaction, restart or session end, or a long step, record any decision or
+  finding not yet posted: the lead designer updates the spec body; everyone else posts
+  the decision or finding on GitHub. After a restart, reread the brief (`gh issue view <issue>`) and the PR as
   [Turns](../README.md#turns) says.
 - Post the comment, then send the Herdr prompt as a separate step. If you repeat the
   post, the script returns the existing comment's URL.

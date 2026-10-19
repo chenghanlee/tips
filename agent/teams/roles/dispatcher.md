@@ -154,8 +154,9 @@ cost, not zero. Post the usage table on the spec when the final brief merges.
   first; the first tester confirms the merge. Default: one implementer and one tester.
   Add a reviewer only when the brief names what it adds, such as client or LiveView
   state, timers or concurrency the tester's checks may not exercise.
-- A P2 is settled when it is fixed, declined with a reason, or deferred in a linked
-  follow-up issue. A deferral never settles a P0 or P1.
+- A P2 is settled when it is fixed, declined with a reason, or deferred in the brief's
+  decisions table or a linked follow-up issue; the deferral settles the P2 while its
+  assumptions hold. A deferral never settles a P0 or P1.
 - On `<URL> blocked`: set the issue Blocked. Route technical questions to the named
   decision owner; ask the user about product, scope or tradeoffs. Record the answer on
   the issue, set Active and notify the agent.
@@ -164,8 +165,9 @@ cost, not zero. Post the usage table on the spec when the final brief merges.
      work holds.
   2. A changed binding decision has a review hold: the tester reviews against the
      adopted decision.
-  3. A required check failed or the PR cannot merge: the implementer.
-  4. The latest review of the head by a required reviewer is not an LGTM: the
+  3. No PR: the implementer continues the eligible brief and opens the PR when ready.
+  4. A required check failed or the PR cannot merge: the implementer.
+  5. The latest review of the head by a required reviewer is not an LGTM: the
      implementer.
-  5. A required reviewer has not reviewed the head: that reviewer.
-  6. `observe` reports ready: the merge-confirming tester.
+  6. A required reviewer has not reviewed the head: that reviewer.
+  7. `observe` reports ready: the merge-confirming tester.

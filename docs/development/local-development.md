@@ -273,8 +273,8 @@ verification from the retained workflow files, using their PR path filters:
 | `dexter.yml` path match | Follow [Dexter verification scope](../../agent/lsp/README.md#verification-scope): tooling changes run the full suite; harness-only changes run real-daemon integration against a verified matching binary. The workflow owns selection for both local and hosted runs. |
 | `db-image.yml` path match | `scripts/db_smoke.sh`; see [extension-enabled database](#extension-enabled-database). Image publication stays paused. |
 
-Start `scripts/release_smoke.sh` in the background first (it uses Docker and ports 5437
-and 4300 only) and run the other checks meanwhile. Keep one smoke per machine. Before
+When the release row applies, start `scripts/release_smoke.sh` in the background first
+(it uses Docker and ports 5437 and 4300 only) and run the other checks meanwhile. Keep one smoke per machine. Before
 handoff, wait for its exit and keep its log.
 
 Run this verification once, at the PR head, before the push that opens the PR; on later
