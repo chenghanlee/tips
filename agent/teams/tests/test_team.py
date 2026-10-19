@@ -1005,12 +1005,13 @@ class HandoffTest(Harness):
         assert f"has not reported mergeability for {head} yet" in refused.stderr
         assert len(self.events("agent", "prompt")) == prompts
         assert len(self.comments("7")) == comments
-        self.update(pr_mergeable="MERGEABLE")
+        # A failed required check does not block the review handoff; the tester is told.
+        failed = {"name": "checks", "workflow": "CI", "bucket": "fail", "link": "https://ci/3"}
+        self.update(pr_mergeable="MERGEABLE", checks=[failed])
         self.team("turn", "7", "tester", pane=self.impl)
-        assert [e[2] for e in self.events("agent", "prompt")[prompts:]] == [
-            "team-1-tester",
-            "team-1-critic",
-        ]
+        sent = self.events("agent", "prompt")[prompts:]
+        assert [e[2] for e in sent] == ["team-1-tester", "team-1-critic"]
+        assert "Current failures: check:CI/checks is fail: https://ci/3." in sent[0][3]
 
     def test_turn_to_implementer_names_the_live_failures_from_any_tester_clone(self) -> None:
         self.push("team-1-impl")
