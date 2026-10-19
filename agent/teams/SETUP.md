@@ -116,7 +116,7 @@ Keep the repository's other rules. Add this Tips-specific entry:
 Preserve other settings and rule lists. Do not add a merge or handoff allow rule.
 Pair clients launch with allow rules for their own GitHub writes (`gh issue edit`,
 `gh issue comment`, `gh pr create`, `gh pr edit`, `gh pr comment`, `gh pr review`) and
-the harness scripts they run (`board.py`, `pr_review.py`, `retirement.py`); the
+the harness scripts they run (`board.py`, `pr_review.py`); the
 classifier judges everything else, including the merge and the handoff.
 Run `claude auto-mode config` to inspect the active context and
 `claude auto-mode critique` to find contradictory rules, then start a new
