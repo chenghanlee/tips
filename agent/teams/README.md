@@ -101,8 +101,8 @@ operator (the user) runs `reset` and `stop --abandon`.
 |---|---|---|
 | `agent/teams/team.py start <brief>` | Dispatcher | Read `Implementer:` and `Required reviews:`. Create an allocation for the implementer (bootstrap branch `task/<brief>`) and the merge-confirming tester. Launch both in the team's workspace (see [Herdr layout](#herdr-layout)), write the record, and post one EVENT per launch on the brief. |
 | `agent/teams/team.py design <issue> <entry>` | Dispatcher | Launch a configured designer in its own allocation. A started brief reuses its team slot; otherwise create or join a spec team. The issue names the lead, any critics and the question or design assignment. Post its launch EVENT on that issue. The adapter keeps the argument name `spec` for either issue number. |
-| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require your own clone to be clean at the PR head and the PR to close the brief. Record the PR's failures (see `observe`); refuse while a merge conflict finding is open. Notify every launched required reviewer of the head and the `bootstrap.py --commit` command that moves its clone there. For each reviewer not launched, post a pending EVENT on the PR and ask the dispatcher to run its `review` command. Try every send; report each failed one. |
-| `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Record the PR's failures, then notify the implementer with the open findings. Your clone's state does not block it. |
+| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require your own clone to be clean at the PR head and the PR to close the brief. Read the PR's live state (see `observe`); refuse unless GitHub reports the head mergeable. Notify every launched required reviewer of the head and the `bootstrap.py --commit` command that moves its clone there. For each reviewer not launched, post a pending EVENT on the PR and ask the dispatcher to run its `review` command. Try every send; report each failed one. |
+| `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Read the PR's live state, then notify the implementer with its merge conflict and failed required checks. Your clone's state does not block it. |
 | `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create its allocation, configured for the PR head, with its own database suffix and port, and launch the reviewer in the team's workspace. |
 | `agent/teams/team.py reset <issue> <entry>` | Operator | Record the operator's decision, after checking a stopped client's work on the issue and PR, that `start`, `design` or `review` may launch a replacement in the same allocation that gets the task again. Refuse a running client. |
 | `agent/teams/team.py stop <issue>` | Dispatcher | See [Retirement](#retirement). |
@@ -115,7 +115,7 @@ operator (the user) runs `reset` and `stop --abandon`.
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment; with `--after`, only the comments after that checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | Tokens per launched session and model, from the session logs. |
 | `agent/teams/pr_review.py list <pr>` | Any agent | Recent reviews and every unresolved thread. Display only. |
-| `agent/teams/pr_review.py observe <pr>` | Launched client | Read the head, base, mergeability, checks and reviews within one `timeouts.github_seconds` deadline; refuse a read during which the head or base changed. Required checks are the contexts the base branch's effective rules require; a required check that has not reported blocks, and other checks are only shown. Record each failure once as a FINDING on the PR; append a resolution naming the finding comment's ID when passing evidence for the same check appears; a resolution closes only the findings that the observation read as open. Unavailable evidence records and resolves nothing. Exit 0 only when the PR can merge at this head. |
+| `agent/teams/pr_review.py observe <pr>` | Launched client | Read the head, base, mergeability, checks and reviews within one `timeouts.github_seconds` deadline; refuse a read during which the head or base changed. Required checks are the contexts the base branch's effective rules require; a required check that has not reported blocks, and other checks are only shown. Post nothing. Judge only the current read: a merge conflict, unknown mergeability, unavailable evidence, a required check that has not passed, a missing or non-LGTM required review and an unresolved thread each block; an earlier failure that this read no longer shows does not. Exit 0 only when the PR can merge at this head. |
 | `agent/teams/pr_review.py resolve <thread>` | Thread opener | Resolve your own thread. |
 | `herdr agent prompt team-<slot>-<entry> "<review URL>"` | Other reviewer | Tell the merge-confirming tester a review exists. |
 | `herdr agent prompt dispatcher "<URL> done"` | Tester | The PR merged. |
@@ -209,7 +209,7 @@ first matching row:
 | A consequential QUESTION is unanswered, or its ANSWER is not incorporated | Hold affected work. The assigned decision owner answers; the implementer incorporates the linked decision. Notify the dispatcher if the owner is missing. |
 | A changed binding decision has a review hold | Tester: review against the adopted decision before clearing it, even at the same head. |
 | No PR | Implementer: continue the eligible brief and open the PR when ready. |
-| A required check failed, or a FINDING is open | Implementer: fix it. |
+| A required check failed, or the PR is not mergeable | Implementer: fix it. |
 | The latest review of the head by any reviewer in `Required reviews:` is not an LGTM | Implementer: address it. |
 | A required reviewer has not reviewed the head | That reviewer: review it. The handoff notified it or asked the dispatcher to launch it. |
 | `agent/teams/pr_review.py observe <pr>` reports ready to merge | Tester: merge. |
@@ -316,15 +316,16 @@ records; `observe` does not interpret issue comments as merge blockers.
 
 During the [CI pause](../../AGENTS.md#github-ci-pause), first verify the PR's applicable
 local check evidence and independent correctness/design review at the current head.
-`observe` reads GitHub state; it does not verify local test logs. An empty required-check
-list is not proof that local checks ran. Skip `gh pr checks --watch --required` while
-no GitHub checks are required. If a required-status rule still expects a paused job,
-report it to the user; do not bypass it or weaken other protections.
+`observe` reads GitHub state and posts nothing; it does not verify local test logs. An
+empty required-check list is not proof that local checks ran. Skip
+`gh pr checks --watch --required` while no GitHub checks are required. If a
+required-status rule still expects a paused job, report it to the user; do not bypass it
+or weaken other protections.
 
 Merge-confirming tester: satisfy the applicable check policy, then merge only when `observe`
 reports the PR ready at the head: every reviewer in `Required reviews:` has an LGTM as its
-latest review of that head, every thread is resolved, any GitHub-required checks pass, GitHub
-reports it mergeable and no FINDING is open.
+latest review of that head, every thread is resolved, any GitHub-required checks pass
+and GitHub reports it mergeable.
 
 ```sh
 # When CI is active and GitHub checks are required:
@@ -334,21 +335,14 @@ agent/teams/pr_review.py observe <pr>
 gh pr merge <pr> --merge --match-head-commit <sha>
 ```
 
-If a check failed or `observe` records a finding, run
+If a check failed or `observe` reports a merge conflict, run
 `agent/teams/team.py turn <pr> <implementer entry>` to notify the implementer. If `observe`
 reports evidence unavailable, run it again later; unavailable never counts as ready. If
 merge is refused for another reason, report `blocked` with the exact error.
 
 A pause-related CI-only hold can be replaced by a current-head review only after the
-reviewer verifies the replacement local evidence. Preserve real test failures. For an
-existing CI-only FINDING, link the pause policy and local evidence when resolving it
-with the procedure below; disabled Actions alone does not resolve findings.
+reviewer verifies the replacement local evidence. Preserve real test failures.
 
-A finding that no later check can resolve, for example after a required check was renamed
-or removed, is resolved by hand. Post a FINDING whose first body line is the finding's
-`TEAM_FINDING` marker with `"state":"resolved"` and `"resolves":<id>`, followed by the
-reason: `agent/teams/board.py post <pr> FINDING`. `<id>` is the number after
-`#issuecomment-` in the open finding's URL; a resolution closes only that comment's finding.
 After the merge closes the brief and deletes the branch, notify the dispatcher with `done`.
 
 ## Report and resolve blockers
