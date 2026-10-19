@@ -496,7 +496,11 @@ def client_args(allocation: Allocation, prompt: str, session: str) -> list[str]:
         spec["effort"],
         "--settings",
         json.dumps(
-            {"enabledPlugins": {"mix-credo@elixir-agent-tools": True, **NATIVE_LSP_PLUGINS}}
+            {
+                "enabledPlugins": {"mix-credo@elixir-agent-tools": True, **NATIVE_LSP_PLUGINS},
+                # No human reads a pair pane; a suggestion is a wasted request per turn.
+                "promptSuggestionEnabled": False,
+            }
         ),
         "--append-system-prompt",
         prompt,
