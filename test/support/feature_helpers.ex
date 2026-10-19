@@ -38,6 +38,9 @@ defmodule Tips.FeatureHelpers do
   end
 
   @doc "Signs `user` in through a magic link."
+  # Wallaby 0.31.0's `assert_has` macro (deps/wallaby/lib/wallaby/browser.ex:1171-1183) has a
+  # catch-all clause after `{:error, _}`; Dialyzer reports it at the call site.
+  @dialyzer {:no_match, sign_in: 2}
   def sign_in(session, user) do
     {token, _hashed} = generate_user_magic_link_token(user)
 

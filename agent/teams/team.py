@@ -79,7 +79,6 @@ from github import (
     event_posted,
     merged_brief,
     post_event,
-    poster,
     pull_request,
     retirement_reports,
     roster,
@@ -644,6 +643,7 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
     enter(pane, root, agent_env(allocation))
     allocation["submission"], allocation["session"] = UNKNOWN, session
     save_record(record)
+    timeouts = conf.settings()["timeouts"]
     herdr(
         "agent",
         "start",
@@ -653,9 +653,11 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
         "--pane",
         pane,
         "--timeout",
-        str(conf.settings()["timeouts"]["launch_seconds"] * 1000),
+        str(timeouts["launch_seconds"] * 1000),
         "--",
         *args,
+        # Herdr's own launch timeout must answer before this one kills the command.
+        timeout=timeouts["launch_seconds"] + timeouts["shell_seconds"],
     )
     started = herdr("agent", "get", pane)["agent"]
     reported = session_id(started)
@@ -865,14 +867,15 @@ def required_reviewers(record: Record) -> list[str]:
     return [record["tester"], *testers, *designers]
 
 
-def observe_pr(pr: PullRequest, allocation: Allocation) -> tuple[list[tuple[str, str]], str]:
-    """Record the PR's failures at its head as the caller. Return each open finding's check
-    and URL, and the conflict the current read shows: "current", "unknown" or ""."""
+def observe_pr(pr: PullRequest) -> tuple[str, list[str]]:
+    """Read the PR at the handed-off head. Return GitHub's mergeability (MERGEABLE,
+    CONFLICTING or UNAVAILABLE) and the live failures the implementer must fix."""
     import pr_review  # pr_review imports this module, so load it only when needed.
 
-    state, known = pr_review.observe(int(pr.number), poster(allocation), pr.head)
-    conflict = {"CONFLICTING": "current", pr_review.UNAVAILABLE: "unknown"}
-    return [(f.check, url) for f, url in known.items()], conflict.get(state.mergeable, "")
+    state = pr_review.read_state(int(pr.number))
+    if state.head != pr.head:
+        raise RuntimeError(f"PR {pr.number} moved from {pr.head} to {state.head}; nothing sent")
+    return state.mergeable, pr_review.failures(state)
 
 
 def request_launch(record: Record, me: str, pr: PullRequest, missing: list[str]) -> list[str]:
@@ -891,14 +894,12 @@ def request_launch(record: Record, me: str, pr: PullRequest, missing: list[str])
     return failed + deliver([("dispatcher", f"{pr.url} review: run {commands}")])
 
 
-def hand_to_reviewers(
-    record: Record, me: str, pr: PullRequest, known: list[tuple[str, str]]
-) -> None:
+def hand_to_reviewers(record: Record, me: str, pr: PullRequest, failures: list[str]) -> None:
     """Notify every required reviewer of one head; request launch of the missing ones."""
     reviewers = required_reviewers(record)
     missing = [entry for entry in reviewers if entry not in record["agents"]]
     tester = live_name(record["slot"], record["tester"])
-    sends = [(tester, tester_message(record, pr, missing, known))]
+    sends = [(tester, tester_message(record, pr, missing, failures))]
     sends += [
         (live_name(record["slot"], entry), reviewer_notice(record, entry, pr))
         for entry in reviewers[1:]
@@ -917,8 +918,8 @@ def hand_to_reviewers(
 def turn(number: str, recipient: str) -> None:
     """Hand a pushed head to every required reviewer, or hand findings to the implementer.
 
-    Both directions first record the PR's failures; a failure that cannot be recorded
-    blocks the handoff.
+    Both directions first read the PR's live state and name its current failures. A head
+    that GitHub does not report mergeable is not handed to the reviewers.
     """
     record, me = caller_record()
     pair = {record["implementer"], record["tester"]}
@@ -934,16 +935,15 @@ def turn(number: str, recipient: str) -> None:
         problem = checkout_problem(project_of(record["agents"][me]), pr.head)
         if problem:
             raise RuntimeError(f"{problem} Commit and push, then hand over.")
-    known, conflict = observe_pr(pr, record["agents"][me])
-    conflicts = [link for check, link in known if check == "mergeability"]
-    if recipient == record["tester"] and conflicts:
-        raise RuntimeError(conflict_refusal(pr.head, conflicts, conflict))
+    mergeable, failures = observe_pr(pr)
+    if recipient == record["tester"] and mergeable != "MERGEABLE":
+        raise RuntimeError(conflict_refusal(pr.head, mergeable))
     if recipient == record["implementer"]:
         partner = live_name(record["slot"], recipient)
-        herdr("agent", "prompt", partner, implementer_message(pr, known))
+        herdr("agent", "prompt", partner, implementer_message(pr, failures))
         print(f"Notified {partner}")
     else:
-        hand_to_reviewers(record, me, pr, known)
+        hand_to_reviewers(record, me, pr, failures)
     print("End your turn now.")
 
 
