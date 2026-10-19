@@ -37,7 +37,10 @@ Read this and your role file at launch and after compaction.
 - Append comments without editing earlier comments. The dispatcher or design lead
   creates a brief; after launch only its implementer maintains its body and PR body.
   The lead maintains a shared spec. Link authoritative decisions instead of copying
-  competing versions. Incorporate an ANSWER before resuming affected work.
+  competing versions: briefs link the source issue and the design sections at their
+  commit instead of copying them; for checks, they link
+  [AGENTS.md#checks](../../../AGENTS.md#checks) and list only additions or exceptions.
+  Incorporate an ANSWER before resuming affected work.
 - The implementer records agreed additional reviewers in `Required reviews:`. The
   pair's implementer and merge-confirming tester cannot change after launch. Body
   authorship does not permit removing required review or waiving a finding.

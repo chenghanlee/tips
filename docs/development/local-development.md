@@ -269,13 +269,19 @@ verification from the retained workflow files, using their PR path filters:
 |---|---|
 | Introduced-commit secret scan, every PR | Run Gitleaks as below, with redacted output. |
 | Application steps in `checks.yml` (changes beyond Markdown and `agent/`) | `mix deps.get --check-locked`, the [application checks](../../README.md#test-changes), `mix assets.setup && mix assets.build`, migration rollback/reapply below, and the [full browser suite](#browser-tests-and-ci), including both pinned version checks. |
-| Release job in `checks.yml` (any non-Markdown change) | `scripts/release_smoke.sh`; see [local application release](#local-application-release) for its exclusive resources and prerequisites. |
+| Release job in `checks.yml` (image inputs changed: `lib/`, `config/`, `priv/`, `assets/`, `rel/`, `db/`, `mix.exs`, `mix.lock`, `Dockerfile`, `compose.yaml`, `.dockerignore`, `scripts/release*` or `.github/workflows/`) | `scripts/release_smoke.sh`; see [local application release](#local-application-release) for its exclusive resources and prerequisites. |
 | `dexter.yml` path match | Follow [Dexter verification scope](../../agent/lsp/README.md#verification-scope): tooling changes run the full suite; harness-only changes run real-daemon integration against a verified matching binary. The workflow owns selection for both local and hosted runs. |
 | `db-image.yml` path match | `scripts/db_smoke.sh`; see [extension-enabled database](#extension-enabled-database). Image publication stays paused. |
 
-Run this verification once, at the PR head, before the push that opens or updates the
-PR. Do not repeat it on `main`: the merge-base already passed review. Per commit, run
-only the fast checks for the files you touched ([AGENTS.md](../../AGENTS.md#checks)).
+Start `scripts/release_smoke.sh` in the background first (it uses Docker and ports 5437
+and 4300 only) and run the other checks meanwhile. Keep one smoke per machine. Before
+handoff, wait for its exit and keep its log.
+
+Run this verification once, at the PR head, before the push that opens the PR; on later
+heads rerun the checks the new commits affect. Do not repeat it on `main`; only the
+[failed-check rule](../../agent/teams/README.md#report-and-resolve-blockers) reruns
+failed tests there. Per commit, run only the fast checks for the files you touched
+([AGENTS.md](../../AGENTS.md#checks)).
 
 For migration rollback/reapply, use a disposable database with your own suffix and
 `MIX_ENV=test`: `mix ecto.create && mix ecto.migrate && mix ecto.rollback --all && mix ecto.migrate`.
@@ -327,7 +333,8 @@ export TIPS_CHROMEDRIVER='/absolute/path/to/chromedriver'
 mix deps.get --check-locked
 mix assets.setup
 mix assets.build
-mix test --include browser --trace
+TIPS_BROWSER=1 mix test test/tips_web/features --trace
+# Plain `mix test` covers the rest, so the unit suite runs once per head.
 # Or select only the smoke tests:
 TIPS_BROWSER=1 mix test test/tips_web/features/live_smoke_test.exs --trace
 ```

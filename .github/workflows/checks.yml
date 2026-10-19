@@ -156,11 +156,12 @@ jobs:
         with:
           fetch-depth: 0
       - name: Detect what changed
-        # A PR that changes only Markdown skips the release build.
+        # A PR that changes no image or smoke input skips the release build.
         id: changes
         run: |
           if [ "$GITHUB_EVENT_NAME" != pull_request ] ||
-            ! git diff --quiet "origin/$GITHUB_BASE_REF...HEAD" -- . ':(exclude)*.md'; then
+            ! git diff --quiet "origin/$GITHUB_BASE_REF...HEAD" -- lib config priv assets rel db \
+              mix.exs mix.lock Dockerfile compose.yaml .dockerignore 'scripts/release*' .github/workflows; then
             echo 'code=true' >> "$GITHUB_OUTPUT"
           fi
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3

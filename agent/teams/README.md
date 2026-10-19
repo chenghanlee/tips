@@ -363,13 +363,16 @@ the answer on the issue; the implementer incorporates it before affected work re
 Set Active and notify the agent when the blocker is resolved. Do
 not run or retry a denied command on another agent's behalf.
 
-If an implementer's failing check also fails on fetched `main`, the implementer
-reports `blocked` with evidence for both SHAs. During the CI pause, reproduce locally
-in an isolated checkout with owned test resources; otherwise link the CI runs. Do not
-attribute a billing or unavailable-run failure to the code. The dispatcher routes the
-revert of the PR that broke `main` through the
-[revert task](roles/tester.md#revert-a-broken-main). Diagnosis that needs access outside
-the tester's allocation goes to the user. Then fix the original issue.
+If a required check fails at the head, rerun only the failed tests, alone, at the head.
+If they fail again, the failure is the PR's to fix unless the user grants a bounded
+exception. If they pass, rerun the same tests alone in a worktree of fetched
+`origin/main`:
+
+- They pass on `main`: the failure is the PR's to fix, with the same exception.
+- The same failure on `main`, and a linked open issue names those tests: the failure is
+  pre-existing. Record both logs and the issue in the PR body; it is not a blocker.
+- The failure reproduces alone on `main` with no PR-side cause and no such issue:
+  report `blocked` with both SHAs. The dispatcher opens a revert brief.
 
 ## Constraints
 
