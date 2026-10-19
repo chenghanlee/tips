@@ -14,6 +14,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 from pathlib import Path
@@ -42,9 +43,21 @@ def test_ids(patterns: list[str]) -> list[str]:
 def chunks(ids: list[str], jobs: int) -> list[list[str]]:
     serial = [i for i in ids if SERIAL in i]
     rest = [i for i in ids if SERIAL not in i]
+    if jobs == 1:
+        return [rest + serial]
     workers = max(1, min(jobs - bool(serial), len(rest)))
     groups = [rest[n::workers] for n in range(workers)]
     return [g for g in [*groups, serial] if g]
+
+
+def start_worker(group: list[str], log: Path) -> subprocess.Popen[bytes]:
+    """Start one unittest process writing to a log file. A pipe would stay open while a
+    background child of a failed test still holds the inherited descriptors."""
+    with log.open("wb") as sink:
+        # Reviewed S603: this interpreter and discovered test ids, no shell.
+        return subprocess.Popen(  # noqa: S603
+            [sys.executable, "-m", "unittest", *group], cwd=TEAMS, stdout=sink, stderr=sink
+        )
 
 
 def main() -> int:
@@ -52,31 +65,26 @@ def main() -> int:
     parser.add_argument("-j", "--jobs", type=int, default=os.cpu_count() or 2)
     parser.add_argument("-k", action="append", default=[], help="keep ids containing this")
     args = parser.parse_args()
+    if args.jobs < 1:
+        parser.error("--jobs must be at least 1")
     ids = test_ids(args.k)
     if not ids:
         return int(print("parallel: no tests selected", file=sys.stderr) or 1)
     started = time.monotonic()
-    # Reviewed S603: this interpreter and discovered test ids, no shell.
-    runs = [
-        subprocess.Popen(  # noqa: S603
-            [sys.executable, "-m", "unittest", *group],
-            cwd=TEAMS,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
-        for group in chunks(ids, args.jobs)
-    ]
-    outputs = [run.communicate()[0] for run in runs]
+    groups = chunks(ids, args.jobs)
+    with tempfile.TemporaryDirectory(prefix="parallel-") as logs:
+        files = [Path(logs) / f"{n}.log" for n in range(len(groups))]
+        workers = [start_worker(g, f) for g, f in zip(groups, files, strict=True)]
+        runs = [(w.wait(), f.read_text()) for w, f in zip(workers, files, strict=True)]
     ran = skipped = 0
     failed = False
-    for run, output in zip(runs, outputs, strict=True):
+    for code, output in runs:
         tail = output.rstrip().splitlines()[-3:]
         counts = re.search(r"Ran (\d+) tests?", output)
         ran += int(counts.group(1)) if counts else 0
         skips = re.search(r"skipped=(\d+)", output)
         skipped += int(skips.group(1)) if skips else 0
-        if run.returncode or not counts:
+        if code or not counts:
             failed = True
             print(output)
         elif tail:
