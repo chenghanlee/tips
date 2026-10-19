@@ -126,7 +126,7 @@ def repo_args() -> list[str]:
 def issue_comments(issue: str, deadline: float | None = None) -> list[dict[str, object]]:
     """Return issue comments oldest first, with id, html_url, body and created_at fields.
 
-    Deduplication and finding folds need every comment, so a truncated read raises.
+    Deduplication and report folds need every comment, so a truncated read raises.
     """
     deadline = deadline or deadline_from_now()
     path = f"repos/{repository()}/issues/{issue}/comments?per_page=100"

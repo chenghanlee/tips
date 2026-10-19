@@ -341,15 +341,9 @@ elif a[:2] == ["pr", "view"]:
     }
     out = json.dumps({key: view[key] for key in a[a.index("--json") + 1].split(",")})
 elif a[:2] == ["pr", "checks"]:
-    # The head can move, or another observer can post, while a reader is between its
-    # first and last view.
+    # The head can move while a reader is between its first and last view.
     if "head_after_checks" in s:
         s["pr_head"] = s.pop("head_after_checks")
-    posts = s.pop("post_on_checks", [])
-    for body in [posts] if isinstance(posts, str) else posts:
-        n = sum(len(c) for c in comments.values()) + 1
-        url = "https://github.com/o/r/issues/%s#issuecomment-%d" % (a[2], n)
-        comments.setdefault(a[2], []).append({"id": n, "html_url": url, "body": body})
     rows = s.get("checks", PASSING)
     buckets = {row["bucket"] for row in rows}
     if s.get("checks_error"):
@@ -368,8 +362,6 @@ elif a[0] == "api" and "/rules/branches/" in a[1]:
     required = [{"context": name} for name in s.get("required", ["checks", "release"])]
     rule = {"type": "required_status_checks", "parameters": {"required_status_checks": required}}
     out = json.dumps([{"type": "deletion"}, *([rule] if required else [])])
-elif a[0] == "api" and "/comments?" in a[1] and s.get("history_fails"):
-    out, code = "fixture comment-history unavailable", 1
 elif a[0] == "api" and "/comments?" in a[1]:
     issue = a[1].split("/issues/")[1].split("/")[0]
     page = int(a[1].rsplit("page=", 1)[1])

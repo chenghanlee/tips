@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from config import Allocation, Record, agent_spec, allocation_paths, harness, live_name, project_of
-from github import PullRequest
+from github import PullRequest, event_role
 
 
 def bootstrap_brief(allocation: Allocation, commit: str) -> str:
@@ -11,13 +11,15 @@ def bootstrap_brief(allocation: Allocation, commit: str) -> str:
     instructions: the client starts in the allocation directory, outside the clone."""
     _, project, logs, _ = allocation_paths(allocation["id"])
     command = f"python3 {harness() / 'bootstrap.py'}" + (f" --commit {commit}" if commit else "")
+    role = f"agent/teams/roles/{event_role(allocation)}.md"
     return (
         f"Your allocation is {allocation['id']}; your project is {project}. First run "
         f"{command}: it clones the repository into the project or reuses your clone, fetches "
         "dependencies and starts Dexter. Its full log is in "
         f"{logs}. If it fails, report blocked with its error and stop; do not prepare the "
-        f"project another way. Then work only in {project}: read its AGENTS.md and "
-        "agent/teams/README.md; they were not loaded at startup. "
+        f"project another way. Then work only in {project}: read its AGENTS.md, "
+        f"agent/teams/roles/common.md and {role}; they were not loaded at startup. Read "
+        "agent/teams/README.md sections only where those files or messages link them. "
     )
 
 
@@ -58,10 +60,10 @@ def pair_brief(record: Record, entry: str, duty: str) -> str:
     return (
         identity(record, entry, duty)
         + bootstrap_brief(allocation, "")
-        + f"Then read the brief with gh issue view {record['brief']}. Use the README restart "
-        "rule, including pending decisions and current issue comments, to find whose turn "
-        "it is. If yours, continue the workflow; otherwise end your "
-        "turn and wait for a message. "
+        + f"Then read the brief with gh issue view {record['brief']}. Use the restart rule "
+        "in the README Turns section, including pending decisions and current issue "
+        "comments, to find whose turn it is. If yours, continue the workflow; otherwise end "
+        "your turn and wait for a message. "
         + handoff
         + f"Put {entry}, <session> on line 2 of each review record; replace <session> with "
         "your session ID. " + dexter_brief(project_of(allocation) / ".dexter/dexter.sh")
@@ -72,14 +74,22 @@ def turn_command(recipient: str) -> str:
     return f"python3 {harness() / 'team.py'} turn <pr> {recipient}"
 
 
+REVIEW_STEPS = {
+    "reviewing designer": 'Follow "Steps: reviewing designer" in agent/teams/roles/designer.md '
+    "and agent/skills/review-software-design/SKILL.md. ",
+    "additional tester": "Follow the review steps in agent/teams/roles/tester.md. ",
+}
+
+
 def reviewer_brief(record: Record, entry: str, duty: str, pr: PullRequest) -> str:
     allocation = record["agents"][entry]
     tester = live_name(record["slot"], record["tester"])
     return (
         identity(record, entry, duty)
         + bootstrap_brief(allocation, pr.head)
-        + f"Review PR {pr.url} at {pr.head} from your own clone. Follow the README reviewer steps. "
-        "Never run team.py turn. Submit the README review record with "
+        + f"Review PR {pr.url} at {pr.head} from your own clone. "
+        + REVIEW_STEPS[duty]
+        + "Never run team.py turn. Submit the README review record with "
         f"{entry}, <session> on line 2; replace <session> with your session ID. "
         "Then notify the merge-confirming tester with "
         f"herdr agent prompt {tester} '<your review URL>' and end your turn. "
@@ -100,7 +110,7 @@ def design_brief(record: Record, entry: str) -> str:
     return (
         identity(record, entry, "designer")
         + bootstrap_brief(allocation, "")
-        + "Read agent/teams/roles/designer.md, then the issue with "
+        + "Read the issue with "
         f"gh issue view {record['brief']}; it names the lead and any critics. "
         + assignment
         + "Use "
@@ -118,25 +128,21 @@ def launch_text(allocation: Allocation) -> str:
     )
 
 
-def findings_text(known: list[tuple[str, str]]) -> str:
-    if not known:
-        return ""
-    return "Open findings: " + "; ".join(f"{check} {url}" for check, url in known) + ". "
+def failures_text(failures: list[str]) -> str:
+    return "Current failures: " + "; ".join(failures) + ". " if failures else ""
 
 
 def bootstrap_command(head: str) -> str:
     return f"python3 {harness() / 'bootstrap.py'} --commit {head}"
 
 
-def tester_message(
-    record: Record, pr: PullRequest, missing: list[str], known: list[tuple[str, str]]
-) -> str:
+def tester_message(record: Record, pr: PullRequest, missing: list[str], failures: list[str]) -> str:
     implementer, tester = record["implementer"], record["tester"]
     message = f"Your turn: review {pr.url} at {pr.head}. This handoff notified every launched "
     message += "required reviewer of this head"
     if missing:
         message += f" and asked the dispatcher to launch {', '.join(missing)}"
-    message += ". " + findings_text(known)
+    message += ". " + failures_text(failures)
     message += (
         f"Move your own clone to the head first: {bootstrap_command(pr.head)}; it refuses a "
         "dirty clone. Follow agent/teams/roles/tester.md and "
@@ -166,12 +172,12 @@ def reviewer_notice(record: Record, entry: str, pr: PullRequest) -> str:
     )
 
 
-def implementer_message(pr: PullRequest, known: list[tuple[str, str]]) -> str:
+def implementer_message(pr: PullRequest, failures: list[str]) -> str:
     tools = harness() / "pr_review.py"
     message = f"Your turn on {pr.url}: run python3 {tools} list {pr.number} and "
-    message += f"python3 {tools} observe {pr.number}. " + findings_text(known)
+    message += f"python3 {tools} observe {pr.number}. " + failures_text(failures)
     message += (
-        "Fix review findings, failed checks and open findings following "
+        "Fix review findings, failed checks and merge conflicts following "
         "agent/skills/implement-software/SKILL.md from your clone. Push your changes, then "
         "run turn to the tester again; it notifies every required reviewer. "
         "If blocked, follow the README blocker procedure."
@@ -179,13 +185,14 @@ def implementer_message(pr: PullRequest, known: list[tuple[str, str]]) -> str:
     return message
 
 
-def conflict_refusal(head: str, links: list[str], conflict: str) -> str:
-    if conflict == "unknown":
+def conflict_refusal(head: str, mergeable: str) -> str:
+    """Why a head whose mergeability is CONFLICTING or UNAVAILABLE is not handed off."""
+    if mergeable == "CONFLICTING":
         return (
-            f"Known merge conflict {', '.join(links)}, and GitHub has not reported "
-            f"mergeability for {head} yet: rerun turn shortly. Nobody was notified."
+            f"Merge conflict at {head}: merge origin/main and push, or report blocked. "
+            "Nobody was notified."
         )
     return (
-        f"Known merge conflict {', '.join(links)}: merge origin/main and push, or report "
-        "blocked. Nobody was notified."
+        f"GitHub has not reported mergeability for {head} yet (mergeable {mergeable}): "
+        "rerun turn shortly. Nobody was notified."
     )

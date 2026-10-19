@@ -58,7 +58,7 @@ if a[:2] == ["issue", "view"] and "title" in a[a.index("--json") + 1]:
     sys.exit(0)
 if a[:2] == ["pr", "view"] and "mergeStateStatus" in a[a.index("--json") + 1]:
     pass
-elif a[:2] not in (["issue", "create"], ["pr", "checks"], ["pr", "list"]) and a[0] != "project":
+elif a[:2] not in (["issue", "create"], ["pr", "list"]) and a[0] != "project":
     os.execv(base, [base, *a])
 s.setdefault("events", []).append(["gh", *a])
 path.write_text(json.dumps(s))
@@ -68,9 +68,6 @@ if a[:2] == ["issue", "create"]:
 elif a[:2] == ["pr", "view"]:
     print(json.dumps({"number": int(a[2]), "state": s.get("pr_state", "OPEN"),
                       "headRefOid": s.get("pr_head", ""), "mergeable": "MERGEABLE"}))
-elif a[:2] == ["pr", "checks"]:
-    print(json.dumps([{"name": "checks", "state": "PENDING", "bucket": "pending", "link": "L"}]))
-    sys.exit(8)
 elif a[:2] == ["pr", "list"]:
     print(json.dumps([{"number": 7, "title": "Brief 29", "state": "OPEN"}]))
 elif a[1] == "view":
@@ -218,7 +215,8 @@ class AdapterTest(Harness):
             await self.call(client, "launch_reviewer", pr=7, entry="critic")
             state = await self.call(client, "pr_state", pr=7)
             assert head in state
-            assert '"bucket": "pending"' in state
+            assert '"mergeable": "MERGEABLE"' in state
+            assert "checks" not in state  # no required-checks call or message
 
         self.session(review)
         assert len(self.events("mix")) == mixes

@@ -8,8 +8,10 @@ Usage:
   agent/teams/board.py usage <issue>...
 
 post prints the comment URL. If the same comment already exists, it returns that URL
-instead of posting again. When you post an EVENT for a new occurrence, use different
-comment text. A relaunch already differs because its header has a new session ID.
+instead of posting again. A worker's BLOCKED post then sends the dispatcher
+`<comment URL> blocked`; if that fails, rerun the command to retry only the notice.
+When you post an EVENT for a new occurrence, use different comment text. A relaunch
+already differs because its header has a new session ID.
 Header format: `<TYPE> <role> <name> <session>`. The Herdr pane supplies
 the name and session; the allocation record supplies the role. Use --role if no record
 names you, or --as to post for another agent (for example, a launch or takeover record).
@@ -33,6 +35,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 from collections import defaultdict
 from collections.abc import Iterator
@@ -97,7 +100,19 @@ def post_as(issue: str, kind: str, poster: tuple[str, str, str], text: str) -> s
 
 
 def post(args: argparse.Namespace) -> None:
-    print(post_as(args.issue, args.type, identity(args), sys.stdin.read()))
+    poster = identity(args)
+    url = post_as(args.issue, args.type, poster, sys.stdin.read())
+    print(url, flush=True)
+    if args.type != "BLOCKED":
+        return
+    try:
+        herdr("agent", "prompt", "dispatcher", f"{url} blocked")
+    except (RuntimeError, OSError, ValueError, subprocess.TimeoutExpired) as error:
+        raise RuntimeError(
+            f"posted {url}; notifying the dispatcher failed: {error}. The post reuses an "
+            "identical comment, so rerun this command to retry only the notification"
+        ) from error
+    print("Notified dispatcher")
 
 
 def read_text(issue: str, after: int | None) -> str:
