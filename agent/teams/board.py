@@ -20,9 +20,10 @@ Create a gist before linking a log:
 read prints the current issue body and every comment, or only comments after the given
 comment.
 
-usage prints a Markdown table with token counts by model for each session named in a
+usage prints a Markdown table with token counts by model for each client named in a
 launch EVENT. team.py posts one EVENT per launch; the dispatcher posts one for a manual
-launch. The command reads Claude logs from `~/.claude/projects`, including advisor calls
+launch. A Codex client's row sums every session started in the allocation its EVENT
+names. The command reads Claude logs from `~/.claude/projects`, including advisor calls
 and subagents, and Codex logs from `~/.codex/sessions`. Input counts show uncached input;
 cache reads and writes have separate columns. Counts cover the session's full lifetime,
 so use fresh sessions for a trial or compare tables from before and after it.
@@ -55,6 +56,7 @@ from herdr import herdr, session_id
 from team import records
 
 WORD_LIMIT = 800
+CODEX_LAUNCH = re.compile(r"launched codex in (?P<root>[^;]+);")
 COUNTS = ("Input", "Output", "Cache read", "Cache write")
 
 
@@ -196,47 +198,66 @@ def codex_tokens(session: str) -> dict[str, list[int]]:
     return totals
 
 
-def launched_sessions(issues: list[str]) -> list[tuple[str, str, str]]:
-    """Return unique (name, role, session) tuples from launch EVENTs, sorted by name.
+def codex_sessions_by_cwd() -> dict[str, set[str]]:
+    """Each working directory's Codex session ids, from the `session_meta` line that opens
+    every rollout log. A file without one is skipped and named on stderr."""
+    found: dict[str, set[str]] = defaultdict(set)
+    for file in (Path.home() / ".codex/sessions").glob("*/*/*/rollout-*.jsonl"):
+        try:
+            with file.open() as lines:
+                entry = json.loads(lines.readline())
+            payload = entry["payload"] if entry.get("type") == "session_meta" else {}
+            found[str(payload["cwd"])].add(str(payload["id"]))
+        except (ValueError, KeyError, TypeError, AttributeError):
+            print(f"board: {file} has no session_meta first line; not counted", file=sys.stderr)
+    return found
+
+
+def launched_sessions(issues: list[str]) -> list[tuple[str, str, list[str]]]:
+    """Return (name, role, sessions) for each client a launch EVENT names, sorted by name.
 
     Codex reports its session to Herdr only after startup, so its launch EVENT may say
-    "unknown" (#451). Its client's later comment headers, on any of the issues or PRs
-    given, carry the real session: every known session in them counts, so a replacement
-    client after a reset counts too. With none, the "unknown" row stays.
+    "unknown" (#451). A Codex launch EVENT names the allocation root the client starts in,
+    and Codex records that directory as the `cwd` of each rollout: every session started
+    there counts in one row, a replacement after a reset included. With none, the EVENT's
+    session stays.
     """
-    comments = [c for issue in issues for c in issue_comments(issue)]
-    comments.sort(key=lambda c: (str(c.get("created_at")), int(str(c.get("id")))))
-    unknown = header_session("")
-    found: set[tuple[str, str, str]] = set()
-    unresolved: dict[str, str] = {}
-    roles: dict[str, str] = {}
-    for comment in comments:
+    clients: dict[tuple[str, str, str], set[str]] = defaultdict(set)
+    roots: dict[tuple[str, str, str], str] = {}
+    for comment in (c for issue in issues for c in issue_comments(issue)):
         parsed = parse_comment(comment)
         if not parsed:
             continue
         match, lines = parsed
-        name, role, session = match["name"], match["role"], match["session"]
-        launched = bool(lines) and lines[0].split()[:1] == ["launched"]
-        if match["type"] == "EVENT" and launched and session == unknown:
-            roles[name] = role
-            unresolved.setdefault(name, role)
-        elif match["type"] == "EVENT" and launched:
-            found.add((name, role, session))
-        elif name in roles and session != unknown:
-            found.add((name, roles[name], session))
-            unresolved.pop(name, None)
-    found.update((name, role, unknown) for name, role in unresolved.items())
-    return sorted(found)
+        if match["type"] != "EVENT" or lines[:1] == [] or lines[0].split()[:1] != ["launched"]:
+            continue
+        codex = CODEX_LAUNCH.match(lines[0])
+        key = (match["name"], match["role"], codex["root"] if codex else match["session"])
+        clients[key].add(match["session"])
+        if codex:
+            roots[key] = codex["root"]
+    by_cwd = codex_sessions_by_cwd() if roots else {}
+    unknown = header_session("")
+    rows: list[tuple[str, str, list[str]]] = []
+    for key, sessions in sorted(clients.items()):
+        started = by_cwd.get(roots[key], set()) if key in roots else set()
+        found = (sessions | started) - {unknown}
+        rows.append((key[0], key[1], sorted(found or sessions)))
+    return rows
 
 
 def usage_table(issues: list[str]) -> str:
-    """A Markdown table of token counts by model for each session the issues' launch EVENTs name."""
+    """A Markdown table of token counts by model for each client the issues' launch EVENTs name."""
     columns = ("Agent", "Role", "Session", "Model", *COUNTS)
     rows = ["| " + " | ".join(columns) + " |", "|" + "---|" * len(columns)]
-    for name, role, session in launched_sessions(issues):
-        tokens = claude_tokens(session) or codex_tokens(session) or {"no logs found": [0, 0, 0, 0]}
-        for model, counts in sorted(tokens.items()):
-            rows.append("| " + " | ".join([name, role, session, model, *map(str, counts)]) + " |")
+    for name, role, sessions in launched_sessions(issues):
+        tokens: dict[str, list[int]] = defaultdict(lambda: [0, 0, 0, 0])
+        for session in sessions:
+            for model, counts in (claude_tokens(session) or codex_tokens(session)).items():
+                tokens[model] = [a + b for a, b in zip(tokens[model], counts, strict=True)]
+        listed = ", ".join(sessions)
+        for model, counts in sorted((tokens or {"no logs found": [0, 0, 0, 0]}).items()):
+            rows.append("| " + " | ".join([name, role, listed, model, *map(str, counts)]) + " |")
     return "\n".join(rows)
 
 
