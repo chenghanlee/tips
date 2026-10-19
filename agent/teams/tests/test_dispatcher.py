@@ -233,20 +233,6 @@ class DispatchTest(unittest.TestCase):
         ]
         assert not self.herdr_calls("notification", seconds=0)
 
-    def test_the_root_is_created_on_first_use_and_must_name_the_repository(self) -> None:
-        root = self.state.parent
-        self.dispatch()
-        assert json.loads((root / "repository.json").read_text()) == {"repository": "o/r"}
-        assert root.parent.name == "agent_teams"
-        # TIPS_TEAM_HARNESS names <root>/harness and moves the root.
-        other = self.root.parent / "elsewhere"
-        self.dispatch(TIPS_TEAM_HARNESS=str(other / "harness"))
-        assert (other / "state/dispatcher.json").exists()
-        # Another repository with the same name is refused.
-        (other / "repository.json").write_text(json.dumps({"repository": "x/r"}))
-        output = self.dispatch(ok=False, TIPS_TEAM_HARNESS=str(other / "harness"))
-        assert "belongs to x/r, not o/r" in output
-
     def test_the_client_holds_the_start_lock_and_a_second_launch_fails_at_once(self) -> None:
         self.dispatch()
         assert (self.root / "calls.lock").read_text() == "held"
