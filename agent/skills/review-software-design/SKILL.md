@@ -17,24 +17,22 @@ Scope limits:
   duplicate passes or reports. Apply the P2 limit across the combined review.
 - One pass. Report every P0 and P1. Report at most three P2 findings, the ones with the
   greatest consequence. Combine findings only when they share a cause and fix.
-- Deferrals follow the [severity rule](../../teams/README.md#severity): a recorded
-  deferral settles P2 while its assumptions hold; a reached trigger or invalidating
-  evidence returns it to its decision owner, without automatically raising severity.
-  It never settles P0 or P1. A shortcut the brief did not accept
-  is a P2 with a proposed deferral, not a demand for completeness.
+- Deferrals follow the [severity rule](../../teams/README.md#severity). A shortcut the
+  brief did not accept is a P2 with a proposed deferral, not a demand for completeness.
 - For a local review with no PR, use the user's brief and report in the form the user
   asked for. Do not publish a GitHub review.
-- Use Credo, Dialyzer and the formatter for style checks. Review conventions only where
-  the change violates its stack skill in AGENTS.md. Cite the skill. Report one finding
-  per repeated pattern.
+- Leave style to Credo, Dialyzer and the formatter, which the tester runs. Review
+  conventions only where the change violates its stack skill in AGENTS.md. Cite the
+  skill. Report one finding per repeated pattern.
 
 ## Step 1: Inputs
 
 1. The brief's contracts, the spec's shared contracts and decisions table.
 2. The head SHA. Record it.
 3. The diff against the PR base, and the callers of every changed public function.
-4. Write your concerns. Then read the [PR body](../../teams/README.md#pr-body) and
-   verify its affected code and decisions against the diff.
+4. Record your concerns as the [review record](../../teams/README.md#pr-review-record)
+   says, then verify the [PR body](../../teams/README.md#pr-body)'s affected code and
+   decisions against the diff.
 
 ## Step 2: Match the brief
 
@@ -98,8 +96,8 @@ Limit tests to the brief's scenarios and contracts.
   tests-without-a-scenario-line section. If neither applies, report P2 to delete it.
 - Each test fails if its contract breaks, and passes for one reason. Ask to delete a
   test only when surviving tests cover its distinct required cases. Name them.
-- Flag combination grids, one test per error tuple, tests of private helpers, restated
-  pattern matches, tests that only assert the database raises.
+- Flag tests that the implementation skill's [Tests](../implement-software/SKILL.md#tests)
+  bans by default.
 - Check the net test change against the brief's test budget and the PR body's reasons.
   Check that replaced tests were deleted.
 - Raise a test's correctness only when you can show the case where it passes wrongly.
@@ -109,6 +107,6 @@ Limit tests to the brief's scenarios and contracts.
 Severity follows the [severity table](../../teams/README.md#severity). For every P2,
 state the proposed change or the deferral line to add.
 
-Submit the [PR review record](../../teams/README.md#pr-review-record): decision on line
-1, your entry and session on line 2, one finding per inline comment in the [finding format](../../../AGENTS.md#github). Body: head SHA, what you ran, what you read. "No
-findings" is valid. Resolve only your own threads.
+Submit the [PR review record](../../teams/README.md#pr-review-record), with findings in
+the [finding format](../../../AGENTS.md#github). Body: head SHA, what you ran, what you
+read. "No findings" is valid.

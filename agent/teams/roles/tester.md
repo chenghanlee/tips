@@ -23,18 +23,16 @@ dirty clone and never resets one.
 
 1. The implementer's handoff notified every required reviewer of the same head and asked
    the dispatcher to launch any that were missing. Do not notify or launch reviewers.
-2. Before your first review, run the [manual browser review](../README.md#manual-browser-review)
-   session sequence (`open about:blank`, `get url`, `close`) once in your own runtime. If
+2. Before your first required manual browser scenario, run the
+   [manual browser review](../README.md#manual-browser-review) session sequence (`open about:blank`, `get url`, `close`) once in your own runtime. If
    it fails, report `blocked` with the exact error. It shows only that your runtime can
    open a browser; it replaces no later check.
-3. Record the head SHA and your first concerns before reading the PR body or another
-   review.
+3. Record the head SHA and your initial findings as the
+   [review record](../README.md#pr-review-record) says.
 4. Follow both skills with your own database and port: affected code, design,
    scenarios and their controls, mutation check, entry points, data, checks.
    Wallaby browser tests (`TIPS_BROWSER=1`, `test/tips_web/features`): a Codex client
-   cannot run them; the macOS sandbox kills chromedriver's Chrome and each attempt
-   leaves a crash dialog ([#432](https://github.com/chenghanlee/tips/issues/432)). If
-   you are a Codex client, do not run them. Read the implementer's retained log named
+   does not run them ([manual browser review](../README.md#manual-browser-review)). Read the implementer's retained log named
    in the PR body under "Checks not run by CI": check the command, the `exit=` line and
    the failure list, and write "browser run by <implementer entry>, log verified" in
    your review. If the PR body names no log, record that in your review; the
@@ -47,8 +45,8 @@ dirty clone and never resets one.
    the head has findings, send `turn` to the implementer. Do not wait for the other
    reviews. When `agent/teams/pr_review.py observe <pr>` reports ready, follow the
    [merge step](../README.md#merge). Then send `done` to the dispatcher.
-7. A new head invalidates every LGTM. Follow the [review record](../README.md#pr-review-record)
-   for first-review coverage and later changes.
+7. Follow the [review record](../README.md#pr-review-record) for new heads, first-review
+   coverage and later changes.
 
 ## Questions and changed decisions
 
@@ -57,30 +55,7 @@ from your own clone and an ANSWER on the brief. This is optional help. A consequ
 decision needing independent technical judgment goes to the appropriate designer;
 checking conformity with your own answer is not independent validation of that decision.
 
-A changed binding decision requires review against the adopted decision even at the
-same head. Follow [Changed binding decisions](../README.md#changed-binding-decisions):
-record the non-LGTM hold before treating a requested pause as established. Do not clear
-it merely because a new code head arrived. A harmless clarification or ordinary
-internal placement within the existing contract needs no hold.
-
-## Revert a broken main
-
-Merge-confirming tester, when the dispatcher asks you to revert PR `<pr>`:
-
-During the [CI pause](../../../AGENTS.md#github-ci-pause), handle the revert through an
-ordinary brief and PR with applicable local checks and an independent reviewer. The
-author of the revert cannot supply its independent review. Follow the normal merge
-procedure; the CI-only shortcut below applies only when CI is active.
-
-1. From your own checkout, run `gh pr revert <pr>`. It opens a revert PR; do not edit it.
-2. Wait for its required checks:
-   `timeout "$TIPS_CHECK_TIMEOUT_SECONDS" gh pr checks <revert> --watch --required`.
-3. If they pass, merge it with
-   `gh pr merge <revert> --merge --match-head-commit <sha>` and send `done` to the
-   dispatcher with the revert PR URL.
-4. If a check fails, or finding the cause needs access outside your allocation, send
-   `blocked` with the run link and the exact error. Do not diagnose outside your
-   allocation.
+For a changed binding decision, follow [Changed binding decisions](../README.md#changed-binding-decisions).
 
 ## Messages you send
 
@@ -94,4 +69,3 @@ procedure; the CI-only shortcut below applies only when CI is active.
   verification when an affected contract's relevant evidence is missing.
 - Do not run `team.py turn` unless you confirm the merge.
 - Do not merge with an unresolved thread, a missing LGTM or a failed check.
-- Codex client: do not run `mix test` with `TIPS_BROWSER=1`. Use `agent-browser` for manual checks.

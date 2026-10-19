@@ -9,14 +9,11 @@ The workflow and its diagram are in the [README](README.md#how-it-runs).
 
 In the GitHub ruleset "Reviewed main", require `checks`, `release` and resolved conversations. Turn off the strict up-to-date requirement and do not require the `tips/independent-review` status. In Project 15, enable the "Item closed" workflow so closed issues get Status Done.
 
-The team board is [Project 16](https://github.com/users/chenghanlee/projects/16). It holds the spec and brief issues. It was created on 2026-10-12 with these commands. A new owner should repeat them and update the project number in [roles/dispatcher.md](roles/dispatcher.md):
+The team board is [Project 15](https://github.com/users/chenghanlee/projects/15). It holds the milestone, spec and brief issues. The dispatcher sets three fields: Status (Backlog, Ready, Active, In review, Blocked, Done), Kind (spec or brief) and Agent (text: the implementer entry). A new owner adds Kind and Agent to their project and updates the project number in [roles/dispatcher.md](roles/dispatcher.md):
 
 ```bash
-gh project create --owner <owner> --title "Tips swarm"
 gh project field-create <number> --owner <owner> --name Kind --data-type SINGLE_SELECT --single-select-options spec,brief
-gh project field-create <number> --owner <owner> --name Feature --data-type TEXT
-gh project field-create <number> --owner <owner> --name Phase --data-type SINGLE_SELECT --single-select-options "Design,Q&A,Implement,Review,Done"
-gh project field-create <number> --owner <owner> --name Implementer --data-type TEXT
+gh project field-create <number> --owner <owner> --name Agent --data-type TEXT
 ```
 
 The dispatcher edits fields with `gh project item-edit`. The `gh` token needs the `project` scope.
@@ -26,7 +23,7 @@ The dispatcher edits fields with `gh project item-edit`. The `gh` token needs th
 Everything owner-specific is in these places. Commit the changes before installing a release: `install.py` reads the repository identity from the commit it installs, and the harness root refuses a repository it was not created for.
 
 - [config.toml](config.toml): `github.repository`, `github.projects`, `team.clone_url`, `team.psql` (an absolute executable and the connection of your compose database), and the models in every `[agents.<entry>]` and `[dispatcher]`.
-- [roles/dispatcher.md](roles/dispatcher.md): the trial issue in the introduction and the Project 15 and 16 links. [roles/designer.md](roles/designer.md): the Project 15 reference. These files are the agents' prompts; issue links kept as evidence can stay.
+- [roles/dispatcher.md](roles/dispatcher.md): the Project 15 link. [roles/designer.md](roles/designer.md): the Project 15 reference. These files are the agents' prompts; issue links kept as evidence can stay.
 - Prerequisites on the machine: Herdr with its session hook, the Dexter build and matching Elixir sources ([LSP guide](../lsp/README.md)), the skills below, and the application and database from [local development](../../docs/development/local-development.md).
 
 Install Python 3.12 and the [configured client CLIs](config.toml). Create the dispatcher's locked environment once per checkout, as in [development](development.md#dependencies-and-test-isolation), or install a harness release (below). Authenticate the clients and the GitHub CLI (`gh`) for this repository. Agents also need GNU `timeout` (macOS: `brew install coreutils`) and `unbuffer` (Expect): the Elixir skill requires it on Mix commands. Testers use `agent-browser` for manual browser review.
@@ -119,7 +116,7 @@ Keep the repository's other rules. Add this Tips-specific entry:
 Preserve other settings and rule lists. Do not add a merge or handoff allow rule.
 Pair clients launch with allow rules for their own GitHub writes (`gh issue edit`,
 `gh issue comment`, `gh pr create`, `gh pr edit`, `gh pr comment`, `gh pr review`) and
-the harness scripts they run (`board.py`, `pr_review.py`, `retirement.py`); the
+the harness scripts they run (`board.py`, `pr_review.py`); the
 classifier judges everything else, including the merge and the handoff.
 Run `claude auto-mode config` to inspect the active context and
 `claude auto-mode critique` to find contradictory rules, then start a new
@@ -133,8 +130,8 @@ The launcher starts Claude in restricted mode with no built-in tools (`--restric
 --tools ""`) and one MCP server, [adapter.py](adapter.py), under `--strict-mcp-config`.
 The launcher sets the server, `--settings`, the session ID and the environment. User,
 project and local settings files, CLAUDE.md files, other MCP servers and Remote Control
-are not loaded. The dispatcher's system prompt is AGENTS.md, the [workflow](README.md)
-and its [role files](roles/dispatcher.md), read by the launcher before start.
+are not loaded. The dispatcher's system prompt is two role files, [common.md](roles/common.md)
+and [dispatcher.md](roles/dispatcher.md), read by the launcher before start.
 
 A restricted client reports no session to Herdr. The launcher execs the client, which
 keeps the launcher's process ID, so it records that ID, its start time, the pane and the

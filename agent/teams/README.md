@@ -110,7 +110,7 @@ operator (the user) runs `reset` and `stop --abandon`.
 | `agent/teams/team.py status` | Dispatcher, user | Every allocation record with each client's live Herdr pane, name, kind, state and session, and whether the recorded dispatcher process runs. |
 | `agent/teams/team.py clean` | Operator | List retained allocations with their reasons. Deletes nothing. |
 | `python3 <harness>/bootstrap.py [--commit <sha>]` | Launched client | Prepare your own clone, as [Allocations](#allocations) says. |
-| `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. |
+| `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. A worker's BLOCKED post also notifies the dispatcher; the command reports a failed notification, and a rerun retries only the notification. |
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment; with `--after`, only the comments after that checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | Token counts by model for each client a launch EVENT names, read from its session logs. A Codex client's row sums every Codex session whose rollout started in its allocation directory, so a launch EVENT that says `unknown` still counts. |
 | `agent/teams/pr_review.py list <pr>` | Any agent | Recent reviews and every unresolved thread. Display only. |
@@ -118,7 +118,6 @@ operator (the user) runs `reset` and `stop --abandon`.
 | `agent/teams/pr_review.py resolve <thread>` | Thread opener | Resolve your own thread. |
 | `herdr agent prompt team-<slot>-<entry> "<review URL>"` | Other reviewer | Tell the merge-confirming tester a review exists. |
 | `herdr agent prompt dispatcher "<URL> done"` | Tester | The PR merged. |
-| `herdr agent prompt dispatcher "<comment URL> blocked"` | Turn holder | A blocker is recorded. |
 
 ### Herdr layout
 
@@ -253,8 +252,7 @@ During the CI pause: commands, tested SHA, results, environment and retained log
 for all applicable local checks. Otherwise, checks CI does not cover, or "none".
 ```
 
-Reviewers: read the brief and the diff before the PR body. Verify the body's claims
-rather than repeating the work it records.
+Reviewers: verify the body's claims rather than repeating the work it records.
 
 ### Severity
 
@@ -278,25 +276,21 @@ When a binding contract changes, the lead identifies affected briefs and holds t
 dependent work. For each affected open PR, ask its merge-confirming tester to submit a
 non-LGTM review linked to the pending decision. Establish that recorded hold before
 making the changed shared contract operative; a sent pause is not an established hold.
-If the PR already merged, use that fact to decide the necessary follow-up instead of
-claiming the merge was prevented.
-
 The lead updates the authoritative shared decision; each implementer incorporates its
 link in the brief before resuming affected work. The tester reviews against the adopted
 decision before replacing its hold with LGTM, even if the code SHA is unchanged. An
 unrelated push does not resolve the question. Harmless clarification and ordinary
-internal placement within existing contracts need no hold. This uses existing review
-records; `observe` does not interpret issue comments as merge blockers.
+internal placement within existing contracts need no hold. `observe` does not
+interpret issue comments as merge blockers.
 
 ### Merge
 
 During the [CI pause](../../AGENTS.md#github-ci-pause), first verify the PR's applicable
 local check evidence and independent correctness/design review at the current head.
 `observe` reads GitHub state and posts nothing; it does not verify local test logs. An
-empty required-check list is not proof that local checks ran. Skip
-`gh pr checks --watch --required` while no GitHub checks are required. If a
-required-status rule still expects a paused job, report it to the user; do not bypass it
-or weaken other protections.
+empty required-check list is not proof that local checks ran. If a required-status rule
+still expects a paused job, report it to the user; do not bypass it or weaken other
+protections.
 
 Merge-confirming tester: satisfy the applicable check policy, then merge only when `observe`
 reports the PR ready at the head: every reviewer in `Required reviews:` has an LGTM as its
@@ -304,9 +298,6 @@ latest review of that head, every thread is resolved, any GitHub-required checks
 and GitHub reports it mergeable.
 
 ```sh
-# When CI is active and GitHub checks are required:
-timeout "$TIPS_CHECK_TIMEOUT_SECONDS" gh pr checks <pr> --watch --required
-# In either mode, after verifying applicable evidence:
 agent/teams/pr_review.py observe <pr>
 gh pr merge <pr> --merge --match-head-commit <sha>
 ```
@@ -316,30 +307,35 @@ If a check failed or `observe` reports a merge conflict, run
 reports evidence unavailable, run it again later; unavailable never counts as ready. If
 merge is refused for another reason, report `blocked` with the exact error.
 
-A pause-related CI-only hold can be replaced by a current-head review only after the
-reviewer verifies the replacement local evidence. Preserve real test failures.
-
 After the merge closes the brief and deletes the branch, notify the dispatcher with `done`.
 
 ## Report and resolve blockers
 
 Report `blocked` if you have a product or scope question, if both sides of a finding
 have evidence but still disagree, or if the same finding remains after two fixes.
-Comment on the issue with your name, the question and the evidence. Notify the
-dispatcher with the comment URL. End your turn. Dispatcher: set Blocked. Route
+Post the question and the evidence on the issue with
+`agent/teams/board.py post <issue> BLOCKED`; the post notifies the dispatcher. End your
+turn. Dispatcher: set Blocked. Route
 consequential technical questions through [designer assignment](roles/dispatcher.md#decisions-during-implementation).
 Ask the user about product, scope or tradeoffs needing the user's judgment. Record
 the answer on the issue; the implementer incorporates it before affected work resumes.
 Set Active and notify the agent when the blocker is resolved. Do
 not run or retry a denied command on another agent's behalf.
 
-If an implementer's failing check also fails on fetched `main`, the implementer
-reports `blocked` with evidence for both SHAs. During the CI pause, reproduce locally
-in an isolated checkout with owned test resources; otherwise link the CI runs. Do not
-attribute a billing or unavailable-run failure to the code. The dispatcher routes the
-revert of the PR that broke `main` through the
-[revert task](roles/tester.md#revert-a-broken-main). Diagnosis that needs access outside
-the tester's allocation goes to the user. Then fix the original issue.
+If a required check fails at the head, rerun only the failed tests, alone, at the head.
+
+- They fail again: rerun them alone in a worktree of fetched `origin/main`.
+  - The same failure there, and a linked open issue names those tests: the failure is
+    pre-existing. Record both logs and the issue in the PR body; it is not a blocker.
+  - The same failure there and no such issue: report `blocked` with both SHAs. The
+    dispatcher opens a revert brief.
+  - They pass on `main`: the failure is the PR's to fix unless the user grants a
+    bounded exception.
+- They pass alone at the head: the failure is intermittent. Run the suite once more.
+  If it fails again, treat it as a deterministic failure above. If it passes and the
+  diff does not touch the behaviour the test covers, record both logs and the open
+  issue that names the test (open one if none) in the PR body; it is not a blocker. If
+  the diff touches that behaviour, the failure is the PR's to fix.
 
 ## Constraints
 
