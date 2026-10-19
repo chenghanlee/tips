@@ -11,9 +11,15 @@ defmodule Tips.MixProject do
       aliases: aliases(),
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
-      listeners: [Phoenix.CodeReloader]
+      listeners: [Phoenix.CodeReloader],
+      dialyzer: [plt_add_apps: plt_add_apps(Mix.env())]
     ]
   end
+
+  # test/support calls ExUnit and Wallaby, which only the test environment compiles;
+  # without them in the PLT, Dialyzer under test reports every such call as unknown.
+  defp plt_add_apps(:test), do: [:ex_unit, :wallaby]
+  defp plt_add_apps(_), do: []
 
   # Configuration for the OTP application.
   #
