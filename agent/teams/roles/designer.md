@@ -36,19 +36,16 @@ round. A settled ordinary brief follows the dispatcher's release path directly.
 
 ## Steps: lead
 
-1. Post a PROPOSAL titled `Candidates` with two or three candidates as the skill's
-   [candidates step](../../skills/design-software/SKILL.md#step-2-candidates) says. For
-   a single candidate, name the settled requirement that leaves no material design
-   choice. Notify each critic. Wait for every critic's CRITIQUE with its ranking. If a
-   critic names a distinct alternative, compare it as a candidate.
-2. Post a PROPOSAL titled `Choice`: the chosen candidate and why you rejected the
-   others.
+1. Post a PROPOSAL titled `Candidates` as the skill's
+   [candidates step](../../skills/design-software/SKILL.md#step-2-candidates) says. Notify each critic. Wait for every
+   critic's CRITIQUE. If a critic names a distinct alternative, compare it as a candidate.
+2. Post a PROPOSAL titled `Choice` as the [choice step](../../skills/design-software/SKILL.md#step-3-choice) says.
 3. Write a shared spec when several briefs need one contract, and one brief per PR in
    the skill's format. Before launch, maintain these bodies; after launch, the
    implementer maintains its brief and incorporates your linked decisions. Post a
    PROPOSAL that says what it covers. Notify each critic.
-4. Read every CRITIQUE. Revise the bodies. Post a PROPOSAL that says what changed and
-   why. State when a substantive change invalidates earlier AGREEs. Hold at most three
+4. Read every CRITIQUE and revise the bodies as the [critique step](../../skills/design-software/SKILL.md#step-6-critique)
+   says. Post a PROPOSAL that says what changed and why. Hold at most three
    rounds after `Choice`. Then every critic has AGREEd, or you record each open P2 as a
    decision and ask for AGREE, or you post BLOCKED.
 5. When every critic has AGREEd, send `done` to the dispatcher with the final PROPOSAL
@@ -59,12 +56,10 @@ round. A settled ordinary brief follows the dispatcher's release path directly.
 
 ## Steps: critic
 
-1. Before reading the lead's `Candidates`, post a CRITIQUE with one independent
-   alternative or concern from your persona, or say you have none. Then add your
-   ranking of all candidates, one reason per rank.
-2. CRITIQUE each later PROPOSAL by the skill's critique rules. Ask to reopen the choice
-   only for a required rule violation or new evidence that changes feasibility, required
-   behaviour or cost. The lead decides and says why.
+1. Before reading the lead's `Candidates`, post a CRITIQUE as the
+   [candidates step](../../skills/design-software/SKILL.md#step-2-candidates) says.
+2. CRITIQUE each later PROPOSAL as the [critique step](../../skills/design-software/SKILL.md#step-6-critique) says. Ask to
+   reopen the choice only as the [choice step](../../skills/design-software/SKILL.md#step-3-choice) allows.
 3. AGREE when no P0 or P1 remains and each P2 has a decision. Name the PROPOSAL URL.
 4. Answer an implementer's QUESTION only when the lead asks.
 
@@ -76,11 +71,10 @@ round. A settled ordinary brief follows the dispatcher's release path directly.
    `bootstrap.py --commit <head>` command in your own allocation.
 2. Read the brief, then the diff, then the [PR body](../README.md#pr-body). Follow
    [review-software-design](../../skills/review-software-design/SKILL.md).
-3. Submit the [review record](../README.md#pr-review-record). Resolve only your own
-   threads. Send the review URL to the merge-confirming tester.
+3. Submit the [review record](../README.md#pr-review-record). Send the review URL to
+   the merge-confirming tester.
 4. When notified of a new head, run the `bootstrap.py --commit <head>` command the notice
-   names. Your first actual PR review covers the full relevant change and affected
-   contracts; later reviews can start from your last actual review.
+   names and review as the [review record](../README.md#pr-review-record) says.
 
 ## Retirement
 

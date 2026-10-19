@@ -122,31 +122,8 @@ violations.
 
 ## Additional rules
 
+Apply the implementation skill's [code rules](../implement-software/SKILL.md#code-rules).
 Classify a violation as P2 and record a decision.
-
-- **Checks where they belong.** Parse input at entry points with existing parsers or
-  changesets. Check caller admission and enforce domain rules in context operations on
-  each call, as required by the [Admission contract](../../../docs/design/backend-design.md#admission-locking-and-returned-data).
-  For writes, recheck eligibility under the required locks and keep it valid through
-  commit. Keep query filters, database constraints and guarded writes. Repeat a check
-  only for a distinct trust boundary or state that may have changed. Problem example:
-  the same check in the LiveView, the context and the query with no reason.
-- **Simplest mechanism.** Choose the simplest mechanism that meets the contract's
-  lifetime, durability and consistency needs. Use existing facilities first. State the
-  present benefit that justifies each new mechanism. Problem example: a scheduler or
-  cache whose lifetime or complexity has no present benefit. One caller does not
-  by itself make a structural abstraction unnecessary.
-- **Reuse existing code.** Use existing modules, Oban and Ecto first. Problem example: a
-  wrapper where the dependency has the feature.
-- **Code that supports tests.** Put side effects behind a function a test can replace.
-  Pass time and randomness as inputs. Problem example: tests that need sleeps or a real
-  provider.
-- **Change stays local.** Keep repairs within the affected flow, including necessary
-  modules, callers and tests. Respect concurrent ownership and explicit restrictions;
-  do not broaden a delivery into unrelated cleanup.
-- **Readable at the call site.** Name a function for its operation and side effects. Use
-  arguments to identify the inputs. Do not add flags that change behaviour. Problem
-  example: an `opts` list with five keys.
 
 Follow the language and framework conventions in the stack skills listed in AGENTS.md.
 
@@ -187,11 +164,8 @@ change. Severity follows the [severity table](../../teams/README.md#severity).
 Use the brief to determine test additions.
 
 - The scenarios and contracts are the test list. One to two tests per scenario.
-- Banned by default: combination grids over inputs, one test per error tuple, tests of
-  private helpers, tests that restate a pattern match, tests that only assert the
-  database raises, tests of cases that cannot happen. A test of how the application
-  handles a constraint error, or of an invariant under concurrent writes, is allowed
-  when a scenario names it.
+- Tests banned by default are listed in the implementation skill's
+  [Tests](../implement-software/SKILL.md#tests).
 - Verification without a prior brief line follows the implementation skill's
   [Tests](../implement-software/SKILL.md#tests): explain the affected contract and gap.
 - When a feature replaces behaviour, the brief names the tests to delete. Delete a test

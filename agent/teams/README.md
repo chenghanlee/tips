@@ -277,8 +277,7 @@ During the CI pause: commands, tested SHA, results, environment and retained log
 for all applicable local checks. Otherwise, checks CI does not cover, or "none".
 ```
 
-Reviewers: read the brief and the diff before the PR body. Verify the body's claims
-rather than repeating the work it records.
+Reviewers: verify the body's claims rather than repeating the work it records.
 
 ### Severity
 

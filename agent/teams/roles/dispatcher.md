@@ -1,9 +1,7 @@
 # Dispatcher
 
 Choose work, open features, start and stop pairs, launch reviewers, and respond to
-blockers. Do not write code or review changes. Read [common rules](common.md). The
-trial's hypothesis, measurement table and decision rule are in
-[issue 399](https://github.com/chenghanlee/tips/issues/399).
+blockers. Do not write code or review changes. Read [common rules](common.md).
 
 You have no shell, file or web tools. Each `tips` tool is one fixed operation
 ([adapter.py](../adapter.py)); this file names the tool for each step. If a step needs
@@ -32,7 +30,8 @@ the task and main SHAs, using local reproductions during the
   no running pair or open PR owns it, and no active issue names the same table, API
   or data rule. One PR per issue; split first.
 - Ask the user only for product, scope, access, purchase or approval decisions.
-  Resolve sequencing yourself. Do not waive gates.
+  Give each question numbered options, each with its follow-through, so the user can
+  answer with a number. Resolve sequencing yourself. Do not waive gates.
 - If no task is eligible, resolve or report the blocker that would make the next task
   eligible. End your turn after assigning work or reporting the blocker. Agents will
   message you through Herdr.
@@ -139,7 +138,4 @@ as approval.
 
 Use `usage_summary` for every participant, including dispatcher and designers;
 it separates uncached input, output, cache reads and writes. Missing logs mean unknown
-cost, not zero. Follow [trial measurement](../development.md#trial-measurement) for
-session attribution and evaluating the result. For issue 399, record its measurement
-table on the spec when the final brief merges and save the first PROPOSAL when a design
-round runs.
+cost, not zero. Post the usage table on the spec when the final brief merges.

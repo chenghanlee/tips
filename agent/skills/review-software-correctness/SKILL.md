@@ -15,8 +15,7 @@ Scope limits:
   assessment of responsibility, dependencies, state ownership or test value.
 - Ask for a test only for a scenario, or for an existing contract the affected code
   reaches that no surviving test proves (step 5).
-- Deferrals follow the [severity rule](../../teams/README.md#severity), including
-  reconsideration when its trigger occurs or evidence invalidates its assumptions.
+- Deferrals follow the [severity rule](../../teams/README.md#severity).
 - One pass. Report every P0 and P1. Report at most three P2 findings, the ones with the
   greatest consequence. Combine findings only when they share a cause and fix.
 
@@ -33,8 +32,9 @@ Collect, in this order:
 3. The diff against the PR base.
 4. The existing tests for each changed module.
 
-Write down your concerns. Then read the [PR body](../../teams/README.md#pr-body) and
-prior review threads. Verify the PR body's scenario table and affected code in steps 2
+Record your concerns as the [review record](../../teams/README.md#pr-review-record)
+says, then read the [PR body](../../teams/README.md#pr-body) and prior review threads.
+Verify the PR body's scenario table and affected code in steps 2
 and 3. Do not copy these claims as results. For a local review with no PR, use the
 user's brief and the working tree.
 
@@ -197,8 +197,8 @@ wrong reason is unproven. State the requested change for every P2.
 
 ## Review record
 
-Submit the [PR review record](../../teams/README.md#pr-review-record): decision on line
-1, your entry and session on line 2, one finding per inline comment in the [finding format](../../../AGENTS.md#github).
+Submit the [PR review record](../../teams/README.md#pr-review-record), with findings in
+the [finding format](../../../AGENTS.md#github).
 
 Review body, in this order:
 

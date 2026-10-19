@@ -60,10 +60,9 @@ Inspect necessary callers and existing mechanisms rather than treating the initi
 list as complete. Fill source-derived gaps in the brief; route unresolved requirements
 or consequential decisions through the workflow and continue independent work.
 
-Binding decisions change through their decision owner, not silently in code. Reconsider
-a deferral when its trigger occurs or evidence invalidates its assumptions; its owner
-can repair, revise or renew it with a current reason. This does not upgrade severity
-or authorize unrelated cleanup. Do not add unagreed product capabilities.
+Binding decisions change through their decision owner, not silently in code. Deferrals
+follow the [severity rule](../../teams/README.md#severity). Do not add unagreed product
+capabilities.
 
 ## Code rules
 
