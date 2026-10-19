@@ -343,6 +343,13 @@ Both version commands must report `153.0.8010.52`. On macOS the browser
 executable is inside `Google Chrome for Testing.app/Contents/MacOS/`.
 ChromeDriver may instead be on PATH.
 
+`--trace` runs the tests serially (`--max-cases 1`) with test timeouts off
+([Mix options](https://hexdocs.pm/mix/Mix.Tasks.Test.html#module-command-line-options));
+this is the stable mode for the browser suite ([#432](https://github.com/chenghanlee/tips/issues/432)).
+For evidence at default concurrency, run the same command without `--trace`; the two
+runs also differ in timeouts, so do not attribute a difference between them to
+concurrency alone.
+
 Browser tests live in `test/tips_web/features/`. They run in a 1280×800 window
 (`config/test.exs`) unless a test resizes it. The smoke test,
 `live_smoke_test.exs`, resizes to 390×844 and runs one connected registration
