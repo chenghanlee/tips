@@ -130,25 +130,21 @@ def launch_text(allocation: Allocation) -> str:
     )
 
 
-def findings_text(known: list[tuple[str, str]]) -> str:
-    if not known:
-        return ""
-    return "Open findings: " + "; ".join(f"{check} {url}" for check, url in known) + ". "
+def failures_text(failures: list[str]) -> str:
+    return "Current failures: " + "; ".join(failures) + ". " if failures else ""
 
 
 def bootstrap_command(head: str) -> str:
     return f"python3 {harness() / 'bootstrap.py'} --commit {head}"
 
 
-def tester_message(
-    record: Record, pr: PullRequest, missing: list[str], known: list[tuple[str, str]]
-) -> str:
+def tester_message(record: Record, pr: PullRequest, missing: list[str], failures: list[str]) -> str:
     implementer, tester = record["implementer"], record["tester"]
     message = f"Your turn: review {pr.url} at {pr.head}. This handoff notified every launched "
     message += "required reviewer of this head"
     if missing:
         message += f" and asked the dispatcher to launch {', '.join(missing)}"
-    message += ". " + findings_text(known)
+    message += ". " + failures_text(failures)
     message += (
         f"Move your own clone to the head first: {bootstrap_command(pr.head)}; it refuses a "
         "dirty clone. Follow agent/teams/roles/tester.md and "
@@ -178,12 +174,12 @@ def reviewer_notice(record: Record, entry: str, pr: PullRequest) -> str:
     )
 
 
-def implementer_message(pr: PullRequest, known: list[tuple[str, str]]) -> str:
+def implementer_message(pr: PullRequest, failures: list[str]) -> str:
     tools = harness() / "pr_review.py"
     message = f"Your turn on {pr.url}: run python3 {tools} list {pr.number} and "
-    message += f"python3 {tools} observe {pr.number}. " + findings_text(known)
+    message += f"python3 {tools} observe {pr.number}. " + failures_text(failures)
     message += (
-        "Fix review findings, failed checks and open findings following "
+        "Fix review findings, failed checks and merge conflicts following "
         "agent/skills/implement-software/SKILL.md from your clone. Push your changes, then "
         "run turn to the tester again; it notifies every required reviewer. "
         "If blocked, follow the README blocker procedure."
@@ -191,13 +187,14 @@ def implementer_message(pr: PullRequest, known: list[tuple[str, str]]) -> str:
     return message
 
 
-def conflict_refusal(head: str, links: list[str], conflict: str) -> str:
-    if conflict == "unknown":
+def conflict_refusal(head: str, mergeable: str) -> str:
+    """Why a head whose mergeability is CONFLICTING or UNAVAILABLE is not handed off."""
+    if mergeable == "CONFLICTING":
         return (
-            f"Known merge conflict {', '.join(links)}, and GitHub has not reported "
-            f"mergeability for {head} yet: rerun turn shortly. Nobody was notified."
+            f"Merge conflict at {head}: merge origin/main and push, or report blocked. "
+            "Nobody was notified."
         )
     return (
-        f"Known merge conflict {', '.join(links)}: merge origin/main and push, or report "
-        "blocked. Nobody was notified."
+        f"GitHub has not reported mergeability for {head} yet (mergeable {mergeable}): "
+        "rerun turn shortly. Nobody was notified."
     )

@@ -994,57 +994,44 @@ class HandoffTest(Harness):
         assert "dispatcher: agent_not_found: dispatcher" in refused.stderr
         assert "by second: not launched" in self.comments("7")[-1]["body"]
 
-    def test_known_merge_conflict_blocks_review_handoff_until_resolved(self) -> None:
+    def test_review_handoff_is_refused_until_github_reports_the_head_mergeable(self) -> None:
         head = self.push("team-1-impl")
         self.team("review", "7", "critic")
         prompts = len(self.events("agent", "prompt"))
-        # A conflict that cannot be recorded blocks the handoff with the failure and error.
-        self.update(pr_mergeable="CONFLICTING", comments_fail=True)
+        comments = len(self.comments("7"))
+        self.update(pr_mergeable="CONFLICTING")
         refused = self.team("turn", "7", "tester", pane=self.impl, ok=False)
-        unrecorded = f"Known failure not recorded on PR 7: Merge conflict at head {head}"
-        assert unrecorded in refused.stderr
-        assert "Error: fixture GitHub refused the comment" in refused.stderr
-        self.update(comments_fail=False, history_fails=True)
-        refused = self.team("turn", "7", "tester", pane=self.impl, ok=False)
-        assert unrecorded in refused.stderr
-        assert "Error: fixture comment-history unavailable" in refused.stderr
-        # Recorded, it still blocks; later unavailable reads neither record nor clear it.
-        self.update(history_fails=False)
-        refused = self.team("turn", "7", "tester", pane=self.impl, ok=False)
-        finding = self.comments("7")[-1]["html_url"]
-        assert f"Known merge conflict {finding}" in refused.stderr
-        self.update(pr_mergeable="UNKNOWN", checks_error="fixture checks unavailable")
-        refused = self.team("turn", "7", "tester", pane=self.impl, ok=False)
-        assert f"Known merge conflict {finding}" in refused.stderr
-        assert self.comments("7")[-1]["html_url"] == finding
+        assert f"Merge conflict at {head}: merge origin/main and push" in refused.stderr
+        # GitHub has not computed mergeability for the new head: unknown is refused too.
         head = self.push("team-1-impl", "merged main")
+        self.update(pr_mergeable="UNKNOWN")
         refused = self.team("turn", "7", "tester", pane=self.impl, ok=False)
         assert f"has not reported mergeability for {head} yet" in refused.stderr
         assert len(self.events("agent", "prompt")) == prompts
-        self.update(pr_mergeable="MERGEABLE", checks_error="")
+        assert len(self.comments("7")) == comments
+        # A failed required check does not block the review handoff; the tester is told.
+        failed = {"name": "checks", "workflow": "CI", "bucket": "fail", "link": "https://ci/3"}
+        self.update(pr_mergeable="MERGEABLE", checks=[failed])
         self.team("turn", "7", "tester", pane=self.impl)
-        resolved = self.comments("7")[-1]["body"]
-        assert '"state":"resolved"' in resolved
-        assert f"Resolves {finding}." in resolved
-        assert [e[2] for e in self.events("agent", "prompt")[prompts:]] == [
-            "team-1-tester",
-            "team-1-critic",
-        ]
+        sent = self.events("agent", "prompt")[prompts:]
+        assert [e[2] for e in sent] == ["team-1-tester", "team-1-critic"]
+        assert "Current failures: check:CI/checks is fail: https://ci/3." in sent[0][3]
 
-    def test_turn_to_implementer_rings_with_open_findings_from_any_tester_clone(self) -> None:
+    def test_turn_to_implementer_names_the_live_failures_from_any_tester_clone(self) -> None:
         self.push("team-1-impl")
         failed = {"name": "checks", "workflow": "CI", "bucket": "fail", "link": "https://ci/2"}
-        self.update(checks=[failed])
-        # The tester's clone state never blocks handing findings back.
+        self.update(checks=[failed], pr_mergeable="CONFLICTING")
+        comments = len(self.comments("7"))
+        # The tester's clone state never blocks handing findings back, nor does a conflict.
         self.team("turn", "7", "impl", pane=self.tester)
-        finding = self.comments("7")[-1]
-        session = self.launched_session("team-1-tester")
-        assert finding["body"].startswith(f"FINDING tester team-1-tester {session}\n")
         ring = self.events("agent", "prompt")[-1]
         assert ring[2] == "team-1-impl"
         assert "pr_review.py list 7" in ring[3]
-        assert f"Open findings: check:CI/checks {finding['html_url']}" in ring[3]
+        head = self.state()["pr_head"]
+        failures = f"merge conflict at {head}; check:CI/checks is fail: https://ci/2"
+        assert f"Current failures: {failures}." in ring[3]
         assert "agent/skills/implement-software/SKILL.md from your clone" in ring[3]
+        assert len(self.comments("7")) == comments
 
     def test_turn_refuses_outside_callers_and_wrong_briefs(self) -> None:
         self.team("start", "30")

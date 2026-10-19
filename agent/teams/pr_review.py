@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
-"""Read a PR's state and record its failures; list reviews and threads; resolve a thread.
+"""Read a PR's state and say whether it can merge; list reviews and threads; resolve a thread.
 
-Both list and observe read through read_state; list only displays. observe also records
-each real failure as a FINDING comment on the PR with a TEAM_FINDING marker line, appends a
-resolution naming that comment's ID when later evidence shows the failure gone, and says
-whether the PR can merge.
-Unavailable evidence records nothing and resolves nothing. The required checks are the
-contexts the base branch's effective rules require. GraphQL is used because GitHub's REST
-API does not list or resolve review threads.
+Both list and observe read through read_state and post nothing. observe judges only the
+live state at the current head: an earlier failure that the current read no longer shows
+does not block. The required checks are the contexts the base branch's effective rules
+require. GraphQL is used because GitHub's REST API does not list or resolve review threads.
 """
 
 import argparse
@@ -16,24 +13,13 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 
 import config as conf
 import team
 from commands import object_fields, object_list, require_type
 from config import READ_PAGES
-from github import (
-    add_comment,
-    call,
-    comment_header,
-    deadline_from_now,
-    github,
-    issue_comments,
-    poster,
-    prefixed_json,
-    pull_request,
-    repo_args,
-)
+from github import call, deadline_from_now, github, pull_request, repo_args
 
 QUERY = """
 query($owner: String!, $name: String!, $number: Int!, $after: String) {
@@ -58,12 +44,6 @@ mutation($id: ID!) {
 }
 """
 UNAVAILABLE = "UNAVAILABLE"
-MERGEABILITY = "mergeability"
-MARKER = "TEAM_FINDING "
-# Version 2: a finding is the comment that opened it; a resolution or supersession names
-# that comment's ID, never a check, head and base.
-MARKER_VERSION = 2
-COMMENT_ID = re.compile(r"#issuecomment-([0-9]+)$")
 PASSED = ("pass", "skipping")
 FAILED = ("fail", "cancel")
 
@@ -103,25 +83,6 @@ class PrState:
     review_nodes: tuple[Any, ...]
     threads: tuple[Any, ...] | None
     unavailable: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class Finding:
-    """What failed: the check (or mergeability) at one head and base. One finding can have
-    several open events when observers raced; each event is resolved by its own ID."""
-
-    check: str
-    head: str
-    base: str
-
-
-@dataclass(frozen=True)
-class History:
-    """The folded FINDING events: open events by comment ID, and each finding's latest
-    event URL."""
-
-    open: dict[int, tuple[Finding, str]]
-    latest: dict[Finding, str]
 
 
 def repository_of(url: str) -> str:
@@ -319,8 +280,8 @@ def read_state(number: int, deadline: float | None = None) -> PrState:
     for key in ("headRefOid", "baseRefOid"):
         if first[key] != last[key]:
             raise RefusalError(
-                f"PR {number} {key} changed from {first[key]} to {last[key]} during the read; "
-                "nothing recorded. Read again."
+                f"PR {number} {key} changed from {first[key]} to {last[key]} during the read. "
+                "Read again."
             )
     mergeable = first["mergeable"]
     gaps += [reviews_gap] if reviews_gap else []
@@ -343,179 +304,14 @@ def read_state(number: int, deadline: float | None = None) -> PrState:
     )
 
 
-def valid_marker(fields: dict[str, object]) -> bool:
-    """An open event may supersede earlier event IDs; a resolution names one event ID."""
-    earlier = fields.get("supersedes", [])
-    if fields.get("state") == "open":
-        event = isinstance(earlier, list) and all(
-            type(e) is int for e in cast(list[object], earlier)
-        )
-    else:
-        event = fields.get("state") == "resolved" and type(fields.get("resolves")) is int
-    return (
-        event
-        and fields.get("v") == MARKER_VERSION
-        and type(fields.get("pr")) is int
-        and all(isinstance(fields.get(key), str) for key in ("check", "head", "base"))
-    )
-
-
-def comment_id(url: str) -> int:
-    match = COMMENT_ID.search(url)
-    if not match:
-        raise RuntimeError(f"No comment ID in {url!r}")
-    return int(match.group(1))
-
-
-def markers(comment: dict[str, object]) -> list[dict[str, Any]]:
-    """The TEAM_FINDING markers of a FINDING comment; a malformed one blocks the fold."""
-    label = f"TEAM_FINDING in {comment.get('html_url')}"
-    try:
-        found = list(prefixed_json(comment, "FINDING", MARKER))
-    except ValueError as error:
-        raise RefusalError(f"Malformed {label}: {error}") from error
-    if not all(valid_marker(fields) for fields in found):
-        raise RefusalError(f"Malformed {label}")
-    return cast(list[dict[str, Any]], found)  # valid_marker checked each field's type
-
-
-def findings(number: int, deadline: float) -> History:
-    """Fold the PR's FINDING comments by event. An open event stays open until a resolution
-    names its comment ID or a later open event supersedes that ID; a resolution never
-    closes another event of the same check, head and base."""
-    opened: dict[int, tuple[Finding, str]] = {}
-    closed: set[int] = set()
-    latest: dict[Finding, str] = {}
-    for comment in issue_comments(str(number), deadline):
-        for fields in markers(comment):
-            if fields["pr"] != number:
-                continue
-            url = str(comment["html_url"])
-            key = Finding(fields["check"], fields["head"], fields["base"])
-            latest[key] = url
-            if fields["state"] == "open":
-                opened[comment_id(url)] = (key, url)
-                closed.update(fields.get("supersedes", []))
-            else:
-                closed.add(fields["resolves"])
-    return History({i: e for i, e in opened.items() if i not in closed}, latest)
-
-
-def by_finding(events: dict[int, tuple[Finding, str]]) -> dict[Finding, str]:
-    """Each open finding with the URL of its first open event."""
-    found: dict[Finding, str] = {}
-    for finding, url in events.values():
-        found.setdefault(finding, url)
-    return found
-
-
-def outcomes(state: PrState) -> tuple[dict[str, str], dict[str, str]]:
-    """Failed and passed evidence by check; unavailable or pending evidence is in neither."""
-    failed: dict[str, str] = {}
-    passed: dict[str, str] = {}
-    at = f"head {state.head} and base {state.base_ref} {state.base}"
-    if state.mergeable == "CONFLICTING":
-        failed[MERGEABILITY] = f"Merge conflict at {at}."
-    elif state.mergeable == "MERGEABLE":
-        passed[MERGEABILITY] = f"Mergeable at {at}."
+def failures(state: PrState) -> list[str]:
+    """What the implementer must fix at this head: a live merge conflict and each failed
+    required check. Unavailable or pending evidence is not a failure."""
+    found = [f"merge conflict at {state.head}"] if state.mergeable == "CONFLICTING" else []
     for check in state.checks or ():
-        evidence = f"Required {check.identity}: {check.bucket} at {at}: {check.link}"
         if check.bucket in FAILED:
-            failed[check.identity] = evidence
-        elif check.bucket in PASSED:
-            passed[check.identity] = evidence
-    return failed, passed
-
-
-def record(
-    number: int,
-    finding: Finding,
-    event: dict[str, Any],
-    text: str,
-    author: tuple[str, str, str],
-    deadline: float,
-) -> str:
-    """Post one FINDING event without rereading the history the caller already folded.
-    `event` holds the state and the event IDs it resolves or supersedes."""
-    fields: dict[str, Any] = {
-        "v": MARKER_VERSION,
-        "pr": number,
-        "check": finding.check,
-        "head": finding.head,
-        "base": finding.base,
-        **event,
-    }
-    marker = MARKER + json.dumps(fields, separators=(",", ":"))
-    body = "\n".join([comment_header("FINDING", *author), marker, text])
-    return add_comment(str(number), body, deadline)
-
-
-def unrecorded(number: int, failed: dict[str, str], error: Exception) -> RefusalError:
-    """The known failures that could not be recorded, with the exact error."""
-    known = " ".join(failed.values()) or "No failure observed, but the history is unreadable."
-    return RefusalError(f"Known failure not recorded on PR {number}: {known} Error: {error}")
-
-
-def observe(
-    number: int, author: tuple[str, str, str], head: str = ""
-) -> tuple[PrState, dict[Finding, str]]:
-    """Read the PR, record its failures and resolutions as `author`, and return the state
-    with the open findings and their URLs. One deadline bounds every read and write.
-
-    The history is read once, before the state. Passing evidence resolves only the events
-    that history showed open, each by its ID; an event posted during the read, even for the
-    same check, head and base, stays open for the next observation. An open finding is not
-    posted again. A new head or base resolves nothing.
-    """
-    deadline = deadline_from_now()
-    try:
-        history, history_error = findings(number, deadline), None
-    except (RuntimeError, ValueError) as error:
-        history, history_error = History({}, {}), error
-    state = read_state(number, deadline)
-    if head and state.head != head:
-        raise RefusalError(f"PR {number} moved from {head} to {state.head}; nothing sent")
-    failed, passed = outcomes(state)
-    if history_error:
-        raise unrecorded(number, failed, history_error)
-    try:
-        current = record_outcomes(state, author, deadline, history, failed, passed)
-    except (RuntimeError, OSError, ValueError) as error:
-        raise unrecorded(number, failed, error) from error
-    return state, current
-
-
-def record_outcomes(
-    state: PrState,
-    author: tuple[str, str, str],
-    deadline: float,
-    history: History,
-    failed: dict[str, str],
-    passed: dict[str, str],
-) -> dict[Finding, str]:
-    """Post new failures, their supersessions and resolutions; return the open findings."""
-    events = dict(history.open)
-    for check, evidence in failed.items():
-        key = Finding(check, state.head, state.base)
-        if key in by_finding(events):
-            continue
-        earlier = {i: url for i, (finding, url) in events.items() if finding.check == check}
-        text = evidence + "".join(f" Supersedes {url}." for url in earlier.values())
-        if key in history.latest:
-            text += f" Reopens after {history.latest[key]}."
-        event: dict[str, Any] = {"state": "open"}
-        if earlier:
-            event["supersedes"] = list(earlier)
-        url = record(state.number, key, event, text, author, deadline)
-        for i in earlier:
-            del events[i]
-        events[comment_id(url)] = (key, url)
-    for check, evidence in passed.items():
-        for i, (finding, url) in [(i, e) for i, e in events.items() if e[0].check == check]:
-            event = {"state": "resolved", "resolves": i}
-            record(state.number, finding, event, f"{evidence} Resolves {url}.", author, deadline)
-            del events[i]
-    return by_finding(events)
+            found.append(f"{check.identity} is {check.bucket}: {check.link}")
+    return found
 
 
 def review_gaps(reviews: dict[str, Review], required: list[str], head: str) -> list[str]:
@@ -529,10 +325,11 @@ def review_gaps(reviews: dict[str, Review], required: list[str], head: str) -> l
     return gaps
 
 
-def blockers(state: PrState, required: list[str], known: dict[Finding, str]) -> list[str]:
-    """Why the PR cannot merge at this head; empty when it can."""
-    reasons = [*state.unavailable, *(f"open finding {url}" for url in known.values())]
-    pending = [check for check in state.checks or () if check.bucket not in PASSED]
+def blockers(state: PrState, required: list[str]) -> list[str]:
+    """Why the PR cannot merge at this head, from the live state alone; empty when it can.
+    Unknown mergeability is in `state.unavailable`, so it blocks too."""
+    reasons = [*state.unavailable, *failures(state)]
+    pending = [c for c in state.checks or () if c.bucket not in PASSED and c.bucket not in FAILED]
     reasons += [f"{check.identity} is {check.bucket}" for check in pending]
     if state.reviews is not None:
         reasons += review_gaps(state.reviews, required, state.head)
@@ -541,7 +338,7 @@ def blockers(state: PrState, required: list[str], known: dict[Finding, str]) -> 
     return reasons
 
 
-def print_state(state: PrState, known: dict[Finding, str]) -> None:
+def print_state(state: PrState) -> None:
     print(f"head {state.head}\nbase {state.base_ref} {state.base}\nmergeable {state.mergeable}")
     if state.checks == () and not any(g.startswith("required") for g in state.unavailable):
         print("no required checks configured")
@@ -549,17 +346,15 @@ def print_state(state: PrState, known: dict[Finding, str]) -> None:
         print(f"{check.identity} {check.bucket} {check.link}")
     for check in state.optional:
         print(f"optional {check.identity} {check.bucket} {check.link}")
-    for finding, url in known.items():
-        print(f"open finding {finding.check} at {finding.head[:7]}: {url}")
 
 
 def observe_command(number: int) -> None:
     conf.configure()
-    caller, me = team.caller_record()
+    caller, _ = team.caller_record()
     pull_request(str(number)).require_closes(caller["brief"])
-    state, known = observe(number, poster(caller["agents"][me]))
-    print_state(state, known)
-    reasons = blockers(state, team.required_reviewers(caller), known)
+    state = read_state(number)
+    print_state(state)
+    reasons = blockers(state, team.required_reviewers(caller))
     if reasons:
         raise RefusalError("not ready to merge:\n- " + "\n- ".join(reasons))
     print(f"ready to merge at {state.head}")
@@ -571,7 +366,7 @@ def main() -> None:
     listing = commands.add_parser("list", help="Recent reviews and every unresolved thread")
     listing.add_argument("pr", type=int)
     listing.add_argument("--all", action="store_true", help="Reviews of every head")
-    observing = commands.add_parser("observe", help="Record failures; say whether it can merge")
+    observing = commands.add_parser("observe", help="Say whether it can merge at this head")
     observing.add_argument("pr", type=int)
     resolving = commands.add_parser("resolve", help="Resolve a thread you opened")
     resolving.add_argument("thread")
