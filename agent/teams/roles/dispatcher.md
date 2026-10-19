@@ -166,7 +166,8 @@ cost, not zero. Post the usage table on the spec when the final brief merges.
   2. A changed binding decision has a review hold: the tester reviews against the
      adopted decision.
   3. No PR: the implementer continues the eligible brief and opens the PR when ready.
-  4. A required check failed or the PR cannot merge: the implementer.
+  4. A required check failed or GitHub reports the head CONFLICTING: the implementer.
+     Pending checks or UNKNOWN mergeability: wait.
   5. The latest review of the head by a required reviewer is not an LGTM: the
      implementer.
   6. A required reviewer has not reviewed the head: that reviewer.

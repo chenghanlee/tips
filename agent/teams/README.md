@@ -113,7 +113,7 @@ operator (the user) runs `reset` and `stop --abandon`.
 | `python3 <harness>/retirement.py` | Launched client | Fetch origin, then post your clone's state on the issue: clean (with the first dirty paths), unpushed commits, HEAD merged into `origin/main`. Then prompt the dispatcher with `<report URL> retired`. If the report fails, post a BLOCKED comment and prompt `<comment URL> blocked`. With no dispatcher to tell, print that command. Changes nothing else. |
 | `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. A worker's BLOCKED post also notifies the dispatcher; the command reports a failed notification, and a rerun retries only the notification. |
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment; with `--after`, only the comments after that checkpoint. |
-| `agent/teams/board.py usage <issue>...` | Dispatcher | Tokens per launched session and model, from the session logs; a Codex launch is matched to its rollouts by the allocation root in its launch EVENT. |
+| `agent/teams/board.py usage <issue>...` | Dispatcher | Tokens per launched session and model, from the session logs. |
 | `agent/teams/pr_review.py list <pr>` | Any agent | Recent reviews and every unresolved thread. Display only. |
 | `agent/teams/pr_review.py observe <pr>` | Launched client | Read the head, base, mergeability, checks and reviews within one `timeouts.github_seconds` deadline; refuse a read during which the head or base changed. Required checks are the contexts the base branch's effective rules require; a required check that has not reported blocks, and other checks are only shown. Post nothing. Judge only the current read: a merge conflict, unknown mergeability, unavailable evidence, a required check that has not passed, a missing or non-LGTM required review and an unresolved thread each block; an earlier failure that this read no longer shows does not. Exit 0 only when the PR can merge at this head. |
 | `agent/teams/pr_review.py resolve <thread>` | Thread opener | Resolve your own thread. |
@@ -356,9 +356,10 @@ If a required check fails at the head, rerun only the failed tests, alone, at th
   - They pass on `main`: the failure is the PR's to fix unless the user grants a
     bounded exception.
 - They pass alone at the head: the failure is intermittent. Run the suite once more.
-  If it passes, record both logs and the open issue that names the test (open one if
-  none) in the PR body; it is not a blocker. If the diff touches the behaviour the test
-  covers, the failure is the PR's to fix.
+  If it passes and an open issue already names the test as intermittent, record both
+  logs and the issue in the PR body; it is not a blocker. Otherwise the failure is the
+  PR's to fix unless the user grants a bounded exception. If the diff touches the
+  behaviour the test covers, the failure is the PR's to fix.
 
 ## Constraints
 
