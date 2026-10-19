@@ -7,7 +7,11 @@ dirty clone and never resets one.
 
 ## Read
 
-1. [Common rules](common.md) and the [workflow](../README.md).
+1. [Common rules](common.md). From the [workflow](../README.md), only [Turns](../README.md#turns),
+   [PR review record](../README.md#pr-review-record) through [Merge](../README.md#merge),
+   [Report and resolve blockers](../README.md#report-and-resolve-blockers) and
+   [Constraints](../README.md#constraints). Read another section only when a step or
+   message links it.
 2. [review-software-correctness](../../skills/review-software-correctness/SKILL.md) and
    [review-software-design](../../skills/review-software-design/SKILL.md). Reuse one
    source investigation and review record for both concerns. Assess responsibility,

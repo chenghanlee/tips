@@ -4,7 +4,11 @@ Implement one brief in your own clone. Manage its PR.
 
 ## Read
 
-1. [Common rules](common.md) and the [workflow](../README.md).
+1. [Common rules](common.md). From the [workflow](../README.md), only [Turns](../README.md#turns),
+   [PR body](../README.md#pr-body), [Severity](../README.md#severity),
+   [Report and resolve blockers](../README.md#report-and-resolve-blockers) and
+   [Constraints](../README.md#constraints). Read another section only when a step or
+   message links it.
 2. The brief: the issue `team.py start` named, including current decisions and questions.
 3. [implement-software](../../skills/implement-software/SKILL.md) from your clone.
 
@@ -56,7 +60,8 @@ one to save a tool call.
    know, run `wc -l < <file>`. For a file over 300 lines:
    - Run `"$TIPS_DEXTER" query symbols <file>`. It lists every definition with its line.
    - Read one definition at a time: `sed -n <start>,<next start - 1>p <file>`, using the
-     line of the definition and the line of the one after it. For a module attribute,
+     line of the definition and the line of the one after it. Independent ranges may go
+     in one batch of parallel tool calls; a batch costs one request. For a module attribute,
      alias, struct or `use` line, find it with `rg -n <text> <file>` and read at most
      20 lines around it.
    - Read the whole file only when a named question cannot be answered from those
