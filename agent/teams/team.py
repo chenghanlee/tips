@@ -1083,9 +1083,9 @@ def stop_brief(brief: str, *, abandon: bool = False) -> None:
     """Stop a team's recorded clients and Dexter daemons and release its slot.
 
     A brief must be closed by a merged PR before anything stops, unless the operator abandons
-    it. stop runs no project Git command: databases are dropped only for merged pair work,
-    and project and log files are always retained for the operator to inspect. A conflict,
-    a failed stop or a busy port keeps the reservation, so stop can run again.
+    it. stop runs no project Git command. It drops databases only for merged pair work and
+    always keeps project and log files for the operator to inspect. A conflict, a failed
+    stop or a busy port keeps the reservation, so stop can run again.
     """
     with store_lock():
         record = record_for(brief)

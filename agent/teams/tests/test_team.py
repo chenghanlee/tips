@@ -1262,7 +1262,7 @@ class RetirementTest(Harness):
         self.merge(head)
         return head
 
-    def test_stop_stops_the_clients_and_releases_merged_work(self) -> None:
+    def test_stop_releases_merged_work_of_exited_clients(self) -> None:
         self.team("start", "30")
         self.merged_pair()
         self.team("review", "7", "critic")

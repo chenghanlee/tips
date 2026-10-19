@@ -51,8 +51,8 @@ initial design choices need designers; a shared spec is useful for common contra
    set Kind, Feature and Phase (`project_set_field`). Briefs are added the same way.
    Post your own session with `board_post`, type EVENT, body `launched claude`;
    the header carries your session. `usage_summary` counts every session a `launched`
-   EVENT names. A Codex launch may name its session `unknown`; its row then sums the Codex
-   sessions started in its allocation. Write the agent set in the body: designers and the lead, testers and the
+   EVENT names. A Codex client's row sums every Codex session started in its allocation,
+   so an `unknown` launch session still counts. Write the agent set in the body: designers and the lead, testers and the
    merge-confirming tester, and any additional required reviewers, each an `[agents.<entry>]` entry.
 2. Launch each designer with `start_design` (spec, entry). Each gets its own allocation
    and clone, with its own database suffix and port, and its launch EVENT on the spec.
