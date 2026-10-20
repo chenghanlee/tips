@@ -1,14 +1,16 @@
 """Operator install of a reviewed harness release, with a disposable source repository.
 
-pip runs offline (PIP_NO_INDEX): the fixture lock is empty, or names a package that
-cannot be found, which stands in for any failure while building the environment.
+pip runs offline (PIP_NO_INDEX): the fixture lock is empty, names a package for another
+platform, or names a local wheel without its hash, which pip must refuse.
 """
 
 import fcntl
 import json
 import os
+import shlex
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 from commands import execute
@@ -17,7 +19,21 @@ from tests.harness import IDENTITY, TEST_RUNS
 
 TEAMS = Path(__file__).resolve().parents[1]
 CONFIG = '[github]\nrepository = "o/r"\n'
-MISSING = "nonexistent-package==1.0 --hash=sha256:" + "0" * 64 + "\n"
+
+
+def unhashed_lock(wheels: Path) -> str:
+    """A lock naming a local wheel that pip could install, but without its hash."""
+    wheels.mkdir()
+    with zipfile.ZipFile(wheels / "demo-1.0-py3-none-any.whl", "w") as wheel:
+        wheel.writestr(
+            "demo-1.0.dist-info/METADATA", "Metadata-Version: 2.1\nName: demo\nVersion: 1.0\n"
+        )
+        wheel.writestr(
+            "demo-1.0.dist-info/WHEEL",
+            "Wheel-Version: 1.0\nGenerator: test\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
+        )
+        wheel.writestr("demo-1.0.dist-info/RECORD", "")
+    return f"--find-links {shlex.quote(str(wheels))}\ndemo==1.0\n"
 
 
 class InstallTest(unittest.TestCase):
@@ -85,12 +101,15 @@ class InstallTest(unittest.TestCase):
         assert (release / "AGENTS.md").read_text() == "Release one.\n"
         execute([release / "agent/teams/.venv/bin/python", "-c", "pass"], check=True)
         self.operator_data_kept()
-        # The second release cannot build its environment.
+        # The second release cannot build its environment: pip refuses a lock line without
+        # a hash, even for a wheel it could install.
         (self.source / "AGENTS.md").write_text("Release two.\n")
-        (self.source / "agent/teams/requirements.lock").write_text(MISSING)
+        lock = unhashed_lock(self.source.parent / "wheels")
+        (self.source / "agent/teams/requirements.lock").write_text(lock)
         second = self.commit("release two")
         self.git("update-ref", "refs/remotes/origin/main", "HEAD")
-        assert "nonexistent-package" in self.install(second, ok=False)
+        failed = self.install(second, ok=False)
+        assert "Hashes are required" in failed, failed
         assert self.installed() == release
         assert (release / "AGENTS.md").read_text() == "Release one.\n"
         execute([release / "agent/teams/.venv/bin/python", "-c", "pass"], check=True)

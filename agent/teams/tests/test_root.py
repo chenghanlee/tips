@@ -3,6 +3,8 @@ name; the shipped configuration."""
 
 import json
 import os
+import re
+import shutil
 import tempfile
 import threading
 import unittest
@@ -31,15 +33,22 @@ class ClaimRootTest(unittest.TestCase):
     ) -> None:
         link = self.base / "link"
         link.symlink_to(self.base / "agent_teams")
-        with tempfile.TemporaryDirectory() as temporary:
-            for root in (
-                self.checkout / "agent_teams/tips",
-                Path(temporary).resolve() / "tips",
-                link / "tips",
-            ):
-                with self.subTest(root=root), self.assertRaises(RuntimeError):
-                    conf.claim_root(root, "o/tips", self.checkout)
-                assert not root.exists()
+        scratch = self.base / "scratch"
+        tmp = Path("/tmp").resolve()  # noqa: S108 - must be refused
+        cases = {
+            "checkout": (self.checkout / "agent_teams/tips", f"is inside {self.checkout}"),
+            "tmp": (tmp / f"tips-root-{os.getpid()}", f"is inside {tmp}"),
+            "TMPDIR": (scratch / "tips", f"is inside {scratch}"),
+            "symlink": (link / "tips", "passes through a symlink"),
+        }
+        # TMPDIR names scratch, so only the fixed list refuses /tmp.
+        with mock.patch.dict(os.environ, {"TMPDIR": str(scratch)}):
+            for case, (root, message) in cases.items():
+                self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+                with self.subTest(case=case):
+                    with self.assertRaisesRegex(RuntimeError, re.escape(message)):
+                        conf.claim_root(root, "o/tips", self.checkout)
+                    assert not root.exists(), f"the refused root {root} was created"
 
     def test_workers_name_the_stable_harness_path_of_an_installed_harness(self) -> None:
         root = self.base / "agent_teams/tips"
