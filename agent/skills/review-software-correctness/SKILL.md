@@ -129,7 +129,7 @@ For each entry point in the affected code:
 Probes, by change type:
 
 - Behaviour: check the observable result for each reachable state: loading, empty,
-  error, stale, conflict. Check UI copy against the glossary.
+  error, stale, conflict. Check UI copy against the design docs.
 - State: check duplicate or out-of-order updates across tabs, reconnects and timeouts.
   Check cancellation or restart after a write. Compare stored, retried and displayed
   values.

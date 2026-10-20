@@ -1,36 +1,19 @@
 # Tips
 
 Tips helps developers find and share practical AI techniques and firsthand results.
-It is an Elixir/Phoenix application with PostgreSQL.
-
-The app has a Hot/New tip feed with filters, search, read-only tip and review
-pages, passwordless magic-link sign-in, session-family management, admission and
-content/search foundations, scheduled registration-cleanup and search-embedding
-jobs and a database health check.
-The Content context can publish, edit and delete text and let moderators hide or
-restore it; no web screens use these yet.
-The design documents describe target product behavior; GitHub issues and PRs track
-what has been implemented.
+Since 2026-10-21 it is being rebuilt from scratch, one thin vertical slice at a time.
+The pre-restart code is at tag `archive/waterfall-2026-10-21`. Stack: Elixir/Phoenix
+with PostgreSQL.
 
 ## Run the app
 
-Follow the [local development guide](docs/development/local-development.md) to:
-
-1. Install the required tools.
-2. Start the shared database from the main checkout.
-3. Set up your checkout, environment and dependencies.
-4. Start Phoenix and open <http://localhost:4000>.
-
-Local setup needs no external provider credentials. If you use multiple
-worktrees, follow the [worktree setup](docs/development/local-development.md#isolated-worktrees)
-to give each checkout its own database and port.
-
-The [toolchain guide](docs/development/toolchain.md) identifies version sources,
-dependency choices and upgrade rules.
+There is no application yet; the first slice creates the Mix project and its setup guide.
+Start the shared database with `docker compose up -d` from the main checkout, never from
+a worktree, so every checkout shares the one service on port 5433.
 
 ## Test changes
 
-After setup, run these checks from your development checkout:
+Once a Mix project exists, run these checks from your development checkout:
 
 ```sh
 mix format --check-formatted
@@ -41,15 +24,10 @@ mix test
 python3 scripts/check_docs.py
 ```
 
-`mix test` excludes browser tests. Follow the
-[browser test instructions](docs/development/local-development.md#browser-tests-and-ci)
-when a change needs browser coverage. During the [GitHub CI pause](AGENTS.md#github-ci-pause),
-run applicable checks locally and record their evidence for independent review. The
-workflow files remain available for restoring hosted checks. Markdown-only changes
-require documentation validation, not application or release builds.
-
-Follow [AGENTS.md](AGENTS.md) for engineering rules. Put the task scope, acceptance
-criteria and review evidence in the relevant GitHub issue and PR.
+Until then, only `python3 scripts/check_docs.py` applies. During the
+[GitHub CI pause](AGENTS.md#github-ci-pause), run applicable checks locally and record their
+evidence for independent review. Follow [AGENTS.md](AGENTS.md) for engineering rules.
+Put the task scope, acceptance criteria and review evidence in the relevant GitHub issue and PR.
 
 ## Use agents (optional)
 
@@ -59,33 +37,30 @@ criteria and review evidence in the relevant GitHub issue and PR.
   used as a CLI by Claude and Codex.
 
 Agent tooling is separate from the application. You do not need it to run Tips.
+Pair bootstrap needs a Mix project with a `mix.lock`, so slices before that run outside
+pairs. Once it exists, the app's config must honour the pair environment: `PGPORT`,
+`TIPS_DB_SUFFIX` appended to the `tips_dev` and `tips_test` database names, and
+`TIPS_TEST_PORT` for the test server. Otherwise pairs share one database and one port.
 
 ## Find requirements and tasks
 
 - [GitHub Project 15](https://github.com/users/chenghanlee/projects/15): task planning and progress.
 - [GitHub issues](https://github.com/chenghanlee/tips/issues): scope, acceptance criteria and blockers.
-- [Design docs](docs/design/README.md): the requirement sections by trigger and by feature, with what each file owns.
+- [Design docs](docs/design/README.md): the requirement sections; the index grows with each slice.
 
 ## Where files belong
 
 | Location | Purpose |
 |---|---|
-| `lib/`, `config/`, `assets/`, `priv/` | Application code, configuration and resources |
-| `test/` | Application tests and fixtures |
-| `rel/` | Scripts packaged into application releases |
 | `scripts/`, `db/` | Maintenance commands and the database image |
-| `docs/development/` | Setup, testing and toolchain guides |
 | `docs/design/` | Current product and technical requirements |
 | `agent/skills/` | Shared, versioned skills for Codex and Claude |
 | `agent/teams/` | The pair workflow, its scripts, configuration and tests |
 | `agent/lsp/` | Agent language-server build script and local patch |
 
-Dexter's binary lives in ignored `agent/lsp/dexter/vendor/`; shared Elixir
-sources live in `agent/lsp/vendor/`.
+Dexter's binary lives in ignored `agent/lsp/dexter/vendor/`; shared Elixir sources live in
+`agent/lsp/vendor/`. Dexter stores its per-checkout index and bound commands in `.dexter/`.
 
-Keep root files in their standard locations for Mix, Git and Docker.
-Put disposable experiment output in ignored `tmp/` or outside the repository.
-Dexter stores its per-checkout index and bound commands in `.dexter/`.
-
-Leave generated and client-managed folders, such as `_build/`, `deps/`, `.codex/`
-and `.claude/`, in their expected locations.
+Keep root files in their standard locations for Mix, Git and Docker. Put disposable output
+in ignored `tmp/` or outside the repository. Leave generated and client-managed folders,
+such as `_build/`, `deps/`, `.codex/` and `.claude/`, in their expected locations.

@@ -13,7 +13,7 @@ with `phase` wrote stay.
 ## Choose work
 
 At startup, after each `done` or `blocked` message, and when the user reports a change,
-check [Project 15](https://github.com/users/chenghanlee/projects/15) for milestone
+check [Project 15](https://github.com/users/chenghanlee/projects/15) for the priority
 order and open issues (`project_read` lists the items that are not Done; read one with
 `issue_read`). Also check open PRs (`pr_list`, `pr_state`) and running teams and their
 clients (`status`). A merged PR's evidence is in its body and reviews; it is not a run
@@ -24,7 +24,7 @@ the task and main SHAs, using local reproductions during the
 - Set merged issues Done (`project_set_field`, Status). An issue with an open question
   stays Blocked.
 - For each free slot (`team.max_teams` in [config.toml](../config.toml)), take the
-  eligible task with the most value for the milestone. Use this priority order: the
+  eligible task with the most value for the next slice. Use this priority order: the
   user's stated priority, unblocking a gate, completing a usable flow, then
   fixing a regression. Prioritize product progress over tooling work.
 - Eligible means: prerequisites complete, a bounded outcome with acceptance scenarios,

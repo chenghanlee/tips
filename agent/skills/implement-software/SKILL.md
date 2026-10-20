@@ -76,7 +76,8 @@ Apply these rules in every change. Use the examples to identify violations.
   different failures.
 - Parse untrusted input at the entry point (LiveView event, controller action, channel
   handler, job args) with existing parsers or changesets. Check caller admission and
-  enforce domain rules in context operations on each call, as required by the [Admission contract](../../../docs/design/backend-design.md#admission-locking-and-returned-data).
+  enforce domain rules in context operations on each call, following the admission
+  contract when the design docs define one.
   For writes, recheck eligibility under the required locks and keep it valid through
   commit. Keep authentication and access checks at web entry points. Do not use UI
   feedback as authorization. Keep query filters, database constraints and guarded

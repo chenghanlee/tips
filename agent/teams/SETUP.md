@@ -7,9 +7,9 @@ The workflow and its diagram are in the [README](README.md#how-it-runs).
 
 ## One-time setup
 
-In the GitHub ruleset "Reviewed main", require `checks`, `release` and resolved conversations. Turn off the strict up-to-date requirement and do not require the `tips/independent-review` status. In Project 15, enable the "Item closed" workflow so closed issues get Status Done.
+In the GitHub ruleset "Reviewed main", require resolved conversations; add required status checks only for workflows that exist and run (during the [CI pause](../../AGENTS.md#github-ci-pause), none). Turn off the strict up-to-date requirement and do not require the `tips/independent-review` status. In Project 15, enable the "Item closed" workflow so closed issues get Status Done.
 
-The team board is [Project 15](https://github.com/users/chenghanlee/projects/15). It holds the milestone, spec and brief issues. The dispatcher sets three fields: Status (Backlog, Ready, Active, In review, Blocked, Done), Kind (spec or brief) and Agent (text: the implementer entry). A new owner adds Kind and Agent to their project and updates the project number in [roles/dispatcher.md](roles/dispatcher.md):
+The team board is [Project 15](https://github.com/users/chenghanlee/projects/15). It holds the spec and brief issues. The dispatcher sets three fields: Status (Backlog, Ready, Active, In review, Blocked, Done), Kind (spec or brief) and Agent (text: the implementer entry). A new owner adds Kind and Agent to their project and updates the project number in [roles/dispatcher.md](roles/dispatcher.md):
 
 ```bash
 gh project field-create <number> --owner <owner> --name Kind --data-type SINGLE_SELECT --single-select-options spec,brief
@@ -24,7 +24,7 @@ Everything owner-specific is in these places. Commit the changes before installi
 
 - [config.toml](config.toml): `github.repository`, `github.projects`, `team.clone_url`, `team.psql` (an absolute executable and the connection of your compose database), and the models in every `[agents.<entry>]` and `[dispatcher]`.
 - [roles/dispatcher.md](roles/dispatcher.md): the Project 15 link. [roles/designer.md](roles/designer.md): the Project 15 reference. These files are the agents' prompts; issue links kept as evidence can stay.
-- Prerequisites on the machine: Herdr with its session hook, the Dexter build and matching Elixir sources ([LSP guide](../lsp/README.md)), the skills below, and the application and database from [local development](../../docs/development/local-development.md).
+- Prerequisites on the machine: Herdr with its session hook, the Dexter build and matching Elixir sources ([LSP guide](../lsp/README.md)), the skills below, and the database from [compose.yaml](../../compose.yaml). Pair bootstrap also needs a Mix project with a `mix.lock` whose config honours `PGPORT`, `TIPS_DB_SUFFIX` and `TIPS_TEST_PORT` ([README](../../README.md#use-agents-optional)).
 
 Install Python 3.12 and the [configured client CLIs](config.toml). Create the dispatcher's locked environment once per checkout, as in [development](development.md#dependencies-and-test-isolation), or install a harness release (below). Authenticate the clients and the GitHub CLI (`gh`) for this repository. Agents also need GNU `timeout` (macOS: `brew install coreutils`) and `unbuffer` (Expect): the Elixir skill requires it on Mix commands. Testers use `agent-browser` for manual browser review.
 
@@ -62,7 +62,7 @@ Generated settings enable Credo for both clients. Claude launches use `--setting
 
 Build Dexter using the [LSP guide](../lsp/README.md#build). The build uses the pinned source and local patch to produce one binary. Put matching Elixir sources in the main checkout's `agent/lsp/vendor/elixir-<version>/` (the source tree contains `lib/elixir/lib/enum.ex`), or set `DEXTER_ELIXIR_LIB_ROOT` to their `lib/` directory. Stop pairs before replacing the shared build.
 
-Codex launches with approval policy `never` and `-C <allocation directory>`; denied actions cannot escalate, and the launcher does not change sandbox settings. Workers run with your current client settings: worker sandbox profiles are deferred by the user's decision of 2026-10-14 ([#437](https://github.com/chenghanlee/tips/issues/437)). Before the first pair, allow Codex to reach GitHub over HTTPS, the Herdr and Dexter Unix sockets, and the local database and test port. `--allow-unix-socket` is a flag of `codex sandbox`, not of the interactive client the launcher starts. Verify in a launched tester: `gh pr view 331 --json state`, `herdr agent get "$HERDR_PANE_ID"`, `"$TIPS_DEXTER" lookup Tips.Repo` and `unbuffer mix test`.
+Codex launches with approval policy `never` and `-C <allocation directory>`; denied actions cannot escalate, and the launcher does not change sandbox settings. Workers run with your current client settings: worker sandbox profiles are deferred by the user's decision of 2026-10-14 ([#437](https://github.com/chenghanlee/tips/issues/437)). Before the first pair, allow Codex to reach GitHub over HTTPS, the Herdr and Dexter Unix sockets, and the local database and test port. `--allow-unix-socket` is a flag of `codex sandbox`, not of the interactive client the launcher starts. Verify in a launched tester, once the repository has a Mix project: `gh pr view 331 --json state`, `herdr agent get "$HERDR_PANE_ID"`, `"$TIPS_DEXTER" lookup <a module of the app>` and `unbuffer mix test`.
 
 ### Browser access for the tester
 
@@ -98,8 +98,8 @@ a separate browser. It can fail inside the Codex sandbox even when the approved
 `open` command works; the quick/offline doctor does not check browser launch. Fix the
 browser launch failure before assigning manual browser review; do not disable Chrome's sandbox or
 silently switch to the user's personal browser profile. ChromeDriver for local
-Wallaby tests is a separate prerequisite in the
-[browser test guide](../../docs/development/local-development.md#browser-tests-and-ci).
+Wallaby tests is a separate prerequisite; the application's development guide names
+it once the project has browser tests.
 
 ### Claude auto-mode repository context
 
@@ -172,7 +172,7 @@ or approval prompts; the command can return before the dispatcher is ready. Run 
 script in the main checkout.
 
 Start one dispatcher. Agents contact it using the name `dispatcher`. It chooses tasks
-from the backlog using milestone order, dependencies and product value; you do not
+from the backlog using priority order, dependencies and product value; you do not
 need to mark them Ready.
 
 The dispatcher does not monitor GitHub. After changing priorities or external facts,
