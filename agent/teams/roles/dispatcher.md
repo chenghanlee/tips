@@ -159,8 +159,8 @@ cost, not zero. Post the usage table on the spec when the final brief merges.
   `turn:<entry>` or `turn:dispatcher` is the coordinating owner. Harness commands write
   them; plain `prompt_agent` changes none. To hand the turn back after a blocker, or to
   repair labels, call `prompt_agent` with `phase`: it sets `phase:<phase>` and
-  `turn:<entry>`, then sends. Agents report `blocked` only for a repair handoff naming
-  a closed PR; a missing `phase:` or `turn:` label, or two of one prefix (a brief started
-  before the labels has none); or a `turn:` value that is neither `dispatcher` nor an
-  entry assigned on the issue (brief roster, spec lead or critics, a QUESTION
-  assignment).
+  `turn:<entry>`, then sends. Agents report a label contradiction as `blocked` only
+  for a repair handoff naming a closed PR; a missing `phase:` or `turn:` label, or two
+  of one prefix (a brief started before the labels has none); or a `turn:` value that
+  is neither `dispatcher` nor an entry assigned on the issue (brief roster, spec lead or
+  critics, a QUESTION assignment).
