@@ -9,8 +9,8 @@ bootstrap.py, a logs directory, and launcher configuration, all under the harnes
 Herdr name, kind, project, database suffix, port, pane, session and task-submission state.
 Restart, handoff and retirement use that record. One lock on `state/.lock` serializes start,
 design, review, reset, stop and cleanup. This controller never runs a build or a
-worker-provided executable in a project. Its only Git commands are cleanup's fetch and
-read-only checks in a stopped allocation's clone, with hooks and fsmonitor off.
+worker-provided executable in a project. Its only Git commands there are cleanup's fetch
+and read-only checks in a stopped allocation's clone, with hooks and fsmonitor off.
 """
 
 import contextlib
@@ -1080,8 +1080,9 @@ def unpublished_work(project: Path) -> str:
     """Why Git cannot show that the clone holds nothing beyond origin, or "" when it can.
 
     Fetch with prune first, so origin's refs are current. A missing or unreadable
-    repository, a failed command and a timeout are reasons, never an empty result. Hooks and
-    fsmonitor are off, so no executable the clone configures runs.
+    repository, a failed command and a timeout are reasons, never an empty result. Commands
+    run from the state directory with hooks and fsmonitor off; the rest of the clone's own
+    Git configuration still applies, within the accepted risk of worker authority.
     """
     git_dir = project / ".git"
     if git_dir.is_symlink() or not git_dir.is_dir():
