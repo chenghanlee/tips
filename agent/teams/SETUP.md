@@ -234,8 +234,8 @@ A configured entry can run in several allocations. Each launch records its
 resources, and the team's Herdr workspace and tabs, in `<root>/state/<slot>.json`
 ([allocations](README.md#allocations)); restart, handoff and cleanup read that record.
 `github.repository` names the repository and the root; `team.clone_url` is what each
-client clones; `team.psql` is the fixed argv `stop` uses to list and drop a retired
-team's databases (the shipped value is the compose database's local development
+client clones; `team.psql` is the fixed argv [cleanup](README.md#cleanup) uses to list
+and drop a retired team's databases (the shipped value is the compose database's local development
 connection). A checkout's scripts use the main checkout's config; an installed harness
 uses its release's config, `<root>/harness/agent/teams/config.toml`.
 `TIPS_TEAM_CONFIG=/absolute/path` selects another file. Launched clients get the file the

@@ -213,8 +213,9 @@ def poster(allocation: Allocation) -> tuple[str, str, str]:
 
 
 def merged_brief(brief: str) -> bool:
-    """Whether GitHub reports the brief closed by a merged PR. stop holds the store lock, so
-    every read shares one timeouts.shell_seconds budget; a late answer keeps the record."""
+    """Whether GitHub reports the brief closed by a PR merged into main. stop holds the store
+    lock, so every read shares one timeouts.shell_seconds budget; a late answer keeps the
+    record."""
     seconds = conf.settings()["timeouts"]["shell_seconds"]
     deadline = time.monotonic() + seconds
 
@@ -232,7 +233,11 @@ def merged_brief(brief: str) -> bool:
     if view.get("state") != "CLOSED":
         return False
     for pr in object_list(view.get("closedByPullRequestsReferences") or [], f"#{brief} PRs"):
-        state = read("gh", "pr", "view", str(pr.get("number")), *repo_args(), "--json", "state")
-        if object_fields(state, "PR state").get("state") == "MERGED":
+        number = str(pr.get("number"))
+        state = object_fields(
+            read("gh", "pr", "view", number, *repo_args(), "--json", "state,baseRefName"),
+            "PR state",
+        )
+        if (state.get("state"), state.get("baseRefName")) == ("MERGED", "main"):
             return True
     return False

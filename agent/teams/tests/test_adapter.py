@@ -156,15 +156,28 @@ class AdapterTest(Harness):
                 await steps(client)
 
         asyncio.run(run())
-        # The adapter runs git only in the harness, never in a worker's clone, whose
-        # .git/config and hooks the worker controls.
+        # In a worker's clone, whose .git/config and hooks the worker controls, the adapter
+        # runs git only as retire_team's cleanup: from the state directory, hooks and
+        # fsmonitor off, a fetch of origin or a read.
         calls = [json.loads(line) for line in self.git_log.read_text().splitlines()]
         assert calls  # the harness's own startup git ran through the wrapper
         allocations = str(self.trusted / "allocations")
-        assert not [c for c in calls if any(allocations in part for part in c)], calls
+        cleanup = [c for c in calls if any(allocations in part for part in c)]
+        hooks_off = {"core.hooksPath=/dev/null", "core.fsmonitor=false"}
+        checks = (
+            ["fetch", "--prune", "--quiet", "origin"],
+            ["status", "--porcelain"],
+            ["rev-list", "HEAD", "--branches", "--not", "--remotes=origin"],
+            ["stash", "list"],
+        )
+        for call in cleanup:
+            assert call[0] == str(self.trusted / "state"), call
+            settings = {call[i + 1] for i, part in enumerate(call[:-1]) if part == "-c"}
+            assert hooks_off <= settings, call
+            assert any(call[-len(check) :] == check for check in checks), call
         assert not marker.exists(), f"a cwd-relative PATH entry ran: {marker.read_text()}"
         # Startup git runs from the client's cwd; every later command from the main checkout.
-        cwds = [c[0] for c in calls[1:]]
+        cwds = [c[0] for c in calls[1:] if c not in cleanup]
         assert all(cwd == str(self.repo) for cwd in cwds), f"ran outside the checkout: {cwds}"
 
     @staticmethod
@@ -254,7 +267,7 @@ class AdapterTest(Harness):
 
         async def unmerged(client: Any) -> None:
             refused = await self.call(client, "retire_team", ok=False, brief=29)
-            assert "not closed by a merged PR" in refused
+            assert "not closed by a PR merged into main" in refused
 
         self.session(unmerged)
         self.merge(head)

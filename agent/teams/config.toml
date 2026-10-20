@@ -13,8 +13,9 @@ repository = "chenghanlee/tips"
 [team]
 # Each allocation clones this URL itself.
 clone_url = "https://github.com/chenghanlee/tips.git"
-# Fixed argv that `team.py stop` uses to drop a retired team's databases: an absolute
-# psql and the compose database's development connection. No project file is read.
+# Fixed argv that cleanup (end of `team.py stop`, and `team.py cleanup`) uses to list and
+# drop a retired team's databases: an absolute psql and the compose database's development
+# connection. No project file is read.
 psql = ["/opt/homebrew/bin/psql", "postgresql://postgres:postgres@127.0.0.1:5433/postgres"]
 # Validation rejects database names that overlap another slot's numbered partitions or
 # exceed PostgreSQL's 63 bytes.
