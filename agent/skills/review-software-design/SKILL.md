@@ -16,7 +16,8 @@ Scope limits:
   remains responsible for scenarios, checks and merge. Reuse shared evidence, not
   duplicate passes or reports. Apply the P2 limit across the combined review.
 - One pass. Report every P0 and P1. Report at most three P2 findings, the ones with the
-  greatest consequence. Combine findings only when they share a cause and fix.
+  greatest consequence. Combine findings only when they share a cause and fix. Put P2s
+  where [Optional P2 findings](../../teams/README.md#optional-p2-findings) says.
 - Deferrals follow the [severity rule](../../teams/README.md#severity). A shortcut the
   brief did not accept is a P2 with a proposed deferral, not a demand for completeness.
 - For a local review with no PR, use the user's brief and report in the form the user
@@ -109,4 +110,4 @@ state the proposed change or the deferral line to add.
 
 Submit the [PR review record](../../teams/README.md#pr-review-record), with findings in
 the [finding format](../../../AGENTS.md#github). Body: head SHA, what you ran, what you
-read. "No findings" is valid.
+read, and the `Optional` P2 findings. "No findings" is valid.

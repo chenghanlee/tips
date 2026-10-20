@@ -32,7 +32,7 @@ Implement one brief in your own clone. Manage its PR.
    merge `origin/main`, push and run it again, or report `blocked`. If it reports failed
    sends, report `blocked` with them. Reviewers work on the pushed head in their own
    clones, so you may keep working while they review.
-5. When reviewers report findings, fix every P0 and P1. Handle P2s as the [severity rule](../README.md#severity) says. Fix the failures the handoff names. Update the
+5. When reviewers report findings, fix every P0 and P1. Optional P2s need no disposition ([severity rule](../README.md#severity)). Fix the failures the handoff names. Update the
    PR body. Push and hand off again. The tester returns failed checks through the same
    handoff.
 
