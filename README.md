@@ -7,13 +7,28 @@ with PostgreSQL.
 
 ## Run the app
 
-There is no application yet; the first slice creates the Mix project and its setup guide.
-Start the shared database with `docker compose up -d` from the main checkout, never from
-a worktree, so every checkout shares the one service on port 5433.
+You need Elixir 1.20, Erlang/OTP 29 and Docker.
+
+1. Start the shared database with `docker compose up -d` from the main checkout, never
+   from a worktree. Every checkout shares the one service on port 5433.
+2. Run `mix setup`. It fetches the dependencies, creates and migrates the database, and
+   installs and builds the assets.
+3. Run `mix phx.server` and open http://localhost:4000.
+
+The config reads these environment variables:
+
+| Variable | Default | Use |
+|---|---|---|
+| `PGHOST` | `localhost` | Database host |
+| `PGPORT` | `5433` | Database port |
+| `PGUSER`, `PGPASSWORD` | `postgres` | Database login |
+| `TIPS_DB_SUFFIX` | empty | Appended to the `tips_dev` and `tips_test` database names |
+| `PORT` | `4000` | Dev server port |
+| `TIPS_TEST_PORT` | `4002` | Test endpoint port |
 
 ## Test changes
 
-Once a Mix project exists, run these checks from your development checkout:
+Start the database as above, then run these checks from your development checkout:
 
 ```sh
 mix format --check-formatted
@@ -24,7 +39,8 @@ mix test
 python3 scripts/check_docs.py
 ```
 
-Until then, only `python3 scripts/check_docs.py` applies. During the
+`mix test` creates and migrates the test database first. The first `mix dialyzer` run
+builds its PLT in `_build/plts` and takes a few minutes. During the
 [GitHub CI pause](AGENTS.md#github-ci-pause), run applicable checks locally and record their
 evidence for independent review. Follow [AGENTS.md](AGENTS.md) for engineering rules.
 Put the task scope, acceptance criteria and review evidence in the relevant GitHub issue and PR.
