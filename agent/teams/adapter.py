@@ -201,8 +201,10 @@ def prompt_agent(brief: Number, entry: Entry, text: Message) -> str:
 @server.tool()
 def retire_team(brief: Number) -> str:
     """Retire a team (team.py stop): stop its clients, close its workspace and release its
-    slot. A brief must be closed by a merged PR; the user retires one closed without a
-    merged PR with `team.py stop <brief> --abandon`. Project files are kept."""
+    slot. A brief must be closed by a PR merged into main; the user retires one closed
+    without a merged PR with `team.py stop <brief> --abandon`. Then cleanup deletes each
+    allocation whose clone holds nothing unpublished, drops the team's databases and
+    reports what it kept."""
     return operate(lambda: team.stop_brief(str(brief)), writes=True)
 
 

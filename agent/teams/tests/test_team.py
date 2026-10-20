@@ -287,7 +287,7 @@ class InProcessTeamTest(unittest.TestCase):
             "agents": self.agents,
         }
         (self.root / "state/1.json").write_text(json.dumps(record))
-        self.drop = mock.Mock(return_value=["tips_test_t1g1i"])
+        self.clean_up = mock.Mock()
         patch = mock.patch.object
         self.enterContext(patch(conf, "cfg", cast(conf.Config, tomllib.loads(CONFIG))))
         self.enterContext(patch(conf, "harness_root", return_value=self.root))
@@ -297,7 +297,7 @@ class InProcessTeamTest(unittest.TestCase):
         self.enterContext(patch(team, "merged_brief", return_value=True))
         self.enterContext(patch(team, "stop_daemon"))
         self.enterContext(patch(team, "port_in_use", return_value=False))
-        self.enterContext(patch(team, "drop_databases", self.drop))
+        self.enterContext(patch(team, "clean_up", self.clean_up))
 
     def stop(self, pane: str, root: str | Path) -> None:
         self.calls.append(("stop", pane, str(root)))
@@ -388,7 +388,7 @@ class InProcessTeamTest(unittest.TestCase):
         )
         assert stopped == ["w1:p1", "w1:p2"], stopped
         assert ("workspace", "close", "w1") not in self.calls, "the workspace stays open"
-        self.drop.assert_not_called()
+        self.clean_up.assert_not_called()
         assert (self.root / "state/1.json").exists(), "the record is kept"
 
     def test_an_exited_client_is_refused_and_nothing_is_sent(self) -> None:
@@ -1018,7 +1018,7 @@ class PairLifecycleTest(Harness):
             assert doc in json.dumps(json.loads(result.stdout))
 
     @unittest.skipUnless(os.environ.get("TIPS_TEST_REAL_DEXTER"), REAL_DEXTER)
-    def test_stop_stops_real_daemons_and_retains_the_projects(self) -> None:
+    def test_stop_stops_real_daemons_before_cleanup_deletes_the_projects(self) -> None:
         self.use_real_dexter()
         self.team("start", "29")
         project = self.project("team-1-impl")
@@ -1029,9 +1029,9 @@ class PairLifecycleTest(Harness):
         assert daemon_pid(project)
         self.merge(self.push("team-1-impl"))
         self.clients_exit(1)
-        self.team("stop", "29")
+        assert "g1-impl: files deleted" in self.team("stop", "29").stdout
         wait_until_stopped(project)
-        assert (project / "sample.ex").exists()
+        assert not project.exists()
 
 
 class HandoffTest(Harness):
@@ -1389,20 +1389,22 @@ class DesignTest(Harness):
         project = root / "project"
         assert self.git("rev-parse", "HEAD", cwd=project) == self.git("rev-parse", "HEAD")
         assert self.git("branch", "--show-current", cwd=project) == ""
-        # A brief start cannot take the spec's slot, and a design team keeps its databases.
+        # A brief start cannot take the spec's slot.
         spec = self.state()["issues"]["50"]
         self.update(issues={**self.state()["issues"], "50": BRIEF})
         refused = self.team("start", "50", ok=False)
         assert "#50 already holds a design team in slot 1" in refused.stderr, refused.stderr
         self.update(issues={**self.state()["issues"], "50": spec})
+        # A design team has no PR; its clean clones and its databases go at stop.
         self.clients_exit(1)
-        self.databases("tips_test_t1g1c")
-        self.team("stop", "50")
-        assert self.remaining_databases() == ["tips_test_t1g1c"]
-        assert not any(call[-2:-1] == ["-c"] for call in self.psql_calls())
-        assert project.is_dir()
+        self.databases("tips_test_t1g1c", "tips_test_t1g1l")
+        stopped = self.team("stop", "50").stdout
+        assert self.remaining_databases() == []
+        assert not root.exists()
+        assert not (self.trusted / "allocations/g1-lead").exists()
         retired = json.loads((self.trusted / "state/g1-critic/retired.json").read_text())
-        assert retired["databases_kept_because"] == "a design team's databases are kept"
+        assert (retired["files"], retired["databases"]) == ("deleted", "dropped")
+        assert "g1-critic: files deleted; databases dropped" in stopped
         assert self.recorded_briefs() == set()
 
 
@@ -1454,26 +1456,41 @@ class RetirementTest(Harness):
         assert "nothing removed" in self.team("stop", "99").stdout
         self.clients_exit(1)
         daemons = sorted(self.state()["daemons"])
+        # An unrecorded name in generation 1, and names no record or retirement owns.
+        self.databases(*self.remaining_databases(), "tips_test_t1g1i_rb", "tips_test_t3g77_x")
+        orphan = self.trusted / "allocations/g99-x"
+        orphan.mkdir()
         stopped = self.team("stop", "29").stdout
-        # Exactly the recorded databases and their partitions are dropped, without FORCE
-        # and without project files; the other team and other generations stay.
-        assert sorted(self.remaining_databases()) == ["tips_test_t1g11i", "tips_test_t2g2i"]
+        # Every database of slot 1's generation 1 is dropped, recorded or not, without
+        # FORCE; generation 11, the live team and the orphan stay.
+        assert sorted(self.remaining_databases()) == [
+            "tips_test_t1g11i",
+            "tips_test_t2g2i",
+            "tips_test_t3g77_x",
+        ]
         assert all(call[:2] == ["fixture-dsn", "-X"] for call in self.psql_calls())
         assert not any("FORCE" in " ".join(call) for call in self.psql_calls())
-        assert "databases dropped: tips_test_t1g1i" in stopped
+        assert "Databases _t1g1: dropped; dropped: tips_test_t1g1i, " in stopped
         # Owned daemons were stopped with the trusted binary; the other team's stays.
         stops = sorted(e[1] for e in self.events("dexter") if e[2:] == ["stop"])
         assert stops == [d for d in daemons if "/g1-" in d]
         assert [d for d in self.state()["daemons"] if "/g1-" in d] == []
-        # Project files are retained and listed, never deleted.
+        # Clean clones go with their whole allocation; only retired.json remains.
         for ident in ("g1-impl", "g1-tester", "g1-critic"):
-            project = self.trusted / "allocations" / ident / "project"
-            assert (project / "tracked.txt").exists()
-            retired = json.loads((self.trusted / "state" / ident / "retired.json").read_text())
-            assert str(project) in retired["retained"]
-            assert retired["databases_kept_because"] == ""
-            assert "report" not in retired
-        assert f"Retained {self.trusted / 'allocations/g1-impl/project'}" in stopped
+            assert not (self.trusted / "allocations" / ident).exists()
+            state = self.trusted / "state" / ident
+            assert [path.name for path in state.iterdir()] == ["retired.json"]
+            retired = json.loads((state / "retired.json").read_text())
+            assert (retired["files"], retired["databases"]) == ("deleted", "dropped")
+            assert f"{ident}: files deleted; databases dropped" in stopped
+        # Orphans are listed and never deleted; the live team's database is no orphan.
+        for run in (stopped, self.team("cleanup", "29").stdout):
+            assert f"Orphan, not deleted: {orphan}\n" in run
+            assert "Orphan, not deleted: database tips_test_t3g77_x\n" in run
+            assert "Orphan, not deleted: database tips_test_t1g11i\n" in run
+            assert "tips_test_t2g2i" not in run
+        assert orphan.is_dir()
+        assert "tips_test_t3g77_x" in self.remaining_databases()
         assert self.workspaces() == ["team-2-30"]
         assert self.recorded_briefs() == {"30"}
         assert self.pane("team-2-impl")["agent"] == "codex"
@@ -1605,33 +1622,46 @@ except RuntimeError as error:
         self.push("team-1-impl", "pushed, never merged")
         self.clients_exit(1)
         stopped = self.team("stop", "29", "--abandon").stdout
-        assert "slot 1 released; databases dropped: none" in stopped
+        assert "#29: slot 1 released\n" in stopped
         assert self.remaining_databases() == ["tips_test_t1g1i"]
         retired = json.loads((self.trusted / "state/g1-impl/retired.json").read_text())
-        assert retired["databases_kept_because"] == (
-            "brief closed without a merged PR (stop --abandon)"
-        )
+        kept = "kept: brief closed without a merged PR (stop --abandon)"
+        assert (retired["files"], retired["databases"]) == (kept, kept)
         assert f"g1-impl (#29): {self.trusted / 'allocations/g1-impl'}" in self.team("clean").stdout
         self.team("start", "30")
         assert self.record(1)["brief"] == "30"
         assert (project / "tracked.txt").exists()
         assert (project / "unfinished.txt").exists()
 
-    def test_a_writer_that_outlives_stop_never_causes_deletion(self) -> None:
+    def test_unpublished_or_unreadable_work_is_kept_and_the_databases_still_drop(self) -> None:
         self.merged_pair()
+        self.team("review", "7", "critic")
+        self.bootstrap("team-1-critic")
         self.clients_exit(1)
-        project = self.project("team-1-impl")
-        late = project / "late.txt"
-        self.env["RACE_DIRTY_FILE"] = str(late)
-        self.team("stop", "29")
-        assert late.read_text() == "written while stopping\n"
-        retired = json.loads((self.trusted / "state/g1-impl/retired.json").read_text())
-        assert str(project) in retired["retained"]
-        # clean lists what stop retained and deletes nothing.
+        self.databases("tips_test_t1g1i", "tips_test_t1g1c")
+        impl, tester, critic = (self.project(f"team-1-{e}") for e in ("impl", "tester", "critic"))
+        # A writer still running during stop leaves an uncommitted file; the tester's clone
+        # has a commit only it holds, the critic's a stash.
+        self.env["RACE_DIRTY_FILE"] = str(impl / "late.txt")
+        self.commit("local only", cwd=tester)
+        (critic / "tracked.txt").write_text("stashed\n")
+        self.git("stash", "-q", cwd=critic)
+        stopped = self.team("stop", "29").stdout
+        del self.env["RACE_DIRTY_FILE"]
+        assert "g1-impl: files kept: uncommitted or untracked files: ?? late.txt;" in stopped
+        assert "g1-tester: files kept: commits not on origin: " in stopped
+        assert "g1-critic: files kept: stashed changes: stash@{0}" in stopped
+        assert all((p / "tracked.txt").exists() for p in (impl, tester, critic))
+        assert self.remaining_databases() == []
+        # A clone whose Git cannot be read is kept too; clean lists every kept allocation.
+        shutil.rmtree(impl / ".git")
+        rerun = self.team("cleanup", "29").stdout
+        assert "g1-impl: files kept: project has no Git repository;" in rerun
+        assert (impl / "late.txt").exists()
         listed = self.team("clean").stdout
-        assert f"g1-impl (#29): {project.parent}; files: project and log files" in listed
+        for ident, project in (("g1-impl", impl), ("g1-tester", tester), ("g1-critic", critic)):
+            assert f"{ident} (#29): {project.parent}; files: kept: " in listed
         assert "databases _t1g1i: dropped" in listed
-        assert late.exists()
 
     def test_a_stalled_github_read_keeps_the_record_and_releases_the_lock(self) -> None:
         self.merged_pair()
@@ -1651,25 +1681,26 @@ except RuntimeError as error:
         self.team("stop", "29")
         assert self.recorded_briefs() == set()
 
-    def test_refused_database_drop_keeps_the_rest_and_the_reservation(self) -> None:
+    def test_a_refused_drop_is_recorded_and_the_rest_of_cleanup_continues(self) -> None:
         self.merged_pair()
         self.clients_exit(1)
         self.databases("tips_test_t1g1i", "tips_test_t1g1r", "tips_dev_t1g1r")
         self.env["PSQL_REFUSE"] = "tips_test_t1g1r"
-        refused = self.team("stop", "29", ok=False)
-        assert 'PostgreSQL refused to drop tips_test_t1g1r: ERROR:  database "tips_test' in (
-            refused.stderr
-        )
-        assert "Dropped: tips_test_t1g1i; the rest and the reservation are kept" in refused.stderr
-        assert self.remaining_databases() == ["tips_test_t1g1r", "tips_dev_t1g1r"]
-        assert self.recorded_briefs() == {"29"}
-        # The slot is not reassigned while it is kept.
-        self.write_config(CONFIG.replace("max_teams = 6", "max_teams = 1"))
-        assert "No free slot" in self.team("start", "30", ok=False).stderr
-        del self.env["PSQL_REFUSE"]
-        self.team("stop", "29")
-        assert self.remaining_databases() == []
+        stopped = self.team("stop", "29").stdout
+        refusal = 'refused: tips_test_t1g1r: ERROR:  database "tips_test_t1g1r" is being accessed'
+        assert f"Databases _t1g1: {refusal}" in stopped
+        assert self.remaining_databases() == ["tips_test_t1g1r"]
         assert self.recorded_briefs() == set()
+        assert not (self.trusted / "allocations/g1-impl").exists()
+        retired = json.loads((self.trusted / "state/g1-impl/retired.json").read_text())
+        assert retired["databases"].startswith(refusal), retired
+        assert retired["databases_dropped"] == ["tips_test_t1g1i", "tips_dev_t1g1r"]
+        # Once the connection closes, a rerun drops the rest.
+        del self.env["PSQL_REFUSE"]
+        self.team("cleanup", "29")
+        assert self.remaining_databases() == []
+        retired = json.loads((self.trusted / "state/g1-impl/retired.json").read_text())
+        assert retired["databases"] == "dropped"
 
     def test_busy_port_or_failed_daemon_stop_keeps_the_reservation(self) -> None:
         self.merged_pair()
@@ -1697,25 +1728,33 @@ except RuntimeError as error:
     def test_generations_never_reuse_allocations_or_database_names(self) -> None:
         self.merged_pair()
         self.clients_exit(1)
-        self.team("stop", "29")
         old = self.trusted / "allocations/g1-impl"
-        # The brief starts again in the same slot with a new generation and new names.
-        self.update(closed_by={}, merged=[])
-        self.team("start", "29")
+        (old / "project/unfinished.txt").write_text("not committed\n")
+        self.team("stop", "29")
+        # Another brief takes the slot with a new generation and new names.
+        self.team("start", "30")
         assert self.record(1)["generation"] == 2
         assert self.launch_env("team-1-impl") == ("_t1g2i", str(PORT_BASE + 10))
-        assert self.pane("team-1-impl")["cwd"] == str(self.trusted / "allocations/g2-impl")
-        assert (old / "project/tracked.txt").exists()
+        new = self.trusted / "allocations/g2-impl"
+        assert self.pane("team-1-impl")["cwd"] == str(new)
+        self.bootstrap("team-1-impl")
+        # Cleanup of the old brief removes only its own allocation and generation.
+        self.databases("tips_test_t1g1i", "tips_test_t1g2i")
+        (old / "project/unfinished.txt").unlink()
+        assert "g1-impl: files deleted" in self.team("cleanup", "29").stdout
+        assert not old.exists()
+        assert self.remaining_databases() == ["tips_test_t1g2i"]
+        assert (new / "project/tracked.txt").exists()
         # A forged record pointing at another allocation's directory is refused at stop.
         path = self.trusted / "state/1.json"
         record = json.loads(path.read_text())
         record["agents"]["impl"]["root"] = str(old)
         path.write_text(json.dumps(record))
         self.clients_exit(1)
-        self.update(closed_by={"29": ["7"]}, merged=["7"])
-        refused = self.team("stop", "29", ok=False)
+        self.update(closed_by={"30": ["8"]}, merged=["8"])
+        refused = self.team("stop", "30", ok=False)
         assert f"recorded allocation {old} is not" in refused.stderr
-        assert (old / "project/tracked.txt").exists()
+        assert (new / "project/tracked.txt").exists()
 
     def test_symlinked_allocation_paths_are_refused_at_retirement(self) -> None:
         self.merged_pair()
