@@ -27,7 +27,7 @@ IMPLEMENTER  ask questions only when answers affect the work → code → push �
              (notifies every required reviewer of the head; asks the dispatcher to launch missing ones)
 DISPATCHER   team.py review <pr> <entry> for each requested reviewer
 REVIEWERS    bootstrap.py --commit <head> → review correctness and design → notify tester if additional reviewer
-TESTER       any review with findings → team.py turn <pr> <implementer>   (repeat until no P0 or P1)
+TESTER       a review with a P0, P1 or hold → team.py turn <pr> <implementer>   (repeat until none)
 TESTER       pr_review.py observe <pr> reports ready → gh pr merge → "done"
 DISPATCHER   team.py stop <brief> → next
 ```
@@ -253,8 +253,9 @@ The dispatcher repairs the labels with the handoff form of `prompt_agent`.
 ## PR review record
 
 Use `COMMENT` reviews instead of native approvals because agents share one GitHub
-identity. Submit one `COMMENT` review per pass on the current PR head and put findings
-in inline comments:
+identity. Submit one `COMMENT` review per pass on the current PR head. Put P0 and P1
+findings in inline comments and P2 findings in the body, as
+[Optional P2 findings](#optional-p2-findings) says:
 
 ```sh
 gh api "repos/{owner}/{repo}/pulls/$PR/reviews" --input tmp/review.json --jq .html_url
@@ -265,11 +266,13 @@ gh api "repos/{owner}/{repo}/pulls/$PR/reviews" --input tmp/review.json --jq .ht
  "comments": [{"path": "...", "line": 12, "body": "..."}]}
 ```
 
-Put either `LGTM` alone or the review decision on the first line of the body. Put
-`<entry>, <session>` on the second line. Record your initial findings before reading the
-PR body or another review. Resolve a thread only if you opened it. A new head
-invalidates every LGTM. Review changes since your last actual review; a first review
-covers the full relevant change and affected contracts. Earlier advice is not a review.
+Put `LGTM` alone on the first line of the body when no P0, P1 or decision hold remains
+and required verification is satisfied, even if the body lists Optional P2s. Otherwise
+put the review decision there. Put `<entry>, <session>` on the second line. Record your
+initial findings before reading the PR body or another review. Resolve a thread only if
+you opened it. A new head invalidates every LGTM. Review changes since your last actual
+review; a first review covers the full relevant change and affected contracts. Earlier
+advice is not a review.
 
 The default tester assesses correctness and design in one investigation and record.
 An additional designer follows its design-review duties.
@@ -323,13 +326,31 @@ Reviewers: verify the body's claims rather than repeating the work it records.
 | P1 | An acceptance scenario fails or is unproven, a required test or check is missing or failing, the change violates a [required rule](../skills/design-software/SKILL.md#required-rules), an error on an affected path is hidden, or the change significantly harms the user's experience. |
 | P2 | Any other finding. |
 
-Implementer: fix every P0 and P1. For P2s, fix them, decline them with a reason, or
-defer them in one follow-up issue linked from the PR body. A deferral recorded in the
-brief's decisions table or in a linked follow-up issue settles P2 findings on that
-point while its assumptions hold. A reached revisit trigger or new invalidating evidence
+Implementer: fix every P0 and P1. You may address [Optional P2s](#optional-p2-findings);
+no disposition is required. A deferral recorded in the brief's decisions table or in a
+linked follow-up issue settles P2 findings on that point while its assumptions hold. A reached revisit trigger or new invalidating evidence
 returns the decision to its owner, who can repair, revise or renew it with a reason.
 Reconsideration alone does not upgrade severity or require unrelated repair. A deferral
 never settles a P0 or P1 condition.
+
+### Optional P2 findings
+
+By the user's decision on 2026-10-20 ([#515](https://github.com/chenghanlee/tips/issues/515)),
+PR P2 findings are optional. Design critiques before implementation keep their P2 rules.
+
+- Put every P2 in an `Optional` part of the review body, not in an inline thread, with
+  its `path:line`, consequence and proposed change. This holds in reviews with P0 or P1
+  findings too, so no P2 thread blocks a later `LGTM`. The review skills' P2 limit
+  still applies.
+- An Optional item needs no reply, issue, turn or fix. Merge follows [Merge](#merge) and
+  does not wait for Optional work.
+- P2 is not a way to demote a missing required check, a contract failure or a
+  [required rule](../skills/design-software/SKILL.md#required-rules) violation.
+- A reviewer may move its own open P2 thread into Optional and resolve the thread
+  without the implementer's disposition.
+
+Lost guarantee: a PR P2 gets no guaranteed acknowledgment, rationale, fix or tracked
+deferral.
 
 ### Changed binding decisions
 

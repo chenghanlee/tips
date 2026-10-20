@@ -30,7 +30,9 @@ dirty clone and never resets one.
 3. Record the head SHA and your initial findings as the
    [review record](../README.md#pr-review-record) says.
 4. Follow both skills with your own database and port: affected code, design,
-   scenarios and their controls, mutation check, entry points, data, checks.
+   scenarios and their controls, mutation check, entry points, data, checks. For the
+   full application suite, verify the implementer's record instead of rerunning it, as
+   [Step 7](../../skills/review-software-correctness/SKILL.md#step-7-checks) says.
    Wallaby browser tests (`TIPS_BROWSER=1`, `test/tips_web/features`): a Codex client
    does not run them ([manual browser review](../README.md#manual-browser-review)). Read the implementer's record
    in the PR body under "Checks not run by CI": check the command, exit, per-run results
@@ -40,11 +42,12 @@ dirty clone and never resets one.
    record that in your review; the merge-confirming tester then runs
    `agent/teams/team.py turn <pr> <implementer entry>` to request it, and any other
    tester sends its review URL to the merge-confirming tester. For manual checks follow [manual browser review](../README.md#manual-browser-review), including its Codex setup, launch form and failure steps.
-5. Submit the [review record](../README.md#pr-review-record). Without findings, submit
-   LGTM. Other tester: send your review URL to the merge-confirming tester.
+5. Submit the [review record](../README.md#pr-review-record). Without a P0 or P1 finding
+   or a hold, submit LGTM; P2s go under [Optional](../README.md#optional-p2-findings).
+   Other tester: send your review URL to the merge-confirming tester.
 6. Merge-confirming tester: when your review or any required reviewer's latest review of
-   the head has findings, send `turn` to the implementer. Do not wait for the other
-   reviews. When `agent/teams/pr_review.py observe <pr>` reports ready, follow the
+   the head has a P0 or P1 finding or a hold, send `turn` to the implementer. Do not
+   wait for the other reviews. When `agent/teams/pr_review.py observe <pr>` reports ready, follow the
    [merge step](../README.md#merge). Then send `done` to the dispatcher.
 7. Follow the [review record](../README.md#pr-review-record) for new heads, first-review
    coverage and later changes.
@@ -60,7 +63,7 @@ For a changed binding decision, follow [Changed binding decisions](../README.md#
 
 ## Messages you send
 
-- `team.py turn <pr> <implementer entry>` when the head has findings.
+- `team.py turn <pr> <implementer entry>` when the head has a P0 or P1 finding or a hold.
 - Review URL to the merge-confirming tester, if you are not it.
 - `done` or `blocked` to the dispatcher.
 

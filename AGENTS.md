@@ -63,7 +63,7 @@ for each kind of file you changed:
 
 | Changed files | Run |
 |---|---|
-| Application code, tests or config | [Test changes](README.md#test-changes), including `mix credo --strict` and `mix dialyzer` |
+| Application code, tests or config | [Test changes](README.md#test-changes), including `mix credo --strict` and `mix dialyzer`. The tester verifies the implementer's full-suite record instead of rerunning `mix test` ([substitution](agent/skills/review-software-correctness/SKILL.md#step-7-checks)) |
 | `agent/teams` Python | [Harness checks](agent/teams/development.md#required-checks) |
 | Go, including carried patches | [Pinned lint profile](agent/lsp/dexter/patches/README.md#required-go-static-analysis) |
 | Markdown | `python3 scripts/check_docs.py` |
@@ -86,8 +86,10 @@ as delivery requirements; it does not remove the applicable checks above or the
   intermittent run, quote the assertion or error excerpt and the comparison runs
   behind its classification. Working logs stay in the implementer's clone until the
   team's cleanup deletes them; the PR may name one but must not depend on it. The
-  independent reviewer verifies that evidence and covers correctness and design
-  before submitting a current-head review. Self-review is insufficient.
+  independent reviewer verifies that evidence, without rerunning the full application
+  suite by default ([substitution](agent/skills/review-software-correctness/SKILL.md#step-7-checks)),
+  and covers correctness and design before submitting a current-head review.
+  Self-review is insufficient.
 - After a change, rerun affected checks. A reviewer may carry forward earlier evidence
   only after checking the intervening diff and recording why it still applies.
 - Follow the [merge procedure](agent/teams/README.md#merge). Do not wait for paused
@@ -107,8 +109,8 @@ as delivery requirements; it does not remove the applicable checks above or the
 ## GitHub
 
 - Issue and PR comments: post only decisions, findings, blockers and the review replies allowed below. Do not post separate progress updates, status updates or acknowledgments.
-- Reviews: follow the [PR review record](agent/teams/README.md#pr-review-record). Put one finding per inline comment, on the line it concerns.
-- Review body: only the review decision, details the review record requires, check results and what you did not check (see Evidence), and findings outside the diff, each with its `path:line`.
+- Reviews: follow the [PR review record](agent/teams/README.md#pr-review-record). Put one P0 or P1 finding per inline comment, on the line it concerns. P2s go in the body's [Optional](agent/teams/README.md#optional-p2-findings) part.
+- Review body: only the review decision, details the review record requires, check results and what you did not check (see Evidence), findings outside the diff, each with its `path:line`, and the Optional P2s.
 - Findings: start with [P0, P1 or P2](agent/teams/README.md#severity) and the change you ask for, then explain why it matters. For wrong behaviour, give the steps or input, the actual result and the expected result; otherwise say what it breaks or costs. A `suggestion` block must replace the commented lines exactly.
 - Review replies: only ask or answer a question the finding leaves open, link the commit that fixes it, or explain why you will not make the requested change. The reviewer who opened the thread resolves it.
 - Blockers: state what is blocked, the exact error or question, and who must act. In a pair, follow the [blocker procedure](agent/teams/README.md#report-and-resolve-blockers).

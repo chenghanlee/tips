@@ -17,7 +17,8 @@ Scope limits:
   reaches that no surviving test proves (step 5).
 - Deferrals follow the [severity rule](../../teams/README.md#severity).
 - One pass. Report every P0 and P1. Report at most three P2 findings, the ones with the
-  greatest consequence. Combine findings only when they share a cause and fix.
+  greatest consequence. Combine findings only when they share a cause and fix. Put P2s
+  where [Optional P2 findings](../../teams/README.md#optional-p2-findings) says.
 
 The [tester role](../../teams/roles/tester.md) defines turns, handoff and the merge.
 [implement-software](../implement-software/SKILL.md) is the standard for contracts,
@@ -161,8 +162,22 @@ not apply to the PR.
 ## Step 7: Checks
 
 Run the [required checks](../../../AGENTS.md#checks) for the kinds of files the PR
-changed, in your own database and port. When application code, tests or
-behaviour-changing config changed, run the full application test suite once.
+changed, in your own database and port, except the full application test suite.
+
+For the full application suite, verify the implementer's record for the reviewed head
+instead of running the suite again. This is a
+[substitution](../../teams/roles/common.md#authority) by the user's decision of
+2026-10-20 ([#515](https://github.com/chenghanlee/tips/issues/515)). It replaces the
+default second run, including the plain `mix test` the changed-file-kind checks reach.
+The record must cover that head completely: a CI run, or during the CI pause the record
+the [policy](../../../AGENTS.md#github-ci-pause) requires. Missing, contradictory or
+inapplicable evidence does not satisfy it: report the required check as missing, or run
+the suite yourself. Also run the suite when your investigation needs it. Steps 3 to 6,
+the other required checks, the browser delegation in the
+[tester role](../../teams/roles/tester.md), the failed-check procedure and the rule for
+carrying evidence across a later diff still apply. Harness Python checks are outside this rule.
+Lost guarantee: a second unconditional application-suite run in another database, port
+and runtime.
 
 During the [CI pause](../../../AGENTS.md#github-ci-pause), verify the recorded local
 commands, tested SHA, results and the excerpts the decision depends on. Record which
@@ -170,8 +185,7 @@ evidence you ran yourself and which you inspected. Apply the policy's rule for c
 evidence across a later diff; an absent CI run is not a pass and does not replace local
 verification.
 
-- Rerun a failing test once. If it passes the second time, report it as flaky with the
-  test name. Do not hide it.
+- For a failing or flaky test, follow the [failed-check procedure](../../teams/README.md#report-and-resolve-blockers).
 - Report: which checks passed, which failed with the failing lines only, which you did
   not run and why.
 - For browser tests, real-provider tests, release smoke and migration rollback, record
@@ -215,6 +229,7 @@ Review body, in this order:
 7. Design assessment and consequential tradeoffs from the shared investigation; no
    duplicate affected-code list or generic declaration is needed.
 8. Findings outside the diff, each with `path:line`.
+9. `Optional`: the P2 findings.
 
 "No findings" is valid when every scenario is proven and every step above is recorded.
 

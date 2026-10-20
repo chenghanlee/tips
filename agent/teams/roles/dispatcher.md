@@ -150,9 +150,10 @@ cost, not zero. Post the usage table on the spec when the final brief merges.
   first; the first tester confirms the merge. Default: one implementer and one tester.
   Add a reviewer only when the brief names what it adds, such as client or LiveView
   state, timers or concurrency the tester's checks may not exercise.
-- A P2 is settled when it is fixed, declined with a reason, or deferred in the brief's
-  decisions table or a linked follow-up issue; the deferral settles the P2 while its
-  assumptions hold. A deferral never settles a P0 or P1.
+- PR P2s are optional: they need no reply, fix or deferral and do not block `LGTM`
+  ([Optional P2 findings](../README.md#optional-p2-findings)). A deferral in the brief's
+  decisions table or a linked follow-up issue settles a P2 while its assumptions hold;
+  it never settles a P0 or P1.
 - On `<URL> blocked`: set the issue Blocked. Route technical questions to the named
   decision owner; ask the user about product, scope or tradeoffs. Record the answer on
   the issue and set Active.
