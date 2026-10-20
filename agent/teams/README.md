@@ -178,7 +178,8 @@ closed by a PR merged into `main`. A standalone design team needs no PR.
 Cleanup keeps no journal and recovers nothing automatically. After an interrupted run or
 a failed delete, which prints the remaining paths, the operator finishes by hand or
 reruns `cleanup`. A process outside Herdr that still writes into an allocation after
-`stop` can lose what it writes after the Git checks; this is part of the
+`stop` can lose what it writes after the Git checks, and cleanup's Git reads the clone's
+own configuration, which a worker can change. Both are part of the
 [accepted risk](#allocations). PR bodies must not depend on files in an allocation:
 cleanup deletes them.
 
