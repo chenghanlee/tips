@@ -53,10 +53,9 @@ Put the task scope, acceptance criteria and review evidence in the relevant GitH
   used as a CLI by Claude and Codex.
 
 Agent tooling is separate from the application. You do not need it to run Tips.
-Pair bootstrap needs a Mix project with a `mix.lock`, so slices before that run outside
-pairs. Once it exists, the app's config must honour the pair environment: `PGPORT`,
-`TIPS_DB_SUFFIX` appended to the `tips_dev` and `tips_test` database names, and
-`TIPS_TEST_PORT` for the test server. Otherwise pairs share one database and one port.
+Pairs run with `MIX_ENV=test` and set `PGPORT`, `TIPS_DB_SUFFIX` and `TIPS_TEST_PORT`
+so each pair has its own database and port. The config reads them as the table in
+[Run the app](#run-the-app) shows; keep that when changing the config.
 
 ## Find requirements and tasks
 

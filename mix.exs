@@ -12,7 +12,11 @@ defmodule Tips.MixProject do
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
       listeners: [Phoenix.CodeReloader],
-      dialyzer: [plt_core_path: "_build/plts", plt_local_path: "_build/plts"]
+      dialyzer: [
+        plt_add_apps: [:ex_unit],
+        plt_core_path: "_build/plts",
+        plt_local_path: "_build/plts"
+      ]
     ]
   end
 
