@@ -43,7 +43,6 @@ from briefs import (
 )
 from commands import execute, object_fields, require_type, run, write_file
 from config import (
-    DATABASE_BASES,
     DISPATCHER_RECOVERY,
     ENTRY,
     NAME_BYTES,
@@ -67,6 +66,7 @@ from config import (
     harness,
     live_name,
     names_fit,
+    namespace_of,
     overlapping,
     project_of,
     slot_record_paths,
@@ -1005,44 +1005,29 @@ def remove_if_empty(directory: Path) -> None:
 class Retired(TypedDict):
     """`state/<id>/retired.json`: what stop retired and what cleanup last did with it.
 
-    `team` is the record's kind. `files` is pending, deleted, `kept: <why>` or
-    `failed: <paths>`; `databases` is pending, dropped, `refused: <why>` or `kept: <why>`.
+    `files` is pending, deleted, `kept: <why>` or `failed: <paths>`; `databases` is pending,
+    dropped, `refused: <why>` or `kept: <why>`.
     """
 
     id: str
     issue: str
-    team: str
     abandoned: bool
     db_suffix: str
     files: str
     databases: str
-    databases_dropped: list[str]
     orphans: list[str]
     report: NotRequired[str]
 
 
 ABANDONED = "brief closed without a merged PR (stop --abandon)"
-# What a retirement written before cleanup existed recorded for a design team.
-LEGACY_DESIGN = "a design team's databases are kept"
 
 
 def read_retired(path: Path) -> Retired:
-    """A retirement note. One written before cleanup existed gets its team and abandonment
-    from the reason it recorded for keeping databases."""
     fields = object_fields(json.loads(path.read_text()), str(path))
-    for key in ("id", "issue", "db_suffix"):
+    for key in ("id", "issue", "db_suffix", "files", "databases"):
         require_type(fields.get(key), str, f"{path}: {key}")
-    if "team" not in fields:
-        kept = fields.pop("databases_kept_because", "")
-        for key in ("retained", "reason"):
-            fields.pop(key, None)
-        fields |= {
-            "team": "design" if kept == LEGACY_DESIGN else "brief",
-            "abandoned": kept == ABANDONED,
-            "files": f"kept: {ABANDONED}" if kept == ABANDONED else "pending",
-            "databases": f"kept: {ABANDONED}" if kept == ABANDONED else "pending",
-            "orphans": [],
-        }
+    if not isinstance(fields.get("abandoned"), bool):
+        raise ValueError(f"{path}: abandoned must be true or false; preserved")
     return cast(Retired, fields)
 
 
@@ -1051,18 +1036,17 @@ def write_retired(path: Path, note: Retired) -> None:
 
 
 def retire(record: Record, abandon: bool) -> None:
-    """Write each allocation's retirement note, which cleanup reads once the record is gone."""
+    """Write each allocation's retirement note, which cleanup reads once the record is gone.
+    stop wrote it only after its merge check passed, or for a standalone design team or an
+    abandoned brief."""
     for allocation in record["agents"].values():
-        kept = f"kept: {ABANDONED}"
         note = Retired(
             id=allocation["id"],
             issue=record["brief"],
-            team=record["kind"],
             abandoned=abandon,
             db_suffix=allocation["db_suffix"],
-            files=kept if abandon else "pending",
-            databases=kept if abandon else "pending",
-            databases_dropped=[],
+            files="pending",
+            databases="pending",
             orphans=[],
         )
         write_retired(retirement_paths(allocation)[3] / "retired.json", note)
@@ -1107,10 +1091,10 @@ def unpublished_work(project: Path) -> str:
 
 def delete_allocation(ident: str) -> str:
     """Delete the whole allocation unless its clone holds work Git cannot show is on origin;
-    then only `state/<id>/retired.json` remains. Return the files outcome for the note."""
-    root, project, logs, config = checked_paths(ident)
-    for directory in (project, logs, root):
-        remove_if_empty(directory)
+    then only `state/<id>/retired.json` remains. A project never cloned into is empty, so
+    it needs no Git check. Return the files outcome for the note."""
+    root, project, _, config = checked_paths(ident)
+    remove_if_empty(project)
     if project.exists():
         problem = unpublished_work(project)
         if problem:
@@ -1124,15 +1108,6 @@ def delete_allocation(ident: str) -> str:
         return f"failed: could not delete {len(remaining)} paths, including {shown}"
     (config / "bootstrap.json").unlink(missing_ok=True)
     return "deleted"
-
-
-def generation_namespace(ident: str, db_suffix: str) -> str:
-    """The `<db_suffix_prefix><slot>g<generation>` start of a saved database suffix."""
-    generation = ident[1 : ident.index("-")]
-    match = re.match(rf".*?[0-9]+g{generation}(?![0-9])", db_suffix)
-    if match is None:
-        raise RuntimeError(f"{ident}: database suffix {db_suffix} has no generation; preserved")
-    return match.group(0)
 
 
 def psql_command() -> list[str]:
@@ -1155,14 +1130,13 @@ def database_names() -> tuple[list[str], str]:
 
 def drop_generation(namespace: str, names: list[str]) -> tuple[str, list[str]]:
     """Drop every listed database in the generation's namespace, recorded or not, with its
-    numbered partitions. The non-digit after the generation keeps g9 from matching g90.
-    Without FORCE, a remaining connection makes PostgreSQL refuse a drop; the rest go on.
-    Return the databases outcome and the names dropped."""
+    numbered partitions. Without FORCE, a remaining connection makes PostgreSQL refuse a
+    drop; the rest go on. Return the databases outcome and the names dropped."""
     timeout = conf.settings()["timeouts"]["launch_seconds"]
-    pattern = rf"(?:{'|'.join(DATABASE_BASES)}){re.escape(namespace)}[^0-9].*"
+    team = conf.settings()["team"]
     dropped: list[str] = []
     refused: list[str] = []
-    for db in (name for name in names if re.fullmatch(pattern, name)):
+    for db in (name for name in names if namespace_of(team, name) == namespace):
         statement = 'DROP DATABASE "' + db.replace('"', '""') + '"'
         try:
             result = execute(
@@ -1180,37 +1154,60 @@ def drop_generation(namespace: str, names: list[str]) -> tuple[str, list[str]]:
 
 def orphans(notes: dict[str, Retired], live: list[Allocation], names: list[str]) -> list[str]:
     """Allocation folders and namespace databases that no live record and no retirement
-    owns. They are reported, never deleted."""
+    owns, and retirements whose suffix names no generation. They are reported, never
+    deleted."""
+    team = conf.settings()["team"]
     owners = {*notes, *(a["id"] for a in live)}
     root = conf.harness_root() / "allocations"
     found = [str(path) for path in sorted(root.glob("g*")) if path.name not in owners]
-    spaces = {generation_namespace(i, n["db_suffix"]) for i, n in notes.items()}
-    spaces |= {generation_namespace(a["id"], a["db_suffix"]) for a in live}
-    prefix = re.escape(conf.settings()["team"]["db_suffix_prefix"])
-    pattern = rf"(?:{'|'.join(DATABASE_BASES)})({prefix}[0-9]+g[0-9]+)[^0-9].*"
+    suffixes = [n["db_suffix"] for n in notes.values()] + [a["db_suffix"] for a in live]
+    spaces = {namespace_of(team, suffix) for suffix in suffixes}
+    for ident, note in notes.items():
+        if namespace_of(team, note["db_suffix"]) is None:
+            found.append(f"retirement {ident}: suffix {note['db_suffix']} names no generation")
     for name in names:
-        match = re.fullmatch(pattern, name)
-        if match and match.group(1) not in spaces:
+        space = namespace_of(team, name)
+        if space is not None and space not in spaces:
             found.append(f"database {name}")
     return found
 
 
-def kept_because(ident: str, note: Retired, live: list[Allocation], merged: bool) -> str:
-    """Why cleanup must keep this retired allocation, or "" when it may proceed."""
+def kept_because(ident: str, note: Retired, live: list[Allocation]) -> str:
+    """Why cleanup must keep this retired allocation, or "" when it may proceed. stop's
+    merge check already passed for every retirement it did not abandon."""
     if any(a["id"] == ident for a in live):
         return "a live record names this allocation"
     if note["abandoned"]:
         return ABANDONED
-    if note["team"] != "design" and not merged:
-        return f"#{note['issue']} is not closed by a PR merged into main"
     return ""
 
 
-def clean_up(issue: str, merged: bool) -> None:
+def delete_allocations(mine: dict[str, Retired], live: list[Allocation]) -> dict[str, list[str]]:
+    """Delete each eligible allocation's folder and record the files outcome. Return the
+    eligible allocations by generation namespace, whose databases cleanup drops."""
+    team = conf.settings()["team"]
+    generations: dict[str, list[str]] = {}
+    for ident, note in mine.items():
+        reason = kept_because(ident, note, live)
+        if reason:
+            note["files"] = f"kept: {reason}"
+            if note["abandoned"]:
+                note["databases"] = f"kept: {reason}"
+            continue
+        note["files"] = delete_allocation(ident)
+        namespace = namespace_of(team, note["db_suffix"])
+        if namespace is None:
+            note["databases"] = f"kept: suffix {note['db_suffix']} names no generation"
+        else:
+            generations.setdefault(namespace, []).append(ident)
+    return generations
+
+
+def clean_up(issue: str) -> None:
     """Delete the issue's retired allocations whose clones hold nothing unpublished, drop
     their generations' databases, and print and record what was deleted, kept and found
-    unowned. `merged` says whether the brief is closed by a PR merged into main; a
-    standalone design team needs no PR. The caller holds the store lock."""
+    unowned. The orphan scan runs before anything is deleted. The caller holds the store
+    lock."""
     live = [a for record in records().values() for a in record["agents"].values()]
     notes = {
         path.parent.name: read_retired(path)
@@ -1221,27 +1218,18 @@ def clean_up(issue: str, merged: bool) -> None:
         print(f"#{issue}: no retired allocations; nothing removed")
         return
     names, problem = database_names()
-    generations: dict[str, list[str]] = {}
-    for ident, note in mine.items():
-        reason = kept_because(ident, note, live, merged)
-        if reason:
-            note["files"] = f"kept: {reason}"
-            continue
-        note["files"] = delete_allocation(ident)
-        generations.setdefault(generation_namespace(ident, note["db_suffix"]), []).append(ident)
-    for namespace, idents in generations.items():
+    unowned = orphans(notes, live, names)
+    if problem:
+        unowned.append(f"databases not checked: {problem}")
+    for namespace, idents in delete_allocations(mine, live).items():
         dropped: list[str] = []
         status = f"refused: {problem}"
         if not problem:
             status, dropped = drop_generation(namespace, names)
-        print(f"Databases {namespace}: {status}; dropped: {', '.join(dropped) or 'none'}")
+        line = f"Databases {namespace}: dropped {', '.join(dropped) or 'none'}"
+        print(line if status == "dropped" else f"{line}; {status}")
         for ident in idents:
             mine[ident]["databases"] = status
-            earlier = mine[ident]["databases_dropped"]
-            earlier += [db for db in dropped if db not in earlier]
-    unowned = orphans(notes, live, names)
-    if problem:
-        unowned.append(f"databases not checked: {problem}")
     for ident, note in mine.items():
         note["orphans"] = unowned
         write_retired(conf.state_dir() / ident / "retired.json", note)
@@ -1254,7 +1242,7 @@ def cleanup(issue: str) -> None:
     """Rerun cleanup for an issue's retired allocations: after an interrupted run, a kept
     clone whose work is now published, or an old generation."""
     with store_lock():
-        clean_up(issue, merged_brief(issue))
+        clean_up(issue)
 
 
 def list_retained() -> None:
@@ -1289,12 +1277,11 @@ def stop_brief(brief: str, *, abandon: bool = False) -> None:
         if record is None:
             print(f"#{brief}: no allocation record; nothing removed")
             return
-        merged = record["kind"] == "brief" and not abandon
         # A brief still in progress is never interrupted: a wrong issue number stops nothing.
-        if merged and not merged_brief(brief):
+        if record["kind"] == "brief" and not abandon and not merged_brief(brief):
             command = harness_command("team.py", "stop", brief, "--abandon")
             raise RuntimeError(
-                f"#{brief} is not closed by a merged PR. Nothing was stopped; the "
+                f"#{brief} is not closed by a PR merged into main. Nothing was stopped; the "
                 "record, databases, files and reservation are kept. If the brief was closed "
                 f"without a merged PR, the operator runs {command}; until then the slot stays "
                 "taken: agent/teams/README.md#retire-a-brief-closed-without-a-merged-pr"
@@ -1320,7 +1307,7 @@ def stop_brief(brief: str, *, abandon: bool = False) -> None:
         retire(record, abandon)
         record_path(record["slot"]).unlink()
         print(f"#{brief}: slot {record['slot']} released")
-        clean_up(brief, merged)
+        clean_up(brief)
 
 
 def require_only_recorded_panes(record: Record) -> bool:
@@ -1472,14 +1459,14 @@ def cli() -> None:
     usage = (
         "Usage: agent/teams/team.py start <brief> | design <issue> <entry> | "
         "turn <pr> <entry> | review <pr> <entry> | reset <issue> <entry> | stop <issue> | "
-        "stop <issue> --abandon | cleanup <issue> | clean | status. Only the operator runs "
+        "stop <issue> --abandon | cleanup <issue> | retained | status. Only the operator runs "
         "reset and stop --abandon, which retires a brief closed without a merged PR and "
         "keeps its files and databases."
     )
     if args == ["status"]:
         status()
         return
-    if args == ["clean"]:
+    if args == ["retained"]:
         list_retained()
         return
     if len(args) < 2 or not args[1].isdecimal():

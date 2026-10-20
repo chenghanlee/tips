@@ -163,7 +163,7 @@ class AdapterTest(Harness):
         assert calls  # the harness's own startup git ran through the wrapper
         allocations = str(self.trusted / "allocations")
         cleanup = [c for c in calls if any(allocations in part for part in c)]
-        hooks_off = ["-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false"]
+        hooks_off = {"core.hooksPath=/dev/null", "core.fsmonitor=false"}
         checks = (
             ["fetch", "--prune", "--quiet", "origin"],
             ["status", "--porcelain"],
@@ -172,8 +172,9 @@ class AdapterTest(Harness):
         )
         for call in cleanup:
             assert call[0] == str(self.trusted / "state"), call
-            assert call[3:7] == hooks_off, call
-            assert call[7:] in checks, call
+            settings = {call[i + 1] for i, part in enumerate(call[:-1]) if part == "-c"}
+            assert hooks_off <= settings, call
+            assert any(call[-len(check) :] == check for check in checks), call
         assert not marker.exists(), f"a cwd-relative PATH entry ran: {marker.read_text()}"
         # Startup git runs from the client's cwd; every later command from the main checkout.
         cwds = [c[0] for c in calls[1:] if c not in cleanup]
@@ -266,7 +267,7 @@ class AdapterTest(Harness):
 
         async def unmerged(client: Any) -> None:
             refused = await self.call(client, "retire_team", ok=False, brief=29)
-            assert "not closed by a merged PR" in refused
+            assert "not closed by a PR merged into main" in refused
 
         self.session(unmerged)
         self.merge(head)

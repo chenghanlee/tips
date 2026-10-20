@@ -213,9 +213,9 @@ def poster(allocation: Allocation) -> tuple[str, str, str]:
 
 
 def merged_brief(brief: str) -> bool:
-    """Whether GitHub reports the brief closed by a PR merged into main. stop and cleanup hold
-    the store lock, so every read shares one timeouts.shell_seconds budget; a late answer
-    changes nothing."""
+    """Whether GitHub reports the brief closed by a PR merged into main. stop holds the store
+    lock, so every read shares one timeouts.shell_seconds budget; a late answer keeps the
+    record."""
     seconds = conf.settings()["timeouts"]["shell_seconds"]
     deadline = time.monotonic() + seconds
 
@@ -225,7 +225,7 @@ def merged_brief(brief: str) -> bool:
         except subprocess.TimeoutExpired as error:
             raise RuntimeError(
                 f"GitHub did not answer within {seconds} s whether #{brief} is closed by a "
-                "merged PR; nothing was changed"
+                "merged PR; the record and reservation are kept"
             ) from error
 
     fields = "state,closedByPullRequestsReferences"

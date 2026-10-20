@@ -412,6 +412,16 @@ def database_stem(team: TeamSettings, slot: int, generation: int, suffix: str) -
     return f"{team['db_suffix_prefix']}{slot}g{generation}{suffix}"
 
 
+def namespace_of(team: TeamSettings, name: str) -> str | None:
+    """The `<db_suffix_prefix><slot>g<generation>` start of a database suffix, or of a
+    database name after `tips_test` or `tips_dev`; None outside every namespace. The entry's
+    suffix starts with a non-digit, so generation 9 never takes generation 90's names."""
+    bases = "|".join(DATABASE_BASES)
+    prefix = re.escape(team["db_suffix_prefix"])
+    match = re.match(rf"(?:{bases})?({prefix}[0-9]+g[0-9]+)[^0-9]", name)
+    return match.group(1) if match else None
+
+
 def validate_allocations(path: Path, value: Config) -> None:
     """Ports and database stems of every slot are distinct, and a long generation still fits
     PostgreSQL's identifier length. Generations differ after the non-digit separator, so one

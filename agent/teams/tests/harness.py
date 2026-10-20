@@ -333,7 +333,7 @@ elif a[:2] == ["pr", "view"]:
     view = {
         "headRefOid": s.get("pr_head", ""),
         "baseRefOid": s.get("pr_base", "b" * 40),
-        "baseRefName": "main",
+        "baseRefName": s.get("pr_base_ref", "main"),
         "mergeable": s.get("pr_mergeable", "MERGEABLE"),
         "state": "MERGED" if a[2] in s.get("merged", []) else "OPEN",
         "url": "https://github.com/o/r/pull/" + a[2],

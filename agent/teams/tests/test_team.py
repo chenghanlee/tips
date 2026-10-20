@@ -936,7 +936,7 @@ class PairLifecycleTest(Harness):
         assert not any(outside.iterdir())
 
     def test_a_symlinked_root_directory_refuses_before_creating_anything(self) -> None:
-        self.team("clean")  # creates the root
+        self.team("retained")  # creates the root
         for name in ("allocations", "state"):
             with self.subTest(directory=name):
                 outside = self.root / f"outside-{name}"
@@ -1470,7 +1470,7 @@ class RetirementTest(Harness):
         ]
         assert all(call[:2] == ["fixture-dsn", "-X"] for call in self.psql_calls())
         assert not any("FORCE" in " ".join(call) for call in self.psql_calls())
-        assert "Databases _t1g1: dropped; dropped: tips_test_t1g1i, " in stopped
+        assert "Databases _t1g1: dropped tips_test_t1g1i, " in stopped
         # Owned daemons were stopped with the trusted binary; the other team's stays.
         stops = sorted(e[1] for e in self.events("dexter") if e[2:] == ["stop"])
         assert stops == [d for d in daemons if "/g1-" in d]
@@ -1604,16 +1604,19 @@ except RuntimeError as error:
         self.databases("tips_test_t1g1i")
         project = self.project("team-1-impl")
         (project / "unfinished.txt").write_text("in progress\n")
+        unmerged = "#29 is not closed by a PR merged into main. Nothing was stopped"
         refused = self.team("stop", "29", ok=False).stderr
-        assert "#29 is not closed by a merged PR. Nothing was stopped" in refused
+        assert unmerged in refused
         abandon = f"python3 '{self.repo / 'agent/teams/team.py'}' stop 29 --abandon"
         assert f"closed without a merged PR, the operator runs {abandon};" in refused
         assert "agent/teams/README.md#retire-a-brief-closed-without-a-merged-pr" in refused
-        # A brief closed by a PR that was never merged is refused the same way.
+        # A brief closed by a PR that was never merged, or merged into another branch, is
+        # refused the same way.
         self.update(closed_by={"29": ["7"]})
-        refused = self.team("stop", "29", ok=False).stderr
-        assert "#29 is not closed by a merged PR. Nothing was stopped" in refused, refused
-        self.update(closed_by={})
+        assert unmerged in self.team("stop", "29", ok=False).stderr
+        self.update(merged=["7"], pr_base_ref="release")
+        assert unmerged in self.team("stop", "29", ok=False).stderr
+        self.update(closed_by={}, merged=[], pr_base_ref="main")
         assert self.workspaces() == ["team-1-29"]
         assert self.remaining_databases() == ["tips_test_t1g1i"]
         assert self.recorded_briefs() == {"29"}
@@ -1627,7 +1630,8 @@ except RuntimeError as error:
         retired = json.loads((self.trusted / "state/g1-impl/retired.json").read_text())
         kept = "kept: brief closed without a merged PR (stop --abandon)"
         assert (retired["files"], retired["databases"]) == (kept, kept)
-        assert f"g1-impl (#29): {self.trusted / 'allocations/g1-impl'}" in self.team("clean").stdout
+        listed = self.team("retained").stdout
+        assert f"g1-impl (#29): {self.trusted / 'allocations/g1-impl'}" in listed
         self.team("start", "30")
         assert self.record(1)["brief"] == "30"
         assert (project / "tracked.txt").exists()
@@ -1653,12 +1657,15 @@ except RuntimeError as error:
         assert "g1-critic: files kept: stashed changes: stash@{0}" in stopped
         assert all((p / "tracked.txt").exists() for p in (impl, tester, critic))
         assert self.remaining_databases() == []
-        # A clone whose Git cannot be read is kept too; clean lists every kept allocation.
+        # A clone whose Git cannot be read, or whose fetch fails, is kept too; retained lists
+        # every kept allocation.
         shutil.rmtree(impl / ".git")
+        self.git("remote", "set-url", "origin", self.root / "missing.git", cwd=critic)
         rerun = self.team("cleanup", "29").stdout
         assert "g1-impl: files kept: project has no Git repository;" in rerun
+        assert "g1-critic: files kept: git fetch failed: " in rerun
         assert (impl / "late.txt").exists()
-        listed = self.team("clean").stdout
+        listed = self.team("retained").stdout
         for ident, project in (("g1-impl", impl), ("g1-tester", tester), ("g1-critic", critic)):
             assert f"{ident} (#29): {project.parent}; files: kept: " in listed
         assert "databases _t1g1i: dropped" in listed
@@ -1688,13 +1695,13 @@ except RuntimeError as error:
         self.env["PSQL_REFUSE"] = "tips_test_t1g1r"
         stopped = self.team("stop", "29").stdout
         refusal = 'refused: tips_test_t1g1r: ERROR:  database "tips_test_t1g1r" is being accessed'
-        assert f"Databases _t1g1: {refusal}" in stopped
+        dropped = "Databases _t1g1: dropped tips_test_t1g1i, tips_dev_t1g1r"
+        assert f"{dropped}; {refusal}" in stopped
         assert self.remaining_databases() == ["tips_test_t1g1r"]
         assert self.recorded_briefs() == set()
         assert not (self.trusted / "allocations/g1-impl").exists()
         retired = json.loads((self.trusted / "state/g1-impl/retired.json").read_text())
         assert retired["databases"].startswith(refusal), retired
-        assert retired["databases_dropped"] == ["tips_test_t1g1i", "tips_dev_t1g1r"]
         # Once the connection closes, a rerun drops the rest.
         del self.env["PSQL_REFUSE"]
         self.team("cleanup", "29")
@@ -1745,13 +1752,22 @@ except RuntimeError as error:
         assert not old.exists()
         assert self.remaining_databases() == ["tips_test_t1g2i"]
         assert (new / "project/tracked.txt").exists()
+        # A stop killed after writing retirements but before deleting the record leaves the
+        # live team's allocations retired; cleanup keeps what the live record names.
+        self.update(closed_by={"30": ["8"]}, merged=["8"])
+        note = {"id": "g2-impl", "issue": "30", "abandoned": False, "db_suffix": "_t1g2i"}
+        note |= {"files": "pending", "databases": "pending", "orphans": []}
+        (self.trusted / "state/g2-impl/retired.json").write_text(json.dumps(note))
+        kept = self.team("cleanup", "30").stdout
+        assert "g2-impl: files kept: a live record names this allocation;" in kept
+        assert (new / "project/tracked.txt").exists()
+        assert self.remaining_databases() == ["tips_test_t1g2i"]
         # A forged record pointing at another allocation's directory is refused at stop.
         path = self.trusted / "state/1.json"
         record = json.loads(path.read_text())
         record["agents"]["impl"]["root"] = str(old)
         path.write_text(json.dumps(record))
         self.clients_exit(1)
-        self.update(closed_by={"30": ["8"]}, merged=["8"])
         refused = self.team("stop", "30", ok=False)
         assert f"recorded allocation {old} is not" in refused.stderr
         assert (new / "project/tracked.txt").exists()
