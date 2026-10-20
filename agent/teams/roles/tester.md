@@ -32,13 +32,14 @@ dirty clone and never resets one.
 4. Follow both skills with your own database and port: affected code, design,
    scenarios and their controls, mutation check, entry points, data, checks.
    Wallaby browser tests (`TIPS_BROWSER=1`, `test/tips_web/features`): a Codex client
-   does not run them ([manual browser review](../README.md#manual-browser-review)). Read the implementer's retained log named
-   in the PR body under "Checks not run by CI": check the command, the `exit=` line and
-   the failure list, and write "browser run by <implementer entry>, log verified" in
-   your review. If the PR body names no log, record that in your review; the
-   merge-confirming tester then runs `agent/teams/team.py turn <pr> <implementer entry>`
-   to request it, and any other tester sends its review URL to the merge-confirming
-   tester. For manual checks follow [manual browser review](../README.md#manual-browser-review), including its Codex setup, launch form and failure steps.
+   does not run them ([manual browser review](../README.md#manual-browser-review)). Read the implementer's record
+   in the PR body under "Checks not run by CI": check the command, exit, per-run results
+   and failure excerpts. While the implementer's working log exists, read the relevant
+   range or ask for an excerpt. Write "Wallaby run by <implementer entry>; inspected
+   <what> at <SHA>; not rerun" in your review. If the PR body has no browser record,
+   record that in your review; the merge-confirming tester then runs
+   `agent/teams/team.py turn <pr> <implementer entry>` to request it, and any other
+   tester sends its review URL to the merge-confirming tester. For manual checks follow [manual browser review](../README.md#manual-browser-review), including its Codex setup, launch form and failure steps.
 5. Submit the [review record](../README.md#pr-review-record). Without findings, submit
    LGTM. Other tester: send your review URL to the merge-confirming tester.
 6. Merge-confirming tester: when your review or any required reviewer's latest review of
