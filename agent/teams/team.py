@@ -7,10 +7,12 @@ bootstrap.py, a logs directory, and launcher configuration, all under the harnes
 `agent_teams/<repository name>/` beside the main checkout. The slot's record in the root's
 `state/` holds the record version, the brief or spec, its roster, and every launched client's
 Herdr name, kind, project, database suffix, port, pane, session and task-submission state.
-Restart, handoff and retirement use that record. One lock on `state/.lock` serializes start,
-design, review, reset, stop and cleanup. This controller never runs a build or a
-worker-provided executable in a project. Its only Git commands there are cleanup's fetch
-and read-only checks in a stopped allocation's clone, with hooks and fsmonitor off.
+Restart, handoff and retirement use that record. The issue's `phase:` and `turn:` labels
+record the workflow step and its coordinating owner (README.md#turns). One lock on
+`state/.lock` serializes start, design, review, reset, stop and cleanup. This controller
+never runs a build or a worker-provided executable in a project. Its only Git commands
+there are cleanup's fetch and read-only checks in a stopped allocation's clone, with hooks
+and fsmonitor off.
 """
 
 import contextlib
@@ -75,12 +77,16 @@ from config import (
 )
 from dexter import stop_daemon, tools
 from github import (
+    WORKFLOW,
+    Phase,
     PullRequest,
     event_posted,
     merged_brief,
     post_event,
     pull_request,
+    replace_labels,
     roster,
+    spec_lead,
 )
 from herdr import deliver, herdr, live_panes, pane_occupant, processes, session_id, stop
 
@@ -721,6 +727,20 @@ def team_record(issue: str, kind: str, implementer: str, tester: str) -> Record:
     return record
 
 
+# --- Workflow labels --------------------------------------------------------
+
+
+def assign(issue: str, phase: Phase, owner: str) -> None:
+    """Record the issue's workflow step and coordinating owner (README.md#turns)."""
+    replace_labels(issue, WORKFLOW, [f"phase:{phase}", f"turn:{owner}"])
+    print(f"#{issue} labelled phase:{phase}, turn:{owner}")
+
+
+def labels_stay(phase: Phase, owner: str) -> str:
+    """What a failed send after `assign` reports: the assignment is not rolled back."""
+    return f"The labels phase:{phase}, turn:{owner} stay."
+
+
 def start(brief: str) -> None:
     """Launch the brief's implementer and merge-confirming tester, each in its own empty
     allocation; each clones and prepares its project itself."""
@@ -731,6 +751,9 @@ def start(brief: str) -> None:
         record = team_record(brief, "brief", *pair)
         if record["implementer"]:
             current_roster(record)
+        if not record["agents"]:
+            # A new pair, before any task prompt; a relaunch keeps the current labels.
+            assign(brief, "implement", implementer)
         duties = ("implementer", "merge-confirming tester")
         for entry, duty in zip(pair, duties, strict=True):
             if entry not in record["agents"]:
@@ -755,8 +778,13 @@ def design(issue: str, entry: str) -> None:
         raise RuntimeError(f"{entry} is not a configured designer entry")
     tools()
     with store_lock():
-        record = record_for(issue) or team_record(issue, "design", "", "")
-        if record["kind"] == "brief":
+        record = record_for(issue)
+        if record is None or (record["kind"] == "design" and not record["agents"]):
+            # A new standalone design team; read its lead before reserving a slot.
+            lead = spec_lead(issue)
+            record = record or team_record(issue, "design", "", "")
+            assign(issue, "design", lead)
+        elif record["kind"] == "brief":
             current_roster(record)
         if entry not in record["agents"]:
             configure_bootstrap(record, add_allocation(record, entry, "designer"), "", "")
@@ -892,8 +920,9 @@ def request_launch(record: Record, me: str, pr: PullRequest, missing: list[str])
     return failed + deliver([("dispatcher", f"{pr.url} review: run {commands}")])
 
 
-def hand_to_reviewers(record: Record, me: str, pr: PullRequest, failures: list[str]) -> None:
-    """Notify every required reviewer of one head; request launch of the missing ones."""
+def hand_to_reviewers(record: Record, me: str, pr: PullRequest, failures: list[str]) -> list[str]:
+    """Notify every required reviewer of one head; request launch of the missing ones.
+    Return the failed sends."""
     reviewers = required_reviewers(record)
     missing = [entry for entry in reviewers if entry not in record["agents"]]
     tester = live_name(record["slot"], record["tester"])
@@ -906,11 +935,7 @@ def hand_to_reviewers(record: Record, me: str, pr: PullRequest, failures: list[s
     failed = deliver(sends)
     if missing:
         failed += request_launch(record, me, pr, missing)
-    if failed:
-        raise RuntimeError(
-            "Handoff incomplete; failed sends: " + "; ".join(failed) + ". Report blocked with "
-            "these errors, or rerun turn after fixing them."
-        )
+    return failed
 
 
 def turn(number: str, recipient: str) -> None:
@@ -928,20 +953,31 @@ def turn(number: str, recipient: str) -> None:
         )
     pr = pull_request(number)
     pr.require_closes(record["brief"])
-    if recipient == record["tester"]:
+    back = recipient == record["implementer"]  # findings back; otherwise a head to review
+    if not back:
         # The handed-off commit is the implementer's own clean, pushed HEAD.
         problem = checkout_problem(project_of(record["agents"][me]), pr.head)
         if problem:
             raise RuntimeError(f"{problem} Commit and push, then hand over.")
     mergeable, failures = observe_pr(pr)
-    if recipient == record["tester"] and mergeable != "MERGEABLE":
+    if not back and mergeable != "MERGEABLE":
         raise RuntimeError(conflict_refusal(pr.head, mergeable))
-    if recipient == record["implementer"]:
+    # The labels record the handoff before anyone is told; a failed write sends nothing.
+    phase: Phase = "implement" if back else "review"
+    assign(record["brief"], phase, recipient)
+    if back:
         partner = live_name(record["slot"], recipient)
-        herdr("agent", "prompt", partner, implementer_message(pr, failures))
-        print(f"Notified {partner}")
+        failed = deliver([(partner, implementer_message(pr, failures))])
     else:
-        hand_to_reviewers(record, me, pr, failures)
+        failed = hand_to_reviewers(record, me, pr, failures)
+    if failed:
+        raise RuntimeError(
+            "Handoff incomplete; failed sends: "
+            + "; ".join(failed)
+            + ". "
+            + labels_stay(phase, recipient)
+            + " Report blocked with these errors, or rerun turn after fixing them."
+        )
     print("End your turn now.")
 
 
@@ -1300,6 +1336,7 @@ def stop_brief(brief: str, *, abandon: bool = False) -> None:
         names = [a["name"] for a in record["agents"].values()]
         panes = frozenset(a["pane"] for a in record["agents"].values())
         refuse_foreign_owner(roots, names, panes)
+        replace_labels(brief, WORKFLOW, [])  # a failed write stops nothing; rerun stop
         present = live_clients(record)
         for allocation in present.values():
             stop(allocation["pane"], allocation["root"])
@@ -1436,12 +1473,10 @@ def status() -> None:
             print("  " + client_state(allocation, panes, agents))
 
 
-def prompt_agent(brief: str, entry: str, text: str) -> None:
-    """Send text to a recorded client of the brief once its pane holds that same client.
+def recorded_client(brief: str, entry: str) -> Allocation:
+    """The brief's recorded client, refused unless its pane holds that same client.
 
     The target is a recorded role, never a pane: an unrecorded or replaced client is refused.
-    Any failure of the prompt call, including Herdr's own timeout, may come after the text
-    reached the client, so the error says delivery is unknown and not to resend blindly.
     """
     record = record_for(brief)
     if record is None:
@@ -1451,6 +1486,12 @@ def prompt_agent(brief: str, entry: str, text: str) -> None:
         raise RuntimeError(f"Brief #{brief} has no launched {entry}")
     if checked_client(record, allocation, "Nothing was sent.") is None:
         raise RuntimeError(f"{allocation['name']} is not running in {allocation['pane']}")
+    return allocation
+
+
+def send_prompt(allocation: Allocation, text: str) -> None:
+    """Any failure of the prompt call, including Herdr's own timeout, may come after the text
+    reached the client, so the error says delivery is unknown and not to resend blindly."""
     try:
         herdr("agent", "prompt", allocation["name"], text)
     except (subprocess.TimeoutExpired, RuntimeError, ValueError) as error:
@@ -1459,6 +1500,22 @@ def prompt_agent(brief: str, entry: str, text: str) -> None:
             "Read the agent's records before sending it again."
         ) from error
     print(f"Prompted {allocation['name']}")
+
+
+def prompt_agent(brief: str, entry: str, text: str) -> None:
+    """Send text to a recorded client of the brief; the issue's labels are unchanged."""
+    send_prompt(recorded_client(brief, entry), text)
+
+
+def hand_off(brief: str, entry: str, text: str, phase: Phase) -> None:
+    """Make the recorded client the brief's coordinating owner in this phase, then send
+    the text. A failed label write sends nothing; a failed send keeps the labels."""
+    allocation = recorded_client(brief, entry)
+    assign(brief, phase, entry)
+    try:
+        send_prompt(allocation, text)
+    except RuntimeError as error:
+        raise RuntimeError(f"{error} {labels_stay(phase, entry)}") from error
 
 
 def cli() -> None:

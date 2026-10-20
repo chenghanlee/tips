@@ -3,8 +3,10 @@
 agent/teams/dispatch starts Claude restricted, with no built-in tools and this one
 server. Every tool takes typed IDs, enums or bounded text and calls the same harness
 functions as the CLI. No tool runs a command string, reads a path or accepts a profile.
-GitHub calls name the configured repository. Run with the locked environment
-(requirements.lock); `python -E -s adapter.py` serves stdio until the client exits.
+GitHub calls name the configured repository. Of an issue's labels, the team tools write
+only the reserved `phase:` and `turn:` labels (README.md#turns). Run with the locked
+environment (requirements.lock); `python -E -s adapter.py` serves stdio until the client
+exits.
 """
 
 import contextlib
@@ -25,6 +27,7 @@ import commands
 import config as conf
 import pr_review
 import team
+from github import Phase
 
 # Responses stay small; full output lives in GitHub, Herdr or local logs.
 RESPONSE_BYTES = 8192
@@ -173,7 +176,9 @@ def status() -> str:
 
 @server.tool()
 def start_pair(brief: Number) -> str:
-    """Launch an eligible brief's implementer and merge-confirming reviewer (team.py start)."""
+    """Launch an eligible brief's implementer and merge-confirming reviewer (team.py start).
+    A new pair labels the brief phase:implement and turn:<implementer>; a relaunch keeps
+    the labels."""
     return operate(lambda: team.start(str(brief)), writes=True)
 
 
@@ -187,24 +192,31 @@ def launch_reviewer(pr: Number, entry: Entry) -> str:
 def start_design(spec: Number, entry: Entry) -> str:
     """Launch a configured designer for the issue numbered by spec (team.py design).
     A started brief uses its existing team slot; otherwise create or join a spec team.
-    The issue names the lead, any critics and the question or design assignment."""
+    The issue names the lead, any critics and the question or design assignment. A new
+    spec team needs a `Lead: <entry>` line and labels the spec phase:design and
+    turn:<lead>."""
     return operate(lambda: team.design(str(spec), entry), writes=True)
 
 
 @server.tool()
-def prompt_agent(brief: Number, entry: Entry, text: Message) -> str:
-    """Send a message to a recorded client of the brief, such as a handoff or an answer.
-    Success means Herdr delivered it, not that the client acted on it."""
-    return operate(lambda: team.prompt_agent(str(brief), entry, text), writes=True)
+def prompt_agent(brief: Number, entry: Entry, text: Message, phase: Phase | None = None) -> str:
+    """Send a message to a recorded client of the brief, such as an answer or a question.
+    Without phase, the brief's labels are unchanged. With phase, a handoff or repair: check
+    the client, set the brief's labels to phase:<phase> and turn:<entry>, then send. A
+    refused client writes no label; a failed label write sends nothing; a failed send
+    keeps the labels. Success means Herdr delivered it, not that the client acted on it."""
+    if phase is None:
+        return operate(lambda: team.prompt_agent(str(brief), entry, text), writes=True)
+    return operate(lambda: team.hand_off(str(brief), entry, text, phase), writes=True)
 
 
 @server.tool()
 def retire_team(brief: Number) -> str:
     """Retire a team (team.py stop): stop its clients, close its workspace and release its
-    slot. A brief must be closed by a PR merged into main; the user retires one closed
-    without a merged PR with `team.py stop <brief> --abandon`. Then cleanup deletes each
-    allocation whose clone holds nothing unpublished, drops the team's databases and
-    reports what it kept."""
+    slot, and remove the brief's phase: and turn: labels. A brief must be closed by a PR
+    merged into main; the user retires one closed without a merged PR with
+    `team.py stop <brief> --abandon`. Then cleanup deletes each allocation whose clone
+    holds nothing unpublished, drops the team's databases and reports what it kept."""
     return operate(lambda: team.stop_brief(str(brief)), writes=True)
 
 

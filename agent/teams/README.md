@@ -101,10 +101,10 @@ operator (the user) runs `reset` and `stop --abandon`.
 
 | Command | Caller | Effect |
 |---|---|---|
-| `agent/teams/team.py start <brief>` | Dispatcher | Read `Implementer:` and `Required reviews:`. Create an allocation for the implementer (bootstrap branch `task/<brief>`) and the merge-confirming tester. Launch both in the team's workspace (see [Herdr layout](#herdr-layout)), write the record, and post one EVENT per launch on the brief. |
-| `agent/teams/team.py design <issue> <entry>` | Dispatcher | Launch a configured designer in its own allocation. A started brief reuses its team slot; otherwise create or join a spec team. The issue names the lead, any critics and the question or design assignment. Post its launch EVENT on that issue. The adapter keeps the argument name `spec` for either issue number. |
-| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require your own clone to be clean at the PR head and the PR to close the brief. Read the PR's live state (see `observe`); refuse unless GitHub reports the head mergeable. Notify every launched required reviewer of the head and the `bootstrap.py --commit` command that moves its clone there. For each reviewer not launched, post a pending EVENT on the PR and ask the dispatcher to run its `review` command. Try every send; report each failed one. |
-| `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Read the PR's live state, then notify the implementer with its merge conflict and failed required checks. Your clone's state does not block it. |
+| `agent/teams/team.py start <brief>` | Dispatcher | Read `Implementer:` and `Required reviews:`. Label a new pair's brief ([Turns](#turns)). Create an allocation for the implementer (bootstrap branch `task/<brief>`) and the merge-confirming tester. Launch both in the team's workspace (see [Herdr layout](#herdr-layout)), write the record, and post one EVENT per launch on the brief. |
+| `agent/teams/team.py design <issue> <entry>` | Dispatcher | Launch a configured designer in its own allocation. A started brief reuses its team slot; otherwise create or join a spec team. The issue names the lead, any critics and the question or design assignment; a new spec team needs a `Lead: <entry>` line naming a configured designer and labels the spec ([Turns](#turns)). Post its launch EVENT on that issue. The adapter keeps the argument name `spec` for either issue number. |
+| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require your own clone to be clean at the PR head and the PR to close the brief. Read the PR's live state (see `observe`); refuse unless GitHub reports the head mergeable. Label the brief ([Turns](#turns)). Notify every launched required reviewer of the head and the `bootstrap.py --commit` command that moves its clone there. For each reviewer not launched, post a pending EVENT on the PR and ask the dispatcher to run its `review` command. Try every send; report each failed one. |
+| `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Read the PR's live state and label the brief ([Turns](#turns)). Notify the implementer with its merge conflict and failed required checks. Your clone's state does not block it. |
 | `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create its allocation, configured for the PR head, with its own database suffix and port, and launch the reviewer in the team's workspace. |
 | `agent/teams/team.py reset <issue> <entry>` | Operator | Record the operator's decision, after checking a stopped client's work on the issue and PR, that `start`, `design` or `review` may launch a replacement in the same allocation that gets the task again. Refuse a running client. |
 | `agent/teams/team.py stop <issue>` | Dispatcher | See [Retirement](#retirement). |
@@ -113,8 +113,8 @@ operator (the user) runs `reset` and `stop --abandon`.
 | `agent/teams/team.py status` | Dispatcher, user | Every allocation record with each client's live Herdr pane, name, kind, state and session, and whether the recorded dispatcher process runs. |
 | `agent/teams/team.py retained` | Operator | List retired allocations that still have files or databases, with cleanup's last result. Deletes nothing. |
 | `python3 <harness>/bootstrap.py [--commit <sha>]` | Launched client | Prepare your own clone, as [Allocations](#allocations) says. |
-| `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. A worker's BLOCKED post also notifies the dispatcher; the command reports a failed notification, and a rerun retries only the notification. |
-| `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment; with `--after`, only the comments after that checkpoint. |
+| `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. A worker's BLOCKED post also sets `turn:dispatcher` and notifies the dispatcher, naming any label error; the command reports either failure, and a rerun retries both, not the post. |
+| `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue's labels and body, then every comment; with `--after`, the labels and only the comments after that checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | Token counts by model for each client a launch EVENT names, read from its session logs. A Codex client's row sums every Codex session whose rollout started in its allocation directory, so a launch EVENT that says `unknown` still counts. |
 | `agent/teams/pr_review.py list <pr>` | Any agent | Recent reviews and every unresolved thread. Display only. |
 | `agent/teams/pr_review.py observe <pr>` | Launched client | Read the head, base, mergeability, checks and reviews within one `timeouts.github_seconds` deadline; refuse a read during which the head or base changed. Required checks are the contexts the base branch's effective rules require; a required check that has not reported blocks, and other checks are only shown. Post nothing. Judge only the current read: a merge conflict, unknown mergeability, unavailable evidence, a required check that has not passed, a missing or non-LGTM required review and an unresolved thread each block; an earlier failure that this read no longer shows does not. Exit 0 only when the PR can merge at this head. |
@@ -200,23 +200,55 @@ Every message starts a turn with the recipient's full context. Send only handoff
 `done`, `blocked`, the dispatcher's answer to a blocker, a review URL to the
 merge-confirming tester, and the design-phase messages the [designer role](roles/designer.md) lists. Do not send
 acknowledgments or progress updates. Put everything the recipient needs in the message
-or the linked record. After sending, end your turn. If sending fails, keep the turn.
-Report `blocked` with the exact command and error. Do not deliver a denied message
+or the linked record. After sending, end your turn. If a send fails, you still report
+it: report `blocked` with the exact command and error. Labels the command already wrote
+stay; they record the assignment, not the delivery. Do not deliver a denied message
 another way.
 
-No label shows who has the turn. After a restart, read the current brief body and
-relevant comments as well as the PR, current-head reviews and required checks. Use the
-first matching row:
+Two labels on the brief or spec issue record the task's state:
 
-| Condition | Turn |
-|---|---|
-| A consequential QUESTION is unanswered, or its ANSWER is not incorporated | Hold affected work. The assigned decision owner answers; the implementer incorporates the linked decision. Notify the dispatcher if the owner is missing. |
-| A changed binding decision has a review hold | Tester: review against the adopted decision before clearing it, even at the same head. |
-| No PR | Implementer: continue the eligible brief and open the PR when ready. |
-| A required check failed, or the PR is not mergeable | Implementer: fix it. |
-| The latest review of the head by any reviewer in `Required reviews:` is not an LGTM | Implementer: address it. |
-| A required reviewer has not reviewed the head | That reviewer: review it. The handoff notified it or asked the dispatcher to launch it. |
-| `agent/teams/pr_review.py observe <pr>` reports ready to merge | Tester: merge. |
+- `phase:design`, `phase:implement` or `phase:review`: the workflow step.
+- `turn:<entry>` or `turn:dispatcher`: the coordinating owner, the agent whose action
+  advances the task.
+
+Only these harness commands write them. Never add or remove them by hand.
+
+| Event | Command | Labels |
+|---|---|---|
+| New pair | `team.py start` | `phase:implement`, `turn:<implementer>` |
+| New standalone design team | `team.py design` | `phase:design`, `turn:<lead>` from the spec's `Lead:` line |
+| Relaunch, additional designer, `review` launch | `start`, `design`, `review` | unchanged |
+| Head to reviewers | `team.py turn <pr> <tester>` | `phase:review`, `turn:<tester>` |
+| Findings back | `team.py turn <pr> <implementer>` | `phase:implement`, `turn:<implementer>` |
+| Blocker | `board.py post <issue> BLOCKED` | phase kept, `turn:dispatcher` |
+| Dispatcher message | `prompt_agent` | unchanged |
+| Dispatcher handoff or repair | `prompt_agent` with `phase` | `phase:<phase>`, `turn:<entry>` |
+| Retirement | `team.py stop` | both removed |
+
+A command writes the labels before it sends its prompt. A failed label write on a
+handoff sends nothing. A BLOCKED post always notifies the dispatcher, naming any label
+error. A command adds the new labels before it removes the old ones, and nothing locks
+the issue: a failed write or two commands at once can leave two of one prefix. That is
+a reported contradiction, not a prevented one.
+
+Helpers act on their explicit assignment without owning the turn: an additional reviewer
+notified of a head, a designer assigned a QUESTION, a critic named in a spec. A label is
+an assignment, not evidence that a prompt arrived, a check passed or an agent runs. Your
+role file, [Merge](#merge), question holds and the failed-check procedure still govern
+what the owner may do.
+
+After a restart, read the issue's labels first (`board.py read <issue>` prints them).
+With `turn:<you>`, act under those rules. Otherwise act only on an explicit assignment
+addressed to you; else end your turn. Report `blocked` for a contradiction between the
+labels and GitHub only in these cases, and do not resolve it yourself:
+
+- A repair handoff names a closed PR.
+- A `phase:` or `turn:` label is missing, or there are two of one prefix. A brief started
+  before the labels existed has none.
+- The `turn:` value is neither `dispatcher` nor an entry explicitly assigned on this
+  issue: the brief's roster, the spec's lead or critics, or a QUESTION assignment.
+
+The dispatcher repairs the labels with the handoff form of `prompt_agent`.
 
 ## PR review record
 
@@ -343,12 +375,13 @@ After the merge closes the brief and deletes the branch, notify the dispatcher w
 Report `blocked` if you have a product or scope question, if both sides of a finding
 have evidence but still disagree, or if the same finding remains after two fixes.
 Post the question and the evidence on the issue with
-`agent/teams/board.py post <issue> BLOCKED`; the post notifies the dispatcher. End your
-turn. Dispatcher: set Blocked. Route
+`agent/teams/board.py post <issue> BLOCKED`; the post sets `turn:dispatcher` and
+notifies the dispatcher. End your turn. Dispatcher: set Blocked. Route
 consequential technical questions through [designer assignment](roles/dispatcher.md#decisions-during-implementation).
 Ask the user about product, scope or tradeoffs needing the user's judgment. Record
 the answer on the issue; the implementer incorporates it before affected work resumes.
-Set Active and notify the agent when the blocker is resolved. Do
+Set Active and hand the turn back with `prompt_agent` and the issue's phase when the
+blocker is resolved. Do
 not run or retry a denied command on another agent's behalf.
 
 If a required check fails at the head, rerun only the failed tests, alone, at the head.

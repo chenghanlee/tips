@@ -294,6 +294,48 @@ class AdapterTest(Harness):
         assert self.record(1)["kind"] == "brief"
         assert self.prompts("team-1-critic")[-1] == "Read QUESTION"
 
+    def test_helpers_and_plain_messages_keep_the_labels(self) -> None:
+        labels = ["phase:implement", "turn:impl"]
+
+        async def launch(client: Any) -> None:
+            await self.call(client, "start_pair", brief=30)
+            assert self.labels("30") == labels
+            await self.call(client, "start_design", spec=30, entry="critic")
+            assert self.labels("30") == labels
+
+        self.session(launch)
+        self.bootstrap("team-1-impl")
+        self.push("team-1-impl", brief="30")
+
+        async def helpers(client: Any) -> None:
+            await self.call(client, "launch_reviewer", pr=7, entry="second")
+            assert self.labels("30") == labels
+            await self.call(client, "prompt_agent", brief=30, entry="critic", text="Read QUESTION")
+
+        self.session(helpers)
+        assert self.prompts("team-1-critic")[-1] == "Read QUESTION"
+        assert self.labels("30") == labels
+        assert len(self.events("gh", "issue", "edit")) == 1, "only the new pair was labelled"
+
+    def test_a_dispatcher_handoff_labels_an_unlabelled_brief_then_prompts(self) -> None:
+        async def launch(client: Any) -> None:
+            await self.call(client, "start_pair", brief=29)
+
+        self.session(launch)
+        # A brief started before the labels existed, in a repository that has none of them.
+        self.update(labels={"29": []}, label_names=[])
+        mark = len(self.state()["events"])
+
+        async def repair(client: Any) -> None:
+            await self.call(
+                client, "prompt_agent", brief=29, entry="tester", text="Review 7", phase="review"
+            )
+
+        self.session(repair)
+        assert self.labels("29") == ["phase:review", "turn:tester"]
+        assert [e[3] for e in self.events("gh", "label", "create")] == self.labels("29")
+        self.labelled_before(mark, ["agent", "prompt", "team-1-tester", "Review 7"])
+
     def test_board_issue_and_project_writes_name_the_repository_and_dispatcher(self) -> None:
         content = {"number": 29, "url": "https://github.com/o/r/issues/29"}
         item = {"id": "I_29", "title": "Brief", "phase": "Design", "content": content}

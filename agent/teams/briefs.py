@@ -50,7 +50,7 @@ def identity(record: Record, entry: str, duty: str) -> str:
 
 
 def pair_brief(record: Record, entry: str, duty: str) -> str:
-    # A relaunched client gets this brief too, so it finds the turn instead of assuming it.
+    # A relaunched client gets this brief too, so it reads the turn instead of assuming it.
     allocation = record["agents"][entry]
     implementer, tester = record["implementer"], record["tester"]
     if entry == implementer:
@@ -60,10 +60,10 @@ def pair_brief(record: Record, entry: str, duty: str) -> str:
     return (
         identity(record, entry, duty)
         + bootstrap_brief(allocation, "")
-        + f"Then read the brief with gh issue view {record['brief']}. Use the restart rule "
-        "in the README Turns section, including pending decisions and current issue "
-        "comments, to find whose turn it is. If yours, continue the workflow; otherwise end "
-        "your turn and wait for a message. "
+        + f"Then read the brief with gh issue view {record['brief']}, its phase: and turn: "
+        "labels first, as the README Turns section says. If it is labelled turn:"
+        f"{entry}, continue the workflow; otherwise act only on an explicit assignment "
+        "addressed to you, or end your turn and wait for a message. "
         + handoff
         + f"Put {entry}, <session> on line 2 of each review record; replace <session> with "
         "your session ID. " + dexter_brief(project_of(allocation) / ".dexter/dexter.sh")
