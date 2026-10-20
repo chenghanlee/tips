@@ -1402,6 +1402,8 @@ class DesignTest(Harness):
 
     def test_a_designer_uses_the_same_allocation_lifecycle(self) -> None:
         self.team("design", "50", "critic")
+        # A new spec team gives the turn to the spec's lead, not to the designer launched.
+        assert self.labels("50") == ["phase:design", "turn:lead"]
         record = self.record(1)
         assert (record["kind"], record["brief"], record["generation"]) == ("design", "50", 1)
         assert (record["implementer"], record["tester"]) == ("", "")
