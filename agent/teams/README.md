@@ -157,8 +157,8 @@ handed off. `agent/teams/team.py clean` lists retained allocations and deletes n
 Before deleting one (`rm -rf <root>/allocations/<id>`), the operator runs `git status`
 and `git log --branches --not --remotes` in its `project` clone and confirms every
 writer has stopped; an earlier listing or a closed pane is not enough. If unsure, keep it.
-PR bodies must not depend on allocation files; allocation folders are deleted after the
-team retires.
+PR bodies must not depend on allocation files; allocation folders may be deleted after
+the team retires.
 
 #### Retire a brief closed without a merged PR
 
@@ -250,9 +250,8 @@ with the reason, or "none".
 Issue URL for deferred work, or "none".
 
 ## Checks not run by CI
-During the CI pause, for all applicable local checks: command, tested SHA, environment,
-exit, result with excluded counts, per-run results and failure excerpts, as the
-AGENTS.md CI pause rule says. Otherwise, checks CI does not cover, or "none".
+During the CI pause: the record the AGENTS.md CI pause rule requires, for all
+applicable local checks. Otherwise, checks CI does not cover, or "none".
 ```
 
 Reviewers: verify the body's claims rather than repeating the work it records.
@@ -360,12 +359,11 @@ Codex clients cannot run Wallaby browser tests on macOS: the Codex sandbox kills
 Chrome that chromedriver starts, and each attempt leaves a crash dialog
 ([#432](https://github.com/chenghanlee/tips/issues/432)). Wallaby runs on the
 implementer's Claude client; the tester inspects its record and records what it
-executed and what it only inspected. The exact
-`agent-browser open about:blank --session <name>`, `get url` and `close` sequence below
-succeeded from this machine's configured Codex client on 2026-10-14 (agent-browser
-0.38.1, codex-cli 0.162.1). Codex manual review still needs the
-[browser setup](SETUP.md#browser-access-for-the-tester) and that preflight in the
-tester's own session.
+executed and what it only inspected. The exact `agent-browser open about:blank --session
+<name>`, `get url` and `close` sequence below succeeded from this machine's configured
+Codex client on 2026-10-14 (agent-browser 0.38.1, codex-cli 0.162.1). Codex manual
+review still needs the [browser setup](SETUP.md#browser-access-for-the-tester) and that
+preflight in the tester's own session.
 
 Clients launch with `MIX_ENV=test`. Wait for `mix test` to exit, then start the app on
 the same port:
