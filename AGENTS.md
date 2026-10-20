@@ -7,8 +7,6 @@
 | Changing the repository alone | Use an isolated worktree and a PR; the [checks](#checks) and [review](agent/teams/README.md#pr-review-record) still apply. Merge only with the user's authorization. Read-only reviews and disposable output in ignored `tmp/` need neither |
 | After context compaction | If paired or dispatching, reread your role file and its workflow sections. Reload each required skill before its next use |
 | Repository context | [README](README.md): product, requirements and file locations |
-| Fresh checkout, browser tests or worktree isolation | [Local development](docs/development/local-development.md) |
-| Product behaviour or copy | [Glossary](docs/design/glossary.md) |
 | Before pushing a change | The [checks](#checks) for the files you changed |
 | Any PR | [PR review record](agent/teams/README.md#pr-review-record) |
 
@@ -74,8 +72,7 @@ Fix the findings your change introduces; report the others.
 
 By the user's decision on 2026-10-18, use local checks and independent review while
 GitHub Actions is paused. This replaces GitHub-hosted execution and passing CI status
-as delivery requirements; it does not remove the applicable checks above or the
-[local equivalents of CI-only checks](docs/development/local-development.md#local-verification-during-the-ci-pause).
+as delivery requirements; it does not remove the applicable checks above.
 
 - Run applicable checks locally before handoff. Missing tools, denied execution and
   skipped required tests are blockers, not passes; report them without bypassing denial.
