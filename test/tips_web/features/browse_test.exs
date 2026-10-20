@@ -48,8 +48,18 @@ defmodule TipsWeb.BrowseFeatureTest do
     |> assert_scroll(bottom)
 
     # Back from a tip mounts the feed again.
+    tip = "#tip-rows li:last-child a[href^='/tips/']"
+
+    title =
+      script_value(session, "return document.querySelector(arguments[0]).textContent.trim()", [
+        tip
+      ])
+
+    # refute_has does not wait while the feed is present, so wait for the tip
+    # page that replaces it before checking the feed is gone.
     session
-    |> click(css("#tip-rows li:last-child a[href^='/tips/']"))
+    |> click(css(tip))
+    |> assert_has(css("h1", text: title))
     |> refute_has(css("#feed"))
     |> js("history.back()")
     |> assert_has(css("#tip-rows li", count: 20))
@@ -89,8 +99,8 @@ defmodule TipsWeb.BrowseFeatureTest do
 
   defp js(session, script), do: execute_script(session, script)
 
-  defp script_value(session, script) do
-    execute_script(session, script, [], &send(self(), {:script_value, &1}))
+  defp script_value(session, script, args \\ []) do
+    execute_script(session, script, args, &send(self(), {:script_value, &1}))
     assert_received {:script_value, value}
     value
   end

@@ -4,7 +4,7 @@ defmodule Tips.FeatureHelpers do
   import ExUnit.Assertions
   import Tips.AccountsFixtures, only: [generate_user_magic_link_token: 1]
   import Wallaby.Browser
-  import Wallaby.Query, only: [button: 1, xpath: 1]
+  import Wallaby.Query, only: [button: 1, css: 1, xpath: 1]
 
   alias Wallaby.WebdriverClient
 
@@ -46,6 +46,8 @@ defmodule Tips.FeatureHelpers do
 
     session
     |> visit("/users/log-in/#{token}")
+    # LiveView cancels the form's submit and drops its push until the view has joined.
+    |> assert_has(css(".phx-connected"))
     |> click(button("Log me in only this time"))
     # The browser matches the email itself, so no text is read from the log-in page's
     # header while the navigation replaces it.
