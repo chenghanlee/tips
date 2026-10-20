@@ -24,7 +24,7 @@ Everything owner-specific is in these places. Commit the changes before installi
 
 - [config.toml](config.toml): `github.repository`, `github.projects`, `team.clone_url`, `team.psql` (an absolute executable and the connection of your compose database), and the models in every `[agents.<entry>]` and `[dispatcher]`.
 - [roles/dispatcher.md](roles/dispatcher.md): the Project 15 link. [roles/designer.md](roles/designer.md): the Project 15 reference. These files are the agents' prompts; issue links kept as evidence can stay.
-- Prerequisites on the machine: Herdr with its session hook, the Dexter build and matching Elixir sources ([LSP guide](../lsp/README.md)), the skills below, and the application and database from [local development](../../docs/development/local-development.md).
+- Prerequisites on the machine: Herdr with its session hook, the Dexter build and matching Elixir sources ([LSP guide](../lsp/README.md)), the skills below, and the database from [compose.yaml](../../compose.yaml). Pair bootstrap also needs a Mix project with a `mix.lock` in the repository.
 
 Install Python 3.12 and the [configured client CLIs](config.toml). Create the dispatcher's locked environment once per checkout, as in [development](development.md#dependencies-and-test-isolation), or install a harness release (below). Authenticate the clients and the GitHub CLI (`gh`) for this repository. Agents also need GNU `timeout` (macOS: `brew install coreutils`) and `unbuffer` (Expect): the Elixir skill requires it on Mix commands. Testers use `agent-browser` for manual browser review.
 
@@ -98,8 +98,8 @@ a separate browser. It can fail inside the Codex sandbox even when the approved
 `open` command works; the quick/offline doctor does not check browser launch. Fix the
 browser launch failure before assigning manual browser review; do not disable Chrome's sandbox or
 silently switch to the user's personal browser profile. ChromeDriver for local
-Wallaby tests is a separate prerequisite in the
-[browser test guide](../../docs/development/local-development.md#browser-tests-and-ci).
+Wallaby tests is a separate prerequisite; the application's development guide names
+it once the project has browser tests.
 
 ### Claude auto-mode repository context
 
