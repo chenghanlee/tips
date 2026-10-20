@@ -341,9 +341,11 @@ elif a[:2] == ["pr", "view"]:
     }
     out = json.dumps({key: view[key] for key in a[a.index("--json") + 1].split(",")})
 elif a[:2] == ["pr", "checks"]:
-    # The head can move while a reader is between its first and last view.
+    # The head or base can move while a reader is between its first and last view.
     if "head_after_checks" in s:
         s["pr_head"] = s.pop("head_after_checks")
+    if "base_after_checks" in s:
+        s["pr_base"] = s.pop("base_after_checks")
     rows = s.get("checks", PASSING)
     buckets = {row["bucket"] for row in rows}
     if s.get("checks_error"):
@@ -378,7 +380,8 @@ sys.exit(code)
 # `faults` injects one failure into the first call whose command and some argument match:
 # crash_before and crash_after kill the calling launcher (SIGKILL) before or after the call
 # takes effect; for `agent start`, timeout_live starts the client and then reports a
-# timeout, timeout_exited runs the task's side effect and exits before the timeout, and
+# timeout, timeout_exited runs the task's side effect and exits before the timeout,
+# misreport reports the fields in `report` instead of the started client's, and
 # concurrent runs a second team.py with `argv` while the first holds the store lock.
 PAIR_HERDR = (
     r"""#!/usr/bin/env python3
@@ -552,6 +555,9 @@ elif a[:2] == ["agent", "start"]:
     x["agent_status"] = "blocked" if s.get("start_fails") else "idle"
     if s.get("wrong_start_root"):
         x["cwd"] = s["wrong_start_root"]
+    if mode == "misreport":
+        # Herdr reports another session, name or kind than the launcher asked for.
+        x.update(fault["report"])
     if mode == "timeout_live":
         finish("timed out waiting for " + a[2])
     result = {"agent": x}

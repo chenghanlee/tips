@@ -8,6 +8,7 @@ import asyncio
 import importlib.util
 import json
 import os
+import re
 import shutil
 import sys
 import unittest
@@ -45,8 +46,11 @@ ADAPTER_GH = r"""#!/usr/bin/env python3
 import json, os, sys, time
 from pathlib import Path
 a = sys.argv[1:]
-if a[0] in ("pr", "issue") and ["--repo", "o/r"] not in [a[i : i + 2] for i in range(len(a))]:
+pairs = [a[i : i + 2] for i in range(len(a))]
+if a[0] in ("pr", "issue") and ["--repo", "o/r"] not in pairs:
     sys.exit("fixture gh: no --repo o/r in " + repr(a))
+if a[0] == "project" and a[1] != "item-edit" and ["--owner", "o"] not in pairs:
+    sys.exit("fixture gh: no --owner o in " + repr(a))
 path = Path(os.environ["HERDR_FIXTURE"])
 s = json.loads(path.read_text())
 base = str(Path(sys.argv[0]).with_name("gh-base"))
@@ -66,8 +70,10 @@ if a[:2] == ["issue", "create"]:
     time.sleep(float(s.get("gh_sleep", 0)))
     print("https://github.com/o/r/issues/500")
 elif a[:2] == ["pr", "view"]:
+    closing = [{"number": 29}] * int(s.get("closing_count", 1))
     print(json.dumps({"number": int(a[2]), "state": s.get("pr_state", "OPEN"),
-                      "headRefOid": s.get("pr_head", ""), "mergeable": "MERGEABLE"}))
+                      "headRefOid": s.get("pr_head", ""), "mergeable": "MERGEABLE",
+                      "closingIssuesReferences": closing}))
 elif a[:2] == ["pr", "list"]:
     print(json.dumps([{"number": 7, "title": "Brief 29", "state": "OPEN"}]))
 elif a[1] == "view":
@@ -119,13 +125,24 @@ class AdapterTest(Harness):
         from mcp.client.session import ClientSession
         from mcp.client.stdio import StdioServerParameters, stdio_client
 
+        # A cwd-relative PATH entry and Python path injection must not reach commands. The
+        # relative entry names a planted gh and git under the client's cwd and under the
+        # main checkout (in its ignored tmp/); each records that it ran.
+        marker = self.root / "relative-bin-ran"
+        for cwd in (self.root, self.repo):
+            planted = cwd / "tmp/relative-bin"
+            planted.mkdir(parents=True, exist_ok=True)
+            for name, real in (("gh", self.bin / "gh"), ("git", self.adapter_bin / "git")):
+                script = f'#!/bin/sh\necho {name} >> "{marker}"\nexec "{real}" "$@"\n'
+                (planted / name).write_text(script)
+                (planted / name).chmod(0o755)
         env = {
             **self.env,
             "TIPS_DISPATCHER_SESSION": "dispatcher-session",
-            # A cwd-relative PATH entry and Python path injection must not reach commands.
-            "PATH": os.pathsep.join(("relative-bin", str(self.adapter_bin), self.env["PATH"])),
+            "PATH": os.pathsep.join(("tmp/relative-bin", str(self.adapter_bin), self.env["PATH"])),
             "PYTHONPATH": str(self.root),
         }
+        self.git_log.unlink(missing_ok=True)
         params = StdioServerParameters(
             command=sys.executable,
             args=["-E", "-s", str(self.repo / "agent/teams/adapter.py")],
@@ -145,6 +162,10 @@ class AdapterTest(Harness):
         assert calls  # the harness's own startup git ran through the wrapper
         allocations = str(self.trusted / "allocations")
         assert not [c for c in calls if any(allocations in part for part in c)], calls
+        assert not marker.exists(), f"a cwd-relative PATH entry ran: {marker.read_text()}"
+        # Startup git runs from the client's cwd; every later command from the main checkout.
+        cwds = [c[0] for c in calls[1:]]
+        assert all(cwd == str(self.repo) for cwd in cwds), f"ran outside the checkout: {cwds}"
 
     @staticmethod
     async def call(client: Any, name: str, ok: bool = True, **arguments: Any) -> str:
@@ -217,6 +238,14 @@ class AdapterTest(Harness):
             assert head in state
             assert '"mergeable": "MERGEABLE"' in state
             assert "checks" not in state  # no required-checks call or message
+            # A tool without an offset keeps a response prefix and says what it dropped.
+            self.update(closing_count=1000)
+            capped = await self.call(client, "pr_state", pr=7)
+            assert "\n[truncated: " in capped, f"{len(capped.encode())} bytes returned uncapped"
+            kept, notice = capped.rsplit("\n", 1)
+            assert len(kept.encode()) == 8192, f"kept {len(kept.encode())} bytes, not 8192"
+            assert head in kept, "the response prefix is lost"
+            assert re.fullmatch(r"\[truncated: [1-9]\d* more bytes\]", notice), capped[-120:]
 
         self.session(review)
         assert len(self.events("mix")) == mixes
@@ -337,7 +366,7 @@ class AdapterTest(Harness):
             fields = {"title": f"Issue {number}", "status": status, "phase": "Design"}
             return {"id": f"I_{number}", **fields, "content": content}
 
-        self.update(items=[item(number) for number in range(1, 301)])
+        self.update(items=[item(number) for number in range(1, 601)])
         pages: list[str] = []
 
         async def steps(client: Any) -> None:
@@ -348,14 +377,16 @@ class AdapterTest(Harness):
                 pages.append(text)
                 if "[more: call again with offset=" not in text:
                     return
-                offset = int(text.rsplit("offset=", 1)[1].split("]")[0])
+                following = int(text.rsplit("offset=", 1)[1].split("]")[0])
+                assert following > offset, f"page {len(pages)} points back to {following}"
+                offset = following
 
         self.session(steps)
-        assert len(pages) > 1
+        assert len(pages) >= 3, len(pages)
         read = "".join(page.split("\n[more:")[0] for page in pages)
-        assert "#299 Issue 299 | Phase: Design | Feature: " in read
-        assert "#300 Issue" not in read
-        assert len(read.splitlines()) == 200
+        assert "#599 Issue 599 | Phase: Design | Feature: " in read
+        numbers = [int(line.split()[0][1:]) for line in read.splitlines()]
+        assert numbers == [n for n in range(1, 601) if n % 3], "missing, repeated or Done items"
 
     def test_an_error_after_a_prompt_is_sent_is_reported_as_ambiguous(self) -> None:
         # Herdr reports its own timeout after the text may have reached the client.

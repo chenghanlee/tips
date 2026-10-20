@@ -14,7 +14,9 @@ from unittest import mock
 
 import config as conf
 import pr_review
+import team
 from commands import execute
+from github import PullRequest
 from tests.harness import CONFIG, FAKE_GH, FakeState, Harness, fake
 
 HEAD = "a" * 40
@@ -31,19 +33,20 @@ def check(name: str, bucket: str, run: int = 1) -> dict[str, str]:
     return {"name": name, "workflow": "CI", "bucket": bucket, "link": f"https://ci/{run}"}
 
 
-def review(entry: str, head: str, verdict: str = "LGTM", n: int = 1) -> dict[str, Any]:
+def review(
+    entry: str, head: str, verdict: str = "LGTM", n: int = 1, state: str = "COMMENTED"
+) -> dict[str, Any]:
     return {
         "databaseId": n,
-        "state": "COMMENTED",
+        "state": state,
         "body": f"{verdict}\n{entry}, session-{entry}",
         "url": f"https://github.com/o/r/pull/7#pullrequestreview-{n}",
         "commit": {"oid": head},
     }
 
 
-class ObserveTest(FakeState, unittest.TestCase):
-    """pr_review.read_state and blockers in this process, as `pr_review.py observe 7` uses
-    them, against the fake gh's PR 7: gh state in, blockers out, nothing posted."""
+class FakeGhTest(FakeState, unittest.TestCase):
+    """pr_review in this process against the fake gh's PR 7."""
 
     def setUp(self) -> None:
         directory = tempfile.TemporaryDirectory()
@@ -57,6 +60,11 @@ class ObserveTest(FakeState, unittest.TestCase):
         fixture = str(self.state_path)
         self.enterContext(mock.patch.dict(os.environ, PATH=path, HERDR_FIXTURE=fixture))
         self.enterContext(mock.patch.object(conf, "cfg", cast(conf.Config, tomllib.loads(CONFIG))))
+
+
+class ObserveTest(FakeGhTest):
+    """pr_review.read_state and blockers, as `pr_review.py observe 7` uses them: gh state
+    in, blockers out, nothing posted."""
 
     def observe(self, ready: bool = False) -> Observation:
         """Observe as `pr_review.py observe 7` does for the tester of brief 29."""
@@ -106,6 +114,19 @@ class ObserveTest(FakeState, unittest.TestCase):
         moved = f"headRefOid changed from {self.head} to {'d' * 40} during the read"
         with self.assertRaisesRegex(pr_review.RefusalError, re.escape(moved)):
             self.observe()
+        # The base moves while the head stays: refused the same way.
+        self.update(base_after_checks="c" * 40)
+        moved = f"baseRefOid changed from {'b' * 40} to {'c' * 40} during the read"
+        with self.assertRaisesRegex(pr_review.RefusalError, re.escape(moved)):
+            self.observe()
+
+    def test_a_head_other_than_the_handed_off_one_is_refused(self) -> None:
+        # turn read head 0...0 from the PR, then the PR moved before its state was read.
+        expected = "0" * 40
+        pr = PullRequest("7", "https://github.com/o/r/pull/7", expected, ["29"])
+        moved = f"PR 7 moved from {expected} to {self.head}; nothing sent"
+        with self.assertRaisesRegex(RuntimeError, re.escape(moved)):
+            team.observe_pr(pr)
 
     def test_configured_required_checks_decide_readiness(self) -> None:
         reviews = [review("tester", self.head, n=1), review("critic", self.head, n=2)]
@@ -129,15 +150,17 @@ class ObserveTest(FakeState, unittest.TestCase):
         assert f"tester has not reviewed head {new}" in observed.blockers
         assert f"critic has not reviewed head {new}" in observed.blockers
         reviews = [review("tester", new, n=3), review("critic", new, "Findings: P1", n=4)]
+        # A draft LGTM is not submitted, so it never replaces the submitted findings.
+        reviews.append(review("critic", new, n=5, state="PENDING"))
         self.update(reviews=reviews, reviewThreads=[{"isResolved": False}])
         observed = self.observe()
         assert "critic's latest review of this head has findings" in observed.blockers
         assert "1 unresolved review threads" in observed.blockers
-        reviews.append(review("critic", new, n=5))
+        reviews.append(review("critic", new, n=6))
         self.update(reviews=reviews, reviewThreads=[{"isResolved": True}])
         assert f"head {new}" in self.observe(ready=True).printed
         # A binding decision can invalidate acceptance without changing the code SHA.
-        reviews.append(review("tester", new, "Hold: pending decision", n=6))
+        reviews.append(review("tester", new, "Hold: pending decision", n=7))
         self.update(reviews=reviews)
         assert "tester's latest review of this head has findings" in self.observe().blockers
 
@@ -178,21 +201,30 @@ class ObserveCommandTest(Harness):
         assert f"ready to merge at {head}" in observe(ok=True).stdout
 
 
-class ListTest(Harness):
-    def test_a_thread_names_the_reviewer_that_opened_it(self) -> None:
-        findings = review("critic", "a" * 40, "Request changes: 1 P1 finding", n=2)
-        comment = {"databaseId": 11, "body": "P1: fix it", "pullRequestReview": findings}
+class ListTest(FakeGhTest):
+    def test_list_shows_the_last_two_reviewed_heads_and_each_thread_with_its_replies(
+        self,
+    ) -> None:
+        heads = ["1" * 40, "2" * 40, self.head]
+        verdicts = ["Findings: oldest head", "Findings: P1 middle head", "LGTM"]
+        reviews = [
+            review("critic", head, verdict, n=n)
+            for n, (head, verdict) in enumerate(zip(heads, verdicts, strict=True), start=1)
+        ]
+        comment = {"databaseId": 11, "body": "P1: fix it", "pullRequestReview": reviews[1]}
+        reply = {"databaseId": 12, "body": "Fixed.\nSee the test.", "pullRequestReview": None}
         thread = {"id": "T_1", "isResolved": False, "path": "a.ex", "line": 3}
-        nodes = {"totalCount": 1, "nodes": [comment]}
-        self.update(reviews=[findings], reviewThreads=[{**thread, "comments": nodes}])
-        result = execute(
-            ["python3", str(self.repo / "agent/teams/pr_review.py"), "list", "7"],
-            cwd=self.repo,
-            env=self.env,
-            timeout=60,
-        )
-        assert result.returncode == 0, result.stderr
-        assert "thread T_1 reply-to 11 a.ex:3 by critic\n" in result.stdout, result.stdout
+        nodes = {"totalCount": 2, "nodes": [comment, reply]}
+        self.update(reviews=reviews, reviewThreads=[{**thread, "comments": nodes}])
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            pr_review.show(7, every_head=False)
+        out = printed.getvalue()
+        assert "Findings: oldest head" not in out, f"the oldest head's review is shown:\n{out}"
+        assert "Findings: P1 middle head" in out, f"the previous head's review is missing:\n{out}"
+        assert f"review {reviews[2]['url']} {self.head[:7]}\nLGTM" in out, f"latest missing:\n{out}"
+        assert "thread T_1 reply-to 11 a.ex:3 by critic\n" in out, f"thread owner wrong:\n{out}"
+        assert "\n> Fixed.\n> See the test.\n" in out, f"the reply is not quoted:\n{out}"
 
 
 if __name__ == "__main__":
