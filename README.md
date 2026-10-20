@@ -2,12 +2,14 @@
 
 Tips helps developers find and share practical AI techniques and firsthand results.
 Since 2026-10-21 it is being rebuilt from scratch, one thin vertical slice at a time.
-The pre-restart code is at tag `archive/waterfall-2026-10-21`. Stack: Elixir/Phoenix with PostgreSQL.
+The pre-restart code is at tag `archive/waterfall-2026-10-21`. Stack: Elixir/Phoenix
+with PostgreSQL.
 
 ## Run the app
 
 There is no application yet; the first slice creates the Mix project and its setup guide.
-Start the shared database from `compose.yaml` with `docker compose up -d`.
+Start the shared database with `docker compose up -d` from the main checkout, never from
+a worktree, so every checkout shares the one service on port 5433.
 
 ## Test changes
 
@@ -29,11 +31,16 @@ Put the task scope, acceptance criteria and review evidence in the relevant GitH
 
 ## Use agents (optional)
 
-- [Agent pairs](agent/teams/README.md): a dispatcher starts one developer and one tester per issue; [setup](agent/teams/SETUP.md) covers prerequisites and configuration.
-- [Elixir language server](agent/lsp/README.md): one shared Dexter server per checkout, used as a CLI by Claude and Codex.
+- [Agent pairs](agent/teams/README.md): a dispatcher starts one developer and one tester
+  per issue; [setup](agent/teams/SETUP.md) covers prerequisites and configuration.
+- [Elixir language server](agent/lsp/README.md): one shared Dexter server per checkout,
+  used as a CLI by Claude and Codex.
 
 Agent tooling is separate from the application. You do not need it to run Tips.
-Pair bootstrap needs a Mix project with a `mix.lock`, so slices before that run outside pairs.
+Pair bootstrap needs a Mix project with a `mix.lock`, so slices before that run outside
+pairs. Once it exists, the app's config must honour the pair environment: `PGPORT`,
+`TIPS_DB_SUFFIX` appended to the `tips_dev` and `tips_test` database names, and
+`TIPS_TEST_PORT` for the test server. Otherwise pairs share one database and one port.
 
 ## Find requirements and tasks
 

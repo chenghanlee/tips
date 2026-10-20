@@ -13,7 +13,7 @@ with `phase` wrote stay.
 ## Choose work
 
 At startup, after each `done` or `blocked` message, and when the user reports a change,
-check [Project 15](https://github.com/users/chenghanlee/projects/15) for the Ready
+check [Project 15](https://github.com/users/chenghanlee/projects/15) for the priority
 order and open issues (`project_read` lists the items that are not Done; read one with
 `issue_read`). Also check open PRs (`pr_list`, `pr_state`) and running teams and their
 clients (`status`). A merged PR's evidence is in its body and reviews; it is not a run

@@ -93,8 +93,9 @@ as delivery requirements; it does not remove the applicable checks above.
   workflows or call their billing failures code failures. Keep review, thread,
   mergeability and merge-authorization requirements. Report any remaining GitHub
   required-status rule to the user; do not bypass it.
-- Keep workflow files for restoration. When the user resumes CI, restore its execution
-  and merge requirements and update this policy together.
+- The product workflows were deleted in the 2026-10-21 restart; `dexter.yml` remains.
+  When the user resumes CI, add the application workflow, restore the merge
+  requirements and update this policy together.
 
 ## Writing
 
