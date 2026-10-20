@@ -328,8 +328,9 @@ Reviewers: verify the body's claims rather than repeating the work it records.
 
 Implementer: fix every P0 and P1. You may address [Optional P2s](#optional-p2-findings);
 no disposition is required. A deferral recorded in the brief's decisions table or in a
-linked follow-up issue settles P2 findings on that point while its assumptions hold. A reached revisit trigger or new invalidating evidence
-returns the decision to its owner, who can repair, revise or renew it with a reason.
+linked follow-up issue settles P2 findings on that point while its assumptions hold. A
+reached revisit trigger or new invalidating evidence returns the decision to its owner,
+who can repair, revise or renew it with a reason.
 Reconsideration alone does not upgrade severity or require unrelated repair. A deferral
 never settles a P0 or P1 condition.
 

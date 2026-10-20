@@ -171,11 +171,12 @@ instead of running the suite again. This is a
 default second run, including the plain `mix test` the changed-file-kind checks reach.
 The record must cover that head completely: a CI run, or during the CI pause the record
 the [policy](../../../AGENTS.md#github-ci-pause) requires. Missing, contradictory or
-inapplicable evidence does not satisfy it: report the required check as missing, or run
-the suite yourself. Also run the suite when your investigation needs it. Steps 3 to 6,
-the other required checks, the browser delegation in the
-[tester role](../../teams/roles/tester.md), the failed-check procedure and the rule for
-carrying evidence across a later diff still apply. Harness Python checks are outside this rule.
+inapplicable evidence does not satisfy it: report the required check as missing. Your
+own run does not replace the implementer's record. Also run the suite when your
+investigation needs it. Steps 3 to 6, the other required checks, the browser delegation
+in the [tester role](../../teams/roles/tester.md), the failed-check procedure and the
+rule for carrying evidence across a later diff still apply. Harness Python checks are
+outside this rule.
 Lost guarantee: a second unconditional application-suite run in another database, port
 and runtime.
 
@@ -185,7 +186,8 @@ evidence you ran yourself and which you inspected. Apply the policy's rule for c
 evidence across a later diff; an absent CI run is not a pass and does not replace local
 verification.
 
-- For a failing or flaky test, follow the [failed-check procedure](../../teams/README.md#report-and-resolve-blockers).
+- For a failing or flaky test, follow the
+  [failed-check procedure](../../teams/README.md#report-and-resolve-blockers).
 - Report: which checks passed, which failed with the failing lines only, which you did
   not run and why.
 - For browser tests, real-provider tests, release smoke and migration rollback, record

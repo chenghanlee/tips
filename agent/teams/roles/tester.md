@@ -47,8 +47,8 @@ dirty clone and never resets one.
    Other tester: send your review URL to the merge-confirming tester.
 6. Merge-confirming tester: when your review or any required reviewer's latest review of
    the head has a P0 or P1 finding or a hold, send `turn` to the implementer. Do not
-   wait for the other reviews. When `agent/teams/pr_review.py observe <pr>` reports ready, follow the
-   [merge step](../README.md#merge). Then send `done` to the dispatcher.
+   wait for the other reviews. When `agent/teams/pr_review.py observe <pr>` reports
+   ready, follow the [merge step](../README.md#merge). Then send `done` to the dispatcher.
 7. Follow the [review record](../README.md#pr-review-record) for new heads, first-review
    coverage and later changes.
 

@@ -63,7 +63,7 @@ for each kind of file you changed:
 
 | Changed files | Run |
 |---|---|
-| Application code, tests or config | [Test changes](README.md#test-changes), including `mix credo --strict` and `mix dialyzer`. The tester verifies the implementer's full-suite record instead of rerunning `mix test` ([substitution](agent/skills/review-software-correctness/SKILL.md#step-7-checks)) |
+| Application code, tests or config | [Test changes](README.md#test-changes), including `mix credo --strict` and `mix dialyzer`. The tester verifies the implementer's full-suite record instead of rerunning the full `mix test` suite ([substitution](agent/skills/review-software-correctness/SKILL.md#step-7-checks)) |
 | `agent/teams` Python | [Harness checks](agent/teams/development.md#required-checks) |
 | Go, including carried patches | [Pinned lint profile](agent/lsp/dexter/patches/README.md#required-go-static-analysis) |
 | Markdown | `python3 scripts/check_docs.py` |
