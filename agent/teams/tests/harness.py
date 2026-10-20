@@ -284,8 +284,8 @@ Path('deps').mkdir(exist_ok=True)
 # Issues, PRs, comments, reviews, labels and required checks live in the fixture state. Each
 # posted comment gets the next id and a time one minute after the previous one. An issue's
 # labels are in `labels`; the repository's label names in `label_names`. As gh does, an edit
-# that adds a label the repository lacks fails naming it, and `label_edit_fails` refuses
-# every label edit.
+# that adds a label the repository lacks fails naming it, and `label_add_fails` refuses
+# every label addition.
 FAKE_GH = r"""#!/usr/bin/env python3
 import datetime, json, os, sys
 from pathlib import Path
@@ -317,16 +317,21 @@ if a[:2] == ["issue", "view"]:
     }
     out = json.dumps({key: view[key] for key in a[a.index("--json") + 1].split(",")})
 elif a[:2] == ["issue", "edit"] and ("--add-label" in a or "--remove-label" in a):
-    remove = a[a.index("--remove-label") + 1].split(",") if "--remove-label" in a else []
-    add = a[a.index("--add-label") + 1].split(",") if "--add-label" in a else []
-    missing = [n for n in add if n not in s.get("label_names", [])]
-    if s.get("label_edit_fails"):
-        out, code = "fixture GitHub refused the label edit", 1
-    elif missing:
-        out, code = "could not add label: '%s' not found" % missing[0], 1
-    else:
-        labels = s.setdefault("labels", {}).setdefault(a[2], [])
-        labels[:] = [n for n in labels if n not in remove] + [n for n in add if n not in labels]
+    # As in gh, the remove and the add are separate mutations: a failed add still removes.
+    labels = s.setdefault("labels", {}).setdefault(a[2], [])
+    if "--remove-label" in a:
+        remove = a[a.index("--remove-label") + 1].split(",")
+        labels[:] = [n for n in labels if n not in remove]
+    if "--add-label" in a:
+        add = a[a.index("--add-label") + 1].split(",")
+        missing = [n for n in add if n not in s.get("label_names", [])]
+        if s.get("label_add_fails"):
+            out, code = "fixture GitHub refused the label edit", 1
+        elif missing:
+            url = "https://github.com/o/r/issues/" + a[2]
+            out, code = "failed to update %s: '%s' not found" % (url, missing[0]), 1
+        else:
+            labels += [n for n in add if n not in labels]
 elif a[:2] == ["label", "create"]:
     if a[2] in s.get("label_names", []):
         out, code = 'label with name "%s" already exists' % a[2], 1
@@ -653,6 +658,16 @@ class FakeState:
         comments: list[dict[str, Any]] = self.state().get("comments", {}).get(issue, [])
         return comments
 
+    def labelled_before(self, mark: int, *prefixes: list[str]) -> None:
+        """Of the events after `mark`, the last label edit comes before the first event that
+        starts with one of `prefixes`, such as a client start or a prompt."""
+        events = self.state()["events"][mark:]
+        edits = [i for i, e in enumerate(events) if e[:3] == ["gh", "issue", "edit"]]
+        later = [i for i, e in enumerate(events) if any(e[: len(p)] == p for p in prefixes)]
+        assert edits, events
+        assert later, events
+        assert edits[-1] < later[0], events
+
     def labels(self, issue: str) -> list[str]:
         """The issue's labels as the fake GitHub holds them."""
         labels: list[str] = self.state().get("labels", {}).get(issue, [])
@@ -740,7 +755,7 @@ class Harness(FakeState, unittest.TestCase):
             "40": "Spec: a design\nLead: critic\n",
             "50": "Spec: a design\nLead: lead\n",
         }
-        # The repository already has the labels most tests write; LabelTest starts without.
+        # The repository already has the labels most tests write.
         names = [f"phase:{p}" for p in ("design", "implement", "review")]
         names += [f"turn:{e}" for e in ("dispatcher", "impl", "tester", "critic", "lead")]
         self.save(

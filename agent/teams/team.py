@@ -25,7 +25,7 @@ import subprocess
 import sys
 import time
 import uuid
-from collections.abc import Generator, Sequence
+from collections.abc import Generator
 from pathlib import Path
 from typing import cast
 
@@ -40,7 +40,7 @@ from briefs import (
     reviewer_notice,
     tester_message,
 )
-from commands import execute, object_fields, object_list, require_type, run, write_file
+from commands import execute, object_fields, require_type, run, write_file
 from config import (
     DATABASE_BASES,
     DISPATCHER_RECOVERY,
@@ -75,15 +75,14 @@ from config import (
 )
 from dexter import stop_daemon, tools
 from github import (
+    WORKFLOW,
+    Phase,
     PullRequest,
-    call,
-    deadline_from_now,
     event_posted,
-    github,
     merged_brief,
     post_event,
     pull_request,
-    repo_args,
+    replace_labels,
     roster,
     spec_lead,
 )
@@ -728,47 +727,16 @@ def team_record(issue: str, kind: str, implementer: str, tester: str) -> Record:
 
 # --- Workflow labels --------------------------------------------------------
 
-# The two reserved label prefixes: the issue's workflow step and its coordinating owner.
-WORKFLOW = ("phase:", "turn:")
+
+def assign(issue: str, phase: Phase, owner: str) -> None:
+    """Record the issue's workflow step and coordinating owner (README.md#turns)."""
+    replace_labels(issue, WORKFLOW, [f"phase:{phase}", f"turn:{owner}"])
+    print(f"#{issue} labelled phase:{phase}, turn:{owner}")
 
 
-def replace_labels(issue: str, prefixes: Sequence[str], new: Sequence[str]) -> None:
-    """Replace the issue's labels that start with one of the prefixes by `new`, leaving every
-    other label alone. A label is created only when GitHub reports it missing. The read,
-    the edit and any creation share one GitHub deadline."""
-    deadline = deadline_from_now()
-    name = f"labels of #{issue}"
-    command = ["gh", "issue", "view", issue, *repo_args(), "--json", "labels"]
-    view = object_fields(json.loads(github(command, deadline, name)), name)
-    current = [str(label.get("name")) for label in object_list(view.get("labels") or [], name)]
-    remove = [label for label in current if label.startswith(tuple(prefixes)) and label not in new]
-    add = [label for label in new if label not in current]
-    if not remove and not add:
-        return
-    edit = ["gh", "issue", "edit", issue, *repo_args()]
-    edit += ["--remove-label", ",".join(remove)] if remove else []
-    edit += ["--add-label", ",".join(add)] if add else []
-    created: list[str] = []
-    while True:
-        result = call(edit, deadline, name)
-        if not result.returncode:
-            return
-        error = result.stderr.strip() or result.stdout.strip() or "gh issue edit failed"
-        # gh names the first label the repository lacks: "could not add label: 'x' not found".
-        missing = re.search(r"could not add label: '([^']+)' not found", error)
-        if not missing or missing.group(1) not in add or missing.group(1) in created:
-            raise RuntimeError(f"Label update of #{issue} failed: {error}")
-        created.append(missing.group(1))
-        github(["gh", "label", "create", created[-1], *repo_args()], deadline, name)
-
-
-def assign(issue: str, phase: str, owner: str) -> str:
-    """Record the issue's workflow step and coordinating owner; return the labels written."""
-    labels = [f"phase:{phase}", f"turn:{owner}"]
-    replace_labels(issue, WORKFLOW, labels)
-    text = ", ".join(labels)
-    print(f"#{issue} labelled {text}")
-    return text
+def labels_stay(phase: Phase, owner: str) -> str:
+    """What a failed send after `assign` reports: the assignment is not rolled back."""
+    return f"The labels phase:{phase}, turn:{owner} stay."
 
 
 def start(brief: str) -> None:
@@ -983,26 +951,30 @@ def turn(number: str, recipient: str) -> None:
         )
     pr = pull_request(number)
     pr.require_closes(record["brief"])
-    if recipient == record["tester"]:
+    back = recipient == record["implementer"]  # findings back; otherwise a head to review
+    if not back:
         # The handed-off commit is the implementer's own clean, pushed HEAD.
         problem = checkout_problem(project_of(record["agents"][me]), pr.head)
         if problem:
             raise RuntimeError(f"{problem} Commit and push, then hand over.")
     mergeable, failures = observe_pr(pr)
-    if recipient == record["tester"] and mergeable != "MERGEABLE":
+    if not back and mergeable != "MERGEABLE":
         raise RuntimeError(conflict_refusal(pr.head, mergeable))
     # The labels record the handoff before anyone is told; a failed write sends nothing.
-    phase = "implement" if recipient == record["implementer"] else "review"
-    labels = assign(record["brief"], phase, recipient)
-    if recipient == record["implementer"]:
+    phase: Phase = "implement" if back else "review"
+    assign(record["brief"], phase, recipient)
+    if back:
         partner = live_name(record["slot"], recipient)
         failed = deliver([(partner, implementer_message(pr, failures))])
     else:
         failed = hand_to_reviewers(record, me, pr, failures)
     if failed:
         raise RuntimeError(
-            "Handoff incomplete; failed sends: " + "; ".join(failed) + f". The labels {labels} "
-            "stay. Report blocked with these errors, or rerun turn after fixing them."
+            "Handoff incomplete; failed sends: "
+            + "; ".join(failed)
+            + ". "
+            + labels_stay(phase, recipient)
+            + " Report blocked with these errors, or rerun turn after fixing them."
         )
     print("End your turn now.")
 
@@ -1328,7 +1300,7 @@ def recorded_client(brief: str, entry: str) -> Allocation:
     return allocation
 
 
-def send_prompt(allocation: Allocation, text: str, note: str = "") -> None:
+def send_prompt(allocation: Allocation, text: str) -> None:
     """Any failure of the prompt call, including Herdr's own timeout, may come after the text
     reached the client, so the error says delivery is unknown and not to resend blindly."""
     try:
@@ -1336,7 +1308,7 @@ def send_prompt(allocation: Allocation, text: str, note: str = "") -> None:
     except (subprocess.TimeoutExpired, RuntimeError, ValueError) as error:
         raise RuntimeError(
             f"Prompt to {allocation['name']} failed ({error}); it may have been delivered. "
-            f"{note}Read the agent's records before sending it again."
+            "Read the agent's records before sending it again."
         ) from error
     print(f"Prompted {allocation['name']}")
 
@@ -1346,12 +1318,15 @@ def prompt_agent(brief: str, entry: str, text: str) -> None:
     send_prompt(recorded_client(brief, entry), text)
 
 
-def hand_off(brief: str, entry: str, text: str, phase: str) -> None:
+def hand_off(brief: str, entry: str, text: str, phase: Phase) -> None:
     """Make the recorded client the brief's coordinating owner in this phase, then send
     the text. A failed label write sends nothing; a failed send keeps the labels."""
     allocation = recorded_client(brief, entry)
-    labels = assign(brief, phase, entry)
-    send_prompt(allocation, text, f"The labels {labels} stay. ")
+    assign(brief, phase, entry)
+    try:
+        send_prompt(allocation, text)
+    except RuntimeError as error:
+        raise RuntimeError(f"{error} {labels_stay(phase, entry)}") from error
 
 
 def cli() -> None:

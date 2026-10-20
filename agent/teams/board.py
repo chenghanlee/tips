@@ -50,6 +50,7 @@ from github import (
     deadline_from_now,
     event_role,
     github,
+    give_turn_to_dispatcher,
     header_session,
     issue_comments,
     parse_comment,
@@ -57,7 +58,7 @@ from github import (
     repo_args,
 )
 from herdr import herdr, session_id
-from team import records, replace_labels
+from team import records
 
 WORD_LIMIT = 800
 CODEX_LAUNCH = re.compile(r"launched codex in (?P<root>[^;]+);")
@@ -104,28 +105,28 @@ def post(args: argparse.Namespace) -> None:
     poster = identity(args)
     url = post_as(args.issue, args.type, poster, sys.stdin.read())
     print(url, flush=True)
-    if args.type != "BLOCKED":
-        return
-    # The blocker hands the turn to the dispatcher; the phase stays. A failed label write
-    # never withholds the notice: the dispatcher is the one who repairs it.
-    label_error = ""
+    if args.type == "BLOCKED":
+        notify_blocked(args.issue, url)
+
+
+def notify_blocked(issue: str, url: str) -> None:
+    """Hand the turn to the dispatcher, then always notify it, naming any label error: the
+    dispatcher repairs the labels. Either failure exits non-zero; a rerun retries both."""
+    problems: list[str] = []
     try:
-        replace_labels(args.issue, ("turn:",), ["turn:dispatcher"])
+        give_turn_to_dispatcher(issue)
     except (RuntimeError, OSError, ValueError) as error:
-        label_error = f"label turn:dispatcher not set: {error}"
-    notice = f"{url} blocked" + (f"; {label_error}" if label_error else "")
+        problems.append(f"label turn:dispatcher not set: {error}")
     try:
-        herdr("agent", "prompt", "dispatcher", notice)
+        herdr("agent", "prompt", "dispatcher", "; ".join([f"{url} blocked", *problems]))
+        print("Notified dispatcher")
     except (RuntimeError, OSError, ValueError, subprocess.TimeoutExpired) as error:
+        problems.append(f"notifying the dispatcher failed: {error}")
+    if problems:
         raise RuntimeError(
-            f"posted {url}; notifying the dispatcher failed: {error}. "
-            + (f"Also {label_error}. " if label_error else "")
-            + "The post reuses an identical comment, so rerun this command to retry the "
-            "label and the notification"
-        ) from error
-    print("Notified dispatcher")
-    if label_error:
-        raise RuntimeError(f"posted {url} and notified the dispatcher, but {label_error}")
+            f"posted {url}; " + "; ".join(problems) + ". The post reuses an identical comment, "
+            "so rerun this command to retry the label and the notification"
+        )
 
 
 def read_text(issue: str, after: int | None) -> str:

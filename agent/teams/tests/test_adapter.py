@@ -309,7 +309,9 @@ class AdapterTest(Harness):
             await self.call(client, "start_pair", brief=29)
 
         self.session(launch)
-        self.update(labels={"29": []})  # a brief started before the labels existed
+        # A brief started before the labels existed, in a repository that has none of them.
+        self.update(labels={"29": []}, label_names=[])
+        mark = len(self.state()["events"])
 
         async def repair(client: Any) -> None:
             await self.call(
@@ -318,9 +320,8 @@ class AdapterTest(Harness):
 
         self.session(repair)
         assert self.labels("29") == ["phase:review", "turn:tester"]
-        events = self.state()["events"]
-        edit = max(i for i, e in enumerate(events) if e[:3] == ["gh", "issue", "edit"])
-        assert events.index(["agent", "prompt", "team-1-tester", "Review 7"]) > edit
+        assert [e[3] for e in self.events("gh", "label", "create")] == self.labels("29")
+        self.labelled_before(mark, ["agent", "prompt", "team-1-tester", "Review 7"])
 
     def test_board_issue_and_project_writes_name_the_repository_and_dispatcher(self) -> None:
         content = {"number": 29, "url": "https://github.com/o/r/issues/29"}

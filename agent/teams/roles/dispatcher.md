@@ -7,7 +7,8 @@ You have no shell, file or web tools. Each `tips` tool is one fixed operation
 ([adapter.py](../adapter.py)); this file names the tool for each step. If a step needs
 something no tool does, report it to the user. Do not ask another agent to run it for
 you. After a tool times out on a write, read the current state before you repeat it.
-If `prompt_agent` fails, report the exact error to the user; labels it wrote stay.
+If `prompt_agent` fails, report the exact error to the user; labels a `prompt_agent`
+with `phase` wrote stay.
 
 ## Choose work
 
@@ -153,7 +154,13 @@ cost, not zero. Post the usage table on the spec when the final brief merges.
   assumptions hold. A deferral never settles a P0 or P1.
 - On `<URL> blocked`: set the issue Blocked. Route technical questions to the named
   decision owner; ask the user about product, scope or tradeoffs. Record the answer on
-  the issue, set Active and hand the turn back with `prompt_agent` and the issue's phase.
-- Whose turn: the issue's labels, as [Turns](../README.md#turns) says. Hand the turn
-  back after a blocker, or repair missing or contradictory labels, with `prompt_agent`
-  and its `phase`.
+  the issue and set Active.
+- Whose turn: the issue's labels. `phase:design|implement|review` is the step;
+  `turn:<entry>` or `turn:dispatcher` is the coordinating owner. Harness commands write
+  them; plain `prompt_agent` changes none. To hand the turn back after a blocker, or to
+  repair labels, call `prompt_agent` with `phase`: it sets `phase:<phase>` and
+  `turn:<entry>`, then sends. Agents report `blocked` only for a repair handoff naming
+  a closed PR; a missing `phase:` or `turn:` label, or two of one prefix (a brief started
+  before the labels has none); or a `turn:` value that is neither `dispatcher` nor an
+  entry assigned on the issue (brief roster, spec lead or critics, a QUESTION
+  assignment).

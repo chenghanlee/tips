@@ -101,8 +101,8 @@ operator (the user) runs `reset` and `stop --abandon`.
 |---|---|---|
 | `agent/teams/team.py start <brief>` | Dispatcher | Read `Implementer:` and `Required reviews:`. Label a new pair's brief ([Turns](#turns)). Create an allocation for the implementer (bootstrap branch `task/<brief>`) and the merge-confirming tester. Launch both in the team's workspace (see [Herdr layout](#herdr-layout)), write the record, and post one EVENT per launch on the brief. |
 | `agent/teams/team.py design <issue> <entry>` | Dispatcher | Launch a configured designer in its own allocation. A started brief reuses its team slot; otherwise create or join a spec team. The issue names the lead, any critics and the question or design assignment; a new spec team needs a `Lead: <entry>` line naming a configured designer and labels the spec ([Turns](#turns)). Post its launch EVENT on that issue. The adapter keeps the argument name `spec` for either issue number. |
-| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require your own clone to be clean at the PR head and the PR to close the brief. Read the PR's live state (see `observe`); refuse unless GitHub reports the head mergeable. Write the [labels](#turns), then notify every launched required reviewer of the head and the `bootstrap.py --commit` command that moves its clone there. For each reviewer not launched, post a pending EVENT on the PR and ask the dispatcher to run its `review` command. Try every send; report each failed one. |
-| `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Read the PR's live state, write the [labels](#turns), then notify the implementer with its merge conflict and failed required checks. Your clone's state does not block it. |
+| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require your own clone to be clean at the PR head and the PR to close the brief. Read the PR's live state (see `observe`); refuse unless GitHub reports the head mergeable. Label the brief ([Turns](#turns)). Notify every launched required reviewer of the head and the `bootstrap.py --commit` command that moves its clone there. For each reviewer not launched, post a pending EVENT on the PR and ask the dispatcher to run its `review` command. Try every send; report each failed one. |
+| `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Read the PR's live state and label the brief ([Turns](#turns)). Notify the implementer with its merge conflict and failed required checks. Your clone's state does not block it. |
 | `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create its allocation, configured for the PR head, with its own database suffix and port, and launch the reviewer in the team's workspace. |
 | `agent/teams/team.py reset <issue> <entry>` | Operator | Record the operator's decision, after checking a stopped client's work on the issue and PR, that `start`, `design` or `review` may launch a replacement in the same allocation that gets the task again. Refuse a running client. |
 | `agent/teams/team.py stop <issue>` | Dispatcher | See [Retirement](#retirement). |
@@ -198,7 +198,9 @@ Only these harness commands write them. Never add or remove them by hand.
 
 A command writes the labels before it sends its prompt. A failed label write on a
 handoff sends nothing. A BLOCKED post always notifies the dispatcher, naming any label
-error.
+error. A command adds the new labels before it removes the old ones, and nothing locks
+the issue: a failed write or two commands at once can leave two of one prefix. That is
+a reported contradiction, not a prevented one.
 
 Helpers act on their explicit assignment without owning the turn: an additional reviewer
 notified of a head, a designer assigned a QUESTION, a critic named in a spec. A label is

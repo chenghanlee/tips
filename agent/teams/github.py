@@ -5,7 +5,7 @@ import re
 import subprocess
 import time
 from collections.abc import Sequence
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 import config as conf
 from commands import execute, object_fields, object_list, run
@@ -49,6 +49,53 @@ def issue_line(body: str, label: str) -> str | None:
 def issue_body(issue: str) -> str:
     command = ["gh", "issue", "view", issue, *repo_args(), "--json", "body"]
     return str(json.loads(github(command, deadline_from_now(), f"#{issue}")).get("body") or "")
+
+
+# The two reserved label prefixes: the issue's workflow step and its coordinating owner.
+WORKFLOW = ("phase:", "turn:")
+Phase = Literal["design", "implement", "review"]
+
+
+def label_failure(issue: str, result: subprocess.CompletedProcess[str], held: list[str]) -> str:
+    error = result.stderr.strip() or result.stdout.strip() or "gh issue edit failed"
+    return f"Label update of #{issue} failed: {error}. Its labels: {', '.join(held) or 'none'}"
+
+
+def replace_labels(issue: str, prefixes: Sequence[str], new: Sequence[str]) -> None:
+    """Replace the issue's labels that start with one of the prefixes by `new`, leaving every
+    other label alone. gh runs the two halves of one edit separately, so a failed add would
+    still remove: add first, then remove. A failure leaves the old labels, or old and new
+    together, and names them. A label is created only when GitHub reports it missing. All
+    calls share one GitHub deadline."""
+    deadline = deadline_from_now()
+    name = f"labels of #{issue}"
+    command = ["gh", "issue", "view", issue, *repo_args(), "--json", "labels"]
+    view = object_fields(json.loads(github(command, deadline, name)), name)
+    held = [str(label.get("name")) for label in object_list(view.get("labels") or [], name)]
+    add = [label for label in new if label not in held]
+    remove = [label for label in held if label.startswith(tuple(prefixes)) and label not in new]
+    edit = ["gh", "issue", "edit", issue, *repo_args()]
+    created: list[str] = []
+    while add:
+        result = call([*edit, "--add-label", ",".join(add)], deadline, name)
+        if not result.returncode:
+            held += add
+            break
+        # gh names the first label the repository lacks: "failed to update <url>: 'x' not found".
+        missing = re.search(r"'([^']+)' not found", result.stderr + result.stdout)
+        if not missing or missing.group(1) not in add or missing.group(1) in created:
+            raise RuntimeError(label_failure(issue, result, held))
+        created.append(missing.group(1))
+        github(["gh", "label", "create", created[-1], *repo_args()], deadline, name)
+    if remove:
+        result = call([*edit, "--remove-label", ",".join(remove)], deadline, name)
+        if result.returncode:
+            raise RuntimeError(label_failure(issue, result, held))
+
+
+def give_turn_to_dispatcher(issue: str) -> None:
+    """A blocker hands the issue's turn to the dispatcher; its phase stays."""
+    replace_labels(issue, ("turn:",), ["turn:dispatcher"])
 
 
 def spec_lead(spec: str) -> str:

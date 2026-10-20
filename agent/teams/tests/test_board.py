@@ -136,17 +136,17 @@ class BoardTest(Harness):
     def test_a_blocked_post_whose_label_write_fails_still_notifies_the_dispatcher(self) -> None:
         self.team("start", "29")
         tester = self.pane("team-1-tester")["pane_id"]
-        self.update(label_edit_fails=True)
+        self.update(label_add_fails=True)
         failed = self.board("post", "29", "BLOCKED", pane=tester, body="no answer\n", ok=False)
         url = self.comments("29")[-1]["html_url"]
         assert self.bodies()[-1].endswith("\nno answer")
-        error = "Label update of #29 failed: fixture GitHub refused the label edit"
-        assert self.prompts("dispatcher") == [
-            f"{url} blocked; label turn:dispatcher not set: {error}"
-        ]
-        assert (
-            f"posted {url} and notified the dispatcher, but label turn:dispatcher" in failed.stderr
+        error = (
+            "label turn:dispatcher not set: Label update of #29 failed: fixture GitHub refused "
+            "the label edit. Its labels: phase:implement, turn:impl"
         )
+        assert self.prompts("dispatcher") == [f"{url} blocked; {error}"]
+        assert f"posted {url}; {error}" in failed.stderr
+        assert self.labels("29") == ["phase:implement", "turn:impl"]
 
     def test_usage_counts_each_launched_session_from_its_own_logs(self) -> None:
         self.update(

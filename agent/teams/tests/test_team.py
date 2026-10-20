@@ -571,29 +571,10 @@ class PairLifecycleTest(Harness):
         self.update(label_names=["bug"], labels={"29": ["bug"]})
         self.team("start", "29")
         assert self.labels("29") == ["bug", "phase:implement", "turn:impl"]
-        events = self.state()["events"]
-        edits = [i for i, e in enumerate(events) if e[:3] == ["gh", "issue", "edit"]]
-        launches = [
-            i for i, e in enumerate(events) if e[:2] in (["agent", "start"], ["agent", "prompt"])
-        ]
-        assert edits[-1] < launches[0], "a client started before its labels were written"
+        self.labelled_before(0, ["agent", "start"], ["agent", "prompt"])
         # The repository lacked both labels: each is created once GitHub reports it missing.
         created = [e[3] for e in self.events("gh", "label", "create")]
         assert created == ["phase:implement", "turn:impl"]
-
-    def test_a_relaunch_keeps_the_labels(self) -> None:
-        self.team("start", "29")
-        self.update(labels={"29": ["phase:review", "turn:tester"]})
-        state = self.state()
-        tester = next(x for x in state["panes"] if x.get("label") == "team-1-tester")
-        for key in ("agent", "name", "agent_status", "agent_session"):
-            tester.pop(key, None)
-        self.save(state)
-        self.reset("29", "tester")
-        self.team("start", "29")
-        assert [e[2] for e in self.events("agent", "start")][-1] == "team-1-tester"
-        assert self.labels("29") == ["phase:review", "turn:tester"]
-        assert len(self.events("gh", "issue", "edit")) == 1, "only the first start labels"
 
     def test_brief_roster_is_validated_before_any_change(self) -> None:
         cases = {
@@ -630,6 +611,7 @@ class PairLifecycleTest(Harness):
         assert "team-1-impl is running in" in refused.stderr
         # A stopped client may have done its task: a rerun neither relaunches nor resends.
         self.clients_exit(1)
+        self.update(labels={"29": ["phase:review", "turn:tester"]})
         refused = self.team("start", "29", ok=False)
         assert "team-1-impl is not running and its task submission is submitted" in refused.stderr
         assert "team.py' reset 29 impl" in refused.stderr
@@ -647,6 +629,9 @@ class PairLifecycleTest(Harness):
         self.reset("29", "impl")
         self.team("start", "29")
         assert len(self.events("agent", "start")) == 4
+        # A relaunch keeps the labels; only the first start wrote them.
+        assert self.labels("29") == ["phase:review", "turn:tester"]
+        assert len(self.events("gh", "issue", "edit")) == 1
         assert self.launch_env("team-1-tester") == ("_t1g1r", str(PORT_BASE + 11))
         # The replacement reuses its clone: bootstrap neither reclones nor resets it.
         self.bootstrap("team-1-impl")
@@ -1128,22 +1113,25 @@ class HandoffTest(Harness):
 
     def test_both_handoffs_move_the_labels_before_the_prompt(self) -> None:
         self.push("team-1-impl")
+        mark = len(self.state()["events"])
         self.team("turn", "7", "tester", pane=self.impl)
         assert self.labels("29") == ["phase:review", "turn:tester"]
-        events = self.state()["events"]
-        edit = max(i for i, e in enumerate(events) if e[:3] == ["gh", "issue", "edit"])
-        ring = max(i for i, e in enumerate(events) if e[:3] == ["agent", "prompt", "team-1-tester"])
-        assert edit < ring, "the reviewer was told before the labels were written"
+        self.labelled_before(mark, ["agent", "prompt", "team-1-tester"])
+        mark = len(self.state()["events"])
         self.team("turn", "7", "impl", pane=self.tester)
+        self.labelled_before(mark, ["agent", "prompt", "team-1-impl"])
         assert self.labels("29") == ["phase:implement", "turn:impl"]
         assert not self.events("gh", "label", "create")
 
     def test_a_failed_label_write_sends_no_handoff(self) -> None:
         self.push("team-1-impl")
         prompts = len(self.events("agent", "prompt"))
-        self.update(label_edit_fails=True)
+        self.update(label_add_fails=True)
         refused = self.team("turn", "7", "tester", pane=self.impl, ok=False)
-        assert "Label update of #29 failed: fixture GitHub refused the label edit" in refused.stderr
+        assert (
+            "Label update of #29 failed: fixture GitHub refused the label edit. Its labels: "
+            "phase:implement, turn:impl" in refused.stderr
+        )
         assert len(self.events("agent", "prompt")) == prompts
         assert self.labels("29") == ["phase:implement", "turn:impl"]
 

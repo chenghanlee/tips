@@ -27,6 +27,7 @@ import commands
 import config as conf
 import pr_review
 import team
+from github import Phase
 
 # Responses stay small; full output lives in GitHub, Herdr or local logs.
 RESPONSE_BYTES = 8192
@@ -44,7 +45,6 @@ Title = Annotated[str, Field(min_length=1, max_length=256)]
 Body = Annotated[str, Field(min_length=1, max_length=60_000)]
 FieldValue = Annotated[str, Field(min_length=1, max_length=256)]
 PrState = Literal["open", "closed", "merged", "all"]
-Phase = Literal["design", "implement", "review"]
 ERRORS = (
     RuntimeError,
     OSError,
