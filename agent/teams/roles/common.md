@@ -45,7 +45,7 @@ Read this and your role file at launch and after compaction.
   allocation record. Types: PROPOSAL, CRITIQUE, QUESTION, ANSWER, AGREE, FINDING,
   BLOCKED, DONE, EVENT. PR reviews use the [review record](../README.md#pr-review-record) instead.
 - Keep each comment under 400 words. If it has more than 800 words, the script warns.
-  Explain why it needs that many words. Put logs and screenshots in a gist with `gh gist create <file>`. Link to CI runs by URL. Do not paste output.
+  Explain why it needs that many words. Put logs and screenshots in a gist with `gh gist create <file>`. Link to CI runs by URL. Do not paste output, except the excerpt a decision depends on.
 - Before compaction, restart or session end, or a long step, record any decision or
   finding not yet posted: the lead designer updates the spec body; everyone else posts
   the decision or finding on GitHub. After a restart, reread the brief (`gh issue view <issue>`) and the PR as
@@ -57,7 +57,8 @@ Read this and your role file at launch and after compaction.
 
 - Support a source claim with `path:line` at its commit. For execution evidence use the
   CI run URL, or during the [CI pause](../../../AGENTS.md#github-ci-pause), the local
-  command, tested SHA, result, environment and log path. Otherwise mark it unverified.
+  command, tested SHA, environment, exit, result and the excerpt the claim depends on.
+  Otherwise mark it unverified.
 - Use the [README scale](../README.md#severity). A designer P1 and a tester P1 both
   block progress.
 - Open a new issue for any improvement outside the brief. Keep that work out of the

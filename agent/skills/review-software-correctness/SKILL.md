@@ -165,9 +165,10 @@ changed, in your own database and port. When application code, tests or
 behaviour-changing config changed, run the full application test suite once.
 
 During the [CI pause](../../../AGENTS.md#github-ci-pause), verify the recorded local
-commands, tested SHA, results and logs. Record which evidence you ran yourself and
-which you inspected. Apply the policy's rule for carrying evidence across a later diff;
-an absent CI run is not a pass and does not replace local verification.
+commands, tested SHA, results and the excerpts the decision depends on. Record which
+evidence you ran yourself and which you inspected. Apply the policy's rule for carrying
+evidence across a later diff; an absent CI run is not a pass and does not replace local
+verification.
 
 - Rerun a failing test once. If it passes the second time, report it as flaky with the
   test name. Do not hide it.

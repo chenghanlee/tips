@@ -53,8 +53,9 @@ one to save a tool call.
    with the same logging but without `--max-failures 1`: the
    [failed-check rule](../README.md#report-and-resolve-blockers) needs every failing
    test name. Plain `mix test` covers the rest, so the unit suite runs once per head.
-   Keep that log; name its path, command and `exit=` line in the PR body under "Checks
-   not run by CI". A Codex tester verifies your log instead
+   Keep that log until cleanup; record its command, exit and results in the PR body under
+   "Checks not run by CI" as the [CI pause rule](../../../AGENTS.md#github-ci-pause) says.
+   A Codex tester inspects that record instead
    ([manual browser review](../README.md#manual-browser-review)).
 2. **Edits.** With the client's edit tool, replace only the lines that must change plus
    the context needed to match them. Do not resend a whole function or file. If the

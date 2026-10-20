@@ -9,8 +9,10 @@ bootstrap.py, a logs directory, and launcher configuration, all under the harnes
 Herdr name, kind, project, database suffix, port, pane, session and task-submission state.
 Restart, handoff and retirement use that record. The issue's `phase:` and `turn:` labels
 record the workflow step and its coordinating owner (README.md#turns). One lock on
-`state/.lock` serializes start, design, review, reset and stop. This controller never runs
-Git, builds or a worker-provided executable in a project.
+`state/.lock` serializes start, design, review, reset, stop and cleanup. This controller
+never runs a build or a worker-provided executable in a project. Its only Git commands
+there are cleanup's fetch and read-only checks in a stopped allocation's clone, with hooks
+and fsmonitor off.
 """
 
 import contextlib
@@ -20,6 +22,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import socket
 import subprocess
 import sys
@@ -27,7 +30,7 @@ import time
 import uuid
 from collections.abc import Generator
 from pathlib import Path
-from typing import cast
+from typing import NotRequired, TypedDict, cast
 
 import config as conf
 from briefs import (
@@ -42,7 +45,6 @@ from briefs import (
 )
 from commands import execute, object_fields, require_type, run, write_file
 from config import (
-    DATABASE_BASES,
     DISPATCHER_RECOVERY,
     ENTRY,
     NAME_BYTES,
@@ -64,9 +66,9 @@ from config import (
     contained,
     database_stem,
     harness,
-    is_partition,
     live_name,
     names_fit,
+    namespace_of,
     overlapping,
     project_of,
     slot_record_paths,
@@ -991,11 +993,7 @@ def retirement_paths(allocation: Allocation) -> tuple[Path, Path, Path, Path]:
             f"{allocation['name']}: recorded allocation {allocation['root']} is not "
             f"{paths[0]}; preserved"
         )
-    trusted = conf.harness_root()
-    for directory in paths:
-        if directory.exists() or directory.is_symlink():
-            contained(directory, trusted)
-    return paths
+    return checked_paths(allocation["id"])
 
 
 # stop's next step when a recorded pane holds a client it cannot confirm.
@@ -1018,36 +1016,15 @@ def port_in_use(port: int) -> bool:
         return probe.connect_ex(("127.0.0.1", port)) != errno.ECONNREFUSED
 
 
-def recorded_databases(name: str, suffixes: list[str]) -> bool:
-    """Whether the database is one of the recorded stems or a numbered partition of one."""
-    stems = [base + suffix for base in DATABASE_BASES for suffix in suffixes]
-    return any(is_partition(stem, name) for stem in stems)
-
-
-def drop_databases(suffixes: list[str]) -> list[str]:
-    """Drop exactly the recorded databases and their numbered partitions with the trusted
-    psql command: no FORCE, no project compose or configuration. The first refusal stops
-    the drop and keeps the reservation."""
-    psql = [*conf.settings()["team"]["psql"], "-X", "-v", "ON_ERROR_STOP=1"]
-    timeout = conf.settings()["timeouts"]["launch_seconds"]
-    listing = execute(
-        [*psql, "-Atc", "SELECT datname FROM pg_database"], cwd=conf.state_dir(), timeout=timeout
-    )
-    if listing.returncode:
-        raise RuntimeError(f"psql could not list databases: {listing.stderr.strip()}; preserved")
-    dropped: list[str] = []
-    for db in listing.stdout.splitlines():
-        if recorded_databases(db, suffixes):
-            # Without FORCE, a remaining connection makes PostgreSQL refuse the drop.
-            statement = 'DROP DATABASE "' + db.replace('"', '""') + '"'
-            result = execute([*psql, "-c", statement], cwd=conf.state_dir(), timeout=timeout)
-            if result.returncode:
-                raise RuntimeError(
-                    f"PostgreSQL refused to drop {db}: {result.stderr.strip()}. Dropped: "
-                    f"{', '.join(dropped) or 'none'}; the rest and the reservation are kept."
-                )
-            dropped.append(db)
-    return dropped
+def checked_paths(ident: str) -> tuple[Path, Path, Path, Path]:
+    """The allocation's directories, refused if a path leaves the harness root or passes
+    through a symlink."""
+    paths = allocation_paths(ident)
+    trusted = conf.harness_root()
+    for directory in paths:
+        if directory.exists() or directory.is_symlink():
+            contained(directory, trusted)
+    return paths
 
 
 def remove_if_empty(directory: Path) -> None:
@@ -1061,78 +1038,294 @@ def remove_if_empty(directory: Path) -> None:
             raise
 
 
-def retain_files(record: Record, dropped: list[str], kept: str) -> None:
-    """Remove only empty residue; record in each allocation's launcher configuration what it
-    leaves behind and why. Project files are never deleted."""
+class Retired(TypedDict):
+    """`state/<id>/retired.json`: what stop retired and what cleanup last did with it.
+
+    `files` is pending, deleted, `kept: <why>` or `failed: <paths>`; `databases` is pending,
+    dropped, `refused: <why>` or `kept: <why>`.
+    """
+
+    id: str
+    issue: str
+    abandoned: bool
+    db_suffix: str
+    files: str
+    databases: str
+    orphans: list[str]
+    report: NotRequired[str]
+
+
+ABANDONED = "brief closed without a merged PR (stop --abandon)"
+
+
+def read_retired(path: Path) -> Retired:
+    fields = object_fields(json.loads(path.read_text()), str(path))
+    for key in ("id", "issue", "db_suffix", "files", "databases"):
+        require_type(fields.get(key), str, f"{path}: {key}")
+    if not isinstance(fields.get("abandoned"), bool):
+        raise ValueError(f"{path}: abandoned must be true or false; preserved")
+    return cast(Retired, fields)
+
+
+def retired_notes() -> dict[str, Retired]:
+    """Every readable retirement note by allocation ID. An unreadable one, such as a note an
+    older release wrote, is reported and skipped: it never blocks cleanup of the others."""
+    notes: dict[str, Retired] = {}
+    for path in sorted(conf.state_dir().glob("*/retired.json")):
+        try:
+            notes[path.parent.name] = read_retired(path)
+        except (OSError, ValueError) as error:
+            print(f"{path}: unreadable retired.json: {error}; skipped")
+    return notes
+
+
+def write_retired(path: Path, note: Retired) -> None:
+    write_file(path, json.dumps(note, indent=2, sort_keys=True) + "\n")
+
+
+def retire(record: Record, abandon: bool) -> None:
+    """Write each allocation's retirement note, which cleanup reads once the record is gone.
+    stop wrote it only after its merge check passed, or for a standalone design team or an
+    abandoned brief."""
     for allocation in record["agents"].values():
-        root, project, logs, config = retirement_paths(allocation)
-        for directory in (project, logs, root):
-            remove_if_empty(directory)
-        retained = [str(path) for path in (project, logs) if path.exists()]
-        own = [db for db in dropped if recorded_databases(db, [allocation["db_suffix"]])]
-        note = {
-            "id": allocation["id"],
-            "issue": record["brief"],
-            "retained": retained,
-            "reason": "project and log files are never deleted automatically",
-            "db_suffix": allocation["db_suffix"],
-            "databases_dropped": own,
-            "databases_kept_because": kept,
-        }
-        write_file(config / "retired.json", json.dumps(note, indent=2, sort_keys=True) + "\n")
-        for path in retained:
-            print(f"Retained {path}: {note['reason']}; see {config / 'retired.json'}")
+        note = Retired(
+            id=allocation["id"],
+            issue=record["brief"],
+            abandoned=abandon,
+            db_suffix=allocation["db_suffix"],
+            files="pending",
+            databases="pending",
+            orphans=[],
+        )
+        write_retired(retirement_paths(allocation)[3] / "retired.json", note)
+
+
+# What each Git check finds when its output is not empty. Only origin counts as published.
+GIT_CHECKS = (
+    (("status", "--porcelain"), "uncommitted or untracked files"),
+    (("rev-list", "HEAD", "--branches", "--not", "--remotes=origin"), "commits not on origin"),
+    (("stash", "list"), "stashed changes"),
+)
+
+
+def unpublished_work(project: Path) -> str:
+    """Why Git cannot show that the clone holds nothing beyond origin, or "" when it can.
+
+    Fetch with prune first, so origin's refs are current. A missing or unreadable
+    repository, a failed command and a timeout are reasons, never an empty result. Commands
+    run from the state directory with hooks and fsmonitor off; the rest of the clone's own
+    Git configuration still applies, within the accepted risk of worker authority.
+    """
+    git_dir = project / ".git"
+    if git_dir.is_symlink() or not git_dir.is_dir():
+        return "project has no Git repository"
+    git = ["git", f"--git-dir={git_dir}", f"--work-tree={project}"]
+    git += ["-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false"]
+    timeout = conf.settings()["timeouts"]["launch_seconds"]
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+    for args, finding in ((("fetch", "--prune", "--quiet", "origin"), ""), *GIT_CHECKS):
+        try:
+            result = execute(
+                [*git, *args], cwd=conf.state_dir(), env=env, timeout=timeout, input_text=""
+            )
+        except subprocess.TimeoutExpired:
+            return f"git {args[0]} did not finish within {timeout} s; incomplete"
+        if result.returncode:
+            return f"git {args[0]} failed: {result.stderr.strip()[-500:]}"
+        if finding and result.stdout.strip():
+            return f"{finding}: {'; '.join(result.stdout.splitlines()[:3])}"
+    return ""
+
+
+def delete_allocation(ident: str) -> str:
+    """Delete the whole allocation unless its clone holds work Git cannot show is on origin;
+    then only `state/<id>/retired.json` remains. A project never cloned into is empty, so
+    it needs no Git check. Return the files outcome for the note."""
+    root, project, _, config = checked_paths(ident)
+    remove_if_empty(project)
+    if project.exists():
+        problem = unpublished_work(project)
+        if problem:
+            return f"kept: {problem}"
+    remaining: list[str] = []
+    if root.exists():
+        shutil.rmtree(root, onexc=lambda _call, path, _error: remaining.append(str(path)))
+    if remaining:
+        # The first paths name the cause; a full list can run to thousands.
+        shown = ", ".join(remaining[:10])
+        return f"failed: could not delete {len(remaining)} paths, including {shown}"
+    (config / "bootstrap.json").unlink(missing_ok=True)
+    return "deleted"
+
+
+def psql_command() -> list[str]:
+    """The trusted psql argv: no FORCE, no project compose or configuration."""
+    return [*conf.settings()["team"]["psql"], "-X", "-v", "ON_ERROR_STOP=1"]
+
+
+def database_names() -> tuple[list[str], str]:
+    """Every database name, or no names and why psql could not list them."""
+    timeout = conf.settings()["timeouts"]["launch_seconds"]
+    query = [*psql_command(), "-Atc", "SELECT datname FROM pg_database"]
+    try:
+        listing = execute(query, cwd=conf.state_dir(), timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return [], f"psql did not list databases within {timeout} s; incomplete"
+    if listing.returncode:
+        return [], f"psql could not list databases: {listing.stderr.strip()}"
+    return listing.stdout.splitlines(), ""
+
+
+def drop_generation(namespace: str, names: list[str]) -> tuple[str, list[str]]:
+    """Drop every listed database in the generation's namespace, recorded or not, with its
+    numbered partitions. Without FORCE, a remaining connection makes PostgreSQL refuse a
+    drop; the rest go on. Return the databases outcome and the names dropped."""
+    timeout = conf.settings()["timeouts"]["launch_seconds"]
+    team = conf.settings()["team"]
+    dropped: list[str] = []
+    refused: list[str] = []
+    for db in (name for name in names if namespace_of(team, name) == namespace):
+        statement = 'DROP DATABASE "' + db.replace('"', '""') + '"'
+        try:
+            result = execute(
+                [*psql_command(), "-c", statement], cwd=conf.state_dir(), timeout=timeout
+            )
+        except subprocess.TimeoutExpired:
+            refused.append(f"{db}: no answer within {timeout} s; incomplete")
+            continue
+        if result.returncode:
+            refused.append(f"{db}: {result.stderr.strip()}")
+        else:
+            dropped.append(db)
+    return (f"refused: {'; '.join(refused)}" if refused else "dropped"), dropped
+
+
+def orphans(notes: dict[str, Retired], live: list[Allocation], names: list[str]) -> list[str]:
+    """Allocation folders and namespace databases that no live record and no retirement
+    owns, and retirements whose suffix names no generation. They are reported, never
+    deleted."""
+    team = conf.settings()["team"]
+    owners = {*notes, *(a["id"] for a in live)}
+    root = conf.harness_root() / "allocations"
+    found = [str(path) for path in sorted(root.glob("g*")) if path.name not in owners]
+    suffixes = [n["db_suffix"] for n in notes.values()] + [a["db_suffix"] for a in live]
+    spaces = {namespace_of(team, suffix) for suffix in suffixes}
+    for ident, note in notes.items():
+        if namespace_of(team, note["db_suffix"]) is None:
+            found.append(f"retirement {ident}: suffix {note['db_suffix']} names no generation")
+    for name in names:
+        space = namespace_of(team, name)
+        if space is not None and space not in spaces:
+            found.append(f"database {name}")
+    return found
+
+
+def kept_because(ident: str, note: Retired, live: list[Allocation]) -> str:
+    """Why cleanup must keep this retired allocation, or "" when it may proceed. stop's
+    merge check already passed for every retirement it did not abandon."""
+    if any(a["id"] == ident for a in live):
+        return "a live record names this allocation"
+    if note["abandoned"]:
+        return ABANDONED
+    return ""
+
+
+def delete_allocations(mine: dict[str, Retired], live: list[Allocation]) -> dict[str, list[str]]:
+    """Delete each eligible allocation's folder and record the files outcome. Return the
+    eligible allocations by generation namespace, whose databases cleanup drops."""
+    team = conf.settings()["team"]
+    generations: dict[str, list[str]] = {}
+    for ident, note in mine.items():
+        reason = kept_because(ident, note, live)
+        if reason:
+            note["files"] = f"kept: {reason}"
+            if note["abandoned"]:
+                note["databases"] = f"kept: {reason}"
+            continue
+        note["files"] = delete_allocation(ident)
+        namespace = namespace_of(team, note["db_suffix"])
+        if namespace is None:
+            note["databases"] = f"kept: suffix {note['db_suffix']} names no generation"
+        else:
+            generations.setdefault(namespace, []).append(ident)
+    return generations
+
+
+def clean_up(issue: str) -> None:
+    """Delete the issue's retired allocations whose clones hold nothing unpublished, drop
+    their generations' databases, and print and record what was deleted, kept and found
+    unowned. The orphan scan runs before anything is deleted. The caller holds the store
+    lock."""
+    live = [a for record in records().values() for a in record["agents"].values()]
+    notes = retired_notes()
+    mine = {ident: note for ident, note in notes.items() if note["issue"] == issue}
+    if not mine:
+        print(f"#{issue}: no retired allocations; nothing removed")
+        return
+    names, problem = database_names()
+    unowned = orphans(notes, live, names)
+    if problem:
+        unowned.append(f"databases not checked: {problem}")
+    for namespace, idents in delete_allocations(mine, live).items():
+        dropped: list[str] = []
+        status = f"refused: {problem}"
+        if not problem:
+            status, dropped = drop_generation(namespace, names)
+        line = f"Databases {namespace}: dropped {', '.join(dropped) or 'none'}"
+        print(line if status == "dropped" else f"{line}; {status}")
+        for ident in idents:
+            mine[ident]["databases"] = status
+    for ident, note in mine.items():
+        note["orphans"] = unowned
+        write_retired(conf.state_dir() / ident / "retired.json", note)
+        print(f"{ident}: files {note['files']}; databases {note['databases']}")
+    for orphan in unowned:
+        print(f"Orphan, not deleted: {orphan}")
+
+
+def cleanup(issue: str) -> None:
+    """Rerun cleanup for an issue's retired allocations: after an interrupted run, a kept
+    clone whose work is now published, or an old generation."""
+    with store_lock():
+        clean_up(issue)
 
 
 def list_retained() -> None:
-    """List each retired allocation that still has files, with why it was kept. Deletes
-    nothing: a writer outside the pane can outlive stop, so only the operator, having
-    established that the work is preserved and every writer has stopped, deletes an
-    allocation by its ID."""
+    """List each retired allocation that still has files or databases, with cleanup's last
+    result. Deletes nothing; `cleanup <issue>` reruns cleanup."""
     found = False
-    for path in sorted(conf.state_dir().glob("*/retired.json")):
-        note = object_fields(json.loads(path.read_text()), str(path))
-        root = allocation_paths(str(note.get("id")))[0]
-        if not root.exists():
+    for ident, note in retired_notes().items():
+        root = allocation_paths(ident)[0]
+        if not root.exists() and note["databases"] == "dropped":
             continue
         found = True
-        kept = note.get("databases_kept_because") or "dropped"
         print(
-            f"{note.get('id')} (#{note.get('issue')}): {root}; files: {note.get('reason')}; "
-            f"databases {note.get('db_suffix')}: {kept}"
+            f"{note['id']} (#{note['issue']}): {root}; files: {note['files']}; "
+            f"databases {note['db_suffix']}: {note['databases']}"
         )
     if not found:
         print("No retained allocations")
 
 
-def kept_databases(record: Record, abandon: bool) -> str:
-    """Why stop keeps the team's databases, or "" when merged work lets it drop them."""
-    if record["kind"] == "design":
-        return "a design team's databases are kept"
-    if abandon:
-        return "brief closed without a merged PR (stop --abandon)"
-    return ""
-
-
 def stop_brief(brief: str, *, abandon: bool = False) -> None:
-    """Stop a team's recorded clients and Dexter daemons and release its slot.
+    """Stop a team's recorded clients and Dexter daemons, release its slot, then clean up.
 
-    A brief must be closed by a merged PR before anything stops, unless the operator abandons
-    it. stop runs no project Git command. It drops databases only for merged pair work and
-    always keeps project and log files for the operator to inspect. A conflict, a failed
-    stop or a busy port keeps the reservation, so stop can run again.
+    A brief must be closed by a PR merged into main before anything stops, unless it is a
+    standalone design team or the operator abandons it. A conflict, a failed stop or a busy
+    port keeps the reservation, so stop can run again. Once the record is gone, cleanup
+    deletes each allocation whose clone holds nothing unpublished and drops the team's
+    generation's databases; an abandoned team keeps everything.
     """
     with store_lock():
         record = record_for(brief)
         if record is None:
             print(f"#{brief}: no allocation record; nothing removed")
             return
-        kept = kept_databases(record, abandon)
         # A brief still in progress is never interrupted: a wrong issue number stops nothing.
-        if not kept and not merged_brief(brief):
+        if record["kind"] == "brief" and not abandon and not merged_brief(brief):
             command = harness_command("team.py", "stop", brief, "--abandon")
             raise RuntimeError(
-                f"#{brief} is not closed by a merged PR. Nothing was stopped; the "
+                f"#{brief} is not closed by a PR merged into main. Nothing was stopped; the "
                 "record, databases, files and reservation are kept. If the brief was closed "
                 f"without a merged PR, the operator runs {command}; until then the slot stays "
                 "taken: agent/teams/README.md#retire-a-brief-closed-without-a-merged-pr"
@@ -1156,14 +1349,10 @@ def stop_brief(brief: str, *, abandon: bool = False) -> None:
         busy = [str(a["port"]) for a in record["agents"].values() if port_in_use(a["port"])]
         if busy:
             raise RuntimeError(f"Ports {', '.join(busy)} are in use; the reservation is kept")
-        suffixes = [a["db_suffix"] for a in record["agents"].values()]
-        dropped = [] if kept else drop_databases(suffixes)
-        retain_files(record, dropped, kept)
+        retire(record, abandon)
         record_path(record["slot"]).unlink()
-    summary = f"databases dropped: {', '.join(dropped) or 'none'}"
-    if kept:
-        summary += f"; databases {', '.join(suffixes)} kept: {kept}"
-    print(f"#{brief}: slot {record['slot']} released; {summary}")
+        print(f"#{brief}: slot {record['slot']} released")
+        clean_up(brief)
 
 
 def require_only_recorded_panes(record: Record) -> bool:
@@ -1335,21 +1524,22 @@ def cli() -> None:
     usage = (
         "Usage: agent/teams/team.py start <brief> | design <issue> <entry> | "
         "turn <pr> <entry> | review <pr> <entry> | reset <issue> <entry> | stop <issue> | "
-        "stop <issue> --abandon | clean | status. Only the operator runs reset and "
-        "stop --abandon, which retires a brief closed without a merged PR and keeps the "
-        "databases."
+        "stop <issue> --abandon | cleanup <issue> | retained | status. Only the operator runs "
+        "reset and stop --abandon, which retires a brief closed without a merged PR and "
+        "keeps its files and databases."
     )
     if args == ["status"]:
         status()
         return
-    if args == ["clean"]:
+    if args == ["retained"]:
         list_retained()
         return
     if len(args) < 2 or not args[1].isdecimal():
         raise RuntimeError(usage)
     named = len(args) == 3 and re.fullmatch(ENTRY, args[2]) is not None
-    if args[0] == "start" and len(args) == 2:
-        start(args[1])
+    by_issue = {"start": start, "cleanup": cleanup}
+    if args[0] in by_issue and len(args) == 2:
+        by_issue[args[0]](args[1])
     elif args[0] == "stop" and args[2:] in ([], ["--abandon"]):
         stop_brief(args[1], abandon=args[2:] == ["--abandon"])
     elif args[0] == "turn" and named:

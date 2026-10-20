@@ -58,7 +58,8 @@ initial design choices need designers; a shared spec is useful for common contra
 2. Launch each designer with `start_design` (spec, entry). Each gets its own allocation
    and clone, with its own database suffix and port, and its launch EVENT on the spec.
    The spec body tells it whether it is lead or critic. Retire the spec's team with
-   `retire_team` when the feature is done; the designers' databases are kept.
+   `retire_team` when the feature is done; [cleanup](../README.md#cleanup) then deletes
+   their clean clones and drops their databases.
 3. Assign these personas: architecture (data integrity, contract boundaries,
    consistency, simplicity, testability, effects on other code) and operations (failure
    and recovery, concurrency, security, performance, migrations, existing data). One
