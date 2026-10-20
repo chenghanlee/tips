@@ -46,14 +46,30 @@ def issue_line(body: str, label: str) -> str | None:
     return match.group(1) if match else None
 
 
+def issue_body(issue: str) -> str:
+    command = ["gh", "issue", "view", issue, *repo_args(), "--json", "body"]
+    return str(json.loads(github(command, deadline_from_now(), f"#{issue}")).get("body") or "")
+
+
+def spec_lead(spec: str) -> str:
+    """The configured designer a standalone design issue names in its `Lead:` line."""
+    lead = issue_line(issue_body(spec), "Lead") or ""
+    agent = conf.settings()["agents"].get(lead)
+    if agent is None or agent["role"] != "designer":
+        raise RuntimeError(
+            f"Spec #{spec} needs a `Lead: <entry>` line naming a configured designer; "
+            f"it names {lead or 'none'}"
+        )
+    return lead
+
+
 def roster(brief: str) -> tuple[str, list[str], list[str]]:
     """Read the brief's implementer, testers and reviewing designers from configured entries.
 
     Read reviewer names from `Required reviews:`. Keep testers in the listed order;
     the first tester confirms the merge. Return testers and designers separately.
     """
-    command = ["gh", "issue", "view", brief, *repo_args(), "--json", "body"]
-    body = str(json.loads(github(command, deadline_from_now(), f"#{brief}")).get("body") or "")
+    body = issue_body(brief)
     implementer = issue_line(body, "Implementer")
     reviews = issue_line(body, "Required reviews")
     if implementer is None or reviews is None:

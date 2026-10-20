@@ -295,6 +295,7 @@ class InProcessTeamTest(unittest.TestCase):
         self.enterContext(patch(herdr_module, "herdr", self.herdr))
         self.enterContext(patch(team, "stop", self.stop))
         self.enterContext(patch(team, "merged_brief", return_value=True))
+        self.enterContext(patch(team, "replace_labels"))
         self.enterContext(patch(team, "stop_daemon"))
         self.enterContext(patch(team, "port_in_use", return_value=False))
         self.enterContext(patch(team, "drop_databases", self.drop))
@@ -490,7 +491,8 @@ class PairLifecycleTest(Harness):
         # Each worker reads the common rules and its own role file, not the whole README.
         assert "agent/teams/roles/common.md and agent/teams/roles/implementer.md;" in impl_brief
         assert "agent/teams/roles/common.md and agent/teams/roles/tester.md;" in tester_brief
-        assert "the restart rule in the README Turns section" in impl_brief
+        assert "labels first, as the README Turns section says" in impl_brief
+        assert "If it is labelled turn:impl, continue" in impl_brief
         assert tester_brief.startswith("You are tester, the merge-confirming tester for brief #29;")
         assert f"python3 {harness / 'team.py'} turn <pr> impl" in tester_brief
         assert "Put tester, <session> on line 2" in tester_brief
@@ -564,6 +566,34 @@ class PairLifecycleTest(Harness):
         assert "EVENT not recorded on #31" in refused.stderr
         assert "Rerun this command once GitHub answers" in refused.stderr
         assert self.record(2)["agents"]["impl"]["session"] == "session-team-2-impl"
+
+    def test_a_new_pair_is_labelled_before_its_task_prompt(self) -> None:
+        self.update(label_names=["bug"], labels={"29": ["bug"]})
+        self.team("start", "29")
+        assert self.labels("29") == ["bug", "phase:implement", "turn:impl"]
+        events = self.state()["events"]
+        edits = [i for i, e in enumerate(events) if e[:3] == ["gh", "issue", "edit"]]
+        launches = [
+            i for i, e in enumerate(events) if e[:2] in (["agent", "start"], ["agent", "prompt"])
+        ]
+        assert edits[-1] < launches[0], "a client started before its labels were written"
+        # The repository lacked both labels: each is created once GitHub reports it missing.
+        created = [e[3] for e in self.events("gh", "label", "create")]
+        assert created == ["phase:implement", "turn:impl"]
+
+    def test_a_relaunch_keeps_the_labels(self) -> None:
+        self.team("start", "29")
+        self.update(labels={"29": ["phase:review", "turn:tester"]})
+        state = self.state()
+        tester = next(x for x in state["panes"] if x.get("label") == "team-1-tester")
+        for key in ("agent", "name", "agent_status", "agent_session"):
+            tester.pop(key, None)
+        self.save(state)
+        self.reset("29", "tester")
+        self.team("start", "29")
+        assert [e[2] for e in self.events("agent", "start")][-1] == "team-1-tester"
+        assert self.labels("29") == ["phase:review", "turn:tester"]
+        assert len(self.events("gh", "issue", "edit")) == 1, "only the first start labels"
 
     def test_brief_roster_is_validated_before_any_change(self) -> None:
         cases = {
@@ -1096,6 +1126,27 @@ class HandoffTest(Harness):
         assert "changed its implementer or merge-confirming tester" in refused.stderr
         assert len(self.events("agent", "prompt")) == prompts
 
+    def test_both_handoffs_move_the_labels_before_the_prompt(self) -> None:
+        self.push("team-1-impl")
+        self.team("turn", "7", "tester", pane=self.impl)
+        assert self.labels("29") == ["phase:review", "turn:tester"]
+        events = self.state()["events"]
+        edit = max(i for i, e in enumerate(events) if e[:3] == ["gh", "issue", "edit"])
+        ring = max(i for i, e in enumerate(events) if e[:3] == ["agent", "prompt", "team-1-tester"])
+        assert edit < ring, "the reviewer was told before the labels were written"
+        self.team("turn", "7", "impl", pane=self.tester)
+        assert self.labels("29") == ["phase:implement", "turn:impl"]
+        assert not self.events("gh", "label", "create")
+
+    def test_a_failed_label_write_sends_no_handoff(self) -> None:
+        self.push("team-1-impl")
+        prompts = len(self.events("agent", "prompt"))
+        self.update(label_edit_fails=True)
+        refused = self.team("turn", "7", "tester", pane=self.impl, ok=False)
+        assert "Label update of #29 failed: fixture GitHub refused the label edit" in refused.stderr
+        assert len(self.events("agent", "prompt")) == prompts
+        assert self.labels("29") == ["phase:implement", "turn:impl"]
+
     def test_two_clones_at_one_handed_off_head_stay_isolated(self) -> None:
         head = self.push("team-1-impl")
         self.team("turn", "7", "tester", pane=self.impl)
@@ -1518,6 +1569,13 @@ except RuntimeError as error:
     def stops(self) -> list[dict[str, Any]]:
         log = self.root / "stops.jsonl"
         return [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+
+    def test_stop_removes_only_the_workflow_labels(self) -> None:
+        self.merged_pair()
+        self.update(labels={"29": ["active", "phase:review", "bug", "turn:tester"]})
+        self.clients_exit(1)
+        self.team("stop", "29")
+        assert self.labels("29") == ["active", "bug"]
 
     def test_stop_stops_each_live_client_before_releasing_anything(self) -> None:
         self.merged_pair()

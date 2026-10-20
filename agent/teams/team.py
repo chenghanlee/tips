@@ -24,7 +24,7 @@ import subprocess
 import sys
 import time
 import uuid
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from pathlib import Path
 from typing import cast
 
@@ -39,7 +39,7 @@ from briefs import (
     reviewer_notice,
     tester_message,
 )
-from commands import execute, object_fields, require_type, run, write_file
+from commands import execute, object_fields, object_list, require_type, run, write_file
 from config import (
     DATABASE_BASES,
     DISPATCHER_RECOVERY,
@@ -75,11 +75,16 @@ from config import (
 from dexter import stop_daemon, tools
 from github import (
     PullRequest,
+    call,
+    deadline_from_now,
     event_posted,
+    github,
     merged_brief,
     post_event,
     pull_request,
+    repo_args,
     roster,
+    spec_lead,
 )
 from herdr import deliver, herdr, live_panes, pane_occupant, processes, session_id, stop
 
@@ -720,6 +725,51 @@ def team_record(issue: str, kind: str, implementer: str, tester: str) -> Record:
     return record
 
 
+# --- Workflow labels --------------------------------------------------------
+
+# The two reserved label prefixes: the issue's workflow step and its coordinating owner.
+WORKFLOW = ("phase:", "turn:")
+
+
+def replace_labels(issue: str, prefixes: Sequence[str], new: Sequence[str]) -> None:
+    """Replace the issue's labels that start with one of the prefixes by `new`, leaving every
+    other label alone. A label is created only when GitHub reports it missing. The read,
+    the edit and any creation share one GitHub deadline."""
+    deadline = deadline_from_now()
+    name = f"labels of #{issue}"
+    command = ["gh", "issue", "view", issue, *repo_args(), "--json", "labels"]
+    view = object_fields(json.loads(github(command, deadline, name)), name)
+    current = [str(label.get("name")) for label in object_list(view.get("labels") or [], name)]
+    remove = [label for label in current if label.startswith(tuple(prefixes)) and label not in new]
+    add = [label for label in new if label not in current]
+    if not remove and not add:
+        return
+    edit = ["gh", "issue", "edit", issue, *repo_args()]
+    edit += ["--remove-label", ",".join(remove)] if remove else []
+    edit += ["--add-label", ",".join(add)] if add else []
+    created: list[str] = []
+    while True:
+        result = call(edit, deadline, name)
+        if not result.returncode:
+            return
+        error = result.stderr.strip() or result.stdout.strip() or "gh issue edit failed"
+        # gh names the first label the repository lacks: "could not add label: 'x' not found".
+        missing = re.search(r"could not add label: '([^']+)' not found", error)
+        if not missing or missing.group(1) not in add or missing.group(1) in created:
+            raise RuntimeError(f"Label update of #{issue} failed: {error}")
+        created.append(missing.group(1))
+        github(["gh", "label", "create", created[-1], *repo_args()], deadline, name)
+
+
+def assign(issue: str, phase: str, owner: str) -> str:
+    """Record the issue's workflow step and coordinating owner; return the labels written."""
+    labels = [f"phase:{phase}", f"turn:{owner}"]
+    replace_labels(issue, WORKFLOW, labels)
+    text = ", ".join(labels)
+    print(f"#{issue} labelled {text}")
+    return text
+
+
 def start(brief: str) -> None:
     """Launch the brief's implementer and merge-confirming tester, each in its own empty
     allocation; each clones and prepares its project itself."""
@@ -730,6 +780,9 @@ def start(brief: str) -> None:
         record = team_record(brief, "brief", *pair)
         if record["implementer"]:
             current_roster(record)
+        if not record["agents"]:
+            # A new pair, before any task prompt; a relaunch keeps the current labels.
+            assign(brief, "implement", implementer)
         duties = ("implementer", "merge-confirming tester")
         for entry, duty in zip(pair, duties, strict=True):
             if entry not in record["agents"]:
@@ -754,8 +807,13 @@ def design(issue: str, entry: str) -> None:
         raise RuntimeError(f"{entry} is not a configured designer entry")
     tools()
     with store_lock():
-        record = record_for(issue) or team_record(issue, "design", "", "")
-        if record["kind"] == "brief":
+        record = record_for(issue)
+        if record is None or (record["kind"] == "design" and not record["agents"]):
+            # A new standalone design team; read its lead before reserving a slot.
+            lead = spec_lead(issue)
+            record = record or team_record(issue, "design", "", "")
+            assign(issue, "design", lead)
+        elif record["kind"] == "brief":
             current_roster(record)
         if entry not in record["agents"]:
             configure_bootstrap(record, add_allocation(record, entry, "designer"), "", "")
@@ -891,8 +949,9 @@ def request_launch(record: Record, me: str, pr: PullRequest, missing: list[str])
     return failed + deliver([("dispatcher", f"{pr.url} review: run {commands}")])
 
 
-def hand_to_reviewers(record: Record, me: str, pr: PullRequest, failures: list[str]) -> None:
-    """Notify every required reviewer of one head; request launch of the missing ones."""
+def hand_to_reviewers(record: Record, me: str, pr: PullRequest, failures: list[str]) -> list[str]:
+    """Notify every required reviewer of one head; request launch of the missing ones.
+    Return the failed sends."""
     reviewers = required_reviewers(record)
     missing = [entry for entry in reviewers if entry not in record["agents"]]
     tester = live_name(record["slot"], record["tester"])
@@ -905,11 +964,7 @@ def hand_to_reviewers(record: Record, me: str, pr: PullRequest, failures: list[s
     failed = deliver(sends)
     if missing:
         failed += request_launch(record, me, pr, missing)
-    if failed:
-        raise RuntimeError(
-            "Handoff incomplete; failed sends: " + "; ".join(failed) + ". Report blocked with "
-            "these errors, or rerun turn after fixing them."
-        )
+    return failed
 
 
 def turn(number: str, recipient: str) -> None:
@@ -935,12 +990,19 @@ def turn(number: str, recipient: str) -> None:
     mergeable, failures = observe_pr(pr)
     if recipient == record["tester"] and mergeable != "MERGEABLE":
         raise RuntimeError(conflict_refusal(pr.head, mergeable))
+    # The labels record the handoff before anyone is told; a failed write sends nothing.
+    phase = "implement" if recipient == record["implementer"] else "review"
+    labels = assign(record["brief"], phase, recipient)
     if recipient == record["implementer"]:
         partner = live_name(record["slot"], recipient)
-        herdr("agent", "prompt", partner, implementer_message(pr, failures))
-        print(f"Notified {partner}")
+        failed = deliver([(partner, implementer_message(pr, failures))])
     else:
-        hand_to_reviewers(record, me, pr, failures)
+        failed = hand_to_reviewers(record, me, pr, failures)
+    if failed:
+        raise RuntimeError(
+            "Handoff incomplete; failed sends: " + "; ".join(failed) + f". The labels {labels} "
+            "stay. Report blocked with these errors, or rerun turn after fixing them."
+        )
     print("End your turn now.")
 
 
@@ -1108,6 +1170,7 @@ def stop_brief(brief: str, *, abandon: bool = False) -> None:
         names = [a["name"] for a in record["agents"].values()]
         panes = frozenset(a["pane"] for a in record["agents"].values())
         refuse_foreign_owner(roots, names, panes)
+        replace_labels(brief, WORKFLOW, [])  # a failed write stops nothing; rerun stop
         present = live_clients(record)
         for allocation in present.values():
             stop(allocation["pane"], allocation["root"])
@@ -1248,12 +1311,10 @@ def status() -> None:
             print("  " + client_state(allocation, panes, agents))
 
 
-def prompt_agent(brief: str, entry: str, text: str) -> None:
-    """Send text to a recorded client of the brief once its pane holds that same client.
+def recorded_client(brief: str, entry: str) -> Allocation:
+    """The brief's recorded client, refused unless its pane holds that same client.
 
     The target is a recorded role, never a pane: an unrecorded or replaced client is refused.
-    Any failure of the prompt call, including Herdr's own timeout, may come after the text
-    reached the client, so the error says delivery is unknown and not to resend blindly.
     """
     record = record_for(brief)
     if record is None:
@@ -1263,14 +1324,33 @@ def prompt_agent(brief: str, entry: str, text: str) -> None:
         raise RuntimeError(f"Brief #{brief} has no launched {entry}")
     if checked_client(record, allocation, "Nothing was sent.") is None:
         raise RuntimeError(f"{allocation['name']} is not running in {allocation['pane']}")
+    return allocation
+
+
+def send_prompt(allocation: Allocation, text: str, note: str = "") -> None:
+    """Any failure of the prompt call, including Herdr's own timeout, may come after the text
+    reached the client, so the error says delivery is unknown and not to resend blindly."""
     try:
         herdr("agent", "prompt", allocation["name"], text)
     except (subprocess.TimeoutExpired, RuntimeError, ValueError) as error:
         raise RuntimeError(
             f"Prompt to {allocation['name']} failed ({error}); it may have been delivered. "
-            "Read the agent's records before sending it again."
+            f"{note}Read the agent's records before sending it again."
         ) from error
     print(f"Prompted {allocation['name']}")
+
+
+def prompt_agent(brief: str, entry: str, text: str) -> None:
+    """Send text to a recorded client of the brief; the issue's labels are unchanged."""
+    send_prompt(recorded_client(brief, entry), text)
+
+
+def hand_off(brief: str, entry: str, text: str, phase: str) -> None:
+    """Make the recorded client the brief's coordinating owner in this phase, then send
+    the text. A failed label write sends nothing; a failed send keeps the labels."""
+    allocation = recorded_client(brief, entry)
+    labels = assign(brief, phase, entry)
+    send_prompt(allocation, text, f"The labels {labels} stay. ")
 
 
 def cli() -> None:

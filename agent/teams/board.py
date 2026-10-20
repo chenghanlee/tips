@@ -8,8 +8,9 @@ Usage:
   agent/teams/board.py usage <issue>...
 
 post prints the comment URL. If the same comment already exists, it returns that URL
-instead of posting again. A worker's BLOCKED post then sends the dispatcher
-`<comment URL> blocked`; if that fails, rerun the command to retry only the notice.
+instead of posting again. A worker's BLOCKED post then replaces the issue's `turn:` label
+with `turn:dispatcher` and sends the dispatcher `<comment URL> blocked`, with any label
+error. If either fails, the command exits non-zero; a rerun retries both, not the post.
 When you post an EVENT for a new occurrence, use different comment text. A relaunch
 already differs because its header has a new session ID.
 Header format: `<TYPE> <role> <name> <session>`. The Herdr pane supplies
@@ -19,8 +20,8 @@ Above 800 words, the command warns; include the reason in the comment.
 Create a gist before linking a log:
 `gh gist create <file>`.
 
-read prints the current issue body and every comment, or only comments after the given
-comment.
+read prints the issue's labels and current body and every comment, or the labels and only
+the comments after the given comment.
 
 usage prints a Markdown table with token counts by model for each client named in a
 launch EVENT. team.py posts one EVENT per launch; the dispatcher posts one for a manual
@@ -56,7 +57,7 @@ from github import (
     repo_args,
 )
 from herdr import herdr, session_id
-from team import records
+from team import records, replace_labels
 
 WORD_LIMIT = 800
 CODEX_LAUNCH = re.compile(r"launched codex in (?P<root>[^;]+);")
@@ -105,26 +106,41 @@ def post(args: argparse.Namespace) -> None:
     print(url, flush=True)
     if args.type != "BLOCKED":
         return
+    # The blocker hands the turn to the dispatcher; the phase stays. A failed label write
+    # never withholds the notice: the dispatcher is the one who repairs it.
+    label_error = ""
     try:
-        herdr("agent", "prompt", "dispatcher", f"{url} blocked")
+        replace_labels(args.issue, ("turn:",), ["turn:dispatcher"])
+    except (RuntimeError, OSError, ValueError) as error:
+        label_error = f"label turn:dispatcher not set: {error}"
+    notice = f"{url} blocked" + (f"; {label_error}" if label_error else "")
+    try:
+        herdr("agent", "prompt", "dispatcher", notice)
     except (RuntimeError, OSError, ValueError, subprocess.TimeoutExpired) as error:
         raise RuntimeError(
-            f"posted {url}; notifying the dispatcher failed: {error}. The post reuses an "
-            "identical comment, so rerun this command to retry only the notification"
+            f"posted {url}; notifying the dispatcher failed: {error}. "
+            + (f"Also {label_error}. " if label_error else "")
+            + "The post reuses an identical comment, so rerun this command to retry the "
+            "label and the notification"
         ) from error
     print("Notified dispatcher")
+    if label_error:
+        raise RuntimeError(f"posted {url} and notified the dispatcher, but {label_error}")
 
 
 def read_text(issue: str, after: int | None) -> str:
-    """The issue URL and body, then every comment; with `after`, the URL and only the
-    comments after that comment id, so new comments stay reachable on a long issue."""
+    """The issue URL, labels and body, then every comment; with `after`, the URL, labels and
+    only the comments after that comment id, so new comments stay reachable on a long
+    issue."""
     deadline = deadline_from_now()
-    command = ["gh", "issue", "view", issue, *repo_args(), "--json", "url,body"]
+    command = ["gh", "issue", "view", issue, *repo_args(), "--json", "url,labels,body"]
     view = json.loads(github(command, deadline, f"#{issue}"))
     comments = issue_comments(issue, deadline)
     if after is not None:
         comments = [c for c in comments if int(str(c["id"])) > after]
-    parts = [view["url"] if after is not None else f"{view['url']}\n{view['body']}"]
+    names = ", ".join(str(label["name"]) for label in view["labels"]) or "none"
+    heading = f"{view['url']}\nLabels: {names}"
+    parts = [heading if after is not None else f"{heading}\n{view['body']}"]
     for comment in comments:
         parts.append(f"\n--- {comment['html_url']} {comment['created_at']}\n{comment['body']}")
     return "\n".join(parts)

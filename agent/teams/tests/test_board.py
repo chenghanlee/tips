@@ -89,26 +89,29 @@ class BoardTest(Harness):
             with self.subTest(args=args):
                 assert message in self.board("post", "29", *args, body=body, ok=False).stderr
         assert len(self.bodies()) == count
-        # read gives the current body with every comment, or only the comments after a
-        # checkpoint, without the body.
+        # read gives the labels and the current body with every comment, or the labels and
+        # only the comments after a checkpoint, without the body.
         self.update(issues={**self.state()["issues"], "29": "Revised brief\n"})
         whole = self.board("read", "29").stdout
         oldest = self.comments("29")[0]
-        assert whole.startswith(f"{ISSUE}\nRevised brief\n")
+        labels = "Labels: phase:implement, turn:impl"
+        assert whole.startswith(f"{ISSUE}\n{labels}\nRevised brief\n")
         assert f"--- {oldest['html_url']} {oldest['created_at']}\n{oldest['body']}" in whole
         after = self.board("read", "29", "--after", url.stdout.strip()).stdout
-        assert after.startswith(f"{ISSUE}\n\n--- ")
+        assert after.startswith(f"{ISSUE}\n{labels}\n\n--- ")
         assert "Revised brief" not in after
         assert "Which port?" not in after
         assert after.count("\n--- ") == count - 3
         assert "comment link" in self.board("read", "29", "--after", ISSUE, ok=False).stderr
 
-    def test_a_worker_blocked_post_wakes_the_dispatcher(self) -> None:
+    def test_a_worker_blocked_post_hands_the_turn_to_the_dispatcher(self) -> None:
         self.team("start", "29")
-        impl = self.pane("team-1-impl")["pane_id"]
-        posted = self.board("post", "29", "BLOCKED", pane=impl, body="mix deps.get fails\n")
+        self.update(labels={"29": ["phase:review", "turn:tester"]})
+        tester = self.pane("team-1-tester")["pane_id"]
+        posted = self.board("post", "29", "BLOCKED", pane=tester, body="mix deps.get fails\n")
         url = self.comments("29")[-1]["html_url"]
         assert posted.stdout.startswith(f"{url}\n")
+        assert self.labels("29") == ["phase:review", "turn:dispatcher"]
         assert self.prompts("dispatcher") == [f"{url} blocked"]
 
     def test_a_failed_blocked_notice_exits_nonzero_and_its_rerun_reuses_the_comment(
@@ -121,7 +124,7 @@ class BoardTest(Harness):
         url = self.comments("29")[-1]["html_url"]
         assert failed.stdout.strip() == url
         assert "agent_not_found: dispatcher" in failed.stderr
-        assert "rerun this command to retry only the notification" in failed.stderr
+        assert "rerun this command to retry the label and the notification" in failed.stderr
         count = len(self.bodies())
         self.update(dispatcher_down=False)
         again = self.board("post", "29", "BLOCKED", pane=impl, body="db down\n")
@@ -129,6 +132,21 @@ class BoardTest(Harness):
         assert len(self.bodies()) == count
         # The failed attempt and the rerun's delivered one.
         assert self.prompts("dispatcher") == [f"{url} blocked"] * 2
+
+    def test_a_blocked_post_whose_label_write_fails_still_notifies_the_dispatcher(self) -> None:
+        self.team("start", "29")
+        tester = self.pane("team-1-tester")["pane_id"]
+        self.update(label_edit_fails=True)
+        failed = self.board("post", "29", "BLOCKED", pane=tester, body="no answer\n", ok=False)
+        url = self.comments("29")[-1]["html_url"]
+        assert self.bodies()[-1].endswith("\nno answer")
+        error = "Label update of #29 failed: fixture GitHub refused the label edit"
+        assert self.prompts("dispatcher") == [
+            f"{url} blocked; label turn:dispatcher not set: {error}"
+        ]
+        assert (
+            f"posted {url} and notified the dispatcher, but label turn:dispatcher" in failed.stderr
+        )
 
     def test_usage_counts_each_launched_session_from_its_own_logs(self) -> None:
         self.update(
