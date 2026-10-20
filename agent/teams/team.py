@@ -1031,6 +1031,18 @@ def read_retired(path: Path) -> Retired:
     return cast(Retired, fields)
 
 
+def retired_notes() -> dict[str, Retired]:
+    """Every readable retirement note by allocation ID. An unreadable one, such as a note an
+    older release wrote, is reported and skipped: it never blocks cleanup of the others."""
+    notes: dict[str, Retired] = {}
+    for path in sorted(conf.state_dir().glob("*/retired.json")):
+        try:
+            notes[path.parent.name] = read_retired(path)
+        except (OSError, ValueError) as error:
+            print(f"{path}: unreadable retired.json: {error}; skipped")
+    return notes
+
+
 def write_retired(path: Path, note: Retired) -> None:
     write_file(path, json.dumps(note, indent=2, sort_keys=True) + "\n")
 
@@ -1209,10 +1221,7 @@ def clean_up(issue: str) -> None:
     unowned. The orphan scan runs before anything is deleted. The caller holds the store
     lock."""
     live = [a for record in records().values() for a in record["agents"].values()]
-    notes = {
-        path.parent.name: read_retired(path)
-        for path in sorted(conf.state_dir().glob("*/retired.json"))
-    }
+    notes = retired_notes()
     mine = {ident: note for ident, note in notes.items() if note["issue"] == issue}
     if not mine:
         print(f"#{issue}: no retired allocations; nothing removed")
@@ -1249,9 +1258,8 @@ def list_retained() -> None:
     """List each retired allocation that still has files or databases, with cleanup's last
     result. Deletes nothing; `cleanup <issue>` reruns cleanup."""
     found = False
-    for path in sorted(conf.state_dir().glob("*/retired.json")):
-        note = read_retired(path)
-        root = allocation_paths(path.parent.name)[0]
+    for ident, note in retired_notes().items():
+        root = allocation_paths(ident)[0]
         if not root.exists() and note["databases"] == "dropped":
             continue
         found = True

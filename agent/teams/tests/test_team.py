@@ -1460,6 +1460,11 @@ class RetirementTest(Harness):
         self.databases(*self.remaining_databases(), "tips_test_t1g1i_rb", "tips_test_t3g77_x")
         orphan = self.trusted / "allocations/g99-x"
         orphan.mkdir()
+        # A note in the shape the previous release writes is reported and skipped.
+        legacy = self.trusted / "state/g0-old/retired.json"
+        legacy.parent.mkdir()
+        fields: dict[str, object] = {"id": "g0-old", "issue": "28", "db_suffix": "_t1g0o"}
+        legacy.write_text(json.dumps(fields | {"reason": "kept", "databases_kept_because": ""}))
         stopped = self.team("stop", "29").stdout
         # Every database of slot 1's generation 1 is dropped, recorded or not, without
         # FORCE; generation 11, the live team and the orphan stay.
@@ -1484,7 +1489,10 @@ class RetirementTest(Harness):
             assert (retired["files"], retired["databases"]) == ("deleted", "dropped")
             assert f"{ident}: files deleted; databases dropped" in stopped
         # Orphans are listed and never deleted; the live team's database is no orphan.
+        unreadable = f"{legacy}: unreadable retired.json: {legacy}: files must be str"
+        assert unreadable in self.team("retained").stdout
         for run in (stopped, self.team("cleanup", "29").stdout):
+            assert unreadable in run
             assert f"Orphan, not deleted: {orphan}\n" in run
             assert "Orphan, not deleted: database tips_test_t3g77_x\n" in run
             assert "Orphan, not deleted: database tips_test_t1g11i\n" in run
