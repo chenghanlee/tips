@@ -7,9 +7,10 @@ bootstrap.py, a logs directory, and launcher configuration, all under the harnes
 `agent_teams/<repository name>/` beside the main checkout. The slot's record in the root's
 `state/` holds the record version, the brief or spec, its roster, and every launched client's
 Herdr name, kind, project, database suffix, port, pane, session and task-submission state.
-Restart, handoff and retirement use that record. One lock on `state/.lock` serializes start,
-design, review, reset and stop. This controller never runs Git, builds or a worker-provided
-executable in a project.
+Restart, handoff and retirement use that record. The issue's `phase:` and `turn:` labels
+record the workflow step and its coordinating owner (README.md#turns). One lock on
+`state/.lock` serializes start, design, review, reset and stop. This controller never runs
+Git, builds or a worker-provided executable in a project.
 """
 
 import contextlib

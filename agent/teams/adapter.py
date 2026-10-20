@@ -201,9 +201,10 @@ def start_design(spec: Number, entry: Entry) -> str:
 @server.tool()
 def prompt_agent(brief: Number, entry: Entry, text: Message, phase: Phase | None = None) -> str:
     """Send a message to a recorded client of the brief, such as an answer or a question.
-    Without phase, the brief's labels are unchanged. With phase, a handoff or repair: first
-    set the brief's labels to phase:<phase> and turn:<entry>, then send; a failed label
-    write sends nothing. Success means Herdr delivered it, not that the client acted on it."""
+    Without phase, the brief's labels are unchanged. With phase, a handoff or repair: check
+    the client, set the brief's labels to phase:<phase> and turn:<entry>, then send. A
+    refused client writes no label; a failed label write sends nothing; a failed send
+    keeps the labels. Success means Herdr delivered it, not that the client acted on it."""
     if phase is None:
         return operate(lambda: team.prompt_agent(str(brief), entry, text), writes=True)
     return operate(lambda: team.hand_off(str(brief), entry, text, phase), writes=True)
