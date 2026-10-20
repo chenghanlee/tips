@@ -111,7 +111,7 @@ operator (the user) runs `reset` and `stop --abandon`.
 | `agent/teams/team.py stop <issue> --abandon` | Operator | Retire a brief closed without a merged PR ([steps](#retire-a-brief-closed-without-a-merged-pr)). |
 | `agent/teams/team.py cleanup <issue>` | Operator | Rerun [cleanup](#cleanup) for the issue's retired allocations: after an interrupted run, once kept work is published, or for an old generation. |
 | `agent/teams/team.py status` | Dispatcher, user | Every allocation record with each client's live Herdr pane, name, kind, state and session, and whether the recorded dispatcher process runs. |
-| `agent/teams/team.py clean` | Operator | List retired allocations that still have files or databases, with cleanup's last result. Deletes nothing. |
+| `agent/teams/team.py retained` | Operator | List retired allocations that still have files or databases, with cleanup's last result. Deletes nothing. |
 | `python3 <harness>/bootstrap.py [--commit <sha>]` | Launched client | Prepare your own clone, as [Allocations](#allocations) says. |
 | `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. A worker's BLOCKED post also notifies the dispatcher; the command reports a failed notification, and a rerun retries only the notification. |
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue body, then every comment; with `--after`, only the comments after that checkpoint. |
@@ -155,9 +155,9 @@ checks that any attached designer's assignment is complete or handed off.
 ### Cleanup
 
 Cleanup runs at the end of `stop` and again with `agent/teams/team.py cleanup <issue>`.
-It reads the issue's `retired.json` files. It keeps an allocation that a live record
-names, an `--abandon` retirement and, for a pair, a brief that GitHub does not show
-closed by a PR merged into `main`. A standalone design team needs no PR.
+It reads the issue's `retired.json` files. `stop` wrote each one after its merge check
+passed, for a standalone design team, or for `--abandon`, so cleanup asks GitHub nothing.
+It keeps an allocation that a live record names and an `--abandon` retirement.
 
 - Git: in each other allocation's clone it runs `git fetch --prune origin`, then
   `git status --porcelain`, `git rev-list HEAD --branches --not --remotes=origin` and
@@ -165,6 +165,9 @@ closed by a PR merged into `main`. A standalone design team needs no PR.
   last three print nothing, it deletes the whole allocation folder (`project/`, `logs/`,
   `tmp/`) and `bootstrap.json`; only `retired.json` remains. Output, a failure, a
   timeout (`timeouts.launch_seconds`) or a missing `.git` keeps the folder and prints why.
+  Only HEAD, the local branches and the stash of the clone's main worktree are checked:
+  work kept only in a linked worktree, a tag or the reflog is lost at cleanup. Push it
+  first.
 - Databases: once per generation, it drops with `team.psql`, without `FORCE`, every
   database named `tips_test` or `tips_dev`, then `<db_suffix_prefix><slot>g<generation>`
   from the saved suffix, then a non-digit, recorded or not. `_team2g9` matches
@@ -173,7 +176,8 @@ closed by a PR merged into `main`. A standalone design team needs no PR.
 - Report: it prints, and writes to each `retired.json`, what it deleted, what it kept and
   why, what it failed to delete, and orphans: `allocations/g*` folders that no record or
   `retired.json` names, and namespace databases outside every live or retired
-  generation. Orphans are listed, never deleted. `team.py clean` lists what remains.
+  generation, and retirements whose suffix names no generation. Orphans are listed, never
+  deleted. `team.py retained` lists what remains.
 
 Cleanup keeps no journal and recovers nothing automatically. After an interrupted run or
 a failed delete, which prints the remaining paths, the operator finishes by hand or
@@ -187,7 +191,7 @@ cleanup deletes them.
 
 `stop` refuses a brief closed without a merged PR, so its slot stays taken until the
 operator runs `agent/teams/team.py stop <issue> --abandon`. It skips the merged-PR check,
-keeps the team's files and databases and records why in each `retired.json`; `clean`
+keeps the team's files and databases and records why in each `retired.json`; `retained`
 lists them. The dispatcher has no tool for it.
 
 ## Turns
