@@ -11,6 +11,8 @@ Read this and your role file at launch and after compaction.
   that authority. Editing the brief records a decision, not permission to invent one.
 - Start work on a Herdr message from the dispatcher or the agent handing off to you. End
   your turn after your own handoff. Do not poll.
+- After a restart, read the issue's `phase:` and `turn:` labels first, as
+  [Turns](../README.md#turns) says. Never set them by hand; only harness commands do.
 - Route consequential technical questions through the dispatcher to a designer.
   Local source or verification questions may go to the existing reviewer when useful;
   consultation is not a mandatory step. Only the user decides UI,
