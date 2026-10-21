@@ -37,5 +37,18 @@ design docs; link them instead of repeating them.
 - PRD at `PRODUCT.md`, the Impeccable file name. Design facts in `docs/design`. Status
   on Project 15. Why: agents read files from their clone, and PRs review changes.
 - Reuse over invent: standards, guidelines, libraries and tools before our own.
-- Skills: Vercel `web-design-guidelines` vendored in `agent/skills/`. Impeccable is
-  installed by the user ([setup](../../agent/teams/SETUP.md#one-time-setup)).
+- Skills: Vercel `web-design-guidelines` vendored in `agent/skills/`; the tester applies
+  it to changed UI. Impeccable and Intent are installed by the user
+  ([setup](../../agent/teams/SETUP.md#one-time-setup)) and used only with the user
+  present, by trigger, never as a command chain. Story 1 trials `impeccable detect` on
+  the running page; one clean run does not make it required.
+- UX designer: a user-launched session with one role file
+  ([ux-designer](../../agent/teams/roles/ux-designer.md)), lead and optional critic, no
+  harness code. Prototypes are HTML with captures; story 1 uses local HTML, later stories
+  Claude Design with the design system synced from GitHub after Basecoat lands. The
+  approved candidate is committed on `task/<issue>` and approved by the user by SHA; the
+  pair starts from that branch. Why: the harness cannot run a design team and a pair on
+  one issue (team.py:711), and captures in `tmp/` are deleted at cleanup.
+- Story order: story 1, then a design-system story (style pack, tokens, usage notes,
+  sync trial against the real form), then feature design stories. Each designs only the
+  next slice.

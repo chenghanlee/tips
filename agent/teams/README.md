@@ -12,7 +12,7 @@ a checkout. Follow
 [review-software-correctness](../skills/review-software-correctness/SKILL.md) or
 [review-software-design](../skills/review-software-design/SKILL.md). Your role file
 lists your responsibilities: [dispatcher](roles/dispatcher.md),
-[designer](roles/designer.md), [implementer](roles/implementer.md),
+[designer](roles/designer.md), [UX designer](roles/ux-designer.md) (user-launched, before a pair), [implementer](roles/implementer.md),
 [tester](roles/tester.md). Read the [common rules](roles/common.md). The user completes
 [setup](SETUP.md) once.
 
