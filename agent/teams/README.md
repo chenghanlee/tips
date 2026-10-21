@@ -437,10 +437,10 @@ If a required check fails at the head, rerun only the failed tests, alone, at th
 
 ## Manual browser review
 
-Codex clients cannot run browser tests on macOS: the Codex sandbox kills the browser
-the test starts, and each attempt leaves a crash dialog
-([#432](https://github.com/chenghanlee/tips/issues/432), seen with Wallaby). The
-PhoenixTest Playwright tests run on the implementer's Claude client; the tester inspects its record and records what it
+Codex clients could not run Wallaby browser tests on macOS: the Codex sandbox killed
+the browser the test started and left a crash dialog
+([#432](https://github.com/chenghanlee/tips/issues/432)). Treat PhoenixTest Playwright
+tests the same until a run shows otherwise. They run on the implementer's Claude client; the tester inspects its record and records what it
 executed and what it only inspected. The exact `agent-browser open about:blank --session
 <name>`, `get url` and `close` sequence below succeeded from this machine's configured
 Codex client on 2026-10-14 (agent-browser 0.38.1, codex-cli 0.162.1). Codex manual

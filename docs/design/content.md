@@ -12,13 +12,13 @@ Schema: `Tips.Content.Post`, table `posts` ([Posts](data-model.md#posts)).
 | `change_post(post, attrs \\ %{})` | changeset | For forms |
 | `get_post!(uid)` | post | Raises `Ecto.NoResultsError`, which renders 404 |
 
-`uid` comes from the `nanoid` library, 12 characters. `slug` comes from the `slugify`
-library applied to the title, cut to 80 characters at a whole word.
+`uid` comes from the `nanoid` library and `slug` from the `slugify` library applied to
+the title. Lengths and uniqueness are in [Posts](data-model.md#posts).
 
 ## Validation and error text
 
-The changeset checks required fields and lengths. A value of only spaces counts as
-empty. HTML `required`, `minlength` and `maxlength` give instant feedback in the
+The changeset checks required fields and the lengths in [Posts](data-model.md#posts).
+A value of only spaces counts as empty. HTML `required`, `minlength` and `maxlength` give instant feedback in the
 browser. The server is the authority.
 
 Error text follows the GOV.UK Design System pattern: one short sentence that says what

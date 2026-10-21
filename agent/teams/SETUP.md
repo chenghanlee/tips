@@ -35,7 +35,7 @@ The user maintains third-party skills in these Git-ignored directories in the ma
 
 Install [Impeccable](https://github.com/pbakaus/impeccable) project-local from the main
 checkout, then run `/impeccable init` once in a client. Node and npm are required here
-and for `mix setup`:
+and, from story 1, for the asset install:
 
 ```bash
 npx impeccable install --scope=project --providers=claude,codex
