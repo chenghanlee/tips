@@ -9,7 +9,8 @@ the [designer](designer.md); the implementer builds; the tester reviews the resu
 The user starts this session before the pair, in a Herdr pane, with: "Read
 agent/teams/roles/common.md and agent/teams/roles/ux-designer.md, then the issue." It
 uses no harness turn labels; the start and turn rules of common.md apply to paired work
-only. Its authority and evidence rules apply here.
+only. Its authority and evidence rules apply here. `board.py` needs a named Herdr agent in
+the pane (`herdr agent rename <pane> ux`) or `--as <name>`, plus `--role ux-designer`.
 
 ## Read
 
@@ -33,7 +34,8 @@ only. Its authority and evidence rules apply here.
    something). For Claude Design, export first and check the export. Put the candidate
    under `prototypes/<issue>/`. Commit and push. The implementer may delete superseded
    prototype files in its PR; the approved commit stays in history.
-4. Post the candidate on the issue with `board.py post <issue> PROPOSAL`: `candidate <full SHA>`, captures, scope, behaviour the
+4. Post the candidate on the issue with `agent/teams/board.py post <issue> PROPOSAL
+   --role ux-designer` (body on stdin): `candidate <full SHA>`, captures, scope, behaviour the
    captures cannot show (focus, validation, kept input, narrow screens), and the record
    below. Stop writing to the branch while it is under review. A rejected candidate may
    be replaced by a new pushed one.
@@ -54,7 +56,8 @@ case: the design-system story.
 2. Review the exported candidate and captures, never the canvas. Open the HTML and
    exercise the relevant controls. Ask the lead for a short clip only for what export
    loses.
-3. One assessment for the named risk. File objections on the issue as P1 or P2 by the
+3. One assessment for the named risk. File objections on the issue with
+   `agent/teams/board.py post <issue> CRITIQUE --role ux-designer`, as P1 or P2 by the
    [severity table](../README.md#severity); P1 only for a failed approved constraint,
    a required rule, or significant harm to the user's experience.
 4. After a revision, revisit only the affected concern. You file findings; the lead edits;
