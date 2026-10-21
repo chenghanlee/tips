@@ -10,7 +10,8 @@ The user starts this session before the pair, in a Herdr pane, with: "Read
 agent/teams/roles/common.md and agent/teams/roles/ux-designer.md, then the issue." It
 uses no harness turn labels; the start and turn rules of common.md apply to paired work
 only. Its authority and evidence rules apply here. `board.py` needs a named Herdr agent in
-the pane (`herdr agent rename <pane> ux`) or `--as <name>`, plus `--role ux-designer`.
+the pane (`herdr agent rename <pane> ux`) or `--as ux-designer <name> <session>`, plus
+`--role ux-designer`.
 
 ## Read
 
