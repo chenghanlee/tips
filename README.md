@@ -59,6 +59,7 @@ so each pair has its own database and port. The config reads them as the table i
 
 ## Find requirements and tasks
 
+- [PRODUCT.md](PRODUCT.md): purpose, audience, first scenario and principles.
 - [GitHub Project 15](https://github.com/users/chenghanlee/projects/15): task planning and progress.
 - [GitHub issues](https://github.com/chenghanlee/tips/issues): scope, acceptance criteria and blockers.
 - [Design docs](docs/design/README.md): the requirement sections; the index grows with each slice.
