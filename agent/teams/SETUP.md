@@ -34,8 +34,9 @@ The user maintains third-party skills in these Git-ignored directories in the ma
 - `.claude/skills/`: the same five Elixir skills and `impeccable`, for Claude.
 
 Install [Impeccable](https://github.com/pbakaus/impeccable) project-local from the main
-checkout, then run `/impeccable init` once in a client. Node and npm are required here
-and, from story 1, for the asset install:
+checkout. Then run `/impeccable init` once from a task worktree: it updates the tracked
+`PRODUCT.md`, which lands by PR like any change. Its `.impeccable/` config is ignored.
+Node and npm are required here and, from story 1, for the asset install:
 
 ```bash
 npx impeccable install --scope=project --providers=claude,codex

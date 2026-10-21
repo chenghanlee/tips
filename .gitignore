@@ -2,6 +2,7 @@
 .claude/
 .codex/
 .agents/
+.impeccable/
 .env
 .env.*
 !.env.example
