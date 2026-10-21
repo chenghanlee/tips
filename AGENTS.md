@@ -19,7 +19,7 @@
 
 ## Skills
 
-Read the skill for your task from the current worktree and apply it: [design-software](agent/skills/design-software/SKILL.md) when designing a feature, writing a spec or brief, or critiquing one; [implement-software](agent/skills/implement-software/SKILL.md) before planning an implementation, changing code or writing tests; [review-software-correctness](agent/skills/review-software-correctness/SKILL.md) when reviewing a PR, diff or commit for correctness against its brief; [review-software-design](agent/skills/review-software-design/SKILL.md) when reviewing one for design. A solo review applies both review skills. Apply [web-design-guidelines](agent/skills/web-design-guidelines/SKILL.md) when writing or reviewing a page, form or component. The language and framework skills below still apply.
+Read the skill for your task from the current worktree and apply it: [design-software](agent/skills/design-software/SKILL.md) when designing a feature, writing a spec or brief, or critiquing one; [implement-software](agent/skills/implement-software/SKILL.md) before planning an implementation, changing code or writing tests; [review-software-correctness](agent/skills/review-software-correctness/SKILL.md) when reviewing a PR, diff or commit for correctness against its brief; [review-software-design](agent/skills/review-software-design/SKILL.md) when reviewing one for design. A solo review applies both review skills. Apply [web-design-guidelines](agent/skills/web-design-guidelines/SKILL.md) when writing or reviewing a page, form or component. Use the user-installed `impeccable` skill on the same work: the implementer runs `/impeccable shape` before building a page and `/impeccable audit` on it before the PR; the tester runs `/impeccable critique` on it in review. The language and framework skills below still apply.
 
 Before reading, editing or reviewing Elixir code, load `elixir` and each skill that applies:
 
@@ -28,7 +28,7 @@ Before reading, editing or reviewing Elixir code, load `elixir` and each skill t
 - `oban`: background jobs.
 - `otp`: processes, supervision, ETS.
 
-These five are user-maintained files outside version control ([setup](agent/teams/SETUP.md#one-time-setup)). If one is missing, report it before the work that needs it.
+These five and `impeccable` are user-maintained files outside version control ([setup](agent/teams/SETUP.md#one-time-setup)). If one is missing, report it before the work that needs it.
 
 ## Elixir navigation
 

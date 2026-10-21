@@ -30,8 +30,8 @@ Install Python 3.12 and the [configured client CLIs](config.toml). Create the di
 
 The user maintains third-party skills in these Git-ignored directories in the main checkout:
 
-- `.agents/skills/`: `elixir`, `phoenix`, `ecto`, `otp`, `oban` and `herdr`, for Codex.
-- `.claude/skills/`: the same five Elixir skills, for Claude.
+- `.agents/skills/`: `elixir`, `phoenix`, `ecto`, `otp`, `oban`, `herdr` and `impeccable`, for Codex.
+- `.claude/skills/`: the same five Elixir skills and `impeccable`, for Claude.
 
 Install [Impeccable](https://github.com/pbakaus/impeccable) project-local from the main
 checkout, then run `/impeccable init` once in a client. Node and npm are required here
