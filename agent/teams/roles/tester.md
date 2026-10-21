@@ -33,11 +33,11 @@ dirty clone and never resets one.
    scenarios and their controls, mutation check, entry points, data, checks. For the
    full application suite, verify the implementer's record instead of rerunning it, as
    [Step 7](../../skills/review-software-correctness/SKILL.md#step-7-checks) says.
-   Wallaby browser tests (`TIPS_BROWSER=1`, `test/tips_web/features`): a Codex client
+   PhoenixTest Playwright browser tests (`test/tips_web/features`): a Codex client
    does not run them ([manual browser review](../README.md#manual-browser-review)). Read the implementer's record
    in the PR body under "Checks not run by CI": check the command, exit, per-run results
    and failure excerpts. While the implementer's working log exists, read the relevant
-   range or ask for an excerpt. Write "Wallaby run by <implementer entry>; inspected
+   range or ask for an excerpt. Write "Browser tests run by <implementer entry>; inspected
    <what> at <SHA>; not rerun" in your review. If the PR body has no browser record,
    record that in your review; the merge-confirming tester then runs
    `agent/teams/team.py turn <pr> <implementer entry>` to request it, and any other

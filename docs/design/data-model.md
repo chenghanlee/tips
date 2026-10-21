@@ -14,7 +14,7 @@ PostgreSQL through Ecto. Timestamps are `inserted_at` and `updated_at` as
 
 ## Posts
 
-A post is a tip in code and the database. Users see the word "tip".
+Code and the database say `post`. Users see "tip".
 
 | Column | Type | Rules |
 |---|---|---|
@@ -22,7 +22,7 @@ A post is a tip in code and the database. Users see the word "tip".
 | `uid` | text | 12-character Nanoid, set by `Tips.Content.create_post/1`, unique index |
 | `slug` | text | made from the title at create time, max 80 characters cut at a whole word, not unique |
 | `title` | text | 3 to 300 characters, must contain a non-space character |
-| `body` | text | 3 to 20,000 characters, plain text |
+| `body` | text | 3 to 20,000 characters, must contain a non-space character, plain text |
 | `inserted_at`, `updated_at` | utc_datetime | |
 
 Every column is `null: false`. Indexes: primary key, unique on `uid`. No author column

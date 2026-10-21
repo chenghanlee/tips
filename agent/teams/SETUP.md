@@ -33,6 +33,14 @@ The user maintains third-party skills in these Git-ignored directories in the ma
 - `.agents/skills/`: `elixir`, `phoenix`, `ecto`, `otp`, `oban` and `herdr`, for Codex.
 - `.claude/skills/`: the same five Elixir skills, for Claude.
 
+Install [Impeccable](https://github.com/pbakaus/impeccable) project-local from the main
+checkout, then run `/impeccable init` once in a client. Node and npm are required here
+and for `mix setup`:
+
+```bash
+npx impeccable install --scope=project --providers=claude,codex
+```
+
 Keep the Codex and Claude skill copies in sync. `team.py` checks that the main checkout's `.agents/skills/` exists, and `bootstrap.py` links it into each clone.
 
 The repository tracks six skills: the [Dexter reference](../skills/dexter/SKILL.md), [design-software](../skills/design-software/SKILL.md), [implement-software](../skills/implement-software/SKILL.md), [review-software-correctness](../skills/review-software-correctness/SKILL.md), [review-software-design](../skills/review-software-design/SKILL.md) and the vendored [web-design-guidelines](../skills/web-design-guidelines/SKILL.md). Link them once into both locations from the main checkout:
@@ -97,9 +105,9 @@ and run `agent-browser doctor` in the same tester session. Doctor's launch test 
 a separate browser. It can fail inside the Codex sandbox even when the approved
 `open` command works; the quick/offline doctor does not check browser launch. Fix the
 browser launch failure before assigning manual browser review; do not disable Chrome's sandbox or
-silently switch to the user's personal browser profile. ChromeDriver for local
-Wallaby tests is a separate prerequisite; the application's development guide names
-it once the project has browser tests.
+silently switch to the user's personal browser profile. Browser tests use PhoenixTest with
+the Playwright driver; Playwright and its Chromium are a separate prerequisite
+(`npx playwright install chromium`).
 
 ### Claude auto-mode repository context
 
