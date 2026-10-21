@@ -39,9 +39,10 @@ design docs; link them instead of repeating them.
 - Reuse over invent: standards, guidelines, libraries and tools before our own.
 - Skills: Vercel `web-design-guidelines` vendored in `agent/skills/`; the tester applies
   it to changed UI. Impeccable and Intent are installed by the user
-  ([setup](../../agent/teams/SETUP.md#one-time-setup)) and used only with the user
-  present, by trigger, never as a command chain. Story 1 trials `impeccable detect` on
-  the running page; one clean run does not make it required.
+  ([setup](../../agent/teams/SETUP.md#one-time-setup)) by trigger, never as a command
+  chain; their interactive commands need the user available. No hooks in pair clones.
+  Story 1's brief carries a trial of `impeccable detect` on the running page; one clean
+  run does not make it required.
 - UX designer: a user-launched session with one role file
   ([ux-designer](../../agent/teams/roles/ux-designer.md)), lead and optional critic, no
   harness code. Prototypes are HTML with captures; story 1 uses local HTML, later stories

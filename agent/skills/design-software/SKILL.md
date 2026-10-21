@@ -30,11 +30,8 @@ Scope limits:
    modules, Oban features, Ecto patterns, provider clients.
 4. The contract and failure sections of
    [implement-software](../implement-software/SKILL.md#trace-the-affected-contract).
-5. With the user present, choose an optional tool for the unresolved design question:
-   `shape` for a surface, `journey` for a multi-step flow, or `document` for an approved
-   visual system when its authoritative home and generated artifacts are agreed. Reuse
-   settled answers; do not run a fixed command chain. UX work belongs to the
-   [UX designer](../../teams/roles/ux-designer.md).
+5. An approved prototype, when the brief links one. UI and UX questions go to the
+   [UX designer](../../teams/roles/ux-designer.md), with the user.
 
 Write two lines before anything else: the product question this feature answers, and the
 signal that would show the answer is wrong. Design the feature so that signal can be

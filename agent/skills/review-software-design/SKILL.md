@@ -113,9 +113,9 @@ For changed pages, forms or components, apply
 CSS and JS within this review; record the fetched rules revision and assess findings
 against the brief and the severity table, within the combined P2 limit. When the brief
 links an approved prototype, compare the implemented states with the approved captures
-at the named viewports: hierarchy, grouping, copy, controls and agreed behaviour. P1
-when an approved constraint fails or is unproven, or the change significantly harms the
-user's experience; other differences are P2. No separate audit or critique pass.
+at the named viewports: hierarchy, grouping, copy, controls and agreed behaviour. P0
+where the table requires it; P1 when an approved constraint fails or is unproven, or the
+change significantly harms the user's experience; other differences are P2. No separate audit or critique pass.
 
 Submit the [PR review record](../../teams/README.md#pr-review-record), with findings in
 the [finding format](../../../AGENTS.md#github). Body: head SHA, what you ran, what you

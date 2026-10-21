@@ -26,11 +26,14 @@ only. Its authority and evidence rules apply here.
 2. Make the smallest useful prototype. Story 1: local HTML with the pinned Basecoat
    bundle. Later stories: Claude Design with the synced design system. Iterate with the
    user in the pane; show named captures and a one-line description of each change.
-   Design only the next slice. Use realistic long content as well as a short example.
+   Iteration files stay in ignored `tmp/`. Design only the next slice. Use realistic
+   long content as well as a short example.
 3. Freeze one candidate: source, exact asset versions, final captures (unannotated, at
    named viewports; a short clip only when timing, focus movement or a transition decides
-   something). For Claude Design, export first and check the export. Commit and push.
-4. Post the candidate on the issue: `candidate <full SHA>`, captures, scope, behaviour the
+   something). For Claude Design, export first and check the export. Put the candidate
+   under `prototypes/<issue>/`. Commit and push. The implementer may delete superseded
+   prototype files in its PR; the approved commit stays in history.
+4. Post the candidate on the issue with `board.py post <issue> PROPOSAL`: `candidate <full SHA>`, captures, scope, behaviour the
    captures cannot show (focus, validation, kept input, narrow screens), and the record
    below. Stop writing to the branch while it is under review. A rejected candidate may
    be replaced by a new pushed one.
@@ -44,7 +47,8 @@ only. Its authority and evidence rules apply here.
 
 ## Steps: critic
 
-Joins only when the brief names an unresolved alternative or risk.
+Joins only when the brief names an unresolved alternative or risk; Opus or Codex. First
+case: the design-system story.
 
 1. Before reading the lead's candidate, write your own concerns from the issue.
 2. Review the exported candidate and captures, never the canvas. Open the HTML and
@@ -59,14 +63,16 @@ Joins only when the brief names an unresolved alternative or risk.
 ## Triggers to tools
 
 Use a tool for a named unresolved problem. Reuse settled answers. Never run a chain.
+Intent installs as separate skills named below (`articulate`, `journey`, ...); invoke them
+by name in your client. Interactive commands that ask questions need the user available.
 
 | Unresolved problem | Tool |
 |---|---|
-| Purpose, structure or the flow of a new surface | `/impeccable shape`, or `/intent:journey` for a multi-step flow; not both |
-| Wording | `/intent:articulate`; error text stays as [content.md](../../../docs/design/content.md#validation-and-error-text) |
-| Recovery or a non-default state | `/intent:fortify`, scaled to the scope |
-| The critic's named risk | `/intent:evaluate`, or `/impeccable critique` when its detector and second assessment add evidence; one, not both |
-| Keyboard, focus or assistive behaviour | `/intent:include` as a scoped spot-check |
+| Purpose, structure or the flow of a new surface | `/impeccable shape`, or the Intent `journey` skill for a multi-step flow; not both |
+| Wording | Intent `articulate`; error text stays as [content.md](../../../docs/design/content.md#validation-and-error-text) |
+| Recovery or a non-default state | Intent `fortify`, scaled to the scope |
+| The critic's named risk | Intent `evaluate`, or `/impeccable critique` when its detector and second assessment add evidence; one, not both |
+| Keyboard, focus or assistive behaviour | Intent `include` as a scoped spot-check |
 | Any exported HTML | the [web-design-guidelines](../../skills/web-design-guidelines/SKILL.md) rules, consulted, not a second report |
 | An approved visual system with concrete source | `/impeccable document`, after the design-system story decides what DESIGN.md owns; never against story 1 defaults |
 

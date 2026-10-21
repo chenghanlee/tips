@@ -34,17 +34,17 @@ The user maintains third-party skills in these Git-ignored directories in the ma
 - `.claude/skills/`: the same five Elixir skills, `impeccable` and the `intent` skills, for Claude.
 
 Install [Impeccable](https://github.com/pbakaus/impeccable) and
-[Intent](https://github.com/ghaida/intent) project-local from the main checkout. Run one
-Impeccable command once so its engine is provisioned. `/impeccable init` is optional:
+[Intent](https://github.com/ghaida/intent) project-local from the main checkout. Run
+`npx impeccable detect --help` once so its engine is provisioned. `/impeccable init` is optional:
 `PRODUCT.md` already exists. `.impeccable/` stays ignored until a shared setting exists.
 Node and npm are required here and, from story 1, for the asset install:
 
 ```bash
 npx impeccable install --scope=project --providers=claude,codex
-npx skills add ghaida/intent --all
+npx skills add ghaida/intent --skill '*' -a claude-code codex -y
 ```
 
-A missing tool is reported, not worked around, unless the brief does not require it.
+Report a missing tool. Use a manual method unless the brief requires that tool's evidence.
 
 Keep the Codex and Claude skill copies in sync. `team.py` checks that the main checkout's `.agents/skills/` exists, and `bootstrap.py` links it into each clone.
 
