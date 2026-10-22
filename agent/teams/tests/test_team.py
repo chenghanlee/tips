@@ -860,6 +860,7 @@ class PairLifecycleTest(Harness):
             (f"port_base = {PORT_BASE}", 'port_base = "wrong"', "team.port_base must be int"),
             ('role = "designer"', 'role = "architect"', "agents.critic.role must be one of"),
             ('kind = "agy"', 'kind = "gemini"', "agents.gem.kind must be one of claude, codex"),
+            ('agy_settings = "', 'agy_settings = "" #', "launch.agy_settings must name agy"),
             ('model = "fixture-test"', 'model = "x"\nadviser = "y"', "unknown keys ['adviser']"),
             ('db_suffix = "r"', 'db_suffix = "9r"', "db_suffix must be nonempty and start"),
             ('repository = "o/r"', 'repository = "o"', "github.repository must be owner/name"),
@@ -2134,7 +2135,25 @@ class UxDesignTeamTest(Harness):
         # Graphic designers join the ux tab. The agy client gets agy's flags and, like
         # Codex, its brief as the first message. Its brief needs no Dexter instructions.
         self.team("design", "60", "pix")
+        # agy asks "Do you trust this folder?" per folder, so the launcher trusts the
+        # allocation root in agy's settings first, keeping the user's own entries. A
+        # missing or broken settings file refuses before the client starts.
+        agy_settings = self.root / "agy-settings.json"
+        refused = self.team("design", "60", "gem", ok=False)
+        assert f"agy settings file {agy_settings} is missing" in refused.stderr
+        agy_settings.write_text("{not json")
+        refused = self.team("design", "60", "gem", ok=False)
+        assert f"agy settings file {agy_settings} is not JSON" in refused.stderr
+        assert not any(e[:2] == ["agent", "start"] and "agy" in e for e in self.state()["events"])
+        agy_settings.write_text(json.dumps({"model": "m", "trustedWorkspaces": ["/theirs"]}))
         self.team("design", "60", "gem")
+        gem_root = self.record(1)["agents"]["gem"]["root"]
+        assert json.loads(agy_settings.read_text()) == {
+            "model": "m",
+            "trustedWorkspaces": ["/theirs", gem_root],
+        }
+        self.team("design", "60", "gem")  # adopted; no duplicate entry
+        assert json.loads(agy_settings.read_text())["trustedWorkspaces"] == ["/theirs", gem_root]
         assert self.tabs("w1") == {"ux": ["team-1-ux", "team-1-pix", "team-1-gem"]}
         argv = self.pane("team-1-gem")["launch_argv"]
         assert argv[argv.index("--kind") + 1] == "agy"
@@ -2196,11 +2215,68 @@ class UxDesignTeamTest(Harness):
         assert "#60 already holds a design team in slot 1" in refused.stderr
         self.clients_exit(1)
         assert "slot 1 released" in self.team("stop", "60").stdout
+        assert json.loads(agy_settings.read_text())["trustedWorkspaces"] == ["/theirs"]
         self.team("start", "60")
         assert (self.record(1)["kind"], self.record(1)["generation"]) == ("brief", 2)
         # A UX team member cannot join a started pair: the pair owns task/60.
         refused = self.team("design", "60", "ux", ok=False)
         assert "#60 already holds a pair in slot 1" in refused.stderr
+
+    def test_stop_reports_an_agy_settings_file_it_cannot_update(self) -> None:
+        # Cleanup never stops at agy's settings file: a missing file has nothing to drop,
+        # and any other failure is reported with the root, the path and the reason, so the
+        # allocation is deleted and the user knows the trust entry is still there.
+        agy_settings = self.root / "agy-settings.json"
+        self.team("design", "60", "pix")  # Codex only: the file is never read at launch
+        agy_settings.mkdir()
+        self.clients_exit(1)
+        stopped = self.team("stop", "60").stdout
+        assert "g1-pix: files deleted" in stopped
+        assert f"g1-pix: agy trust entry for {self.trusted}/allocations/g1-pix not removed" in (
+            stopped
+        )
+        assert "Is a directory" in stopped
+        retired = json.loads((self.trusted / "state/g1-pix/retired.json").read_text())
+        assert retired["files"] == "deleted"
+        agy_settings.rmdir()
+        agy_settings.write_text(json.dumps({"trustedWorkspaces": []}))
+        self.team("design", "60", "gem")
+        gem_root = self.record(1)["agents"]["gem"]["root"]
+        with agy_settings.open("a") as handle:
+            handle.write("junk")
+        self.clients_exit(1)
+        stopped = self.team("stop", "60").stdout
+        assert f"g2-gem: agy trust entry for {gem_root} not removed: agy settings file" in stopped
+        assert "is not JSON" in stopped
+        assert gem_root in agy_settings.read_text()
+        # Bytes that are not UTF-8 are malformed content too, at launch and at cleanup.
+        agy_settings.write_bytes(b"\xff{}")
+        refused = self.team("design", "60", "gem", ok=False)
+        assert f"agy settings file {agy_settings} is not JSON" in refused.stderr
+        self.team("design", "60", "pix")
+        self.clients_exit(1)
+        stopped = self.team("stop", "60").stdout
+        assert "g3-pix: files deleted; databases dropped" in stopped
+        assert "g3-pix: agy trust entry for" in stopped
+        assert "is not JSON" in stopped
+        # A parent directory cleanup cannot search fails the existence check itself.
+        locked = self.root / "locked"
+        locked.mkdir()
+        self.write_config(
+            CONFIG.replace('"/fixture/agy-settings.json"', f'"{locked}/agy-settings.json"')
+        )
+        self.team("design", "60", "pix")
+        self.clients_exit(1)
+        locked.chmod(0o000)
+        try:
+            stopped = self.team("stop", "60").stdout
+        finally:
+            locked.chmod(0o755)
+        assert "g4-pix: files deleted; databases dropped" in stopped
+        assert f"g4-pix: agy trust entry for {self.trusted}/allocations/g4-pix not removed" in (
+            stopped
+        )
+        assert "Permission denied" in stopped
 
     def test_ux_team_entries_do_not_review(self) -> None:
         self.update(

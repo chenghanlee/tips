@@ -319,7 +319,9 @@ retirement in this version: before the pair starts, UI and UX questions go to th
 designer; after that, to the user through the dispatcher as `blocked`. A UX discovery
 that changes a technical contract is a QUESTION with a `question` notice
 ([Turns](#turns)). An `agy` graphic designer is ready only once a real launch,
-prompt, restart and `team.py stop` have been run on this machine ([setup](SETUP.md#one-time-setup)).
+prompt, restart and `team.py stop` have been run on this machine ([setup](SETUP.md#one-time-setup));
+the launcher trusts each agy allocation root in agy's settings file before the client
+starts, and `stop` removes the entry with the allocation.
 
 ## PR review record
 

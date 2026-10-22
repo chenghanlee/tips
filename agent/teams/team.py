@@ -655,6 +655,8 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
     # Claude runs a session id assigned here; Codex's is known only if Herdr reports it.
     session = str(uuid.uuid4()) if kind == "claude" else ""
     args = client_args(allocation, prompt, session)  # a configuration error refuses first
+    if kind == "agy":
+        trust_agy_workspace(root)
     allocation["launch"] = uuid.uuid4().hex
     enter(pane, root, agent_env(allocation))
     allocation["submission"], allocation["session"] = UNKNOWN, session
@@ -694,6 +696,71 @@ def launch(record: Record, allocation: Allocation, prompt: str) -> None:
     save_record(record)
     print(f"Launched {name}: {kind} in {root}, session {allocation['session'] or 'unknown'}")
     post_event(record["brief"], allocation, launch_text(allocation))
+
+
+def agy_settings_path() -> Path:
+    return Path(conf.settings()["launch"]["agy_settings"]).expanduser()
+
+
+def read_agy_settings(path: Path) -> dict[str, object]:
+    """agy's user settings, which the harness never creates: the user signs in first."""
+    try:
+        data = path.read_bytes()
+    except FileNotFoundError:
+        raise RuntimeError(
+            f"agy settings file {path} is missing; sign in to agy once (SETUP.md)"
+        ) from None
+    except OSError as error:
+        raise RuntimeError(f"agy settings file {path} is unreadable: {error}") from error
+    return parse_agy_settings(path, data)
+
+
+def parse_agy_settings(path: Path, data: bytes) -> dict[str, object]:
+    """Decoding errors are ValueErrors too, so bytes that are not UTF-8 JSON are reported
+    with the path like any other malformed content."""
+    try:
+        loaded = json.loads(data)
+    except ValueError as error:
+        raise RuntimeError(f"agy settings file {path} is not JSON: {error}") from error
+    if not isinstance(loaded, dict):
+        raise RuntimeError(f"agy settings file {path} must hold a JSON object")
+    return cast(dict[str, object], loaded)
+
+
+def trust_agy_workspace(root: Path) -> None:
+    """Add the allocation root to agy's `trustedWorkspaces` before its client starts, so
+    the per-folder trust dialog does not block the launch. Other settings are untouched."""
+    path = agy_settings_path()
+    settings = read_agy_settings(path)
+    trusted: list[object] = (
+        cast(list[object], settings["trustedWorkspaces"])
+        if isinstance(settings.get("trustedWorkspaces"), list)
+        else []
+    )
+    if str(root) not in trusted:
+        settings["trustedWorkspaces"] = [*trusted, str(root)]
+        write_file(path, json.dumps(settings, indent=2) + "\n")
+
+
+def untrust_agy_workspace(root: Path) -> str:
+    """Drop a deleted allocation's root from agy's `trustedWorkspaces`. No settings file
+    means nothing to drop. Any other failure is returned for the cleanup report, so the
+    rest of cleanup goes on without claiming the entry was removed."""
+    path = agy_settings_path()
+    try:
+        try:
+            data = path.read_bytes()
+        except FileNotFoundError:
+            return ""
+        settings = parse_agy_settings(path, data)
+        trusted = settings.get("trustedWorkspaces")
+        if isinstance(trusted, list) and str(root) in trusted:
+            kept = [entry for entry in cast(list[object], trusted) if entry != str(root)]
+            settings["trustedWorkspaces"] = kept
+            write_file(path, json.dumps(settings, indent=2) + "\n")
+    except (RuntimeError, OSError) as error:
+        return f"agy trust entry for {root} not removed: {error}"
+    return ""
 
 
 def current_roster(record: Record) -> tuple[list[str], list[str]]:
@@ -1213,6 +1280,9 @@ def delete_allocation(ident: str) -> str:
         shown = ", ".join(remaining[:10])
         return f"failed: could not delete {len(remaining)} paths, including {shown}"
     (config / "bootstrap.json").unlink(missing_ok=True)
+    problem = untrust_agy_workspace(root)
+    if problem:
+        print(f"{ident}: {problem}")
     return "deleted"
 
 
