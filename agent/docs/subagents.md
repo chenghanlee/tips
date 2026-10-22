@@ -12,7 +12,7 @@ for an "all", "only" or "none" answer, ask for the search scope and exclusions.
 
 Before relying on the result in a change or review, read the cited source and enough
 context to verify it, and check completeness when the decision depends on it. Keep known
-short reads, literal lookups and Dexter lookups ([Elixir navigation](../AGENTS.md#elixir-navigation))
+short reads, literal lookups and Dexter lookups ([Elixir navigation](../../AGENTS.md#elixir-navigation))
 inline. The subagent gathers and explains evidence; you own design and implementation
 decisions, review findings and verdicts. It does not edit and does not replace an
 independent reviewer.
@@ -47,4 +47,4 @@ A helper's check does not replace a required review.
 You make unresolved decisions and decide whether to accept the result.
 
 Read-only work: [Lookup subagents](#lookup-subagents).
-A whole brief: [design-software Step 7](skills/design-software/SKILL.md#step-7-choose-the-implementer).
+A whole brief: [design-software Step 7](../skills/design-software/SKILL.md#step-7-choose-the-implementer).

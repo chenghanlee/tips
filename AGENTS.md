@@ -9,7 +9,7 @@
 | Repository context | [README](README.md): product, requirements and file locations |
 | Before pushing a change | The [checks](#checks) for the files you changed |
 | Any PR | [PR review record](agent/teams/README.md#pr-review-record) |
-| Before launching a subagent | [Subagents](agent/subagents.md): lookup agents for evidence; delegate settled work to Haiku or Luna |
+| Before launching a subagent | [Subagents](agent/docs/subagents.md): lookup agents for evidence; delegate settled work to Haiku or Luna |
 
 ## Boundaries
 
