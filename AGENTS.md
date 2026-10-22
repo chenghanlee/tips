@@ -68,6 +68,32 @@ inline. The subagent gathers and explains evidence; you own design and implement
 decisions, review findings and verdicts. It does not edit and does not replace an
 independent reviewer.
 
+### Delegate settled work
+
+Delegate work when its goal, scope and solution are settled and the worker needs no new
+decision. Examples: fill a template, apply a checklist, run named commands, collect
+results, make a prescribed change.
+
+Worker: Haiku in a Claude Code general-purpose agent, or Luna in a Codex collaboration
+agent. Effort high.
+
+Give it the inputs, the scope, the instructions and the expected result. Link
+instructions; do not copy them. It may use scripts. One worker, unless independent parts
+run in parallel with separate write scopes.
+
+Tell it to return, not guess: inputs it did not expect, instructions it cannot follow,
+failures it has no instruction for. Ask for the result, the evidence and what is
+unresolved.
+
+Inspect the output and the evidence. Make sure the required checks ran on the final
+result. If the checks cannot show the result is complete, have a non-editor check it
+against the goal and the sources. The required reviewer may perform this check. A
+helper's check does not replace a required review. Unresolved decisions and acceptance
+stay with you.
+
+Read-only work: [Lookup subagents](#lookup-subagents). A whole brief:
+[design-software Step 7](agent/skills/design-software/SKILL.md#step-7-choose-the-implementer).
+
 ## Checks
 
 Per commit, run only the fast checks for the files you touched: the formatter, the
