@@ -52,6 +52,8 @@ class InstallTest(unittest.TestCase):
         (teams / "config.toml").write_text(CONFIG)
         (teams / "requirements.lock").write_text("# no packages\n")
         (self.source / "AGENTS.md").write_text("Release one.\n")
+        (self.source / "agent/docs").mkdir()
+        (self.source / "agent/docs/checks.md").write_text("Checks one.\n")
         (self.source / ".gitignore").write_text("/agent/teams/allocations/\n")
         self.first = self.commit("release one")
         self.git("remote", "add", "origin", str(self.source))
@@ -99,6 +101,7 @@ class InstallTest(unittest.TestCase):
         assert record["root"] == str(self.root)
         assert record["source"] == str(self.source)
         assert (release / "AGENTS.md").read_text() == "Release one.\n"
+        assert (release / "agent/docs/checks.md").read_text() == "Checks one.\n"
         execute([release / "agent/teams/.venv/bin/python", "-c", "pass"], check=True)
         self.operator_data_kept()
         # The second release cannot build its environment: pip refuses a lock line without

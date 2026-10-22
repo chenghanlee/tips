@@ -3,7 +3,7 @@
 
 Run from the main checkout with teams drained and the dispatcher stopped. The commit must
 be merged into origin/main and the checkout's tracked files clean. The release holds
-AGENTS.md and agent/teams from that commit, plus the locked adapter environment, under
+AGENTS.md, agent/docs and agent/teams from that commit, plus the locked adapter environment, under
 <root>/releases/. <root>/harness then points at it; the switch is one atomic rename.
 state/ and allocations/ are never touched. A failed install removes only its own
 unfinished release, so the previous harness keeps running. Default root:
@@ -39,7 +39,7 @@ from team import load_record
 
 # Creating the environment and fetching locked wheels; the same budget as dependency fetches.
 INSTALL_SECONDS = 300
-RELEASE_FILES = ("AGENTS.md", "agent/teams")
+RELEASE_FILES = ("AGENTS.md", "agent/docs", "agent/teams")
 
 
 def git(source: Path, *args: str) -> str:

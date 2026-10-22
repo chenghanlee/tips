@@ -218,7 +218,7 @@ python3 agent/teams/install.py <commit>
 ```
 
 The commit must be merged into `origin/main`, and the checkout's tracked files must be
-clean. The command copies AGENTS.md and `agent/teams` from that commit, creates the
+clean. The command copies AGENTS.md, `agent/docs` and `agent/teams` from that commit, creates the
 locked environment (`--require-hashes`, wheels only) and records the commit, the
 repository, this checkout's path and the root in `install.json`. The root defaults to
 `agent_teams/<name>/` in the main checkout's parent directory, where `<name>` is the
