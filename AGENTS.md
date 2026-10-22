@@ -70,29 +70,35 @@ independent reviewer.
 
 ### Delegate settled work
 
-Delegate work when its goal, scope and solution are settled and the worker needs no new
-decision. Examples: fill a template, apply a checklist, run named commands, collect
-results, make a prescribed change.
+Delegate work whose goal, scope and solution are already decided.
+Examples: fill a template, apply a checklist, run specified commands, collect results or
+make a specified change.
 
-Worker: Haiku in a Claude Code general-purpose agent, or Luna in a Codex collaboration
-agent. Effort high.
+Use Haiku in a Claude Code general-purpose agent or Luna in a Codex collaboration agent.
+Set effort to high.
 
-Give it the inputs, the scope, the instructions and the expected result. Link
-instructions; do not copy them. It may use scripts. One worker, unless independent parts
-run in parallel with separate write scopes.
+Give the worker the inputs, scope, instructions and expected result.
+Link existing instructions instead of copying them.
+The worker may use scripts.
+Use one worker unless independent parts can run in parallel.
+Give parallel workers separate write scopes.
 
-Tell it to return, not guess: inputs it did not expect, instructions it cannot follow,
-failures it has no instruction for. Ask for the result, the evidence and what is
-unresolved.
+Tell the worker to report unexpected inputs, unclear instructions and failures it has no
+instructions to resolve.
+It must not guess or expand the task.
+Ask for the result, supporting evidence and unresolved items.
 
-Inspect the output and the evidence. Make sure the required checks ran on the final
-result. If the checks cannot show the result is complete, have a non-editor check it
-against the goal and the sources. The required reviewer may perform this check. A
-helper's check does not replace a required review. Unresolved decisions and acceptance
-stay with you.
+Inspect the output and evidence.
+Check that the required checks ran on the final result.
+If they cannot establish completeness, have someone who did not make the changes check
+against the goal and source material.
+The required reviewer can do this.
+A helper's check does not replace a required review.
 
-Read-only work: [Lookup subagents](#lookup-subagents). A whole brief:
-[design-software Step 7](agent/skills/design-software/SKILL.md#step-7-choose-the-implementer).
+You make unresolved decisions and decide whether to accept the result.
+
+Read-only work: [Lookup subagents](#lookup-subagents).
+A whole brief: [design-software Step 7](agent/skills/design-software/SKILL.md#step-7-choose-the-implementer).
 
 ## Checks
 
