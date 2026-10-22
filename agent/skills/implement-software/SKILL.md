@@ -123,7 +123,9 @@ Make failures detectable when working quickly. Follow the fifth [required rule](
 
 When you change behaviour or a return format: find every caller with Dexter `references`
 and scoped `rg`, and check the result through to the final state and side effects. A
-correct return value does not prove a correct outcome.
+correct return value does not prove a correct outcome. For evidence across several
+files, follow the [Lookup subagents](../../../AGENTS.md#lookup-subagents) rule; you
+remain responsible for tracing and verifying the affected contract.
 
 When you add, cache, move or remove a fact (a stored value, a derived flag, or a timer
 that keeps it current): find every path that constructs, updates, reads, resets or
