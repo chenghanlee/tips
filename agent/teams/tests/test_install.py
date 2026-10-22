@@ -8,6 +8,7 @@ import fcntl
 import json
 import os
 import shlex
+import shutil
 import tempfile
 import unittest
 import zipfile
@@ -118,6 +119,16 @@ class InstallTest(unittest.TestCase):
         execute([release / "agent/teams/.venv/bin/python", "-c", "pass"], check=True)
         assert sorted((self.root / "releases").iterdir()) == [release]
         self.operator_data_kept()
+
+    def test_a_commit_without_agent_docs_installs(self) -> None:
+        # Rolling back to a release older than agent/docs must still work.
+        shutil.rmtree(self.source / "agent/docs")
+        older = self.commit("release without agent/docs")
+        self.git("update-ref", "refs/remotes/origin/main", "HEAD")
+        self.install(older)
+        release = self.installed()
+        assert (release / "AGENTS.md").read_text() == "Release one.\n"
+        assert not (release / "agent/docs").exists()
 
     def test_a_package_for_another_platform_is_skipped_not_demanded(self) -> None:
         # pip skips a requirement whose environment marker fails here, so the check after
