@@ -2207,6 +2207,34 @@ class UxDesignTeamTest(Harness):
         refused = self.team("design", "60", "ux", ok=False)
         assert "#60 already holds a pair in slot 1" in refused.stderr
 
+    def test_stop_reports_an_agy_settings_file_it_cannot_update(self) -> None:
+        # Cleanup never stops at agy's settings file: a missing file has nothing to drop,
+        # and any other failure is reported with the root, the path and the reason, so the
+        # allocation is deleted and the user knows the trust entry is still there.
+        agy_settings = self.root / "agy-settings.json"
+        self.team("design", "60", "pix")  # Codex only: the file is never read at launch
+        agy_settings.mkdir()
+        self.clients_exit(1)
+        stopped = self.team("stop", "60").stdout
+        assert "g1-pix: files deleted" in stopped
+        assert f"g1-pix: agy trust entry for {self.trusted}/allocations/g1-pix not removed" in (
+            stopped
+        )
+        assert "Is a directory" in stopped
+        retired = json.loads((self.trusted / "state/g1-pix/retired.json").read_text())
+        assert retired["files"] == "deleted"
+        agy_settings.rmdir()
+        agy_settings.write_text(json.dumps({"trustedWorkspaces": []}))
+        self.team("design", "60", "gem")
+        gem_root = self.record(1)["agents"]["gem"]["root"]
+        with agy_settings.open("a") as handle:
+            handle.write("junk")
+        self.clients_exit(1)
+        stopped = self.team("stop", "60").stdout
+        assert f"g2-gem: agy trust entry for {gem_root} not removed: agy settings file" in stopped
+        assert "is not JSON" in stopped
+        assert gem_root in agy_settings.read_text()
+
     def test_ux_team_entries_do_not_review(self) -> None:
         self.update(
             issues={

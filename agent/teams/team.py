@@ -709,6 +709,8 @@ def read_agy_settings(path: Path) -> dict[str, object]:
         raise RuntimeError(
             f"agy settings file {path} is missing; sign in to agy once (SETUP.md)"
         ) from None
+    except OSError as error:
+        raise RuntimeError(f"agy settings file {path} is unreadable: {error}") from error
     except ValueError as error:
         raise RuntimeError(f"agy settings file {path} is not JSON: {error}") from error
     if not isinstance(loaded, dict):
@@ -731,19 +733,23 @@ def trust_agy_workspace(root: Path) -> None:
         write_file(path, json.dumps(settings, indent=2) + "\n")
 
 
-def untrust_agy_workspace(root: Path) -> None:
-    """Drop a deleted allocation's root from agy's `trustedWorkspaces`. A missing or
-    unreadable settings file has nothing to drop; cleanup goes on."""
+def untrust_agy_workspace(root: Path) -> str:
+    """Drop a deleted allocation's root from agy's `trustedWorkspaces`. No settings file
+    means nothing to drop. Any other failure is returned for the cleanup report, so the
+    rest of cleanup goes on without claiming the entry was removed."""
     path = agy_settings_path()
+    if not path.exists():
+        return ""
     try:
         settings = read_agy_settings(path)
-    except RuntimeError:
-        return
-    trusted = settings.get("trustedWorkspaces")
-    if isinstance(trusted, list) and str(root) in trusted:
-        kept: list[object] = [entry for entry in cast(list[object], trusted) if entry != str(root)]
-        settings["trustedWorkspaces"] = kept
-        write_file(path, json.dumps(settings, indent=2) + "\n")
+        trusted = settings.get("trustedWorkspaces")
+        if isinstance(trusted, list) and str(root) in trusted:
+            kept = [entry for entry in cast(list[object], trusted) if entry != str(root)]
+            settings["trustedWorkspaces"] = kept
+            write_file(path, json.dumps(settings, indent=2) + "\n")
+    except (RuntimeError, OSError) as error:
+        return f"agy trust entry for {root} not removed: {error}"
+    return ""
 
 
 def current_roster(record: Record) -> tuple[list[str], list[str]]:
@@ -1263,7 +1269,9 @@ def delete_allocation(ident: str) -> str:
         shown = ", ".join(remaining[:10])
         return f"failed: could not delete {len(remaining)} paths, including {shown}"
     (config / "bootstrap.json").unlink(missing_ok=True)
-    untrust_agy_workspace(root)
+    problem = untrust_agy_workspace(root)
+    if problem:
+        print(f"{ident}: {problem}")
     return "deleted"
 
 
