@@ -89,3 +89,31 @@ model = "gpt-6-astra"
 effort = "xhigh"
 db_suffix = "_astra"
 port_offset = 4
+
+# The UX design team (README.md#ux-design-team): one UX designer and one or more graphic
+# designers, named on a brief by `UX: <entry>` and `Graphic designers: <entry>, ...`.
+# Graphic designers generate images with their client's own image skill.
+[agents.opus-ux]
+role = "ux-designer"
+kind = "claude"
+model = "claude-opus-5-5"
+effort = "high"
+db_suffix = "_ux"
+port_offset = 5
+
+[agents.astra-graphic]
+role = "graphic-designer"
+kind = "codex"
+model = "gpt-6-astra"
+effort = "medium"
+db_suffix = "_astrag"
+port_offset = 6
+
+# Gemini through the agy CLI; the model slug carries its own effort level.
+[agents.argon-graphic]
+role = "graphic-designer"
+kind = "agy"
+model = "gemini-4-argon-medium"
+effort = "medium"
+db_suffix = "_argon"
+port_offset = 7

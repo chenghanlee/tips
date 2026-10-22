@@ -14,9 +14,14 @@ from config import (
     HEADER,
     READ_PAGES,
     ROLES,
+    UX_ROLES,
     Allocation,
     repository,
 )
+
+# The user's approval of a UX candidate: a comment that begins with this record. Agent
+# comments begin with a harness header, so none of them matches (README.md#ux-design-team).
+APPROVAL = re.compile(r"^APPROVED candidate [0-9a-f]{40}\b")
 
 
 class PullRequest(NamedTuple):
@@ -33,11 +38,11 @@ class PullRequest(NamedTuple):
             )
 
 
-def reviewer_names(value: str) -> list[str]:
-    """Return names from `Required reviews:`. Reject empty or duplicate names."""
+def reviewer_names(value: str, label: str = "Required reviews") -> list[str]:
+    """Return the names of a comma-separated roster line. Reject empty or duplicate names."""
     names = [name.strip() for name in value.split(",")]
     if not all(names) or len(set(names)) != len(names):
-        raise ValueError("empty or repeated name in Required reviews")
+        raise ValueError(f"empty or repeated name in {label}")
     return names
 
 
@@ -132,6 +137,7 @@ def roster(brief: str) -> tuple[str, list[str], list[str]]:
         raise RuntimeError(f"Brief #{brief}: Implementer {implementer} is not an implementer entry")
     if implementer in names:
         raise RuntimeError(f"Brief #{brief}: implementer {implementer} cannot review its own PR")
+    refuse_ux_reviewers(brief, names)
     by_role = {
         role: [n for n in names if conf.settings()["agents"][n]["role"] == role] for role in ROLES
     }
@@ -140,6 +146,50 @@ def roster(brief: str) -> tuple[str, list[str], list[str]]:
     if not by_role["tester"]:
         raise RuntimeError(f"Brief #{brief}: Required reviews names no tester")
     return implementer, by_role["tester"], by_role["designer"]
+
+
+def refuse_ux_reviewers(brief: str, names: list[str]) -> None:
+    """UX design team entries design before the pair; they never review its PR."""
+    for name in names:
+        role = conf.settings()["agents"][name]["role"]
+        if role in UX_ROLES:
+            raise RuntimeError(
+                f"Brief #{brief}: Required reviews names {name}, a {role} entry; only tester "
+                "and designer entries review"
+            )
+
+
+def ux_team(brief: str) -> tuple[str, list[str]] | None:
+    """The brief's UX designer and graphic designers from its `UX:` and `Graphic designers:`
+    lines, or None for a brief without a `UX:` line."""
+    body = issue_body(brief)
+    ux = issue_line(body, "UX")
+    if ux is None:
+        return None
+    graphics = issue_line(body, "Graphic designers")
+    if not ux or not graphics:
+        raise RuntimeError(
+            f"Brief #{brief} needs a UX: entry and a Graphic designers: line naming at least "
+            "one entry"
+        )
+    try:
+        names = reviewer_names(graphics, "Graphic designers")
+    except ValueError as error:
+        raise RuntimeError(f"Brief #{brief}: {error}") from error
+    agents = conf.settings()["agents"]
+    for name, role in ((ux, "ux-designer"), *((n, "graphic-designer") for n in names)):
+        if name not in agents:
+            raise RuntimeError(f"Brief #{brief} names {name!r}, which is not a configured entry")
+        if agents[name]["role"] != role:
+            raise RuntimeError(f"Brief #{brief}: {name} is not a {role} entry")
+    return ux, names
+
+
+def approved_candidate(brief: str) -> bool:
+    """Whether the user has posted the approval record of a UX candidate on the brief."""
+    return any(
+        APPROVAL.match(str(comment.get("body") or "").lstrip()) for comment in issue_comments(brief)
+    )
 
 
 def header_session(session: str) -> str:

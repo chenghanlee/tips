@@ -39,9 +39,9 @@ def dexter_brief(wrapper: Path) -> str:
     )
 
 
-def identity(record: Record, entry: str, duty: str) -> str:
+def identity(record: Record, entry: str, duty: str, issue: str = "") -> str:
     persona = agent_spec(record["agents"][entry]).get("persona")
-    issue = "spec" if record["kind"] == "design" else "brief"
+    issue = issue or ("spec" if record["kind"] == "design" else "brief")
     text = f"You are {entry}, the {duty} for {issue} #{record['brief']}; your Herdr name is "
     text += f"{live_name(record['slot'], entry)}. "
     if persona:
@@ -116,6 +116,35 @@ def design_brief(record: Record, entry: str) -> str:
         + "Use "
         "agent/teams/board.py to read and post. "
         + dexter_brief(project_of(allocation) / ".dexter/dexter.sh")
+    )
+
+
+def ux_team_brief(record: Record, entry: str, ux: str, graphics: list[str]) -> str:
+    """The launch envelope of a UX design team member. Its duties are in its role file."""
+    allocation = record["agents"][entry]
+    role = allocation["role"]
+    if role == "ux-designer":
+        names = ", ".join(live_name(record["slot"], name) for name in graphics)
+        duties = (
+            f"Your graphic designers are {names}; send each request with herdr agent prompt "
+            "<name> '<request>' and read its reply from the path it returns. "
+        )
+    else:
+        duties = (
+            f"Your UX designer is {live_name(record['slot'], ux)}; it sends your requests "
+            "with herdr agent prompt and you reply the same way. Post nothing on GitHub. "
+        )
+    return (
+        identity(record, entry, role, "brief")
+        + bootstrap_brief(allocation, "")
+        + f"Read the brief with gh issue view {record['brief']}. "
+        + duties
+        + f"Follow agent/teams/roles/{role}.md; it holds your steps and the messages you send. "
+        + (
+            dexter_brief(project_of(allocation) / ".dexter/dexter.sh")
+            if role == "ux-designer"
+            else ""
+        )
     )
 
 

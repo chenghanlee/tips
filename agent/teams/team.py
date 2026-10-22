@@ -42,6 +42,7 @@ from briefs import (
     reviewer_brief,
     reviewer_notice,
     tester_message,
+    ux_team_brief,
 )
 from commands import execute, object_fields, require_type, run, write_file
 from config import (
@@ -54,6 +55,7 @@ from config import (
     SUBMITTED,
     TABS,
     UNKNOWN,
+    UX_ROLES,
     Allocation,
     DispatcherLaunch,
     Entity,
@@ -80,6 +82,7 @@ from github import (
     WORKFLOW,
     Phase,
     PullRequest,
+    approved_candidate,
     event_posted,
     merged_brief,
     post_event,
@@ -87,6 +90,7 @@ from github import (
     replace_labels,
     roster,
     spec_lead,
+    ux_team,
 )
 from herdr import deliver, herdr, live_panes, pane_occupant, processes, session_id, stop
 
@@ -508,6 +512,13 @@ def client_args(allocation: Allocation, prompt: str, session: str) -> list[str]:
             args += ["-m", spec["model"]]
         effort = ["-c", "model_reasoning_effort=" + json.dumps(spec["effort"])]
         return [*args, *effort]
+    if spec["kind"] == "agy":
+        # Gemini's agy CLI, used by graphic designers. Its mode and effort flags come from
+        # `agy --help`; the real launch in the trial verifies their effect.
+        args = ["--mode", "auto", "--effort", spec["effort"]]
+        if spec["model"]:
+            args += ["--model", spec["model"]]
+        return args
     args = [
         "--permission-mode",
         policies["claude_permission_mode"],
@@ -746,6 +757,11 @@ def start(brief: str) -> None:
     allocation; each clones and prepares its project itself."""
     implementer, testers, _ = roster(brief)
     pair = [implementer, testers[0]]
+    if ux_team(brief) is not None and not approved_candidate(brief):
+        raise RuntimeError(
+            f"Brief #{brief} names a UX design team; start its pair only after the user's "
+            "comment beginning 'APPROVED candidate <SHA>' (README.md#ux-design-team)"
+        )
     tools()  # missing tools refuse before a slot is reserved
     with store_lock():
         record = team_record(brief, "brief", *pair)
@@ -772,14 +788,33 @@ def start(brief: str) -> None:
 
 
 def design(issue: str, entry: str) -> None:
-    """Join a started brief or a spec with a designer in its own allocation."""
+    """Join a started brief or a spec with a designer in its own allocation, or launch a
+    UX design team member on a brief before its pair (README.md#ux-design-team)."""
     agent = conf.settings()["agents"].get(entry)
-    if agent is None or agent["role"] != "designer":
+    if agent is None or agent["role"] not in ("designer", *UX_ROLES):
         raise RuntimeError(f"{entry} is not a configured designer entry")
+    role = agent["role"]
     tools()
     with store_lock():
         record = record_for(issue)
-        if record is None or (record["kind"] == "design" and not record["agents"]):
+        team = None
+        if role in UX_ROLES:
+            if record is not None and record["kind"] == "brief":
+                raise RuntimeError(
+                    f"#{issue} already holds a pair in slot {record['slot']}; the UX design "
+                    "team runs before the pair, so its members cannot join it"
+                )
+            team = ux_team(issue)
+            if team is None:
+                raise RuntimeError(f"Brief #{issue} has no UX: line; nothing to launch {entry} for")
+            if entry != team[0] and entry not in team[1]:
+                raise RuntimeError(
+                    f"{entry} is not on brief #{issue}'s UX: or Graphic designers: line"
+                )
+            if record is None or not record["agents"]:
+                record = record or team_record(issue, "design", "", "")
+                assign(issue, "design", team[0])
+        elif record is None or (record["kind"] == "design" and not record["agents"]):
             # A new standalone design team; read its lead before reserving a slot.
             lead = spec_lead(issue)
             record = record or team_record(issue, "design", "", "")
@@ -787,12 +822,15 @@ def design(issue: str, entry: str) -> None:
         elif record["kind"] == "brief":
             current_roster(record)
         if entry not in record["agents"]:
-            configure_bootstrap(record, add_allocation(record, entry, "designer"), "", "")
+            duty = role if role in UX_ROLES else "designer"
+            branch = f"task/{issue}" if role == "ux-designer" else ""
+            configure_bootstrap(record, add_allocation(record, entry, duty), branch, "")
             save_record(record)
         allocation = record["agents"][entry]
         refuse_foreign_owner([Path(allocation["root"])], [allocation["name"]])
         open_pane(record, allocation)
-        launch(record, allocation, design_brief(record, entry))
+        prompt = ux_team_brief(record, entry, *team) if team else design_brief(record, entry)
+        launch(record, allocation, prompt)
     print(f"Issue {issue}: {entry} in slot {record['slot']}, {allocation['root']}")
 
 
