@@ -6,7 +6,9 @@ description: Guides the design assessment of a tips PR, by the combined tester o
 # Review software design
 
 Check whether a simpler implementation could satisfy the brief's contracts. The
-[design-software](../design-software/SKILL.md) rules are the standard. The [designer role](../../teams/roles/designer.md) defines turns and messages.
+[design-software](../design-software/SKILL.md) rules are the standard. The
+[tester role](../../teams/roles/tester.md) defines turns and messages; for an additional
+reviewing designer, the [designer role](../../teams/roles/designer.md) does.
 
 Scope limits:
 
@@ -110,10 +112,15 @@ state the proposed change or the deferral line to add.
 
 For changed pages, forms or components, apply
 [web-design-guidelines](../web-design-guidelines/SKILL.md) to the affected templates,
-CSS and JS within this review; record the fetched rules revision and assess findings
+CSS and JS within this review. Pin the rules: resolve the commit with
+`gh api repos/vercel-labs/web-interface-guidelines/commits/main --jq .sha`, fetch
+`https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/<sha>/command.md`
+(`curl` on a Codex client) and record the SHA in the review. This replaces the vendored
+skill's fetch from `main`, its file prompt and its output format. Assess findings
 against the brief and the severity table, within the combined P2 limit. When the brief
 names an approved candidate (`design/<brief>/` at the approved SHA), compare the
-implemented states with its images at the named viewports: hierarchy, grouping, copy, controls and agreed behaviour. P0
+implemented states with its images at the named viewports and states `candidate.md`
+names, with the authoritative copy and the disclosed differences: hierarchy, grouping, copy, controls and agreed behaviour. P0
 where the table requires it; P1 when an approved constraint fails or is unproven, or the
 change significantly harms the user's experience; other differences are P2. No separate audit or critique pass.
 

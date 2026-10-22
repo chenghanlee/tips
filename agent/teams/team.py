@@ -347,6 +347,7 @@ def configure_bootstrap(record: Record, allocation: Allocation, branch: str, com
         "issue": record["brief"],
         "entry": allocation["entry"],
         "kind": allocation["kind"],
+        "role": allocation["role"],
         "project": str(project),
         "logs": str(logs),
         "clone_url": conf.settings()["team"]["clone_url"],
@@ -1513,10 +1514,17 @@ def dispatcher_status(named: Entity | None) -> str:
 
 
 def status() -> None:
-    """Print every allocation record with each client's live Herdr state and the dispatcher's."""
+    """Print every allocation record with each client's live Herdr state and the dispatcher's.
+
+    The dispatcher has no file tools, so this also prints the capacity and the entries it
+    may name on a brief."""
     agents = {a["pane_id"]: a for a in herdr("agent", "list")["agents"]}
     named = {a.get("name"): a for a in agents.values()}
     print(dispatcher_status(named.get("dispatcher")))
+    config = conf.settings()
+    print(f"slots: {config['team']['max_teams']}")
+    for entry, spec in sorted(config["agents"].items()):
+        print(f"entry {entry}: {spec['role']}, {spec['kind']}, {spec['model']}")
     found = records()
     if not found:
         print("No allocation records.")

@@ -9,7 +9,7 @@ The workflow and its diagram are in the [README](README.md#how-it-runs).
 
 In the GitHub ruleset "Reviewed main", require resolved conversations; add required status checks only for workflows that exist and run (during the [CI pause](../../AGENTS.md#github-ci-pause), none). Turn off the strict up-to-date requirement and do not require the `tips/independent-review` status. In Project 15, enable the "Item closed" workflow so closed issues get Status Done.
 
-The team board is [Project 15](https://github.com/users/chenghanlee/projects/15). It holds the spec and brief issues. The dispatcher sets three fields: Status (Backlog, Ready, Active, In review, Blocked, Done), Kind (spec or brief) and Agent (text: the implementer entry). A new owner adds Kind and Agent to their project and updates the project number in [roles/dispatcher.md](roles/dispatcher.md):
+The team board is [Project 15](https://github.com/users/chenghanlee/projects/15). It holds the spec and brief issues. The dispatcher sets three fields: Status (Backlog, Ready, Active, In review, Blocked, Done), Kind (spec or brief) and Agent (text: the implementer entry, or the UX entry while the UX design team runs). A new owner adds Kind and Agent to their project and updates the project number in [roles/dispatcher.md](roles/dispatcher.md):
 
 ```bash
 gh project field-create <number> --owner <owner> --name Kind --data-type SINGLE_SELECT --single-select-options spec,brief

@@ -18,8 +18,10 @@ designers integrate discoveries that change consequential technical commitments.
 
 Scope limits:
 
-- Use the [severity table](../../teams/README.md#severity). Classify performance and
-  maintainability findings as P2 with a decision.
+- Classify performance and maintainability findings by the
+  [severity table](../../teams/README.md#severity). A [Bounded work](#required-rules)
+  violation is P1; other cost findings are P2 with a decision unless the table says
+  otherwise.
 - Prefer an objection that removes a part over one that adds a part.
 
 ## Step 1: Read
@@ -30,8 +32,11 @@ Scope limits:
    modules, Oban features, Ecto patterns, provider clients.
 4. The contract and failure sections of
    [implement-software](../implement-software/SKILL.md#trace-the-affected-contract).
-5. The approved candidate under `design/<brief>/`, when the brief has one. UI and UX
-   questions go to the [UX designer](../../teams/roles/ux-designer.md), with the user.
+5. For a brief with `UX:`, the approved candidate under `design/<brief>/` at its SHA.
+   Before the pair starts, UI and UX questions go to the
+   [UX designer](../../teams/roles/ux-designer.md), with the user; after that, to the
+   user through the dispatcher as `blocked`
+   ([blocker route](../../teams/README.md#report-and-resolve-blockers)).
 
 Write two lines before anything else: the product question this feature answers, and the
 signal that would show the answer is wrong. Design the feature so that signal can be
@@ -87,6 +92,8 @@ Lead: edit the body. Other agents: use comments.
 One brief per PR. Keep it short; split only at contracts that can ship independently.
 Start with the agreed outcome, genuine constraints, acceptance examples and roster:
 `Implementer: <entry>` and `Required reviews: <entries>`, merge-confirming tester first.
+A story that changes what the user sees also names `UX: <ux-designer entry>` and
+`Graphic designers: <entry>, ...` ([UX design team](../../teams/README.md#ux-design-team)).
 The default is one independent tester covering correctness and design. Add reviewers
 only for an identified contribution.
 

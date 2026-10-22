@@ -19,7 +19,7 @@ lists your responsibilities: [dispatcher](roles/dispatcher.md),
 ## How it runs
 
 ```
-USER         set goals · answer product questions · start the dispatcher once · report an agent that has stopped
+USER         set goals · answer product questions · start the dispatcher once · UX intake in the UX designer's pane and post the APPROVED line · report an agent that has stopped
 DISPATCHER   record a bounded outcome, constraints, examples and roster → team.py start <brief>
 DESIGN      unresolved consequential choice → team.py design <issue> <entry> → decision reaches affected work
 UX TEAM      brief with UX: → team.py design <brief> <entry> for the UX designer and each graphic designer → intake with the user → images → candidate on task/<brief> → user posts APPROVED → team.py stop <brief> → team.py start <brief>
@@ -81,14 +81,17 @@ ID (`g<generation>-<entry>`) never repeats:
 [cleanup](#cleanup)'s `git fetch --prune origin` and read-only checks in a stopped
 allocation's clone. The client does:
 `python3 <harness>/bootstrap.py [--commit <sha>]` clones into an empty project (the
-implementer on `task/<brief>`, others detached at the commit or at `origin/main`), or
+implementer and the UX designer on `task/<brief>`, never at the same time because the
+[UX design team](#ux-design-team) runs before the pair; others detached at the commit or
+at `origin/main`), or
 fetches an existing clone without resetting it. Without `--commit`, it finishes the
 checkout of a clone that an interrupted run left off it, and refuses one with commits or
 files not on origin. With `--commit`, it refuses a dirty clone and a commit that no
 origin branch contains. Then it runs `mix deps.get --check-locked`
 unless a fetch for the current `mix.lock` already succeeded, writes the git-ignored Dexter wrapper and skills link, starts Dexter
 and updates its index. Running them is the proof that the client can clone, fetch and
-index. The console shows at most 8 KiB;
+index. A graphic designer's bootstrap stops after the wrapper and skills link: it reads
+the brief and writes images, so it fetches no dependencies and starts no Dexter. The console shows at most 8 KiB;
 the full log is in `logs/`. Each database name is `tips_test` or `tips_dev`, then
 `db_suffix_prefix`, the slot, `g`, the generation and the entry's `db_suffix`, so no
 generation reuses another's databases.
@@ -201,13 +204,26 @@ lists them. The dispatcher has no tool for it.
 
 Every message starts a turn with the recipient's full context. Send only handoffs,
 `done`, `blocked`, the dispatcher's answer to a blocker, a review URL to the
-merge-confirming tester, the design-phase messages the [designer role](roles/designer.md) lists,
-and the [UX design team](#ux-design-team)'s requests, replies and `<comment URL> approved`. Do not send
+merge-confirming tester, the design notices below, and the
+[UX design team](#ux-design-team)'s requests, replies and `<comment URL> approved`. Do not send
 acknowledgments or progress updates. Put everything the recipient needs in the message
-or the linked record. After sending, end your turn. If a send fails, you still report
+or the linked record. After sending, end your turn, except after a `question` notice:
+continue unaffected work. If a send fails, you still report
 it: report `blocked` with the exact command and error. Labels the command already wrote
 stay; they record the assignment, not the delivery. Do not deliver a denied message
 another way.
+
+Design notices are `herdr agent prompt <recipient> "<comment URL> <word>"`. Posting a
+comment notifies nobody (only a BLOCKED post does), so the poster sends the notice:
+
+| Notice | From | To | After posting |
+|---|---|---|---|
+| `<URL> question` | implementer or UX designer | `dispatcher` | a QUESTION; the dispatcher assigns a designer |
+| `<URL> answer` | designer | the agent that posted the QUESTION | an ANSWER |
+| `<URL> critique`, `<URL> agree` | critic | the lead | a CRITIQUE or AGREE |
+| `<URL> hold` | lead | each affected implementer and merge-confirming tester | the PROPOSAL of a [changed binding decision](#changed-binding-decisions) |
+| `<URL> held` | merge-confirming tester | the lead | its non-LGTM hold review |
+| `<URL> decision` | lead | each affected implementer and merge-confirming tester | the adopted decision |
 
 Two labels on the brief or spec issue record the task's state:
 
@@ -259,14 +275,17 @@ The dispatcher repairs the labels with the handoff form of `prompt_agent`.
 
 A brief whose story changes what the user sees names `UX: <entry>` (a `ux-designer`
 entry) and `Graphic designers: <entry>, ...` (one or more `graphic-designer` entries).
-The design lead adds the lines when it writes the brief; the dispatcher adds them to a
-settled brief. The principles behind this team are in
+The design lead writes them as [design-software Step 5](../skills/design-software/SKILL.md#step-5-briefs)
+says; the dispatcher writes them when it creates a brief. Nobody can edit an issue body
+from the dispatcher's tools, so a brief that lacks them goes back to the user with the
+exact lines to add. The principles behind this team are in
 [docs/brainstorm/ux-agent-principles-chavruta.md](../../docs/brainstorm/ux-agent-principles-chavruta.md)
 and the mechanics in
 [docs/brainstorm/ux-agent-mechanics-chavruta.md](../../docs/brainstorm/ux-agent-mechanics-chavruta.md).
 
 1. Once the brief meets the release conditions except approval, the dispatcher runs
-   `team.py design <brief> <entry>` for the UX entry, then for each graphic entry. They
+   `team.py design <brief> <entry>` for the UX entry, then for each graphic entry, and
+   sets the brief's Status to Active and its Agent to the UX entry. They
    form a standalone design team on the brief in the `ux` tab, labelled `phase:design`,
    `turn:<UX entry>`. The UX designer's clone starts on `task/<brief>`; it is the
    branch's only writer. Graphic designers generate nothing until step 3.
@@ -279,10 +298,14 @@ and the mechanics in
    `design/<brief>/` on `task/<brief>`, pushes, and posts a PROPOSAL with the SHA and
    the images.
 5. The user posts `APPROVED candidate <full SHA> for <scope> with <exceptions or none>`
-   as a plain comment. No agent posts it: agent comments begin with a harness header,
-   and `start` accepts only a comment that begins with the record.
-6. The UX designer sends `herdr agent prompt dispatcher "<comment URL> approved"`. The
-   dispatcher reads the comment, runs `team.py stop <brief>` (a standalone design team
+   as a plain comment; the UX designer gives the user that line with the SHA filled in.
+   No agent posts it: agent comments begin with a harness header,
+   and `start` accepts only a comment that begins with `APPROVED candidate` and the full
+   40-character SHA.
+6. The UX designer checks that the comment begins with that line and names the
+   candidate's SHA, then sends `herdr agent prompt dispatcher "<comment URL> approved"`. The
+   dispatcher reads the comment, checks the same and that the release conditions still
+   hold, runs `team.py stop <brief>` (a standalone design team
    needs no merged PR), then `team.py start <brief>`. The implementer's clone starts
    `task/<brief>` from origin and holds the candidate; before its first edit it checks
    that the approved SHA is an ancestor of HEAD. The tester compares the built screens
@@ -290,7 +313,10 @@ and the mechanics in
 
 Approval is the user's; a contradiction found while building returns to the user by the
 [blocker route](#report-and-resolve-blockers). The UX designer is not relaunched after
-retirement in this version. An `agy` graphic designer is ready only once a real launch,
+retirement in this version: before the pair starts, UI and UX questions go to the UX
+designer; after that, to the user through the dispatcher as `blocked`. A UX discovery
+that changes a technical contract is a QUESTION with a `question` notice
+([Turns](#turns)). An `agy` graphic designer is ready only once a real launch,
 prompt, restart and `team.py stop` have been run on this machine ([setup](SETUP.md#one-time-setup)).
 
 ## PR review record
@@ -399,13 +425,20 @@ deferral.
 ### Changed binding decisions
 
 When a binding contract changes, the lead identifies affected briefs and holds their
-dependent work. For each affected open PR, ask its merge-confirming tester to submit a
-non-LGTM review linked to the pending decision. Establish that recorded hold before
-making the changed shared contract operative; a sent pause is not an established hold.
-The lead updates the authoritative shared decision; each implementer incorporates its
-link in the brief before resuming affected work. The tester reviews against the adopted
-decision before replacing its hold with LGTM, even if the code SHA is unchanged. An
-unrelated push does not resolve the question. Harmless clarification and ordinary
+dependent work, with the notices in [Turns](#turns):
+
+1. The lead posts the pending decision as a PROPOSAL, then sends `<PROPOSAL URL> hold`
+   to each affected brief's implementer and, for each affected open PR, its
+   merge-confirming tester. The implementer pauses dependent work.
+2. That tester submits a non-LGTM review linked to the pending decision and sends
+   `<review URL> held` to the lead. Establish that recorded hold before making the
+   changed shared contract operative; a sent pause is not an established hold.
+3. The lead updates the authoritative shared decision and sends `<URL> decision` to the
+   same implementers and testers. Each implementer incorporates its link in the brief
+   before resuming affected work. The tester reviews against the adopted decision before
+   replacing its hold with LGTM, even if the code SHA is unchanged.
+
+An unrelated push does not resolve the question. Harmless clarification and ordinary
 internal placement within existing contracts need no hold. `observe` does not
 interpret issue comments as merge blockers.
 
@@ -430,7 +463,10 @@ gh pr merge <pr> --merge --match-head-commit <sha>
 
 If a check failed or `observe` reports a merge conflict, run
 `agent/teams/team.py turn <pr> <implementer entry>` to notify the implementer. If `observe`
-reports evidence unavailable, run it again later; unavailable never counts as ready. If
+reports evidence unavailable (GitHub has not computed mergeability yet), run it once more
+in the same turn after about a minute; this is the one exception to the no-poll rule.
+If it is still unavailable, report `blocked` with the `observe` output; unavailable
+never counts as ready. If
 merge is refused for another reason, report `blocked` with the exact error.
 
 After the merge closes the brief and deletes the branch, notify the dispatcher with `done`.

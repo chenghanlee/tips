@@ -33,7 +33,8 @@ Read this and your role file at launch and after compaction.
 - Append comments without editing earlier comments. The dispatcher or design lead
   creates a brief; after launch only its implementer maintains its body and PR body.
   The lead maintains a shared spec. Link authoritative decisions instead of copying
-  competing versions: briefs link the source issue and the design sections at their
+  competing versions: a brief is the story issue itself; it links its epic and the
+  design sections at their
   commit instead of copying them; for checks, they link
   [AGENTS.md#checks](../../../AGENTS.md#checks) and list only additions or exceptions.
   Incorporate an ANSWER before resuming affected work.
@@ -50,7 +51,8 @@ Read this and your role file at launch and after compaction.
   finding not yet posted: the lead designer updates the spec body; everyone else posts
   the decision or finding on GitHub. After a restart, reread the brief (`gh issue view <issue>`) and the PR as
   [Turns](../README.md#turns) says.
-- Post the comment, then send the Herdr prompt as a separate step. If you repeat the
+- Post the comment, then send the Herdr prompt as a separate step, except for BLOCKED:
+  its post already notifies the dispatcher, so send no second prompt. If you repeat the
   post, the script returns the existing comment's URL.
 
 ## Evidence and scope
