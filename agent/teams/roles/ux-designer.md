@@ -41,8 +41,8 @@ clone starts on `task/<brief>`; you are its only writer until the pair starts.
 4. **Direct.** For each round, write `tmp/ux/requests/<n>/brief.md` in your clone: the
    open choice, intended fidelity, layout constraints, components by code name, copy,
    states, and the role of each reference image (reference, edit target, style input),
-   with the PROPOSAL URL. Send the same text to each graphic designer the launch named:
-   `herdr agent prompt <name> "<request text>"`. Use both for an open alternative; one
+   with the PROPOSAL URL. Send the same text, starting with `request <n>:`, to each
+   graphic designer the launch named: `herdr agent prompt <name> "request <n>: <text>"`. Use both for an open alternative; one
    for a targeted revision. Each reply names a path under the sender's clone, or a
    named failure. Read what it names; copy what you keep into your own `tmp/ux/`.
 5. **Curate.** Discard off-brief results. Show the user at most one recommendation and

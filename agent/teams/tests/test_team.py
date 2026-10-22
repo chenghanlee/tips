@@ -26,6 +26,7 @@ from tests.harness import (
     CONFIG,
     HERDR,
     MIX_PROJECT,
+    NARROW,
     PORT_BASE,
     REAL_DEXTER,
     SCRIPT,
@@ -596,6 +597,8 @@ class PairLifecycleTest(Harness):
             "45": ("Implementer: impl\nRequired reviews: tester, impl\n", "cannot review"),
             "46": ("Implementer: impl\nRequired reviews: tester, tester\n", "repeated name"),
             "47": ("Implementer: impl\nRequired reviews: tester,\n", "empty or repeated"),
+            "48": (NARROW + "Graphic designers: pix\n", "both a UX: entry and a Graphic"),
+            "49": (NARROW + "UX: ux\n", "both a UX: entry and a Graphic"),
         }
         self.update(issues={**self.state()["issues"], **{k: v[0] for k, v in cases.items()}})
         for brief, (_, message) in cases.items():
@@ -2222,6 +2225,16 @@ class UxDesignTeamTest(Harness):
         self.bootstrap("team-1-pix")
         assert self.git("branch", "--show-current", cwd=self.project("team-1-ux")) == "task/60"
         assert self.git("branch", "--show-current", cwd=self.project("team-1-pix")) == ""
+        # The branch has one writer: a renamed UX: line cannot add a second UX designer
+        # beside the live one. Restoring the line resumes.
+        issues = self.state()["issues"]
+        self.update(issues={**issues, "60": issues["60"].replace("UX: ux", "UX: ux2")})
+        refused = self.team("design", "60", "ux2", ok=False)
+        assert "changed its UX: or Graphic designers: line since launch; ux still holds" in (
+            refused.stderr
+        )
+        assert sorted(self.record(1)["agents"]) == ["gem", "pix", "ux"]
+        self.update(issues=issues)
         # The pair waits for the user's approval record. An agent comment that merely
         # quotes the record does not count: it begins with a harness header.
         refused = self.team("start", "60", ok=False)

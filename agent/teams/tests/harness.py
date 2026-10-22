@@ -99,6 +99,14 @@ effort = "high"
 db_suffix = "u"
 port_offset = 7
 
+[agents.ux2]
+role = "ux-designer"
+kind = "claude"
+model = "fixture-ux2"
+effort = "high"
+db_suffix = "v"
+port_offset = 6
+
 [agents.pix]
 role = "graphic-designer"
 kind = "codex"

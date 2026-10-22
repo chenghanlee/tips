@@ -814,6 +814,8 @@ def design(issue: str, entry: str) -> None:
             if record is None or not record["agents"]:
                 record = record or team_record(issue, "design", "", "")
                 assign(issue, "design", team[0])
+            else:
+                refuse_changed_ux_team(record, team)
         elif record is None or (record["kind"] == "design" and not record["agents"]):
             # A new standalone design team; read its lead before reserving a slot.
             lead = spec_lead(issue)
@@ -832,6 +834,23 @@ def design(issue: str, entry: str) -> None:
         prompt = ux_team_brief(record, entry, *team) if team else design_brief(record, entry)
         launch(record, allocation, prompt)
     print(f"Issue {issue}: {entry} in slot {record['slot']}, {allocation['root']}")
+
+
+def refuse_changed_ux_team(record: Record, team: tuple[str, list[str]]) -> None:
+    """A UX design team's members are fixed once launched: the UX designer owns the
+    branch, so a brief that renames its UX: or Graphic designers: entries is refused
+    until the dispatcher retires the team with `stop`."""
+    ux, graphics = team
+    for allocation in record["agents"].values():
+        entry, role = allocation["entry"], allocation["role"]
+        if (role == "ux-designer" and entry != ux) or (
+            role == "graphic-designer" and entry not in graphics
+        ):
+            raise RuntimeError(
+                f"Brief #{record['brief']} changed its UX: or Graphic designers: line since "
+                f"launch; {entry} still holds slot {record['slot']}. Stop the brief to "
+                "retire the design team, or restore the line."
+            )
 
 
 def brief_record(pr: PullRequest) -> Record:

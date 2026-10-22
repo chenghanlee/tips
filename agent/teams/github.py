@@ -161,16 +161,16 @@ def refuse_ux_reviewers(brief: str, names: list[str]) -> None:
 
 def ux_team(brief: str) -> tuple[str, list[str]] | None:
     """The brief's UX designer and graphic designers from its `UX:` and `Graphic designers:`
-    lines, or None for a brief without a `UX:` line."""
+    lines, or None for a brief with neither line."""
     body = issue_body(brief)
     ux = issue_line(body, "UX")
-    if ux is None:
-        return None
     graphics = issue_line(body, "Graphic designers")
+    if ux is None and graphics is None:
+        return None
     if not ux or not graphics:
         raise RuntimeError(
-            f"Brief #{brief} needs a UX: entry and a Graphic designers: line naming at least "
-            "one entry"
+            f"Brief #{brief} needs both a UX: entry and a Graphic designers: line naming at "
+            "least one entry, or neither"
         )
     try:
         names = reviewer_names(graphics, "Graphic designers")
