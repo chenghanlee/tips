@@ -38,16 +38,21 @@ For the [UX design team](README.md#ux-design-team), also install into `.agents/s
 `fortify`, `evaluate`, `include`), and [Impeccable](https://github.com/pbakaus/impeccable)'s
 complete skill directory with its reference files as `impeccable`. Verify the destination;
 an installer's `--all` writes into other directories, including tracked `agent/skills/`.
+Node and npm are required for the installers (`npx impeccable install --scope=project
+--providers=codex`; `npx skills add ghaida/intent --skill '*' -a codex -y`) and, from
+story 1, for the asset install. Run `npx impeccable detect --help` once so its engine is
+provisioned; `.impeccable/` stays ignored until a shared setting exists. Report a missing
+tool; use a manual method unless the brief requires that tool's evidence.
 The `grilling` skill is user scope, at `~/.claude/skills/grilling`. Install and sign in to
 the `agy` CLI for a Gemini graphic designer; then run one real launch, prompt, restart and
 `team.py stop` of that entry before relying on it.
 
 Keep the Codex and Claude skill copies in sync. `team.py` checks that the main checkout's `.agents/skills/` exists, and `bootstrap.py` links it into each clone.
 
-The repository tracks five skills: the [Dexter reference](../skills/dexter/SKILL.md), [design-software](../skills/design-software/SKILL.md), [implement-software](../skills/implement-software/SKILL.md), [review-software-correctness](../skills/review-software-correctness/SKILL.md) and [review-software-design](../skills/review-software-design/SKILL.md). Link them once into both locations from the main checkout:
+The repository tracks six skills: the [Dexter reference](../skills/dexter/SKILL.md), [design-software](../skills/design-software/SKILL.md), [implement-software](../skills/implement-software/SKILL.md), [review-software-correctness](../skills/review-software-correctness/SKILL.md), [review-software-design](../skills/review-software-design/SKILL.md) and the vendored [web-design-guidelines](../skills/web-design-guidelines/SKILL.md). Link them once into both locations from the main checkout:
 
 ```bash
-for skill in dexter design-software implement-software review-software-correctness review-software-design; do
+for skill in dexter design-software implement-software review-software-correctness review-software-design web-design-guidelines; do
   ln -s ../../agent/skills/$skill .agents/skills/$skill
   ln -s ../../agent/skills/$skill .claude/skills/$skill
 done
@@ -106,9 +111,9 @@ and run `agent-browser doctor` in the same tester session. Doctor's launch test 
 a separate browser. It can fail inside the Codex sandbox even when the approved
 `open` command works; the quick/offline doctor does not check browser launch. Fix the
 browser launch failure before assigning manual browser review; do not disable Chrome's sandbox or
-silently switch to the user's personal browser profile. ChromeDriver for local
-Wallaby tests is a separate prerequisite; the application's development guide names
-it once the project has browser tests.
+silently switch to the user's personal browser profile. Browser tests use PhoenixTest with
+the Playwright driver; Playwright and its Chromium are a separate prerequisite
+(`npx playwright install chromium`).
 
 ### Claude auto-mode repository context
 

@@ -2,7 +2,7 @@
 
 | When | Read or do |
 |---|---|
-| Every task | Read the issue or the user's brief and its linked design sections; the [design index](docs/design/README.md) names the sections to read for a trigger or feature |
+| Every task | Read the issue or the user's brief and its linked design sections; the [design index](docs/design/README.md) names the sections to read for a trigger or feature. [PRODUCT.md](PRODUCT.md) states the purpose, audience and principles |
 | On pair or dispatcher launch | Read the [common rules](agent/teams/roles/common.md) and your role file; it names the [pair workflow](agent/teams/README.md) sections you read |
 | Changing the repository alone | Use an isolated worktree and a PR; the [checks](#checks) and [review](agent/teams/README.md#pr-review-record) still apply. Merge only with the user's authorization. Read-only reviews and disposable output in ignored `tmp/` need neither |
 | After context compaction | If paired or dispatching, reread your role file and its workflow sections. Reload each required skill before its next use |
@@ -19,7 +19,7 @@
 
 ## Skills
 
-Read the skill for your task from the current worktree and apply it: [design-software](agent/skills/design-software/SKILL.md) when designing a feature, writing a spec or brief, or critiquing one; [implement-software](agent/skills/implement-software/SKILL.md) before planning an implementation, changing code or writing tests; [review-software-correctness](agent/skills/review-software-correctness/SKILL.md) when reviewing a PR, diff or commit for correctness against its brief; [review-software-design](agent/skills/review-software-design/SKILL.md) when reviewing one for design. A solo review applies both review skills. The language and framework skills below still apply.
+Read the skill for your task from the current worktree and apply it: [design-software](agent/skills/design-software/SKILL.md) when designing a feature, writing a spec or brief, or critiquing one; [implement-software](agent/skills/implement-software/SKILL.md) before planning an implementation, changing code or writing tests; [review-software-correctness](agent/skills/review-software-correctness/SKILL.md) when reviewing a PR, diff or commit for correctness against its brief; [review-software-design](agent/skills/review-software-design/SKILL.md) when reviewing one for design. A solo review applies both review skills. Apply [web-design-guidelines](agent/skills/web-design-guidelines/SKILL.md) when reviewing changed UI, as review-software-design describes. Impeccable and Intent are optional design tools; their interactive workflows need the user available. The [UX designer](agent/teams/roles/ux-designer.md) names the trigger for each. The language and framework skills below still apply.
 
 Before reading, editing or reviewing Elixir code, load `elixir` and each skill that applies:
 
@@ -28,7 +28,7 @@ Before reading, editing or reviewing Elixir code, load `elixir` and each skill t
 - `oban`: background jobs.
 - `otp`: processes, supervision, ETS.
 
-These five are user-maintained files outside version control ([setup](agent/teams/SETUP.md#one-time-setup)). If one is missing, report it before the work that needs it.
+These five, `impeccable` and the `intent` skills are user-maintained files outside version control ([setup](agent/teams/SETUP.md#one-time-setup)). If one is missing, report it before the work that needs it.
 
 ## Elixir navigation
 
