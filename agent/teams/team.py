@@ -704,13 +704,19 @@ def agy_settings_path() -> Path:
 def read_agy_settings(path: Path) -> dict[str, object]:
     """agy's user settings, which the harness never creates: the user signs in first."""
     try:
-        loaded = json.loads(path.read_text())
+        text = path.read_text()
     except FileNotFoundError:
         raise RuntimeError(
             f"agy settings file {path} is missing; sign in to agy once (SETUP.md)"
         ) from None
     except OSError as error:
         raise RuntimeError(f"agy settings file {path} is unreadable: {error}") from error
+    return parse_agy_settings(path, text)
+
+
+def parse_agy_settings(path: Path, text: str) -> dict[str, object]:
+    try:
+        loaded = json.loads(text)
     except ValueError as error:
         raise RuntimeError(f"agy settings file {path} is not JSON: {error}") from error
     if not isinstance(loaded, dict):
@@ -738,10 +744,12 @@ def untrust_agy_workspace(root: Path) -> str:
     means nothing to drop. Any other failure is returned for the cleanup report, so the
     rest of cleanup goes on without claiming the entry was removed."""
     path = agy_settings_path()
-    if not path.exists():
-        return ""
     try:
-        settings = read_agy_settings(path)
+        try:
+            text = path.read_text()
+        except FileNotFoundError:
+            return ""
+        settings = parse_agy_settings(path, text)
         trusted = settings.get("trustedWorkspaces")
         if isinstance(trusted, list) and str(root) in trusted:
             kept = [entry for entry in cast(list[object], trusted) if entry != str(root)]

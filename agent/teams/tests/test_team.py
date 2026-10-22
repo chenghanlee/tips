@@ -2234,6 +2234,24 @@ class UxDesignTeamTest(Harness):
         assert f"g2-gem: agy trust entry for {gem_root} not removed: agy settings file" in stopped
         assert "is not JSON" in stopped
         assert gem_root in agy_settings.read_text()
+        # A parent directory cleanup cannot search fails the existence check itself.
+        locked = self.root / "locked"
+        locked.mkdir()
+        self.write_config(
+            CONFIG.replace('"/fixture/agy-settings.json"', f'"{locked}/agy-settings.json"')
+        )
+        self.team("design", "60", "pix")
+        self.clients_exit(1)
+        locked.chmod(0o000)
+        try:
+            stopped = self.team("stop", "60").stdout
+        finally:
+            locked.chmod(0o755)
+        assert "g3-pix: files deleted; databases dropped" in stopped
+        assert f"g3-pix: agy trust entry for {self.trusted}/allocations/g3-pix not removed" in (
+            stopped
+        )
+        assert "Permission denied" in stopped
 
     def test_ux_team_entries_do_not_review(self) -> None:
         self.update(
