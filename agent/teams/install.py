@@ -5,11 +5,10 @@ Run from the main checkout with teams drained and the dispatcher stopped. The co
 be merged into origin/main and the checkout's tracked files clean. The release holds
 AGENTS.md, agent/docs and agent/teams from that commit (those the commit has), plus the
 locked adapter environment, under <root>/releases/. <root>/harness then points at it;
-the switch is one atomic rename.
-state/ and allocations/ are never touched. A failed install removes only its own
-unfinished release, so the previous harness keeps running. Default root:
-agent_teams/<repository name>/ in the main checkout's parent directory, created on first
-use. The root is a copy target, not write-protected.
+the switch is one atomic rename. state/ and allocations/ are never touched. A failed
+install removes only its own unfinished release, so the previous harness keeps running.
+Default root: agent_teams/<repository name>/ in the main checkout's parent directory,
+created on first use. The root is a copy target, not write-protected.
 """
 
 import argparse
@@ -113,7 +112,9 @@ def export(source: Path, commit: str, release: Path) -> None:
     present = [
         path
         for path in RELEASE_FILES
-        if not execute(["git", "-C", source, "cat-file", "-e", f"{commit}:{path}"]).returncode
+        if not execute(
+            ["git", "-C", source, "cat-file", "-e", f"{commit}:{path}"], timeout=INSTALL_SECONDS
+        ).returncode
     ]
     archive = release.with_suffix(".tar")
     try:
