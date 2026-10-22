@@ -24,7 +24,7 @@ Classify each choice before you make it:
   implement it. Explain it in the PR if a reviewer could ask why.
 - Expensive to reverse: schema, stored data, public URLs, provider contracts, new hex
   dependencies. Follow the agreed contract. An unresolved consequential choice goes
-  through the [designer route](../../teams/roles/dispatcher.md#decisions-during-implementation).
+  through the [architect route](../../teams/roles/dispatcher.md#decisions-during-implementation).
   Continue unaffected work; do not guess at the missing decision.
 
 ## Design during delivery
@@ -215,7 +215,7 @@ Rules:
 - Allowed without a prior brief line: a regression test for a fixed bug, or relevant
   verification of an existing affected contract, including preservation during a
   refactor. Explain the uncovered case; extend an existing test where possible. Test
-  gaps do not require a new designer approval unless the contract itself is unsettled.
+  gaps do not require a new architect approval unless the contract itself is unsettled.
 - Delete a test only when surviving tests cover its distinct required cases. Name them
   in the PR body.
 - Test through public entry points: the context function, the LiveView, the job. Add a
@@ -248,7 +248,7 @@ Apply the [performance principles](../design-software/SKILL.md#performance-princ
 at the expected MVP workload. Link the brief's relevant limits and assumptions.
 Record new evidence and any implementation trade-off or discovery that affects the
 design in the PR body. If it changes an agreed contract, obtain the decision through
-the designer route and incorporate the linked answer before resuming affected work.
+the architect route and incorporate the linked answer before resuming affected work.
 
 Measure only when a limit is stated or the cost could change the design. Before
 measuring, read [performance measurement](references/performance-measurement.md).

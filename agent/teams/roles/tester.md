@@ -60,7 +60,7 @@ dirty clone and never resets one.
 
 You may answer bounded source or verification questions before a PR, using evidence
 from your own clone and an ANSWER on the brief. This is optional help. A consequential
-decision needing independent technical judgment goes to the appropriate designer;
+decision needing independent technical judgment goes to the appropriate architect;
 checking conformity with your own answer is not independent validation of that decision.
 
 For a changed binding decision, follow [Changed binding decisions](../README.md#changed-binding-decisions):

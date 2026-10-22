@@ -2,7 +2,7 @@
 
 GitHub issues, PRs and reviews store the workflow state. Herdr messages start turns. One
 dispatcher chooses work, opens features, starts pairs and launches reviewers and
-designers. It has no shell or file tools: it acts only through the fixed operations of
+architects. It has no shell or file tools: it acts only through the fixed operations of
 [adapter.py](adapter.py), which call the commands below. Every launched client gets its
 own [allocation](#allocations) and its own clone of the repository; no two clients share
 a checkout. Follow
@@ -12,7 +12,7 @@ a checkout. Follow
 [review-software-correctness](../skills/review-software-correctness/SKILL.md) or
 [review-software-design](../skills/review-software-design/SKILL.md). Your role file
 lists your responsibilities: [dispatcher](roles/dispatcher.md),
-[designer](roles/designer.md), [implementer](roles/implementer.md),
+[architect](roles/architect.md), [implementer](roles/implementer.md),
 [tester](roles/tester.md). Read the [common rules](roles/common.md). The user completes
 [setup](SETUP.md) once.
 
@@ -48,10 +48,10 @@ and design. The implementer maintains the brief's technical detail and owns a co
 working change, including justified bounded repairs under
 [Design during delivery](../skills/implement-software/SKILL.md#design-during-delivery).
 Working behavior and changeability are both delivery concerns. No compulsory refactor
-or advance two-designer consensus is needed for settled work.
+or advance two-architect consensus is needed for settled work.
 
 The reviewer can help with local source or verification questions when useful.
-Consequential decisions go to a named designer, with independent challenge when the
+Consequential decisions go to a named architect, with independent challenge when the
 unresolved alternative or risk warrants it. `design` joins a started brief in its
 existing slot before a PR, including at full capacity; otherwise it creates or joins
 a standalone design team. Use a shared spec when several briefs need one contract.
@@ -108,7 +108,7 @@ operator (the user) runs `reset` and `stop --abandon`.
 | Command | Caller | Effect |
 |---|---|---|
 | `agent/teams/team.py start <brief>` | Dispatcher | Read `Implementer:` and `Required reviews:`. For a brief with `UX:`, refuse unless a comment begins with `APPROVED candidate <SHA>` ([UX design team](#ux-design-team)). Label a new pair's brief ([Turns](#turns)). Create an allocation for the implementer (bootstrap branch `task/<brief>`) and the merge-confirming tester. Launch both in the team's workspace (see [Herdr layout](#herdr-layout)), write the record, and post one EVENT per launch on the brief. |
-| `agent/teams/team.py design <issue> <entry>` | Dispatcher | Launch a configured designer in its own allocation. A started brief reuses its team slot; otherwise create or join a spec team. The issue names the lead, any critics and the question or design assignment; a new spec team needs a `Lead: <entry>` line naming a configured designer and labels the spec ([Turns](#turns)). For a UX or graphic entry, launch it into the brief's [UX design team](#ux-design-team) instead; refused once the brief holds a pair. Post its launch EVENT on that issue. The adapter keeps the argument name `spec` for either issue number. |
+| `agent/teams/team.py design <issue> <entry>` | Dispatcher | Launch a configured architect in its own allocation. A started brief reuses its team slot; otherwise create or join a spec team. The issue names the lead, any critics and the question or design assignment; a new spec team needs a `Lead: <entry>` line naming a configured architect and labels the spec ([Turns](#turns)). For a UX or graphic entry, launch it into the brief's [UX design team](#ux-design-team) instead; refused once the brief holds a pair. Post its launch EVENT on that issue. The adapter keeps the argument name `spec` for either issue number. |
 | `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require your own clone to be clean at the PR head and the PR to close the brief. Read the PR's live state (see `observe`); refuse unless GitHub reports the head mergeable. Label the brief ([Turns](#turns)). Notify every launched required reviewer of the head and the `bootstrap.py --commit` command that moves its clone there. For each reviewer not launched, post a pending EVENT on the PR and ask the dispatcher to run its `review` command. Try every send; report each failed one. |
 | `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Read the PR's live state and label the brief ([Turns](#turns)). Notify the implementer with its merge conflict and failed required checks. Your clone's state does not block it. |
 | `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create its allocation, configured for the PR head, with its own database suffix and port, and launch the reviewer in the team's workspace. |
@@ -131,7 +131,7 @@ operator (the user) runs `reset` and `stop --abandon`.
 ### Herdr layout
 
 Each team has one Herdr workspace, labelled `team-<slot>-<brief>`. It has one tab per
-role: `designers`, `implementers` and `reviewers`, and `ux` for the UX designer and the
+role: `architects`, `implementers` and `reviewers`, and `ux` for the UX designer and the
 graphic designers. The merge-confirming tester and additional testers share `reviewers`. Each client is a pane in its role's tab, named
 after the client; a second client of a role is split off the tab's last pane. A tab
 opens with its first client. `start` and `review` reopen a closed pane in the same
@@ -156,7 +156,7 @@ client in an allocation. Then it stops the recorded clients, closes the workspac
 stops each project's Dexter daemon. It keeps the reservation while any of the team's
 ports still answers. It writes each allocation's `state/<id>/retired.json`, deletes the
 record and runs [cleanup](#cleanup) under the same lock. Before retiring, the dispatcher
-checks that any attached designer's assignment is complete or handed off.
+checks that any attached architect's assignment is complete or handed off.
 
 ### Cleanup
 
@@ -219,8 +219,8 @@ comment notifies nobody (only a BLOCKED post does), so the poster sends the noti
 
 | Notice | From | To | After posting |
 |---|---|---|---|
-| `<URL> question` | implementer or UX designer | `dispatcher` | a QUESTION; the dispatcher assigns a designer |
-| `<URL> answer` | designer | the agent that posted the QUESTION | an ANSWER |
+| `<URL> question` | implementer or UX designer | `dispatcher` | a QUESTION; the dispatcher assigns an architect |
+| `<URL> answer` | architect | the agent that posted the QUESTION | an ANSWER |
 | `<URL> proposal` | lead | each critic | a PROPOSAL that needs critiques |
 | `<URL> critique`, `<URL> agree` | critic | the lead | a CRITIQUE or AGREE |
 | `<URL> hold` | lead | each affected implementer and merge-confirming tester | the PROPOSAL of a [changed binding decision](#changed-binding-decisions) |
@@ -239,7 +239,7 @@ Only these harness commands write them. Never add or remove them by hand.
 |---|---|---|
 | New pair | `team.py start` | `phase:implement`, `turn:<implementer>` |
 | New standalone design team | `team.py design` | `phase:design`, `turn:<lead>` from the spec's `Lead:` line, or from the brief's `UX:` line |
-| Relaunch, additional designer, `review` launch | `start`, `design`, `review` | unchanged |
+| Relaunch, additional architect, `review` launch | `start`, `design`, `review` | unchanged |
 | Head to reviewers | `team.py turn <pr> <tester>` | `phase:review`, `turn:<tester>` |
 | Findings back | `team.py turn <pr> <implementer>` | `phase:implement`, `turn:<implementer>` |
 | Blocker | `board.py post <issue> BLOCKED` | phase kept, `turn:dispatcher` |
@@ -254,7 +254,7 @@ the issue: a failed write or two commands at once can leave two of one prefix. T
 a reported contradiction, not a prevented one.
 
 Helpers act on their explicit assignment without owning the turn: an additional reviewer
-notified of a head, a designer assigned a QUESTION, a critic named in a spec. A label is
+notified of a head, an architect assigned a QUESTION, a critic named in a spec. A label is
 an assignment, not evidence that a prompt arrived, a check passed or an agent runs. Your
 role file, [Merge](#merge), question holds and the failed-check procedure still govern
 what the owner may do.
@@ -277,7 +277,7 @@ The dispatcher repairs the labels with the handoff form of `prompt_agent`.
 
 A brief whose story changes what the user sees names `UX: <entry>` (a `ux-designer`
 entry) and `Graphic designers: <entry>, ...` (one or more `graphic-designer` entries).
-The design lead writes them as [design-software Step 5](../skills/design-software/SKILL.md#step-5-briefs)
+The lead architect writes them as [design-software Step 5](../skills/design-software/SKILL.md#step-5-briefs)
 says; the dispatcher writes them when it creates a brief. Nobody can edit an issue body
 from the dispatcher's tools, so a brief that lacks them goes back to the user with the
 exact lines to add. The principles behind this team are in
@@ -348,7 +348,7 @@ review; a first review covers the full relevant change and affected contracts. E
 advice is not a review.
 
 The default tester assesses correctness and design in one investigation and record.
-An additional designer follows its design-review duties.
+An additional architect follows its design-review duties.
 
 ### PR body
 
@@ -484,7 +484,7 @@ have evidence but still disagree, or if the same finding remains after two fixes
 Post the question and the evidence on the issue with
 `agent/teams/board.py post <issue> BLOCKED`; the post sets `turn:dispatcher` and
 notifies the dispatcher. End your turn. Dispatcher: set Blocked. Route
-consequential technical questions through [designer assignment](roles/dispatcher.md#decisions-during-implementation).
+consequential technical questions through [architect assignment](roles/dispatcher.md#decisions-during-implementation).
 Ask the user about product, scope or tradeoffs needing the user's judgment. Record
 the answer on the issue; the implementer incorporates it before affected work resumes.
 Set Active and hand the turn back with `prompt_agent` and the issue's phase when the

@@ -7,13 +7,13 @@ Read this and your role file at launch and after compaction.
 - Follow your role file and the agreed outcome and constraints in the brief. The user
   owns product scope. The implementer owns a coherent working change and the bounded
   repairs in [Design during delivery](../../skills/implement-software/SKILL.md#design-during-delivery).
-  A named designer owns consequential technical decisions; a linked ANSWER records
+  A named architect owns consequential technical decisions; a linked ANSWER records
   that authority. Editing the brief records a decision, not permission to invent one.
 - Start work on a Herdr message from the dispatcher or the agent handing off to you. End
   your turn after your own handoff. Do not poll.
 - After a restart, read the issue's `phase:` and `turn:` labels first, as
   [Turns](../README.md#turns) says. Never set them by hand; only harness commands do.
-- Route consequential technical questions through the dispatcher to a designer.
+- Route consequential technical questions through the dispatcher to an architect.
   Local source or verification questions may go to the existing reviewer when useful;
   consultation is not a mandatory step. Only the user decides UI,
   UX, user-facing behaviour and PRD questions. Record those decisions on the board.
@@ -30,7 +30,7 @@ Read this and your role file at launch and after compaction.
 
 ## Comments
 
-- Append comments without editing earlier comments. The dispatcher or design lead
+- Append comments without editing earlier comments. The dispatcher or lead architect
   creates a brief; after launch only its implementer maintains its body and PR body.
   The lead maintains a shared spec. Link authoritative decisions instead of copying
   competing versions: a brief is the story issue itself; it links its epic and the
@@ -48,7 +48,7 @@ Read this and your role file at launch and after compaction.
 - Keep each comment under 400 words. If it has more than 800 words, the script warns.
   Explain why it needs that many words. Put logs and screenshots in a gist with `gh gist create <file>`. Link to CI runs by URL. Do not paste output, except the excerpt a decision depends on.
 - Before compaction, restart or session end, or a long step, record any decision or
-  finding not yet posted: the lead designer updates the spec body; everyone else posts
+  finding not yet posted: the lead architect updates the spec body; everyone else posts
   the decision or finding on GitHub. After a restart, reread the brief (`gh issue view <issue>`) and the PR as
   [Turns](../README.md#turns) says.
 - Post the comment, then send the Herdr prompt as a separate step, except for BLOCKED:
@@ -61,7 +61,7 @@ Read this and your role file at launch and after compaction.
   CI run URL, or during the [CI pause](../../../AGENTS.md#github-ci-pause), the local
   command, tested SHA, environment, exit, result and the excerpt the claim depends on.
   Otherwise mark it unverified.
-- Use the [README scale](../README.md#severity). A designer P1 and a tester P1 both
+- Use the [README scale](../README.md#severity). An architect P1 and a tester P1 both
   block progress.
 - Open a new issue for any improvement outside the brief. Keep that work out of the
   current PR.

@@ -1,9 +1,9 @@
-# Designer
+# Architect
 
 Own the affected technical direction and integrate material discoveries. Join a
 brief for a consequential question, or design a feature whose choices are not settled.
 The assignment names a lead and any critics. Independent challenge is useful for an
-unresolved alternative or risk; two-designer agreement is not required for every task.
+unresolved alternative or risk; two-architect agreement is not required for every task.
 The default tester still reviews the resulting code for correctness and design.
 
 ## Read
@@ -70,10 +70,10 @@ round. A settled ordinary brief follows the dispatcher's release path directly.
    to the lead ([Turns](../README.md#turns)); the lead waits for it and cannot poll.
 5. Answer an implementer's QUESTION only when the lead asks.
 
-## Steps: reviewing designer
+## Steps: reviewing architect
 
 1. A PR handoff gives you review duties when you are named in `Required reviews:`.
-   An already attached designer receives the ordinary implementer handoff; otherwise
+   An already attached architect receives the ordinary implementer handoff; otherwise
    the dispatcher launches you with `team.py review <pr> <entry>`. Run the
    `bootstrap.py --commit <head>` command in your own allocation.
 2. Read the brief, then the diff, then the [PR body](../README.md#pr-body). Follow
@@ -98,12 +98,12 @@ unresolved, report the blocker; a clean clone is not proof the assignment is fin
   agreement is complete.
 - Critic: CRITIQUE, AGREE, QUESTION on the spec or brief; `<URL> critique` or
   `<URL> agree` to the lead after each.
-- Reviewing designer: review URL to the merge-confirming tester.
+- Reviewing architect: review URL to the merge-confirming tester.
 
 ## Do not
 
 - Follow the [body ownership rules](common.md#comments); a launched brief belongs to
   its implementer, a shared spec to its lead.
-- The reviewing designer does not run `team.py turn`, review scenarios, run checks or
+- The reviewing architect does not run `team.py turn`, review scenarios, run checks or
   merge. The tester is responsible for those tasks.
 - Do not treat silence as agreement.

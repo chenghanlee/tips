@@ -1,6 +1,6 @@
 ---
 name: review-software-design
-description: Guides the design assessment of a tips PR, by the combined tester or an additional designer. Covers contracts, responsibility, dependencies, state ownership, simplicity, performance and test value.
+description: Guides the design assessment of a tips PR, by the combined tester or an additional architect. Covers contracts, responsibility, dependencies, state ownership, simplicity, performance and test value.
 ---
 
 # Review software design
@@ -8,13 +8,13 @@ description: Guides the design assessment of a tips PR, by the combined tester o
 Check whether a simpler implementation could satisfy the brief's contracts. The
 [design-software](../design-software/SKILL.md) rules are the standard. The
 [tester role](../../teams/roles/tester.md) defines turns and messages; for an additional
-reviewing designer, the [designer role](../../teams/roles/designer.md) does.
+reviewing architect, the [architect role](../../teams/roles/architect.md) does.
 
 Scope limits:
 
 - The combined tester applies this and
   [review-software-correctness](../review-software-correctness/SKILL.md) in one source
-  investigation and review record. An additional designer covers design; the tester
+  investigation and review record. An additional architect covers design; the tester
   remains responsible for scenarios, checks and merge. Reuse shared evidence, not
   duplicate passes or reports. Apply the P2 limit across the combined review.
 - One pass. Report every P0 and P1. Report at most three P2 findings, the ones with the

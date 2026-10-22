@@ -18,7 +18,7 @@ clone starts on `task/<brief>`; you are its only writer until the pair starts.
    decisions it links. A UX choice that changes a technical contract, or needs one the
    brief lacks, is a QUESTION on the brief: post it, send
    `herdr agent prompt dispatcher "<QUESTION URL> question"`, and continue unaffected
-   work; the dispatcher assigns a designer, whose `answer` notice brings the decision.
+   work; the dispatcher assigns an architect, whose `answer` notice brings the decision.
 3. `PRODUCT.md`, the sections the [design index](../../../docs/design/README.md) names,
    and `DESIGN.md` and the component library where they exist. Reading the design
    system is mandatory when there is one; story 1 has none yet.

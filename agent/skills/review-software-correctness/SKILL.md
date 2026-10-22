@@ -126,7 +126,7 @@ For each entry point in the affected code:
 4. If the path reaches an existing contract that no surviving test proves for the
    changed case, file P1 "missing coverage for affected contract `path:line`" with the
    uncovered case. The implementer records the case and supplies the missing evidence;
-   only an unsettled contract needs a designer decision. Prefer extending an existing test.
+   only an unsettled contract needs an architect decision. Prefer extending an existing test.
 
 Probes, by change type:
 

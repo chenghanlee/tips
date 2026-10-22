@@ -138,13 +138,13 @@ ProcessRows = dict[int, tuple[int, str]]
 # The UX design team: one UX designer and one or more graphic designers, launched as a
 # standalone design team on a brief before its pair (README.md#ux-design-team).
 UX_ROLES = ("ux-designer", "graphic-designer")
-ROLES = ("designer", "implementer", "tester", *UX_ROLES)
+ROLES = ("architect", "implementer", "tester", *UX_ROLES)
 # The clients the launcher starts and stop can signal.
 CLIENT_KINDS = ("claude", "codex", "agy")
 # A team's workspace holds one tab per role; every client of that role is a pane in it.
 # The UX design team's two roles share the `ux` tab.
 TABS = {
-    "designer": "designers",
+    "architect": "architects",
     "implementer": "implementers",
     "tester": "reviewers",
     "ux-designer": "ux",

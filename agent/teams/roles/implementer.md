@@ -25,8 +25,8 @@ Implement one brief in your own clone. Manage its PR.
    For a consequential contract question, post a QUESTION naming the assumption,
    consequence and source SHA or supplied evidence, then send
    `herdr agent prompt dispatcher "<QUESTION URL> question"` ([Turns](../README.md#turns));
-   the dispatcher assigns a designer on this brief. Continue unaffected work; the
-   designer's `<ANSWER URL> answer` notice brings the decision. Incorporate it
+   the dispatcher assigns an architect on this brief. Continue unaffected work; the
+   architect's `<ANSWER URL> answer` notice brings the decision. Incorporate it
    before resuming affected work. Product or scope questions go to the dispatcher as
    `blocked`. A local question may go to your reviewer when its evidence would help.
    A `hold` notice pauses the dependent work it names until its `decision` notice
@@ -100,5 +100,5 @@ one to save a tool call.
 - Do not add product capabilities outside the agreed scope. Internal structure follows
   the bounded repair authority in the implementation skill.
 - Run the check that proves completion before reporting the work as done.
-- Do not decide disagreements between designers.
+- Do not decide disagreements between architects.
 - Do not edit another agent's comment or a shared spec body.

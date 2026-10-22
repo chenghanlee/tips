@@ -90,7 +90,7 @@ def turn_command(recipient: str) -> str:
 
 
 REVIEW_STEPS = {
-    "reviewing designer": 'Follow "Steps: reviewing designer" in agent/teams/roles/designer.md '
+    "reviewing architect": 'Follow "Steps: reviewing architect" in agent/teams/roles/architect.md '
     "and agent/skills/review-software-design/SKILL.md. ",
     "additional tester": "Follow the review steps in agent/teams/roles/tester.md. ",
 }
@@ -120,11 +120,11 @@ def design_brief(record: Record, entry: str) -> str:
     assignment = (
         "If it assigns you a QUESTION, read it and its evidence; for a named source SHA, run "
         f"python3 {harness() / 'bootstrap.py'} --commit <sha> in your own clone before "
-        "deciding; follow the designer role's bounded-question steps. Otherwise follow "
-        "the designer role's initial-design steps. "
+        "deciding; follow the architect role's bounded-question steps. Otherwise follow "
+        "the architect role's initial-design steps. "
     )
     return (
-        identity(record, entry, "designer")
+        identity(record, entry, "architect")
         + bootstrap_brief(allocation, "")
         + "Read the issue with "
         f"gh issue view {record['brief']}; it names the lead and any critics. "

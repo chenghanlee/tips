@@ -78,16 +78,16 @@ effort = "xhigh"
 db_suffix = "_sol"
 port_offset = 2
 
-[agents.fable-designer]
-role = "designer"
+[agents.fable-architect]
+role = "architect"
 kind = "claude"
 model = "claude-fable-5-1"
 effort = "high"
 db_suffix = "_fable"
 port_offset = 3
 
-[agents.astra-designer]
-role = "designer"
+[agents.astra-architect]
+role = "architect"
 kind = "codex"
 model = "gpt-6-astra"
 effort = "xhigh"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Manage teams in Herdr: start a brief's pair, launch reviewers and designers, hand off, stop.
+"""Manage teams in Herdr: start a brief's pair, launch reviewers and architects, hand off, stop.
 
 Configured agents are `[agents.<entry>]` in config.toml. Every client gets an allocation with
 a generation ID that never repeats: an empty project directory it clones into itself with
@@ -764,19 +764,19 @@ def untrust_agy_workspace(root: Path) -> str:
 
 
 def current_roster(record: Record) -> tuple[list[str], list[str]]:
-    """Read additional testers and designers from the brief; no separate list is stored.
+    """Read additional testers and architects from the brief; no separate list is stored.
 
     The pair owners are fixed in the record, so a brief that names another implementer
     or first tester is refused wherever it is read.
     """
-    implementer, testers, designers = roster(record["brief"])
+    implementer, testers, architects = roster(record["brief"])
     if (implementer, testers[0]) != (record["implementer"], record["tester"]):
         raise RuntimeError(
             f"Brief #{record['brief']} changed its implementer or merge-confirming tester "
             "since launch; the pair checkout cannot change hands. Stop the brief after its "
             "work is merged, or restore the brief."
         )
-    return testers[1:], designers
+    return testers[1:], architects
 
 
 def team_record(issue: str, kind: str, implementer: str, tester: str) -> Record:
@@ -856,11 +856,11 @@ def start(brief: str) -> None:
 
 
 def design(issue: str, entry: str) -> None:
-    """Join a started brief or a spec with a designer in its own allocation, or launch a
+    """Join a started brief or a spec with an architect in its own allocation, or launch a
     UX design team member on a brief before its pair (README.md#ux-design-team)."""
     agent = conf.settings()["agents"].get(entry)
-    if agent is None or agent["role"] not in ("designer", *UX_ROLES):
-        raise RuntimeError(f"{entry} is not a configured designer entry")
+    if agent is None or agent["role"] not in ("architect", *UX_ROLES):
+        raise RuntimeError(f"{entry} is not a configured architect entry")
     role = agent["role"]
     tools()
     with store_lock():
@@ -892,7 +892,7 @@ def design(issue: str, entry: str) -> None:
         elif record["kind"] == "brief":
             current_roster(record)
         if entry not in record["agents"]:
-            duty = role if role in UX_ROLES else "designer"
+            duty = role if role in UX_ROLES else "architect"
             branch = f"task/{issue}" if role == "ux-designer" else ""
             configure_bootstrap(record, add_allocation(record, entry, duty), branch, "")
             save_record(record)
@@ -935,13 +935,13 @@ def review(number: str, entry: str) -> None:
     pr = pull_request(number)
     with store_lock():
         record = brief_record(pr)
-        testers, designers = current_roster(record)
-        if entry not in testers + designers:
+        testers, architects = current_roster(record)
+        if entry not in testers + architects:
             raise RuntimeError(
                 f"{entry} is not an additional reviewer of brief #{record['brief']} "
-                f"(additional reviewers: {', '.join(testers + designers) or 'none'})"
+                f"(additional reviewers: {', '.join(testers + architects) or 'none'})"
             )
-        duty = "reviewing designer" if entry in designers else "additional tester"
+        duty = "reviewing architect" if entry in architects else "additional tester"
         allocation = record["agents"].get(entry) or add_allocation(record, entry, duty)
         allocation["pr"] = number
         save_record(record)
@@ -1014,8 +1014,8 @@ def caller_record() -> tuple[Record, str]:
 
 def required_reviewers(record: Record) -> list[str]:
     """The brief's current `Required reviews:` entries, merge-confirming tester first."""
-    testers, designers = current_roster(record)
-    return [record["tester"], *testers, *designers]
+    testers, architects = current_roster(record)
+    return [record["tester"], *testers, *architects]
 
 
 def observe_pr(pr: PullRequest) -> tuple[str, list[str]]:

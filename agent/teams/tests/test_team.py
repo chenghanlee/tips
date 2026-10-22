@@ -858,7 +858,7 @@ class PairLifecycleTest(Harness):
     def test_invalid_config_refuses_before_herdr(self) -> None:
         cases = (
             (f"port_base = {PORT_BASE}", 'port_base = "wrong"', "team.port_base must be int"),
-            ('role = "designer"', 'role = "architect"', "agents.critic.role must be one of"),
+            ('role = "architect"', 'role = "sculptor"', "agents.critic.role must be one of"),
             ('kind = "agy"', 'kind = "gemini"', "agents.gem.kind must be one of claude, codex"),
             ('agy_settings = "', 'agy_settings = "" #', "launch.agy_settings must name agy"),
             ('model = "fixture-test"', 'model = "x"\nadviser = "y"', "unknown keys ['adviser']"),
@@ -1234,17 +1234,17 @@ class HandoffTest(Harness):
         critic = self.pane("team-1-critic")
         assert critic["cwd"] == str(root)
         brief = self.system_prompt("team-1-critic")
-        assert brief.startswith("You are critic, the reviewing designer for brief #29;")
+        assert brief.startswith("You are critic, the reviewing architect for brief #29;")
         assert "Your persona: operations: failure and recovery paths." in brief
         assert f"bootstrap.py --commit {head}" in brief
         assert f"Review PR https://github.com/o/r/pull/7 at {head} from your own clone" in brief
         assert "herdr agent prompt team-1-tester" in brief
-        assert 'Follow "Steps: reviewing designer" in agent/teams/roles/designer.md' in brief
+        assert 'Follow "Steps: reviewing architect" in agent/teams/roles/architect.md' in brief
         allocation = self.record(1)["agents"]["critic"]
         assert (allocation["pr"], allocation["head"]) == ("7", head)
         assert allocation["session"] == self.launched_session("team-1-critic")
         assert self.comments("29")[-1]["body"].startswith(
-            f"EVENT designer team-1-critic {allocation['session']}\nlaunched claude in "
+            f"EVENT architect team-1-critic {allocation['session']}\nlaunched claude in "
         )
         # The reviewer clones and checks out the head under its own authority.
         self.bootstrap("team-1-critic", "--commit", head)
@@ -1262,7 +1262,7 @@ class HandoffTest(Harness):
         assert self.tabs("w1") == {
             "implementers": ["team-1-impl"],
             "reviewers": ["team-1-tester", "team-1-second"],
-            "designers": ["team-1-critic"],
+            "architects": ["team-1-critic"],
         }
         assert second["split"] == "right"
         # A running reviewer keeps the head its record names.
@@ -1314,7 +1314,7 @@ class HandoffTest(Harness):
 
 
 class DesignTest(Harness):
-    def test_a_designer_joins_a_full_brief_then_reviews_and_retires_with_it(self) -> None:
+    def test_an_architect_joins_a_full_brief_then_reviews_and_retires_with_it(self) -> None:
         self.write_config(CONFIG.replace("max_teams = 6", "max_teams = 1"))
         ordinary = "Implementer: impl\nRequired reviews: tester\n"
         self.update(issues={**self.state()["issues"], "29": ordinary})
@@ -1346,13 +1346,13 @@ class DesignTest(Harness):
         assert all(question_head in e[3] for e in notices)
         assert len(self.events("agent", "start")) == starts
 
-        # The attached designer retires with the pair once the brief is merged.
+        # The attached architect retires with the pair once the brief is merged.
         self.merge(question_head)
         self.clients_exit(1)
         assert "slot 1 released" in self.team("stop", "29").stdout
         assert self.recorded_briefs() == set()
 
-    def test_attaching_a_designer_checks_the_existing_pair_ownership(self) -> None:
+    def test_attaching_an_architect_checks_the_existing_pair_ownership(self) -> None:
         self.team("start", "29")
         self.update(
             issues={
@@ -1364,36 +1364,37 @@ class DesignTest(Harness):
         assert "changed its implementer or merge-confirming tester" in refused.stderr
         assert "critic" not in self.record(1)["agents"]
 
-    def test_a_designer_uses_the_same_allocation_lifecycle(self) -> None:
+    def test_an_architect_uses_the_same_allocation_lifecycle(self) -> None:
         self.team("design", "50", "critic")
-        # A new spec team gives the turn to the spec's lead, not to the designer launched.
+        # A new spec team gives the turn to the spec's lead, not to the architect launched.
         assert self.labels("50") == ["phase:design", "turn:lead"]
         record = self.record(1)
         assert (record["kind"], record["brief"], record["generation"]) == ("design", "50", 1)
         assert (record["implementer"], record["tester"]) == ("", "")
         root = self.trusted / "allocations/g1-critic"
         assert self.pane("team-1-critic")["cwd"] == str(root)
-        assert self.tabs("w1") == {"designers": ["team-1-critic"]}
+        assert self.tabs("w1") == {"architects": ["team-1-critic"]}
         brief = self.system_prompt("team-1-critic")
-        assert brief.startswith("You are critic, the designer for spec #50;")
-        assert "agent/teams/roles/common.md and agent/teams/roles/designer.md;" in brief
+        assert brief.startswith("You are critic, the architect for spec #50;")
+        assert "agent/teams/roles/common.md and agent/teams/roles/architect.md;" in brief
         assert "bootstrap.py:" in brief
-        # The launch EVENT lets board.py usage find the designer's session.
+        # The launch EVENT lets board.py usage find the architect's session.
         assert self.comments("50")[-1]["body"] == (
-            f"EVENT designer team-1-critic {self.launched_session('team-1-critic')}\n"
+            f"EVENT architect team-1-critic {self.launched_session('team-1-critic')}\n"
             f"launched claude in {root}; allocation g1-critic; launch "
             f"{self.record(1)['agents']['critic']['launch']}; database suffix _t1g1c; "
             f"port {PORT_BASE + 12}"
         )
-        # A second designer joins the spec's team in its own allocation; non-designers
+        # A second architect joins the spec's team in its own allocation; non-architects
         # are refused.
         refused = self.team("design", "50", "tester", ok=False)
-        assert "tester is not a configured designer entry" in refused.stderr
+        assert "tester is not a configured architect entry" in refused.stderr
         self.team("design", "50", "lead")
         assert self.record(1)["agents"]["lead"]["root"] == str(self.trusted / "allocations/g1-lead")
-        assert self.tabs("w1") == {"designers": ["team-1-critic", "team-1-lead"]}
-        assert self.prompts("team-1-lead")[0].startswith("You are lead, the designer for spec #50;")
-        assert self.comments("50")[-1]["body"].startswith("EVENT designer team-1-lead ")
+        assert self.tabs("w1") == {"architects": ["team-1-critic", "team-1-lead"]}
+        prompt = self.prompts("team-1-lead")[0]
+        assert prompt.startswith("You are lead, the architect for spec #50;")
+        assert self.comments("50")[-1]["body"].startswith("EVENT architect team-1-lead ")
         self.bootstrap("team-1-critic")
         project = root / "project"
         assert self.git("rev-parse", "HEAD", cwd=project) == self.git("rev-parse", "HEAD")
@@ -2287,6 +2288,6 @@ class UxDesignTeamTest(Harness):
         )
         refused = self.team("start", "62", ok=False)
         assert (
-            "names pix, a graphic-designer entry; only tester and designer entries review"
+            "names pix, a graphic-designer entry; only tester and architect entries review"
             in refused.stderr
         )

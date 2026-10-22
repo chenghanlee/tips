@@ -68,7 +68,7 @@ db_suffix = "r"
 port_offset = 1
 
 [agents.critic]
-role = "designer"
+role = "architect"
 kind = "claude"
 model = "fixture-critic"
 effort = "high"
@@ -85,7 +85,7 @@ db_suffix = "s"
 port_offset = 3
 
 [agents.lead]
-role = "designer"
+role = "architect"
 kind = "codex"
 model = "fixture-lead"
 effort = "high"
