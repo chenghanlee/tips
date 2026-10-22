@@ -23,10 +23,14 @@ Implement one brief in your own clone. Manage its PR.
    agreed outcome and constraints. Make settled internal choices and bounded repairs
    under the skill's [Design during delivery](../../skills/implement-software/SKILL.md#design-during-delivery).
    For a consequential contract question, post a QUESTION naming the assumption,
-   consequence and source SHA or supplied evidence. Notify the dispatcher to assign a
-   designer on this brief. Continue unaffected work; incorporate the linked ANSWER
+   consequence and source SHA or supplied evidence, then send
+   `herdr agent prompt dispatcher "<QUESTION URL> question"` ([Turns](../README.md#turns));
+   the dispatcher assigns a designer on this brief. Continue unaffected work; the
+   designer's `<ANSWER URL> answer` notice brings the decision. Incorporate it
    before resuming affected work. Product or scope questions go to the dispatcher as
    `blocked`. A local question may go to your reviewer when its evidence would help.
+   A `hold` notice pauses the dependent work it names until its `decision` notice
+   ([Changed binding decisions](../README.md#changed-binding-decisions)).
 2. Follow the skill. Keep verification proportionate to the affected contracts and
    explain changes to an existing test budget in the PR.
 3. Record deferred work in one follow-up issue before handoff.
@@ -46,19 +50,18 @@ Implement one brief in your own clone. Manage its PR.
 Apply the matching rule before every test command, edit and source read. Do not skip
 one to save a tool call.
 
-1. **Tests.** For every `mix test` invocation, including one test, one file and reruns,
-   run from your clone's root:
-   `mkdir -p tmp && mix test <args> --max-failures 1 > tmp/<name>.log 2>&1; echo "exit=$?"`.
-   Use a new `<name>` per run. The printed `exit=` is the result. On `exit=0`, read
-   `tail -n 10 tmp/<name>.log` and stop. On any other exit, run
-   `grep -n -E 'failure|error|seed|\*\*' tmp/<name>.log | head -n 40`, then
-   `sed -n` at most 60 lines around the first failure. Never `cat` or Read the whole log.
+1. **Tests.** Run every `mix test` as the [test log rule](../../../AGENTS.md#test-logs)
+   says, with `--max-failures 1`.
    Run the browser suite yourself, serial with timeouts off, when the repository has
-   one (`mix test test/tips_web/features --trace`)
+   one (`mix test --only browser --trace`; feature modules carry `@moduletag :browser`
+   and `test/test_helper.exs` excludes the tag by default, so plain `mix test` runs the
+   rest once per head; add both, and the browser command to the
+   [README checks](../../../README.md#test-changes), with the first feature test)
    with the same logging but without `--max-failures 1`: the
    [failed-check rule](../README.md#report-and-resolve-blockers) needs every failing
-   test name. Plain `mix test` covers the rest, so the unit suite runs once per head.
-   Keep that log until cleanup; record its command, exit and results in the PR body under
+   test name.
+   Keep that log until cleanup; record both commands, exits, results and excluded counts
+   in the PR body under
    "Checks not run by CI" as the [CI pause rule](../../../AGENTS.md#github-ci-pause) says.
    A Codex tester inspects that record instead
    ([manual browser review](../README.md#manual-browser-review)).
@@ -86,8 +89,8 @@ one to save a tool call.
 
 ## Messages you send
 
-- QUESTION on the brief, to the dispatcher for designer assignment, or to the assigned
-  lead. Local questions may go to the existing reviewer.
+- QUESTION on the brief, then `<QUESTION URL> question` to the dispatcher, or to the
+  assigned lead. Local questions may go to the existing reviewer.
 - `team.py turn <pr> <tester entry>` after each push.
 - `blocked` to the dispatcher, as the [blocker procedure](../README.md#report-and-resolve-blockers) says.
 

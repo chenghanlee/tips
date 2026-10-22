@@ -11,12 +11,24 @@ def bootstrap_brief(allocation: Allocation, commit: str) -> str:
     instructions: the client starts in the allocation directory, outside the clone."""
     _, project, logs, _ = allocation_paths(allocation["id"])
     command = f"python3 {harness() / 'bootstrap.py'}" + (f" --commit {commit}" if commit else "")
-    role = f"agent/teams/roles/{event_role(allocation)}.md"
+    duty = event_role(allocation)
+    role = f"agent/teams/roles/{duty}.md"
+    if duty == "graphic-designer":
+        # It reads the brief and writes images; it has no Elixir work and posts nothing, so
+        # bootstrap skips the language setup and a failure goes to its UX designer.
+        prepares = "and writes its helpers; it fetches no dependencies and starts no Dexter"
+        failure = (
+            "send bootstrap failed: <error> to your UX designer named below with "
+            "herdr agent prompt and stop"
+        )
+    else:
+        prepares = "fetches dependencies and starts Dexter"
+        failure = "report blocked with its error and stop"
     return (
         f"Your allocation is {allocation['id']}; your project is {project}. First run "
-        f"{command}: it clones the repository into the project or reuses your clone, fetches "
-        "dependencies and starts Dexter. Its full log is in "
-        f"{logs}. If it fails, report blocked with its error and stop; do not prepare the "
+        f"{command}: it clones the repository into the project or reuses your clone, "
+        f"{prepares}. Its full log is in "
+        f"{logs}. If it fails, {failure}; do not prepare the "
         f"project another way. Then work only in {project}: read its AGENTS.md, "
         f"agent/teams/roles/common.md and {role}; they were not loaded at startup. Read "
         "agent/teams/README.md sections only where those files or messages link them. "
@@ -56,7 +68,10 @@ def pair_brief(record: Record, entry: str, duty: str) -> str:
     if entry == implementer:
         handoff = f"After each push, hand the head to the reviewers with {turn_command(tester)}. "
     else:
-        handoff = f"Hand findings to the implementer with {turn_command(implementer)}. "
+        handoff = (
+            "Hand a P0 or P1 finding or a hold to the implementer with "
+            f"{turn_command(implementer)}; Optional P2s need no turn. "
+        )
     return (
         identity(record, entry, duty)
         + bootstrap_brief(allocation, "")
@@ -100,12 +115,13 @@ def reviewer_brief(record: Record, entry: str, duty: str, pr: PullRequest) -> st
 
 def design_brief(record: Record, entry: str) -> str:
     allocation = record["agents"][entry]
+    # The issue, not the record's kind, says which steps apply: a brief in its UX phase
+    # holds a design record, and a spec can carry a later bounded question.
     assignment = (
-        "Read the assigned QUESTION and its evidence. For a named source SHA, run "
+        "If it assigns you a QUESTION, read it and its evidence; for a named source SHA, run "
         f"python3 {harness() / 'bootstrap.py'} --commit <sha> in your own clone before "
-        "deciding. Follow the designer role's bounded-question steps. "
-        if record["kind"] == "brief"
-        else "Follow the designer role's initial-design steps. "
+        "deciding; follow the designer role's bounded-question steps. Otherwise follow "
+        "the designer role's initial-design steps. "
     )
     return (
         identity(record, entry, "designer")
@@ -179,8 +195,9 @@ def tester_message(record: Record, pr: PullRequest, missing: list[str], failures
         "agent/skills/review-software-design/SKILL.md from your clone and use the "
         "README PR review record. "
         f"Put {tester}, <session> on line 2; replace <session> with your session ID. "
-        "When your review or any required reviewer's latest review of this head has findings, "
-        f"run {turn_command(implementer).replace('<pr>', pr.number)}; do not wait for the "
+        "When your review or any required reviewer's latest review of this head has a P0 or "
+        f"P1 finding or a hold, run {turn_command(implementer).replace('<pr>', pr.number)}; "
+        "Optional P2s need no turn. Do not wait for the "
         f"other reviews. Follow the README merge step when python3 {harness() / 'pr_review.py'} "
         f"observe {pr.number} reports ready to merge. After the merge, notify the dispatcher "
         f"with herdr agent prompt dispatcher '{pr.url} done'."
@@ -206,7 +223,8 @@ def implementer_message(pr: PullRequest, failures: list[str]) -> str:
     message = f"Your turn on {pr.url}: run python3 {tools} list {pr.number} and "
     message += f"python3 {tools} observe {pr.number}. " + failures_text(failures)
     message += (
-        "Fix review findings, failed checks and merge conflicts following "
+        "Fix P0 and P1 findings (Optional P2s need no disposition), failed checks and "
+        "merge conflicts following "
         "agent/skills/implement-software/SKILL.md from your clone. Push your changes, then "
         "run turn to the tester again; it notifies every required reviewer. "
         "If blocked, follow the README blocker procedure."

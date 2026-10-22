@@ -42,14 +42,10 @@ dirty clone and never resets one.
    record that in your review; the merge-confirming tester then runs
    `agent/teams/team.py turn <pr> <implementer entry>` to request it, and any other
    tester sends its review URL to the merge-confirming tester. For manual checks follow [manual browser review](../README.md#manual-browser-review), including its Codex setup, launch form and failure steps.
-5. For a brief with a `UX:` line, compare the built screens side by side with the
-   images under `design/<brief>/` at the approved SHA, at the viewports and states
-   `candidate.md` names, with the authoritative copy and the disclosed differences;
-   severity by consequence ([UX design team](../README.md#ux-design-team)). For a
-   changed page, form or component, apply the
-   [web-design-guidelines](../../skills/web-design-guidelines/SKILL.md) rules to the
-   affected templates, CSS and JS: resolve the rules' source commit, fetch that
-   revision (a Codex client uses `curl` against GitHub) and record it.
+5. For a brief with a `UX:` line, or a changed page, form or component, apply the
+   [Record](../../skills/review-software-design/SKILL.md#record) section of
+   review-software-design: the candidate comparison and the pinned web-design-guidelines
+   check.
 6. Submit the [review record](../README.md#pr-review-record). Without a P0 or P1 finding
    or a hold, submit LGTM; P2s go under [Optional](../README.md#optional-p2-findings).
    Other tester: send your review URL to the merge-confirming tester.
@@ -67,12 +63,16 @@ from your own clone and an ANSWER on the brief. This is optional help. A consequ
 decision needing independent technical judgment goes to the appropriate designer;
 checking conformity with your own answer is not independent validation of that decision.
 
-For a changed binding decision, follow [Changed binding decisions](../README.md#changed-binding-decisions).
+For a changed binding decision, follow [Changed binding decisions](../README.md#changed-binding-decisions):
+on the lead's `<URL> hold`, the merge-confirming tester submits the non-LGTM hold
+review and sends `<review URL> held` to the lead; on `<URL> decision`, it reviews
+against the adopted decision before replacing the hold.
 
 ## Messages you send
 
 - `team.py turn <pr> <implementer entry>` when the head has a P0 or P1 finding or a hold.
 - Review URL to the merge-confirming tester, if you are not it.
+- `<review URL> held` to the lead after a hold review.
 - `done` or `blocked` to the dispatcher.
 
 ## Do not

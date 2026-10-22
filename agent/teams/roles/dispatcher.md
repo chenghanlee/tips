@@ -12,7 +12,8 @@ with `phase` wrote stay.
 
 ## Choose work
 
-At startup, after each `done` or `blocked` message, and when the user reports a change,
+At startup, after each `done`, `blocked`, `question`, `review:` or `approved` message,
+and when the user reports a change,
 check [Project 15](https://github.com/users/chenghanlee/projects/15) for the priority
 order and open issues (`project_read` lists the items that are not Done; read one with
 `issue_read`). Also check open PRs (`pr_list`, `pr_state`) and running teams and their
@@ -23,12 +24,13 @@ the task and main SHAs, using local reproductions during the
 
 - Set merged issues Done (`project_set_field`, Status). An issue with an open question
   stays Blocked.
-- For each free slot (`team.max_teams` in [config.toml](../config.toml)), take the
+- For each free slot (`status` prints the slot capacity and the configured entries with
+  their role, client kind and model), take the
   eligible task with the most value for the next slice. Use this priority order: the
   user's stated priority, unblocking a gate, completing a usable flow, then
   fixing a regression. Prioritize product progress over tooling work.
 - Eligible means: prerequisites complete, a bounded outcome with acceptance scenarios,
-  no running pair or open PR owns it, and no active issue names the same table, API
+  no running team or open PR owns it, and no active issue names the same table, API
   or data rule. One PR per issue; split first.
 - Ask the user only for product, scope, access, purchase or approval decisions.
   Give each question numbered options, each with its follow-through, so the user can
@@ -39,8 +41,15 @@ the task and main SHAs, using local reproductions during the
 
 ## Open a feature
 
-For settled bounded work, create a brief directly with the user's outcome,
-constraints, acceptance examples and configured implementer/reviewer. The implementer
+The brief is the story issue: one issue, one branch `task/<issue>`, one PR that closes
+it ([PRODUCT.md](../../../PRODUCT.md#principles)). For settled bounded work, create it
+with `issue_create` from the user's story: outcome,
+constraints, acceptance examples and the roster lines (`Implementer:`,
+`Required reviews:` and, when the story changes what the user sees, `UX:` and
+`Graphic designers:`; see [Rules carried](#rules-carried-from-agentsmd-and-the-readme)).
+You cannot edit a body later, so write every line at creation. If the user already
+opened the story as an issue, give the user the exact roster lines to paste into its
+body, then release it. Ask the user to add the issue under its epic. The implementer
 inspects source and maintains its technical detail. Do not invent source facts or
 require a spec solely to obtain advance agreement. Add the brief to Project 15 and
 record your launch EVENT as in step 1 below. Use the steps below when actual
@@ -54,11 +63,15 @@ initial design choices need designers; a shared spec is useful for common contra
    the header carries your session. `usage_summary` counts every session a `launched`
    EVENT names. A Codex client's row sums every Codex session started in its allocation,
    so an `unknown` launch session still counts. Write the agent set in the body: designers and the lead (a `Lead: <entry>` line), testers and the
-   merge-confirming tester, and any additional required reviewers, each an `[agents.<entry>]` entry.
+   merge-confirming tester, and any additional required reviewers, each an entry `status` lists.
 2. Launch each designer with `start_design` (spec, entry). Each gets its own allocation
    and clone, with its own database suffix and port, and its launch EVENT on the spec.
-   The spec body tells it whether it is lead or critic. Retire the spec's team with
-   `retire_team` when the feature is done; [cleanup](../README.md#cleanup) then deletes
+   The spec body tells it whether it is lead or critic. Call `retire_team` on the spec
+   when its lead sends `done` and the board shows each attached designer's assignment
+   complete or handed off (the [retirement check](#retirement-check)); do not hold the
+   slot until dependent briefs merge. Later questions on a started brief go through
+   [Decisions during implementation](#decisions-during-implementation).
+   [Cleanup](../README.md#cleanup) then deletes
    their clean clones and drops their databases.
 3. Assign these personas: architecture (data integrity, contract boundaries,
    consistency, simplicity, testability, effects on other code) and operations (failure
@@ -78,33 +91,54 @@ Start a brief only when all these conditions are met:
   prerequisites and active ownership meet the eligibility rules above.
 - The brief has an outcome, constraints, acceptance examples, an `Implementer:` entry
   and `Required reviews:` naming the merge-confirming tester and, once each, any
-  additional reviewer whose contribution the brief names. A designer is optional. Link relevant known
+  additional reviewer whose contribution the brief names. A story that changes what the
+  user sees also has `UX:` and `Graphic designers:` lines. A designer is optional. Link relevant known
   contracts; the implementer fills source-derived details without changing scope.
 
 If a design round had one designer and no critic, check its PROPOSAL against these
 conditions; do not substitute dispatch judgment for missing technical evidence. Start
 the pair (`start_pair`) and set the brief's Agent to the implementer entry and its
 Status to Active (`project_set_field`).
-Send a design decision link with `prompt_agent` when one applies. When a tester asks,
-launch each additional required reviewer (`launch_reviewer`). After the
-merge-confirming tester reports `done`, confirm the merge (`pr_state`). Once any attached
-designer's assignment is complete or handed off to a reachable successor, call
+Send a design decision link with `prompt_agent` when one applies. On
+`<PR URL> review: run ... team.py review <pr> <entry>` (the implementer's `turn` sends
+it), call `launch_reviewer` for each named entry. After the
+merge-confirming tester reports `done`, confirm the merge (`pr_state`), run the
+[retirement check](#retirement-check) and call
 `retire_team` once. If it refuses a brief closed without a merged PR, ask the user to run
 `team.py stop <brief> --abandon` ([abandon](../README.md#retire-a-brief-closed-without-a-merged-pr)).
+
+### Retirement check
+
+Before `retire_team`, read the issue (`issue_read`, `board_read`). Each attached
+designer's assignment is complete when it posted its terminal record: the lead's
+`done`, a critic's AGREE on the final PROPOSAL, or the ANSWER to an assigned QUESTION.
+A handoff also completes it: a comment naming a lead on another running team, and that
+lead's reply accepting it. A UX team's record is the approval the [UX design
+team](#ux-design-team) section validates; graphic designers post nothing.
+Silence is not acceptance. If an assignment is open, prompt that designer for the
+missing post, or report the blocker to the user; do not retire over it.
 
 ## UX design team
 
 For a brief with a `UX:` line, follow the [UX design team](../README.md#ux-design-team)
 steps: once the brief meets the release conditions except approval, call `start_design`
-for the UX entry and then for each entry on `Graphic designers:`. Tell the user which
+for the UX entry and then for each entry on `Graphic designers:`, then set the brief's
+Status to Active and its Agent to the UX entry (`project_set_field`). Tell the user which
 pane the UX designer waits in. When the UX designer sends `<comment URL> approved`, read
-the comment with `board_read`; if it is the user's `APPROVED candidate <SHA>` record, call
-`retire_team` then `start_pair`. `start_pair` refuses a `UX:` brief without that comment.
+the comment with `board_read`. It must be the user's comment, begin with
+`APPROVED candidate` and the full 40-character SHA, and name the SHA of the candidate
+PROPOSAL; otherwise tell the user what to fix and stop. If it does and the release
+conditions still hold, call `retire_team` then `start_pair`. The UX team's own ownership
+of the brief is the expected state, not a conflict; the ownership rule still excludes
+other teams and open PRs. `start_pair` refuses a `UX:` brief without that comment.
+A UX designer's `<URL> question` is a technical QUESTION: handle it under
+[Decisions during implementation](#decisions-during-implementation).
 A UX question that arrives as `blocked` after the pair started goes to the user.
 
 ## Decisions during implementation
 
-For a consequential technical QUESTION, name a lead and the question link on the
+On `<QUESTION URL> question` from an implementer or UX designer, name a lead and the
+question link on the
 brief with `board_post`, then call `start_design` with that brief number in `spec` and
 the designer entry. A started brief uses its existing slot, even at full capacity.
 The implementer incorporates the assignment and answer into the body. For another
@@ -115,8 +149,10 @@ The question names source evidence and the decision needed. The designer inspect
 source and answers; you route its answer, not decide architecture without source
 access. A second designer joins only when its independent expertise is useful. A
 shared spec can be maintained by a designer attached to an affected brief without
-allocating a separate spec team. Follow the shared-decision and retirement rules in
-[the designer role](designer.md).
+allocating a separate spec team. A changed binding decision holds the affected PRs
+through the lead's `hold`, the tester's `held` and the lead's `decision` notices
+([Changed binding decisions](../README.md#changed-binding-decisions)); you only route
+a `blocked` that comes out of it. Retire with the [retirement check](#retirement-check).
 
 ## Revert a broken main
 
@@ -159,7 +195,16 @@ cost, not zero. Post the usage table on the spec when the final brief merges.
 - Brief roster: `Implementer: <entry>` and `Required reviews: <entry>, ...`, testers
   first; the first tester confirms the merge. Default: one implementer and one tester.
   Add a reviewer only when the brief names what it adds, such as client or LiveView
-  state, timers or concurrency the tester's checks may not exercise.
+  state, timers or concurrency the tester's checks may not exercise. A story that
+  changes what the user sees also names `UX: <ux-designer entry>` and
+  `Graphic designers: <entry>, ...` (one or more graphic-designer entries). Name an
+  `agy` graphic designer only after the user confirms its setup run
+  ([setup](../SETUP.md#one-time-setup)).
+- Implementer model: name the Haiku implementer only when the brief names every file,
+  function, contract and scenario, no design choice is open, no schema, migration,
+  process or external service is added, and a mechanical check proves the result.
+  Otherwise name an Opus implementer and say which condition failed
+  ([design-software](../../skills/design-software/SKILL.md#step-7-choose-the-implementer)).
 - PR P2s are optional: they need no reply, fix or deferral and do not block `LGTM`
   ([Optional P2 findings](../README.md#optional-p2-findings)). A deferral in the brief's
   decisions table or a linked follow-up issue settles a P2 while its assumptions hold;
@@ -174,5 +219,5 @@ cost, not zero. Post the usage table on the spec when the final brief merges.
   `turn:<entry>`, then sends. Agents report a label contradiction as `blocked` only
   for a repair handoff naming a closed PR; a missing `phase:` or `turn:` label, or two
   of one prefix (a brief started before the labels has none); or a `turn:` value that
-  is neither `dispatcher` nor an entry assigned on the issue (brief roster, spec lead or
-  critics, a QUESTION assignment).
+  is neither `dispatcher` nor an entry assigned on the issue (brief roster, the brief's
+  `UX:` entry, spec lead or critics, a QUESTION assignment).

@@ -58,10 +58,11 @@ personal outreach.
 - Reuse over invent. Prefer industry standards, guidelines, libraries and tools to our
   own designs.
 - Simplest working solution. Add a part when a story needs it, not before.
-- Process. An epic is an issue with the label `epic`; its stories are sub-issues. A
-  story has one branch `task/<issue>` and one PR that says "Closes #<issue>", merged
-  with a merge commit after pair review. Done means merged and tried by the user.
-  Project 15 holds status only.
+- Process. An epic is an issue with the label `epic`; its stories are sub-issues. The
+  story issue is the brief the agents work from: it carries the roster lines, has one
+  branch `task/<issue>` and one PR that says "Closes #<issue>", merged
+  with a merge commit after pair review. Project 15 Done means merged; the user tries
+  each story before the next one is written. Project 15 holds status only.
 
 ## Where things live
 

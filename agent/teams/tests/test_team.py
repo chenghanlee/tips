@@ -1063,7 +1063,9 @@ class HandoffTest(Harness):
         assert f"python3 {harness / 'bootstrap.py'} --commit {pushed}" in ring
         assert "it refuses a dirty clone" in ring
         assert "Put tester, <session> on line 2" in ring
-        assert f"python3 {harness / 'team.py'} turn 7 impl; do not wait" in ring
+        # Only a P0, P1 or hold sends the head back; Optional P2s need no turn (#515).
+        turn = f"python3 {harness / 'team.py'} turn 7 impl"
+        assert f"has a P0 or P1 finding or a hold, run {turn}; Optional P2s need no turn." in ring
         assert "asked the dispatcher to launch critic" in ring
         assert "pr_review.py observe 7 reports ready to merge" in ring
         assert sent[1][3] == (
@@ -1867,6 +1869,10 @@ class LaunchRecoveryTest(Harness):
         status = self.team("status").stdout
         assert "team-1-tester: startup incomplete in" in status
         assert "team-1-impl: running in" in status
+        # The dispatcher reads capacity and the entries it may name from here, not files.
+        assert "slots: 6\n" in status
+        assert "entry impl: implementer, codex, fixture-impl\n" in status
+        assert "entry gem: graphic-designer, agy, fixture-gem\n" in status
         rerun = self.team("start", "29").stdout
         assert "team-1-tester: task submission is unknown; nothing was resent" in rerun
         assert f"python3 '{self.repo / 'agent/teams/team.py'}' reset 29 tester and" in rerun
@@ -2164,6 +2170,10 @@ class UxDesignTeamTest(Harness):
         assert "Your UX designer is team-1-ux;" in gem_brief
         assert "agent/teams/roles/graphic-designer.md" in gem_brief
         assert "Run TIPS_DEXTER=" not in gem_brief
+        # It never posts on GitHub, so a failed bootstrap goes to its UX designer.
+        assert "it fetches no dependencies and starts no Dexter" in gem_brief
+        assert "send bootstrap failed: <error> to your UX designer named below" in gem_brief
+        assert "report blocked" not in gem_brief
         assert self.comments("60")[-1]["body"].startswith("EVENT graphic-designer team-1-gem ")
         # Only the brief's own UX and graphic entries launch on it.
         self.update(issues={**self.state()["issues"], "61": "UX: ux\nGraphic designers: pix\n"})
@@ -2171,11 +2181,16 @@ class UxDesignTeamTest(Harness):
         assert "gem is not on brief #61's UX: or Graphic designers: line" in refused.stderr
         refused = self.team("design", "29", "ux", ok=False)
         assert "Brief #29 has no UX: line" in refused.stderr
-        # The UX clone starts on the story branch; a graphic designer's stays detached.
+        # The UX clone starts on the story branch; a graphic designer's stays detached and
+        # gets no dependencies or Dexter, only the helpers.
         self.bootstrap("team-1-ux")
         self.bootstrap("team-1-pix")
         assert self.git("branch", "--show-current", cwd=self.project("team-1-ux")) == "task/60"
         assert self.git("branch", "--show-current", cwd=self.project("team-1-pix")) == ""
+        pix = str(self.project("team-1-pix"))
+        assert [e for e in self.events("mix") if e[1] == pix] == []
+        assert [e for e in self.events("mix") if e[1] == str(self.project("team-1-ux"))]
+        assert (self.project("team-1-pix") / ".agents/skills").is_symlink()
         # The branch has one writer: a renamed UX: line cannot add a second UX designer
         # beside the live one. Restoring the line resumes.
         issues = self.state()["issues"]

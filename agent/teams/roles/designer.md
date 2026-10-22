@@ -23,11 +23,12 @@ The default tester still reviews the resulting code for correctness and design.
 2. Compare alternatives only where a consequential choice remains. Ask a critic for
    orthogonal judgment when the alternative or risk warrants it. Reversible exploration
    can supply evidence; do not change product scope or waive required rules.
-3. Post an ANSWER linking the QUESTION, evidence and decision, then notify the
-   implementer. It incorporates the decision into its brief before affected work
+3. Post an ANSWER linking the QUESTION, evidence and decision, then send
+   `<ANSWER URL> answer` to the agent that posted the QUESTION ([Turns](../README.md#turns)).
+   It incorporates the decision into its brief before affected work
    resumes. If relevant facts changed while waiting, check applicability first.
-4. For a shared decision, follow [Changed binding decisions](../README.md#changed-binding-decisions).
-   Unresolved disputes use the blocker route.
+4. For a shared decision, follow [Changed binding decisions](../README.md#changed-binding-decisions):
+   its `hold`, `held` and `decision` notices. Unresolved disputes use the blocker route.
 
 ## Initial design
 
@@ -37,20 +38,24 @@ round. A settled ordinary brief follows the dispatcher's release path directly.
 ## Steps: lead
 
 1. Post a PROPOSAL titled `Candidates` as the skill's
-   [candidates step](../../skills/design-software/SKILL.md#step-2-candidates) says. Notify each critic. Wait for every
-   critic's CRITIQUE. If a critic names a distinct alternative, compare it as a candidate.
+   [candidates step](../../skills/design-software/SKILL.md#step-2-candidates) says. Send `<URL> proposal` to each
+   critic ([Turns](../README.md#turns)) and wait for every critic's `critique` notice.
+   If a critic names a distinct alternative, compare it as a candidate.
 2. Post a PROPOSAL titled `Choice` as the [choice step](../../skills/design-software/SKILL.md#step-3-choice) says.
 3. Write a shared spec when several briefs need one contract, and one brief per PR in
    the skill's format. Before launch, maintain these bodies; after launch, the
    implementer maintains its brief and incorporates your linked decisions. Post a
-   PROPOSAL that says what it covers. Notify each critic.
+   PROPOSAL that says what it covers and send `<URL> proposal` to each critic.
 4. Read every CRITIQUE and revise the bodies as the [critique step](../../skills/design-software/SKILL.md#step-6-critique)
-   says. Post a PROPOSAL that says what changed and why. Hold at most three
+   says. Post a PROPOSAL that says what changed and why, and send `<URL> proposal` to
+   each critic. Hold at most three
    rounds after `Choice`. Then every critic has AGREEd, or you record each open P2 as a
    decision and ask for AGREE, or you post BLOCKED.
 5. When every critic has AGREEd, send `done` to the dispatcher with the final PROPOSAL
    URL and the brief URLs.
-6. Handle discoveries through the bounded-question steps, including shared decisions.
+6. After `done`, the dispatcher retires the spec team. A later question on a started
+   brief reaches you through a relaunch on that brief; handle it with the
+   bounded-question steps.
 7. Review a PR if deliberately named in its `Required reviews:`. Design advice is
    neither a review baseline nor an LGTM. The combined tester remains independent.
 
@@ -61,7 +66,9 @@ round. A settled ordinary brief follows the dispatcher's release path directly.
 2. CRITIQUE each later PROPOSAL as the [critique step](../../skills/design-software/SKILL.md#step-6-critique) says. Ask to
    reopen the choice only as the [choice step](../../skills/design-software/SKILL.md#step-3-choice) allows.
 3. AGREE when no P0 or P1 remains and each P2 has a decision. Name the PROPOSAL URL.
-4. Answer an implementer's QUESTION only when the lead asks.
+4. After each CRITIQUE or AGREE, send `<comment URL> critique` or `<comment URL> agree`
+   to the lead ([Turns](../README.md#turns)); the lead waits for it and cannot poll.
+5. Answer an implementer's QUESTION only when the lead asks.
 
 ## Steps: reviewing designer
 
@@ -85,9 +92,12 @@ unresolved, report the blocker; a clean clone is not proof the assignment is fin
 
 ## Messages you send
 
-- Lead: post PROPOSAL, ANSWER or BLOCKED on the spec or brief. Notify critics after each
-  PROPOSAL. Send `done` to the dispatcher when agreement is complete.
-- Critic: CRITIQUE, AGREE, QUESTION on the spec or brief.
+- Lead: post PROPOSAL, ANSWER or BLOCKED on the spec or brief. `<URL> proposal` to each
+  critic after each PROPOSAL; `<ANSWER URL> answer` to the agent that asked; `<URL> hold` and
+  `<URL> decision` for a changed binding decision. Send `done` to the dispatcher when
+  agreement is complete.
+- Critic: CRITIQUE, AGREE, QUESTION on the spec or brief; `<URL> critique` or
+  `<URL> agree` to the lead after each.
 - Reviewing designer: review URL to the merge-confirming tester.
 
 ## Do not

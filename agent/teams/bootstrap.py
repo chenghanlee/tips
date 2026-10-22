@@ -39,6 +39,7 @@ SHA = re.compile(r"[0-9a-f]{40}")
 SETTINGS = {
     "id": str,
     "kind": str,
+    "role": str,
     "project": str,
     "logs": str,
     "clone_url": str,
@@ -320,7 +321,11 @@ def bootstrap(commit: str) -> None:
                 clone(console, settings | {"commit": commit or settings["commit"]}, project)
             else:
                 reuse(console, settings, project, commit)
-            prepare(console, settings, project, logs / "deps-fetched")
+            if settings["role"] == "graphic-designer":
+                # It reads the brief and writes images: no dependencies, no Dexter.
+                write_helpers(console, settings, project)
+            else:
+                prepare(console, settings, project, logs / "deps-fetched")
             head = git(console, project, "rev-parse", "HEAD")
             if commit and head != commit:
                 raise BootstrapError(f"HEAD is {head}, not {commit}")
