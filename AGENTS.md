@@ -51,6 +51,8 @@ These five, `impeccable` and the `intent` skills are user-maintained files outsi
 - An empty Dexter result does not prove absence: dynamic dispatch, macros and generated code hide uses. Check with `rg` before concluding that a function is unused.
 - After `mix deps.get` or a dependency change, run `"$TIPS_DEXTER" reindex`.
 
+## Subagents
+
 ### Lookup subagents
 
 When your client offers a lookup subagent, use it for bounded evidence gathering:
