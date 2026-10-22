@@ -878,6 +878,7 @@ class PairLifecycleTest(Harness):
         cases = (
             (f"port_base = {PORT_BASE}", 'port_base = "wrong"', "team.port_base must be int"),
             ('role = "designer"', 'role = "architect"', "agents.critic.role must be one of"),
+            ('kind = "agy"', 'kind = "gemini"', "agents.gem.kind must be one of claude, codex"),
             ('model = "fixture-test"', 'model = "x"\nadviser = "y"', "unknown keys ['adviser']"),
             ('db_suffix = "r"', 'db_suffix = "9r"', "db_suffix must be nonempty and start"),
             ('repository = "o/r"', 'repository = "o"', "github.repository must be owner/name"),
