@@ -3,12 +3,12 @@
 
 Run from the main checkout with teams drained and the dispatcher stopped. The commit must
 be merged into origin/main and the checkout's tracked files clean. The release holds
-AGENTS.md and agent/teams from that commit, plus the locked adapter environment, under
-<root>/releases/. <root>/harness then points at it; the switch is one atomic rename.
-state/ and allocations/ are never touched. A failed install removes only its own
-unfinished release, so the previous harness keeps running. Default root:
-agent_teams/<repository name>/ in the main checkout's parent directory, created on first
-use. The root is a copy target, not write-protected.
+AGENTS.md, agent/docs and agent/teams from that commit (those the commit has), plus the
+locked adapter environment, under <root>/releases/. <root>/harness then points at it;
+the switch is one atomic rename. state/ and allocations/ are never touched. A failed
+install removes only its own unfinished release, so the previous harness keeps running.
+Default root: agent_teams/<repository name>/ in the main checkout's parent directory,
+created on first use. The root is a copy target, not write-protected.
 """
 
 import argparse
@@ -39,7 +39,7 @@ from team import load_record
 
 # Creating the environment and fetching locked wheels; the same budget as dependency fetches.
 INSTALL_SECONDS = 300
-RELEASE_FILES = ("AGENTS.md", "agent/teams")
+RELEASE_FILES = ("AGENTS.md", "agent/docs", "agent/teams")
 
 
 def git(source: Path, *args: str) -> str:
@@ -108,9 +108,17 @@ def quiet(root: Path) -> Generator[None]:
 
 
 def export(source: Path, commit: str, release: Path) -> None:
+    """Copy the release files the commit has; an older commit may lack agent/docs."""
+    present = [
+        path
+        for path in RELEASE_FILES
+        if not execute(
+            ["git", "-C", source, "cat-file", "-e", f"{commit}:{path}"], timeout=INSTALL_SECONDS
+        ).returncode
+    ]
     archive = release.with_suffix(".tar")
     try:
-        git(source, "archive", "--format=tar", "-o", str(archive), commit, *RELEASE_FILES)
+        git(source, "archive", "--format=tar", "-o", str(archive), commit, *present)
         with tarfile.open(archive) as tar:
             tar.extractall(release, filter="data")
     finally:
