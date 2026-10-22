@@ -110,8 +110,11 @@ merge-confirming tester reports `done`, confirm the merge (`pr_state`), run the
 ### Retirement check
 
 Before `retire_team`, read the issue (`issue_read`, `board_read`). Each attached
-designer's assignment is complete when it posted its ANSWER or `done`, or handed off:
-a comment naming a lead on another running team, and that lead's reply accepting it.
+designer's assignment is complete when it posted its terminal record: the lead's
+`done`, a critic's AGREE on the final PROPOSAL, or the ANSWER to an assigned QUESTION.
+A handoff also completes it: a comment naming a lead on another running team, and that
+lead's reply accepting it. A UX team's record is the approval the [UX design
+team](#ux-design-team) section validates; graphic designers post nothing.
 Silence is not acceptance. If an assignment is open, prompt that designer for the
 missing post, or report the blocker to the user; do not retire over it.
 
@@ -125,8 +128,9 @@ pane the UX designer waits in. When the UX designer sends `<comment URL> approve
 the comment with `board_read`. It must be the user's comment, begin with
 `APPROVED candidate` and the full 40-character SHA, and name the SHA of the candidate
 PROPOSAL; otherwise tell the user what to fix and stop. If it does and the release
-conditions still hold, call
-`retire_team` then `start_pair`. `start_pair` refuses a `UX:` brief without that comment.
+conditions still hold, call `retire_team` then `start_pair`. The UX team's own ownership
+of the brief is the expected state, not a conflict; the ownership rule still excludes
+other teams and open PRs. `start_pair` refuses a `UX:` brief without that comment.
 A UX designer's `<URL> question` is a technical QUESTION: handle it under
 [Decisions during implementation](#decisions-during-implementation).
 A UX question that arrives as `blocked` after the pair started goes to the user.

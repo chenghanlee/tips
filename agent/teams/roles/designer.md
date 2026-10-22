@@ -38,15 +38,17 @@ round. A settled ordinary brief follows the dispatcher's release path directly.
 ## Steps: lead
 
 1. Post a PROPOSAL titled `Candidates` as the skill's
-   [candidates step](../../skills/design-software/SKILL.md#step-2-candidates) says. Notify each critic. Wait for every
-   critic's `critique` notice. If a critic names a distinct alternative, compare it as a candidate.
+   [candidates step](../../skills/design-software/SKILL.md#step-2-candidates) says. Send `<URL> proposal` to each
+   critic ([Turns](../README.md#turns)) and wait for every critic's `critique` notice.
+   If a critic names a distinct alternative, compare it as a candidate.
 2. Post a PROPOSAL titled `Choice` as the [choice step](../../skills/design-software/SKILL.md#step-3-choice) says.
 3. Write a shared spec when several briefs need one contract, and one brief per PR in
    the skill's format. Before launch, maintain these bodies; after launch, the
    implementer maintains its brief and incorporates your linked decisions. Post a
-   PROPOSAL that says what it covers. Notify each critic.
+   PROPOSAL that says what it covers and send `<URL> proposal` to each critic.
 4. Read every CRITIQUE and revise the bodies as the [critique step](../../skills/design-software/SKILL.md#step-6-critique)
-   says. Post a PROPOSAL that says what changed and why. Hold at most three
+   says. Post a PROPOSAL that says what changed and why, and send `<URL> proposal` to
+   each critic. Hold at most three
    rounds after `Choice`. Then every critic has AGREEd, or you record each open P2 as a
    decision and ask for AGREE, or you post BLOCKED.
 5. When every critic has AGREEd, send `done` to the dispatcher with the final PROPOSAL
@@ -90,8 +92,8 @@ unresolved, report the blocker; a clean clone is not proof the assignment is fin
 
 ## Messages you send
 
-- Lead: post PROPOSAL, ANSWER or BLOCKED on the spec or brief. Notify critics after each
-  PROPOSAL; `<ANSWER URL> answer` to the agent that asked; `<URL> hold` and
+- Lead: post PROPOSAL, ANSWER or BLOCKED on the spec or brief. `<URL> proposal` to each
+  critic after each PROPOSAL; `<ANSWER URL> answer` to the agent that asked; `<URL> hold` and
   `<URL> decision` for a changed binding decision. Send `done` to the dispatcher when
   agreement is complete.
 - Critic: CRITIQUE, AGREE, QUESTION on the spec or brief; `<URL> critique` or

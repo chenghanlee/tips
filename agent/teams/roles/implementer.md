@@ -55,7 +55,8 @@ one to save a tool call.
    Run the browser suite yourself, serial with timeouts off, when the repository has
    one (`mix test --only browser --trace`; feature modules carry `@moduletag :browser`
    and `test/test_helper.exs` excludes the tag by default, so plain `mix test` runs the
-   rest once per head; add both with the first feature test)
+   rest once per head; add both, and the browser command to the
+   [README checks](../../../README.md#test-changes), with the first feature test)
    with the same logging but without `--max-failures 1`: the
    [failed-check rule](../README.md#report-and-resolve-blockers) needs every failing
    test name.

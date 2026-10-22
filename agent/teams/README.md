@@ -207,8 +207,9 @@ Every message starts a turn with the recipient's full context. Send only handoff
 merge-confirming tester, the design notices below, and the
 [UX design team](#ux-design-team)'s requests, replies and `<comment URL> approved`. Do not send
 acknowledgments or progress updates. Put everything the recipient needs in the message
-or the linked record. After sending, end your turn, except after a `question` notice:
-continue unaffected work. If a send fails, you still report
+or the linked record. After sending, end your turn, with two exceptions: after a
+`question` notice, continue unaffected work; after a `hold` that reached no tester
+(no affected PR is open), continue to the decision. If a send fails, you still report
 it: report `blocked` with the exact command and error. Labels the command already wrote
 stay; they record the assignment, not the delivery. Do not deliver a denied message
 another way.
@@ -220,6 +221,7 @@ comment notifies nobody (only a BLOCKED post does), so the poster sends the noti
 |---|---|---|---|
 | `<URL> question` | implementer or UX designer | `dispatcher` | a QUESTION; the dispatcher assigns a designer |
 | `<URL> answer` | designer | the agent that posted the QUESTION | an ANSWER |
+| `<URL> proposal` | lead | each critic | a PROPOSAL that needs critiques |
 | `<URL> critique`, `<URL> agree` | critic | the lead | a CRITIQUE or AGREE |
 | `<URL> hold` | lead | each affected implementer and merge-confirming tester | the PROPOSAL of a [changed binding decision](#changed-binding-decisions) |
 | `<URL> held` | merge-confirming tester | the lead | its non-LGTM hold review |
@@ -432,7 +434,9 @@ dependent work, with the notices in [Turns](#turns):
    merge-confirming tester. The implementer pauses dependent work.
 2. That tester submits a non-LGTM review linked to the pending decision and sends
    `<review URL> held` to the lead. Establish that recorded hold before making the
-   changed shared contract operative; a sent pause is not an established hold.
+   changed shared contract operative; a sent pause is not an established hold. When no
+   affected PR is open, there is no hold to establish: the lead continues to step 3 in
+   the same turn.
 3. The lead updates the authoritative shared decision and sends `<URL> decision` to the
    same implementers and testers. Each implementer incorporates its link in the brief
    before resuming affected work. The tester reviews against the adopted decision before
