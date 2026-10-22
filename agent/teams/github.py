@@ -104,22 +104,22 @@ def give_turn_to_dispatcher(issue: str) -> None:
 
 
 def spec_lead(spec: str) -> str:
-    """The configured designer a standalone design issue names in its `Lead:` line."""
+    """The configured architect a standalone design issue names in its `Lead:` line."""
     lead = issue_line(issue_body(spec), "Lead") or ""
     agent = conf.settings()["agents"].get(lead)
-    if agent is None or agent["role"] != "designer":
+    if agent is None or agent["role"] != "architect":
         raise RuntimeError(
-            f"Spec #{spec} needs a `Lead: <entry>` line naming a configured designer; "
+            f"Spec #{spec} needs a `Lead: <entry>` line naming a configured architect; "
             f"it names {lead or 'none'}"
         )
     return lead
 
 
 def roster(brief: str) -> tuple[str, list[str], list[str]]:
-    """Read the brief's implementer, testers and reviewing designers from configured entries.
+    """Read the brief's implementer, testers and reviewing architects from configured entries.
 
     Read reviewer names from `Required reviews:`. Keep testers in the listed order;
-    the first tester confirms the merge. Return testers and designers separately.
+    the first tester confirms the merge. Return testers and architects separately.
     """
     body = issue_body(brief)
     implementer = issue_line(body, "Implementer")
@@ -145,7 +145,7 @@ def roster(brief: str) -> tuple[str, list[str], list[str]]:
         raise RuntimeError(f"Brief #{brief}: Required reviews names implementer entries")
     if not by_role["tester"]:
         raise RuntimeError(f"Brief #{brief}: Required reviews names no tester")
-    return implementer, by_role["tester"], by_role["designer"]
+    return implementer, by_role["tester"], by_role["architect"]
 
 
 def refuse_ux_reviewers(brief: str, names: list[str]) -> None:
@@ -155,7 +155,7 @@ def refuse_ux_reviewers(brief: str, names: list[str]) -> None:
         if role in UX_ROLES:
             raise RuntimeError(
                 f"Brief #{brief}: Required reviews names {name}, a {role} entry; only tester "
-                "and designer entries review"
+                "and architect entries review"
             )
 
 

@@ -1,20 +1,20 @@
 ---
 name: design-software
-description: Guides the design lead and the design critic of a tips feature. Covers reading, candidate designs, the choice, the spec and brief format, the required rules, the additional rules, the performance principles, the test budget, critique and the choice of implementer. Code reviews use review-software-design.
+description: Guides the lead architect and the critic architect of a tips feature. Covers reading, candidate designs, the choice, the spec and brief format, the required rules, the additional rules, the performance principles, the test budget, critique and the choice of implementer. Code reviews use review-software-design.
 ---
 
 # Design software
 
 For an unresolved consequential design choice, the lead owns the decision and a
 critic challenges it from a different persona when that judgment is useful. The
-[designer role](../../teams/roles/designer.md) defines turns, messages, the round limit
+[architect role](../../teams/roles/architect.md) defines turns, messages, the round limit
 and the AGREE condition. Use this skill to write and assess the design.
 
 Build Tips as a new MVP to test product demand. Learn through working software with
 the simplest sufficient engineering. Let the user decide the product capabilities.
 Settled bounded work uses the ordinary brief path, without a ceremonial design round.
 The implementer applies [Design during delivery](../implement-software/SKILL.md#design-during-delivery);
-designers integrate discoveries that change consequential technical commitments.
+architects integrate discoveries that change consequential technical commitments.
 
 Scope limits:
 
@@ -76,7 +76,7 @@ Explain your decision.
 ## Step 4: Spec
 
 A shared spec is useful when several briefs depend on one contract. It is not required
-solely to launch a designer for a question on a started brief. When needed, sections:
+solely to launch an architect for a question on a started brief. When needed, sections:
 
 1. Product question and signal.
 2. Briefs in dependency order, each with its agents.
@@ -106,7 +106,7 @@ scope. Explicit restrictions and agreed contracts remain binding.
 Number acceptance scenarios with input, action and observable result. Mark `Masking
 risk:` where a test could pass with its intended defect, and name that defect. Explain
 expected test additions/replacements when useful, and update the budget as evidence
-changes; a source-informed contract check does not require advance designer permission.
+changes; a source-informed contract check does not require advance architect permission.
 Link relevant design sections and their revision rather than copying whole documents.
 
 ## Required rules

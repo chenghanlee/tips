@@ -53,7 +53,7 @@ body, then release it. Ask the user to add the issue under its epic. The impleme
 inspects source and maintains its technical detail. Do not invent source facts or
 require a spec solely to obtain advance agreement. Add the brief to Project 15 and
 record your launch EVENT as in step 1 below. Use the steps below when actual
-initial design choices need designers; a shared spec is useful for common contracts.
+initial design choices need architects; a shared spec is useful for common contracts.
 
 1. Create the spec issue (`issue_create`) and add it to
    [Project 15](https://github.com/users/chenghanlee/projects/15) (`project_add_item`);
@@ -62,12 +62,12 @@ initial design choices need designers; a shared spec is useful for common contra
    Post your own session with `board_post`, type EVENT, body `launched claude`;
    the header carries your session. `usage_summary` counts every session a `launched`
    EVENT names. A Codex client's row sums every Codex session started in its allocation,
-   so an `unknown` launch session still counts. Write the agent set in the body: designers and the lead (a `Lead: <entry>` line), testers and the
+   so an `unknown` launch session still counts. Write the agent set in the body: architects and the lead (a `Lead: <entry>` line), testers and the
    merge-confirming tester, and any additional required reviewers, each an entry `status` lists.
-2. Launch each designer with `start_design` (spec, entry). Each gets its own allocation
+2. Launch each architect with `start_design` (spec, entry). Each gets its own allocation
    and clone, with its own database suffix and port, and its launch EVENT on the spec.
    The spec body tells it whether it is lead or critic. Call `retire_team` on the spec
-   when its lead sends `done` and the board shows each attached designer's assignment
+   when its lead sends `done` and the board shows each attached architect's assignment
    complete or handed off (the [retirement check](#retirement-check)); do not hold the
    slot until dependent briefs merge. Later questions on a started brief go through
    [Decisions during implementation](#decisions-during-implementation).
@@ -76,7 +76,7 @@ initial design choices need designers; a shared spec is useful for common contra
 3. Assign these personas: architecture (data integrity, contract boundaries,
    consistency, simplicity, testability, effects on other code) and operations (failure
    and recovery, concurrency, security, performance, migrations, existing data). One
-   designer covers both personas. If there are multiple designers, divide the personas
+   architect covers both personas. If there are multiple architects, divide the personas
    so their coverage does not overlap.
 
 ## Release a brief
@@ -92,10 +92,10 @@ Start a brief only when all these conditions are met:
 - The brief has an outcome, constraints, acceptance examples, an `Implementer:` entry
   and `Required reviews:` naming the merge-confirming tester and, once each, any
   additional reviewer whose contribution the brief names. A story that changes what the
-  user sees also has `UX:` and `Graphic designers:` lines. A designer is optional. Link relevant known
+  user sees also has `UX:` and `Graphic designers:` lines. An architect is optional. Link relevant known
   contracts; the implementer fills source-derived details without changing scope.
 
-If a design round had one designer and no critic, check its PROPOSAL against these
+If a design round had one architect and no critic, check its PROPOSAL against these
 conditions; do not substitute dispatch judgment for missing technical evidence. Start
 the pair (`start_pair`) and set the brief's Agent to the implementer entry and its
 Status to Active (`project_set_field`).
@@ -110,12 +110,12 @@ merge-confirming tester reports `done`, confirm the merge (`pr_state`), run the
 ### Retirement check
 
 Before `retire_team`, read the issue (`issue_read`, `board_read`). Each attached
-designer's assignment is complete when it posted its terminal record: the lead's
+architect's assignment is complete when it posted its terminal record: the lead's
 `done`, a critic's AGREE on the final PROPOSAL, or the ANSWER to an assigned QUESTION.
 A handoff also completes it: a comment naming a lead on another running team, and that
 lead's reply accepting it. A UX team's record is the approval the [UX design
 team](#ux-design-team) section validates; graphic designers post nothing.
-Silence is not acceptance. If an assignment is open, prompt that designer for the
+Silence is not acceptance. If an assignment is open, prompt that architect for the
 missing post, or report the blocker to the user; do not retire over it.
 
 ## UX design team
@@ -140,15 +140,15 @@ A UX question that arrives as `blocked` after the pair started goes to the user.
 On `<QUESTION URL> question` from an implementer or UX designer, name a lead and the
 question link on the
 brief with `board_post`, then call `start_design` with that brief number in `spec` and
-the designer entry. A started brief uses its existing slot, even at full capacity.
+the architect entry. A started brief uses its existing slot, even at full capacity.
 The implementer incorporates the assignment and answer into the body. For another
-question to an already running designer, use `prompt_agent`; repeating launch does not
+question to an already running architect, use `prompt_agent`; repeating launch does not
 submit new work. Use `start_design` on a separate spec only for standalone design.
 
-The question names source evidence and the decision needed. The designer inspects
+The question names source evidence and the decision needed. The architect inspects
 source and answers; you route its answer, not decide architecture without source
-access. A second designer joins only when its independent expertise is useful. A
-shared spec can be maintained by a designer attached to an affected brief without
+access. A second architect joins only when its independent expertise is useful. A
+shared spec can be maintained by an architect attached to an affected brief without
 allocating a separate spec team. A changed binding decision holds the affected PRs
 through the lead's `hold`, the tester's `held` and the lead's `decision` notices
 ([Changed binding decisions](../README.md#changed-binding-decisions)); you only route
@@ -171,16 +171,16 @@ nothing is working, not stopped: pair clients post no progress updates, and thei
 checks run for minutes while the pane shows `idle`. Never resend a client's task or
 launch text; a repeat restarts its bootstrap and its work. Prompt a live client only
 with new information or a question. Relaunch a stopped pair client
-with `start_pair`, a stopped designer with `start_design`, and a stopped PR reviewer
+with `start_pair`, a stopped architect with `start_design`, and a stopped PR reviewer
 with `launch_reviewer`; each launch posts its EVENT. If a tool refuses because the client may already have done its task, ask the
-user; only the user runs `team.py reset`. If designers cannot agree, they post BLOCKED.
+user; only the user runs `team.py reset`. If architects cannot agree, they post BLOCKED.
 Route the technical evidence to the named decision owner; ask the user for product,
 scope or unresolved tradeoffs requiring the user's judgment. A timeout does not count
 as approval.
 
 ## Measurement
 
-Use `usage_summary` for every participant, including dispatcher and designers;
+Use `usage_summary` for every participant, including dispatcher and architects;
 it separates uncached input, output, cache reads and writes. Missing logs mean unknown
 cost, not zero. Post the usage table on the spec when the final brief merges.
 

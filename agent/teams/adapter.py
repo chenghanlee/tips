@@ -190,7 +190,7 @@ def launch_reviewer(pr: Number, entry: Entry) -> str:
 
 @server.tool()
 def start_design(spec: Number, entry: Entry) -> str:
-    """Launch a configured designer for the issue numbered by spec (team.py design).
+    """Launch a configured architect for the issue numbered by spec (team.py design).
     A started brief uses its existing team slot; otherwise create or join a spec team.
     The issue names the lead, any critics and the question or design assignment. A new
     spec team needs a `Lead: <entry>` line and labels the spec phase:design and

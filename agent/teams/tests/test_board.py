@@ -61,10 +61,10 @@ class BoardTest(Harness):
         # A repeat after an uncertain post returns the existing URL, for EVENTs too.
         again = self.board("post", "29", "QUESTION", pane=impl, body="Which port?\n")
         assert again.stdout == url.stdout
-        launch = ("post", "29", "EVENT", "--as", "designer", "lead", "s-lead")
+        launch = ("post", "29", "EVENT", "--as", "architect", "lead", "s-lead")
         first = self.board(*launch, body="launched codex by hand").stdout
         assert self.board(*launch, body="launched codex by hand").stdout == first
-        assert self.bodies()[-1] == "EVENT designer lead s-lead\nlaunched codex by hand"
+        assert self.bodies()[-1] == "EVENT architect lead s-lead\nlaunched codex by hand"
         # A pane without a record needs --role; too long a body posts with a warning.
         self.update(strays=[{"pane_id": "wL:p1", "name": "lead", "agent": "codex", "cwd": "/"}])
         refused = self.board("post", "29", "PROPOSAL", pane="wL:p1", body="x", ok=False)
@@ -74,12 +74,12 @@ class BoardTest(Harness):
             "29",
             "CRITIQUE",
             "--role",
-            "designer",
+            "architect",
             pane="wL:p1",
             body="word " * 801,
         )
         assert "801 words, above 800" in long.stderr
-        assert self.bodies()[-1].startswith("CRITIQUE designer lead unknown\nword ")
+        assert self.bodies()[-1].startswith("CRITIQUE architect lead unknown\nword ")
         count = len(self.bodies())
         for args, body, message in (
             (("ANSWER",), "x", "HERDR_PANE_ID is not set"),
@@ -160,9 +160,9 @@ class BoardTest(Harness):
                     comment(
                         3, 2, event("implementer", "team-1-impl", "s-impl-b", "launched codex")
                     ),
-                    comment(4, 3, event("designer", "lead", "s-lead", "launched codex by hand")),
+                    comment(4, 3, event("architect", "lead", "s-lead", "launched codex by hand")),
                     comment(5, 4, event("dispatcher", "dispatcher", "s-d", "board changed")),
-                    comment(6, 5, "R1 PROPOSAL designer lead s-lead\nnot a launch"),
+                    comment(6, 5, "R1 PROPOSAL architect lead s-lead\nnot a launch"),
                 ]
             }
         )
@@ -227,7 +227,7 @@ class BoardTest(Harness):
         rows = self.board("usage", "29", env={"HOME": str(home)}).stdout.splitlines()
         tester = "| team-1-tester | tester | s-t | "
         assert rows[2:] == [
-            "| lead | designer | s-lead | no logs found | 0 | 0 | 0 | 0 |",
+            "| lead | architect | s-lead | no logs found | 0 | 0 | 0 | 0 |",
             "| team-1-impl | implementer | s-impl-a | fixture-impl | 200 | 80 | 400 | 14 |",
             "| team-1-impl | implementer | s-impl-b | no logs found | 0 | 0 | 0 | 0 |",
             tester + "claude-haiku | 10 | 5 | 100 | 20 |",
