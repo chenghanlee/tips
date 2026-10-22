@@ -704,19 +704,21 @@ def agy_settings_path() -> Path:
 def read_agy_settings(path: Path) -> dict[str, object]:
     """agy's user settings, which the harness never creates: the user signs in first."""
     try:
-        text = path.read_text()
+        data = path.read_bytes()
     except FileNotFoundError:
         raise RuntimeError(
             f"agy settings file {path} is missing; sign in to agy once (SETUP.md)"
         ) from None
     except OSError as error:
         raise RuntimeError(f"agy settings file {path} is unreadable: {error}") from error
-    return parse_agy_settings(path, text)
+    return parse_agy_settings(path, data)
 
 
-def parse_agy_settings(path: Path, text: str) -> dict[str, object]:
+def parse_agy_settings(path: Path, data: bytes) -> dict[str, object]:
+    """Decoding errors are ValueErrors too, so bytes that are not UTF-8 JSON are reported
+    with the path like any other malformed content."""
     try:
-        loaded = json.loads(text)
+        loaded = json.loads(data)
     except ValueError as error:
         raise RuntimeError(f"agy settings file {path} is not JSON: {error}") from error
     if not isinstance(loaded, dict):
@@ -746,10 +748,10 @@ def untrust_agy_workspace(root: Path) -> str:
     path = agy_settings_path()
     try:
         try:
-            text = path.read_text()
+            data = path.read_bytes()
         except FileNotFoundError:
             return ""
-        settings = parse_agy_settings(path, text)
+        settings = parse_agy_settings(path, data)
         trusted = settings.get("trustedWorkspaces")
         if isinstance(trusted, list) and str(root) in trusted:
             kept = [entry for entry in cast(list[object], trusted) if entry != str(root)]

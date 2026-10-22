@@ -2234,6 +2234,16 @@ class UxDesignTeamTest(Harness):
         assert f"g2-gem: agy trust entry for {gem_root} not removed: agy settings file" in stopped
         assert "is not JSON" in stopped
         assert gem_root in agy_settings.read_text()
+        # Bytes that are not UTF-8 are malformed content too, at launch and at cleanup.
+        agy_settings.write_bytes(b"\xff{}")
+        refused = self.team("design", "60", "gem", ok=False)
+        assert f"agy settings file {agy_settings} is not JSON" in refused.stderr
+        self.team("design", "60", "pix")
+        self.clients_exit(1)
+        stopped = self.team("stop", "60").stdout
+        assert "g3-pix: files deleted; databases dropped" in stopped
+        assert "g3-pix: agy trust entry for" in stopped
+        assert "is not JSON" in stopped
         # A parent directory cleanup cannot search fails the existence check itself.
         locked = self.root / "locked"
         locked.mkdir()
@@ -2247,8 +2257,8 @@ class UxDesignTeamTest(Harness):
             stopped = self.team("stop", "60").stdout
         finally:
             locked.chmod(0o755)
-        assert "g3-pix: files deleted; databases dropped" in stopped
-        assert f"g3-pix: agy trust entry for {self.trusted}/allocations/g3-pix not removed" in (
+        assert "g4-pix: files deleted; databases dropped" in stopped
+        assert f"g4-pix: agy trust entry for {self.trusted}/allocations/g4-pix not removed" in (
             stopped
         )
         assert "Permission denied" in stopped
