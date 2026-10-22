@@ -42,14 +42,22 @@ dirty clone and never resets one.
    record that in your review; the merge-confirming tester then runs
    `agent/teams/team.py turn <pr> <implementer entry>` to request it, and any other
    tester sends its review URL to the merge-confirming tester. For manual checks follow [manual browser review](../README.md#manual-browser-review), including its Codex setup, launch form and failure steps.
-5. Submit the [review record](../README.md#pr-review-record). Without a P0 or P1 finding
+5. For a brief with a `UX:` line, compare the built screens side by side with the
+   images under `design/<brief>/` at the approved SHA, at the viewports and states
+   `candidate.md` names, with the authoritative copy and the disclosed differences;
+   severity by consequence ([UX design team](../README.md#ux-design-team)). For a
+   changed page, form or component, apply the
+   [web-design-guidelines](../../skills/web-design-guidelines/SKILL.md) rules to the
+   affected templates, CSS and JS: resolve the rules' source commit, fetch that
+   revision (a Codex client uses `curl` against GitHub) and record it.
+6. Submit the [review record](../README.md#pr-review-record). Without a P0 or P1 finding
    or a hold, submit LGTM; P2s go under [Optional](../README.md#optional-p2-findings).
    Other tester: send your review URL to the merge-confirming tester.
-6. Merge-confirming tester: when your review or any required reviewer's latest review of
+7. Merge-confirming tester: when your review or any required reviewer's latest review of
    the head has a P0 or P1 finding or a hold, send `turn` to the implementer. Do not
    wait for the other reviews. When `agent/teams/pr_review.py observe <pr>` reports
    ready, follow the [merge step](../README.md#merge). Then send `done` to the dispatcher.
-7. Follow the [review record](../README.md#pr-review-record) for new heads, first-review
+8. Follow the [review record](../README.md#pr-review-record) for new heads, first-review
    coverage and later changes.
 
 ## Questions and changed decisions

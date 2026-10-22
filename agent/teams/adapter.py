@@ -194,7 +194,9 @@ def start_design(spec: Number, entry: Entry) -> str:
     A started brief uses its existing team slot; otherwise create or join a spec team.
     The issue names the lead, any critics and the question or design assignment. A new
     spec team needs a `Lead: <entry>` line and labels the spec phase:design and
-    turn:<lead>."""
+    turn:<lead>. For a ux-designer or graphic-designer entry, the brief's `UX:` and
+    `Graphic designers:` lines name the team; it launches before the pair and is refused
+    once the brief holds one (README.md#ux-design-team)."""
     return operate(lambda: team.design(str(spec), entry), writes=True)
 
 

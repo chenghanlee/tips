@@ -26,6 +26,7 @@ from tests.harness import (
     CONFIG,
     HERDR,
     MIX_PROJECT,
+    NARROW,
     PORT_BASE,
     REAL_DEXTER,
     SCRIPT,
@@ -161,6 +162,8 @@ while True: time.sleep(.05)
             {"listed_kind": None, "omit_kind": True},
             {"clear_error": "agent_not_found"},
             {"stale_reads": 2},
+            # A graphic designer's agy client stops like the other configured kinds.
+            {"pane_kind": "agy", "listed_kind": "agy"},
         ]
         for flags in cases:
             with self.subTest(flags=flags):
@@ -208,6 +211,14 @@ while True: time.sleep(.05)
                 if not attempted:
                     assert "owner changed during shutdown" in result.stderr
                 assert (["agent", "rename", "wT:p1", "--clear"] in calls) == attempted
+
+    def test_an_unconfigured_client_kind_is_preserved(self) -> None:
+        p = self.client()
+        self.save({**json.loads((self.root / "state.json").read_text()), "pane_kind": "cursor"})
+        r = self.stop()
+        assert r.returncode != 0
+        assert p.poll() is None
+        assert "cannot establish owned client; preserved" in r.stderr
 
     def test_wrong_root_refuses_to_signal(self) -> None:
         p = self.client()
@@ -586,6 +597,8 @@ class PairLifecycleTest(Harness):
             "45": ("Implementer: impl\nRequired reviews: tester, impl\n", "cannot review"),
             "46": ("Implementer: impl\nRequired reviews: tester, tester\n", "repeated name"),
             "47": ("Implementer: impl\nRequired reviews: tester,\n", "empty or repeated"),
+            "48": (NARROW + "Graphic designers: pix\n", "both a UX: entry and a Graphic"),
+            "49": (NARROW + "UX: ux\n", "both a UX: entry and a Graphic"),
         }
         self.update(issues={**self.state()["issues"], **{k: v[0] for k, v in cases.items()}})
         for brief, (_, message) in cases.items():
@@ -868,6 +881,7 @@ class PairLifecycleTest(Harness):
         cases = (
             (f"port_base = {PORT_BASE}", 'port_base = "wrong"', "team.port_base must be int"),
             ('role = "designer"', 'role = "architect"', "agents.critic.role must be one of"),
+            ('kind = "agy"', 'kind = "gemini"', "agents.gem.kind must be one of claude, codex"),
             ('model = "fixture-test"', 'model = "x"\nadviser = "y"', "unknown keys ['adviser']"),
             ('db_suffix = "r"', 'db_suffix = "9r"', "db_suffix must be nonempty and start"),
             ('repository = "o/r"', 'repository = "o"', "github.repository must be owner/name"),
@@ -2148,3 +2162,108 @@ class LaunchRecoveryTest(Harness):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UxDesignTeamTest(Harness):
+    """The UX design team: a standalone design team on a brief, before its pair
+    (README.md#ux-design-team)."""
+
+    def comment(self, issue: str, body: str) -> None:
+        comments = self.state().get("comments", {})
+        held = comments.setdefault(issue, [])
+        held.append(
+            {
+                "id": 900 + len(held),
+                "html_url": f"https://github.com/o/r/issues/{issue}#issuecomment-{900 + len(held)}",
+                "body": body,
+                "created_at": "2026-10-22T00:00:00Z",
+            }
+        )
+        self.update(comments=comments)
+
+    def test_the_ux_team_launches_before_the_pair_and_hands_off_on_approval(self) -> None:
+        self.team("design", "60", "ux")
+        assert self.labels("60") == ["phase:design", "turn:ux"]
+        record = self.record(1)
+        assert (record["kind"], record["brief"], record["implementer"]) == ("design", "60", "")
+        assert self.tabs("w1") == {"ux": ["team-1-ux"]}
+        brief = self.system_prompt("team-1-ux")
+        assert brief.startswith("You are ux, the ux-designer for brief #60;")
+        assert "agent/teams/roles/common.md and agent/teams/roles/ux-designer.md;" in brief
+        assert "Your graphic designers are team-1-pix, team-1-gem;" in brief
+        assert "Run TIPS_DEXTER=" in brief
+        assert self.comments("60")[-1]["body"].startswith("EVENT ux-designer team-1-ux ")
+        # Graphic designers join the ux tab. The agy client gets agy's flags and, like
+        # Codex, its brief as the first message. Its brief needs no Dexter instructions.
+        self.team("design", "60", "pix")
+        self.team("design", "60", "gem")
+        assert self.tabs("w1") == {"ux": ["team-1-ux", "team-1-pix", "team-1-gem"]}
+        argv = self.pane("team-1-gem")["launch_argv"]
+        assert argv[argv.index("--kind") + 1] == "agy"
+        assert argv[argv.index("--") + 1 :] == [
+            "--mode",
+            "auto",
+            "--effort",
+            "medium",
+            "--model",
+            "fixture-gem",
+        ]
+        [gem_brief] = self.prompts("team-1-gem")
+        assert gem_brief.startswith("You are gem, the graphic-designer for brief #60;")
+        assert "Your UX designer is team-1-ux;" in gem_brief
+        assert "agent/teams/roles/graphic-designer.md" in gem_brief
+        assert "Run TIPS_DEXTER=" not in gem_brief
+        assert self.comments("60")[-1]["body"].startswith("EVENT graphic-designer team-1-gem ")
+        # Only the brief's own UX and graphic entries launch on it.
+        self.update(issues={**self.state()["issues"], "61": "UX: ux\nGraphic designers: pix\n"})
+        refused = self.team("design", "61", "gem", ok=False)
+        assert "gem is not on brief #61's UX: or Graphic designers: line" in refused.stderr
+        refused = self.team("design", "29", "ux", ok=False)
+        assert "Brief #29 has no UX: line" in refused.stderr
+        # The UX clone starts on the story branch; a graphic designer's stays detached.
+        self.bootstrap("team-1-ux")
+        self.bootstrap("team-1-pix")
+        assert self.git("branch", "--show-current", cwd=self.project("team-1-ux")) == "task/60"
+        assert self.git("branch", "--show-current", cwd=self.project("team-1-pix")) == ""
+        # The branch has one writer: a renamed UX: line cannot add a second UX designer
+        # beside the live one. Restoring the line resumes.
+        issues = self.state()["issues"]
+        self.update(issues={**issues, "60": issues["60"].replace("UX: ux", "UX: ux2")})
+        refused = self.team("design", "60", "ux2", ok=False)
+        assert "changed its UX: or Graphic designers: line since launch; ux still holds" in (
+            refused.stderr
+        )
+        assert sorted(self.record(1)["agents"]) == ["gem", "pix", "ux"]
+        self.update(issues=issues)
+        # The pair waits for the user's approval record. An agent comment that merely
+        # quotes the record does not count: it begins with a harness header.
+        refused = self.team("start", "60", ok=False)
+        assert "comment beginning 'APPROVED candidate <SHA>'" in refused.stderr
+        template = f"APPROVED candidate {'a' * 40} for the form with none"
+        self.comment("60", f"PROPOSAL ux-designer team-1-ux s1\nPost this to approve: {template}")
+        refused = self.team("start", "60", ok=False)
+        assert "comment beginning 'APPROVED candidate <SHA>'" in refused.stderr
+        self.comment("60", f"APPROVED candidate {'b' * 40} for the form with none")
+        # Approved, but the design team still holds the slot: the dispatcher retires it first.
+        refused = self.team("start", "60", ok=False)
+        assert "#60 already holds a design team in slot 1" in refused.stderr
+        self.clients_exit(1)
+        assert "slot 1 released" in self.team("stop", "60").stdout
+        self.team("start", "60")
+        assert (self.record(1)["kind"], self.record(1)["generation"]) == ("brief", 2)
+        # A UX team member cannot join a started pair: the pair owns task/60.
+        refused = self.team("design", "60", "ux", ok=False)
+        assert "#60 already holds a pair in slot 1" in refused.stderr
+
+    def test_ux_team_entries_do_not_review(self) -> None:
+        self.update(
+            issues={
+                **self.state()["issues"],
+                "62": "Implementer: impl\nRequired reviews: tester, pix\n",
+            }
+        )
+        refused = self.team("start", "62", ok=False)
+        assert (
+            "names pix, a graphic-designer entry; only tester and designer entries review"
+            in refused.stderr
+        )

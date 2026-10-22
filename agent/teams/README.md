@@ -22,6 +22,7 @@ lists your responsibilities: [dispatcher](roles/dispatcher.md),
 USER         set goals · answer product questions · start the dispatcher once · report an agent that has stopped
 DISPATCHER   record a bounded outcome, constraints, examples and roster → team.py start <brief>
 DESIGN      unresolved consequential choice → team.py design <issue> <entry> → decision reaches affected work
+UX TEAM      brief with UX: → team.py design <brief> <entry> for the UX designer and each graphic designer → intake with the user → images → candidate on task/<brief> → user posts APPROVED → team.py stop <brief> → team.py start <brief>
 EVERY CLIENT bootstrap.py prepares its own clone before its first task
 IMPLEMENTER  ask questions only when answers affect the work → code → push → PR "Closes #<brief>" → team.py turn <pr> <tester>
              (notifies every required reviewer of the head; asks the dispatcher to launch missing ones)
@@ -33,7 +34,9 @@ DISPATCHER   team.py stop <brief> → next
 ```
 
 Agents are `[agents.<entry>]` entries in [config.toml](config.toml). A brief names its
-agents: `Implementer: <entry>` and `Required reviews: <entry>, <entry>`, testers first.
+agents: `Implementer: <entry>` and `Required reviews: <entry>, <entry>`, testers first;
+a brief that changes what the user sees adds `UX: <entry>` and
+`Graphic designers: <entry>, ...` ([UX design team](#ux-design-team)).
 The first tester confirms the merge. A launched client is `team-<slot>-<entry>` in
 Herdr; records use the entry name. Launches are recorded in the harness root's
 `state/<slot>.json`, with each client's allocation and task-submission state.
@@ -101,8 +104,8 @@ operator (the user) runs `reset` and `stop --abandon`.
 
 | Command | Caller | Effect |
 |---|---|---|
-| `agent/teams/team.py start <brief>` | Dispatcher | Read `Implementer:` and `Required reviews:`. Label a new pair's brief ([Turns](#turns)). Create an allocation for the implementer (bootstrap branch `task/<brief>`) and the merge-confirming tester. Launch both in the team's workspace (see [Herdr layout](#herdr-layout)), write the record, and post one EVENT per launch on the brief. |
-| `agent/teams/team.py design <issue> <entry>` | Dispatcher | Launch a configured designer in its own allocation. A started brief reuses its team slot; otherwise create or join a spec team. The issue names the lead, any critics and the question or design assignment; a new spec team needs a `Lead: <entry>` line naming a configured designer and labels the spec ([Turns](#turns)). Post its launch EVENT on that issue. The adapter keeps the argument name `spec` for either issue number. |
+| `agent/teams/team.py start <brief>` | Dispatcher | Read `Implementer:` and `Required reviews:`. For a brief with `UX:`, refuse unless a comment begins with `APPROVED candidate <SHA>` ([UX design team](#ux-design-team)). Label a new pair's brief ([Turns](#turns)). Create an allocation for the implementer (bootstrap branch `task/<brief>`) and the merge-confirming tester. Launch both in the team's workspace (see [Herdr layout](#herdr-layout)), write the record, and post one EVENT per launch on the brief. |
+| `agent/teams/team.py design <issue> <entry>` | Dispatcher | Launch a configured designer in its own allocation. A started brief reuses its team slot; otherwise create or join a spec team. The issue names the lead, any critics and the question or design assignment; a new spec team needs a `Lead: <entry>` line naming a configured designer and labels the spec ([Turns](#turns)). For a UX or graphic entry, launch it into the brief's [UX design team](#ux-design-team) instead; refused once the brief holds a pair. Post its launch EVENT on that issue. The adapter keeps the argument name `spec` for either issue number. |
 | `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require your own clone to be clean at the PR head and the PR to close the brief. Read the PR's live state (see `observe`); refuse unless GitHub reports the head mergeable. Label the brief ([Turns](#turns)). Notify every launched required reviewer of the head and the `bootstrap.py --commit` command that moves its clone there. For each reviewer not launched, post a pending EVENT on the PR and ask the dispatcher to run its `review` command. Try every send; report each failed one. |
 | `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Read the PR's live state and label the brief ([Turns](#turns)). Notify the implementer with its merge conflict and failed required checks. Your clone's state does not block it. |
 | `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create its allocation, configured for the PR head, with its own database suffix and port, and launch the reviewer in the team's workspace. |
@@ -125,8 +128,8 @@ operator (the user) runs `reset` and `stop --abandon`.
 ### Herdr layout
 
 Each team has one Herdr workspace, labelled `team-<slot>-<brief>`. It has one tab per
-role: `designers`, `implementers` and `reviewers`. The merge-confirming tester and
-additional testers share `reviewers`. Each client is a pane in its role's tab, named
+role: `designers`, `implementers` and `reviewers`, and `ux` for the UX designer and the
+graphic designers. The merge-confirming tester and additional testers share `reviewers`. Each client is a pane in its role's tab, named
 after the client; a second client of a role is split off the tab's last pane. A tab
 opens with its first client. `start` and `review` reopen a closed pane in the same
 workspace and tab; `stop` refuses a workspace that holds a pane the record does not
@@ -198,7 +201,8 @@ lists them. The dispatcher has no tool for it.
 
 Every message starts a turn with the recipient's full context. Send only handoffs,
 `done`, `blocked`, the dispatcher's answer to a blocker, a review URL to the
-merge-confirming tester, and the design-phase messages the [designer role](roles/designer.md) lists. Do not send
+merge-confirming tester, the design-phase messages the [designer role](roles/designer.md) lists,
+and the [UX design team](#ux-design-team)'s requests, replies and `<comment URL> approved`. Do not send
 acknowledgments or progress updates. Put everything the recipient needs in the message
 or the linked record. After sending, end your turn. If a send fails, you still report
 it: report `blocked` with the exact command and error. Labels the command already wrote
@@ -216,7 +220,7 @@ Only these harness commands write them. Never add or remove them by hand.
 | Event | Command | Labels |
 |---|---|---|
 | New pair | `team.py start` | `phase:implement`, `turn:<implementer>` |
-| New standalone design team | `team.py design` | `phase:design`, `turn:<lead>` from the spec's `Lead:` line |
+| New standalone design team | `team.py design` | `phase:design`, `turn:<lead>` from the spec's `Lead:` line, or from the brief's `UX:` line |
 | Relaunch, additional designer, `review` launch | `start`, `design`, `review` | unchanged |
 | Head to reviewers | `team.py turn <pr> <tester>` | `phase:review`, `turn:<tester>` |
 | Findings back | `team.py turn <pr> <implementer>` | `phase:implement`, `turn:<implementer>` |
@@ -246,9 +250,48 @@ labels and GitHub only in these cases, and do not resolve it yourself:
 - A `phase:` or `turn:` label is missing, or there are two of one prefix. A brief started
   before the labels existed has none.
 - The `turn:` value is neither `dispatcher` nor an entry explicitly assigned on this
-  issue: the brief's roster, the spec's lead or critics, or a QUESTION assignment.
+  issue: the brief's roster, its `UX:` entry, the spec's lead or critics, or a QUESTION
+  assignment.
 
 The dispatcher repairs the labels with the handoff form of `prompt_agent`.
+
+## UX design team
+
+A brief whose story changes what the user sees names `UX: <entry>` (a `ux-designer`
+entry) and `Graphic designers: <entry>, ...` (one or more `graphic-designer` entries).
+The design lead adds the lines when it writes the brief; the dispatcher adds them to a
+settled brief. The principles behind this team are in
+[docs/brainstorm/ux-agent-principles-chavruta.md](../../docs/brainstorm/ux-agent-principles-chavruta.md)
+and the mechanics in
+[docs/brainstorm/ux-agent-mechanics-chavruta.md](../../docs/brainstorm/ux-agent-mechanics-chavruta.md).
+
+1. Once the brief meets the release conditions except approval, the dispatcher runs
+   `team.py design <brief> <entry>` for the UX entry, then for each graphic entry. They
+   form a standalone design team on the brief in the `ux` tab, labelled `phase:design`,
+   `turn:<UX entry>`. The UX designer's clone starts on `task/<brief>`; it is the
+   branch's only writer. Graphic designers generate nothing until step 3.
+2. The UX designer asks the user for ideas and grills to a shared understanding in its
+   pane ([ux-designer](roles/ux-designer.md)).
+3. It posts that understanding as a PROPOSAL, then sends requests to the graphic
+   designers with `herdr agent prompt`; each replies with the path of its images and
+   prompts under its own clone ([graphic-designer](roles/graphic-designer.md)).
+4. It curates, iterates with the user, then commits the candidate under
+   `design/<brief>/` on `task/<brief>`, pushes, and posts a PROPOSAL with the SHA and
+   the images.
+5. The user posts `APPROVED candidate <full SHA> for <scope> with <exceptions or none>`
+   as a plain comment. No agent posts it: agent comments begin with a harness header,
+   and `start` accepts only a comment that begins with the record.
+6. The UX designer sends `herdr agent prompt dispatcher "<comment URL> approved"`. The
+   dispatcher reads the comment, runs `team.py stop <brief>` (a standalone design team
+   needs no merged PR), then `team.py start <brief>`. The implementer's clone starts
+   `task/<brief>` from origin and holds the candidate; before its first edit it checks
+   that the approved SHA is an ancestor of HEAD. The tester compares the built screens
+   with the images at the approved SHA inside its combined review.
+
+Approval is the user's; a contradiction found while building returns to the user by the
+[blocker route](#report-and-resolve-blockers). The UX designer is not relaunched after
+retirement in this version. An `agy` graphic designer is ready only once a real launch,
+prompt, restart and `team.py stop` have been run on this machine ([setup](SETUP.md#one-time-setup)).
 
 ## PR review record
 

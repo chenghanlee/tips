@@ -91,6 +91,38 @@ effort = "high"
 db_suffix = "l"
 port_offset = 4
 
+[agents.ux]
+role = "ux-designer"
+kind = "claude"
+model = "fixture-ux"
+effort = "high"
+db_suffix = "u"
+port_offset = 7
+
+[agents.ux2]
+role = "ux-designer"
+kind = "claude"
+model = "fixture-ux2"
+effort = "high"
+db_suffix = "v"
+port_offset = 6
+
+[agents.pix]
+role = "graphic-designer"
+kind = "codex"
+model = "fixture-pix"
+effort = "medium"
+db_suffix = "p"
+port_offset = 8
+
+[agents.gem]
+role = "graphic-designer"
+kind = "agy"
+model = "fixture-gem"
+effort = "medium"
+db_suffix = "g"
+port_offset = 9
+
 """
 BRIEF = "Implementer: impl\nRequired reviews: tester, critic\n"
 WIDE = "Implementer: impl\nRequired reviews: tester, second, critic\n"
@@ -141,7 +173,8 @@ a = sys.argv[1:]
 with open(os.environ["HERDR_LOG"], "a") as f:
     f.write(json.dumps(a) + "\n")
 if a[:2] == ["pane", "get"]:
-    r = {"pane": {"pane_id": "wT:p1", "agent": "codex", "foreground_cwd": s["root"]}}
+    kind = s.get("pane_kind", "codex")
+    r = {"pane": {"pane_id": "wT:p1", "agent": kind, "foreground_cwd": s["root"]}}
 elif a[:2] == ["pane", "process-info"]:
     def alive(pid):
         try:
@@ -754,6 +787,8 @@ class Harness(FakeState, unittest.TestCase):
             "31": NARROW,
             "40": "Spec: a design\nLead: critic\n",
             "50": "Spec: a design\nLead: lead\n",
+            "60": "Implementer: impl\nRequired reviews: tester\nUX: ux\n"
+            "Graphic designers: pix, gem\n",
         }
         # The repository already has the labels most tests write.
         names = [f"phase:{p}" for p in ("design", "implement", "review")]

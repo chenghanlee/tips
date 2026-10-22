@@ -135,9 +135,21 @@ class HerdrResult(TypedDict):
 
 
 ProcessRows = dict[int, tuple[int, str]]
-ROLES = ("designer", "implementer", "tester")
+# The UX design team: one UX designer and one or more graphic designers, launched as a
+# standalone design team on a brief before its pair (README.md#ux-design-team).
+UX_ROLES = ("ux-designer", "graphic-designer")
+ROLES = ("designer", "implementer", "tester", *UX_ROLES)
+# The clients the launcher starts and stop can signal.
+CLIENT_KINDS = ("claude", "codex", "agy")
 # A team's workspace holds one tab per role; every client of that role is a pane in it.
-TABS = {"designer": "designers", "implementer": "implementers", "tester": "reviewers"}
+# The UX design team's two roles share the `ux` tab.
+TABS = {
+    "designer": "designers",
+    "implementer": "implementers",
+    "tester": "reviewers",
+    "ux-designer": "ux",
+    "graphic-designer": "ux",
+}
 ENTRY = r"[a-z0-9][a-z0-9-]*"
 # An allocation ID: the generation, then the entry. It never repeats.
 ALLOCATION_ID = rf"g[0-9]+-{ENTRY}"
@@ -341,8 +353,10 @@ def validate_settings(path: Path, value: Config) -> None:
     for name, spec in value["agents"].items():
         if spec["role"] not in ROLES:
             raise RuntimeError(f"{path}: agents.{name}.role must be one of {', '.join(ROLES)}")
-        if spec["kind"] not in ("codex", "claude"):
-            raise RuntimeError(f"{path}: agents.{name}.kind must be claude or codex")
+        if spec["kind"] not in CLIENT_KINDS:
+            raise RuntimeError(
+                f"{path}: agents.{name}.kind must be one of {', '.join(CLIENT_KINDS)}"
+            )
 
 
 def allocation_id(generation: int, entry: str) -> str:
