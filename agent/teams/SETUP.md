@@ -30,21 +30,22 @@ Install Python 3.12 and the [configured client CLIs](config.toml). Create the di
 
 The user maintains third-party skills in these Git-ignored directories in the main checkout:
 
-- `.agents/skills/`: `elixir`, `phoenix`, `ecto`, `otp`, `oban`, `herdr`, `impeccable` and the `intent` skills, for Codex.
-- `.claude/skills/`: the same five Elixir skills, `impeccable` and the `intent` skills, for Claude.
+- `.agents/skills/`: `elixir`, `phoenix`, `ecto`, `otp`, `oban` and `herdr`, for Codex.
+- `.claude/skills/`: the same five Elixir skills, for Claude.
 
-Install [Impeccable](https://github.com/pbakaus/impeccable) and
-[Intent](https://github.com/ghaida/intent) project-local from the main checkout. Run
-`npx impeccable detect --help` once so its engine is provisioned. `/impeccable init` is optional:
-`PRODUCT.md` already exists. `.impeccable/` stays ignored until a shared setting exists.
-Node and npm are required here and, from story 1, for the asset install:
-
-```bash
-npx impeccable install --scope=project --providers=claude,codex
-npx skills add ghaida/intent --skill '*' -a claude-code codex -y
-```
-
-Report a missing tool. Use a manual method unless the brief requires that tool's evidence.
+For the [UX design team](README.md#ux-design-team), also install into `.agents/skills/` only:
+[Intent](https://github.com/ghaida/intent) as its separate skills (`journey`, `articulate`,
+`fortify`, `evaluate`, `include`), and [Impeccable](https://github.com/pbakaus/impeccable)'s
+complete skill directory with its reference files as `impeccable`. Verify the destination;
+an installer's `--all` writes into other directories, including tracked `agent/skills/`.
+Node and npm are required for the installers (`npx impeccable install --scope=project
+--providers=codex`; `npx skills add ghaida/intent --skill '*' -a codex -y`) and, from
+story 1, for the asset install. Run `npx impeccable detect --help` once so its engine is
+provisioned; `.impeccable/` stays ignored until a shared setting exists. Report a missing
+tool; use a manual method unless the brief requires that tool's evidence.
+The `grilling` skill is user scope, at `~/.claude/skills/grilling`. Install and sign in to
+the `agy` CLI for a Gemini graphic designer; then run one real launch, prompt, restart and
+`team.py stop` of that entry before relying on it.
 
 Keep the Codex and Claude skill copies in sync. `team.py` checks that the main checkout's `.agents/skills/` exists, and `bootstrap.py` links it into each clone.
 

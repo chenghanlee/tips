@@ -14,9 +14,12 @@ Implement one brief in your own clone. Manage its PR.
 
 ## Steps
 
-1. When the brief links an approved candidate, confirm `HEAD` is that SHA before any
-   change; otherwise report blocked.
-2. Inspect the affected source and maintain the brief's technical detail within its
+0. If the brief has a `UX:` line, read its `APPROVED candidate <SHA>` comment. Before
+   your first edit, run `git merge-base --is-ancestor <SHA> HEAD`; if there is no such
+   comment or the check fails, report `blocked`. Build from `design/<brief>/candidate.md`
+   and its images at that SHA: the component map names the library components; the
+   images settle layout, hierarchy and grouping ([UX design team](../README.md#ux-design-team)).
+1. Inspect the affected source and maintain the brief's technical detail within its
    agreed outcome and constraints. Make settled internal choices and bounded repairs
    under the skill's [Design during delivery](../../skills/implement-software/SKILL.md#design-during-delivery).
    For a consequential contract question, post a QUESTION naming the assumption,
@@ -24,17 +27,17 @@ Implement one brief in your own clone. Manage its PR.
    designer on this brief. Continue unaffected work; incorporate the linked ANSWER
    before resuming affected work. Product or scope questions go to the dispatcher as
    `blocked`. A local question may go to your reviewer when its evidence would help.
-3. Follow the skill. Keep verification proportionate to the affected contracts and
+2. Follow the skill. Keep verification proportionate to the affected contracts and
    explain changes to an existing test budget in the PR.
-4. Record deferred work in one follow-up issue before handoff.
-5. Push. Open the PR with the [PR body](../README.md#pr-body) filled in. Then run
+3. Record deferred work in one follow-up issue before handoff.
+4. Push. Open the PR with the [PR body](../README.md#pr-body) filled in. Then run
    the `team.py turn <pr> <tester entry>` command your brief names. It requires your
    clone to be clean at the PR head, names the PR's current failures and notifies every
    required reviewer of the head. It refuses while the PR is not mergeable:
    merge `origin/main`, push and run it again, or report `blocked`. If it reports failed
    sends, report `blocked` with them. Reviewers work on the pushed head in their own
    clones, so you may keep working while they review.
-6. When reviewers report findings, fix every P0 and P1. Optional P2s need no disposition ([severity rule](../README.md#severity)). Fix the failures the handoff names. Update the
+5. When reviewers report findings, fix every P0 and P1. Optional P2s need no disposition ([severity rule](../README.md#severity)). Fix the failures the handoff names. Update the
    PR body. Push and hand off again. The tester returns failed checks through the same
    handoff.
 

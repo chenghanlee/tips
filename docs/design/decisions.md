@@ -43,13 +43,18 @@ design docs; link them instead of repeating them.
   command chain; their interactive commands need the user available. No hooks in pair clones.
   Story 1's brief carries a trial of `impeccable detect` on the running page; one clean
   run does not make it required.
-- UX designer: a user-launched session with one role file
-  ([ux-designer](../../agent/teams/roles/ux-designer.md)), lead and optional critic, no
-  harness code. Prototypes are HTML with captures; story 1 uses local HTML, later stories
-  Claude Design with the design system synced from GitHub after Basecoat lands. The
-  approved candidate is committed on `task/<issue>` and approved by the user by SHA; the
-  pair starts from that branch. Why: the harness cannot run a design team and a pair on
-  one issue (team.py:711), and captures in `tmp/` are deleted at cleanup.
+- UX design team: one UX designer ([ux-designer](../../agent/teams/roles/ux-designer.md),
+  Opus by default) and one or more graphic designers
+  ([graphic-designer](../../agent/teams/roles/graphic-designer.md); Codex `imagegen` or
+  Gemini via `agy`), launched by the dispatcher as a standalone design team before the
+  pair ([UX design team](../../agent/teams/README.md#ux-design-team)). The UX designer
+  grills the user to a shared understanding, directs the graphic designers, and commits
+  the candidate (images in native format, `candidate.md`, references, prompts) under
+  `design/<brief>/` on `task/<brief>`. The user approves by SHA with
+  `APPROVED candidate <SHA>`; `team.py start` refuses the pair without it. Why: generated
+  images are cheaper than HTML prototypes for proposing layout and hierarchy; the design
+  system renders the components. Records: the principles and mechanics chavruta files in
+  `docs/brainstorm/`.
 - Story order: story 1, then a design-system story (style pack, tokens, usage notes,
   sync trial against the real form), then feature design stories. Each designs only the
   next slice.

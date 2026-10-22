@@ -134,7 +134,7 @@ def stop(pane: str, root: str | Path) -> None:
 def signal_client(pane: str, current: Entity, clients: set[int], owned: set[int]) -> None:
     if clients:
         if (
-            current.get("agent") not in ("claude", "codex")
+            current.get("agent") not in conf.CLIENT_KINDS
             or len(clients) != 1
             or not clients <= owned
         ):

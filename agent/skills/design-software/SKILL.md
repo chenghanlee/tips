@@ -30,8 +30,8 @@ Scope limits:
    modules, Oban features, Ecto patterns, provider clients.
 4. The contract and failure sections of
    [implement-software](../implement-software/SKILL.md#trace-the-affected-contract).
-5. An approved prototype, when the brief links one. UI and UX questions go to the
-   [UX designer](../../teams/roles/ux-designer.md), with the user.
+5. The approved candidate under `design/<brief>/`, when the brief has one. UI and UX
+   questions go to the [UX designer](../../teams/roles/ux-designer.md), with the user.
 
 Write two lines before anything else: the product question this feature answers, and the
 signal that would show the answer is wrong. Design the feature so that signal can be
