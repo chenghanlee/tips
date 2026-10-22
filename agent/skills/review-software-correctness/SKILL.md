@@ -48,7 +48,7 @@ Find everything the change can affect, not only the changed lines.
 2. For each item, find its users with Dexter `references` and scoped `rg`, as the
    [navigation rules](../../../AGENTS.md#elixir-navigation) say. Investigate every user
    that only one of them found. For evidence across several files, follow the
-   [Lookup subagents](../../../AGENTS.md#lookup-subagents) rule; you remain responsible
+   [Lookup subagents](../../subagents.md#lookup-subagents) rule; you remain responsible
    for tracing and verifying the affected contract.
 3. Follow each user in turn. Stop at an entry point, or at a caller whose handling of
    the change you have read and that still satisfies its own contract. Do not stop just
