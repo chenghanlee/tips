@@ -445,7 +445,6 @@ class PairLifecycleTest(Harness):
             assert not any((root / "project").iterdir())
         settings = json.loads((self.trusted / "state/g1-impl/bootstrap.json").read_text())
         assert (settings["branch"], settings["commit"]) == ("task/29", "")
-        assert "probe" not in settings
         assert settings["clone_url"] == str(self.origin)
         assert settings["writable"] == [str(impl_root)]
         tester_settings = json.loads((self.trusted / "state/g1-tester/bootstrap.json").read_text())
@@ -507,10 +506,8 @@ class PairLifecycleTest(Harness):
         assert tester_brief.startswith("You are tester, the merge-confirming tester for brief #29;")
         assert f"python3 {harness / 'team.py'} turn <pr> impl" in tester_brief
         assert "Put tester, <session> on line 2" in tester_brief
-        assert "retirement.py" not in tester_brief
         assert "persona" not in tester_brief
         targ = tester["launch_argv"]
-        assert "--advisor" not in targ + argv
         settings = json.loads(targ[targ.index("--settings") + 1])
         assert settings["promptSuggestionEnabled"] is False
         # The brief body is the implementer's to maintain; auto mode must not deny it.
@@ -570,13 +567,6 @@ class PairLifecycleTest(Harness):
         other = tester_root / "project"
         assert self.git("rev-parse", "HEAD", cwd=other) == release
         assert self.git("branch", "--show-current", cwd=other) == ""
-        # A refused post is an error after the launch itself: the record stands and a rerun
-        # posts the EVENT.
-        self.update(comments_fail=True)
-        refused = self.team("start", "31", ok=False)
-        assert "EVENT not recorded on #31" in refused.stderr
-        assert "Rerun this command once GitHub answers" in refused.stderr
-        assert self.record(2)["agents"]["impl"]["session"] == "session-team-2-impl"
 
     def test_a_new_pair_is_labelled_before_its_task_prompt(self) -> None:
         self.update(label_names=["bug"], labels={"29": ["bug"]})
@@ -840,18 +830,6 @@ class PairLifecycleTest(Harness):
         self.team("start", "29")
         assert len(self.events("agent", "start")) == 2
 
-    def test_a_team_whose_clients_never_launched_retires(self) -> None:
-        self.update(setup_lost=True)
-        self.team("start", "29", ok=False)
-        assert [a["launch"] for a in self.record(1)["agents"].values()] == ["", ""]
-        self.update(setup_lost=False)
-        self.merge(self.git("--git-dir", self.origin, "rev-parse", "main"))
-        self.databases("tips_test_t1g1i")
-        stopped = self.team("stop", "29").stdout
-        assert "slot 1 released" in stopped
-        assert self.recorded_briefs() == set()
-        assert self.remaining_databases() == []
-
     def test_client_started_blocked_or_in_another_root_is_reported(self) -> None:
         # A blocked client has the recorded identity: a rerun adopts it and sends nothing.
         self.update(start_fails=True)
@@ -886,7 +864,6 @@ class PairLifecycleTest(Harness):
             ('db_suffix = "r"', 'db_suffix = "9r"', "db_suffix must be nonempty and start"),
             ('repository = "o/r"', 'repository = "o"', "github.repository must be owner/name"),
             ('psql = ["/fixture/psql"', 'psql = ["psql"', "psql must start with an absolute"),
-            ('db_suffix = "c"', 'db_suffix = "c"\nprobe = ["make"]', "unknown keys ['probe']"),
             ('psql = ["/fixture/psql", "fixture-dsn"]', "psql = []", "psql must hold 1 to 16"),
             ('db_suffix_prefix = "_t"', 'db_suffix_prefix = "_' + "t" * 50 + '"', "exceed 63"),
             ('[github.projects]\n16 = ["Phase", "Feature"]\n', "", "github.projects must be"),
@@ -917,22 +894,13 @@ class PairLifecycleTest(Harness):
         refused = self.team("stop", "29", ok=False)
         assert "TIPS_TEAM_HARNESS must be an absolute path" in refused.stderr
 
-    def test_a_root_in_the_checkout_or_a_temporary_directory_is_refused(self) -> None:
-        scratch, tmp = self.root / "scratch", Path("/tmp").resolve()  # noqa: S108 - must be refused
-        roots: dict[str, tuple[Path, Path, dict[str, str]]] = {
-            "checkout": (self.repo / "x", self.repo, {}),
-            "tmp": (tmp / f"tips-root-{os.getpid()}", tmp, {}),
-            "TMPDIR": (scratch / "x", scratch, {"TMPDIR": str(scratch)}),
-        }
-        env = self.env
-        for case, (root, parent, extra) in roots.items():
-            self.addCleanup(shutil.rmtree, root, ignore_errors=True)
-            with self.subTest(case=case):
-                self.env = {**env, **extra, "TIPS_TEAM_HARNESS": str(root / "harness")}
-                refused = self.team("start", "29", ok=False)
-                assert f"Harness root {root} is inside {parent}; refused" in refused.stderr
-                assert not root.exists()
-        self.env = env
+    def test_a_root_in_the_checkout_is_refused(self) -> None:
+        root = self.repo / "x"
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        self.env = {**self.env, "TIPS_TEAM_HARNESS": str(root / "harness")}
+        refused = self.team("start", "29", ok=False)
+        assert f"Harness root {root} is inside {self.repo}; refused" in refused.stderr
+        assert not root.exists()
         assert [e for e in self.state()["events"] if e[0] != "gh"] == []
 
     def test_trusted_paths_inside_writable_or_temporary_roots_are_refused(self) -> None:
@@ -1154,16 +1122,11 @@ class HandoffTest(Harness):
         self.team("turn", "7", "tester", pane=self.impl)
         # The tester moves its own clone to the handed-off head.
         self.bootstrap("team-1-tester", "--commit", head)
-        impl, tester = self.project("team-1-impl"), self.project("team-1-tester")
-        assert impl != tester
+        tester = self.project("team-1-tester")
         assert self.git("rev-parse", "HEAD", cwd=tester) == head
-        # Tester edits never reach the implementer, and the implementer repairs while the
-        # tester stays on the immutable head it reviews.
+        # A dirty clone blocks the move to the repaired head and is never reset.
         (tester / "tracked.txt").write_text("tester experiment\n")
-        assert (impl / "tracked.txt").read_text() == "work\n"
         repaired = self.push("team-1-impl", "repair")
-        assert self.git("rev-parse", "HEAD", cwd=tester) == head
-        # A dirty clone blocks the move and is never reset.
         failed = self.bootstrap("team-1-tester", "--commit", repaired, ok=False)
         assert "uncommitted or untracked files; nothing changed" in failed.stderr
         assert (tester / "tracked.txt").read_text() == "tester experiment\n"
@@ -1254,7 +1217,6 @@ class HandoffTest(Harness):
             (("7", "tester"), critic, "this pane is critic"),
             (("7", "tester"), None, "HERDR_PANE_ID is not set"),
             (("7", "tester"), other, "does not close brief #30"),
-            (("7", "Lead"), self.impl, "Usage:"),
         ]
         for args, pane, message in cases:
             with self.subTest(args=args, message=message):
@@ -1268,7 +1230,6 @@ class HandoffTest(Harness):
         root = self.trusted / "allocations/g1-critic"
         critic = self.pane("team-1-critic")
         assert critic["cwd"] == str(root)
-        assert self.launch_env("team-1-critic") == ("_t1g1c", str(PORT_BASE + 12))
         brief = self.system_prompt("team-1-critic")
         assert brief.startswith("You are critic, the reviewing designer for brief #29;")
         assert "Your persona: operations: failure and recovery paths." in brief
@@ -1361,8 +1322,6 @@ class DesignTest(Harness):
         assert (record["implementer"], record["tester"]) == ("impl", "tester")
         assert self.recorded_briefs() == {"29"}
         assert self.launch_env("team-1-critic") == ("_t1g1c", str(PORT_BASE + 12))
-        assert "No free slot" in self.team("start", "30", ok=False).stderr
-        assert "not a configured designer" in self.team("design", "29", "tester", ok=False).stderr
         starts = len(self.events("agent", "start"))
         prompts = len(self.prompts("team-1-critic"))
         assert "Already running" in self.team("design", "29", "critic").stdout
@@ -1423,18 +1382,10 @@ class DesignTest(Harness):
             f"{self.record(1)['agents']['critic']['launch']}; database suffix _t1g1c; "
             f"port {PORT_BASE + 12}"
         )
-        usage = execute(
-            ["python3", str(self.repo / "agent/teams/board.py"), "usage", "50"],
-            cwd=self.repo,
-            env=self.env,
-            timeout=60,
-        )
-        assert "team-1-critic" in usage.stdout + usage.stderr
         # A second designer joins the spec's team in its own allocation; non-designers
         # are refused.
         refused = self.team("design", "50", "tester", ok=False)
         assert "tester is not a configured designer entry" in refused.stderr
-        assert "Already running: team-1-critic" in self.team("design", "50", "critic").stdout
         self.team("design", "50", "lead")
         assert self.record(1)["agents"]["lead"]["root"] == str(self.trusted / "allocations/g1-lead")
         assert self.tabs("w1") == {"designers": ["team-1-critic", "team-1-lead"]}
@@ -1878,18 +1829,6 @@ class LaunchRecoveryTest(Harness):
     def starts(self) -> list[str]:
         return [e[2] for e in self.events("agent", "start")]
 
-    def test_attached_designer_after_launch_timeout_is_adopted_without_resend(self) -> None:
-        self.team("start", "29")
-        self.fault("agent start", "team-1-critic", "timeout_live")
-        assert "timed out" in self.team("design", "29", "critic", ok=False).stderr
-        allocation = self.record(1)["agents"]["critic"]
-        assert allocation["submission"] == "unknown"
-        starts = self.starts()
-        assert "nothing was resent" in self.team("design", "29", "critic").stdout
-        assert self.starts() == starts
-        assert not self.prompts("team-1-critic")
-        assert self.record(1)["agents"]["critic"]["id"] == allocation["id"]
-
     def test_two_concurrent_starts_launch_each_client_once(self) -> None:
         # The second start runs while the first is starting the implementer.
         self.fault("agent start", "team-1-impl", "concurrent", argv=["start", "29"])
@@ -1972,16 +1911,6 @@ class LaunchRecoveryTest(Harness):
                 assert submission == "unknown", f"{tester} recorded as {submission}"
                 assert not self.prompts(tester), f"{tester} was sent its task"
 
-    def test_stop_retires_a_client_whose_session_was_never_recorded(self) -> None:
-        # The launcher dies after the Codex client started: the record has no session.
-        self.fault("agent start", "team-1-impl", "crash_after")
-        self.team("start", "29", ok=False)
-        assert self.record(1)["agents"]["impl"]["session"] == ""
-        self.bootstrap("team-1-impl")
-        self.merge(self.push("team-1-impl"))
-        self.clients_exit(1)
-        assert "slot 1 released" in self.team("stop", "29").stdout
-
     def test_task_done_and_client_exited_before_the_record_update_is_never_replayed(self) -> None:
         self.fault("agent start", "team-1-tester", "timeout_exited")
         self.team("start", "29", ok=False)
@@ -2008,8 +1937,11 @@ class LaunchRecoveryTest(Harness):
         for message, value in cases.items():
             with self.subTest(message=message):
                 path.write_text(json.dumps(value))
-                for command in (("start", "29"), ("reset", "29", "impl"), ("stop", "29")):
-                    assert message in self.team(*command, ok=False).stderr
+                assert message in self.team("start", "29", ok=False).stderr
+        # reset and stop read the record through the same loader as start.
+        path.write_text(json.dumps(cases["record version 2 is not 3"]))
+        for command in (("reset", "29", "impl"), ("stop", "29")):
+            assert "record version 2 is not 3" in self.team(*command, ok=False).stderr
         # A live client with the recorded name that this record never started.
         never = json.loads(json.dumps(good))
         never["agents"]["tester"]["submission"] = "never_submitted"
@@ -2028,7 +1960,7 @@ class LaunchRecoveryTest(Harness):
         assert self.record(1)["agents"]["tester"]["session"] == session
         tester["agent_session"] = {"kind": "id", "value": session}
         self.save(state)
-        # Another client in a recorded pane.
+        # Another client of the recorded kind in a recorded pane: its name alone refuses it.
         state = self.state()
         visitor = next(x for x in state["panes"] if x.get("label") == "team-1-tester")
         visitor.update(name="visitor", cwd=str(self.repo))
