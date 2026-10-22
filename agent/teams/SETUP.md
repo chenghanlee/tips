@@ -147,14 +147,15 @@ permission flow. See [Claude auto-mode configuration](https://code.claude.com/do
 
 ## Start the dispatcher
 
-The launcher starts Claude in restricted mode with no built-in tools (`--restricted
---tools ""`) and one MCP server, [adapter.py](adapter.py), under `--strict-mcp-config`.
-The launcher sets the server, `--settings`, the session ID and the environment. User,
-project and local settings files, CLAUDE.md files, other MCP servers and Remote Control
-are not loaded. The dispatcher's system prompt is two role files, [common.md](roles/common.md)
-and [dispatcher.md](roles/dispatcher.md), read by the launcher before start.
+The launcher starts Claude with its built-in tools, the `launch.claude_permission_mode`
+of config.toml and one MCP server, [adapter.py](adapter.py), under `--strict-mcp-config`,
+so no other MCP server loads. The launcher sets the server, `--settings` (Remote Control
+off), the session ID and the environment. The dispatcher runs in the main checkout, so
+its CLAUDE.md and settings apply. Two role files, [common.md](roles/common.md) and
+[dispatcher.md](roles/dispatcher.md), are appended to its system prompt by the launcher
+before start.
 
-A restricted client reports no session to Herdr. The launcher execs the client, which
+The launcher execs the client, which
 keeps the launcher's process ID, so it records that ID, its start time, the pane and the
 session in `state/dispatcher.json` under the [harness root](#install-a-harness-release). When Herdr shows
 that process in the pane, ready for input, it names the pane `dispatcher` and sends the

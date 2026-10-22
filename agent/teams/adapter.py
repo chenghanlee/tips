@@ -1,12 +1,13 @@
-"""The dispatcher's only tools: fixed harness operations served over MCP stdio.
+"""The dispatcher's harness tools: fixed harness operations served over MCP stdio.
 
-agent/teams/dispatch starts Claude restricted, with no built-in tools and this one
-server. Every tool takes typed IDs, enums or bounded text and calls the same harness
-functions as the CLI. No tool runs a command string, reads a path or accepts a profile.
-GitHub calls name the configured repository. Of an issue's labels, the team tools write
-only the reserved `phase:` and `turn:` labels (README.md#turns). Run with the locked
-environment (requirements.lock); `python -E -s adapter.py` serves stdio until the client
-exits.
+agent/teams/dispatch starts Claude with its built-in tools and this one MCP server. The
+dispatcher uses these tools for every operation they cover, because they write the
+workflow's records, labels and events. Every tool takes typed IDs, enums or bounded text
+and calls the same harness functions as the CLI. No tool runs a command string, reads a
+path or accepts a profile. GitHub calls name the configured repository. Of an issue's
+labels, the team tools write only the reserved `phase:` and `turn:` labels
+(README.md#turns). Run with the locked environment (requirements.lock);
+`python -E -s adapter.py` serves stdio until the client exits.
 """
 
 import contextlib

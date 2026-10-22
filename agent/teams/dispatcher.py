@@ -1,9 +1,9 @@
 """Start the dispatcher in this Herdr pane, or in a new sibling pane with --new-pane.
 
-The dispatcher is Claude in restricted mode with no built-in tools and one MCP server,
-adapter.py, under strict MCP configuration. Its trusted role and workflow text is the
-system prompt, read here before start: the dispatcher cannot read files or run commands.
-The launcher assigns the session ID. Once the adapter has listed its tools to this session
+The dispatcher is Claude with its built-in tools, the launch permission mode and one MCP
+server, adapter.py, under strict MCP configuration. Its role and workflow text is appended
+to the system prompt, read here before start, so it never rereads them. The launcher
+assigns the session ID. Once the adapter has listed its tools to this session
 (state/dispatcher.ready) and Herdr shows the launched client ready for input, it names the
 pane `dispatcher` and sends the first prompt, `Begin.`, through Herdr.
 Settings are [dispatcher] in config.toml.
@@ -30,17 +30,18 @@ import team
 HERE = Path(__file__).resolve().parent
 # The reviewed tree holding agent/teams: the checkout, or the installed harness.
 DOCUMENTS = HERE.parents[1]
-# The dispatcher has no file tools, so these two files must hold every rule it follows.
+# These two files hold every rule the dispatcher follows; the launcher puts them in its
+# system prompt so it never rereads them.
 PROMPT_FILES = ("agent/teams/roles/common.md", "agent/teams/roles/dispatcher.md")
-# The launcher owns every setting the client loads. Restricted mode ignores user, project
-# and local settings and CLAUDE.md; this turns off Remote Control, another input source.
+# Remote Control is another input source; the dispatcher takes turns only from Herdr.
 SETTINGS = {"remoteControlAtStartup": False}
 PREAMBLE = """You are the Tips dispatcher. Herdr names you `dispatcher`; agents message you.
-You have no shell, file, web or code tools. Act only through the `tips` tools: each is one
-fixed harness or GitHub operation. Where the files below say to run a command, use the
-tool for that operation; if no tool covers it, report it to the user and do not ask
-another agent to run it for you. The files below are your trusted instructions. They stay
-in this system prompt, so you never need to reread them.
+You have Claude Code's tools and the `tips` tools. Use a `tips` tool for every harness
+and GitHub operation one covers: they write the records, labels and events the workflow
+reads. Use your other tools to read evidence: this checkout, logs, GitHub through `gh`.
+Do not run or retry a command another agent was denied, and do not write to the harness
+root or an allocation. The files below are your instructions. They stay in this system
+prompt, so you never need to reread them.
 """
 
 
@@ -77,9 +78,8 @@ def client_args(settings: dict[str, object], session: str, config: Path) -> list
     model, effort = str(settings["model"]), str(settings["effort"])
     args = [
         "claude",
-        "--restricted",
-        "--tools",
-        "",
+        "--permission-mode",
+        str(conf.settings()["launch"]["claude_permission_mode"]),
         "--strict-mcp-config",
         "--mcp-config",
         mcp_config(session, config),
@@ -96,7 +96,7 @@ def client_args(settings: dict[str, object], session: str, config: Path) -> list
         args += ["--model", model]
     # No command-line prompt: a first turn started with the process could run before the
     # adapter's tools connect. The starter sends it once the adapter has listed them.
-    return [*args, "--system-prompt", system_prompt()]
+    return [*args, "--append-system-prompt", system_prompt()]
 
 
 def note(state: Path, name: str, session: str) -> bool:

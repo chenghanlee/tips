@@ -180,14 +180,19 @@ class DispatchTest(unittest.TestCase):
         assert env["TIPS_TEAM_CONFIG"] == str(self.config)
         assert cwd == str(self.root)
 
-    def test_dispatcher_starts_restricted_with_one_server_and_trusted_text(self) -> None:
+    def test_dispatcher_starts_with_its_tools_one_server_and_the_role_text(self) -> None:
         self.dispatch()
         _, args, env, cwd = self.calls("claude")[-1]
-        assert args[:5] == ["--restricted", "--tools", "", "--strict-mcp-config", "--mcp-config"]
-        assert "--permission-mode" not in args
+        assert args[:4] == [
+            "--permission-mode",
+            "bypassPermissions",
+            "--strict-mcp-config",
+            "--mcp-config",
+        ]
+        assert "--restricted" not in args
         assert json.loads(args[args.index("--settings") + 1]) == {"remoteControlAtStartup": False}
         assert args[args.index("--allowedTools") + 1] == "mcp__tips"
-        servers = json.loads(args[5])["mcpServers"]
+        servers = json.loads(args[4])["mcpServers"]
         assert list(servers) == ["tips"]
         tips = servers["tips"]
         assert tips["command"] == str(self.scripts / ".venv/bin/python")
@@ -198,14 +203,14 @@ class DispatchTest(unittest.TestCase):
             "TIPS_DISPATCHER_SESSION": session,
             "TIPS_TEAM_CONFIG": str(self.config),
         }
-        prompt = args[args.index("--system-prompt") + 1]
+        prompt = args[args.index("--append-system-prompt") + 1]
         for name in DOCUMENTS:
             assert f"Trusted {name} text." in prompt, name
-        # The role files carry the dispatcher's rules; AGENTS.md and the README do not load.
+        # The role files carry the dispatcher's rules; the README is not in the prompt.
         for name in ("AGENTS.md", "README.md"):
             assert f"Trusted {name} text." not in prompt, name
         # No command-line prompt: the first turn waits for the client to be ready.
-        assert args[-2] == "--system-prompt"
+        assert args[-2] == "--append-system-prompt"
         assert "Begin." not in args
         assert env["CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"] == "42"
         assert cwd == str(self.root)
