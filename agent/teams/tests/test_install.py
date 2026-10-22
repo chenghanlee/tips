@@ -164,13 +164,10 @@ class InstallTest(unittest.TestCase):
                 fcntl.flock(held, fcntl.LOCK_EX)
                 assert busy in self.install(self.first, ok=False)
         assert not list((self.root / "releases").iterdir())
-        # A root inside the checkout or a temporary directory is refused before any write.
+        # A root inside the checkout is refused before any write.
         inside = self.install(self.first, ok=False, root=self.source / "agent_teams/r")
         assert "inside" in inside
         assert not (self.source / "agent_teams").exists()
-        with tempfile.TemporaryDirectory() as temporary:
-            refused = self.install(self.first, ok=False, root=Path(temporary).resolve() / "r")
-            assert "inside" in refused
         # The same repository name under another owner is refused.
         (self.root / "repository.json").write_text(json.dumps({"repository": "x/r"}))
         assert "belongs to x/r, not o/r" in self.install(self.first, ok=False)

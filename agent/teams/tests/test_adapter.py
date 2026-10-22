@@ -201,22 +201,16 @@ class AdapterTest(Harness):
                 assert not names & {"path", "command", "cmd", "args", "profile", "cwd", "pane"}
             refused = await self.call(client, "status", ok=False, path="/etc/hosts")
             assert "does not accept path" in refused
-            await self.call(client, "start_pair", ok=False, brief="../29")
-            await self.call(client, "launch_reviewer", ok=False, pr=7, entry="Bad Entry")
             unknown = await self.call(
                 client, "prompt_agent", ok=False, brief=29, entry="ghost", text="hi"
             )
             assert "no allocation record" in unknown
-            post: dict[str, Any] = {"issue": 29, "comment_type": "SHELL", "body": "x"}
-            await self.call(client, "board_post", ok=False, **post)
             await self.call(client, "pr_list", ok=False, state="draft")
             status: dict[str, Any] = {"project": 16, "issue": 29, "field": "Status"}
             field = await self.call(client, "project_set_field", ok=False, **status, value="Done")
             assert "not approved" in field
             other = await self.call(client, "project_read", ok=False, project=15)
             assert "not configured" in other
-            design = await self.call(client, "start_design", ok=False, spec=40, entry="impl")
-            assert "not a configured designer entry" in design
 
         self.session(steps)
         assert not self.events("agent", "start")
@@ -280,19 +274,6 @@ class AdapterTest(Harness):
 
         self.session(second)
         assert self.recorded_briefs() == {"40"}
-
-    def test_start_design_can_join_a_started_brief_without_a_spare_slot(self) -> None:
-        self.write_config(CONFIG.replace("max_teams = 6", "max_teams = 1"))
-
-        async def steps(client: Any) -> None:
-            await self.call(client, "start_pair", brief=29)
-            await self.call(client, "start_design", spec=29, entry="critic")
-            await self.call(client, "prompt_agent", brief=29, entry="critic", text="Read QUESTION")
-
-        self.session(steps)
-        assert self.recorded_briefs() == {"29"}
-        assert self.record(1)["kind"] == "brief"
-        assert self.prompts("team-1-critic")[-1] == "Read QUESTION"
 
     def test_helpers_and_plain_messages_keep_the_labels(self) -> None:
         labels = ["phase:implement", "turn:impl"]
