@@ -14,6 +14,11 @@ Implement one brief in your own clone. Manage its PR.
 
 ## Steps
 
+0. If the brief has a `UX:` line, read its `APPROVED candidate <SHA>` comment. Before
+   your first edit, run `git merge-base --is-ancestor <SHA> HEAD`; if there is no such
+   comment or the check fails, report `blocked`. Build from `design/<brief>/candidate.md`
+   and its images at that SHA: the component map names the library components; the
+   images settle layout, hierarchy and grouping ([UX design team](../README.md#ux-design-team)).
 1. Inspect the affected source and maintain the brief's technical detail within its
    agreed outcome and constraints. Make settled internal choices and bounded repairs
    under the skill's [Design during delivery](../../skills/implement-software/SKILL.md#design-during-delivery).

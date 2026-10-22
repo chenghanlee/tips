@@ -69,6 +69,7 @@ so each pair has its own database and port. The config reads them as the table i
 |---|---|
 | `scripts/`, `db/` | Maintenance commands and the database image |
 | `docs/design/` | Current product and technical requirements |
+| `design/<brief>/` | Approved UX candidates: reference images, prompts and `candidate.md` per story ([UX design team](agent/teams/README.md#ux-design-team)) |
 | `agent/skills/` | Shared, versioned skills for Codex and Claude |
 | `agent/teams/` | The pair workflow, its scripts, configuration and tests |
 | `agent/lsp/` | Agent language-server build script and local patch |

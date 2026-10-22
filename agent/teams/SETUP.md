@@ -33,6 +33,15 @@ The user maintains third-party skills in these Git-ignored directories in the ma
 - `.agents/skills/`: `elixir`, `phoenix`, `ecto`, `otp`, `oban` and `herdr`, for Codex.
 - `.claude/skills/`: the same five Elixir skills, for Claude.
 
+For the [UX design team](README.md#ux-design-team), also install into `.agents/skills/` only:
+[Intent](https://github.com/ghaida/intent) as its separate skills (`journey`, `articulate`,
+`fortify`, `evaluate`, `include`), and [Impeccable](https://github.com/pbakaus/impeccable)'s
+complete skill directory with its reference files as `impeccable`. Verify the destination;
+an installer's `--all` writes into other directories, including tracked `agent/skills/`.
+The `grilling` skill is user scope, at `~/.claude/skills/grilling`. Install and sign in to
+the `agy` CLI for a Gemini graphic designer; then run one real launch, prompt, restart and
+`team.py stop` of that entry before relying on it.
+
 Keep the Codex and Claude skill copies in sync. `team.py` checks that the main checkout's `.agents/skills/` exists, and `bootstrap.py` links it into each clone.
 
 The repository tracks five skills: the [Dexter reference](../skills/dexter/SKILL.md), [design-software](../skills/design-software/SKILL.md), [implement-software](../skills/implement-software/SKILL.md), [review-software-correctness](../skills/review-software-correctness/SKILL.md) and [review-software-design](../skills/review-software-design/SKILL.md). Link them once into both locations from the main checkout:

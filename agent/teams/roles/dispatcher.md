@@ -92,6 +92,16 @@ designer's assignment is complete or handed off to a reachable successor, call
 `retire_team` once. If it refuses a brief closed without a merged PR, ask the user to run
 `team.py stop <brief> --abandon` ([abandon](../README.md#retire-a-brief-closed-without-a-merged-pr)).
 
+## UX design team
+
+For a brief with a `UX:` line, follow the [UX design team](../README.md#ux-design-team)
+steps: once the brief meets the release conditions except approval, call `start_design`
+for the UX entry and then for each entry on `Graphic designers:`. Tell the user which
+pane the UX designer waits in. When the UX designer sends `<comment URL> approved`, read
+the comment with `board_read`; if it is the user's `APPROVED candidate <SHA>` record, call
+`retire_team` then `start_pair`. `start_pair` refuses a `UX:` brief without that comment.
+A UX question that arrives as `blocked` after the pair started goes to the user.
+
 ## Decisions during implementation
 
 For a consequential technical QUESTION, name a lead and the question link on the
