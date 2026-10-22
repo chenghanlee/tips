@@ -20,7 +20,7 @@ order and open issues (`project_read` lists the items that are not Done; read on
 clients (`status`). A merged PR's evidence is in its body and reviews; it is not a run
 against today's `main`. A broken `main` reaches you as an implementer's `blocked` with evidence for both
 the task and main SHAs, using local reproductions during the
-[CI pause](../../../AGENTS.md#github-ci-pause). Do not wait for paused workflows.
+[CI pause](../../../agent/docs/github-ci-pause.md). Do not wait for paused workflows.
 
 - Set merged issues Done (`project_set_field`, Status). An issue with an open question
   stays Blocked.

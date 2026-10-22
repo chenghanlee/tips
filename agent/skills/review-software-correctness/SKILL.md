@@ -46,9 +46,9 @@ Find everything the change can affect, not only the changed lines.
 1. List each changed public function, schema, changeset, query, migration, config key,
    PubSub topic, Oban queue or worker, shared test fixture and shared component.
 2. For each item, find its users with Dexter `references` and scoped `rg`, as the
-   [navigation rules](../../../AGENTS.md#elixir-navigation) say. Investigate every user
+   [navigation rules](../../../agent/docs/elixir-navigation.md) say. Investigate every user
    that only one of them found. For evidence across several files, follow the
-   [Lookup subagents](../../../AGENTS.md#lookup-subagents) rule; you remain responsible
+   [Lookup subagents](../../docs/lookup-subagents.md) rule; you remain responsible
    for tracing and verifying the affected contract.
 3. Follow each user in turn. Stop at an entry point, or at a caller whose handling of
    the change you have read and that still satisfies its own contract. Do not stop just
@@ -163,7 +163,7 @@ not apply to the PR.
 
 ## Step 7: Checks
 
-Run the [required checks](../../../AGENTS.md#checks) for the kinds of files the PR
+Run the [required checks](../../../agent/docs/checks.md) for the kinds of files the PR
 changed, in your own database and port, except the full application test suite.
 
 For the full application suite, verify the implementer's record for the reviewed head
@@ -172,7 +172,7 @@ instead of running the suite again. This is a
 2026-10-20 ([#515](https://github.com/chenghanlee/tips/issues/515)). It replaces the
 default second run, including the plain `mix test` the changed-file-kind checks reach.
 The record must cover that head completely: a CI run, or during the CI pause the record
-the [policy](../../../AGENTS.md#github-ci-pause) requires. Missing, contradictory or
+the [policy](../../../agent/docs/github-ci-pause.md) requires. Missing, contradictory or
 inapplicable evidence does not satisfy it: report the required check as missing. Your
 own run does not replace the implementer's record. Also run the suite when your
 investigation needs it. Steps 3 to 6, the other required checks, the browser delegation
@@ -182,7 +182,7 @@ outside this rule.
 Lost guarantee: a second unconditional application-suite run in another database, port
 and runtime.
 
-During the [CI pause](../../../AGENTS.md#github-ci-pause), verify the recorded local
+During the [CI pause](../../../agent/docs/github-ci-pause.md), verify the recorded local
 commands, tested SHA, results and the excerpts the decision depends on. Record which
 evidence you ran yourself and which you inspected. Apply the policy's rule for carrying
 evidence across a later diff; an absent CI run is not a pass and does not replace local

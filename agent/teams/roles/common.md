@@ -36,7 +36,7 @@ Read this and your role file at launch and after compaction.
   competing versions: a brief is the story issue itself; it links its epic and the
   design sections at their
   commit instead of copying them; for checks, they link
-  [AGENTS.md#checks](../../../AGENTS.md#checks) and list only additions or exceptions.
+  [agent/docs/checks.md](../../../agent/docs/checks.md) and list only additions or exceptions.
   Incorporate an ANSWER before resuming affected work.
 - The implementer records agreed additional reviewers in `Required reviews:`. The
   pair's implementer and merge-confirming tester cannot change after launch. Body
@@ -58,7 +58,7 @@ Read this and your role file at launch and after compaction.
 ## Evidence and scope
 
 - Support a source claim with `path:line` at its commit. For execution evidence use the
-  CI run URL, or during the [CI pause](../../../AGENTS.md#github-ci-pause), the local
+  CI run URL, or during the [CI pause](../../../agent/docs/github-ci-pause.md), the local
   command, tested SHA, environment, exit, result and the excerpt the claim depends on.
   Otherwise mark it unverified.
 - Use the [README scale](../README.md#severity). An architect P1 and a tester P1 both

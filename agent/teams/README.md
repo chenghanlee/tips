@@ -450,7 +450,7 @@ interpret issue comments as merge blockers.
 
 ### Merge
 
-During the [CI pause](../../AGENTS.md#github-ci-pause), first verify the PR's applicable
+During the [CI pause](../../agent/docs/github-ci-pause.md), first verify the PR's applicable
 local check evidence and independent correctness/design review at the current head.
 `observe` reads GitHub state and posts nothing; it does not verify local test logs. An
 empty required-check list is not proof that local checks ran. If a required-status rule

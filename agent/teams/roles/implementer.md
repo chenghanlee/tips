@@ -50,7 +50,7 @@ Implement one brief in your own clone. Manage its PR.
 Apply the matching rule before every test command, edit and source read. Do not skip
 one to save a tool call.
 
-1. **Tests.** Run every `mix test` as the [test log rule](../../../AGENTS.md#test-logs)
+1. **Tests.** Run every `mix test` as the [test log rule](../../../agent/docs/test-logs.md)
    says, with `--max-failures 1`.
    Run the browser suite yourself, serial with timeouts off, when the repository has
    one (`mix test --only browser --trace`; feature modules carry `@moduletag :browser`
@@ -62,7 +62,7 @@ one to save a tool call.
    test name.
    Keep that log until cleanup; record both commands, exits, results and excluded counts
    in the PR body under
-   "Checks not run by CI" as the [CI pause rule](../../../AGENTS.md#github-ci-pause) says.
+   "Checks not run by CI" as the [CI pause rule](../../../agent/docs/github-ci-pause.md) says.
    A Codex tester inspects that record instead
    ([manual browser review](../README.md#manual-browser-review)).
 2. **Edits.** With the client's edit tool, replace only the lines that must change plus

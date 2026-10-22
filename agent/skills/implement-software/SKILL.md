@@ -53,7 +53,7 @@ Start with these sources, then follow the affected flow as needed:
 
 1. The brief: outcome, contracts, scenarios, test budget, decisions table, restrictions.
 2. The stack skills AGENTS.md names for the files you will change.
-3. Each `path:line` the brief names and its callers, found with the [navigation rules](../../../AGENTS.md#elixir-navigation).
+3. Each `path:line` the brief names and its callers, found with the [navigation rules](../../../agent/docs/elixir-navigation.md).
 4. The existing tests for the changed modules.
 
 Inspect necessary callers and existing mechanisms rather than treating the initial path
@@ -124,7 +124,7 @@ Make failures detectable when working quickly. Follow the fifth [required rule](
 When you change behaviour or a return format: find every caller with Dexter `references`
 and scoped `rg`, and check the result through to the final state and side effects. A
 correct return value does not prove a correct outcome. For evidence across several
-files, follow the [Lookup subagents](../../../AGENTS.md#lookup-subagents) rule; you
+files, follow the [Lookup subagents](../../docs/lookup-subagents.md) rule; you
 remain responsible for tracing and verifying the affected contract.
 
 When you add, cache, move or remove a fact (a stored value, a derived flag, or a timer
@@ -278,7 +278,7 @@ scenario does not rule out a worthwhile repair. Stop when the affected problem i
 
 ## Finish
 
-Finish only when every scenario has a test. Confirm the tests and the [required checks](../../../AGENTS.md#checks) pass.
+Finish only when every scenario has a test. Confirm the tests and the [required checks](../../../agent/docs/checks.md) pass.
 
 - Inspect the diff for required behavior and coherent structure. Remove additions
   whose benefit does not justify their cost; retain justified repairs even when the

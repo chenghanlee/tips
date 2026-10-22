@@ -10,7 +10,7 @@ This beta is read-only. It does not support renaming or other edits.
 
 ## Operations
 
-Follow the [AGENTS.md](../../AGENTS.md#elixir-navigation) Elixir navigation table and its
+Follow the [AGENTS.md](../../agent/docs/elixir-navigation.md) Elixir navigation table and its
 use check. The [Dexter reference](../skills/dexter/SKILL.md) gives commands and
 position handling. If this guide differs from `"$TIPS_DEXTER" query --help` or
 `"$TIPS_DEXTER" lookup --help` on syntax, output, limits or exit status, follow the help.
@@ -220,7 +220,7 @@ binary. A clean CI runner must build a binary even for integration-only checks.
 The id covers the upstream pin and patch, not the build script or Go toolchain, and
 does not prove tests passed. Full-scope changes keep the full suite. Carry earlier
 evidence only after the reviewer checks the changed inputs and records why it applies,
-under the [CI pause policy](../../AGENTS.md#github-ci-pause).
+under the [CI pause policy](../../agent/docs/github-ci-pause.md).
 
 ## Elixir sources
 
