@@ -41,7 +41,7 @@ python3 scripts/check_docs.py
 
 `mix test` creates and migrates the test database first. The first `mix dialyzer` run
 builds its PLT in `_build/plts` and takes a few minutes. During the
-[GitHub CI pause](AGENTS.md#github-ci-pause), run applicable checks locally and record their
+[GitHub CI pause](agent/docs/github-ci-pause.md), run applicable checks locally and record their
 evidence for independent review. Follow [AGENTS.md](AGENTS.md) for engineering rules.
 Put the task scope, acceptance criteria and review evidence in the relevant GitHub issue and PR.
 

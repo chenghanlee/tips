@@ -3,7 +3,7 @@
 ## Required checks
 
 For Python changes in `agent/teams`, run these checks locally under the
-[CI pause policy](../../AGENTS.md#github-ci-pause):
+[CI pause policy](../../agent/docs/github-ci-pause.md):
 
 ```sh
 python -m pip install --require-hashes --no-deps -r agent/teams/requirements.lock
