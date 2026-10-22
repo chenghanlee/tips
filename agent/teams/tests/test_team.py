@@ -1960,6 +1960,12 @@ class LaunchRecoveryTest(Harness):
         assert self.record(1)["agents"]["tester"]["session"] == session
         tester["agent_session"] = {"kind": "id", "value": session}
         self.save(state)
+        # Another client of the recorded kind in a recorded pane: its name alone refuses it.
+        state = self.state()
+        visitor = next(x for x in state["panes"] if x.get("label") == "team-1-tester")
+        visitor.update(name="visitor", cwd=str(self.repo))
+        self.save(state)
+        assert "conflicting client; preserved" in self.team("start", "29", ok=False).stderr
         assert self.starts() == ["team-1-impl", "team-1-tester"]
         assert len(self.events("agent", "prompt")) == 2
         assert self.state()["workspaces"]
