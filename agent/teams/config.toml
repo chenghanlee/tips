@@ -37,6 +37,10 @@ lock_seconds = 60
 [launch]
 codex_approval = "never"
 claude_permission_mode = "auto"
+# agy's user settings file. Before an agy client starts, the launcher adds its allocation
+# root to `trustedWorkspaces` there (agy asks "Do you trust this folder?" per folder, and a
+# trusted parent does not cover children); stop removes the entry with the allocation.
+agy_settings = "~/.gemini/antigravity-cli/settings.json"
 
 # agent/teams/dispatch always starts this agent as Claude. It compacts at
 # compact_percent because each message starts a new turn with the full conversation.

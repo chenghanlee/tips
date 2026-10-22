@@ -49,6 +49,7 @@ lock_seconds = 1
 [launch]
 codex_approval = "never"
 claude_permission_mode = "bypassPermissions"
+agy_settings = "/fixture/agy-settings.json"
 
 [agents.impl]
 role = "implementer"
@@ -800,6 +801,7 @@ class Harness(FakeState, unittest.TestCase):
     def write_config(self, text: str) -> None:
         text = text.replace("/fixture/origin.git", str(self.origin))
         text = text.replace("/fixture/psql", str(self.bin / "psql"))
+        text = text.replace("/fixture/agy-settings.json", str(self.root / "agy-settings.json"))
         (self.repo / "agent/teams/config.toml").write_text(text)
 
     def git(self, *args: str | Path, cwd: Path | None = None) -> str:
