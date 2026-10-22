@@ -291,7 +291,9 @@ and the mechanics in
 Approval is the user's; a contradiction found while building returns to the user by the
 [blocker route](#report-and-resolve-blockers). The UX designer is not relaunched after
 retirement in this version. An `agy` graphic designer is ready only once a real launch,
-prompt, restart and `team.py stop` have been run on this machine ([setup](SETUP.md#one-time-setup)).
+prompt, restart and `team.py stop` have been run on this machine ([setup](SETUP.md#one-time-setup));
+the launcher trusts each agy allocation root in agy's settings file before the client
+starts, and `stop` removes the entry with the allocation.
 
 ## PR review record
 

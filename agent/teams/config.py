@@ -289,8 +289,10 @@ def validate_config_fields(path: Path, value: Config) -> None:
         raise RuntimeError(f"{path}: team.psql must start with an absolute executable path")
     object_fields(fields.get("timeouts"), f"{path}: timeouts")
     policies = object_fields(fields.get("launch"), f"{path}: launch")
-    for key in ("codex_approval", "claude_permission_mode"):
+    for key in ("codex_approval", "claude_permission_mode", "agy_settings"):
         require_type(policies.get(key), str, f"{path}: launch.{key}")
+    if not policies["agy_settings"]:
+        raise RuntimeError(f"{path}: launch.agy_settings must name agy's settings file")
     agents = object_fields(fields.get("agents"), f"{path}: agents")
     if not agents:
         raise RuntimeError(f"{path}: agents must name at least one entry")

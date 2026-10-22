@@ -45,7 +45,14 @@ provisioned; `.impeccable/` stays ignored until a shared setting exists. Report 
 tool; use a manual method unless the brief requires that tool's evidence.
 The `grilling` skill is user scope, at `~/.claude/skills/grilling`. Install and sign in to
 the `agy` CLI for a Gemini graphic designer; then run one real launch, prompt, restart and
-`team.py stop` of that entry before relying on it.
+`team.py stop` of that entry before relying on it. agy asks "Do you trust this folder?" once
+per folder, and trusting a parent does not cover its children, so the launcher adds each
+agy allocation root to `trustedWorkspaces` in agy's settings file (`launch.agy_settings`
+in `config.toml`, default `~/.gemini/antigravity-cli/settings.json`) before the client
+starts and removes it when `stop` deletes the allocation. The file must already exist
+from your sign-in; the harness never creates it. Command permissions in `permissions.allow`
+stay yours; the graphic designer needs the bootstrap script, `gh issue view`,
+`herdr agent prompt`, and file reads and copies.
 
 Keep the Codex and Claude skill copies in sync. `team.py` checks that the main checkout's `.agents/skills/` exists, and `bootstrap.py` links it into each clone.
 
