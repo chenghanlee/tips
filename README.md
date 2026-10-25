@@ -34,13 +34,15 @@ Start the database as above, then run these checks from your development checkou
 mix format --check-formatted
 mix compile --warnings-as-errors
 mix credo --strict
-mix dialyzer
 mix test
 python3 scripts/check_docs.py
 ```
 
-`mix test` creates and migrates the test database first. The first `mix dialyzer` run
-builds its PLT in `_build/plts` and takes a few minutes. During the
+`mix test` creates and migrates the test database first. `mix dialyzer` runs on `main`
+after a merge batch, before a release, and on a PR only when its diff touches `@spec`,
+`@type`, `@callback`, `@behaviour` or `mix.lock`
+([checks](agent/docs/checks.md#dialyzer)). Its first run builds a PLT in `_build/plts`
+and takes a few minutes. During the
 [GitHub CI pause](agent/docs/github-ci-pause.md), run applicable checks locally and record their
 evidence for independent review. Follow [AGENTS.md](AGENTS.md) for engineering rules.
 Put the task scope, acceptance criteria and review evidence in the relevant GitHub issue and PR.

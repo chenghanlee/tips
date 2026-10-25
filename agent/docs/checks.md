@@ -8,7 +8,7 @@ for each kind of file you changed:
 
 | Changed files | Run |
 |---|---|
-| Application code, tests or config | [Test changes](../../README.md#test-changes), including `mix credo --strict` and `mix dialyzer` |
+| Application code, tests or config | [Test changes](../../README.md#test-changes), including `mix credo --strict`; `mix dialyzer` only as [Dialyzer](#dialyzer) says |
 | `agent/teams` Python | [Harness checks](../teams/development.md#required-checks) |
 | Go, including carried patches | [Pinned lint profile](../lsp/dexter/patches/README.md#required-go-static-analysis) |
 | Markdown | `python3 scripts/check_docs.py` |
@@ -17,6 +17,15 @@ Fix the findings your change introduces; report the others.
 
 Every `mix test` run follows [Test logs](test-logs.md). While GitHub Actions is paused,
 record local checks as [GitHub CI pause](github-ci-pause.md) says.
+
+## Dialyzer
+
+`mix dialyzer` is not a per-PR check. Run it on `main` after each day's merges (the
+dispatcher, while CI is paused; a nightly job on `main` once CI resumes), before a
+release or demo, and on a PR only when its diff touches `@spec`, `@type`, `@callback`,
+`@behaviour` or `mix.lock`. A finding on `main` is fixed in a small follow-up PR. User's
+decision of 2026-10-26. Lost: a spec mismatch can sit on `main` until the next run.
+Credo stays per PR: it costs seconds.
 
 ## Application suite substitution
 

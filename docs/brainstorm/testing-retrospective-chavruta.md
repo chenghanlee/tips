@@ -488,3 +488,5 @@ On S14: whatever the order, each scenario test must still fail under its named c
 Next: one docs PR stacked on PR 540, linked here.
 
 Subtraction PR: https://github.com/chenghanlee/tips/pull/541 (stacked on 540)
+
+User decision 2026-10-26: Credo stays per PR; Dialyzer runs on main after merges, before a release, and on a PR only when it touches specs, types, behaviours or mix.lock (checks.md#dialyzer, in PR 541).
