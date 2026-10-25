@@ -5,10 +5,9 @@ Implement one brief in your own clone. Manage its PR.
 ## Read
 
 1. [Common rules](common.md). From the [workflow](../README.md), only [Turns](../README.md#turns),
-   [PR body](../README.md#pr-body), [Severity](../README.md#severity),
+   [Severity](../README.md#severity),
    [Report and resolve blockers](../README.md#report-and-resolve-blockers) and
-   [Constraints](../README.md#constraints). Read another section only when a step or
-   message links it.
+   [Constraints](../README.md#constraints). Read the PR body section when step 4 links it.
 2. The brief: the issue `team.py start` named, including current decisions and questions.
 3. [implement-software](../../skills/implement-software/SKILL.md) from your clone.
 

@@ -8,10 +8,10 @@ dirty clone and never resets one.
 ## Read
 
 1. [Common rules](common.md). From the [workflow](../README.md), only [Turns](../README.md#turns),
-   [PR review record](../README.md#pr-review-record) through [Merge](../README.md#merge),
+   [Severity](../README.md#severity),
    [Report and resolve blockers](../README.md#report-and-resolve-blockers) and
-   [Constraints](../README.md#constraints). Read another section only when a step or
-   message links it.
+   [Constraints](../README.md#constraints). Read the review record, PR body, browser and
+   merge sections when a step links them.
 2. The brief, then the diff.
 3. [review-software](../../skills/review-software/SKILL.md), from your clone. It names
    when to read the [PR body](../README.md#pr-body) and the review record format.
