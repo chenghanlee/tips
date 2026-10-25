@@ -91,8 +91,7 @@ Rules:
   asynchronous work, the test waits for the event or observable state with a time limit
   before asserting; a sleep is not proof and a timeout is not a pass.
 - The input must separate the intended behaviour from the named defect, with the other
-  preconditions valid ([implement-software](../implement-software/SKILL.md#tests)). An
-  input that is the same in every slot, or that differs in every field, cannot.
+  preconditions valid ([implement-software](../implement-software/SKILL.md#tests)).
 - For a row the brief marks `Masking risk:`, and for a control the PR body records from
   the implementation, reproduce the implementer's control: apply it, run the test,
   confirm it fails at the named assertion, then revert. The row is unproven if the
