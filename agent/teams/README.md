@@ -452,7 +452,7 @@ blocker is resolved. Do
 not run or retry a denied command on another agent's behalf.
 
 If a required check fails at the head, rerun the failed tests alone in a worktree of
-fetched `origin/main`. If they fail there too, the failure is pre-existing: link or open
+fetched `origin/main`. If the same failure occurs there, it is pre-existing: link or open
 the issue that names them in the PR body and continue. Otherwise the failure is the PR's
 to fix, including a test that fails only in the full suite.
 
