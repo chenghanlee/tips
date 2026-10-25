@@ -31,8 +31,7 @@ Implement one brief in your own clone. Manage its PR.
    `blocked`. A local question may go to your reviewer when its evidence would help.
    A `hold` notice pauses the dependent work it names until its `decision` notice
    ([Changed binding decisions](../README.md#changed-binding-decisions)).
-2. Follow the skill. Keep verification proportionate to the affected contracts and
-   explain changes to an existing test budget in the PR.
+2. Follow the skill. Keep verification proportionate to the affected contracts.
 3. Record deferred work in one follow-up issue before handoff.
 4. Push. Open the PR with the [PR body](../README.md#pr-body) filled in. Then run
    the `team.py turn <pr> <tester entry>` command your brief names. It requires your

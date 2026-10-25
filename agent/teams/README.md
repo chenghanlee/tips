@@ -369,15 +369,13 @@ One paragraph: what works now.
 
 A `Masking risk:` row also gives its control as an exact edit (`path:line` and the change)
 and the assertion the control fails. A control the implementer found from the
-implementation is recorded the same way, with the mistake it distinguishes.
+implementation is recorded the same way, with the mistake it distinguishes. A test with
+no scenario number gets its own row with a one-line reason.
 
 ## Affected code
 Changed public functions, schemas, changesets, migrations, config, PubSub topics,
 Oban workers, shared fixtures; the callers and entry points each reaches. For a
 changed fact, its construct, update, read, reset, removal and late-callback paths.
-
-## Tests without a scenario line
-Test name and one-line reason, or "none".
 
 ## Decisions
 Choices made during implementation that the brief does not record, one line each

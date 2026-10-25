@@ -1,6 +1,6 @@
 ---
 name: implement-software
-description: Guides implementing a brief for the Tips application and its agent harness (agent/teams). Covers the MVP scope, code rules, state and failure, data changes, tests and the test budget, deferrals and when to stop. Code reviews use review-software-correctness and review-software-design, which link to this skill's contract and failure sections.
+description: Guides implementing a brief for the Tips application and its agent harness (agent/teams). Covers the MVP scope, code rules, state and failure, data changes, tests, deferrals and when to stop. Code reviews use review-software-correctness and review-software-design, which link to this skill's contract and failure sections.
 ---
 
 # Implement software
@@ -51,7 +51,7 @@ Use existing PR Decisions/Affected code for consequential choices, not a smell i
 
 Start with these sources, then follow the affected flow as needed:
 
-1. The brief: outcome, contracts, scenarios, test budget, decisions table, restrictions.
+1. The brief: outcome, contracts, scenarios, decisions table, restrictions.
 2. The stack skills AGENTS.md names for the files you will change.
 3. Each `path:line` the brief names and its callers, found with the [navigation rules](../../../agent/docs/elixir-navigation.md).
 4. The existing tests for the changed modules.
@@ -188,31 +188,30 @@ Schema and stored data are expensive to reverse.
 
 ## Tests
 
-The brief's scenarios and contracts are the test list. The brief's test budget is the
-expected net test change; explain any difference in the PR body.
+The brief's scenarios and contracts are the test list.
 
 Order of work:
 
 1. Read the existing tests for the changed modules.
 2. Delete tests for behaviour this brief replaces. The brief names them.
 3. For each scenario, find an existing test that can cover it with the same setup and
-   action. Extend it. Add a new test only when none can.
-4. Write the scenario test before the implementation. Run it. Confirm it fails for the
-   reason the scenario describes.
-5. Make the scenario work. Then use the implementation to identify plausible mistakes
+   action. Extend it. Add a new test only when none can. Write the test before or after
+   the code, as you choose; the control below is what proves it can fail.
+4. Make the scenario work. Then use the implementation to identify plausible mistakes
    its test could miss. For each masking risk you find, repair the setup, the input or
    the missing observation so the test distinguishes the mistake. Correct an existing
    expectation only from the brief or an established affected contract, and explain the
    correction in the PR body. Run the distinguishing control and record it in the PR
    body as for a marked `Masking risk:` row.
-6. Inspect the affected design under [Design during delivery](#design-during-delivery).
+5. Inspect the affected design under [Design during delivery](#design-during-delivery).
    Repair a justified problem or record the consequential tradeoff. Stop when the
    working change is coherent and verified.
 
 Rules:
 
-- One to two tests per scenario. A test that maps to no scenario or contract line needs
-  a one-line reason in the PR.
+- Prefer extending an existing test. Add or retain another only for a distinct required
+  case the surviving tests do not prove. A test that maps to no scenario or contract line
+  gets its own row in the PR body's scenario table with a one-line reason.
 - Banned by default: combination grids over inputs, one test per error tuple, tests of
   private helpers, tests that restate a pattern match, tests that only assert the
   database raises, tests of cases that cannot happen. A test of how the application
@@ -297,5 +296,5 @@ Finish only when every scenario has a test. Confirm the tests and the [required 
 - Delete superseded code, tests and docs in the same PR.
 - Update affected contract and usage docs so they describe the resulting behavior.
 - Fill the [PR body](../../teams/README.md#pr-body): outcome, scenario table, affected
-  code, tests without a scenario line, decisions, follow-up issue, checks not run by CI.
+  code, decisions, follow-up issue, checks not run by CI.
 - Hand off through the [pair workflow](../../teams/README.md).

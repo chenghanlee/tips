@@ -1,6 +1,6 @@
 ---
 name: design-software
-description: Guides the lead architect and the critic architect of a tips feature. Covers reading, candidate designs, the choice, the spec and brief format, the required rules, the additional rules, the performance principles, the test budget, critique and the choice of implementer. Code reviews use review-software-design.
+description: Guides the lead architect and the critic architect of a tips feature. Covers reading, candidate designs, the choice, the spec and brief format, the required rules, the additional rules, the performance principles, critique and the choice of implementer. Code reviews use review-software-design.
 ---
 
 # Design software
@@ -104,10 +104,11 @@ decision instead of copying it. Initial file/function placement is guidance, not
 scope. Explicit restrictions and agreed contracts remain binding.
 
 Number acceptance scenarios with input, action and observable result. Mark `Masking
-risk:` where a test could pass with its intended defect, and name that defect. Explain
-expected test additions/replacements when useful, and update the budget as evidence
-changes; a source-informed contract check does not require advance architect permission.
-Link relevant design sections and their revision rather than copying whole documents.
+risk:` where you know a defect a test could pass with, and name that defect. When a
+feature replaces behaviour, name the tests to delete. The implementation skill's
+[Tests](../implement-software/SKILL.md#tests) bounds additions; a source-informed
+contract check does not require advance architect permission. Link relevant design
+sections and their revision rather than copying whole documents.
 
 ## Required rules
 
@@ -181,20 +182,6 @@ change. Severity follows the [severity table](../../teams/README.md#severity).
    [measurement reference](../implement-software/references/performance-measurement.md).
    Say whether a number is an estimate or a measurement.
 
-## Test budget
-
-Use the brief to determine test additions.
-
-- The scenarios and contracts are the test list. One to two tests per scenario.
-- Tests banned by default are listed in the implementation skill's
-  [Tests](../implement-software/SKILL.md#tests).
-- Verification without a prior brief line follows the implementation skill's
-  [Tests](../implement-software/SKILL.md#tests): explain the affected contract and gap.
-- When a feature replaces behaviour, the brief names the tests to delete. Delete a test
-  only when surviving tests cover its distinct required cases.
-- Critic: name the uncovered contract when adding a scenario. The brief's writer
-  updates the budget; unsettled contracts go to their decision owner.
-
 ## Step 6: Critique
 
 Critic, for each PROPOSAL:
@@ -205,9 +192,7 @@ Critic, for each PROPOSAL:
 3. Use P1 only for a required rule violation or a severity-table condition. Classify
    everything else as P2 with a proposed decision.
 4. A P2 does not block. The lead records a decision in the table or a note to the
-   implementer.
-5. Check each scenario for a masking risk. For a scenario that has one but no mark,
-   propose the mark and its distinguishing defect.
+   implementer. Name the uncovered contract when you add a scenario.
 
 Lead, after each round:
 

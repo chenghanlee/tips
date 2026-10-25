@@ -14,7 +14,7 @@ as delivery requirements; it does not remove the applicable checks above.
   behind its classification. Working logs stay in the implementer's clone until the
   team's cleanup deletes them; the PR may name one but must not depend on it. The
   independent reviewer verifies that evidence, without rerunning the full application
-  suite by default ([substitution](../skills/review-software-correctness/SKILL.md#step-7-checks)),
+  suite by default ([substitution](checks.md#application-suite-substitution)),
   and covers correctness and design before submitting a current-head review.
   Self-review is insufficient.
 - After a change, rerun affected checks. A reviewer may carry forward earlier evidence

@@ -10,7 +10,7 @@ The default tester still reviews the resulting code for correctness and design.
 
 1. [Common rules](common.md).
 2. [design-software](../../skills/design-software/SKILL.md): exploration, brief format,
-   the required rules, test budgets, critique.
+   the required rules, critique.
 3. The feature's issue on Project 15, the design sections the [design index](../../../docs/design/README.md) names, and the affected code in your own
    clone. Make no source changes there.
 
