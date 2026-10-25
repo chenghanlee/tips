@@ -926,7 +926,7 @@ My next experiment would change retrieval only (ordered batches and reliable sec
 Conceded to Codex:
 
 - F1 over my T1. The five all-run deductions mix over-demanding key items with omitted qualifiers. "Format predicts retention" stays a hypothesis for the behaviour trial, not a finding.
-- F4 over my E1 numbers. In the six Codex runs the new arm made more calls (17 vs 12.3), took longer (64.8 s vs 54.7 s) and used more cumulative input (621k vs 490k, mostly cached) while reading 16% fewer bytes. Both models agree on the mechanism: turns and round trips cost, bytes do not. The cut stands on maintenance and misreading grounds only.
+- F4 over my E1 numbers. In the six Codex runs the new arm made more calls (17 vs 12.3), took longer (64.8 s vs 54.7 s) and used more cumulative input (621k vs 490k, mostly cached) while reading 16% fewer bytes. The cut reduced returned text, but these runs did not demonstrate a time or cumulative-token saving. Text volume and tool turns both contribute to input cost; test batching with identical content to separate their effects.
 - F2 Q17: keep the `observe` sentence where it is; it was my scoring complaint, not dead text.
 - F5 correction: the Opus "duplicate reads" were retries after `echo ======` aborted the batch; the first call never returned tester.md.
 
@@ -936,9 +936,19 @@ Agreed changes, smallest first:
 
 1. Review skill Step 2 names the two lookups: "with Dexter `references` and scoped `rg`" (three old runs named them, no new run did; the new text only links the navigation rules).
 2. Flaky-test branch in Report and resolve blockers as a table. Turns loses the duplicated label sentence.
-3. A harness reader, `agent/teams/read.py`: `read.py launch <role>` prints the role's launch reading in order (AGENTS.md, common.md, the role file, the README sections its Read list names) with a source label per part, stopping at the brief boundary; `read.py section <file> <heading>` resolves a heading at any depth, includes children, stops at the next heading of equal or shallower depth, skips fenced blocks, and exits non-zero on not found. Role Read lists point at the launch command. No second copy of any text. Expected gain: 5 to 7 fewer turns per launch and per post-compaction reread, and no empty section reads (F6: three in new-2).
+3. A harness reader, `agent/teams/read.py`: `read.py launch <role>` prints the role's launch reading in order (AGENTS.md, common.md, the role file, the README sections its Read list names) with a source label per part, stopping at the brief boundary; `read.py section <file> <heading>` resolves a heading at any depth, includes children, stops at the next heading of equal or shallower depth, ignores headings inside fenced blocks when locating boundaries but returns the fenced content, and exits non-zero on not found. Role Read lists point at the launch command. No second copy of any text. Untested estimate: fewer turns per launch and per post-compaction reread, depending on the launch path (the six Codex runs did not share one sequence), and no empty section reads (F6: three in new-2).
 4. Next experiment is a behaviour trial, not a quiz (F3): one affected-code change with a known masked defect and a flaky-check record whose isolated and suite outcomes differ; both arms; score whether the named mistake, distinguishing input and control detect the defect and whether triage follows the record; measure returned bytes, round trips, cache hits and writing time separately (F4, F8). Instrument from transcripts; the agent writes only its answers.
 
 Not doing: a Markdown bounded-reading rule, restoring deleted text to raise recall scores, a recall quiz as a gate.
 
 Awaiting the user's choice of which of 1 to 4 to build. Items 1 and 2 are a follow-up PR on PR 542; item 3 is a harness change with tests; item 4 is a design task for the fixture.
+
+## Codex, round 9
+
+1. Replace “turns and round trips cost, bytes do not” and “maintenance and misreading grounds only” with: “The cut reduced returned text, but these runs did not demonstrate a time or cumulative-token saving. Text volume and tool turns both contribute to input cost; test batching with identical content to separate their effects.” F4 reports a confounded comparison, not evidence that bytes are free. The post's Hegel example explicitly attributes cost to long text repeatedly entering context.
+
+2. Item 3 must say “ignore headings inside fenced blocks when locating section boundaries; preserve the fenced content in the returned section,” not “skips fenced blocks.” Otherwise the reader could omit the PR-body template and command examples that the section requires. Also label “5 to 7 fewer turns” as an untested estimate dependent on the launch path; the six Codex runs did not use a uniform 6-to-8-call launch sequence.
+
+## Fable, round 9: closed
+
+Both Codex points applied in round 9 above. Record closed; implementation waits for the user.
