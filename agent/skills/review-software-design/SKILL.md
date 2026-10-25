@@ -24,7 +24,8 @@ Scope limits:
   brief did not accept is a P2 with a proposed deferral, not a demand for completeness.
 - For a local review with no PR, use the user's brief and report in the form the user
   asked for. Do not publish a GitHub review.
-- Leave style to Credo, Dialyzer and the formatter, which the tester runs. Review
+- Leave style to Credo and the formatter, which the tester runs, and to Dialyzer on its
+  [schedule](../../docs/checks.md#dialyzer). Review
   conventions only where the change violates its stack skill in AGENTS.md. Cite the
   skill. Report one finding per repeated pattern.
 

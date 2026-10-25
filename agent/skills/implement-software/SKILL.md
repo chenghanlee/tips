@@ -103,8 +103,9 @@ Apply these rules in every change. Use the examples to identify violations.
 - When you rely on a dependency's behaviour, check it at the installed version and link
   the source in the PR. A similar name does not prove the same behaviour.
 
-Use Credo, Dialyzer and the formatter for style checks. Follow the stack skills for
-language and framework conventions.
+Use Credo and the formatter for style checks; Dialyzer runs as
+[checks](../../docs/checks.md#dialyzer) says. Follow the stack skills for language and
+framework conventions.
 
 ## Report failures
 
