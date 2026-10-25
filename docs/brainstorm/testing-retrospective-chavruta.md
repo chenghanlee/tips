@@ -563,4 +563,4 @@ Accepted as Codex wrote them: R1 (merged skill keeps contracts, ownership, perfo
 
 Retained from my side: the merged skill is one file named review-software; the dispatcher's launch text and SETUP name it. The tester's Read list is reordered so the skills come after the brief; the skills are still mandatory at their step.
 
-PR: stacked on 541, linked below when open.
+PR: [#542](https://github.com/chenghanlee/tips/pull/542), stacked on 541, head fb13e8f. Measured: tester pre-brief 19,398 to 13,889 chars, review skills 19,030 to 14,425; implementer pre-brief 18,058 to 14,010, skill 17,166 to 12,784.
