@@ -499,8 +499,8 @@ class PairLifecycleTest(Harness):
         assert f"your project is {impl_root / 'project'}" in impl_brief
         assert f"python3 {harness / 'team.py'} turn <pr> tester" in impl_brief
         # Each worker reads the common rules and its own role file, not the whole README.
-        assert "agent/teams/roles/common.md and agent/teams/roles/implementer.md;" in impl_brief
-        assert "agent/teams/roles/common.md and agent/teams/roles/tester.md;" in tester_brief
+        assert "read.py launch implementer there; it prints AGENTS.md," in impl_brief
+        assert "read.py launch tester there; it prints AGENTS.md," in tester_brief
         assert "labels first, as the README Turns section says" in impl_brief
         assert "If it is labelled turn:impl, continue" in impl_brief
         assert tester_brief.startswith("You are tester, the merge-confirming tester for brief #29;")
@@ -1376,7 +1376,7 @@ class DesignTest(Harness):
         assert self.tabs("w1") == {"architects": ["team-1-critic"]}
         brief = self.system_prompt("team-1-critic")
         assert brief.startswith("You are critic, the architect for spec #50;")
-        assert "agent/teams/roles/common.md and agent/teams/roles/architect.md;" in brief
+        assert "read.py launch architect there; it prints AGENTS.md," in brief
         assert "bootstrap.py:" in brief
         # The launch EVENT lets board.py usage find the architect's session.
         assert self.comments("50")[-1]["body"] == (
@@ -2129,7 +2129,7 @@ class UxDesignTeamTest(Harness):
         assert self.tabs("w1") == {"ux": ["team-1-ux"]}
         brief = self.system_prompt("team-1-ux")
         assert brief.startswith("You are ux, the ux-designer for brief #60;")
-        assert "agent/teams/roles/common.md and agent/teams/roles/ux-designer.md;" in brief
+        assert "read.py launch ux-designer there; it prints AGENTS.md," in brief
         assert "Your graphic designers are team-1-pix, team-1-gem;" in brief
         assert "Run TIPS_DEXTER=" in brief
         assert self.comments("60")[-1]["body"].startswith("EVENT ux-designer team-1-ux ")

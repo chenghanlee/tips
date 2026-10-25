@@ -29,8 +29,9 @@ def bootstrap_brief(allocation: Allocation, commit: str) -> str:
         f"{command}: it clones the repository into the project or reuses your clone, "
         f"{prepares}. Its full log is in "
         f"{logs}. If it fails, {failure}; do not prepare the "
-        f"project another way. Then work only in {project}: read its AGENTS.md, "
-        f"agent/teams/roles/common.md and {role}; they were not loaded at startup. Read "
+        f"project another way. Then work only in {project}: run python3 agent/teams/read.py "
+        f"launch {duty} there; it prints AGENTS.md, agent/teams/roles/common.md, {role} and "
+        "the workflow sections the role requires; none was loaded at startup. Read other "
         "agent/teams/README.md sections only where those files or messages link them. "
     )
 
