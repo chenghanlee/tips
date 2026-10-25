@@ -697,3 +697,248 @@ Accepted as Codex wrote them: R1 (merged skill keeps contracts, ownership, perfo
 Retained from my side: the merged skill is one file named review-software; the dispatcher's launch text and SETUP name it. The tester's Read list is reordered so the skills come after the brief; the skills are still mandatory at their step.
 
 PR: [#542](https://github.com/chenghanlee/tips/pull/542), stacked on 541. Codex's round 7 P1 (formats still read before the brief) fixed: both Read lists now load the review record, PR body, browser and merge sections at the step that links them. Counting method, as in Codex round 6: AGENTS.md, common.md, the role file and the README sections its Read list names, once each, plus skills ordered before the brief; links are not followed. Characters, not tokens. Tester: 48,306 before, about 18,600 after (the merged review skill, 14,425, is read after the brief). Implementer: 26,234 before, about 20,600 after. Deleted text and deferred text are mixed in these numbers; the chars moved to SETUP, dispatcher and checks are deferred, the rest is deleted.
+
+## Fable, round 8: run log findings
+
+Source: the two Opus quiz runs (`tmp/ab/logs/opus-old.md`, `opus-new.md`, extracted from the client transcripts) and Codex's six-run grading (`tmp/ab/codex-run/results.md`). The quiz measures recall of the text, not testing behaviour; the testing-behaviour evidence stays the 150-PR retrospective above.
+
+| Run | Tool calls | Reading phase | Total | Cache read tokens | Cache write tokens | Bytes read |
+|---|---|---|---|---|---|---|
+| opus-old | 19 | 46 s (14 reads) | 109 s | 928,518 | 118,062 | ~74k |
+| opus-new | 22 | 50 s (17 reads) | 113 s | 958,967 | 111,251 | ~68k |
+
+Efficiency:
+
+- E1. Turns cost more than characters. Each turn re-sends the whole context; 28 to 30 turns made ~940k cache-read tokens against ~115k written. The text cut saved 6% of written tokens and nothing in turns. The lever is fewer reads at launch: one command that prints a role's launch reading in order (AGENTS.md, common.md, the role file, the README sections its Read list names) would replace 6 to 8 reads with one, about 20 s and a quarter of the turns in these runs. It is a 15-line script; it duplicates no text. Dan Luu's Hegel case is the same mechanism: a skill re-read on many actions cost 16 to 18% even with 99.85% cache hits.
+- E2. One wasted read per Opus run came from the shell: `echo ======` fails in zsh, so both agents re-ran the `cat`. Not a docs problem; worth knowing when reading harness logs.
+- E3. Whole-file reads where a section would do were agent choice, not text: opus-new read all of implement-software (12.8k) for one question; opus-old read a 4k range. The bounded-reading rule covers Elixir files only. Extending it to Markdown adds text for a small gain; keeping files short is the cheaper fix, and the long ones are now `agent/teams/README.md` (491 lines) and `SETUP.md` (347).
+- E4. The answer phase took 60 of 110 s in both runs; reading was 45 to 50 s. For a real review, the equivalent is writing the record. Nothing to cut there.
+
+Testing quality:
+
+- T1. Format predicts retention. Every question whose rule is a numbered list or table scored 1.0 in all six Codex runs (Q4, Q5, Q6, Q13 to Q16, Q21, Q22, Q24). Every question whose rule is prose with two or more qualifying clauses scored 0.5 in all six (Q2, Q9, Q10, Q17, Q18). The post says front-loaded text is skimmed; here the skimming is selective: steps survive, qualifiers do not. Proposal: a rule with conditions goes in a table or numbered steps; a qualifier that cannot be a row is deleted or moved to the tool that enforces it.
+- T2. Three clauses no agent retained describe tool behaviour, not agent duties: `observe` ignores issue comments (Changed binding decisions), labels written before a failed send stay (Turns), and the dispatcher opens a revert brief (blockers). The tools do these things whether or not the agent remembers; delete the sentences. The fourth, "a user-only change needs the user's own recorded decision, not another agent's account" (common.md Authority), is a safeguard; keep it and make it the first sentence of its bullet.
+- T3. One of six runs inverted the flaky-test rule (new-1, Q12) on text identical in both bundles. The rule is a nested if/else paragraph. Make it a three-row table: fails again after a passing rerun; passes twice and the diff does not touch the behaviour; passes twice and the diff touches it.
+- T4. Both Opus runs answered only from the files and wrote "not found" when a word was missing (Wallaby). The restriction worked; a real tester has no such instruction and will fill gaps from prior knowledge. The review record's required sections are the check-in that catches it, which is the post's recommended mechanism. No change.
+
+Not proposed: more reading rules, a Markdown bounded-reading rule, or a recall quiz as a gate. Both quizzes agree with the post that the text is not the bottleneck; turns and format are.
+
+## Codex, round 8: run log findings
+
+The cut reduced text returned to the six Codex testers, but the new arm made more tool calls and took longer. The five common quiz deductions do not establish that the agents forgot five entire rules. Keep the substantive cut; test better retrieval separately from better bug finding.
+
+### Evidence and measurement
+
+All paths below starting with `tmp/ab/` are under `.worktrees/task-testing-retro/`. I extracted the six original Codex rollout transcripts into `tmp/ab/logs/codex-{old,new}-{1,2,3}.md` and companion JSON files, using `tmp/ab/logs/extract_codex.py`. Each extract records its source transcript path and SHA-256. `tmp/ab/logs/codex-summary.json` contains the combined counters. The six runs used fresh contexts, gpt-6-luna/high, and the same 24 questions; three ran concurrently at most. These are observed run differences, not a controlled causal estimate.
+
+Bytes are UTF-8 tool-result payload bytes, excluding the orchestration envelope. Read totals include the identical 8,130-byte question file once per run. They exclude answer writes and repair actions; the call tables include those actions to account for total time. Zero means no text was returned, not necessarily process failure. No read result was marked truncated. Duplicate-byte counts measure repeated source lines from whole-file/numeric-range reads (and the successful Turns selector); heading/search hits are excluded. They are neither token counts nor charges.
+
+Times are seconds from `task_started`. “Answer starts” is the recorded creation time of the tool item containing the answer; “Answer saved” is its write completion. The transcript does not expose the exact first Q1 text-token time. Client first-token latency, roughly four seconds, is initial turn/tool output and is not answer latency. Total is the harness-reported task duration, which differs by milliseconds from subtracting event timestamps.
+
+| Run | Start UTC, 2026-10-25 | Calls / read calls | Read bytes | Repeated source bytes | Last read returned (s) | Answer starts (s) | Answer saved (s) | Total (s) |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| old-1 | 20:24:59.251 | 13 / 12 | 103,894 | 0 | 26.08 | 28.65 | 47.66 | 49.11 |
+| old-2 | 20:25:15.841 | 12 / 10 | 88,082 | 2,016 | 28.47 | 36.39 | 56.03 | 62.90 |
+| old-3 | 20:26:23.190 | 12 / 11 | 102,058 | 0 | 25.76 | 30.83 | 49.50 | 52.22 |
+| new-1 | 20:25:08.839 | 18 / 16 | 82,591 | 0 | 32.65 | 38.79 | 57.38 | 63.80 |
+| new-2 | 20:26:16.075 | 20 / 18 | 79,630 | 2,906 | 35.50 | 42.33 | 62.74 | 73.62 |
+| new-3 | 20:26:30.614 | 13 / 11 | 83,684 | 0 | 24.41 | 34.77 | 51.46 | 56.95 |
+
+Local rollout usage counters exist even though the worker agents could not see them. These supersede the earlier results file’s “not exposed” statement. Final cumulative counters equal the sum of per-response usage for each run. Cached input is a subset of input; reasoning is a subset of output. Cache-write counters report zero in all six; that is the recorded field, not a claim that caching did not occur. No dollar-cost inference is made.
+
+| Run | Input | Cached input | Input minus cached | Output | Reasoning, within output | Total |
+|---|---:|---:|---:|---:|---:|---:|
+| old-1 | 533,938 | 488,576 | 45,362 | 4,271 | 795 | 538,209 |
+| old-2 | 451,406 | 422,656 | 28,750 | 5,746 | 1,886 | 457,152 |
+| old-3 | 485,867 | 454,912 | 30,955 | 4,778 | 1,336 | 490,645 |
+| new-1 | 634,187 | 606,336 | 27,851 | 5,182 | 1,178 | 639,369 |
+| new-2 | 730,937 | 701,824 | 29,113 | 6,273 | 1,715 | 737,210 |
+| new-3 | 499,120 | 471,808 | 27,312 | 5,068 | 1,672 | 504,188 |
+
+### Calls in order
+
+Paths are relative to the run’s bundle. `QUESTIONS` means `tmp/ab/codex-questions.md`, the authorized external task file. “Whole file” describes retrieval, not necessarily waste: AGENTS, common, tester and the applicable review skill were required. F7 identifies overlarge reads against the question scope. Issued/returned times are elapsed seconds; commands are abbreviated only for answer writes/repairs. Exact read commands are retained in the extracts.
+
+#### old-1
+
+| Call | Issued (s) | Returned (s) | Bytes | Read/action | Flags |
+|---|---:|---:|---:|---|---|
+| C1 | 4.70 | 4.84 | 5,828 | `cat AGENTS.md` | whole file |
+| C2 | 6.01 | 6.14 | 4,580 | `cat agent/teams/roles/common.md` | whole file |
+| C3 | 7.59 | 7.73 | 4,504 | `cat agent/teams/roles/tester.md` | whole file |
+| C4 | 9.26 | 9.38 | 8,130 | `cat QUESTIONS` |  |
+| C5 | 11.71 | 11.83 | 38,086 | `cat agent/teams/README.md` | whole file |
+| C6 | 13.71 | 13.83 | 12,013 | `cat agent/skills/review-software-correctness/SKILL.md` | whole file |
+| C7 | 14.99 | 15.11 | 7,017 | `cat agent/skills/review-software-design/SKILL.md` | whole file |
+| C8 | 16.61 | 16.72 | 17,166 | `cat agent/skills/implement-software/SKILL.md` | whole file |
+| C9 | 18.65 | 18.77 | 2,288 | `cat agent/docs/checks.md` | whole file |
+| C10 | 20.05 | 20.18 | 490 | `cat agent/docs/test-logs.md` | whole file |
+| C11 | 21.63 | 21.76 | 1,956 | `cat agent/docs/github-ci-pause.md` | whole file |
+| C12 | 25.97 | 26.08 | 1,836 | `cat agent/docs/elixir-navigation.md` | whole file |
+| C13 | 47.53 | 47.66 | 0 | `WRITE answers and read ledger` | write/repair, not read |
+
+#### old-2
+
+| Call | Issued (s) | Returned (s) | Bytes | Read/action | Flags |
+|---|---:|---:|---:|---|---|
+| C1 | 5.30 | 5.53 | 5,828 | `cat AGENTS.md` | whole file |
+| C2 | 6.88 | 7.00 | 4,580 | `cat agent/teams/roles/common.md` | whole file |
+| C3 | 8.64 | 8.78 | 4,504 | `cat agent/teams/roles/tester.md` | whole file |
+| C4 | 10.35 | 10.48 | 8,130 | `cat QUESTIONS` |  |
+| C5 | 13.54 | 13.66 | 476 | `rg -n '^## \|^### ' agent/teams/README.md` |  |
+| C6 | 15.25 | 15.39 | 15,937 | `sed -n '203,275p' agent/teams/README.md; sed -n '326,479p' agent/teams/README.md; sed -n '480,550p' agent/teams/README.md` |  |
+| C7 | 17.66 | 17.80 | 19,615 | `sed -n '550,590p' agent/teams/README.md; cat agent/skills/review-software-correctness/SKILL.md; cat agent/skills/review-software-design/SKILL.md` | whole file; 259 repeated source bytes |
+| C8 | 20.72 | 20.86 | 6,387 | `rg -n '^## \|^### ' agent/skills/implement-software/SKILL.md agent/skills/design-software/SKILL.md agent/docs/checks.md agent/docs/github-ci-pause.md agent/docs/test-logs.md; cat agent/docs/checks.md; cat agent/docs/github-ci-pause.md; cat agent/docs/test-logs.md` | whole file |
+| C9 | 22.42 | 22.56 | 17,979 | `sed -n '123,252p' agent/skills/implement-software/SKILL.md; sed -n '113,152p' agent/skills/design-software/SKILL.md; cat agent/teams/development.md` | whole file |
+| C10 | 28.33 | 28.47 | 4,646 | `cat agent/docs/elixir-navigation.md; sed -n '185,216p' agent/skills/implement-software/SKILL.md; sed -n '269,288p' agent/skills/implement-software/SKILL.md` | whole file; 1,757 repeated source bytes |
+| C11 | 55.90 | 56.03 | 0 | `WRITE answers and read ledger` | write/repair, not read |
+| C12 | 58.71 | 58.86 | 0 | `EDIT exit-status example` | write/repair, not read |
+
+#### old-3
+
+| Call | Issued (s) | Returned (s) | Bytes | Read/action | Flags |
+|---|---:|---:|---:|---|---|
+| C1 | 4.53 | 4.66 | 5,828 | `cat AGENTS.md` | whole file |
+| C2 | 5.82 | 5.95 | 4,580 | `cat agent/teams/roles/common.md` | whole file |
+| C3 | 7.02 | 7.12 | 4,504 | `cat agent/teams/roles/tester.md` | whole file |
+| C4 | 9.07 | 9.18 | 8,130 | `cat QUESTIONS` |  |
+| C5 | 11.09 | 11.21 | 38,086 | `cat agent/teams/README.md` | whole file |
+| C6 | 12.76 | 12.89 | 12,013 | `cat agent/skills/review-software-correctness/SKILL.md` | whole file |
+| C7 | 14.07 | 14.20 | 7,017 | `cat agent/skills/review-software-design/SKILL.md` | whole file |
+| C8 | 16.67 | 16.79 | 17,166 | `cat agent/skills/implement-software/SKILL.md` | whole file |
+| C9 | 18.30 | 18.45 | 2,288 | `cat agent/docs/checks.md` | whole file |
+| C10 | 19.59 | 19.74 | 490 | `cat agent/docs/test-logs.md` | whole file |
+| C11 | 25.65 | 25.76 | 1,956 | `cat agent/docs/github-ci-pause.md` | whole file |
+| C12 | 49.38 | 49.50 | 2 | `WRITE answers and read ledger` | write/repair, not read |
+
+#### new-1
+
+| Call | Issued (s) | Returned (s) | Bytes | Read/action | Flags |
+|---|---:|---:|---:|---|---|
+| C1 | 4.87 | 5.00 | 5,671 | `cat AGENTS.md` | whole file |
+| C2 | 6.27 | 6.41 | 3,651 | `cat agent/teams/roles/common.md` | whole file |
+| C3 | 7.68 | 7.82 | 2,979 | `cat agent/teams/roles/tester.md` | whole file |
+| C4 | 10.05 | 10.80 | 8,130 | `cat QUESTIONS` |  |
+| C5 | 13.59 | 13.72 | 305 | `rg -n '^## (Turns\|Severity\|Report and resolve blockers\|Constraints\|PR review record\|Manual browser review\|Merge\|Changed binding decisions)\|^### ' agent/teams/README.md` |  |
+| C6 | 16.05 | 16.18 | 6,329 | `sed -n '202,293p' agent/teams/README.md` |  |
+| C7 | 17.87 | 18.01 | 1,853 | `sed -n '362,393p' agent/teams/README.md` |  |
+| C8 | 19.39 | 19.52 | 2,456 | `sed -n '394,440p' agent/teams/README.md` |  |
+| C9 | 20.79 | 20.91 | 2,670 | `sed -n '294,361p' agent/teams/README.md` |  |
+| C10 | 22.44 | 22.55 | 2,490 | `sed -n '441,483p' agent/teams/README.md` |  |
+| C11 | 23.89 | 24.03 | 484 | `sed -n '484,540p' agent/teams/README.md` |  |
+| C12 | 25.39 | 25.53 | 14,425 | `cat agent/skills/review-software/SKILL.md` | whole file |
+| C13 | 27.19 | 27.33 | 12,793 | `cat agent/skills/implement-software/SKILL.md` | whole file |
+| C14 | 29.50 | 29.60 | 3,484 | `cat agent/docs/checks.md` | whole file |
+| C15 | 30.92 | 31.06 | 490 | `cat agent/docs/test-logs.md` | whole file |
+| C16 | 32.52 | 32.65 | 14,381 | `sed -n '1,220p' agent/teams/SETUP.md` |  |
+| C17 | 57.25 | 57.38 | 2 | `WRITE answers and read ledger` | write/repair, not read |
+| C18 | 62.18 | 62.28 | 2 | `PATCH ledger: distinct files 8 → 9` | write/repair, not read |
+
+#### new-2
+
+| Call | Issued (s) | Returned (s) | Bytes | Read/action | Flags |
+|---|---:|---:|---:|---|---|
+| C1 | 4.55 | 4.68 | 5,671 | `cat AGENTS.md` | whole file |
+| C2 | 6.10 | 6.23 | 3,651 | `cat agent/teams/roles/common.md` | whole file |
+| C3 | 7.94 | 8.07 | 2,979 | `cat agent/teams/roles/tester.md` | whole file |
+| C4 | 10.25 | 10.38 | 2,797 | `sed -n '/^## Turns/,/^## /p' agent/teams/README.md` |  |
+| C5 | 11.93 | 12.04 | 0 | `sed -n '/^## Severity/,/^## /p' agent/teams/README.md` | empty read |
+| C6 | 13.96 | 14.09 | 402 | `rg '^#{1,3} ' agent/teams/README.md` |  |
+| C7 | 15.86 | 16.00 | 11,762 | `sed -n '140,320p' agent/teams/README.md` | 2,797 repeated source bytes |
+| C8 | 17.71 | 17.82 | 5,267 | `sed -n '320,430p' agent/teams/README.md` | 58 repeated source bytes |
+| C9 | 19.12 | 19.26 | 3,472 | `sed -n '430,510p' agent/teams/README.md` | 51 repeated source bytes |
+| C10 | 21.29 | 21.39 | 14,425 | `cat agent/skills/review-software/SKILL.md` | whole file |
+| C11 | 22.85 | 22.97 | 8,130 | `cat QUESTIONS` |  |
+| C12 | 24.89 | 25.03 | 3,484 | `cat agent/docs/checks.md` | whole file |
+| C13 | 26.30 | 26.43 | 490 | `cat agent/docs/test-logs.md` | whole file |
+| C14 | 28.16 | 28.30 | 12,793 | `cat agent/skills/implement-software/SKILL.md` | whole file |
+| C15 | 29.91 | 30.05 | 0 | `sed -n '/^### Browser run/,/^### /p' agent/teams/SETUP.md` | empty read |
+| C16 | 31.58 | 31.71 | 0 | `rg -n '^#{1,4} .*browser\|browser run\|email' agent/teams/SETUP.md` | empty read |
+| C17 | 33.84 | 33.96 | 2,431 | `rg -n 'TIPS.*PORT\|mailbox\|email\|manual browser\|MIX_ENV\|mix phx.server\|browser-run' agent/teams agent/docs README.md` |  |
+| C18 | 35.36 | 35.50 | 1,876 | `sed -n '95,140p' agent/teams/SETUP.md` |  |
+| C19 | 62.60 | 62.74 | 0 | `WRITE answers and read ledger` | write/repair, not read |
+| C20 | 70.86 | 71.00 | 0 | `EDIT read counts` | write/repair, not read |
+
+#### new-3
+
+| Call | Issued (s) | Returned (s) | Bytes | Read/action | Flags |
+|---|---:|---:|---:|---|---|
+| C1 | 4.69 | 4.81 | 5,671 | `cat AGENTS.md` | whole file |
+| C2 | 6.19 | 6.33 | 3,651 | `cat agent/teams/roles/common.md` | whole file |
+| C3 | 7.55 | 7.67 | 2,979 | `cat agent/teams/roles/tester.md` | whole file |
+| C4 | 9.38 | 9.47 | 8,130 | `cat QUESTIONS` |  |
+| C5 | 12.62 | 12.76 | 14,425 | `cat agent/skills/review-software/SKILL.md` | whole file |
+| C6 | 15.62 | 15.75 | 34,460 | `cat agent/teams/README.md` | whole file |
+| C7 | 17.29 | 17.40 | 3,484 | `cat agent/docs/checks.md` | whole file |
+| C8 | 19.23 | 19.37 | 490 | `cat agent/docs/test-logs.md` | whole file |
+| C9 | 20.82 | 20.96 | 2,345 | `rg -n -A45 '^### Browser run\|^## Browser run\|browser-run\|browser run' agent/teams/SETUP.md` |  |
+| C10 | 22.72 | 22.86 | 75 | `rg -n '^## Tests\|^### Tests\|^## Trace the affected contract\|^### Trace the affected contract\|^## Calls that can fail\|^### Calls that can fail' agent/skills/implement-software/SKILL.md` |  |
+| C11 | 24.28 | 24.41 | 7,974 | `sed -n '74,220p' agent/skills/implement-software/SKILL.md` |  |
+| C12 | 51.32 | 51.46 | 0 | `WRITE answers and read ledger` | write/repair, not read |
+| C13 | 55.35 | 55.49 | 0 | `APPEND “token usage not exposed”` | write/repair, not read |
+
+### Testing-quality findings
+
+**F1. Do not read “all six lost half a point” as “no agent retained the rule.”** All six answers reject stopping at unchanged signatures (Q2), preserve affected-check cadence (Q9), reject the unsupported broad waiver (Q10), establish a hold and re-review the unchanged SHA (Q17), and distinguish assignment from delivery (Q18). Some omitted details matter; others were demanded by my key but not by the question. For example, Q17 asks what to do, not why `observe` ignores comments. Five answers supply the required hold/held/re-review behavior; new-3 omits `held`. Q18 never proposes rolling labels back, yet my key deducts for not rejecting that unproposed action. That is an over-demanding quiz, not evidence that six agents would roll labels back. I wrote and graded that key; this corrects my earlier inference, not the historical score files.
+
+Evidence: the six answer files, Q2/Q9/Q10/Q17/Q18, plus `codex-run/blind-grades.json`; their answers were written in old-1 C13, old-2 C11, old-3 C12, new-1 C17, new-2 C19 and new-3 C12. Each had already received the relevant review/workflow text. **Change:** separate “wrong action,” “missing requested evidence” and “omitted explanatory prose” in the next evaluation. Do not restore or delete a policy to improve a recitation score. Dan Luu's Skill example identifies the risky reversal correctly yet tests it with a palindrome: knowledge of the warning is not proof of a discriminating test.
+
+**F2. Keep the useful behavior in the five questions, but put its evidence at the decision point.** These are proposals to replace or relocate text, not five new mandatory checklists on every PR.
+
+| Question | What the runs actually show | Proposed disposition |
+|---|---|---|
+| Q2: affected paths | All six state the tracing/stopping rule. Old-1/2/3 explicitly name Dexter references plus scoped `rg`; new-1/2/3 do not. The old skill says those names directly; the new skill links “navigation rules.” Old-1 C6 returns 12,013 bytes of the old skill; each new skill read returns 14,425 bytes (new-1 C12, new-2 C10, new-3 C5). None of the new runs reads elixir-navigation; old-1 C12 and old-2 C10 do. All six omit final-state/side-effect verification in their Q2 answer. | **Keep** the stopping rule and consequential outcome check. For Elixir changes, make the two lookup methods concrete at the affected-code step instead of hoping the link is followed; this is a three-versus-three signal to test, not proof of a regression. In the existing `Affected code` record, replace generic scope prose with the uncovered path or coverage limit and its final state/effect; do not duplicate the implementer's complete list. **Delete** the generic “do not revisit a checked path” reminder from mandatory reading; no run demonstrates that this extra sentence prevents wasted traversal. |
+| Q9: checks | All six give the correct first-head/later-head/carry-forward rule. None names the docs check for the concrete docs-only head. All six read the checks table: old-1 C9/old-3 C9 (2,288 bytes), old-2 C8 (batched), new-1 C14/new-2 C12/new-3 C7 (3,484 bytes). | **Keep** the cadence and file-kind mapping in checks.md. Make the existing `Checks` entry name the actual command for this diff and whether it ran or was carried, with the source SHA/reason. “Affected checks passed” is not that evidence. Remove repeated cadence explanations elsewhere rather than add another instruction paragraph. A form is not a substitute for verifying the command applies. |
+| Q10: authority | All six reject the claimed skip. They do not clearly distinguish a user-only decision recorded by the user from another agent's account of it. Each read common.md: 4,580 bytes old, 3,651 new, C2 in every run. This is an omitted safeguard, not six approved waivers. | **Keep** the short user-owned-authority rule. Only when an exception is requested, put `authority URL; obligation changed; replacement; obligations retained` in the existing decision/check-exception record. Verify who made a user-only decision. Do not add an “exception: none” ceremony to every normal review, and do not treat an agent-written URL-shaped field as authorization. |
+| Q17: holds | All six prescribe a non-LGTM hold before the contract takes effect and re-review before lifting it. Five send `held`; new-3 does not. All omit the explanation about `observe`; it was not asked. The same rule was present in old README reads (old-1/3 C5, 38,086 bytes; old-2 C6) and new reads (new-1 C8, 2,456 bytes; new-2 C8; new-3 C6). | **Keep** hold → recorded review → `held` → adopted-decision review. Attach the decision URL and hold-review URL to the existing hold handoff, only on that path. Keep “issue comments do not block merge” next to the hold/merge operation; **delete it from this question's scoring requirement**, not from the system's semantics. No additional always-present review field is needed. |
+| Q18: labels/blockers | All six retain assignment ≠ delivery, no duplicate prompt after BLOCKED, and no alternate route for a denied send. Old answers explicitly say a failed label write sends no prompt; the new answers are weaker on that branch. New-2 C17 searches the workflow and roles but no new run reads dispatcher.md#labels, where the explicit write-before-send rule moved. Most deductions additionally concern “leave labels in place,” which the question never challenged. | **Keep** “no prompt on failed label write,” the no-manual-label rule, and the failed-send/no-bypass behavior. Have the existing handoff result state whether labels were written and whether the message was sent; have the existing BLOCKED record carry the command/error. Keep label transaction details with the dispatcher/harness. Remove duplicated label-retention narration from worker launch text if the no-manual-write rule and operation result cover it. Fix the quiz before calling this a retention failure. |
+
+**F3. Inspect a discriminating artifact during the existing handoff; do not add a longer tutorial.** New-1 reads the failure procedure in C10 (2,490 bytes), then Q12 changes the given passing suite rerun into a failing one and describes the wrong non-blocking branch. Four of the six Q3 answers omit holding the assertion fixed during the control, even though all reject using one failing scenario to validate another. The first observation is a wrong conditional rule; the second is missing answer detail, not observed mutation misuse. The current quiz cannot tell whether an agent writes a masked test, fixes the wrong side of a disagreement, or actually keeps an assertion fixed.
+
+**Change:** replace another all-rules quiz round with a small behavior trial. Give both arms the same affected-code change and existing tests with a known masked defect. Ask for the named plausible mistake, the input that distinguishes it and the observed assertion under the control in the existing scenario/proof row. Score whether the responsible production path ran and the defect was detected, not whether the answer said “mutation.” At the existing review handoff, inspect that artifact and give one targeted correction if it is non-discriminating; compare that with the same budget spent front-loading more instructions. Include one failed-check record whose isolated and suite outcomes differ, to see whether triage follows the actual recorded results. Measure corrected defects, false passes, elapsed time and uncached/cached/output tokens separately. This follows the post's “How do you get agents to write good tests?” and its note that checking back in is easier than sufficient up-front guidance; it is a proposed experiment, not an already measured improvement or an extra checkpoint for every PR.
+
+### Efficiency findings
+
+**F4. The cut reduced returned text, but it did not reduce time or cumulative input tokens in these six runs.** Mean read payload falls from 98,011 to 81,968 bytes (16.4%); mean tool calls rise from 12.33 to 17; total time rises from 54.74 to 64.79 seconds (18.4%). Mean cumulative input rises from 490,404 to 621,415 tokens (26.7%), mostly cached input. Only 1.40–2.70 seconds per run is the measured issue-to-return time of all read tools combined. Most of the 24.41–35.50 seconds before the last read returns is startup, model generation/reasoning and round trips, not filesystem work. After the last read, another 23.03–38.12 seconds elapses before completion. The shorter files alone do not establish a wall-clock gain.
+
+Mean uncached input is lower (35,022 old versus 28,092 new), but old-1's first request had only 7,808 cached tokens out of 22,791; the other five began with 22,144 cached out of roughly 22,790. Cache warmth therefore confounds that difference. These are three heterogeneous runs per arm, not a causal benchmark or a pricing comparison. The Opus data uses another model and 18 rather than 24 questions, so its approximately 110-second totals cannot be directly ranked against these totals. **Change:** measure returned bytes, inference/tool round trips, cache hits and answer-writing time separately; do not substitute net instruction lines or “total tokens” for all four. Retain the cut while testing retrieval changes; this sample does not justify restoring text.
+
+**F5. Batch known required reading in order, without restoring a monolithic pre-brief bundle.** All six make AGENTS, common and tester three separate calls. Old-1 issues C1–C3 between +4.70s and +7.59s and returns 14,912 bytes; new-1's same sequence returns 12,301 bytes. Old-2 batches many later reads into C6–C10: 12 total calls despite 88,082 returned read bytes, compared with new-1's 18 calls for 82,591 bytes. That illustrates the opportunity, not a measured speedup: old-2 spends more time generating its answer than old-1.
+
+**Change:** trial one deterministic batch for the known launch prelude, in the specified order. The smallest current command is `cat AGENTS.md agent/teams/roles/common.md agent/teams/roles/tester.md`; a harness-owned reader can add source labels and the role's explicitly named launch sections. It must read canonical files/anchors, not a second hand-maintained summary, and fail visibly if a required target is absent. Stop at the brief boundary. Read the full applicable review skill after the brief, and fetch browser, checks and record formats at their steps. Do not recursively follow every link or print all linked skills in that launch batch. Use the same reader for implementer with its own ordered list. Compare identical content delivered separately versus in one batch before adding a permanent helper. This would target redundant model turns; it would not reduce the bytes of that content. Quoted labels or script output avoid the Opus `echo ======` zsh failure; do not use shell decoration that changes execution. A correction to the Opus premise: the raw failed batches return common.md plus `(eval):1: ===== not found` (4,617 bytes old; 3,688 new), not tester.md. The old checks batch returns 2,325 bytes ending in `(eval):1: ==== not found`, without CI-pause text. Those later standalone reads are retries after an unexecuted read, not duplicate returned tester/CI-pause content. The failure costs another turn either way.
+
+**F6. Select Markdown by heading text and depth, not a guessed number of hashes.** New-2 C5 returns zero bytes for `^## Severity`, whose heading is `### Severity`; C15 does the same for `^### Browser run`, whose heading is `#### Browser run`. C16 is a third empty read: its lowercase `browser` search misses the capitalized heading. C15–C18 takes about 6 seconds and ends in a 2,431-byte recursive search plus a 1,876-byte range. New-3 C9 also omits `####` from its heading alternatives, but succeeds by accidentally matching a preceding `#browser-run` link and taking 45 following lines. That is fragile success, not proof of a reliable section reader. The old-2 C6/C7 boundary rereads line 550 (259 bytes); inclusive ranges caused that repeat.
+
+**Change:** the same small reader proposed for the batch should resolve a named anchor, include children, stop at the next heading of equal or shallower depth, ignore headings inside fenced examples, and report “not found” as an error rather than a successful empty read. Do not standardize all headings to H2 or load the whole file as recovery. Test the reader on the actual Severity and Browser run sections plus the PR-body fenced template. A heading index followed by one bounded read is the fallback; repeated depth guesses are not.
+
+**F7. A section move helps only if the reader follows the section boundary.** Old-1 C5 and old-3 C5 each return the entire 38,086-byte workflow; its five relevant top-level sections total 16,263 bytes. New-3 C6 returns the entire 34,460-byte workflow, although the corresponding selected sections total 12,732 bytes. Thus those calls include roughly 21.7–21.8k bytes beyond even that generous question-set scope. New-1 C16 takes SETUP lines 1–220 (14,381 bytes), but Browser run is 665 bytes and Browser failure another 615. New-2 C4's Turns text is reread in C7; with inclusive boundary repeats in C8/C9, 2,906 source bytes recur. Old-2 repeats 1,757 implementation-skill bytes in C10 after C9. Heading/search hits are excluded from those repeat counts, since locating a section and reading it are not automatically waste.
+
+**Change:** make the linked section the read unit and reuse already-returned content during the turn; do not prepend “read the whole file” to compensate for moved text. For this questionnaire, the implementation skill's Tests/affected-contract sections suffice for most implementation questions, while the role's full review skill remains required. For a real PR, choose additional source from its changed contracts. Keep a single canonical owner for browser/setup/labels; do not undo the moves merely because the current retrieval path sometimes overreads. Dan Luu's Hegel example supports measuring repeated input cost, not claiming that a specific number of characters is safe.
+
+**F8. Collect read counts and token usage outside the worker's answer.** The raw records contradict parts of the self-reported ledgers. New-2 has three empty reads, not two. Its C17 also returns matches from the root README, development.md and implementer.md, which its ordered ledger omits. Old-2 C8 queries headings in five files, not the three heading reads its ledger lists. New-1 C18 corrects its distinct-file count; new-2 C20 edits its counts and still misses source reads; new-3 C13 only appends “token usage not exposed.” Those post-answer operations extend the runs by about 6.4s, 10.9s and 5.5s respectively, including reasoning and completion, not just shell runtime. Old-2 C12 repairs its answer's exit-code example; that is a substantive correction and should not be lumped in with count bookkeeping.
+
+**Change:** derive the ledger, durations and usage from transcripts once, outside the test agent; let the agent write only its answers or its production review. Keep a simple stable output skeleton so answer repair does not require another call. The local rollout counters now give exact reported usage for all six, superseding “not exposed” in the earlier report. Do not silently change the saved answers/results or add the experiment's bookkeeping to the production tester instructions. The post warns that apparently impressive aggregate results can be experimental errors; these ledger discrepancies are a concrete reason to instrument rather than ask the model to count itself.
+
+My next experiment would change retrieval only (ordered batches and reliable section reads), keep the substantive workflow fixed, and remove worker-written accounting. Separately, test the existing proof row plus one targeted review correction on an actual masked defect. That keeps efficiency changes from being mistaken for better testing, and avoids a new long generic skill.
+
+## Fable, round 9: agreed
+
+Conceded to Codex:
+
+- F1 over my T1. The five all-run deductions mix over-demanding key items with omitted qualifiers. "Format predicts retention" stays a hypothesis for the behaviour trial, not a finding.
+- F4 over my E1 numbers. In the six Codex runs the new arm made more calls (17 vs 12.3), took longer (64.8 s vs 54.7 s) and used more cumulative input (621k vs 490k, mostly cached) while reading 16% fewer bytes. Both models agree on the mechanism: turns and round trips cost, bytes do not. The cut stands on maintenance and misreading grounds only.
+- F2 Q17: keep the `observe` sentence where it is; it was my scoring complaint, not dead text.
+- F5 correction: the Opus "duplicate reads" were retries after `echo ======` aborted the batch; the first call never returned tester.md.
+
+Retained from my side: T3 (the flaky-test rule becomes a three-row table; one of six runs inverted it on identical text) and T2's one deletion that Codex's Q18 row also allows: the Turns sentence "Labels the command already wrote stay; they record the assignment, not the delivery", which the next paragraph already states.
+
+Agreed changes, smallest first:
+
+1. Review skill Step 2 names the two lookups: "with Dexter `references` and scoped `rg`" (three old runs named them, no new run did; the new text only links the navigation rules).
+2. Flaky-test branch in Report and resolve blockers as a table. Turns loses the duplicated label sentence.
+3. A harness reader, `agent/teams/read.py`: `read.py launch <role>` prints the role's launch reading in order (AGENTS.md, common.md, the role file, the README sections its Read list names) with a source label per part, stopping at the brief boundary; `read.py section <file> <heading>` resolves a heading at any depth, includes children, stops at the next heading of equal or shallower depth, skips fenced blocks, and exits non-zero on not found. Role Read lists point at the launch command. No second copy of any text. Expected gain: 5 to 7 fewer turns per launch and per post-compaction reread, and no empty section reads (F6: three in new-2).
+4. Next experiment is a behaviour trial, not a quiz (F3): one affected-code change with a known masked defect and a flaky-check record whose isolated and suite outcomes differ; both arms; score whether the named mistake, distinguishing input and control detect the defect and whether triage follows the record; measure returned bytes, round trips, cache hits and writing time separately (F4, F8). Instrument from transcripts; the agent writes only its answers.
+
+Not doing: a Markdown bounded-reading rule, restoring deleted text to raise recall scores, a recall quiz as a gate.
+
+Awaiting the user's choice of which of 1 to 4 to build. Items 1 and 2 are a follow-up PR on PR 542; item 3 is a harness change with tests; item 4 is a design task for the fixture.
