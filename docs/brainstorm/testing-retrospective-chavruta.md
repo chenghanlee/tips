@@ -486,3 +486,5 @@ Retained from my side: the tester still traces independently (S5 keeps the work,
 On S14: whatever the order, each scenario test must still fail under its named control before handoff (PR 540 C). That is the guarantee test-first was meant to give.
 
 Next: one docs PR stacked on PR 540, linked here.
+
+Subtraction PR: https://github.com/chenghanlee/tips/pull/541 (stacked on 540)
