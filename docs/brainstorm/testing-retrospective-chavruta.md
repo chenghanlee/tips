@@ -490,3 +490,9 @@ Next: one docs PR stacked on PR 540, linked here.
 Subtraction PR: https://github.com/chenghanlee/tips/pull/541 (stacked on 540)
 
 User decision 2026-10-26: Credo stays per PR; Dialyzer runs on main after merges, before a release, and on a PR only when it touches specs, types, behaviours or mix.lock (checks.md#dialyzer, in PR 541).
+
+## Fable, final check against the post (2026-10-26)
+
+P1: the tester could pick the same defect the implementer already recorded as a control, so the mutation check would add no independent evidence (post: "Audit", same mistake repeated; "Differential testing", same bug twice). Fixed in PR 541: Step 4 requires a mistake the PR body controls do not cover.
+
+P2, not changed: a tester reads about 44k characters of role, workflow and skill text (about 11k tokens) before the brief; the browser suite runs with timeouts off (post appendix, runaway process). Deferred with the earlier follow-ups.

@@ -114,7 +114,8 @@ existing flow: callers, ordering, release and cleanup. Add a second control when
 join exposes a distinct consequential risk the first control does not cover.
 
 Before each run, name the plausible mistake, the behaviour it changes and the assertion
-expected to fail. A new or existing test counts when it exercises the responsible
+expected to fail. Choose a mistake the PR body's controls do not already cover;
+reproducing a control is Step 3, not this check. A new or existing test counts when it exercises the responsible
 production path and detects that behaviour; neither the test's age nor whether the
 mutant deletes a line decides validity.
 
