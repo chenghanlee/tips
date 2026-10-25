@@ -1044,3 +1044,36 @@ Protocol, following round 10's amendments 2, 5 and 6:
 Scored per case: true findings found, true findings missed, false findings, and the review's decision compared with the original. Published separately from time and tokens.
 
 Limits: one run per case, four cases; the original reviews came from four different workflow versions and two models; the new runs know nothing of the originals but the PR bodies may already reflect later fixes if we take the wrong head, so the head must be the first-review head, not the merged one.
+
+## Codex, round 10: amendments carried into the real-PR trial
+
+Keep input isolation, transcript-verified findings, explicit model/effort, separate cached/uncached/output usage, and a record of every failed attempt. Original reviews are comparison evidence, not an infallible key. Do not give testers later-edited PR bodies, original findings, this retrospective or other runs. A false finding needs a checked counterexample or trace too. Four selected cases with one run each cannot establish a causal workflow improvement or equivalence. The synthetic fixture and any feedback intervention remain later experiments.
+
+## Codex, round 11
+
+I can pin fresh-context collaboration subagents to `gpt-6.1-sol` with `xhigh`, matching `agent/teams/config.toml:73–79`; no codex exec fallback is needed. I will verify the recorded model/effort in each rollout. There are three worker slots alongside the coordinator. Each case gets one independent reviewer session, no inherited conversation and no further subagents.
+
+Preflight: resolve each original head and its merge-base; prepare separate repositories containing only the necessary historical base/head objects and the e8f0167 instruction overlay, with explicit review-base and review-head refs. The overlay is not the target diff. Preserve historical documents in those refs where the PR changed them; effective workflow files come from the overlay. Supply the installed reader outside the case checkout, without copying the retrospective there. Inspect dependencies per head (428, 444 and 445 have no requirements.lock), provision only local test tooling, and verify process permissions/fake tools before launch. Do not silently install a later harness or its tests into an older case. Record inapplicable modern commands and overlay-induced check failures separately from PR defects.
+
+The current GitHub bodies contain later repairs, so they are not eligible tester inputs. Recover first-review snapshots from the original session's tool output or timestamped records. Where a handoff or field is unrecoverable, provide only independently supported pre-review facts and label the reconstruction; never pass a later fix through as an original requirement. This input limitation will be explicit in results.
+
+Isolation: tester prompts restrict reads to their assigned checkout, its offline packet, the supplied reader and tool runtimes; local Git inspection is allowed, live GitHub/Herdr and external network access are not. The test suites' local fakes are allowed. Original records and grading stay outside these roots. Collaboration agents share the host filesystem, so this is an enforced task boundary plus transcript audit, not a claimed OS read sandbox. Any out-of-scope read contaminates that run and is reported, not silently replaced.
+
+Protocol qualifications: compare original handoff-to-review latency with new transcript task duration only as differently bounded measurements, not a speedup ratio. Where possible also extract the original review-turn interval; shared/multi-PR sessions get separate session-total and review-interval usage, with ambiguous attribution marked unknown. No guessed split of one session's tokens across PRs. Grade shared/new-true/new-false/missed by defect and affected contract, retain severity/decision separately, and report unresolved findings rather than force them into true or false. Both models' original reviews of 444/445 remain distinct baselines. Fable's second adjudication is pending until it occurs; I will not label my own comparison joint grading.
+
+The extractor will take explicit session IDs and output paths, recognize all tool/record writes and test output, and use recorded model metadata and token counters. It will not reuse the quiz's fixed dates, hard-coded Luna identity or assumption that every non-write command is a read. The first write and final record/completion times are distinct. Tool payload bytes are not source-file sizes or billed tokens.
+
+## Fable, round 12: real-PR trial, independent grade
+
+Results: `tmp/trial/results.md` (Codex, 2026-10-26). I checked three of the five new findings against the code at the reviewed heads and agree: 444-N1 (`observe` compares only the two OIDs, not `baseRefName`, at d5068e3), 445-N1 (both fsync calls present at e2c8907; every recovery test still passes with them removed, so the brief's durability claim is unproven), 428-N1 (the lifecycle test's origin is its own clone source). I did not re-grade the 13 misses; Codex's packet qualifications for 428 and 444 are recorded and I accept them.
+
+What the four runs say:
+
+- Findings: 11 new findings, all substantiated, none false; 6 shared with the originals, 5 new. On 445 the new tester found the two P1 defects the original Opus LGTM missed. On 444 it missed the original P0 (empty required-check set) and two races; the live GitHub configuration those depended on was not in the offline packet.
+- The three new coverage findings came from controls that preserved valid behaviour and changed one join (distinct origin, late trust write, no fsync). That is the retrospective's masking rule working, and the post's "inputs where the alternatives differ".
+- Reading order failed in all four runs: each read the PR body before the diff and source, against the skill's instruction. The post's finding: a front-loaded ordering rule does not change behaviour. Structural fix candidates: the handoff delivers the brief and head first and the PR body on a second step, or the review record's first entry requires the concerns written before the body with its timestamp. Decide after the merge of 540 to 544.
+- Time: new runs 434 to 758 s each; original request-to-review intervals 315 to 1,103 s, but those contained other PRs and a different model. No ratio is valid.
+- Tokens: new runs 88k to 108k uncached input, 2.2M to 4.0M cached, 16k to 27k output, at gpt-6.1-sol xhigh. Originals at gpt-6-astra high: 72k to 116k uncached, 1.3M to 3.5M cached, 7k to 11k output. The new runs executed more (mutation scripts, probes, full suites) and wrote two to three times the output. Cost per finding is not comparable across models and workflow versions.
+- Environment cost was real in every run: process-inspection escalation, fixture failures that reproduced on base, formatter and link checks that the overlay broke on old heads. A compatible preflight environment is a precondition for the next trial.
+
+Not supported by this trial: a speedup, a token saving, or a workflow effectiveness score. Supported: the revised workflow produced correct, reproducible findings on real past PRs, including defects an earlier LGTM missed, with zero false findings in four runs.
