@@ -500,6 +500,9 @@ class PairLifecycleTest(Harness):
         assert f"python3 {harness / 'team.py'} turn <pr> tester" in impl_brief
         # Each worker reads the common rules and its own role file, not the whole README.
         assert "read.py launch implementer there; it prints AGENTS.md," in impl_brief
+        # The reader comes from the installed harness: a reviewed head may predate read.py.
+        assert "python3 agent/teams/read.py" not in impl_brief
+        assert f"python3 {harness / 'read.py'} launch implementer there" in impl_brief
         assert "read.py launch tester there; it prints AGENTS.md," in tester_brief
         assert "labels first, as the README Turns section says" in impl_brief
         assert "If it is labelled turn:impl, continue" in impl_brief

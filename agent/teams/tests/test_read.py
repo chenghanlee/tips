@@ -47,6 +47,17 @@ class SectionTest(unittest.TestCase):
         with self.assertRaises(LookupError):
             read.section(DOC, "Outcome")
 
+    def test_an_inner_shorter_fence_does_not_close_an_outer_one(self):
+        doc = (
+            "## Target\n\n````markdown\n```python\n## Example heading\n```\n````\n\nAfter.\n\n"
+            "## Next\n\nnext text\n"
+        )
+        text = read.section(doc, "Target")
+        assert text.endswith("````\n\nAfter.\n")
+        with self.assertRaises(LookupError):
+            read.section(doc, "Example heading")
+        assert read.section(doc, "Next") == "## Next\n\nnext text\n"
+
     def test_a_slug_a_title_and_a_fragment_all_resolve_at_any_depth(self):
         for name in ("nested", "Nested", "#nested"):
             text = read.section(DOC, name)

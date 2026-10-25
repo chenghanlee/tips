@@ -24,7 +24,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-FENCE = re.compile(r"^\s{0,3}(```|~~~)")
+FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})(.*)$")
 HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 
@@ -55,7 +55,14 @@ def headings(lines: list[str]) -> list[Heading]:
     for number, line in enumerate(lines):
         opened = FENCE.match(line)
         if fence:
-            if opened and opened.group(1) == fence:
+            # Only a run of the same character, at least as long, with nothing after it,
+            # closes the block; a shorter inner fence or an info string does not.
+            if (
+                opened
+                and opened.group(1)[0] == fence[0]
+                and len(opened.group(1)) >= len(fence)
+                and not opened.group(2).strip()
+            ):
                 fence = ""
             continue
         if opened:
