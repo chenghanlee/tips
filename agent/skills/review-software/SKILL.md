@@ -47,9 +47,9 @@ not copy these claims as results.
 
 Independently trace changed contracts, shared fixtures and config through their callers
 to entry points, or to a caller whose handling of the change you have read and that
-still satisfies its own contract. Follow the
-[navigation rules](../../../agent/docs/elixir-navigation.md); investigate every use that
-only one lookup found. An unchanged signature is not a stopping point. For each entry
+still satisfies its own contract. Find users with Dexter `references` and scoped `rg`
+([navigation rules](../../../agent/docs/elixir-navigation.md)); investigate every use
+that only one lookup found. An unchanged signature is not a stopping point. For each entry
 point reached, check the resulting state and side effects. Do not revisit a checked
 path. For evidence across several files, follow the
 [Lookup subagents](../../docs/lookup-subagents.md) rule; you remain responsible for
