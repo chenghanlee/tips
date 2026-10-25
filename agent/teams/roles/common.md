@@ -18,15 +18,11 @@ Read this and your role file at launch and after compaction.
   consultation is not a mandatory step. Only the user decides UI,
   UX, user-facing behaviour and PRD questions. Record those decisions on the board.
 - Silence, a timeout or a missing agent never counts as consent or approval.
-- An answer or instruction that touches a required check or its evidence says whether
-  it is a clarification (how to meet an obligation, without changing which checks run
-  or what evidence counts), a substitution or a waiver. A substitution or waiver names
-  the obligations that still apply, the exact obligation it replaces or removes, any
-  replacement, and its authority: a link to the user's decision, the brief or its
-  decisions table, or a rule in this workflow; without it, or when the kind or scope
-  is unclear, the original obligation stands. A change only the user may
-  make needs the user's own recorded decision. A role, a label or another agent's
-  report of the user's view does not count.
+- A change to required [checks](../../../agent/docs/checks.md) or accepted evidence must
+  link its authority (the user's decision, the brief or its decisions table, or a
+  workflow rule), name what it replaces or removes and any replacement, and say what
+  still applies; otherwise the original obligation stands. A user-only change needs the
+  user's own recorded decision, not another agent's account of it.
 
 ## Comments
 
@@ -54,16 +50,3 @@ Read this and your role file at launch and after compaction.
 - Post the comment, then send the Herdr prompt as a separate step, except for BLOCKED:
   its post already notifies the dispatcher, so send no second prompt. If you repeat the
   post, the script returns the existing comment's URL.
-
-## Evidence and scope
-
-- Support a source claim with `path:line` at its commit. For execution evidence use the
-  CI run URL, or during the [CI pause](../../../agent/docs/github-ci-pause.md), the local
-  command, tested SHA, environment, exit, result and the excerpt the claim depends on.
-  Otherwise mark it unverified.
-- Use the [README scale](../README.md#severity). An architect P1 and a tester P1 both
-  block progress.
-- Open a new issue for any improvement outside the brief. Keep that work out of the
-  current PR.
-- When several findings concern the same design, propose a simpler design before fixing
-  them separately.

@@ -7,7 +7,7 @@
 | Changing the repository alone | Use an isolated worktree and a PR; the [checks](agent/docs/checks.md) and [review](agent/teams/README.md#pr-review-record) still apply. Merge only with the user's authorization. Read-only reviews and disposable output in ignored `tmp/` need neither |
 | After context compaction | If paired or dispatching, reread your role file and its workflow sections. Reload each required skill before its next use |
 | Repository context | [README](README.md): product, requirements and file locations |
-| Before pushing a change | The [checks](agent/docs/checks.md) for the files you changed; record them as the [CI pause](agent/docs/github-ci-pause.md) says |
+| Before pushing a change | The [checks](agent/docs/checks.md) for the files you changed; record them as the [CI pause](agent/docs/checks.md#github-ci-pause) says |
 | Every `mix test` run | [Test logs](agent/docs/test-logs.md) |
 | Any PR | [PR review record](agent/teams/README.md#pr-review-record) |
 | Before reading, editing or reviewing Elixir code | [Elixir navigation](agent/docs/elixir-navigation.md): Dexter answers structure and uses; scoped `rg` answers text |
@@ -22,7 +22,7 @@
 
 ## Skills
 
-Read the skill for your task from the current worktree and apply it: [design-software](agent/skills/design-software/SKILL.md) when designing a feature, writing a spec or brief, or critiquing one; [implement-software](agent/skills/implement-software/SKILL.md) before planning an implementation, changing code or writing tests; [review-software-correctness](agent/skills/review-software-correctness/SKILL.md) when reviewing a PR, diff or commit for correctness against its brief; [review-software-design](agent/skills/review-software-design/SKILL.md) when reviewing one for design. A solo review applies both review skills. Apply [web-design-guidelines](agent/skills/web-design-guidelines/SKILL.md) when reviewing changed UI, as review-software-design describes. Impeccable and Intent are optional design tools; their interactive workflows need the user available. The [UX designer](agent/teams/roles/ux-designer.md) names the trigger for each. The language and framework skills below still apply.
+Read the skill for your task from the current worktree and apply it: [design-software](agent/skills/design-software/SKILL.md) when designing a feature, writing a spec or brief, or critiquing one; [implement-software](agent/skills/implement-software/SKILL.md) before planning an implementation, changing code or writing tests; [review-software](agent/skills/review-software/SKILL.md) when reviewing a PR, diff or commit. Apply [web-design-guidelines](agent/skills/web-design-guidelines/SKILL.md) when reviewing changed UI, as review-software describes. Impeccable and Intent are optional design tools; their interactive workflows need the user available. The [UX designer](agent/teams/roles/ux-designer.md) names the trigger for each. The language and framework skills below still apply.
 
 Before reading, editing or reviewing Elixir code, load `elixir` and each skill that applies:
 
@@ -49,4 +49,4 @@ These five, `impeccable` and the `intent` skills are user-maintained files outsi
 - Review replies: only ask or answer a question the finding leaves open, link the commit that fixes it, or explain why you will not make the requested change. The reviewer who opened the thread resolves it.
 - Blockers: state what is blocked, the exact error or question, and who must act. In a pair, follow the [blocker procedure](agent/teams/README.md#report-and-resolve-blockers).
 - Decisions: say what you decided and why in one or two sentences.
-- Evidence: link code at its commit SHA and CI at its run URL when used. During the [CI pause](agent/docs/github-ci-pause.md), record local check evidence instead. When quoting check output, quote only the failing lines. Report checks that failed, are pending or were not run, and local results; omit passing CI checks.
+- Evidence: link code at its commit SHA and CI at its run URL when used. During the [CI pause](agent/docs/checks.md#github-ci-pause), record local check evidence instead. Mark an unsupported claim unverified. When quoting check output, quote only the failing lines. Report checks that failed, are pending or were not run, and local results; omit passing CI checks.

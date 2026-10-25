@@ -91,7 +91,7 @@ def turn_command(recipient: str) -> str:
 
 REVIEW_STEPS = {
     "reviewing architect": 'Follow "Steps: reviewing architect" in agent/teams/roles/architect.md '
-    "and agent/skills/review-software-design/SKILL.md. ",
+    "and the Design section of agent/skills/review-software/SKILL.md. ",
     "additional tester": "Follow the review steps in agent/teams/roles/tester.md. ",
 }
 
@@ -191,8 +191,7 @@ def tester_message(record: Record, pr: PullRequest, missing: list[str], failures
     message += (
         f"Move your own clone to the head first: {bootstrap_command(pr.head)}; it refuses a "
         "dirty clone. Follow agent/teams/roles/tester.md and "
-        "both agent/skills/review-software-correctness/SKILL.md and "
-        "agent/skills/review-software-design/SKILL.md from your clone and use the "
+        "agent/skills/review-software/SKILL.md from your clone and use the "
         "README PR review record. "
         f"Put {tester}, <session> on line 2; replace <session> with your session ID. "
         "When your review or any required reviewer's latest review of this head has a P0 or "

@@ -7,7 +7,7 @@ The workflow and its diagram are in the [README](README.md#how-it-runs).
 
 ## One-time setup
 
-In the GitHub ruleset "Reviewed main", require resolved conversations; add required status checks only for workflows that exist and run (during the [CI pause](../../agent/docs/github-ci-pause.md), none). Turn off the strict up-to-date requirement and do not require the `tips/independent-review` status. In Project 15, enable the "Item closed" workflow so closed issues get Status Done.
+In the GitHub ruleset "Reviewed main", require resolved conversations; add required status checks only for workflows that exist and run (during the [CI pause](../../agent/docs/checks.md#github-ci-pause), none). Turn off the strict up-to-date requirement and do not require the `tips/independent-review` status. In Project 15, enable the "Item closed" workflow so closed issues get Status Done.
 
 The team board is [Project 15](https://github.com/users/chenghanlee/projects/15). It holds the spec and brief issues. The dispatcher sets three fields: Status (Backlog, Ready, Active, In review, Blocked, Done), Kind (spec or brief) and Agent (text: the implementer entry, or the UX entry while the UX design team runs). A new owner adds Kind and Agent to their project and updates the project number in [roles/dispatcher.md](roles/dispatcher.md):
 
@@ -56,10 +56,10 @@ stay yours; the graphic designer needs the bootstrap script, `gh issue view`,
 
 Keep the Codex and Claude skill copies in sync. `team.py` checks that the main checkout's `.agents/skills/` exists, and `bootstrap.py` links it into each clone.
 
-The repository tracks six skills: the [Dexter reference](../skills/dexter/SKILL.md), [design-software](../skills/design-software/SKILL.md), [implement-software](../skills/implement-software/SKILL.md), [review-software-correctness](../skills/review-software-correctness/SKILL.md), [review-software-design](../skills/review-software-design/SKILL.md) and the vendored [web-design-guidelines](../skills/web-design-guidelines/SKILL.md). Link them once into both locations from the main checkout:
+The repository tracks five skills: the [Dexter reference](../skills/dexter/SKILL.md), [design-software](../skills/design-software/SKILL.md), [implement-software](../skills/implement-software/SKILL.md), [review-software](../skills/review-software/SKILL.md) and the vendored [web-design-guidelines](../skills/web-design-guidelines/SKILL.md). Link them once into both locations from the main checkout (remove stale `review-software-correctness` and `review-software-design` links):
 
 ```bash
-for skill in dexter design-software implement-software review-software-correctness review-software-design web-design-guidelines; do
+for skill in dexter design-software implement-software review-software web-design-guidelines; do
   ln -s ../../agent/skills/$skill .agents/skills/$skill
   ln -s ../../agent/skills/$skill .claude/skills/$skill
 done
@@ -99,28 +99,41 @@ Chrome cannot start inside the Codex sandbox. Add this rule to
 prefix_rule(pattern=["agent-browser", "open"], decision="allow")
 ```
 
-After changing permissions or rules, start a new tester session and run this
-preflight there, one command per call, in the
-[required form](README.md#manual-browser-review):
+After changing permissions or rules, start a new tester session and run the
+[preflight](#browser-run) there. Browser tests use PhoenixTest with the Playwright
+driver; Playwright and its Chromium are a separate prerequisite
+(`npx playwright install chromium`).
+
+#### Browser run
+
+Clients launch with `MIX_ENV=test`. Wait for `mix test` to exit, then start the app on
+the same port:
 
 ```sh
-agent-browser open about:blank --session preflight
-agent-browser close --session preflight
+MIX_ENV=dev unbuffer mix ecto.setup && MIX_ENV=dev PORT="$TIPS_TEST_PORT" unbuffer mix do assets.setup, assets.build, phx.server
 ```
 
-If opening fails with `Chrome exited early` or `without writing DevToolsActivePort`,
-first follow the close-and-reopen recovery in [manual browser review](README.md#manual-browser-review).
-A daemon started inside the sandbox can survive a failed launch, so retrying
-`open` alone can still fail even with the allow rule installed.
+Preflight, one command per tool call, replacing only `<name>`; the second prints
+`about:blank`:
 
-If recovery fails or `agent-browser open` reports another error, keep the full error
-and run `agent-browser doctor` in the same tester session. Doctor's launch test starts
-a separate browser. It can fail inside the Codex sandbox even when the approved
-`open` command works; the quick/offline doctor does not check browser launch. Fix the
-browser launch failure before assigning manual browser review; do not disable Chrome's sandbox or
-silently switch to the user's personal browser profile. Browser tests use PhoenixTest with
-the Playwright driver; Playwright and its Chromium are a separate prerequisite
-(`npx playwright install chromium`).
+```sh
+agent-browser open about:blank --session <name>
+agent-browser get url --session <name>
+agent-browser close --session <name>
+```
+
+Start every session with exactly that `open` form: other forms can start Chrome inside
+the Codex sandbox. Read mail in `/dev/mailbox`. Stop the server before handing off.
+
+#### Browser failure
+
+If `open` fails with `Chrome exited early` or `without writing DevToolsActivePort`, run
+`close`, then `open about:blank`, then `get url`, each in its own tool call; a daemon
+started inside the sandbox can survive a failed launch. If that fails, keep the full
+error and run `agent-browser doctor` in the same session; its launch test can fail
+inside the sandbox even when the approved `open` works, and the quick or offline doctor
+does not check launch. Fix the launch failure before assigning manual browser review.
+Do not disable Chrome's sandbox or use the user's personal browser profile.
 
 ### Claude auto-mode repository context
 
@@ -244,6 +257,12 @@ used with a changed workflow release must include that workflow change. If conti
 an older branch, merge `origin/main` into it before handing it to the new release;
 do not rebase or force-push. A newly opened PR can still have old instructions, so its
 opening date is not evidence of compatibility. Do not upgrade running teams in place.
+
+## Resuming CI
+
+The product workflows were deleted in the 2026-10-21 restart; `dexter.yml` remains.
+When the user resumes CI, add the application workflow, restore the merge requirements
+and update the [CI pause policy](../docs/checks.md#github-ci-pause) together.
 
 ## Configuration
 
