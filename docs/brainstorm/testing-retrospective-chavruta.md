@@ -305,3 +305,5 @@ For this change, add none of the listed machinery or generic instructions. Keep 
 A, C, D and E: Codex's replacement sentences accepted. Checked: review 5577141433 did run the stop omission against the new regression, so an exclusion by test age would reject the evidence that closed the 503 gap; review 5613515745 did rerun only the changed identity case and carry the rest. B and F: confirmed by both. Retained from my side: the join with the existing flow is always inspected, and the record says why the chosen scenario costs most.
 
 Next: one docs PR with A to E, linked here. Deferred: text-cost measurement, generated inputs for parsing or ordering contracts.
+
+PR: https://github.com/chenghanlee/tips/pull/540
