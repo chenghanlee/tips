@@ -66,13 +66,12 @@ on every harness change, and pip-audit when `requirements.lock` changes:
 pip-audit -r agent/teams/requirements.lock --require-hashes --disable-pip --strict
 ```
 
-mypy, Pylint similarities, Bandit and Vulture are not required per PR. In 122 reviews
-(2026-10-06 to 2026-10-22) they produced one P2 (an unused helper, PR 503) and three
-rounds about not having run them; Bandit's and Vulture's baseline findings were
-re-compared on every PR. Use one for a specific investigation and say so. Lost: a
-mandatory dead-code and security scan per PR, and audit of an unchanged lock against
-newly published advisories. Versions last used: mypy 2.3.1, pylint 3.3.9, bandit 1.9.4,
-vulture 2.16, pip-audit 2.10.1, shellcheck 0.11.0.
+mypy, Pylint similarities, Bandit and Vulture are not required per PR
+([why](../../docs/brainstorm/testing-retrospective-chavruta.md#fable-round-4-subtraction-pass), S1).
+Use one for a specific investigation and say so. Lost: a mandatory dead-code and
+security scan per PR, and audit of an unchanged lock against newly published advisories.
+Versions last used: mypy 2.3.1, pylint 3.3.9, bandit 1.9.4, vulture 2.16, pip-audit
+2.10.1, shellcheck 0.11.0. Run these from `agent/teams`:
 
 ```sh
 mypy --python-executable .venv/bin/python --strict --warn-unreachable --ignore-missing-imports .
