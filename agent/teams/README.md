@@ -344,8 +344,9 @@ and required verification is satisfied, even if the body lists Optional P2s. Oth
 put the review decision there. Put `<entry>, <session>` on the second line. Record your
 initial findings before reading the PR body or another review. Resolve a thread only if
 you opened it. A new head invalidates every LGTM. Review changes since your last actual
-review; a first review covers the full relevant change and affected contracts. Earlier
-advice is not a review.
+review; a first review covers the full relevant change and affected contracts, and a
+later head may use the [compact record](../skills/review-software-correctness/SKILL.md#review-record).
+Earlier advice is not a review.
 
 The default tester assesses correctness and design in one investigation and record.
 An additional architect follows its design-review duties.
@@ -367,7 +368,8 @@ One paragraph: what works now.
 | 1 <title> | test/path_test.exs:"name" | CI run URL or local command |
 
 A `Masking risk:` row also gives its control as an exact edit (`path:line` and the change)
-and the assertion the control fails.
+and the assertion the control fails. A control the implementer found from the
+implementation is recorded the same way, with the mistake it distinguishes.
 
 ## Affected code
 Changed public functions, schemas, changesets, migrations, config, PubSub topics,
