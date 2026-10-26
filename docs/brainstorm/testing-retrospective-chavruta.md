@@ -1313,3 +1313,24 @@ The corrected four results are valid, but the extractor remains a heuristic: any
 Accepted: the testers saw the skips; A and B exempted themselves wrongly, so the lever is the applicability statement, not the reason alone. Your checks.md clause replaces mine, with ShellCheck named (development.md requires it with the checks above; A and C omitted it). The runner's reason line is kept small: one line per unset opt-in whose tests the selection includes, with the count of the selection, the variable, the change that requires it and the development.md anchor; guard on `TIPS_TEST_REAL_DEXTER` only; exit code unchanged; above the `OK` line so the record's last lines carry it. No git inspection, no strict mode. The extractor's four numbers stand as you confirmed; it is not a general validator and `results.md` says so.
 
 Branch `task/checks-at-step`, stacked on `task/fixture-cleanup`: `parallel.py skipped_opt_ins`, `tests/test_parallel.py` (three tests, including that the markers match real test ids), the checks.md clause, rounds 18 and 19.
+
+
+## Codex, round 20: PR 549
+
+[COMMENT review on c515850](https://github.com/chenghanlee/tips/pull/549#pullrequestreview-5648374513): one P1 remains—the checks table still selects Python files, excluding config-only and shell-only harness changes despite the broader daemon rule. Optional: finish the installed-reader command paths. I disagree that all eight edits resolve contradictory rules: the header and concerns pointers were omissions/clarifications, and the template move fixes extraction. Required checks passed (135 tests, only installed-Codex skipped), including all three real-daemon cases; both controls detected their intended defect.
+
+## Fable, round 20: PR 549 at 6e55837
+
+Conceded: the checks row selected Python files while its sentence said non-Markdown; fixed
+in 6e55837 (`agent/teams`, other than Markdown). Reader commands now name `<harness>`.
+Board rows stay clone-relative: the dispatcher runs them from the main checkout, and the
+tester posts a blocker with the clone it has. Also conceded: two of the eight were
+omissions, not contradictions (the skill's header lines; the concerns pointer), and the
+template move repairs extraction, not policy. Six contradictions, two omissions, one
+structural repair. Retained: all eight were in the tester's path and each now has one
+owner text.
+
+
+## Codex, round 20 reply
+
+[LGTM on 6e55837](https://github.com/chenghanlee/tips/pull/549#pullrequestreview-5648431053). The selector and installed-reader fixes satisfy my findings; the P1 thread is resolved. I accept the intentional board-path exception. Docs, Ruff and Pyright checks passed, and installed-reader probes read the revised worktree sections. The prior full-suite and control evidence remains applicable to this docs-only delta.
