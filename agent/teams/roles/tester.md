@@ -11,9 +11,10 @@ dirty clone and never resets one.
    [Severity](../README.md#severity),
    [Report and resolve blockers](../README.md#report-and-resolve-blockers) and
    [Constraints](../README.md#constraints). Read the review record, PR body, browser and
-   merge sections when a step links them.
+   merge sections when a step links them; `agent/teams/read.py section <file> <heading>`
+   prints one.
 2. The brief, then the diff against the base your handoff names, then the tests of the
-   changed modules. Your handoff withholds the PR until step 3 below.
+   changed modules. Your handoff withholds the PR until the `handoff` step below.
 3. [review-software](../../skills/review-software/SKILL.md), from your clone. Its Step 1
    is the concerns file and the `handoff` command that prints the
    [PR body](../README.md#pr-body); it also gives the review record format.
@@ -22,27 +23,24 @@ dirty clone and never resets one.
 
 1. The implementer's handoff notified every required reviewer of the same head and asked
    the dispatcher to launch any that were missing. Do not notify or launch reviewers.
-2. Before your first required manual browser scenario, run the
-   [browser preflight](../SETUP.md#browser-run) once in your own runtime. If it fails,
-   report `blocked` with the exact error.
-3. Write the head SHA and your initial concerns to `tmp/concerns.md`; on a later head,
+2. Write the head SHA and your initial concerns to `tmp/concerns.md`; on a later head,
    append the new head and the delta's concerns to it. Then run the
    `pr_review.py handoff <head> tmp/concerns.md` command your handoff names. It prints
-   the PR, its body and prior reviews; `turn` and `observe` take the number it prints.
+   the PR, its body and prior reviews; `turn` and `observe` take the PR it prints.
    The [review record](../README.md#pr-review-record) repeats the concerns.
-4. Follow the skill with your own database and port: affected code, scenarios and
+3. Follow the skill with your own database and port: affected code, scenarios and
    their controls, mutation check, entry points, checks, design. For the full
    application suite, verify the implementer's record instead of rerunning it
    ([substitution](../../../agent/docs/checks.md#application-suite-substitution)).
    Browser tests and manual checks follow [manual browser review](../README.md#manual-browser-review).
-5. Submit the [review record](../README.md#pr-review-record). Without a P0 or P1 finding
+4. Submit the [review record](../README.md#pr-review-record). Without a P0 or P1 finding
    or a hold, submit LGTM; P2s go under [Optional](../README.md#optional-p2-findings).
    Other tester: send your review URL to the merge-confirming tester.
-6. Merge-confirming tester: when your review or any required reviewer's latest review of
-   the head has a P0 or P1 finding or a hold, send `turn` to the implementer. Do not
-   wait for the other reviews. When `agent/teams/pr_review.py observe <pr>` reports
+5. Merge-confirming tester: when your review or any required reviewer's latest review of
+   the head has a P0 or P1 finding, send `turn` to the implementer. Do not
+   wait for the other reviews. When `python3 <harness>/pr_review.py observe <pr>` reports
    ready, follow the [merge step](../README.md#merge). Then send `done` to the dispatcher.
-7. On a `<URL> hold`, follow [Changed binding decisions](../README.md#changed-binding-decisions)
+6. On a `<URL> hold`, follow [Changed binding decisions](../README.md#changed-binding-decisions)
    before replacing the hold review. You may answer a bounded verification question with
    evidence from your clone; checking compliance with your own consequential decision is
    not independent review.

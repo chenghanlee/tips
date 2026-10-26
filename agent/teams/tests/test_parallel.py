@@ -19,25 +19,31 @@ class SkippedOptInsTest(unittest.TestCase):
     def test_each_unset_opt_in_is_named_once_with_its_count_and_requirement(self) -> None:
         lines = parallel.skipped_opt_ins(DAEMONS + CODEX + OTHER, {})
         assert lines == [
-            "skipped opt-in: real-daemon tests (3): set TIPS_TEST_REAL_DEXTER; required for "
-            "agent/teams Python changes (agent/teams/development.md#required-checks)",
+            "skipped opt-in: real-daemon tests (3): set TIPS_TEST_REAL_DEXTER and "
+            "DEXTER_ELIXIR_LIB_ROOT; required for non-Markdown agent/teams changes "
+            "(agent/teams/development.md#required-checks)",
             "skipped opt-in: installed-Codex tests (1): set TIPS_TEST_REAL_CODEX; required for "
             "Codex launch argument changes (agent/teams/development.md#required-checks)",
         ]
 
     def test_a_set_opt_in_and_a_selection_without_its_tests_say_nothing(self) -> None:
-        both = {"TIPS_TEST_REAL_DEXTER": "/dexter", "TIPS_TEST_REAL_CODEX": "1"}
+        both = {
+            "TIPS_TEST_REAL_DEXTER": "/dexter",
+            "DEXTER_ELIXIR_LIB_ROOT": "/lib",
+            "TIPS_TEST_REAL_CODEX": "1",
+        }
         assert parallel.skipped_opt_ins(DAEMONS + CODEX, both) == []
         assert parallel.skipped_opt_ins(OTHER, {}) == []
         # -k narrowed the run to one daemon case: the count is the selection's, not three.
         assert parallel.skipped_opt_ins(DAEMONS[:1], {}) == [
-            "skipped opt-in: real-daemon tests (1): set TIPS_TEST_REAL_DEXTER; required for "
-            "agent/teams Python changes (agent/teams/development.md#required-checks)"
+            "skipped opt-in: real-daemon tests (1): set TIPS_TEST_REAL_DEXTER and "
+            "DEXTER_ELIXIR_LIB_ROOT; required for non-Markdown agent/teams changes "
+            "(agent/teams/development.md#required-checks)"
         ]
 
     def test_the_markers_match_the_suite_s_opt_in_tests(self) -> None:
         ids = parallel.test_ids([])
-        for marker, _variable, _name, _required in parallel.OPT_INS:
+        for marker, _variables, _name, _required in parallel.OPT_INS:
             assert any(marker in test_id for test_id in ids), marker
 
 

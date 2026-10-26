@@ -71,7 +71,7 @@ def pair_brief(record: Record, entry: str, duty: str) -> str:
         handoff = f"After each push, hand the head to the reviewers with {turn_command(tester)}. "
     else:
         handoff = (
-            "Hand a P0 or P1 finding or a hold to the implementer with "
+            "Hand a P0 or P1 finding to the implementer with "
             f"{turn_command(implementer)}; Optional P2s need no turn. "
         )
     return (
@@ -104,8 +104,8 @@ def first_reading(pr: PullRequest) -> str:
     return (
         f"Review head {pr.head} on base {pr.base_ref} in your own clone: read the brief, "
         f"then git diff origin/{pr.base_ref}...HEAD and the tests of each changed module. "
-        "Write the head and your initial concerns to tmp/concerns.md as the README review "
-        "record says; on a later head of the same PR, append the new head and your concerns "
+        "Write the head and your initial concerns to tmp/concerns.md as review-software "
+        "Step 1 says; on a later head of the same PR, append the new head and your concerns "
         f"about the delta to it instead. Then run {handoff_command(pr.head)}; it prints the "
         "PR, its body and prior reviews. "
     )
@@ -215,7 +215,7 @@ def tester_message(record: Record, pr: PullRequest, missing: list[str], failures
         "from your clone and use the README PR review record. "
         f"Put {tester}, <session> on line 2; replace <session> with your session ID. "
         "When your review or any required reviewer's latest review of this head has a P0 or "
-        f"P1 finding or a hold, run {turn_command(implementer)} with the PR number handoff "
+        f"P1 finding, run {turn_command(implementer)} with the PR number handoff "
         "printed; Optional P2s need no turn. Do not wait for the other reviews. Follow the "
         f"README merge step when python3 {harness() / 'pr_review.py'} observe <pr> reports "
         "ready to merge. After the merge, notify the dispatcher with herdr agent prompt "
