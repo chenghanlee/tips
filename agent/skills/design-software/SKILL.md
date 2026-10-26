@@ -1,6 +1,6 @@
 ---
 name: design-software
-description: Guides the lead architect and the critic architect of a tips feature. Covers reading, candidate designs, the choice, the spec and brief format, the required rules, the additional rules, the performance principles, critique and the choice of implementer. Code reviews use review-software-design.
+description: Guides the lead architect and the critic architect of a tips feature. Covers reading, candidate designs, the choice, the spec and brief format, the required rules, the additional rules, the performance principles, critique and the choice of implementer. Code reviews use review-software.
 ---
 
 # Design software

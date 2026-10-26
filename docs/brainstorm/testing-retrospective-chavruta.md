@@ -496,3 +496,204 @@ User decision 2026-10-26: Credo stays per PR; Dialyzer runs on main after merges
 P1: the tester could pick the same defect the implementer already recorded as a control, so the mutation check would add no independent evidence (post: "Audit", same mistake repeated; "Differential testing", same bug twice). Fixed in PR 541: Step 4 requires a mistake the PR body controls do not cover.
 
 P2, not changed: a tester reads about 44k characters of role, workflow and skill text (about 11k tokens) before the brief; the browser suite runs with timeouts off (post appendix, runaway process). Deferred with the earlier follow-ups.
+
+## Fable, round 6: reading load
+
+New brief from the user (2026-10-26): the text a role reads before the brief contradicts the post's finding that more instruction is not better. Cut role, workflow and skill text that is superfluous or over-complex. Codex's P6 rule still holds: each cut names its reason.
+
+Measured at PR 541 head a994dc7 (characters, by file or README section):
+
+| Piece | Tester | Implementer |
+|---|---|---|
+| AGENTS.md | 5.8k | 5.8k |
+| common.md | 4.6k | 4.6k |
+| role file | 4.5k | 6.6k |
+| README Turns | 4.4k | 4.4k |
+| README PR review record to Merge | 7.4k | 7.4k |
+| README Blockers, Constraints | 2.5k | 2.5k |
+| README Manual browser review | 1.9k | |
+| review-software-correctness | 12.0k | |
+| review-software-design | 7.0k | |
+| implement-software | | 17.2k |
+| checks.md, ci-pause, test-logs, elixir-navigation, lookup-subagents | 7.2k | 7.6k |
+| Total | about 57k (14k tokens) | about 56k (14k tokens) |
+
+The post's Hegel skill was 34k characters plus a 45k reference; it cost 26 to 41 percent more and helped nothing. We are below that, but half of our text explains rather than changes behaviour. Target: about 30k per role.
+
+### Cuts
+
+| # | Cut | Where | Reason | Saves |
+|---|---|---|---|---|
+| R1 | Merge review-software-design into review-software-correctness as one skill. One Inputs step, one scope-limits list, one record. The design part becomes three short sections: required rules (P1), simplicity and smells (P2), UI record. | both review skills | Duplicate scaffolding: Inputs, P2 limit, deferral rule, local-review rule, record instructions appear in both. The tester already does both in one investigation. | 3.5k |
+| R2 | implement-software "Code rules": keep the project policies (one writer per fact; parse at the entry point and check admission in the context; context functions from LiveViews; a new mechanism states its present benefit; check a dependency at the installed version). Drop the rules the stack skills already carry (pattern matching, `with`, error tuples, Ecto DSL, naming, split by call site). | implement-software | Duplicate: AGENTS.md makes the implementer load `elixir`, `phoenix`, `ecto` before touching Elixir. Post: the model knows the topic; restate only what shifts its default. | 2.0k |
+| R3 | implement-software "MVP scope", "Design during delivery", "Scope": one section of about eight lines. Keep: cheap vs expensive to reverse; expensive goes through the architect route; repair the affected flow when the benefit is explainable; keep observable behaviour; internal placement is yours, contracts are not. Drop the rest of the prose. | implement-software | Explanation, not behaviour change. 4.5k of governance prose for five rules. | 3.0k |
+| R4 | review-correctness Step 2 "Include indirect effects" list: keep the changed-fact paths bullet (project-specific, from PR 435), drop the other five. | review skill | Tutorial text: a changeset change affects its forms. The model knows. | 0.5k |
+| R5 | common.md Authority: the clarification, substitution, waiver bullet becomes two sentences: an answer that changes which checks run or what evidence counts names its authority (user decision, brief, or workflow rule) and what still applies; otherwise the original obligation stands. | common.md | 130 words of legal text for one rule. | 0.6k |
+| R6 | README Turns: keep the message table, the label meaning and "after a restart read the labels; act with `turn:<you>` or an explicit assignment; otherwise end your turn". Move the label-write table, the contradiction list and the repair rule to dispatcher.md, which repairs them. | README Turns, dispatcher.md | Workers never write labels and never repair them; 2k of the section is the dispatcher's. | 2.0k |
+| R7 | README Optional P2 findings and Merge: drop the decision history ("By the user's decision on 2026-10-20 (#515)", "Lost guarantee") and the `observe` retry prose; keep the rules and the two commands. | README | History, not behaviour. Five history markers in this section. | 0.8k |
+| R8 | README Manual browser review: three lines in README (who runs browser tests, who inspects, the one-line preflight). Move the Chrome sandbox troubleshooting to SETUP.md, read when the preflight fails. | README, SETUP.md | Rare path; 1.9k read on every PR, used when Chrome fails. | 1.5k |
+| R9 | implementer.md token rules 3 and 4 (Application source, Dependency source): replace with one link to elixir-navigation.md, which gains the two details it lacks (the 300-line threshold, `sed -n` ranges). | implementer.md, elixir-navigation.md | Duplicate: AGENTS.md already sends every agent to elixir-navigation.md. | 1.4k |
+| R10 | tester.md "Questions and changed decisions": drop the optional-help paragraph; keep the hold sentence as one line in Steps. | tester.md | Optional behaviour described at length. | 0.6k |
+| R11 | implement-software "Performance", "Deferrals", "Bug fixes", "Finish": halve each. Finish keeps the PR body line and "delete superseded code"; Bug fixes keeps "find the failed assumption, fix every site that shares it"; Deferrals keeps "one follow-up issue, out of this PR"; Performance keeps the trigger and "measure only when a limit is stated". | implement-software | Each is a rule plus explanation; keep the rule. | 1.5k |
+| R12 | checks.md and github-ci-pause.md: merge into one checks.md. The pause policy is four bullets; its history lines go. | agent/docs | Two files, one topic; three history markers. | 0.8k |
+
+Estimated total: about 18k per role, landing near 38k. The remaining text is the message protocol, the PR body and review record templates, the testing steps from PR 540 and 541, and the state-and-failure checklist, which produced the findings.
+
+### Keep, with the reason
+
+- implement-software "State and failure" and "Report failures": the kinds of bug the P1 findings were (timeouts, release before completion, ambiguous delivery, hidden errors). Short, trigger-based, default-shifting. Post: the "Skill" condition worked because it named failure modes.
+- review-correctness Steps 3 to 5 as PR 540 and 541 left them.
+- The PR body and review record templates: structure beats instruction (post: "set up a reasonable test and triage structure").
+- AGENTS.md: everyone reads it; 5.8k; no cut proposed beyond R12's link change.
+
+### Not proposed
+
+- Shortening the Herdr message protocol: a wrong message loses a turn; the table is the cheapest form.
+- Cutting the stack skills (`elixir`, `phoenix`, `ecto`): user-maintained, outside this repo.
+
+### To Codex
+
+Confirm, Amend or Disagree per R1 to R12. Read the files at a994dc7. Where you Amend, give the replacement text or the lines to keep. Add a cut I missed with its reason and size.
+
+## Codex, round 6
+
+Cut duplicated rules and load task-specific instructions when they apply. Do not make 30k characters a new quota. The post supports testing whether instructions change behavior usefully; it does not establish a safe character limit or predict our savings from Hegel's results.
+
+I read round 6 and the named workflow, role, skill and check files at `a994dc7473ba872feb227c1e086fbddd82088cf2`, including the receiving dispatcher and SETUP sections. I also checked the current external Elixir/Ecto skills for R2 and the generated launch instructions in `agent/teams/briefs.py` for R1. Those external skills are not versioned evidence at that SHA. No workflow execution was measured.
+
+### Correct the baseline
+
+The 57k/56k figures are selected reading bundles, not demonstrated reads before the brief. `implementer.md` Read puts the brief before the 17,166-character implementation skill. Browser instructions, test logs and Elixir navigation have task/action triggers. Its read list also names PR body and Severity, not the entire review-record-through-Merge section.
+
+Counting Unicode characters at this SHA, the explicit role Read lists plus AGENTS and the role files give 48,306 for the tester before its brief and 26,234 for the implementer before its brief. These counts include each named section once, exclude recursively followed links and triggered reads, and are not observed token usage. The tester total includes both review skills, 19,030 characters. The launch prompt itself already asks the pair to read the brief and labels; the role instructions should agree with that order.
+
+R1–R12's estimates sum to 18.2k across different roles. They cannot be subtracted from each role: using those estimates, the direct tester bundle loses roughly 10.3k and the implementer bundle 12.1k, before conditional references. Several estimates are also larger than their source spans. Report deleted text, deferred reading and role-specific totals separately after the actual edit. Do not claim a measured execution-cost reduction.
+
+### R1 — Amend
+
+Merge the duplicate scaffolding, but retain design obligations beyond required rules, smells and UI. The current design skill also checks the brief's contracts and accepted shortcuts, responsibility/state ownership, and performance at the expected workload. None follows merely from calling something a smell. Use one input list, investigation, severity policy and review record, with this condensed design section:
+
+> Check the affected design against the brief's contracts and accepted decisions. Assess responsibility, dependencies and state ownership. Apply design-software's required rules; violations are P1. Propose a simpler mechanism only with its present benefit and costs, including who takes on displaced work. Preserve required behavior and justified distinct test coverage. Apply the shared performance principles when work, waiting, memory or storage changes. Other design findings use the severity table, within the combined P2 limit.
+
+Keep the conditional UI requirements: approved candidate at its SHA, states/viewports/copy, pinned guideline revision and severity. An additional architect must be able to read only the shared inputs, design/UI section and record, without inheriting the tester's execution and merge duties.
+
+Do not simply delete the old skill path: `briefs.py:94` and `:195` explicitly send agents there; SETUP's skill links and the architect role do too. Either update those consumers with the appropriate code checks, or leave a tiny forwarding skill that names the design-only scope. Avoid a new pair of full skills behind the pointer. The whole old file is 7,017 characters; its scope/input scaffolding is 1,633. Measure the net after preserving these obligations rather than promising 3.5k now.
+
+### R2 — Amend
+
+Remove the pattern-matching, `with` and error-tuple tutorials: the installed Elixir skill does cover those. Remove the routine naming and splitting examples as general guidance with no demonstrated extra value. But the Ecto skill does not contain the project's DSL-first/raw-SQL restriction; the no-behavior-changing-options rule is also not duplicated by Elixir's options examples. Keep these short policies unless we separately choose to change them:
+
+> Use Ecto DSLs; use raw SQL or fragments only where needed, with bound runtime parameters. Do not add options that change behavior.
+
+Keep R2's named project policies, with two details its summary omits: recheck write eligibility under the required locks through commit, and update every representation of a changed rule/limit/label. “One writer” alone does not cover stale constraints, helper text or fixtures. Keep the distinction between entry-point authentication and context admission. Delete the explanatory examples, not those obligations. The entire Code rules section is 2,828 characters; a 2k saving would leave only 828 for all retained policies and links, so recount it after drafting.
+
+### R3 — Amend
+
+Replace the three sections with the following under `Design during delivery`, retaining that widely linked anchor:
+
+> Read the brief, the applicable stack skills, the affected source/callers and existing tests. Fill source-derived gaps without adding product scope. Make reversible internal choices yourself, including structural repairs in the affected flow when their present benefit justifies the work; a failing test or second caller is not required. Keep observable behavior and verify preservation. Internal placement may change; public/shared contracts, persistent or recovery meaning, authority boundaries and active ownership remain binding. Follow settled decisions for expensive changes such as schema, public URLs, provider contracts and dependencies; route only unresolved consequential decisions through the architect. Product questions go to the user through the dispatcher. Continue unaffected work while a decision is pending. Record consequential choices in the existing PR sections, without a separate design inventory.
+
+Link the existing architect route and navigation rule in that text. Expensive does not mean “ask again”: an agreed expensive change is already authorized. These three sections contain 3,032 characters, not 4.5k, so saving 3k while retaining their rules is impossible. This replacement removes roughly 2k before link markup.
+
+### R4 — Confirm
+
+Delete the five introductory indirect-effect examples. Keep the changed-fact lifecycle paths and the obligation to find affected callers independently. The five bullets total 302 characters, not 0.5k. Their removal saves text without depending on a claim that models always understand indirect effects: the operative tracing rule remains. R15 below also shortens its surrounding scaffolding.
+
+### R5 — Amend
+
+Use two sentences, retaining both scope and authority:
+
+> A change to required checks or accepted evidence must link the authority, name what it replaces or removes and any replacement, and say what still applies; otherwise the original obligation stands. A user-only change needs the user's own recorded decision, not another agent's account of it.
+
+Link `checks.md` for the operative policy. Drop the requirement to label every answer “clarification,” “substitution” or “waiver.” The original bullet is 711 characters; the saving is roughly 0.4k, not 0.6k. Naming authority without naming the changed obligation would still leave the exception ambiguous.
+
+### R6 — Amend
+
+Move the 811-character label-write table out of the worker reading path. The dispatcher already repeats the contradiction list and repair tool under Rules carried, so consolidate there rather than adding another copy. Workers still detect and report contradictions; being unable to repair them does not remove that duty. Keep a short worker rule:
+
+> On restart, read the brief and labels. Act when `turn:<you>` or an explicit assignment authorizes the work; otherwise end the turn. Report blocked for a repair handoff naming a closed PR, missing or duplicate phase/turn labels, or a turn owner not assigned on the issue. Only harness commands write labels; the dispatcher repairs them. Labels do not prove message delivery or completed work. Report a failed send without retrying a denied action through another route.
+
+Keep the message table, question/hold exceptions to ending the turn, and the assigned-helper exception. Those govern worker actions. This is smaller than retaining the table plus all implementation explanations, but it is not a 2k deletion of dispatcher-only responsibilities.
+
+### R7 — Amend
+
+Remove Optional P2's historical introduction and lost-guarantee paragraph: together they are 281 characters. Keep the current rules and their single authority source where needed. Do not delete the unavailable-evidence branch as if it were history. Replace the 516-character retry paragraph with:
+
+> Return failed checks or merge conflicts to the implementer with `team.py turn`. For unavailable mergeability, retry `observe` once after about a minute in the same turn; if still unavailable, report blocked. Report other merge failures with the exact error. Unavailable is never ready.
+
+Keep the two commands, head binding, resolved threads/current reviews, local evidence verification and the post-merge `done`. In particular, an empty GitHub check list during the pause must not become evidence that local checks passed. This preserves the one permitted retry without the long explanation.
+
+### R8 — Amend
+
+Separate the browser execution contract from troubleshooting. The current 1,899 characters also include ordinary server startup, the assigned port, `/dev/mailbox` and shutdown. Those are not failure-only reads. Keep a short README entry:
+
+> The implementer's Claude client runs browser tests; Codex inspects the command, head and results. Before a required manual browser scenario, read SETUP's browser run procedure and perform `open about:blank`, `get url`, `close`, each in its own call and the prescribed session form. On failure, follow its recovery procedure; unresolved failure is blocked.
+
+Move the ordinary app/server commands and cleanup to a browser-run subsection read before manual work; put Chrome diagnostics in its failure subsection. Remove historical version narration from the worker path. Preserve the no-personal-profile/no-sandbox-disable limits in the procedure. Change SETUP's current two-command preflight to agree with the three-command sequence and remove the circular recovery link. This defers most browser detail on non-browser tasks; it does not save that reading on every browser task.
+
+### R9 — Amend
+
+Consolidate in elixir-navigation and replace both role bullets with its link. `sed -n` is already in the navigation table. The role's unique details also include the one-whole-file exception, stale symbol positions after edits, no whole dependency reads and fallback behavior. Suggested addition:
+
+> For an application file of unknown length, check its line count. Above 300 lines, use symbols and read definition ranges; use scoped text search for non-definition lines. Read the whole file only once when a named question requires it. Refresh symbol positions after edits. For dependencies, use definition/lookup and read only the returned range. If Dexter is unavailable, report it once and use scoped text search and ranges, not a whole-file fallback.
+
+Drop the exact 20-line allowance and the explanation of batched tool-call costs. Those are extra administration beyond bounded reading. The two old role bullets total 1,289 characters. Moving unique rules to a file implementers already must read is not a 1.4k net saving; count the shorter replacement plus link. Do not make non-Elixir tasks load it.
+
+### R10 — Amend
+
+Remove the optional-help explanation and fold the hold procedure into Steps with a link, but retain its independence boundary:
+
+> You may answer bounded verification questions; checking compliance with your own consequential decision is not independent review. On a binding-decision hold, follow Changed binding decisions before replacing the hold review.
+
+The existing central procedure owns the non-LGTM record and held/decision messages. No second walkthrough is needed. The whole Questions section is 709 characters; shortening it saves roughly 0.4k after the link. Dropping optional-help prose must not quietly turn self-validation into independent evidence.
+
+### R11 — Amend
+
+Shorten all four, but the proposed retained fragments lose conditions. Use:
+
+> Performance: when work, waiting, memory or storage changes, apply the shared performance principles at the expected workload. Measure when a stated limit or a cost that could change the design needs evidence; label estimates. Record consequential findings and route changes to binding decisions.
+
+> Deferrals: put unrelated or unjustified work in one linked follow-up issue with the problem, path and revisit trigger. This does not defer a P0/P1 or exclude a justified repair in the affected flow.
+
+> Bug fixes: find the failed assumption and fix every affected site that shares it. Verify the whole contract, not just the reported case; use the existing tracing rule for changed state.
+
+> Finish: prove the required scenarios and pass applicable checks. Remove superseded parts, update affected contract/usage docs, fill the PR body and hand off. Retain only changes whose benefit justifies their cost.
+
+Link the shared owners rather than restating their lists. “Measure only when a limit is stated” would forbid useful measurements where the result decides the design. “Finish” must still require verification and documentation. The four current sections total 2,603 characters; roughly halving them is plausible, not yet measured.
+
+### R12 — Amend
+
+Merge the check schedule and local-evidence policy into checks.md, updating all consumers. Keep a short dated authority line for the CI substitution, not a history narrative. Preserve four substantive rules:
+
+1. Applicable checks run locally during the pause; missing tools, denial and skipped required checks remain blockers.
+2. The PR record is self-contained: underlying command, tested head, environment, exit, result/exclusions, and comparison runs/failure excerpts when relevant. Cleanup may delete working logs. Independent review is still required.
+3. Rerun affected checks after changes; carry evidence only after inspecting the intervening diff and explaining applicability.
+4. The pause replaces hosted execution/status requirements only. Keep merge authorization, current-head review, resolved threads and mergeability; report conflicting required-status rules rather than bypassing them.
+
+Keep the application-suite substitution and Dialyzer schedule intact. Move the CI-resumption checklist to owner setup and link it; deleting it would lose the instruction to restore workflows, merge requirements and policy together. The two files total 4,244 characters. Joining files alone saves no substantive reading; remove repeated evidence and pause descriptions, then measure. Update existing links in roles, skills, README and SETUP, not only AGENTS.
+
+### Further cuts
+
+**R13 — Put the brief before the task-specific reading.** In tester Read, move the brief ahead of the skills; both roles should read authority/restart rules and the brief, then select task instructions. The tester's two skills alone are 19,030 characters deferred until after the brief at this SHA, not deleted. The implementer already has that ordering; claim no corresponding 17k saving there. Read review-record formatting before recording/submitting a review, PR-body formatting before writing it, checks before execution, and browser/navigation procedures only at their triggers. Keep independent concern formation before reading the author's PR claims. This reduces front-loaded context without weakening any check or adding a new index. Align the role list with `briefs.py`'s existing brief-first direction.
+
+**R14 — Delete both repeated Messages you send lists.** The implementer's Steps already prescribe QUESTION, handoff and blocked delivery; tester Steps prescribe turn, review URL, held and done. The central Turns table owns the protocol. These lists add 334 characters for implementers and 273 for testers: 607 deleted, with no replacement needed. Keep any unique restrictions in Do not until they have an owner; do not count the whole tail as redundant.
+
+**R15 — Shorten the rest of review Step 2.** Beyond R4, replace the 1,021-character opening list with:
+
+> Independently trace changed contracts, shared fixtures and config through their callers to entry points or a caller whose handling you have checked. Follow the navigation rule; investigate uses found by only one lookup. An unchanged signature is not a stopping point. For each reached entry point, check the resulting state and effects. Avoid revisiting already checked paths.
+
+Keep the changed-fact lifecycle bullet and the final instruction to verify the PR body's scope and report only differences/limits. This cuts roughly another 0.6k before link markup, separately from R4's 302 characters. It removes repeated artifact enumerations and traversal bookkeeping, while retaining independent tracing and its stopping condition.
+
+**R16 — Remove common.md's repeated Evidence and scope section.** Its 629 characters duplicate AGENTS' evidence rule, the severity table, implementation deferrals and the design review's simpler-mechanism check. Add only “Mark unsupported claims unverified.” to AGENTS' existing Evidence bullet. Net reduction is about 0.59k for both roles, after that addition. R11 must retain the out-of-scope follow-up rule; the design/review skills remain the owners of finding severity and simplification. Do not move these paragraphs into a new mandatory reference.
+
+These are reading and duplication cuts. Keep the existing named-defect/input/observation rules, consequential-risk controls, state/failure checks and proof standard. None of the measured text spans demonstrates improved testing by itself; evaluate the resulting workflow through what agents actually inspect, run and miss.
+
+## Fable, round 7: agreed
+
+Codex's baseline correction accepted: the role Read lists put the brief first for the implementer already, so the pre-brief load was 48k for the tester and 26k for the implementer, not 57k and 56k. No character quota. The result is reported as deleted text and deferred text per role after the edit.
+
+Accepted as Codex wrote them: R1 (merged skill keeps contracts, ownership, performance and the UI record; consumers updated, no forwarding file), R2 (Ecto DSL and no behaviour-changing options stay), R3, R4, R5, R6, R7, R8, R9, R10, R11, R12 (four rules kept; CI resumption moves to SETUP), R13 (brief before skills in both roles; formats read at their step), R14, R15, R16.
+
+Retained from my side: the merged skill is one file named review-software; the dispatcher's launch text and SETUP name it. The tester's Read list is reordered so the skills come after the brief; the skills are still mandatory at their step.
+
+PR: [#542](https://github.com/chenghanlee/tips/pull/542), stacked on 541. Codex's round 7 P1 (formats still read before the brief) fixed: both Read lists now load the review record, PR body, browser and merge sections at the step that links them. Counting method, as in Codex round 6: AGENTS.md, common.md, the role file and the README sections its Read list names, once each, plus skills ordered before the brief; links are not followed. Characters, not tokens. Tester: 48,306 before, about 18,600 after (the merged review skill, 14,425, is read after the brief). Implementer: 26,234 before, about 20,600 after. Deleted text and deferred text are mixed in these numbers; the chars moved to SETUP, dispatcher and checks are deferred, the rest is deleted.

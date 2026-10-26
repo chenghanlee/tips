@@ -9,8 +9,7 @@ a checkout. Follow
 [AGENTS.md](../../AGENTS.md) and the skill for your task:
 [design-software](../skills/design-software/SKILL.md),
 [implement-software](../skills/implement-software/SKILL.md),
-[review-software-correctness](../skills/review-software-correctness/SKILL.md) or
-[review-software-design](../skills/review-software-design/SKILL.md). Your role file
+[review-software](../skills/review-software/SKILL.md). Your role file
 lists your responsibilities: [dispatcher](roles/dispatcher.md),
 [architect](roles/architect.md), [implementer](roles/implementer.md),
 [tester](roles/tester.md). Read the [common rules](roles/common.md). The user completes
@@ -227,51 +226,20 @@ comment notifies nobody (only a BLOCKED post does), so the poster sends the noti
 | `<URL> held` | merge-confirming tester | the lead | its non-LGTM hold review |
 | `<URL> decision` | lead | each affected implementer and merge-confirming tester | the adopted decision |
 
-Two labels on the brief or spec issue record the task's state:
+Two labels on the brief or spec issue record the task's state: `phase:design`,
+`phase:implement` or `phase:review` is the workflow step; `turn:<entry>` or
+`turn:dispatcher` is the coordinating owner, the agent whose action advances the task.
+Only harness commands write them ([which](roles/dispatcher.md#labels)); never add or
+remove them by hand. A label is an assignment, not evidence that a prompt arrived, a
+check passed or an agent runs. Helpers act on their explicit assignment without owning
+the turn: an additional reviewer notified of a head, an architect assigned a QUESTION, a
+critic named in a spec.
 
-- `phase:design`, `phase:implement` or `phase:review`: the workflow step.
-- `turn:<entry>` or `turn:dispatcher`: the coordinating owner, the agent whose action
-  advances the task.
-
-Only these harness commands write them. Never add or remove them by hand.
-
-| Event | Command | Labels |
-|---|---|---|
-| New pair | `team.py start` | `phase:implement`, `turn:<implementer>` |
-| New standalone design team | `team.py design` | `phase:design`, `turn:<lead>` from the spec's `Lead:` line, or from the brief's `UX:` line |
-| Relaunch, additional architect, `review` launch | `start`, `design`, `review` | unchanged |
-| Head to reviewers | `team.py turn <pr> <tester>` | `phase:review`, `turn:<tester>` |
-| Findings back | `team.py turn <pr> <implementer>` | `phase:implement`, `turn:<implementer>` |
-| Blocker | `board.py post <issue> BLOCKED` | phase kept, `turn:dispatcher` |
-| Dispatcher message | `prompt_agent` | unchanged |
-| Dispatcher handoff or repair | `prompt_agent` with `phase` | `phase:<phase>`, `turn:<entry>` |
-| Retirement | `team.py stop` | both removed |
-
-A command writes the labels before it sends its prompt. A failed label write on a
-handoff sends nothing. A BLOCKED post always notifies the dispatcher, naming any label
-error. A command adds the new labels before it removes the old ones, and nothing locks
-the issue: a failed write or two commands at once can leave two of one prefix. That is
-a reported contradiction, not a prevented one.
-
-Helpers act on their explicit assignment without owning the turn: an additional reviewer
-notified of a head, an architect assigned a QUESTION, a critic named in a spec. A label is
-an assignment, not evidence that a prompt arrived, a check passed or an agent runs. Your
-role file, [Merge](#merge), question holds and the failed-check procedure still govern
-what the owner may do.
-
-After a restart, read the issue's labels first (`board.py read <issue>` prints them).
-With `turn:<you>`, act under those rules. Otherwise act only on an explicit assignment
-addressed to you; else end your turn. Report `blocked` for a contradiction between the
-labels and GitHub only in these cases, and do not resolve it yourself:
-
-- A repair handoff names a closed PR.
-- A `phase:` or `turn:` label is missing, or there are two of one prefix. A brief started
-  before the labels existed has none.
-- The `turn:` value is neither `dispatcher` nor an entry explicitly assigned on this
-  issue: the brief's roster, its `UX:` entry, the spec's lead or critics, or a QUESTION
-  assignment.
-
-The dispatcher repairs the labels with the handoff form of `prompt_agent`.
+On restart, read the brief and its labels (`board.py read <issue>` prints them). Act
+when `turn:<you>` or an explicit assignment authorizes the work; otherwise end your
+turn. Report `blocked`, and do not repair it yourself, for a repair handoff that names a
+closed PR, a missing or duplicate `phase:` or `turn:` label, or a `turn:` owner not
+assigned on the issue. The dispatcher repairs labels.
 
 ## UX design team
 
@@ -345,7 +313,7 @@ put the review decision there. Put `<entry>, <session>` on the second line. Reco
 initial findings before reading the PR body or another review. Resolve a thread only if
 you opened it. A new head invalidates every LGTM. Review changes since your last actual
 review; a first review covers the full relevant change and affected contracts, and a
-later head may use the [compact record](../skills/review-software-correctness/SKILL.md#review-record).
+later head may use the [compact record](../skills/review-software/SKILL.md#review-record).
 Earlier advice is not a review.
 
 The default tester assesses correctness and design in one investigation and record.
@@ -409,8 +377,8 @@ never settles a P0 or P1 condition.
 
 ### Optional P2 findings
 
-By the user's decision on 2026-10-20 ([#515](https://github.com/chenghanlee/tips/issues/515)),
-PR P2 findings are optional. Design critiques before implementation keep their P2 rules.
+PR P2 findings are optional ([#515](https://github.com/chenghanlee/tips/issues/515)).
+Design critiques before implementation keep their P2 rules.
 
 - Put every P2 in an `Optional` part of the review body, not in an inline thread, with
   its `path:line`, consequence and proposed change. This holds in reviews with P0 or P1
@@ -422,9 +390,6 @@ PR P2 findings are optional. Design critiques before implementation keep their P
   [required rule](../skills/design-software/SKILL.md#required-rules) violation.
 - A reviewer may move its own open P2 thread into Optional and resolve the thread
   without the implementer's disposition.
-
-Lost guarantee: a PR P2 gets no guaranteed acknowledgment, rationale, fix or tracked
-deferral.
 
 ### Changed binding decisions
 
@@ -450,30 +415,26 @@ interpret issue comments as merge blockers.
 
 ### Merge
 
-During the [CI pause](../../agent/docs/github-ci-pause.md), first verify the PR's applicable
-local check evidence and independent correctness/design review at the current head.
-`observe` reads GitHub state and posts nothing; it does not verify local test logs. An
-empty required-check list is not proof that local checks ran. If a required-status rule
-still expects a paused job, report it to the user; do not bypass it or weaken other
-protections.
+During the [CI pause](../../agent/docs/checks.md#github-ci-pause), first verify the PR's
+applicable local check evidence and an independent review at the current head.
+`observe` reads GitHub state only; an empty required-check list is not proof that local
+checks ran. Report a required-status rule that still expects a paused job to the user.
 
-Merge-confirming tester: satisfy the applicable check policy, then merge only when `observe`
-reports the PR ready at the head: every reviewer in `Required reviews:` has an LGTM as its
-latest review of that head, every thread is resolved, any GitHub-required checks pass
-and GitHub reports it mergeable.
+Merge-confirming tester: merge only when `observe` reports the PR ready at the head:
+every reviewer in `Required reviews:` has an LGTM as its latest review of that head,
+every thread is resolved, any GitHub-required checks pass and GitHub reports it
+mergeable.
 
 ```sh
 agent/teams/pr_review.py observe <pr>
 gh pr merge <pr> --merge --match-head-commit <sha>
 ```
 
-If a check failed or `observe` reports a merge conflict, run
-`agent/teams/team.py turn <pr> <implementer entry>` to notify the implementer. If `observe`
-reports evidence unavailable (GitHub has not computed mergeability yet), run it once more
-in the same turn after about a minute; this is the one exception to the no-poll rule.
-If it is still unavailable, report `blocked` with the `observe` output; unavailable
-never counts as ready. If
-merge is refused for another reason, report `blocked` with the exact error.
+Return failed checks or a merge conflict to the implementer with
+`agent/teams/team.py turn <pr> <implementer entry>`. For unavailable mergeability, run
+`observe` once more after about a minute in the same turn; if still unavailable, report
+`blocked` with its output. Report any other refused merge with the exact error.
+Unavailable is never ready.
 
 After the merge closes the brief and deletes the branch, notify the dispatcher with `done`.
 
@@ -522,33 +483,9 @@ If a required check fails at the head, rerun only the failed tests, alone, at th
 
 ## Manual browser review
 
-Codex clients could not run Wallaby browser tests on macOS: the Codex sandbox killed
-the browser the test started and left a crash dialog
-([#432](https://github.com/chenghanlee/tips/issues/432)). Treat PhoenixTest Playwright
-tests the same until a run shows otherwise. They run on the implementer's Claude client; the tester inspects its record and records what it
-executed and what it only inspected. The exact `agent-browser open about:blank --session
-<name>`, `get url` and `close` sequence below succeeded from this machine's configured
-Codex client on 2026-10-14 (agent-browser 0.38.1, codex-cli 0.162.1). Codex manual
-review still needs the [browser setup](SETUP.md#browser-access-for-the-tester) and that
-preflight in the tester's own session.
-
-Clients launch with `MIX_ENV=test`. Wait for `mix test` to exit, then start the app on
-the same port:
-
-```sh
-MIX_ENV=dev unbuffer mix ecto.setup && MIX_ENV=dev PORT="$TIPS_TEST_PORT" unbuffer mix do assets.setup, assets.build, phx.server
-```
-
-Use `agent-browser` to test the app. Codex testers start each session with exactly this
-command, alone in its tool call, replacing only `<name>`:
-
-```sh
-agent-browser open about:blank --session <name>
-```
-
-Other forms of `agent-browser open` can start Chrome inside the Codex sandbox and fail
-with `Chrome exited early`. If `open` fails with that error or with `without writing DevToolsActivePort`, run `agent-browser close --session <name>`, then `agent-browser open about:blank --session <name>` again, then `agent-browser get url --session <name>`,
-each in its own tool call. The last command prints `about:blank`. If this recovery
-fails, keep the full error and follow the [browser setup diagnostics](SETUP.md#browser-access-for-the-tester). Do not disable Chrome's sandbox or
-use the user's browser profile. Read mail in `/dev/mailbox`. Stop the server before
-handing off.
+Browser tests (`test/tips_web/features`) run on the implementer's Claude client; a Codex
+tester inspects the recorded command, head and results instead
+([#432](https://github.com/chenghanlee/tips/issues/432)). Before a required manual
+browser scenario, read the [browser run procedure](SETUP.md#browser-run) and perform the
+preflight it names, each command in its own tool call. On failure, follow its recovery
+procedure; an unresolved failure is `blocked`.

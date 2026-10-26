@@ -1,73 +1,64 @@
 ---
-name: review-software-correctness
-description: Guides the correctness part of a tips PR review. The combined tester also applies review-software-design in the same investigation and review record.
+name: review-software
+description: Guides a tips PR review: correctness against the brief on every affected path, and the design of the change. The tester applies all of it. An additional reviewing architect applies Steps 1 and 2, the Design section and the record.
 ---
 
-# Review software correctness
+# Review software
 
-Verify that the change meets the brief on every affected path. Provide evidence for that
-conclusion.
+Verify that the change meets the brief on every affected path and that its design is
+the simplest that satisfies the contracts. Provide evidence for both conclusions.
 
 Scope limits:
 
-- Also apply [review-software-design](../review-software-design/SKILL.md). Reuse the
-  same affected-code investigation and review record; correctness does not replace
-  assessment of responsibility, dependencies, state ownership or test value.
 - Ask for a test only for a scenario, or for an existing contract the affected code
-  reaches that no surviving test proves (step 5).
-- Deferrals follow the [severity rule](../../teams/README.md#severity).
+  reaches that no surviving test proves (Step 5).
 - One pass. Report every P0 and P1. Report at most three P2 findings, the ones with the
   greatest consequence. Combine findings only when they share a cause and fix. Put P2s
   where [Optional P2 findings](../../teams/README.md#optional-p2-findings) says.
+  Deferrals follow the [severity rule](../../teams/README.md#severity); a shortcut the
+  brief did not accept is a P2 with a proposed deferral, not a demand for completeness.
+- For a local review with no PR, use the user's brief and the working tree, and report
+  in the form the user asked for. Do not publish a GitHub review.
+- Leave style to Credo and the formatter, and to Dialyzer on its
+  [schedule](../../docs/checks.md#dialyzer). Review conventions only where the change
+  violates its stack skill in AGENTS.md. Cite the skill. One finding per repeated pattern.
 
-The [tester role](../../teams/roles/tester.md) defines turns, handoff and the merge.
-[implement-software](../implement-software/SKILL.md) is the standard for contracts,
-state and failure. Follow this skill to inspect the code and run checks.
+The [tester role](../../teams/roles/tester.md) defines turns, handoff and the merge; the
+[architect role](../../teams/roles/architect.md) does for an additional reviewing
+architect. [implement-software](../implement-software/SKILL.md) is the standard for
+contracts, state and failure.
 
 ## Step 1: Inputs
 
 Collect, in this order:
 
-1. The brief: contracts, acceptance scenarios, decisions table.
+1. The brief: contracts, acceptance scenarios, decisions table; the spec's shared
+   contracts when the brief links one.
 2. The head SHA you review. Record it.
 3. The diff against the PR base.
 4. The existing tests for each changed module.
 
 Record your concerns as the [review record](../../teams/README.md#pr-review-record)
 says, then read the [PR body](../../teams/README.md#pr-body) and prior review threads.
-Verify the PR body's scenario table and affected code in steps 2
-and 3. Do not copy these claims as results. For a local review with no PR, use the
-user's brief and the working tree.
+Verify the PR body's scenario table, affected code and decisions in steps 2 and 3. Do
+not copy these claims as results.
 
 ## Step 2: Affected code
 
-Find everything the change can affect, not only the changed lines.
+Independently trace changed contracts, shared fixtures and config through their callers
+to entry points, or to a caller whose handling of the change you have read and that
+still satisfies its own contract. Follow the
+[navigation rules](../../../agent/docs/elixir-navigation.md); investigate every use that
+only one lookup found. An unchanged signature is not a stopping point. For each entry
+point reached, check the resulting state and side effects. Do not revisit a checked
+path. For evidence across several files, follow the
+[Lookup subagents](../../docs/lookup-subagents.md) rule; you remain responsible for
+tracing and verifying the affected contract.
 
-1. List each changed public function, schema, changeset, query, migration, config key,
-   PubSub topic, Oban queue or worker, shared test fixture and shared component.
-2. For each item, find its users with Dexter `references` and scoped `rg`, as the
-   [navigation rules](../../../agent/docs/elixir-navigation.md) say. Investigate every user
-   that only one of them found. For evidence across several files, follow the
-   [Lookup subagents](../../docs/lookup-subagents.md) rule; you remain responsible
-   for tracing and verifying the affected contract.
-3. Follow each user in turn. Stop at an entry point, or at a caller whose handling of
-   the change you have read and that still satisfies its own contract. Do not stop just
-   because a signature is unchanged. Keep a list of visited functions. Do not revisit a
-   function.
-4. Collect the entry points reached: LiveViews, controllers, channels, jobs, other
-   contexts.
-
-Include indirect effects:
-
-- A changeset change affects every form and context that uses it.
-- A migration affects every existing row.
-- A shared fixture or factory change affects every test that uses it.
-- A config change affects every environment that reads it.
-- A changed error tuple affects every caller that matches on it.
-- An added, cached, moved or removed fact affects each path that constructs, updates,
-  reads, resets or removes it, and each late callback
-  ([implement-software](../implement-software/SKILL.md#trace-the-affected-contract)).
-  Find them yourself before comparing with the PR body's list.
+An added, cached, moved or removed fact affects each path that constructs, updates,
+reads, resets or removes it, and each late callback
+([implement-software](../implement-software/SKILL.md#trace-the-affected-contract)).
+Find them yourself before comparing with the PR body's list.
 
 Then verify the PR body's `Affected code` list at the reviewed head. In the review body
 report only what you add, correct or dispute, and any material coverage limit; link the
@@ -99,7 +90,9 @@ Rules:
   such as setup, compilation or an unrelated crash.
 - A double may replace an external call. The production code responsible for the claim
   must still run.
-- Prove a scenario that names a user interaction in the browser. Follow [manual browser review](../../teams/README.md#manual-browser-review). Otherwise, mark it unproven.
+- Prove a scenario that names a user interaction in the browser. Follow
+  [manual browser review](../../teams/README.md#manual-browser-review). Otherwise, mark
+  it unproven.
 - Ask for another test only for a distinct required case no surviving test proves
   ([implement-software](../implement-software/SKILL.md#tests)).
 
@@ -115,9 +108,9 @@ join exposes a distinct consequential risk the first control does not cover.
 
 Before each run, name the plausible mistake, the behaviour it changes and the assertion
 expected to fail. Choose a mistake the PR body's controls do not already cover;
-reproducing a control is Step 3, not this check. A new or existing test counts when it exercises the responsible
-production path and detects that behaviour; neither the test's age nor whether the
-mutant deletes a line decides validity.
+reproducing a control is Step 3, not this check. A new or existing test counts when it
+exercises the responsible production path and detects that behaviour; neither the
+test's age nor whether the mutant deletes a line decides validity.
 
 For each control:
 
@@ -170,7 +163,7 @@ Probes, by change type:
 Run the [required checks](../../../agent/docs/checks.md) for the kinds of files the PR
 changed, in your own database and port. For the full application suite, follow the
 [substitution](../../../agent/docs/checks.md#application-suite-substitution); for local
-evidence during the CI pause, follow the [policy](../../../agent/docs/github-ci-pause.md).
+evidence during the CI pause, follow the [policy](../../../agent/docs/checks.md#github-ci-pause).
 Run any further check your investigation needs.
 
 Report each applicable check once: run by you, verified from the implementer's record,
@@ -178,6 +171,45 @@ or missing with its reason or an authorized waiver. Quote only the failing lines
 failing or flaky test, follow the
 [failed-check procedure](../../teams/README.md#report-and-resolve-blockers). Do not
 report a skipped CI check as passed.
+
+## Design
+
+Check the affected design against the brief's contracts and accepted decisions: each
+contract has one implementation at its stated place, or the PR body says where it moved
+and why; each accepted shortcut matches its decision row, and its failure is detected.
+Assess responsibility, dependencies and state ownership. Apply design-software's
+[required rules](../design-software/SKILL.md#required-rules); a violation is P1 with the
+rule and `path:line`. Internal layout may change under
+[Design during delivery](../implement-software/SKILL.md#design-during-delivery); check
+the stated benefit and the preserved contracts, and do not demand a new design approval
+for a bounded repair. Propose a simpler mechanism only with its present benefit and
+costs, including who takes on displaced work; do not infer simplicity from fewer lines.
+Report a code or architecture smell only when it costs now: harder to change or test, a
+fact with two writers, or a hidden failure path. Preserve required behaviour and
+justified distinct test coverage; an added test with no scenario, affected contract or
+justified regression is P2. Apply the
+[performance principles](../design-software/SKILL.md#performance-principles) when the
+change adds or alters work, waiting, memory or storage; a finding names the operation,
+the workload, the consequence and the change. Other design findings use the
+[severity table](../../teams/README.md#severity), within the combined P2 limit.
+
+For changed pages, forms or components, apply
+[web-design-guidelines](../web-design-guidelines/SKILL.md) to the affected templates,
+CSS and JS within this review. Pin the rules: resolve the commit with
+`gh api repos/vercel-labs/web-interface-guidelines/commits/main --jq .sha`, fetch
+`https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/<sha>/command.md`
+(`curl` on a Codex client) and record the SHA in the review. This replaces the vendored
+skill's fetch from `main`, its file prompt and its output format. When the brief names
+an approved candidate (`design/<brief>/` at the approved SHA), compare the implemented
+states with its images at the viewports and states `candidate.md` names, with the
+authoritative copy and the disclosed differences: hierarchy, grouping, copy, controls
+and agreed behaviour. P0 where the table requires it; P1 when an approved constraint
+fails or is unproven, or the change significantly harms the user's experience; other
+differences are P2.
+
+An additional reviewing architect applies Steps 1 and 2, this section and the record;
+the tester remains responsible for scenarios, checks and the merge. Reuse shared
+evidence, not duplicate passes.
 
 ## Proof standard
 

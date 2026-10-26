@@ -1,6 +1,6 @@
 ---
 name: implement-software
-description: Guides implementing a brief for the Tips application and its agent harness (agent/teams). Covers the MVP scope, code rules, state and failure, data changes, tests, deferrals and when to stop. Code reviews use review-software-correctness and review-software-design, which link to this skill's contract and failure sections.
+description: Guides implementing a brief for the Tips application and its agent harness (agent/teams). Covers design during delivery, code rules, state and failure, data changes, tests, deferrals and when to stop. Code reviews use review-software, which links to this skill's contract and failure sections.
 ---
 
 # Implement software
@@ -11,101 +11,52 @@ structure and evidence proportionate to the contracts and uncertainty.
 and checks. [design-software](../design-software/SKILL.md#required-rules) defines the
 architecture rules. Follow this skill to write code and tests.
 
-## MVP scope
-
-Build the Tips application and its agent harness (`agent/teams`) as an MVP to test
-product demand. Ship the simplest sufficient working change. Preserve the agreed outcome and constraints; missing product requirements go
-to the user through the dispatcher. Maintain the brief's source-derived technical
-detail without inventing scope.
-
-Classify each choice before you make it:
-
-- Cheap to reverse: code, config, queries, jobs, module layout. Make the choice and
-  implement it. Explain it in the PR if a reviewer could ask why.
-- Expensive to reverse: schema, stored data, public URLs, provider contracts, new hex
-  dependencies. Follow the agreed contract. An unresolved consequential choice goes
-  through the [architect route](../../teams/roles/dispatcher.md#decisions-during-implementation).
-  Continue unaffected work; do not guess at the missing decision.
-
 ## Design during delivery
 
-The implementer owns the coherent working change. Repair a structural problem in the
-affected flow when its explainable present benefit to understanding, maintenance,
-change, extension, reuse or verification justifies the work. Include necessary modules,
-callers and tests. A failing scenario, prewritten refactor instruction, second caller
-or smaller diff is not required. A cosmetic extraction is not required either.
+Build Tips and its harness as an MVP: ship the simplest sufficient working change. Read
+the brief, the stack skills AGENTS.md names for the files you change, the affected
+source and its callers ([navigation rules](../../../agent/docs/elixir-navigation.md)),
+and the existing tests. Fill source-derived gaps without adding product scope; product
+questions go to the user through the dispatcher.
 
-Choose clear responsibilities, dependencies and ownership of state. Use small coherent
-steps and prompt feedback; keep structural and behavioral effects distinguishable.
-Separate commits or PRs when the review or verification benefit justifies the extra
-coordination, not automatically. Keep observable behavior unless an authorized decision
-changes it. Close the relevant evidence gap before trusting a preservation claim.
-
-Internal placement is not frozen scope. Shared/public contracts, persistent or recovery
-meaning, authority boundaries, expensive commitments and active ownership still bind.
-When new facts invalidate one, raise the specific decision and evidence through the
-workflow; only dependent work waits. Reversible exploration can establish missing facts.
-Use existing PR Decisions/Affected code for consequential choices, not a smell inventory.
-
-## Scope
-
-Start with these sources, then follow the affected flow as needed:
-
-1. The brief: outcome, contracts, scenarios, decisions table, restrictions.
-2. The stack skills AGENTS.md names for the files you will change.
-3. Each `path:line` the brief names and its callers, found with the [navigation rules](../../../agent/docs/elixir-navigation.md).
-4. The existing tests for the changed modules.
-
-Inspect necessary callers and existing mechanisms rather than treating the initial path
-list as complete. Fill source-derived gaps in the brief; route unresolved requirements
-or consequential decisions through the workflow and continue independent work.
-
-Binding decisions change through their decision owner, not silently in code. Deferrals
-follow the [severity rule](../../teams/README.md#severity). Do not add unagreed product
-capabilities.
+Make reversible internal choices yourself (code, config, queries, jobs, module layout),
+including structural repairs in the affected flow when their present benefit to
+understanding, change or verification justifies the work; a failing test or a second
+caller is not required, and neither is a cosmetic extraction. Keep observable behaviour
+and verify that it is preserved. Internal placement may change; public or shared
+contracts, persistent or recovery meaning, authority boundaries and active ownership
+remain binding. Follow settled decisions for expensive changes (schema, stored data,
+public URLs, provider contracts, dependencies); route only an unresolved consequential
+decision through the
+[architect route](../../teams/roles/dispatcher.md#decisions-during-implementation), and
+continue unaffected work while it is pending. Record consequential choices in the PR
+body's Decisions, not in a separate design inventory. Deferrals follow the
+[severity rule](../../teams/README.md#severity).
 
 ## Code rules
 
-Apply these rules in every change. Use the examples to identify violations.
+The stack skills carry the language and framework conventions. These are project
+policy:
 
-- Pattern-match on the expected data format. Let an unexpected format fail at the
-  boundary. Problem example: `nil` checks on every step of a function.
-- Use one set of error results per context: `{:ok, value}` and `{:error, reason}` with a
-  fixed set of reasons. Use `with` for operations with several steps that can fail.
-  Problem example: a function that returns `nil`, `false` and `{:error, _}` for
-  different failures.
-- Parse untrusted input at the entry point (LiveView event, controller action, channel
-  handler, job args) with existing parsers or changesets. Check caller admission and
-  enforce domain rules in context operations on each call, following the admission
-  contract when the design docs define one.
-  For writes, recheck eligibility under the required locks and keep it valid through
-  commit. Keep authentication and access checks at web entry points. Do not use UI
-  feedback as authorization. Keep query filters, database constraints and guarded
-  writes. Add a repeated check only for a distinct trust boundary or state that may have
-  changed. Problem example: the same check in the LiveView, the context and the query
-  with no reason.
-- Call context functions from LiveViews and controllers. Do not call `Repo` from them.
-  Problem example: a query inside a `handle_event`.
-- Assign one module to write each fact. Find the other copies of a rule, limit, enum or
-  label before changing it: constraints, migrations, helper text, fixtures, docs. Update
-  each one. Problem example: two modules that update the same column.
-- Name a function for its operation and side effects. Use arguments to identify the
-  inputs. Do not add options that change behaviour. Problem example: an `opts` list with
-  five keys.
-- Keep responsibilities and dependencies understandable at the call site. Split a
-  function or module when that improves the affected design, not to meet a line count.
+- Parse untrusted input at the entry point with existing parsers or changesets. Check
+  caller admission and enforce domain rules in context operations on each call; for a
+  write, recheck eligibility under the required locks through commit. Authentication
+  and access checks stay at web entry points; UI feedback is not authorization. Add a
+  repeated check only for a distinct trust boundary or state that may have changed.
+- Call context functions from LiveViews and controllers, not `Repo`.
+- One module writes each fact. Before changing a rule, limit, enum or label, find and
+  update every copy: constraints, migrations, helper text, fixtures, docs.
+- Use Ecto's query, changeset and migration DSLs; raw SQL or `fragment` only for what
+  they cannot express, with runtime values bound as parameters. Do not add options that
+  change behaviour.
 - Use existing modules, Ecto, Oban and Phoenix features before creating your own. State
-  in the PR what present benefit justifies a new process, cache, GenServer,
-  scheduler or abstraction. A present structural benefit can justify a helper with one
-  caller; a wrapper that merely repeats a dependency's API does not establish a benefit.
-- Use Ecto's query, changeset and migration DSLs. Use raw SQL or `fragment` only for
-  what they cannot express. Bind runtime values as parameters.
+  in the PR the present benefit of a new process, cache, GenServer, scheduler or
+  abstraction; a wrapper that repeats a dependency's API has none.
 - When you rely on a dependency's behaviour, check it at the installed version and link
-  the source in the PR. A similar name does not prove the same behaviour.
+  the source in the PR.
 
-Use Credo and the formatter for style checks; Dialyzer runs as
-[checks](../../docs/checks.md#dialyzer) says. Follow the stack skills for language and
-framework conventions.
+Use Credo and the formatter for style; Dialyzer runs as
+[checks](../../docs/checks.md#dialyzer) says.
 
 ## Report failures
 
@@ -252,50 +203,29 @@ Rules:
 
 ## Performance
 
-Trigger: the change adds or alters work, waiting, memory or storage, including an
-existing operation.
-
-Apply the [performance principles](../design-software/SKILL.md#performance-principles)
-at the expected MVP workload. Link the brief's relevant limits and assumptions.
-Record new evidence and any implementation trade-off or discovery that affects the
-design in the PR body. If it changes an agreed contract, obtain the decision through
-the architect route and incorporate the linked answer before resuming affected work.
-
-Measure only when a limit is stated or the cost could change the design. Before
-measuring, read [performance measurement](references/performance-measurement.md).
-Support a performance claim with the operation, the workload and the code, contract
-or measurement evidence. Say whether a number is an estimate or a measurement.
+When the change adds or alters work, waiting, memory or storage, apply the
+[performance principles](../design-software/SKILL.md#performance-principles) at the
+expected workload. Measure when a stated limit, or a cost that could change the design,
+needs evidence ([how](references/performance-measurement.md)); label estimates as such.
+Record consequential findings in the PR body and route a change to a binding decision
+through the architect route.
 
 ## Deferrals
 
-For unrelated improvements or wider work whose cost is not justified in this delivery:
-
-- Keep it out of the current PR. Bounded repairs in the affected flow follow
-  [Design during delivery](#design-during-delivery), not this exclusion.
-- Put it in one follow-up issue for this PR: the problem, the `path:line`, the trigger
-  that makes it worth fixing. Link the issue from the PR body.
-- If it breaks a scenario or a required rule, post a blocker instead.
+Put unrelated or unjustified work in one linked follow-up issue: the problem, the
+`path:line`, the trigger that makes it worth fixing. This does not defer a P0 or P1 and
+does not exclude a justified repair in the affected flow.
 
 ## Bug fixes
 
-When a result contradicts the brief, or a review finding shows a defect: find the failed
-assumption before adding a condition. Check the other sites that share the assumption
-and fix them in the same PR. When the fix changes how a fact is stored, list its paths
-as [Trace the affected contract](#trace-the-affected-contract) says. Verify the whole
-contract, not only the reported case.
-
-Structural repairs follow [Design during delivery](#design-during-delivery); a passing
-scenario does not rule out a worthwhile repair. Stop when the affected problem is resolved.
+Find the failed assumption and fix every affected site that shares it. Verify the whole
+contract, not only the reported case; for changed state, follow
+[Trace the affected contract](#trace-the-affected-contract).
 
 ## Finish
 
-Finish only when every scenario has a test. Confirm the tests and the [required checks](../../../agent/docs/checks.md) pass.
-
-- Inspect the diff for required behavior and coherent structure. Remove additions
-  whose benefit does not justify their cost; retain justified repairs even when the
-  scenarios passed before them.
-- Delete superseded code, tests and docs in the same PR.
-- Update affected contract and usage docs so they describe the resulting behavior.
-- Fill the [PR body](../../teams/README.md#pr-body): outcome, scenario table, affected
-  code, decisions, follow-up issue, checks not run by CI.
-- Hand off through the [pair workflow](../../teams/README.md).
+Prove the required scenarios and pass the [required checks](../../../agent/docs/checks.md).
+Remove superseded code, tests and docs; update affected contract and usage docs; keep
+only changes whose benefit justifies their cost. Fill the
+[PR body](../../teams/README.md#pr-body) and hand off through the
+[pair workflow](../../teams/README.md).
