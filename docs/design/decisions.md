@@ -53,8 +53,8 @@ design docs; link them instead of repeating them.
   `design/<brief>/` on `task/<brief>`. The user approves by SHA with
   `APPROVED candidate <SHA>`; `team.py start` refuses the pair without it. Why: generated
   images are cheaper than HTML prototypes for proposing layout and hierarchy; the design
-  system renders the components. Records: the principles and mechanics chavruta files in
-  `docs/brainstorm/`.
+  system renders the components. Records: the UX chavruta files at
+  [ab8f43f](https://github.com/chenghanlee/tips/tree/ab8f43f/docs/brainstorm).
 - Story order: story 1, then a design-system story (style pack, tokens, usage notes,
   sync trial against the real form), then feature design stories. Each designs only the
   next slice.

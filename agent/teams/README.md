@@ -251,10 +251,8 @@ entry) and `Graphic designers: <entry>, ...` (one or more `graphic-designer` ent
 The lead architect writes them as [design-software Step 5](../skills/design-software/SKILL.md#step-5-briefs)
 says; the dispatcher writes them when it creates a brief. Nobody can edit an issue body
 from the dispatcher's tools, so a brief that lacks them goes back to the user with the
-exact lines to add. The principles behind this team are in
-[docs/brainstorm/ux-agent-principles-chavruta.md](../../docs/brainstorm/ux-agent-principles-chavruta.md)
-and the mechanics in
-[docs/brainstorm/ux-agent-mechanics-chavruta.md](../../docs/brainstorm/ux-agent-mechanics-chavruta.md).
+exact lines to add. The principles and mechanics behind this team are recorded in the
+UX chavruta files at [ab8f43f](https://github.com/chenghanlee/tips/tree/ab8f43f/docs/brainstorm).
 
 1. Once the brief meets the release conditions except approval, the dispatcher runs
    `team.py design <brief> <entry>` for the UX entry, then for each graphic entry, and
