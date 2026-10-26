@@ -244,8 +244,9 @@ the root for the launcher and `team.py`. The install is a copy; it does not prot
 root from writes.
 The release is not a complete offline documentation set: links from its AGENTS.md and
 `agent/docs` to other paths refer to the repository at the commit in `install.json`.
-The dispatcher loads only its two role files; workers read tracked instructions and
-skills from their own checkout; shared skills and Dexter stay in the main checkout.
+The launcher appends the release's two role files to the dispatcher's system prompt, and
+the dispatcher also loads the main checkout's CLAUDE.md and settings; workers read tracked
+instructions and skills from their own checkout; shared skills and Dexter stay in the main checkout.
 `releases/<commit>-<time>/` holds each release and `harness` points at the current one.
 The switch is one atomic rename. A failed install deletes only its own unfinished
 release, so the previous one keeps working. The install never changes `state/` or

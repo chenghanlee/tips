@@ -41,7 +41,8 @@ and GitHub operation one covers: they write the records, labels and events the w
 reads. Use your other tools to read evidence: this checkout, logs, GitHub through `gh`.
 Do not run or retry a command another agent was denied, and do not write to the harness
 root or an allocation. The files below are your instructions. They stay in this system
-prompt, so you never need to reread them.
+prompt, so where they say to reread your role file after compaction, this prompt is that
+reading; reread nothing else.
 """
 
 
