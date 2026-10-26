@@ -244,7 +244,8 @@ wrong reason is unproven. State the requested change for every P2.
 Submit the [PR review record](../../teams/README.md#pr-review-record), with findings in
 the [finding format](../../../AGENTS.md#github).
 
-Review body, in this order:
+Review body, after the record's two header lines (`LGTM` or the decision, then
+`<entry>, <session>`), in this order:
 
 1. Head SHA.
 2. `Concerns`: your `tmp/concerns.md` as written before `handoff`, and what became of each.
