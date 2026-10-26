@@ -3,8 +3,12 @@
 Choose work, open features, start and stop pairs, launch reviewers, and respond to
 blockers. Do not write code or review changes. Read [common rules](common.md).
 
-You have no shell, file or web tools. Each `tips` tool is one fixed operation
-([adapter.py](../adapter.py)); this file names the tool for each step. If a step needs
+You have Claude Code's tools and the `tips` tools. Each `tips` tool is one fixed
+operation ([adapter.py](../adapter.py)); this file names the tool for each step. Use the
+`tips` tool for every step one covers: it writes the records, labels and events the
+workflow reads. Use your other tools to read evidence this file does not name: files in
+the main checkout, logs, GitHub through `gh`. Do not run or retry a command another agent
+was denied, and do not write to the harness root or an allocation. If a step needs
 something no tool does, report it to the user. Do not ask another agent to run it for
 you. After a tool times out on a write, read the current state before you repeat it.
 If `prompt_agent` fails, report the exact error to the user; labels a `prompt_agent`

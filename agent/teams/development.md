@@ -55,7 +55,7 @@ Run these additional tests for the listed changes:
 |---|---|---|
 | Non-Markdown `agent/teams/` changes | Real-daemon tests (`-k real_daemons`), with `TIPS_TEST_REAL_DEXTER` and `DEXTER_ELIXIR_LIB_ROOT` set. Follow the [Dexter verification scope](../lsp/README.md#verification-scope). | Check the selected binary's identity, run locally and record the result. Harness-only changes do not require Dexter's internal Go or build-script suite. |
 | Codex launch arguments | Installed-Codex tests, with `TIPS_TEST_REAL_CODEX=1`. | Run locally and record the result on the PR. CI has no Codex client. |
-| Dispatcher launch arguments or adapter tools | The real restricted client with the launcher's arguments against a disposable copy, fake `gh` and a refusing fake `herdr`: it lists only the adapter tools and a read tool works. | Run locally and record the transcript summary on the PR. CI has no Claude client. |
+| Dispatcher launch arguments or adapter tools | The real client with the launcher's arguments against a disposable copy, fake `gh` and a refusing fake `herdr`: it lists the adapter tools beside its built-in tools and a `status` call works. | Run locally and record the transcript summary on the PR. CI has no Claude client. |
 
 ### Other local analyzers
 

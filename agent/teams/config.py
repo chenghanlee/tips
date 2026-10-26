@@ -202,8 +202,8 @@ HEADER = re.compile(r"^(?P<type>[A-Z]+) (?P<role>\S+) (?P<name>\S+) (?P<session>
 class DispatcherLaunch(TypedDict):
     """The launched dispatcher client: its process id and start time, pane and session.
 
-    A restricted client reports no session to Herdr, so this record is its identity: the
-    launcher execs the client, which keeps the launcher's process id.
+    This record is the client's identity: the launcher execs the client, which keeps the
+    launcher's process id. Herdr learns the session later, through the client's hook.
     """
 
     pid: int

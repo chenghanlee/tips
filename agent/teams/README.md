@@ -2,8 +2,8 @@
 
 GitHub issues, PRs and reviews store the workflow state. Herdr messages start turns. One
 dispatcher chooses work, opens features, starts pairs and launches reviewers and
-architects. It has no shell or file tools: it acts only through the fixed operations of
-[adapter.py](adapter.py), which call the commands below. Every launched client gets its
+architects. It runs the workflow through the fixed operations of [adapter.py](adapter.py),
+which call the commands below, and reads evidence with Claude Code's own tools. Every launched client gets its
 own [allocation](#allocations) and its own clone of the repository; no two clients share
 a checkout. Follow
 [AGENTS.md](../../AGENTS.md) and the skill for your task:
@@ -95,7 +95,7 @@ the full log is in `logs/`. Each database name is `tips_test` or `tips_dev`, the
 `db_suffix_prefix`, the slot, `g`, the generation and the entry's `db_suffix`, so no
 generation reuses another's databases.
 
-**Accepted risk.** Workers retain broad authority. Mistakes, misleading instructions or deliberate actions can modify the harness, records or other allocations, and a worker can perform an operation the dispatcher asks for outside the dispatcher's tool surface. Restricted dispatcher tools remove its direct execution authority (RP8c direct retry prevented) but do not enforce a worker or deputy boundary; the no-proxy rule stays procedural. The sibling root reduces accidental edits from ordinary checkout operations; it does not prevent absolute-path writes. Shared-state corruption can defeat recovery assumptions or lose work. Accepted for this MVP. Revisit after an unauthorized cross-allocation or control-file write, or a delegated denial bypass, in normal use. E0's failures stay recorded as facts, not as passing tests.
+**Accepted risk.** Workers retain broad authority. Mistakes, misleading instructions or deliberate actions can modify the harness, records or other allocations, and the dispatcher has the same authority since the user's 2026-10-23 decision to give it Claude Code's tools back (the restricted launch of 2026-10-14, which prevented the RP8c direct retry, cost more in ask-backs than it protected). The no-proxy and no-retry rules are procedural for every agent. The sibling root reduces accidental edits from ordinary checkout operations; it does not prevent absolute-path writes. Shared-state corruption can defeat recovery assumptions or lose work. Accepted for this MVP. Revisit after an unauthorized cross-allocation or control-file write, or a denial retried or bypassed by the dispatcher itself or through another agent, in normal use. E0's failures stay recorded as facts, not as passing tests.
 
 ## Commands
 

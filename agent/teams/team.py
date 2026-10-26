@@ -1586,8 +1586,8 @@ def dispatcher_status(named: Entity | None) -> str:
 def status() -> None:
     """Print every allocation record with each client's live Herdr state and the dispatcher's.
 
-    The dispatcher has no file tools, so this also prints the capacity and the entries it
-    may name on a brief."""
+    Also prints the capacity and the entries the dispatcher may name on a brief, so one
+    read answers its roster questions."""
     agents = {a["pane_id"]: a for a in herdr("agent", "list")["agents"]}
     named = {a.get("name"): a for a in agents.values()}
     print(dispatcher_status(named.get("dispatcher")))

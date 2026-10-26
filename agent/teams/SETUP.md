@@ -160,14 +160,15 @@ permission flow. See [Claude auto-mode configuration](https://code.claude.com/do
 
 ## Start the dispatcher
 
-The launcher starts Claude in restricted mode with no built-in tools (`--restricted
---tools ""`) and one MCP server, [adapter.py](adapter.py), under `--strict-mcp-config`.
-The launcher sets the server, `--settings`, the session ID and the environment. User,
-project and local settings files, CLAUDE.md files, other MCP servers and Remote Control
-are not loaded. The dispatcher's system prompt is two role files, [common.md](roles/common.md)
-and [dispatcher.md](roles/dispatcher.md), read by the launcher before start.
+The launcher starts Claude with its built-in tools, the `launch.claude_permission_mode`
+of config.toml and one MCP server, [adapter.py](adapter.py), under `--strict-mcp-config`,
+so no other MCP server loads. The launcher sets the server, `--settings` (Remote Control
+off), the session ID and the environment. The dispatcher runs in the main checkout, so
+its CLAUDE.md and settings apply. Two role files, [common.md](roles/common.md) and
+[dispatcher.md](roles/dispatcher.md), are appended to its system prompt by the launcher
+before start.
 
-A restricted client reports no session to Herdr. The launcher execs the client, which
+The launcher execs the client, which
 keeps the launcher's process ID, so it records that ID, its start time, the pane and the
 session in `state/dispatcher.json` under the [harness root](#install-a-harness-release). When Herdr shows
 that process in the pane, ready for input, it names the pane `dispatcher` and sends the
@@ -243,8 +244,9 @@ the root for the launcher and `team.py`. The install is a copy; it does not prot
 root from writes.
 The release is not a complete offline documentation set: links from its AGENTS.md and
 `agent/docs` to other paths refer to the repository at the commit in `install.json`.
-The dispatcher loads only its two role files; workers read tracked instructions and
-skills from their own checkout; shared skills and Dexter stay in the main checkout.
+The launcher appends the release's two role files to the dispatcher's system prompt, and
+the dispatcher also loads the main checkout's CLAUDE.md and settings; workers read tracked
+instructions and skills from their own checkout; shared skills and Dexter stay in the main checkout.
 `releases/<commit>-<time>/` holds each release and `harness` points at the current one.
 The switch is one atomic rename. A failed install deletes only its own unfinished
 release, so the previous one keeps working. The install never changes `state/` or
