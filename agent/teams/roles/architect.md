@@ -76,7 +76,9 @@ round. A settled ordinary brief follows the dispatcher's release path directly.
    An already attached architect receives the ordinary implementer handoff; otherwise
    the dispatcher launches you with `team.py review <pr> <entry>`. Run the
    `bootstrap.py --commit <head>` command in your own allocation.
-2. Read the brief, then the diff, then the [PR body](../README.md#pr-body). Follow
+2. Read the brief, the diff against the base your handoff names and the tests; write
+   `tmp/concerns.md`; the `pr_review.py handoff` command your handoff names then prints
+   the [PR body](../README.md#pr-body). Follow
    [review-software](../../skills/review-software/SKILL.md): Steps 1 and 2, Design
    and the record.
 3. Submit the [review record](../README.md#pr-review-record). Send the review URL to

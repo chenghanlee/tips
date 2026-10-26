@@ -12,9 +12,11 @@ dirty clone and never resets one.
    [Report and resolve blockers](../README.md#report-and-resolve-blockers) and
    [Constraints](../README.md#constraints). Read the review record, PR body, browser and
    merge sections when a step links them.
-2. The brief, then the diff.
-3. [review-software](../../skills/review-software/SKILL.md), from your clone. It names
-   when to read the [PR body](../README.md#pr-body) and the review record format.
+2. The brief, then the diff against the base your handoff names, then the tests of the
+   changed modules. Your handoff withholds the PR until step 3 below.
+3. [review-software](../../skills/review-software/SKILL.md), from your clone. Its Step 1
+   is the concerns file and the `handoff` command that prints the
+   [PR body](../README.md#pr-body); it also gives the review record format.
 
 ## Steps
 
@@ -23,8 +25,11 @@ dirty clone and never resets one.
 2. Before your first required manual browser scenario, run the
    [browser preflight](../SETUP.md#browser-run) once in your own runtime. If it fails,
    report `blocked` with the exact error.
-3. Record the head SHA and your initial findings as the
-   [review record](../README.md#pr-review-record) says.
+3. Write the head SHA and your initial concerns to `tmp/concerns.md`; on a later head,
+   append the new head and the delta's concerns to it. Then run the
+   `pr_review.py handoff <head> tmp/concerns.md` command your handoff names. It prints
+   the PR, its body and prior reviews; `turn` and `observe` take the number it prints.
+   The [review record](../README.md#pr-review-record) repeats the concerns.
 4. Follow the skill with your own database and port: affected code, scenarios and
    their controls, mutation check, entry points, checks, design. For the full
    application suite, verify the implementer's record instead of rerunning it

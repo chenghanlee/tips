@@ -26,7 +26,7 @@ EVERY CLIENT bootstrap.py prepares its own clone before its first task
 IMPLEMENTER  ask questions only when answers affect the work → code → push → PR "Closes #<brief>" → team.py turn <pr> <tester>
              (notifies every required reviewer of the head; asks the dispatcher to launch missing ones)
 DISPATCHER   team.py review <pr> <entry> for each requested reviewer
-REVIEWERS    bootstrap.py --commit <head> → review correctness and design → notify tester if additional reviewer
+REVIEWERS    bootstrap.py --commit <head> → brief, diff, tests → tmp/concerns.md → pr_review.py handoff <head> tmp/concerns.md prints the PR → review → notify tester if additional reviewer
 TESTER       a review with a P0, P1 or hold → team.py turn <pr> <implementer>   (repeat until none)
 TESTER       pr_review.py observe <pr> reports ready → gh pr merge → "done"
 DISPATCHER   team.py stop <brief> → next
@@ -108,7 +108,7 @@ operator (the user) runs `reset` and `stop --abandon`.
 |---|---|---|
 | `agent/teams/team.py start <brief>` | Dispatcher | Read `Implementer:` and `Required reviews:`. For a brief with `UX:`, refuse unless a comment begins with `APPROVED candidate <SHA>` ([UX design team](#ux-design-team)). Label a new pair's brief ([Turns](#turns)). Create an allocation for the implementer (bootstrap branch `task/<brief>`) and the merge-confirming tester. Launch both in the team's workspace (see [Herdr layout](#herdr-layout)), write the record, and post one EVENT per launch on the brief. |
 | `agent/teams/team.py design <issue> <entry>` | Dispatcher | Launch a configured architect in its own allocation. A started brief reuses its team slot; otherwise create or join a spec team. The issue names the lead, any critics and the question or design assignment; a new spec team needs a `Lead: <entry>` line naming a configured architect and labels the spec ([Turns](#turns)). For a UX or graphic entry, launch it into the brief's [UX design team](#ux-design-team) instead; refused once the brief holds a pair. Post its launch EVENT on that issue. The adapter keeps the argument name `spec` for either issue number. |
-| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require your own clone to be clean at the PR head and the PR to close the brief. Read the PR's live state (see `observe`); refuse unless GitHub reports the head mergeable. Label the brief ([Turns](#turns)). Notify every launched required reviewer of the head and the `bootstrap.py --commit` command that moves its clone there. For each reviewer not launched, post a pending EVENT on the PR and ask the dispatcher to run its `review` command. Try every send; report each failed one. |
+| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require your own clone to be clean at the PR head and the PR to close the brief. Read the PR's live state (see `observe`); refuse unless GitHub reports the head mergeable. Label the brief ([Turns](#turns)). Notify every launched required reviewer of the head, its base and the `bootstrap.py --commit` command that moves its clone there; the PR itself waits for `pr_review.py handoff`. For each reviewer not launched, post a pending EVENT on the PR and ask the dispatcher to run its `review` command. Try every send; report each failed one. |
 | `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Read the PR's live state and label the brief ([Turns](#turns)). Notify the implementer with its merge conflict and failed required checks. Your clone's state does not block it. |
 | `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create its allocation, configured for the PR head, with its own database suffix and port, and launch the reviewer in the team's workspace. |
 | `agent/teams/team.py reset <issue> <entry>` | Operator | Record the operator's decision, after checking a stopped client's work on the issue and PR, that `start`, `design` or `review` may launch a replacement in the same allocation that gets the task again. Refuse a running client. |
@@ -122,6 +122,7 @@ operator (the user) runs `reset` and `stop --abandon`.
 | `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. A worker's BLOCKED post also sets `turn:dispatcher` and notifies the dispatcher, naming any label error; the command reports either failure, and a rerun retries both, not the post. |
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue's labels and body, then every comment; with `--after`, the labels and only the comments after that checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | Token counts by model for each client a launch EVENT names, read from its session logs. A Codex client's row sums every Codex session whose rollout started in its allocation directory, so a launch EVENT that says `unknown` still counts. |
+| `agent/teams/pr_review.py handoff <head> <concerns file>` | Reviewer | Refuse until the file names the head. Then find the one open PR at that head, refuse none or several, and print its URL, body, recent reviews and unresolved threads. Post nothing. |
 | `agent/teams/pr_review.py list <pr>` | Any agent | Recent reviews and every unresolved thread. Display only. |
 | `agent/teams/pr_review.py observe <pr>` | Launched client | Read the head, base, mergeability, checks and reviews within one `timeouts.github_seconds` deadline; refuse a read during which the head or base changed. Required checks are the contexts the base branch's effective rules require; a required check that has not reported blocks, and other checks are only shown. Post nothing. Judge only the current read: a merge conflict, unknown mergeability, unavailable evidence, a required check that has not passed, a missing or non-LGTM required review and an unresolved thread each block; an earlier failure that this read no longer shows does not. Exit 0 only when the PR can merge at this head. |
 | `agent/teams/pr_review.py resolve <thread>` | Thread opener | Resolve your own thread. |
@@ -309,8 +310,10 @@ gh api "repos/{owner}/{repo}/pulls/$PR/reviews" --input tmp/review.json --jq .ht
 
 Put `LGTM` alone on the first line of the body when no P0, P1 or decision hold remains
 and required verification is satisfied, even if the body lists Optional P2s. Otherwise
-put the review decision there. Put `<entry>, <session>` on the second line. Record your
-initial findings before reading the PR body or another review. Resolve a thread only if
+put the review decision there. Put `<entry>, <session>` on the second line. Write your
+initial concerns before the PR body or another review: `pr_review.py handoff` prints
+them only once `tmp/concerns.md` names the head, and the record repeats the concerns.
+Resolve a thread only if
 you opened it. A new head invalidates every LGTM. Review changes since your last actual
 review; a first review covers the full relevant change and affected contracts, and a
 later head may use the [compact record](../skills/review-software/SKILL.md#review-record).

@@ -123,7 +123,7 @@ class ObserveTest(FakeGhTest):
     def test_a_head_other_than_the_handed_off_one_is_refused(self) -> None:
         # turn read head 0...0 from the PR, then the PR moved before its state was read.
         expected = "0" * 40
-        pr = PullRequest("7", "https://github.com/o/r/pull/7", expected, ["29"])
+        pr = PullRequest("7", "https://github.com/o/r/pull/7", expected, ["29"], "main")
         moved = f"PR 7 moved from {expected} to {self.head}; nothing sent"
         with self.assertRaisesRegex(RuntimeError, re.escape(moved)):
             team.observe_pr(pr)
@@ -199,6 +199,99 @@ class ObserveCommandTest(Harness):
         passing = [check("checks", "pass", 2), check("release", "pass", 2)]
         self.update(reviews=reviews, checks=passing)
         assert f"ready to merge at {head}" in observe(ok=True).stdout
+
+
+class HandoffTest(FakeGhTest):
+    """handoff prints the PR only after the reviewer's own concerns name its head."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.concerns = Path(directory.name) / "concerns.md"
+        self.update(pr_body="## Outcome\nImplementer's account of the change.")
+
+    def handoff(self, head: str = HEAD) -> str:
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            pr_review.handoff(head, self.concerns)
+        return printed.getvalue()
+
+    def refused(self, head: str = HEAD) -> str:
+        with self.assertRaises(pr_review.RefusalError) as raised:
+            self.handoff(head)
+        return str(raised.exception)
+
+    def test_the_body_waits_for_a_concerns_file_that_names_the_head(self) -> None:
+        assert "write your concerns to" in self.refused()
+        assert "No such file" in self.refused()
+        self.concerns.write_text("")
+        assert f"does not name head {HEAD}" in self.refused()
+        self.concerns.write_text(f"head {'c' * 40}\n- old concern\n")
+        assert f"does not name head {HEAD}" in self.refused(), "a stale file is not consent"
+        self.concerns.write_text(f"head {HEAD[:7]}\n- a prefix is not the head\n")
+        assert f"does not name head {HEAD}" in self.refused()
+        self.concerns.write_text(f"head {HEAD[:7]}{'b' * 33}\n- shares a prefix\n")
+        assert f"does not name head {HEAD}" in self.refused()
+        assert not self.events("gh", "api"), "the PR was read before the concerns existed"
+        self.concerns.write_text(f"head {HEAD}\n- the diff drops the origin reset\n")
+        out = self.handoff()
+        assert out.startswith(f"PR https://github.com/o/r/pull/7 head {HEAD} base main\n")
+        assert "--- PR body ---\n## Outcome\nImplementer's account of the change.\n" in out
+        assert f"--- reviews ---\nhead {HEAD}\n" in out
+
+    def test_the_handed_off_head_must_be_the_one_open_pr_head(self) -> None:
+        self.concerns.write_text(f"head {HEAD}\n")
+        assert "not a full head SHA" in self.refused(HEAD[:7])
+        self.update(pr_head="0" * 40)
+        assert f"No open PR has head {HEAD}" in self.refused()
+        # A stacked PR contains the commit but is at another head: GitHub lists it too.
+        stacked = {
+            "number": 9,
+            "state": "open",
+            "html_url": "https://github.com/o/r/pull/9",
+            "head": {"sha": "9" * 40},
+            "base": {"ref": "main"},
+            "body": "",
+        }
+        self.update(pr_head=HEAD, pulls=[stacked])
+        assert self.handoff().startswith("PR https://github.com/o/r/pull/7 "), "stacked PR ignored"
+        other = {
+            "number": 8,
+            "state": "open",
+            "html_url": "https://github.com/o/r/pull/8",
+            "head": {"sha": HEAD},
+            "base": {"ref": "main"},
+            "body": "",
+        }
+        self.update(pulls=[other, stacked])
+        assert f"PRs 7, 8 share head {HEAD}" in self.refused()
+        self.update(pulls=[{**other, "state": "closed"}])
+        assert "pull/7" in self.handoff(), "a closed PR at the head does not count"
+        self.update(pulls=[{**other, "number": n} for n in range(8, 107)])
+        assert "100 or more PRs; read incomplete" in self.refused()
+
+    def test_a_head_pushed_after_the_lookup_is_refused_not_mixed_in(self) -> None:
+        self.concerns.write_text(f"head {HEAD}\n")
+        moved = "d" * 40
+        original = pr_review.pulls_at
+
+        def lookup_then_push(head: str, deadline: float) -> list[dict[str, Any]]:
+            pulls = original(head, deadline)
+            self.update(pr_head=moved)
+            return pulls
+
+        with mock.patch.object(pr_review, "pulls_at", lookup_then_push):
+            message = self.refused()
+        assert f"PR 7 moved to {moved} since the lookup" in message
+
+    def test_it_shows_the_recent_reviews_and_threads_after_the_body(self) -> None:
+        self.concerns.write_text(f"{HEAD}\n")
+        self.update(reviews=[review("critic", HEAD, "Findings: P1 lost write")])
+        out = self.handoff()
+        assert (
+            out.index("--- PR body ---") < out.index("--- reviews ---") < out.index("P1 lost write")
+        )
 
 
 class ListTest(FakeGhTest):

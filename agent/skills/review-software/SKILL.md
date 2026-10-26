@@ -30,18 +30,24 @@ contracts, state and failure.
 
 ## Step 1: Inputs
 
-Collect, in this order:
+Your handoff names the head and its base, not the PR. Read, in this order:
 
 1. The brief: contracts, acceptance scenarios, decisions table; the spec's shared
-   contracts when the brief links one.
-2. The head SHA you review. Record it.
-3. The diff against the PR base.
-4. The existing tests for each changed module.
+   contracts when the brief links one. If the brief is missing or incomplete, report
+   `blocked`; the PR body is not a substitute.
+2. The diff: `git diff origin/<base>...HEAD` in your clone at the head.
+3. The existing tests for each changed module.
 
-Record your concerns as the [review record](../../teams/README.md#pr-review-record)
-says, then read the [PR body](../../teams/README.md#pr-body) and prior review threads.
-Verify the PR body's scenario table, affected code and decisions in steps 2 and 3. Do
-not copy these claims as results.
+Write `tmp/concerns.md`: the head SHA, then the plausible mistakes this change could
+make and the check that would tell each one apart, with the brief line or contract that
+gives the expected result. "No specific concern" is valid. These are hypotheses to revise,
+not a test plan. On a later head of the same PR, append the new head and your concerns
+about the delta to the same file. Then run
+`python3 <harness>/pr_review.py handoff <head> tmp/concerns.md`;
+it refuses until the file names the head, and then prints the PR, its
+[body](../../teams/README.md#pr-body) and prior review threads. Verify the body's
+scenario table, affected code and decisions in steps 2 and 3. Do not copy its claims as
+results.
 
 ## Step 2: Affected code
 
@@ -237,16 +243,17 @@ the [finding format](../../../AGENTS.md#github).
 Review body, in this order:
 
 1. Head SHA.
-2. `Affected code`: what you add to, correct or dispute in the PR body's list, or "none".
-3. `Scenarios`: the table from step 3.
-4. `Mutation`: what you broke and whether the test failed, and each control you
+2. `Concerns`: your `tmp/concerns.md` as written before `handoff`, and what became of each.
+3. `Affected code`: what you add to, correct or dispute in the PR body's list, or "none".
+4. `Scenarios`: the table from step 3.
+5. `Mutation`: what you broke and whether the test failed, and each control you
    reproduced.
-5. `Checks`: each applicable check as run, verified from the record, or missing with its
+6. `Checks`: each applicable check as run, verified from the record, or missing with its
    reason or [waiver](../../teams/roles/common.md#authority); limitations that qualify
    a proof. Omit inapplicable categories.
-6. Design assessment and consequential tradeoffs from the shared investigation; no
+7. Design assessment and consequential tradeoffs from the shared investigation; no
    generic declaration is needed.
-7. Findings outside the diff, each with `path:line`, and `Optional` P2 findings. Omit
+8. Findings outside the diff, each with `path:line`, and `Optional` P2 findings. Omit
    either heading when it has none.
 
 "No findings" is valid when every scenario is proven and every step above is recorded.
