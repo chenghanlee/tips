@@ -226,11 +226,15 @@ class HandoffTest(FakeGhTest):
         assert "write your concerns to" in self.refused()
         assert "No such file" in self.refused()
         self.concerns.write_text("")
-        assert f"does not name head {HEAD[:7]}" in self.refused()
+        assert f"does not name head {HEAD}" in self.refused()
         self.concerns.write_text(f"head {'c' * 40}\n- old concern\n")
-        assert f"does not name head {HEAD[:7]}" in self.refused(), "a stale file is not consent"
+        assert f"does not name head {HEAD}" in self.refused(), "a stale file is not consent"
+        self.concerns.write_text(f"head {HEAD[:7]}\n- a prefix is not the head\n")
+        assert f"does not name head {HEAD}" in self.refused()
+        self.concerns.write_text(f"head {HEAD[:7]}{'b' * 33}\n- shares a prefix\n")
+        assert f"does not name head {HEAD}" in self.refused()
         assert not self.events("gh", "api"), "the PR was read before the concerns existed"
-        self.concerns.write_text(f"head {HEAD[:7]}\n- the diff drops the origin reset\n")
+        self.concerns.write_text(f"head {HEAD}\n- the diff drops the origin reset\n")
         out = self.handoff()
         assert out.startswith(f"PR https://github.com/o/r/pull/7 head {HEAD} base main\n")
         assert "--- PR body ---\n## Outcome\nImplementer's account of the change.\n" in out
@@ -253,6 +257,22 @@ class HandoffTest(FakeGhTest):
         assert f"PRs 7, 8 share head {HEAD}" in self.refused()
         self.update(pulls=[{**other, "state": "closed"}])
         assert "pull/7" in self.handoff(), "a closed PR at the head does not count"
+        self.update(pulls=[{**other, "number": n} for n in range(8, 107)])
+        assert "100 or more PRs; read incomplete" in self.refused()
+
+    def test_a_head_pushed_after_the_lookup_is_refused_not_mixed_in(self) -> None:
+        self.concerns.write_text(f"head {HEAD}\n")
+        moved = "d" * 40
+        original = pr_review.pulls_at
+
+        def lookup_then_push(head: str, deadline: float) -> list[dict[str, Any]]:
+            pulls = original(head, deadline)
+            self.update(pr_head=moved)
+            return pulls
+
+        with mock.patch.object(pr_review, "pulls_at", lookup_then_push):
+            message = self.refused()
+        assert f"PR 7 moved to {moved} since the lookup" in message
 
     def test_it_shows_the_recent_reviews_and_threads_after_the_body(self) -> None:
         self.concerns.write_text(f"{HEAD}\n")

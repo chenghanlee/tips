@@ -148,7 +148,11 @@ def show_thread(thread: Any, owners: dict[str, str]) -> None:
 
 def show(number: int, every_head: bool) -> None:
     """Display recent reviews and every unresolved thread from one read_state."""
-    state = read_state(number)
+    render(read_state(number), every_head)
+
+
+def render(state: PrState, every_head: bool) -> None:
+    """Display one read's recent reviews and every unresolved thread."""
     if state.threads is None:
         raise RefusalError("; ".join(state.unavailable))
     reviews = [
@@ -174,6 +178,8 @@ def pulls_at(head: str, deadline: float) -> list[dict[str, Any]]:
     label = f"PRs at {head[:7]}"
     path = f"repos/{repository()}/commits/{head}/pulls?per_page=100"
     pulls = object_list(json.loads(github(["gh", "api", path], deadline, label)), label)
+    if len(pulls) >= 100:
+        raise RefusalError(f"{head[:7]} is in 100 or more PRs; read incomplete")
     return [
         pr
         for pr in pulls
@@ -192,19 +198,27 @@ def handoff(head: str, concerns: Path) -> None:
         text = concerns.read_text()
     except OSError as error:
         raise RefusalError(f"{first}: {error}") from error
-    if head[:7] not in text:
-        raise RefusalError(f"{first}; it does not name head {head[:7]}")
-    pulls = pulls_at(head, deadline_from_now())
+    if not re.search(rf"\b{head}\b", text):
+        raise RefusalError(f"{first}; it does not name head {head}")
+    deadline = deadline_from_now()
+    pulls = pulls_at(head, deadline)
     if not pulls:
         raise RefusalError(f"No open PR has head {head}; wait for the handoff of the current head")
     if len(pulls) > 1:
         numbers = ", ".join(str(pr.get("number")) for pr in pulls)
         raise RefusalError(f"PRs {numbers} share head {head}; report blocked")
     pr = pulls[0]
-    base = object_fields(pr.get("base"), "PR base").get("ref")
-    print(f"PR {pr.get('html_url')} head {head} base {base}")
+    number = int(str(pr["number"]))
+    # One read of the reviews, bound to the handed-off head: a head pushed between the
+    # lookup and this read would otherwise mix the body of one head with the reviews of another.
+    state = read_state(number, deadline)
+    if state.head != head:
+        raise RefusalError(
+            f"PR {number} moved to {state.head} since the lookup; wait for its handoff"
+        )
+    print(f"PR {state.url} head {head} base {state.base_ref}")
     print(f"--- PR body ---\n{str(pr.get('body') or '').strip()}\n--- reviews ---")
-    show(int(str(pr["number"])), every_head=False)
+    render(state, every_head=False)
 
 
 def resolve(thread_id: str) -> None:
