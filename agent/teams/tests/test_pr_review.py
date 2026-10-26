@@ -201,6 +201,68 @@ class ObserveCommandTest(Harness):
         assert f"ready to merge at {head}" in observe(ok=True).stdout
 
 
+class HandoffTest(FakeGhTest):
+    """handoff prints the PR only after the reviewer's own concerns name its head."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.concerns = Path(directory.name) / "concerns.md"
+        self.update(pr_body="## Outcome\nImplementer's account of the change.")
+
+    def handoff(self, head: str = HEAD) -> str:
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            pr_review.handoff(head, self.concerns)
+        return printed.getvalue()
+
+    def refused(self, head: str = HEAD) -> str:
+        with self.assertRaises(pr_review.RefusalError) as raised:
+            self.handoff(head)
+        return str(raised.exception)
+
+    def test_the_body_waits_for_a_concerns_file_that_names_the_head(self) -> None:
+        assert "write your concerns to" in self.refused()
+        assert "No such file" in self.refused()
+        self.concerns.write_text("")
+        assert f"does not name head {HEAD[:7]}" in self.refused()
+        self.concerns.write_text(f"head {'c' * 40}\n- old concern\n")
+        assert f"does not name head {HEAD[:7]}" in self.refused(), "a stale file is not consent"
+        assert not self.events("gh", "api"), "the PR was read before the concerns existed"
+        self.concerns.write_text(f"head {HEAD[:7]}\n- the diff drops the origin reset\n")
+        out = self.handoff()
+        assert out.startswith(f"PR https://github.com/o/r/pull/7 head {HEAD} base main\n")
+        assert "--- PR body ---\n## Outcome\nImplementer's account of the change.\n" in out
+        assert f"--- reviews ---\nhead {HEAD}\n" in out
+
+    def test_the_handed_off_head_must_be_the_one_open_pr_head(self) -> None:
+        self.concerns.write_text(f"head {HEAD}\n")
+        assert "not a full head SHA" in self.refused(HEAD[:7])
+        self.update(pr_head="0" * 40)
+        assert f"No open PR has head {HEAD}" in self.refused()
+        other = {
+            "number": 8,
+            "state": "open",
+            "html_url": "https://github.com/o/r/pull/8",
+            "head": {"sha": HEAD},
+            "base": {"ref": "main"},
+            "body": "",
+        }
+        self.update(pr_head=HEAD, pulls=[other])
+        assert f"PRs 7, 8 share head {HEAD}" in self.refused()
+        self.update(pulls=[{**other, "state": "closed"}])
+        assert "pull/7" in self.handoff(), "a closed PR at the head does not count"
+
+    def test_it_shows_the_recent_reviews_and_threads_after_the_body(self) -> None:
+        self.concerns.write_text(f"{HEAD}\n")
+        self.update(reviews=[review("critic", HEAD, "Findings: P1 lost write")])
+        out = self.handoff()
+        assert (
+            out.index("--- PR body ---") < out.index("--- reviews ---") < out.index("P1 lost write")
+        )
+
+
 class ListTest(FakeGhTest):
     def test_list_shows_the_last_two_reviewed_heads_and_each_thread_with_its_replies(
         self,

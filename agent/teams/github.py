@@ -29,6 +29,7 @@ class PullRequest(NamedTuple):
     url: str
     head: str
     briefs: list[str]  # the issues the PR closes
+    base_ref: str = "main"
 
     def require_closes(self, brief: str) -> None:
         if brief not in self.briefs:
@@ -311,13 +312,15 @@ def parse_comment(comment: dict[str, object]) -> tuple[re.Match[str], list[str]]
 
 def pull_request(number: str) -> PullRequest:
     """The PR's URL, head commit and closing-reference issue numbers."""
-    fields = "headRefOid,url,closingIssuesReferences"
+    fields = "headRefOid,url,closingIssuesReferences,baseRefName"
     command = ["gh", "pr", "view", number, *repo_args(), "--json", fields]
     label = f"PR {number}"
     view = object_fields(json.loads(github(command, deadline_from_now(), label)), label)
     references = object_list(view.get("closingIssuesReferences") or [], f"{label} closing issues")
     briefs = [str(issue.get("number")) for issue in references]
-    return PullRequest(number, str(view.get("url")), str(view.get("headRefOid")), briefs)
+    return PullRequest(
+        number, str(view.get("url")), str(view.get("headRefOid")), briefs, str(view["baseRefName"])
+    )
 
 
 def poster(allocation: Allocation) -> tuple[str, str, str]:

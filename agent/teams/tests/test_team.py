@@ -1062,15 +1062,22 @@ class HandoffTest(Harness):
         assert [e[2] for e in sent] == ["team-1-tester", "dispatcher"]
         ring = sent[0][3]
         harness = self.repo / "agent/teams"
-        assert "https://github.com/o/r/pull/7" in ring
+        # The tester reads the brief, diff and tests before the implementer's account: the
+        # handoff withholds the PR; pr_review.py handoff prints it once the concerns exist.
+        assert ring.startswith(f"Your turn: review brief #29 at head {pushed}. ")
+        assert "github.com" not in ring, ring
+        assert " 7 " not in ring, ring
         assert f"python3 {harness / 'bootstrap.py'} --commit {pushed}" in ring
         assert "it refuses a dirty clone" in ring
+        assert "read the brief, then git diff origin/main...HEAD and the tests" in ring
+        handoff = f"python3 {harness / 'pr_review.py'} handoff {pushed} tmp/concerns.md"
+        assert f"tmp/concerns.md as the README review record says, then run {handoff};" in ring
         assert "Put tester, <session> on line 2" in ring
         # Only a P0, P1 or hold sends the head back; Optional P2s need no turn (#515).
-        turn = f"python3 {harness / 'team.py'} turn 7 impl"
+        turn = f"python3 {harness / 'team.py'} turn <pr> impl with the PR number handoff printed"
         assert f"has a P0 or P1 finding or a hold, run {turn}; Optional P2s need no turn." in ring
         assert "asked the dispatcher to launch critic" in ring
-        assert "pr_review.py observe 7 reports ready to merge" in ring
+        assert "pr_review.py observe <pr> reports ready to merge" in ring
         assert sent[1][3] == (
             "https://github.com/o/r/pull/7 review: run agent/teams/team.py review 7 critic"
         )
@@ -1086,9 +1093,11 @@ class HandoffTest(Harness):
         self.team("turn", "7", "tester", pane=self.impl)
         sent = self.events("agent", "prompt")[prompts:]
         assert [e[2] for e in sent] == ["team-1-tester", "team-1-critic"]
-        assert all(moved in e[3] for e in sent)
+        assert all(moved in e[3] and "github.com" not in e[3] for e in sent)
         assert f"bootstrap.py --commit {moved}" in sent[1][3]
         assert "never resets one" in sent[1][3]
+        again = f"python3 {harness / 'pr_review.py'} handoff {moved} tmp/concerns.md"
+        assert f"your concerns about the delta to it. Then run {again};" in sent[1][3]
         assert "herdr agent prompt team-1-tester" in sent[1][3]
         assert "asked the dispatcher" not in sent[0][3]
         # The brief cannot move the merge-confirming tester under a running pair.
@@ -1240,7 +1249,11 @@ class HandoffTest(Harness):
         assert brief.startswith("You are critic, the reviewing architect for brief #29;")
         assert "Your persona: operations: failure and recovery paths." in brief
         assert f"bootstrap.py --commit {head}" in brief
-        assert f"Review PR https://github.com/o/r/pull/7 at {head} from your own clone" in brief
+        reading = f"Review head {head} on base main in your own clone: read the brief, then "
+        assert f"{reading}git diff origin/main...HEAD" in brief
+        assert "github.com/o/r/pull/7" not in brief, "the PR body waits for the reviewer's concerns"
+        handoff = f"pr_review.py handoff {head} tmp/concerns.md; it prints the PR, its body"
+        assert handoff in brief
         assert "herdr agent prompt team-1-tester" in brief
         assert 'Follow "Steps: reviewing architect" in agent/teams/roles/architect.md' in brief
         allocation = self.record(1)["agents"]["critic"]

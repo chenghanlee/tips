@@ -419,6 +419,18 @@ elif a[:2] == ["api", "graphql"]:
     name = "reviewThreads" if "reviewThreads" in query else "reviews"
     page = {"pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": s.get(name, [])}
     out = json.dumps({"data": {"repository": {"pullRequest": {name: page}}}})
+elif a[0] == "api" and "/commits/" in a[1] and a[1].endswith("/pulls?per_page=100"):
+    sha = a[1].split("/commits/")[1].split("/")[0]
+    seven = {
+        "number": 7,
+        "state": "closed" if "7" in s.get("merged", []) else "open",
+        "html_url": "https://github.com/o/r/pull/7",
+        "head": {"sha": s.get("pr_head", "")},
+        "base": {"ref": s.get("pr_base_ref", "main")},
+        "body": s.get("pr_body", ""),
+    }
+    pulls = [seven, *s.get("pulls", [])]
+    out = json.dumps([pr for pr in pulls if pr["head"]["sha"] == sha])
 elif a[0] == "api" and "/rules/branches/" in a[1]:
     required = [{"context": name} for name in s.get("required", ["checks", "release"])]
     rule = {"type": "required_status_checks", "parameters": {"required_status_checks": required}}
