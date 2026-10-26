@@ -296,10 +296,8 @@ starts, and `stop` removes the entry with the allocation.
 
 ## PR review record
 
-Use `COMMENT` reviews instead of native approvals because agents share one GitHub
-identity. Submit one `COMMENT` review per pass on the current PR head. Put P0 and P1
-findings in inline comments and P2 findings in the body, as
-[Optional P2 findings](#optional-p2-findings) says:
+Use `COMMENT` reviews instead of native approvals. Submit one `COMMENT` review per pass
+on the current PR head:
 
 ```sh
 gh api "repos/{owner}/{repo}/pulls/$PR/reviews" --input tmp/review.json --jq .html_url
@@ -312,17 +310,11 @@ gh api "repos/{owner}/{repo}/pulls/$PR/reviews" --input tmp/review.json --jq .ht
 
 Put `LGTM` alone on the first line of the body when no P0, P1 or decision hold remains
 and required verification is satisfied, even if the body lists Optional P2s. Otherwise
-put the review decision there. Put `<entry>, <session>` on the second line. Write your
-initial concerns before the PR body or another review: `pr_review.py handoff` prints
-them only once `tmp/concerns.md` names the head, and the record repeats the concerns.
-Resolve a thread only if
-you opened it. A new head invalidates every LGTM. Review changes since your last actual
-review; a first review covers the full relevant change and affected contracts, and a
-later head may use the [compact record](../skills/review-software/SKILL.md#review-record).
-Earlier advice is not a review.
-
-The default tester assesses correctness and design in one investigation and record.
-An additional architect follows its design-review duties.
+put the review decision there. Put `<entry>, <session>` on the second line. Review
+changes since your last actual review; a first review covers the full relevant change
+and affected contracts, and a later head may use the
+[compact record](../skills/review-software/SKILL.md#review-record). Earlier advice is
+not a review.
 
 ### Severity
 
@@ -342,17 +334,13 @@ never settles a P0 or P1 condition.
 
 ### Optional P2 findings
 
-PR P2 findings are optional ([#515](https://github.com/chenghanlee/tips/issues/515)).
 Design critiques before implementation keep their P2 rules.
 
 - Put every P2 in an `Optional` part of the review body, not in an inline thread, with
   its `path:line`, consequence and proposed change. This holds in reviews with P0 or P1
-  findings too, so no P2 thread blocks a later `LGTM`. The review skills' P2 limit
-  still applies.
+  findings too, so no P2 thread blocks a later `LGTM`.
 - An Optional item needs no reply, issue, turn or fix. Merge follows [Merge](#merge) and
   does not wait for Optional work.
-- P2 is not a way to demote a missing required check, a contract failure or a
-  [required rule](../skills/design-software/SKILL.md#required-rules) violation.
 - A reviewer may move its own open P2 thread into Optional and resolve the thread
   without the implementer's disposition.
 
@@ -386,9 +374,6 @@ applicable local check evidence and an independent review at the current head.
 checks ran. Report a required-status rule that still expects a paused job to the user.
 
 Merge-confirming tester: merge only when `observe` reports the PR ready at the head:
-every reviewer in `Required reviews:` has an LGTM as its latest review of that head,
-every thread is resolved, any GitHub-required checks pass and GitHub reports it
-mergeable.
 
 ```sh
 python3 <harness>/pr_review.py observe <pr>
@@ -400,8 +385,6 @@ Return failed checks or a merge conflict to the implementer with
 `observe` once more after about a minute in the same turn; if still unavailable, report
 `blocked` with its output. Report any other refused merge with the exact error.
 Unavailable is never ready.
-
-After the merge closes the brief and deletes the branch, notify the dispatcher with `done`.
 
 ## Report and resolve blockers
 
@@ -480,5 +463,3 @@ Issue URL for deferred work, or "none".
 During the CI pause: the record the AGENTS.md CI pause rule requires, for all
 applicable local checks. Otherwise, checks CI does not cover, or "none".
 ```
-
-Reviewers: verify the body's claims rather than repeating the work it records.

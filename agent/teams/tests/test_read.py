@@ -86,12 +86,11 @@ class LaunchTest(unittest.TestCase):
         ]
         assert labels[3:] == [
             "--- agent/teams/README.md#turns ---",
-            "--- agent/teams/README.md#severity ---",
             "--- agent/teams/README.md#report-and-resolve-blockers ---",
             "--- agent/teams/README.md#constraints ---",
         ]
         assert "## Turns\n" in text
-        assert "### Severity\n" in text
+        assert "### Severity\n" not in text, "the record section carries the severity table"
         assert "## PR review record" not in text, "step-linked sections are not launch reading"
 
     def test_every_role_file_launches_and_its_links_resolve(self):

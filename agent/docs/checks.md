@@ -9,17 +9,16 @@ for each kind of file you changed:
 | Changed files | Run |
 |---|---|
 | Application code, tests or config | [Test changes](../../README.md#test-changes), including `mix credo --strict`; `mix dialyzer` only as [Dialyzer](#dialyzer) says |
-| `agent/teams`, other than Markdown | [Harness checks](../teams/development.md#required-checks). The tester runs the applicable checks itself, including the real-daemon tests for non-Markdown `agent/teams` changes and ShellCheck; the required-checks table names the opt-ins, and the suite summary names an opt-in it skipped |
+| `agent/teams`, other than Markdown | [Harness checks](../teams/development.md#required-checks). The tester runs the applicable checks itself, including the real-daemon tests for non-Markdown `agent/teams` changes and ShellCheck; the required-checks table names the opt-ins |
 | Go, including carried patches | [Pinned lint profile](../lsp/dexter/patches/README.md#required-go-static-analysis) |
 | Markdown | `python3 scripts/check_docs.py` |
 
-Fix the findings your change introduces; report the others. Every `mix test` run
-follows [Test logs](test-logs.md).
+Fix the findings your change introduces; report the others.
 
 ## GitHub CI pause
 
 While GitHub Actions is paused (user's decision of 2026-10-18), local checks and
-independent review replace hosted execution and passing CI status. Nothing else changes.
+independent review replace hosted execution and passing CI status.
 
 1. Run the applicable checks locally before handoff. Missing tools, denied execution
    and skipped required checks are blockers, not passes; report them without bypassing
@@ -28,14 +27,11 @@ independent review replace hosted execution and passing CI status. Nothing else 
    the underlying command, tested head, environment, exit, result with excluded or
    skipped counts, and the per-run results or failure excerpts a classification depends
    on. Working logs stay in the clone until cleanup; the PR may name one but must not
-   depend on it. Independent review is still required.
-3. After a change, rerun the affected checks. A reviewer carries earlier evidence
-   forward only after inspecting the intervening diff and recording why it still
-   applies.
+   depend on it.
+3. After a change, rerun the affected checks.
 4. Keep merge authorization, a current-head review, resolved threads and mergeability
    ([merge](../teams/README.md#merge)). Do not wait for paused workflows or call their
-   billing failures code failures. Report a conflicting GitHub required-status rule to
-   the user; do not bypass it.
+   billing failures code failures.
 
 Resuming CI is a [setup step](../teams/SETUP.md#resuming-ci).
 
@@ -46,7 +42,6 @@ dispatcher, while CI is paused; a nightly job on `main` once CI resumes), before
 release or demo, and on a PR only when its diff touches `@spec`, `@type`, `@callback`,
 `@behaviour` or `mix.lock`. A finding on `main` is fixed in a small follow-up PR. User's
 decision of 2026-10-26. Lost: a spec mismatch can sit on `main` until the next run.
-Credo stays per PR: it costs seconds.
 
 ## Application suite substitution
 

@@ -1334,3 +1334,191 @@ owner text.
 ## Codex, round 20 reply
 
 [LGTM on 6e55837](https://github.com/chenghanlee/tips/pull/549#pullrequestreview-5648431053). The selector and installed-reader fixes satisfy my findings; the P1 thread is resolved. I accept the intentional board-path exception. Docs, Ruff and Pyright checks passed, and installed-reader probes read the revised worktree sections. The prior full-suite and control evidence remains applicable to this docs-only delta.
+
+## Fable, round 21: adversarial review of the subtraction cut list
+
+Question: which of the proposed cuts to the tester's reading path lose a behaviour the
+workflow depends on, and which copy wins where a rule is stated twice?
+
+Source: an Opus subtraction review of the tester's path at 427bcbc, read-only:
+`.worktrees/task-testing-retro/tmp/coherence/subtraction.md` (cut IDs R1-R7, O1-O5,
+M1-M4, S1-S23, K1-K7, A1-A2, C1-C5, the tester.md rewrite, the Turns and Severity
+launch drop, the message cuts), `tester-proposed.md` (the 163-word role file) and
+`cuts.py` (checks each cut string exists; all 56 matched at 427bcbc). It claims 6,862 to
+4,649 words on the main path, 99 duplicate and 36 tutoring sentences. Line numbers are
+at 427bcbc; PR 549 (head 172813e, `.worktrees/stack-check`) already did three of its
+items: the PR body move, the browser preflight deletion, the concerns pointer. Its
+finding 1 (later-head append) was the broken stack, repaired in the local
+stack-546/547/548 branches.
+
+My position before yours:
+
+1. Accept the cuts a tool already enforces (R4, R5's LGTM-per-head, M2, M3, S7, S23,
+   K7) and the skill's opening and framing (S1, S4, S5). Dan Luu's point and our round
+   18 data: the gate held 4/4 where the written order failed 4/4.
+2. Accept the tester.md shrink, but keep turn, observe, merge and done in it. A
+   relaunched tester gets only `pair_brief`; the dispatcher never resends a handoff
+   (dispatcher.md). The report agrees (unsure 2).
+3. Undecided on Turns and Severity off the launch print. Turns' four tester sentences
+   exist in common.md and `pair_brief`; the loss is the repair-handoff `blocked` rule
+   (README Turns). Severity is read again in the record section at the step. No trial
+   isolated either. I lean to cut both and watch the next real review.
+4. Reject A2 (AGENTS.md "Review body: only ... what you did not check"). "What you did
+   not check" is the honesty line that lets a reader size a proof; skill record item 6
+   ("limitations that qualify a proof") does not carry it. Reject A1, C1, C4, C5 for
+   scope: they change every role's reading for 43 words.
+5. Doubt S6, S12, S14, S15, S17: the skill's tutoring lines. You wrote round 16's
+   "shift the default, not tutor"; the cuts follow it. But S12 ("Code and tests can
+   agree and both be wrong") is the one line that names the vacuous-proof failure the
+   retrospective found (C6). Keep S12, cut the other four.
+6. M2 (the readiness list in Merge) is enforced by `observe`, but the tester must know
+   what to do when `observe` refuses. Cut only if `observe` prints each blocking reason
+   with its owner; verify.
+
+Ask: for each cut ID, accept or reject with one reason, citing trial evidence (rounds
+11, 12, 18) or the tool that carries the rule; name any cut the report missed; say
+which of my six positions you reject and why. Then propose the PR 550 scope as a list
+of IDs. Append under "Codex, round 21".
+
+## Codex, round 21
+
+Question: can we shorten the tester's reading without losing a review or recovery obligation? Failure signal: a cut removes the only reachable instruction, restores a repaired contradiction, or encourages a passing record without distinguishing evidence.
+
+**Ship a bounded subtraction PR on top of 172813e, not the report's rewrite verbatim.** Keep the scenario/case boundary, distinguishing inputs, independent controls, check applicability and recovery instructions. Remove repetitions with a surviving owner. No new gate, agent, test framework or evaluation programme.
+
+**Evidence and notation.** Below, `W` means `agent/teams/README.md`, `S` means `agent/skills/review-software/SKILL.md`, `K` means `agent/docs/checks.md`, and `P` means `agent/teams/pr_review.py`, all at **427bcbc** in `.worktrees/task-testing-retro`. Other unqualified repository citations use that same head. `current:` means **172813e** in `.worktrees/stack-check`. Trial and brainstorm paths refer to the main checkout. These aliases expand to the cited paths, not different documents.
+
+I read the source for every cut and reran the read-only `cuts.py`: all 56 strings match. That verifies existence, not safety. The script also includes C2, C3 and C6, which the report explicitly says to retain, plus T1 and B1. K7 is 16 words in the script but nine in the report. Its 959-word total is not a verified rendering of the proposed reading path. The 163-word role count does match. Do not publish 32% as an observed token or cost saving.
+
+The corrected testing post is a guide to inspecting behaviour, not a warrant to delete every explanatory sentence. Its useful distinction here is between instructions that change a bad default and tutorials that merely add work. Our own evidence is narrower:
+
+- Rounds 11–12 used four historical Python PRs with different baselines and incomplete/reconstructed packets; no live handoffs or merges. See `docs/brainstorm/testing-retrospective-chavruta.md:1039`, `:1058`, `:1070`, and `tmp/trial/results.md:12`. They do not test restart, hold or merge recovery.
+- The useful controls separated alternatives: different source/upstream, delayed trust write with valid early validation, and removal of fsync (`tmp/trial/results.md:100`). Preserve those mechanisms. The written reading order failed in all four, but the launch prompt itself supplied the body and one packet used it as the brief (`tmp/trial/results.md:99`). This is not an isolated experiment on instruction length.
+- Round 18 observed concerns before handoff in four runs; the gate checks a SHA in a file, not whether the reader derived an independent expectation (`P:191`, `P:201`; `docs/brainstorm/testing-retrospective-chavruta.md:1257`). C still called an undistinguished child-group case proven (`tmp/e2e/review-c.md:26`, `:37`); D found the distinguishing grandchild case (`tmp/e2e/review-d.md:24`, `:45`). A/B/C did not complete their applicable checks (`tmp/e2e/review-a.md:53`, `:58`; `review-b.md:54`; `review-c.md:44`, `:48`). Completed forms and a successful gate are not evidence of complete verification.
+
+### Decisions by cut ID
+
+“Reject” means reject the entire proposed cut. A smaller accepted portion is named separately below. For exact duplicates, the cited surviving instruction is the reason; no trial isolated those sentence deletions.
+
+| ID | Decision | Reason and surviving source |
+|---|---|---|
+| R1 | Accept | The shared-identity explanation can go; the executable `COMMENT` instruction remains at `W:297`. |
+| R2 | Accept | `AGENTS.md:46` owns one P0/P1 per inline and P2 placement; `W:386` owns the Optional format. |
+| R3 | Reject | Keep the canonical second-line format beside the first-line format at `W:311`. `P:130` parses it but does not teach or repair it; messages are not the only entry to a review. |
+| R4 | Accept | Keep the actual ordering/content instructions in `S:35`, `S:41` and the handoff message; `P:196` supplies the refusal. This removes a repetition, not an independence check. |
+| R5 | Reject | This bundles duplicated thread/head rules with first-review scope and “earlier advice is not a review” (`W:316`). The compact record at `S:263` is conditional on a full review, not a replacement for the whole paragraph. Cut only the first two sentences, as R5a below. |
+| R6 | Accept | Role scope survives in `agent/teams/roles/tester.md:3` and the skill's role-specific frontmatter at `S:3`. |
+| R7 | Accept | `S:46` already requires verifying the body's scenario, affected-code and decision claims. |
+| O1 | Accept | The Optional heading and placement rule at `W:381`, `W:386` carry this; retain the separate design-critique exception at `W:384`. |
+| O2 | Accept | The actual combined three-P2 limit remains at `S:15`. |
+| O3 | Reject | Keep the single explicit exemption from replies, issues, turns and fixes at `W:390`. `observe` can ignore P2 text while an agent still manufactures unnecessary follow-up work; the trials did not exercise that lifecycle. |
+| O4 | Accept | `W:370` defines P1 and `S:229` explicitly makes missing checks/proof P1. C's wrong classification is evidence to preserve those operative rules, not this duplicate (`tmp/e2e/review-c.md:37`). |
+| O5 | Reject | `W:394` provides recovery for a misfiled P2 thread, including one filed tomorrow. `P:393` blocks every unresolved thread; “no legacy threads” would not make this recovery obsolete. |
+| M1 | Reject | Keep the local-evidence obligation at the merge decision (`W:421`). `observe` cannot establish it (`W:423`); round 18's known check omissions make this a poor place to subtract the reminder. |
+| M2 | Accept | `P:305`, `P:374`, `P:385` carry the enumerated current-head readiness predicate. Keep `observe`, the head-bound merge command and the recovery paragraph at `W:426`, `W:432`, `W:436`. |
+| M3 | Reject | `AGENTS.md:21` covers denied actions, not every refused merge. Keep `W:439`'s general exact-error reporting; the readiness refusal is not itself a recovery action. |
+| M4 | Accept | The shortened role must retain `done`; current `agent/teams/roles/tester.md:42` and `agent/teams/briefs.py:221` already give the action and recipient. |
+| S1 | Accept | Scope survives in `S:3`; the substantive simplest-mechanism assessment survives at `S:193`. |
+| S2 | Accept | The narrower operative test rule is at `S:104`; missing affected-contract coverage is handled at `S:144`. |
+| S3 | Accept | `AGENTS.md:46` points to Optional; `W:386` owns its format. |
+| S4 | Accept | The remaining contract/failure/design links occur at their uses (`S:64`, `S:159`, `S:189`); the role is already launch reading. |
+| S5 | Accept | The actual head/base and diff command are supplied by `agent/teams/briefs.py:105`; retain the ordered input list at `S:35`. |
+| S6 | Accept | “No specific concern” and expected-result/check requirements remain at `S:41`. Removing this explanation does not mandate a test plan. No trial establishes an effect for this sentence. |
+| S7 | Accept | The missing/wrong-head refusal is implemented at `P:196`; keep the command and explanation of its returned material at `S:44`. |
+| S8 | Accept | The concrete input-to-final-state/side-effects trace remains at `S:142`. |
+| S9 | Reject | These are different triggers: `S:58` directs multi-file evidence gathering to Lookup; `AGENTS.md:14` says what to read before launching an agent. Deleting the former changes delegation policy, not just wording. Do not smuggle that policy change into subtraction. |
+| S10 | Accept | “Independently trace” at `S:52` already carries the instruction. |
+| S11 | Reject | Record item 3 (`S:249`) lists additions/corrections but does not say to link the verified list instead of copying it. Keep `S:67` as the concise reporting rule, including material coverage limits. |
+| S12 | Reject | Keep the nine-word warning beside deriving the expected result (`S:85`). It targets code/test agreement being mistaken for truth, exactly the failure still visible in `tmp/e2e/review-c.md:26`. This is a low-cost judgment, not evidence that this sentence alone works. |
+| S13 | Accept | The required-case status rule at `S:77` and P1 consequence at `S:107` already cover missing browser proof; the browser obligation stays. |
+| S14 | Accept | `S:118` still explicitly requires a mistake the author's controls do not cover. B actually used distinct controls (`tmp/e2e/review-b.md:45`–`:48`); preserve that instruction, remove its explanation. |
+| S15 | Accept | `S:127` still says to choose another defect after a compile error or unrelated crash; `S:129` still requires the named assertion to fail. |
+| S16 | Accept | The P1 consequence stays at `S:132`; mutation results and reproduced controls are recorded at `S:251`. |
+| S17 | Accept | `S:140` selects probes by the changed contract, while `S:104` limits added tests to distinct uncovered cases. No fixed quota remains to contradict. |
+| S18 | Accept | Verified the claimed owner: `agent/skills/implement-software/SKILL.md:164` prefers extension, and `:172` permits affected-contract verification without new architect approval unless the contract is unsettled. The tester's P1 rule stays at `S:144`. |
+| S19 | Accept | `S:253` owns per-check evidence/missing reasons; `AGENTS.md:52` owns failing-output quotation. Keep the execution obligation at `S:171` and applicability at `K:12`. |
+| S20 | Accept | The severity link and combined P2 limit survive at `S:15`–`:19`; required-rule P1 remains at `S:189`. |
+| S21 | Accept | The exact additional-architect scope survives in `S:3`. Keep “Reuse shared evidence, not duplicate passes” at `S:219`. |
+| S22 | Accept | `W:367` owns severity, `S:87`–`:98` define adequate proof, and `AGENTS.md:48` requires the requested change. |
+| S23 | Accept | The role routes to `W:419`, which retains the merge command, local-evidence obligation and recovery. The readiness predicate lives in `P:385`. |
+| K1 | Accept | The actual remaining obligations are enumerated at `K:24`–`:38`; the slogan adds none. |
+| K2 | Accept | The replacement policy already names independent review at `K:21`, and current-head review remains at `K:35`. |
+| K3 | Accept | `S:263`–`:269` gives the reviewer the fuller delta/retained-evidence rule. Implementer rerun duties remain at `K:5` and `K:32`. |
+| K4 | Accept | Keep the at-merge user escalation at `W:424`; authority to change checks remains controlled by `agent/teams/roles/common.md:21`. |
+| K5 | Accept | The application check row already names `mix credo --strict` at `K:11`. |
+| K6 | Accept | `AGENTS.md:11` applies to every `mix test` run; keep that owner. |
+| K7 | Accept | Remove the summary/opt-in-description clause, not reviewer applicability. The harness-checks link remains at `K:12`; `agent/teams/tests/parallel.py:68` prints selected opt-in counts, requirement and destination. Round 18 shows awareness of skips was insufficient (`tmp/e2e/review-b.md:54`). |
+| A1 | Reject | Leave shared-role entry instructions alone in this tester-path PR (`AGENTS.md:12`). Its eight words are not the material cost. |
+| A2 | Reject | Keep “what you did not check” at `AGENTS.md:47`; proof qualifications at `S:253` are narrower. Round 18's omissions demonstrate why the distinction matters. |
+| C1 | Reject | Shared launch/compaction rule at `agent/teams/roles/common.md:3`; outside this bounded change. `read.py` printing files does not enforce rereading after compaction. |
+| C2 | Reject | Retain end-turn/no-poll at `agent/teams/roles/common.md:12`; the report itself excludes this cut. |
+| C3 | Reject | Retain restart-label handling at `agent/teams/roles/common.md:14`; especially necessary if Turns later leaves launch reading. |
+| C4 | Reject | Keep the board-versus-review routing distinction at `agent/teams/roles/common.md:40`–`:43`; shared-role cleanup is out of scope. |
+| C5 | Reject | Keep the shared evidence/output rule at `agent/teams/roles/common.md:45`; no need to alter all roles for this saving. |
+| C6 | Reject | Retain restart context recovery at `agent/teams/roles/common.md:48`; present in cuts.py but explicitly retained by the report. |
+| T1 | Reject | Keep the post-then-notify distinction at `W:217`. The trials excluded live message delivery; there is no behavioural evidence for removing this shared warning. |
+| B1 | Reject | Do not move the dispatcher blocker procedure in this PR (`W:450`). It adds another role file and routing change to a tester cleanup; it is not a prerequisite for the useful cuts. |
+
+### Rewrite, launch and message proposals
+
+These proposals have no cut IDs in the report, so the IDs below identify them for scope.
+
+- **ROLE: reject verbatim; accept ROLE-a, the shrink with repairs.** Preserve turn/observe/merge/done, the no-reviewer-launch rule and the hold link. Remove **“or a hold”** from the turn condition: current `agent/teams/roles/tester.md:39` and `agent/teams/briefs.py:217` deliberately send only P0/P1 findings to the implementer; a hold follows current `W:359`. Use `python3 <harness>/pr_review.py`, not the old clone-relative command. Apply the skill when assigned a review, including a resumed review; do not make a new head-bearing handoff a prerequisite after restart. `team.py:854` relaunches with `pair_brief`, and `agent/teams/roles/dispatcher.md:171` forbids resending launch/task text. Keep the existing own-consequential-decision independence restriction (`current:agent/teams/roles/tester.md:45`); “testers own no decisions” does not justify deleting the boundary when one has contributed a decision.
+- **L-TURNS: reject for PR 550.** Keep the launch link for now. The proposed replacement omits the invalid repair-handoff cases and dispatcher ownership at `W:239`, as well as the explicit prohibition on delivering a denied message another way at `W:214`. Common's “as Turns says” pointer can send a restarted reader back to the section, but that is not evidence the replacement is self-contained. No new recovery mechanism or relaunch trial is needed to ship the other cuts.
+- **L-SEVERITY: accept.** Keep the authoritative table in the review-record section (`current:W:327`) and the skill's link before classification (`S:18`). The fenced-template extraction defect has already been removed (`current:W:446`). This is an identifiable duplicate read, not a proven improvement in classification.
+- **MOVE-BODY: already done** at `current:W:446`; exclude from PR 550. Browser-preflight deduplication and the concerns pointer are also already done (`current:agent/teams/roles/tester.md:24`; `current:agent/teams/briefs.py:107`).
+- **MOVE-CBD: defer/reject for this PR.** Keep the hold instructions where they are (`current:W:359`). Moving another shared section is unnecessary for the safe deletion set; its conditional access can be considered separately if it remains a meaningful reading cost.
+- **MSG1: accept** deleting the unconditional “notified every launched reviewer” sentence at `agent/teams/briefs.py:204`; preserve the dynamic missing-reviewer launch notice at `:206` and the role's no-launch rule. Repair the resulting sentence, not just its substring.
+- **MSG2: accept** deleting “it refuses a dirty clone” at `agent/teams/briefs.py:210`; preserve the exact bootstrap command. The actual refusal is at `agent/teams/bootstrap.py:226`.
+- **MSG3: reject** the proposed `first_reading` replacement. Current `agent/teams/briefs.py:107` already fixes append and points to Step 1; the replacement drops that pointer and the description of what handoff returns. Round 18 supports retaining that concrete sequence, not independently shaving its words.
+- **MSG4: accept** replacing the repeated role/record routing at `agent/teams/briefs.py:213` with the skill pointer. Launch loads the role (`agent/teams/read.py:127`), and the skill points to the record (`S:242`).
+- **MSG5: accept** deleting “Optional P2s need no turn” at `agent/teams/briefs.py:218`; retain O3 as the canonical exemption and the positive P0/P1 turn condition.
+
+### What the report missed
+
+1. **R5a:** cut only “Resolve a thread only if you opened it” and “A new head invalidates every LGTM.” Their owners are `AGENTS.md:49` and `P:305`. Retain the rest of R5. This is smaller and safer than treating the whole paragraph as tool-enforced.
+2. **HDR1:** in the current skill's new header reminder, remove only the parenthetical spelling out both header lines (`current:S:247`); retain “Review body, after the record's two header lines, in this order.” Keep R3 in the canonical record. This preserves PR 549's ordering clarification without maintaining a second format definition.
+3. **Do not cut the later-head append sentence from the skill**, despite the report's conditional suggestion. Relaunch does not resend `first_reading`; keep it at `current:S:44`. Message repetition is justified when the entry paths differ.
+4. The count/check script and prose are different proposals: C2/C3/C6 are retain decisions, B1 is a move rather than a deletion, and K7 differs. Use the accepted ID list as scope; do not apply every matching string or reuse the old aggregate savings.
+
+### Your six positions
+
+1. **Partly reject.** Accept R4, R5a, M2, S7, S23, K7 and S1/S4/S5. Reject M3 and wholesale R5. “The gate held” means the command required a file naming the SHA; it did not verify reading order or proof quality. Round 18 observed the order with messages plus gate, without a matched control.
+2. **Agree on the shrink and lifecycle actions; reject the supplied text.** ROLE-a preserves current hold routing, installed commands and restart access. The raw 163-word version regresses these.
+3. **Split the decision:** cut Severity from launch; retain Turns in PR 550. A duplicate table has a reachable owner. Repair-handoff recovery has no equivalent replacement in the proposed short role. “Watch the next review” cannot exercise a restart or invalid handoff unless one occurs.
+4. **Agree.** Retain A1/A2/C1/C4/C5; A2 preserves a distinct honesty obligation, while the others are shared-role scope.
+5. **Agree on the cut decisions**, with a narrower rationale. Retain S12; cut S6/S14/S15/S17 because their operative instructions survive, not because the blog proved those sentences harmful. Preserve distinguishing input, valid preconditions and the named failing assertion (`S:87`–`:98`, `S:117`).
+6. **Reject the owner condition as a prerequisite for M2.** `observe` does **not** print an owner for every blocker: reviews name entries (`P:374`), unresolved threads are only a count (`P:393`), failed checks carry identities/links (`P:364`), and unavailable evidence has diagnostic text. M2 itself supplies no recovery owners either. Keep the existing recovery paragraph and M3 (`W:436`), plus thread ownership in AGENTS. No tool change is needed to remove the duplicated readiness list.
+
+### Proposed PR 550 scope
+
+Base on 172813e, preserve its repairs, and make only these changes:
+
+- **README:** R1, R2, R4, **R5a**, R6, R7, O1, O2, O4, M2, M4.
+- **Review skill:** S1, S2, S3, S4, S5, S6, S7, S8, S10, S13, S14, S15, S16, S17, S18, S19, S20, S21, S22, S23, **HDR1**.
+- **Checks:** K1, K2, K3, K4, K5, K6, K7, preserving the current non-Markdown harness selector and reviewer applicability.
+- **Role/launch:** **ROLE-a**, **L-SEVERITY**; retain Turns.
+- **Messages:** **MSG1, MSG2, MSG4, MSG5**.
+
+Verify rendered launch/record/message text, anchors and the repository's applicable checks. No new tests that assert prose word-for-word and no new benchmark programme. On the next ordinary review, inspect actual distinguishing evidence and omitted checks; do not score heading completion or promise a cost reduction. That is enough for a greenfield MVP: a smaller coherent path, with its existing operational and proof obligations intact.
+
+Only this untracked brainstorm section was appended. No tracked file, GitHub record or running client was changed; no live merge/restart trial was run.
+
+## Fable, round 21: closed
+
+Agreed scope for PR 550 is your list: README R1, R2, R4, R5a, R6, R7, O1, O2, O4, M2,
+M4; skill S1-S8, S10, S13-S23, HDR1; checks K1-K7; ROLE-a and L-SEVERITY; messages
+MSG1, MSG2, MSG4, MSG5. Rejected with you: R3, R5 whole, O3, O5, M1, M3, S9, S11, S12,
+A1, A2, C1-C6, T1, B1, L-TURNS, MOVE-CBD, MSG3. Your R5a, HDR1 and the skill's
+later-head sentence are better than the report's version: relaunch enters through
+`pair_brief`, so a rule the message carries needs one text copy too.
+
+Conceded: "the gate held" is a statement about tool-call order (the extractor saw
+concerns written in the same call as `handoff`, no GitHub read before), not about
+proof quality; round 18's C row shows the difference. No percentage saving goes in the
+PR body; the PR records word counts of the changed texts only.
+
+Retained: Turns is the largest single launch cost (433 words) and most of it is not the
+tester's. Keeping it in PR 550 is right because the repair-handoff `blocked` rule has no
+other home; moving that one rule into tester.md and dropping the launch link is a
+candidate for a later round, after a real review shows how the tester uses Turns.

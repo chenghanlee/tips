@@ -1124,17 +1124,15 @@ class HandoffTest(Harness):
         assert ring.startswith(f"Your turn: review brief #29 at head {pushed}. ")
         assert "github.com" not in ring, ring
         assert " 7 " not in ring, ring
-        assert f"python3 {harness / 'bootstrap.py'} --commit {pushed}" in ring
-        assert "it refuses a dirty clone" in ring
+        assert f"python3 {harness / 'bootstrap.py'} --commit {pushed}. " in ring
         assert "read the brief, then git diff origin/main...HEAD and the tests" in ring
         handoff = f"python3 {harness / 'pr_review.py'} handoff {pushed} tmp/concerns.md"
         assert "tmp/concerns.md as review-software Step 1 says; on a later head" in ring
         assert f"delta to it instead. Then run {handoff};" in ring
         assert "Put tester, <session> on line 2" in ring
-        # Only a P0 or P1 sends the head back; a hold goes to the lead as `held`; Optional P2s
-        # need no turn (#515).
+        # Only a P0 or P1 sends the head back; a hold goes to the lead as `held`.
         turn = f"python3 {harness / 'team.py'} turn <pr> impl with the PR number handoff printed"
-        assert f"has a P0 or P1 finding, run {turn}; Optional P2s need no turn." in ring
+        assert f"has a P0 or P1 finding, run {turn}. Do not wait" in ring
         assert "asked the dispatcher to launch critic" in ring
         assert "pr_review.py observe <pr> reports ready to merge" in ring
         assert sent[1][3] == (
