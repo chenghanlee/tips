@@ -199,9 +199,15 @@ Order of work:
    action. Extend it. Add a new test only when none can.
 4. Write the scenario test before the implementation. Run it. Confirm it fails for the
    reason the scenario describes.
-5. Make the scenario work, then inspect the affected design under
-   [Design during delivery](#design-during-delivery). Repair a justified problem or
-   record the consequential tradeoff. Stop when the working change is coherent and verified.
+5. Make the scenario work. Then use the implementation to identify plausible mistakes
+   its test could miss. For each masking risk you find, repair the setup, the input or
+   the missing observation so the test distinguishes the mistake. Correct an existing
+   expectation only from the brief or an established affected contract, and explain the
+   correction in the PR body. Run the distinguishing control and record it in the PR
+   body as for a marked `Masking risk:` row.
+6. Inspect the affected design under [Design during delivery](#design-during-delivery).
+   Repair a justified problem or record the consequential tradeoff. Stop when the
+   working change is coherent and verified.
 
 Rules:
 
@@ -223,15 +229,20 @@ Rules:
   for an interaction lower-level tests cannot check.
 - Derive the expected result from the brief, not from the code. Code and tests can agree
   and both be wrong.
+- Choose inputs that separate the intended behaviour from the named mistake, and keep
+  the other preconditions valid so another guard cannot hide it. Problem examples: four
+  identical streams into a feature that orders four streams, so a swap changes nothing;
+  an identity check tested with a record that differs in every field, so an `or`
+  written for an `and` still rejects it.
 - A test proves a scenario only if its setup reached the condition and its assertion
   would fail for a plausible defect. Inspect the setup and expectation when a test
   passes unexpectedly.
 - For a scenario the brief marks `Masking risk:`, supply a control: a small change to
   production code, or to a stub the test controls, that introduces the named defect.
-  Never change the assertion. Run the test with the control, confirm the test fails at
-  the assertion that detects that defect, then revert. Put the control
-  and the failing assertion in the PR body. One control serves several scenarios only
-  when it shows each one's distinguishing defect.
+  Keep the assertion fixed during the control run. Run the test with the control,
+  confirm the test fails at the assertion that detects that defect, then revert. Put the
+  control and the failing assertion in the PR body. One control serves several scenarios
+  only when it shows each one's distinguishing defect.
 - A double may replace an external call. The production code responsible for the claim
   must still run.
 - Wait for the event or observable state with a time limit. A sleep is not proof. A

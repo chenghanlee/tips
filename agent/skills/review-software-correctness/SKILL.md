@@ -85,15 +85,20 @@ Rules:
 
 - Derive the expected result from the brief, not from the code or the test. Code and
   tests can agree and both be wrong.
-- Run the test. Read its assertion. The test proves the scenario only if its setup
-  reached the condition and its assertion fails for a plausible defect.
-- For a row the brief marks `Masking risk:`, reproduce the implementer's control from
-  the PR body: apply it, run the test, confirm it fails at the named assertion, then
-  revert. The row is unproven if the control is missing, the test still passes, or it
-  fails for another reason, such as setup, compilation or an unrelated crash.
+- Run the test. Read its assertion. For each row, identify how the setup reaches the
+  claimed condition, the brief line or established affected contract that supplies the
+  expected result, and the assertion that would fail for the named defect. For
+  asynchronous work, the test waits for the event or observable state with a time limit
+  before asserting; a sleep is not proof and a timeout is not a pass.
+- The input must separate the intended behaviour from the named defect, with the other
+  preconditions valid ([implement-software](../implement-software/SKILL.md#tests)).
+- For a row the brief marks `Masking risk:`, and for a control the PR body records from
+  the implementation, reproduce the implementer's control: apply it, run the test,
+  confirm it fails at the named assertion, then revert. The row is unproven if the
+  control is missing or not run, the test still passes, or it fails for another reason,
+  such as setup, compilation or an unrelated crash.
 - A double may replace an external call. The production code responsible for the claim
   must still run.
-- Do not treat a sleep as proof or a timeout as a pass.
 - Prove a scenario that names a user interaction in the browser. Follow [manual browser review](../../teams/README.md#manual-browser-review). Otherwise, mark it unproven.
 - One test per scenario is enough. Do not ask for more.
 
@@ -101,17 +106,27 @@ Classify unproven or wrong scenarios as P1.
 
 ## Step 4: Mutation check
 
-Skip when the PR changes only docs. Otherwise pick the scenario with the highest cost if
-wrong: data loss, money, access, or an external effect.
+Skip when the PR changes only docs. Otherwise choose a realistic defect in the scenario
+with the highest cost if wrong: data loss, money, access, or an external effect. Say in
+the record why that scenario costs most. Then inspect where the change joins the
+existing flow: callers, ordering, release and cleanup. Add a second control when that
+join exposes a distinct consequential risk the first control does not cover.
+
+Before each run, name the plausible mistake, the behaviour it changes and the assertion
+expected to fail. A new or existing test counts when it exercises the responsible
+production path and detects that behaviour; neither the test's age nor whether the
+mutant deletes a line decides validity.
+
+For each control:
 
 1. Run its test unchanged. Confirm it passes.
-2. Break the production code for that scenario with one realistic defect: invert a
-   condition, drop a write, return early. If it causes a compile error or an unrelated
-   crash, pick another defect. Neither proves the test detects the intended defect.
-3. Run the test. Confirm its assertion fails.
+2. Apply the defect: invert a condition, drop a write, return early, reorder two steps.
+   If it causes a compile error or an unrelated crash, pick another defect. Neither
+   proves the test detects the intended defect.
+3. Run the test. Confirm the named assertion fails.
 4. Revert the change. Rerun the test. Confirm the working tree is clean.
 
-Report P1 if the test still passes in step 3. It does not prove the scenario. Record the
+Report P1 if the test still passes in step 3. It does not prove the scenario. Record each
 mutation, the result and the time spent in the review body.
 
 ## Step 5: Entry points
@@ -236,6 +251,14 @@ Review body, in this order:
 9. `Optional`: the P2 findings.
 
 "No findings" is valid when every scenario is proven and every step above is recorded.
+
+After a full review of a PR, a review of a later head may use a compact record: the
+head, the complete delta, the new evidence you inspected or ran, the reason each retained
+result still applies, findings and unresolved checks. Recheck the obligations, code,
+tests, fixtures and inputs the delta changes; repeat a control when the change
+invalidates its evidence. A change to one claim does not require repeating unaffected
+evidence. An unchanged head does not remove the need to assess new evidence, such as a
+new check record.
 
 ## Merge
 
