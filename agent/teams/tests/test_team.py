@@ -60,23 +60,45 @@ class StopAgentTest(unittest.TestCase):
             HERDR_LOG=str(self.root / "calls"),
             TIPS_TEAM_CONFIG=str(self.config),
         )
-        self.processes: list[subprocess.Popen[bytes]] = []
+        # Every launch: its host and its own pid files. A failed subtest launches again,
+        # so cleanup walks all of them, not the last pair (the 531 trial leaked eight).
+        self.launches: list[tuple[subprocess.Popen[bytes], Path, Path]] = []
 
     def tearDown(self) -> None:
-        for p in self.processes:
-            if p.poll() is None:
-                p.kill()
-            p.wait()
-        for name in ("client", "child"):
-            child_file = self.root / name
-            if child_file.exists():
-                with contextlib.suppress(ProcessLookupError):
-                    os.kill(int(child_file.read_text()), signal.SIGKILL)
+        problems = self.reap()
         wrapper = self.root / ".dexter/dexter.sh"
         if wrapper.exists():
             # A real daemon outlives its clients; stop it before its root disappears.
             execute(["/bin/sh", wrapper, "stop", "--force"], input_text="")
         self.tmp.cleanup()
+        assert not problems, problems
+
+    def reap(self) -> list[str]:
+        """Kill every launch's child group, client and host; return what could not be done.
+        A missing or empty pid file is reported, and the other launches are still reaped."""
+        problems: list[str] = []
+        for host, client_file, child_file in self.launches:
+            for file, kill in ((child_file, os.killpg), (client_file, os.kill)):
+                try:
+                    pid = int(file.read_text())
+                except (OSError, ValueError) as error:
+                    problems.append(f"{file.name}: {error}")
+                    continue
+                with contextlib.suppress(ProcessLookupError):
+                    kill(pid, signal.SIGKILL)  # the child leads its own session and group
+            if host.poll() is None:
+                host.kill()
+            try:
+                host.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                problems.append(f"host {host.pid} did not exit")
+        self.launches = []
+        return problems
+
+    def pid(self, name: str) -> int:
+        """The latest launch's client or child pid."""
+        _, client_file, child_file = self.launches[-1]
+        return int((child_file if name == "child" else client_file).read_text())
 
     def client(
         self, stubborn: bool = False, child: Sequence[str | Path] | None = None
@@ -92,8 +114,8 @@ def stop(*_):
 signal.signal(signal.SIGTERM, signal.SIG_IGN if sys.argv[2]=='yes' else stop)
 while True: time.sleep(.05)
 """
-        for name in ("client", "child"):
-            (self.root / name).unlink(missing_ok=True)
+        number = len(self.launches) + 1
+        client_file, child_file = self.root / f"client-{number}", self.root / f"child-{number}"
         host = (
             "import subprocess,sys; p=subprocess.Popen(sys.argv[2:]); open(sys"
             '.argv[1],"w").write(str(p.pid)); sys.exit(p.wait())'
@@ -105,32 +127,33 @@ while True: time.sleep(.05)
                     "python3",
                     "-c",
                     host,
-                    str(self.root / "client"),
+                    str(client_file),
                     "python3",
                     "-c",
                     code,
-                    str(self.root / "child"),
+                    str(child_file),
                     "yes" if stubborn else "no",
                     *child,
                 ]
             ),
             cwd=self.root,
         )
-        self.processes.append(p)
+        # Registered before the pid files are read: a launch that never becomes ready is
+        # still reaped, and its empty file is reported.
+        self.launches.append((p, client_file, child_file))
         # The host writes "client" after its Popen returns, so "child" can appear first
         # and either file can exist before its pid is written.
-        pid_files = [self.root / "client", self.root / "child"]
         for _ in range(100):
-            if all(f.exists() and f.read_text() for f in pid_files):
+            if all(f.exists() and f.read_text() for f in (client_file, child_file)):
                 break
             time.sleep(0.02)
         (self.root / "state.json").write_text(
             json.dumps(
                 {
-                    "pid": int((self.root / "client").read_text()),
+                    "pid": self.pid("client"),
                     "shell": p.pid,
                     "root": str(self.root),
-                    "child": int((self.root / "child").read_text()),
+                    "child": self.pid("child"),
                 }
             )
         )
@@ -174,7 +197,7 @@ while True: time.sleep(.05)
                 assert r.returncode == 0, r.stderr
                 assert p.wait(timeout=2) == 0
                 try:
-                    os.kill(int((self.root / "child").read_text()), 0)
+                    os.kill(self.pid("child"), 0)
                 except ProcessLookupError:
                     pass  # Expected: this owned child must have exited.
                 else:
@@ -234,6 +257,24 @@ while True: time.sleep(.05)
         assert p.poll() is None
         assert "surviv" in r.stderr.lower()
 
+    def test_teardown_reaps_every_launch_not_only_the_last(self) -> None:
+        """A failed stop leaves its client alive and the next launch overwrites nothing."""
+        self.client(stubborn=True)
+        assert self.stop().returncode != 0
+        survivors = [self.pid("client"), self.pid("child")]
+        self.client()
+        survivors += [self.pid("client"), self.pid("child")]
+        assert self.reap() == []
+        for pid in survivors:
+            for _ in range(100):  # SIGKILL is delivered; the reparenting and reap follow
+                try:
+                    os.kill(pid, 0)
+                except ProcessLookupError:
+                    break
+                time.sleep(0.02)
+            else:
+                raise AssertionError(f"process {pid} survived teardown")
+
     @unittest.skipUnless(os.environ.get("TIPS_TEST_REAL_DEXTER"), REAL_DEXTER)
     def test_client_stop_leaves_real_daemons_started_by_a_client_query(self) -> None:
         (self.root / "mix.exs").write_text(MIX_PROJECT)
@@ -249,7 +290,7 @@ while True: time.sleep(.05)
         ]
         # A client's query starts the daemon and ends; the daemon is then nobody's child.
         client = self.client(child=query)
-        child = int((self.root / "child").read_text())
+        child = self.pid("child")
         for _ in range(600):
             if daemon_pid(self.root) and execute(["ps", "-p", str(child)]).returncode:
                 break
