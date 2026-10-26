@@ -209,8 +209,7 @@ acknowledgments or progress updates. Put everything the recipient needs in the m
 or the linked record. After sending, end your turn, with two exceptions: after a
 `question` notice, continue unaffected work; after a `hold` that reached no tester
 (no affected PR is open), continue to the decision. If a send fails, you still report
-it: report `blocked` with the exact command and error. Labels the command already wrote
-stay; they record the assignment, not the delivery. Do not deliver a denied message
+it: report `blocked` with the exact command and error. Do not deliver a denied message
 another way.
 
 Design notices are `herdr agent prompt <recipient> "<comment URL> <word>"`. Posting a
@@ -452,22 +451,10 @@ Set Active and hand the turn back with `prompt_agent` and the issue's phase when
 blocker is resolved. Do
 not run or retry a denied command on another agent's behalf.
 
-If a required check fails at the head, rerun only the failed tests, alone, at the head.
-
-- They fail again: rerun them alone in a worktree of fetched `origin/main`.
-  - The same failure there, and a linked open issue names those tests: the failure is
-    pre-existing. Record the per-run results and failure excerpts of both commits
-    and the issue in the PR body; it is not a blocker.
-  - The same failure there and no such issue: report `blocked` with both SHAs. The
-    dispatcher opens a revert brief.
-  - They pass on `main`: the failure is the PR's to fix unless the user grants a
-    bounded exception.
-- They pass alone at the head: the failure is intermittent. Run the suite once more.
-  If it fails again, treat it as a deterministic failure above. If it passes and the
-  diff does not touch the behaviour the test covers, record the per-run results and
-  failure excerpts and the open issue that names the test (open one if none) in the
-  PR body; it is not a blocker. If the diff touches that behaviour, the failure is the
-  PR's to fix.
+If a required check fails at the head, rerun the failed tests alone in a worktree of
+fetched `origin/main`. If the same failure occurs there, it is pre-existing: link or open
+the issue that names them in the PR body and continue. Otherwise the failure is the PR's
+to fix, including a test that fails only in the full suite.
 
 ## Constraints
 
