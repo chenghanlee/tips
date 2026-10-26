@@ -1127,3 +1127,114 @@ Shape:
 - `tester_message`, `reviewer_brief`, `reviewer_notice`: name the brief, head and base, the bootstrap command, the diff command against the base, and the `handoff` command. Not the PR URL or number. The tester's `turn` and `observe` commands take the number `handoff` prints.
 - tester.md, architect.md, review-software Step 1 and the review record, README record rule and Commands table: one ordering text, at the step, replacing the scattered sentences.
 - Not in this PR: the merge gate, the hook, the next trial. Each waits for evidence from a trial under the new handoff.
+
+
+## Codex, round 15
+
+I read the brief, diff and tests before the PR body at b675234; `tmp/concerns.md` was written before `pr_review.py handoff` returned the body.
+The staged command and the user's explicit ordering reminder guided this run; the user supplied the PR URL, so this is not an independent trial of URL withholding. [Review](https://github.com/chenghanlee/tips/pull/545#pullrequestreview-5646960634): one P1, mixed-head evidence.
+
+## Fable, round 16: partial proof marked proven
+
+The user asked for an adversarial round on the simplest well-engineered fix for the findings I verified from `tmp/trial/results.md` after PR 545. Attack this; answer under `## Codex, round 16`.
+
+### The defect
+
+Two rows in the new reviews said "proven" after checking part of the scenario:
+
+- 444 row 2, "Persistence failure": proof was the failed-write test. The scenario's read path (`observe` calls `findings()` outside the diagnostic wrapper at d5068e3) and the stale-PASS ordering were not exercised. Two original P1s sat in the unchecked part.
+- 428 row 6, "Unreachable reviewer is reported without failing the tester handoff": proof was the printed `Could not notify` line and exit 0. Who learns of the failure and acts was not checked. The requirement was in a design round the packet lacked, so this one is qualified.
+
+Same shape both times: the scenario title names a class (persistence failure, unreachable reviewer); the proof covers one member; the status cell has only `proven`, `unproven` or `wrong`, so one member rounds up to the class.
+
+The other three findings (packets, environment, leaked fixture processes) are trial hygiene. The fixture leak is 16 processes from `test_team.py:92`'s fake client on the 531 run; my runs today left none; cause not established.
+
+### What a fix must do
+
+Make the tester write down what the row did not exercise, at the moment it fills the row. Not a new step, not a new document, not a new column the implementer must also fill. Dan Luu: the skill should shift the default, not tutor.
+
+### Candidates
+
+- **A. A fourth status, `partial`.** Step 3: "A scenario that names a class, several paths or an ordering (read and write, before and after, first and later) is proven only when each member has its own proof. Otherwise write `partial: <member not exercised>`. Partial is unproven for severity." One sentence in the rules, one word in the status vocabulary. The tester already fills the cell; the new word forces the negative space into it.
+- **B. Split the Proof cell** into condition reached, assertion, and not covered. Forces the same negative space but on every row, including the single-path ones. Three cells to fill where one would do. More text per row, read by nobody.
+- **C. Make the brief enumerate failure points** so the row is never a class. Moves the work to the architect, who cannot know the implementation's joins. The 444 read path exists because of how `observe` was written, not because of the brief. Rejected.
+- **D. A harness check.** Nothing mechanical can tell a class from a member. Rejected.
+
+I recommend A. Cost: one sentence and one word. Risk: `partial` becomes a label that is skimmed like `proven`. Mitigation is that partial is P1 by rule, so writing it has a consequence the tester must own.
+
+### Hygiene, outside the skill
+
+- Packets and environment: the round 10 trial design already says freeze packets and provide a compatible preflight. No repo change.
+- Fixture leak: `Harness.client()` should register the kill at the call, not in `tearDown`, and kill the child's process group, since it starts a new session. Only if the cause is a reused pid file or a runner killed before teardown; you have the 531 logs. Say which.
+
+### Attack this
+
+1. Rewrite 444 row 2 and 428 row 6 as they would read under A. Would the tester have written `partial`, or would it have written `proven` anyway? If anyway, A is a label and we need something else; say what.
+2. Is `partial` already covered by `unproven`? If so, why did neither row say unproven?
+3. A costs a sentence. Is there a zero-text fix: a change to the example row, or to the table header, that does the same work?
+4. The fixture leak: cause from the 531 logs, and the smallest fix.
+
+
+## Codex, round 16
+
+Question: can the review distinguish the required outcome from the subset tested? Failure signal: a row says proven while its evidence leaves a required path or recipient unchecked.
+
+1. **The rows, under A.**
+
+   | Scenario | Proof | Status |
+   |---|---|---|
+   | 444, persistence failure | Failed comment write: conflict handoff test asserts known conflict/head plus exact GitHub error and refuses handoff. History-read failure not exercised. | partial: history-read failure |
+   | 428, unreachable reviewer | Notification probe asserts missing critic diagnostic, successful recipients and exit 0. Delivery of failure details to a recovery owner not exercised. | partial: recovery ownership; that obligation was not established by the supplied brief |
+
+   These are retrospective corrections, not evidence A would produce them. The actual 444 cell already says **“Proven for failed comment writes”** (`tmp/trial/inputs/pr444/tmp/review.md`). The agent noticed its narrower evidence and still accepted it. 428's row matches its supplied, weaker scenario (`tmp/trial/inputs/pr428/tmp/review.md`); a status word cannot recover an omitted contract. I dispute treating both as the same demonstrated classification failure. Also, the stale-PASS race concerns resolution ordering, not simply another persistence-failure member: historical `pr_review.py:430–433` resolves by check identity. A could fix the read/write label and still miss that race.
+
+2. **Partial proof is already unproven for the full required claim.** Step 3 and the severity rule require this. The records establish narrowed evidence, not why the model accepted it. A fourth status adds no enforcement; P1 is already the consequence. “Each member has its own proof” also risks exhaustive enumeration of an undefined class or separate tests where one structured test suffices. Limit the obligation to required cases on affected paths, not everything suggested by a broad title.
+
+3. **Replace the existing table cells.** Keep three columns and statuses. Replace the Proof example with: **“required case → assertion; required cases not exercised (or none)”**. Replace the Status example with: **“proven only if no required case remains unproven; otherwise unproven or wrong”**. This puts the prompt where the answer is written and reuses the existing P1 rule. No new step; not literally zero text. Whether it changes behaviour remains untested. Check the next real review for honest case boundaries, not merely completed cells.
+
+   **A:** reject the new status; retain exposing missing evidence. **B:** amend to the single-cell replacement above; three separate proof columns add ceremony. **C:** reject exhaustive architect enumeration, but keep complete contracts and named recovery owners in the brief. Missing packets mattered in 428. **D:** reject semantic gating; a parser can enforce words, not adequate proof. No extra agent or review round.
+
+4. **The leak is lost per-launch cleanup identity, with matching evidence; not an established runner kill.** It is `StopAgentTest.client()`, not `Harness.client()`. At both the trial head and current worktree, `test_team.py:64–74` kills saved host handles but reads only the latest `client`/`child` files; `:99–100` removes those files on each launch. Failed subtests continue launching. The 531 `tmp/review-work/full-suite.log` records four failures in the owner-change loop and six in graceful-stop, including `/bin/ps` denial; the suite completes all 115 tests (log call 29, exit 1). `tmp/trial/coordinator/orphan-cleanup.json` finds three client trees using `tmph2aqsj29/child` and five using `tmpuywgd0j8/child`: exactly the earlier launches left when only the last of four/six is cleaned. Eight clients plus eight children, sixteen total. The later successful run cannot recover those overwritten identities. The logs do not map every PID to its launch, so that correspondence is an inference supported by the cleanup code, not a fresh reproduction.
+
+   Smallest fixture repair: keep cleanup ownership per invocation, using unique PID files and a cleanup registered when its host is spawned, before readiness assertions. Cleanup must stop that invocation's child process group and client, then kill/reap its host with bounded waits, before removing its files. Preserve separate real-daemon teardown. `addCleanup` alone with shared filenames still leaks; it cannot survive SIGKILL of the runner. Verify with two launches whose stop fails, then fixture teardown: both clients and both child groups must disappear. This belongs in the fixture, not tester instructions.
+
+I would ship the table-cell replacement and fixture ownership repair separately. Keep packet/preflight corrections in the trial protocol. Do not claim improved review recall until observed.
+
+## Fable, round 17: converge
+
+Conceded: A. The 444 cell already said "Proven for failed comment writes", so the tester saw the narrowing and a new status word would have given it nothing it lacked. The stale-PASS race is an ordering case, not a member of "persistence failure"; I withdraw that pairing. Your cell replacement puts the prompt where the answer is written, and the existing P1 rule is the consequence. Shipping that.
+
+Retained: "required case" needs a boundary or the cell invites either a one-word "none" or an endless list. The boundary is what the brief's scenario or an affected contract from Step 2 names. Exact text for Step 3:
+
+| Scenario | Proof | Status |
+|---|---|---|
+| number and title | each required case: test name or command and its assertion; then the required cases not exercised, or `none` | proven only when no required case is unexercised or unproven; otherwise unproven or wrong |
+
+One rule sentence after the table: "A required case is a path, recipient or ordering the brief's scenario or an affected contract from Step 2 names: read and write, first and later, each named recipient. Evidence for part of a scenario is unproven, not 'proven for' the part." The old bullet "Run the test. Read its assertion..." stays; nothing else changes. Not claimed: that this changes behaviour. The next real review is the check: the cell either names a case not exercised or says `none`, and the P1 rule bites when `none` was false.
+
+Fixture: your trace is confirmed. 4 subtest failures in `test_changed_owner_or_failed_clear_preserves_the_name` and 6 in `test_graceful_stop_exits_owned_children_and_releases_the_name` in the 531 `full-suite.log`; the orphan list has 3 trees under one TEST_RUNS directory and 5 under another; 4−1 and 6−1. `tearDown` kills every host in `self.processes`, so the clients become ppid 1, and the pid-file kill reaches only the last launch. Smallest repair, in `StopAgentTest.client()`:
+
+- Per-launch pid files, `client-<n>` and `child-<n>`; the launch records `(host, client_file, child_file)`.
+- `tearDown` walks every launch: `os.killpg(child_pid, SIGKILL)`, since the child is a session leader and its group is its own; `os.kill(client_pid, SIGKILL)`; `host.kill()` and `wait()`; suppress `ProcessLookupError`. Bounded waits are not needed after SIGKILL on these owned processes.
+- Tests that read `self.root / "client"` or `"child"` (lines 130, 133, 177, 252) read the latest launch's files; keep a `self.latest` pair so they do not change.
+- Proof: a test that launches twice with a failing stop between, then runs teardown, and asserts both children's groups and both clients are gone. The control is the old teardown, which leaves the first pair.
+
+`addCleanup` on shared names was rejected for the reason you gave. A runner killed by SIGKILL is out of scope; the suite is not run that way.
+
+Two PRs after the user's approval: skill text (Step 3 cells and the sentence) and the fixture repair with its test. Packet freeze and preflight stay in the trial protocol. If you object to the boundary sentence or the teardown shape, say so under `## Codex, round 17`; otherwise write "agreed" and the exact cell text you would ship if it differs.
+
+
+## Codex, round 17
+
+Agreed on the required-case boundary and exact table cells in round 17. No replacement text. Agreed on per-launch identities, child-group cleanup, the two-launch regression and its old-teardown control.
+
+Two teardown amendments:
+
+- Keep a bounded host wait, for example `wait(timeout=2)`, and report a timeout after attempting the remaining cleanup. SIGKILL is not evidence that reaping has completed. Existing stop assertions already use `wait(timeout=2)` (`test_team.py:174`); dropping the bound saves no meaningful work and conflicts with the bounded-work rule. The trial did not demonstrate a hung reap; this is a design constraint, not another observed defect.
+- Register each launch immediately after `Popen`, before reading its PID files. A missing or empty PID file must not abort cleanup of other launches, the host or the daemon. The readiness comment and loop (`test_team.py:123–136`) explicitly allow files to appear empty and can exhaust their wait. Preserve that failure as a diagnostic; do not silently declare cleanup complete. Separate cleanup callbacks or equivalent exception-safe teardown suffice.
+
+No runner-SIGKILL recovery or general process supervisor.
+
+## Fable, round 17: closed
+
+Both teardown amendments accepted: bounded host `wait(timeout=2)` with the timeout reported after the remaining cleanup runs; each launch registered right after `Popen`, before its pid files are read, with a missing or empty file reported, never silently skipped. Agreed fix, pending the user's approval: Step 3 table cells and the required-case sentence in one PR; the fixture repair and its two-launch test in another.
