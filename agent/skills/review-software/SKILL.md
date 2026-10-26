@@ -5,16 +5,10 @@ description: Guides a tips PR review: correctness against the brief on every aff
 
 # Review software
 
-Verify that the change meets the brief on every affected path and that its design is
-the simplest that satisfies the contracts. Provide evidence for both conclusions.
-
 Scope limits:
 
-- Ask for a test only for a scenario, or for an existing contract the affected code
-  reaches that no surviving test proves (Step 5).
 - One pass. Report every P0 and P1. Report at most three P2 findings, the ones with the
-  greatest consequence. Combine findings only when they share a cause and fix. Put P2s
-  where [Optional P2 findings](../../teams/README.md#optional-p2-findings) says.
+  greatest consequence. Combine findings only when they share a cause and fix.
   Deferrals follow the [severity rule](../../teams/README.md#severity); a shortcut the
   brief did not accept is a P2 with a proposed deferral, not a demand for completeness.
 - For a local review with no PR, use the user's brief and the working tree, and report
@@ -23,14 +17,9 @@ Scope limits:
   [schedule](../../docs/checks.md#dialyzer). Review conventions only where the change
   violates its stack skill in AGENTS.md. Cite the skill. One finding per repeated pattern.
 
-The [tester role](../../teams/roles/tester.md) defines turns, handoff and the merge; the
-[architect role](../../teams/roles/architect.md) does for an additional reviewing
-architect. [implement-software](../implement-software/SKILL.md) is the standard for
-contracts, state and failure.
-
 ## Step 1: Inputs
 
-Your handoff names the head and its base, not the PR. Read, in this order:
+Read, in this order:
 
 1. The brief: contracts, acceptance scenarios, decisions table; the spec's shared
    contracts when the brief links one. If the brief is missing or incomplete, report
@@ -40,11 +29,9 @@ Your handoff names the head and its base, not the PR. Read, in this order:
 
 Write `tmp/concerns.md`: the head SHA, then the plausible mistakes this change could
 make and the check that would tell each one apart, with the brief line or contract that
-gives the expected result. "No specific concern" is valid. These are hypotheses to revise,
-not a test plan. On a later head of the same PR, append the new head and your concerns
-about the delta to the same file. Then run
-`python3 <harness>/pr_review.py handoff <head> tmp/concerns.md`;
-it refuses until the file names the head, and then prints the PR, its
+gives the expected result. "No specific concern" is valid. On a later head of the same
+PR, append the new head and your concerns about the delta to the same file. Then run
+`python3 <harness>/pr_review.py handoff <head> tmp/concerns.md`; it prints the PR, its
 [body](../../teams/README.md#pr-body) and prior review threads. Verify the body's
 scenario table, affected code and decisions in steps 2 and 3. Do not copy its claims as
 results.
@@ -55,16 +42,14 @@ Independently trace changed contracts, shared fixtures and config through their 
 to entry points, or to a caller whose handling of the change you have read and that
 still satisfies its own contract. Find users with Dexter `references` and scoped `rg`
 ([navigation rules](../../../agent/docs/elixir-navigation.md)); investigate every use
-that only one lookup found. An unchanged signature is not a stopping point. For each entry
-point reached, check the resulting state and side effects. Do not revisit a checked
-path. For evidence across several files, follow the
+that only one lookup found. An unchanged signature is not a stopping point. Do not
+revisit a checked path. For evidence across several files, follow the
 [Lookup subagents](../../docs/lookup-subagents.md) rule; you remain responsible for
 tracing and verifying the affected contract.
 
 An added, cached, moved or removed fact affects each path that constructs, updates,
 reads, resets or removes it, and each late callback
 ([implement-software](../implement-software/SKILL.md#trace-the-affected-contract)).
-Find them yourself before comparing with the PR body's list.
 
 Then verify the PR body's `Affected code` list at the reviewed head. In the review body
 report only what you add, correct or dispute, and any material coverage limit; link the
@@ -101,8 +86,7 @@ Rules:
 - A double may replace an external call. The production code responsible for the claim
   must still run.
 - Prove a scenario that names a user interaction in the browser. Follow
-  [manual browser review](../../teams/README.md#manual-browser-review). Otherwise, mark
-  it unproven.
+  [manual browser review](../../teams/README.md#manual-browser-review).
 - Ask for another test only for a distinct required case no surviving test proves
   ([implement-software](../implement-software/SKILL.md#tests)).
 
@@ -117,22 +101,20 @@ existing flow: callers, ordering, release and cleanup. Add a second control when
 join exposes a distinct consequential risk the first control does not cover.
 
 Before each run, name the plausible mistake, the behaviour it changes and the assertion
-expected to fail. Choose a mistake the PR body's controls do not already cover;
-reproducing a control is Step 3, not this check. A new or existing test counts when it
-exercises the responsible production path and detects that behaviour; neither the
-test's age nor whether the mutant deletes a line decides validity.
+expected to fail. Choose a mistake the PR body's controls do not already cover. A new
+or existing test counts when it exercises the responsible production path and detects
+that behaviour; neither the test's age nor whether the mutant deletes a line decides
+validity.
 
 For each control:
 
 1. Run its test unchanged. Confirm it passes.
 2. Apply the defect: invert a condition, drop a write, return early, reorder two steps.
-   If it causes a compile error or an unrelated crash, pick another defect. Neither
-   proves the test detects the intended defect.
+   If it causes a compile error or an unrelated crash, pick another defect.
 3. Run the test. Confirm the named assertion fails.
 4. Revert the change. Rerun the test. Confirm the working tree is clean.
 
-Report P1 if the test still passes in step 3. It does not prove the scenario. Record each
-mutation and its result in the review body.
+Report P1 if the test still passes in step 3.
 
 ## Step 5: Entry points
 
@@ -140,13 +122,12 @@ For each entry point in the affected code:
 
 1. Run its existing tests.
 2. Pick the probes below that the changed contract makes relevant. Name them in the
-   review body. Do not require a fixed number of probes.
+   review body.
 3. Trace one input from the entry point through the changed code to the final state and
    side effects.
 4. If the path reaches an existing contract that no surviving test proves for the
    changed case, file P1 "missing coverage for affected contract `path:line`" with the
-   uncovered case. The implementer records the case and supplies the missing evidence;
-   only an unsettled contract needs an architect decision. Prefer extending an existing test.
+   uncovered case.
 
 Probes, by change type:
 
@@ -176,9 +157,7 @@ changed, in your own database and port. For the full application suite, follow t
 evidence during the CI pause, follow the [policy](../../../agent/docs/checks.md#github-ci-pause).
 Run any further check your investigation needs.
 
-Report each applicable check once: run by you, verified from the implementer's record,
-or missing with its reason or an authorized waiver. Quote only the failing lines. For a
-failing or flaky test, follow the
+For a failing or flaky test, follow the
 [failed-check procedure](../../teams/README.md#report-and-resolve-blockers). Do not
 report a skipped CI check as passed.
 
@@ -200,8 +179,7 @@ justified distinct test coverage; an added test with no scenario, affected contr
 justified regression is P2. Apply the
 [performance principles](../design-software/SKILL.md#performance-principles) when the
 change adds or alters work, waiting, memory or storage; a finding names the operation,
-the workload, the consequence and the change. Other design findings use the
-[severity table](../../teams/README.md#severity), within the combined P2 limit.
+the workload, the consequence and the change.
 
 For changed pages, forms or components, apply
 [web-design-guidelines](../web-design-guidelines/SKILL.md) to the affected templates,
@@ -217,9 +195,7 @@ and agreed behaviour. P0 where the table requires it; P1 when an approved constr
 fails or is unproven, or the change significantly harms the user's experience; other
 differences are P2.
 
-An additional reviewing architect applies Steps 1 and 2, this section and the record;
-the tester remains responsible for scenarios, checks and the merge. Reuse shared
-evidence, not duplicate passes.
+Reuse shared evidence, not duplicate passes.
 
 ## Proof standard
 
@@ -234,18 +210,12 @@ defect reproduction.
 
 Say for every finding whether it came from a run or from reading.
 
-## Severity
-
-Use the [severity table](../../teams/README.md#severity). A scenario that passes for the
-wrong reason is unproven. State the requested change for every P2.
-
 ## Review record
 
 Submit the [PR review record](../../teams/README.md#pr-review-record), with findings in
 the [finding format](../../../AGENTS.md#github).
 
-Review body, after the record's two header lines (`LGTM` or the decision, then
-`<entry>, <session>`), in this order:
+Review body, after the record's two header lines, in this order:
 
 1. Head SHA.
 2. `Concerns`: your `tmp/concerns.md` as written before `handoff`, and what became of each.
@@ -270,9 +240,3 @@ tests, fixtures and inputs the delta changes; repeat a control when the change
 invalidates its evidence. A change to one claim does not require repeating unaffected
 evidence. An unchanged head does not remove the need to assess new evidence, such as a
 new check record.
-
-## Merge
-
-Merge only as the [merge rule](../../teams/README.md#merge) allows: every required
-review is an LGTM on the head, every thread is resolved, the required checks pass. This
-skill does not authorize a review or a merge on its own.

@@ -202,21 +202,18 @@ def bootstrap_command(head: str) -> str:
 
 def tester_message(record: Record, pr: PullRequest, missing: list[str], failures: list[str]) -> str:
     implementer, tester = record["implementer"], record["tester"]
-    message = f"Your turn: review brief #{record['brief']} at head {pr.head}. This handoff "
-    message += "notified every launched required reviewer of this head"
+    message = f"Your turn: review brief #{record['brief']} at head {pr.head}. "
     if missing:
-        message += f" and asked the dispatcher to launch {', '.join(missing)}"
-    message += ". " + failures_text(failures)
+        message += f"This handoff asked the dispatcher to launch {', '.join(missing)}. "
+    message += failures_text(failures)
     message += (
-        f"Move your own clone to the head first: {bootstrap_command(pr.head)}; it refuses a "
-        "dirty clone. "
+        f"Move your own clone to the head first: {bootstrap_command(pr.head)}. "
         + first_reading(pr)
-        + "Follow agent/teams/roles/tester.md and agent/skills/review-software/SKILL.md "
-        "from your clone and use the README PR review record. "
+        + "Follow agent/skills/review-software/SKILL.md from your clone. "
         f"Put {tester}, <session> on line 2; replace <session> with your session ID. "
         "When your review or any required reviewer's latest review of this head has a P0 or "
         f"P1 finding, run {turn_command(implementer)} with the PR number handoff "
-        "printed; Optional P2s need no turn. Do not wait for the other reviews. Follow the "
+        "printed. Do not wait for the other reviews. Follow the "
         f"README merge step when python3 {harness() / 'pr_review.py'} observe <pr> reports "
         "ready to merge. After the merge, notify the dispatcher with herdr agent prompt "
         "dispatcher '<PR URL> done'."
