@@ -24,7 +24,8 @@ Scope limits:
   brief did not accept is a P2 with a proposed deferral, not a demand for completeness.
 - For a local review with no PR, use the user's brief and report in the form the user
   asked for. Do not publish a GitHub review.
-- Leave style to Credo, Dialyzer and the formatter, which the tester runs. Review
+- Leave style to Credo and the formatter, which the tester runs, and to Dialyzer on its
+  [schedule](../../docs/checks.md#dialyzer). Review
   conventions only where the change violates its stack skill in AGENTS.md. Cite the
   skill. Report one finding per repeated pattern.
 
@@ -93,17 +94,10 @@ depends on it. Severity follows the [severity table](../../teams/README.md#sever
 
 ## Step 7: Test value
 
-Limit tests to the brief's scenarios and contracts.
-
-- Map each new test to a scenario or affected contract, or to a reason in the PR body's
-  tests-without-a-scenario-line section. If neither applies, report P2 to delete it.
-- Each test fails if its contract breaks, and passes for one reason. Ask to delete a
-  test only when surviving tests cover its distinct required cases. Name them.
-- Flag tests that the implementation skill's [Tests](../implement-software/SKILL.md#tests)
-  bans by default.
-- Check the net test change against the brief's test budget and the PR body's reasons.
-  Check that replaced tests were deleted.
-- Raise a test's correctness only when you can show the case where it passes wrongly.
+Apply the implementation skill's [Tests](../implement-software/SKILL.md#tests) rules to
+test value and review-software-correctness Step 3 to proof. An added test with no
+scenario, affected contract or justified regression is P2. Ask to delete a test only
+when surviving tests cover its distinct required cases, and name them.
 
 ## Record
 

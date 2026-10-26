@@ -30,18 +30,10 @@ dirty clone and never resets one.
 3. Record the head SHA and your initial findings as the
    [review record](../README.md#pr-review-record) says.
 4. Follow both skills with your own database and port: affected code, design,
-   scenarios and their controls, mutation check, entry points, data, checks. For the
-   full application suite, verify the implementer's record instead of rerunning it, as
-   [Step 7](../../skills/review-software-correctness/SKILL.md#step-7-checks) says.
-   PhoenixTest Playwright browser tests (`test/tips_web/features`): a Codex client
-   does not run them ([manual browser review](../README.md#manual-browser-review)). Read the implementer's record
-   in the PR body under "Checks not run by CI": check the command, exit, per-run results
-   and failure excerpts. While the implementer's working log exists, read the relevant
-   range or ask for an excerpt. Write "Browser tests run by <implementer entry>; inspected
-   <what> at <SHA>; not rerun" in your review. If the PR body has no browser record,
-   record that in your review; the merge-confirming tester then runs
-   `agent/teams/team.py turn <pr> <implementer entry>` to request it, and any other
-   tester sends its review URL to the merge-confirming tester. For manual checks follow [manual browser review](../README.md#manual-browser-review), including its Codex setup, launch form and failure steps.
+   scenarios and their controls, mutation check, entry points, checks. For the full
+   application suite, verify the implementer's record instead of rerunning it
+   ([substitution](../../../agent/docs/checks.md#application-suite-substitution)).
+   Browser tests and manual checks follow [manual browser review](../README.md#manual-browser-review).
 5. For a brief with a `UX:` line, or a changed page, form or component, apply the
    [Record](../../skills/review-software-design/SKILL.md#record) section of
    review-software-design: the candidate comparison and the pinned web-design-guidelines
