@@ -429,8 +429,9 @@ elif a[0] == "api" and "/commits/" in a[1] and a[1].endswith("/pulls?per_page=10
         "base": {"ref": s.get("pr_base_ref", "main")},
         "body": s.get("pr_body", ""),
     }
-    pulls = [seven, *s.get("pulls", [])]
-    out = json.dumps([pr for pr in pulls if pr["head"]["sha"] == sha])
+    # GitHub lists every PR whose branch contains the commit, stacked ones included; the
+    # caller picks the one whose head it is. The fake does not filter for it.
+    out = json.dumps([seven, *s.get("pulls", [])])
 elif a[0] == "api" and "/rules/branches/" in a[1]:
     required = [{"context": name} for name in s.get("required", ["checks", "release"])]
     rule = {"type": "required_status_checks", "parameters": {"required_status_checks": required}}

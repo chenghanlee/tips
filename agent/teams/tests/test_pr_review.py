@@ -123,7 +123,7 @@ class ObserveTest(FakeGhTest):
     def test_a_head_other_than_the_handed_off_one_is_refused(self) -> None:
         # turn read head 0...0 from the PR, then the PR moved before its state was read.
         expected = "0" * 40
-        pr = PullRequest("7", "https://github.com/o/r/pull/7", expected, ["29"])
+        pr = PullRequest("7", "https://github.com/o/r/pull/7", expected, ["29"], "main")
         moved = f"PR 7 moved from {expected} to {self.head}; nothing sent"
         with self.assertRaisesRegex(RuntimeError, re.escape(moved)):
             team.observe_pr(pr)
@@ -245,6 +245,17 @@ class HandoffTest(FakeGhTest):
         assert "not a full head SHA" in self.refused(HEAD[:7])
         self.update(pr_head="0" * 40)
         assert f"No open PR has head {HEAD}" in self.refused()
+        # A stacked PR contains the commit but is at another head: GitHub lists it too.
+        stacked = {
+            "number": 9,
+            "state": "open",
+            "html_url": "https://github.com/o/r/pull/9",
+            "head": {"sha": "9" * 40},
+            "base": {"ref": "main"},
+            "body": "",
+        }
+        self.update(pr_head=HEAD, pulls=[stacked])
+        assert self.handoff().startswith("PR https://github.com/o/r/pull/7 "), "stacked PR ignored"
         other = {
             "number": 8,
             "state": "open",
@@ -253,7 +264,7 @@ class HandoffTest(FakeGhTest):
             "base": {"ref": "main"},
             "body": "",
         }
-        self.update(pr_head=HEAD, pulls=[other])
+        self.update(pulls=[other, stacked])
         assert f"PRs 7, 8 share head {HEAD}" in self.refused()
         self.update(pulls=[{**other, "state": "closed"}])
         assert "pull/7" in self.handoff(), "a closed PR at the head does not count"

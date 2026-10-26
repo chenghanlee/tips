@@ -29,7 +29,7 @@ class PullRequest(NamedTuple):
     url: str
     head: str
     briefs: list[str]  # the issues the PR closes
-    base_ref: str = "main"
+    base_ref: str
 
     def require_closes(self, brief: str) -> None:
         if brief not in self.briefs:

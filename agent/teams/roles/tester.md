@@ -25,7 +25,8 @@ dirty clone and never resets one.
 2. Before your first required manual browser scenario, run the
    [browser preflight](../SETUP.md#browser-run) once in your own runtime. If it fails,
    report `blocked` with the exact error.
-3. Write the head SHA and your initial concerns to `tmp/concerns.md`, then run the
+3. Write the head SHA and your initial concerns to `tmp/concerns.md`; on a later head,
+   append the new head and the delta's concerns to it. Then run the
    `pr_review.py handoff <head> tmp/concerns.md` command your handoff names. It prints
    the PR, its body and prior reviews; `turn` and `observe` take the number it prints.
    The [review record](../README.md#pr-review-record) repeats the concerns.

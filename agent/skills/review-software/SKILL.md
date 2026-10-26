@@ -41,7 +41,9 @@ Your handoff names the head and its base, not the PR. Read, in this order:
 Write `tmp/concerns.md`: the head SHA, then the plausible mistakes this change could
 make and the check that would tell each one apart, with the brief line or contract that
 gives the expected result. "No specific concern" is valid. These are hypotheses to revise,
-not a test plan. Then run `python3 <harness>/pr_review.py handoff <head> tmp/concerns.md`;
+not a test plan. On a later head of the same PR, append the new head and your concerns
+about the delta to the same file. Then run
+`python3 <harness>/pr_review.py handoff <head> tmp/concerns.md`;
 it refuses until the file names the head, and then prints the PR, its
 [body](../../teams/README.md#pr-body) and prior review threads. Verify the body's
 scenario table, affected code and decisions in steps 2 and 3. Do not copy its claims as

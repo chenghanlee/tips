@@ -1071,7 +1071,8 @@ class HandoffTest(Harness):
         assert "it refuses a dirty clone" in ring
         assert "read the brief, then git diff origin/main...HEAD and the tests" in ring
         handoff = f"python3 {harness / 'pr_review.py'} handoff {pushed} tmp/concerns.md"
-        assert f"tmp/concerns.md as the README review record says, then run {handoff};" in ring
+        assert "tmp/concerns.md as the README review record says; on a later head" in ring
+        assert f"delta to it instead. Then run {handoff};" in ring
         assert "Put tester, <session> on line 2" in ring
         # Only a P0, P1 or hold sends the head back; Optional P2s need no turn (#515).
         turn = f"python3 {harness / 'team.py'} turn <pr> impl with the PR number handoff printed"
@@ -1089,15 +1090,24 @@ class HandoffTest(Harness):
         # A new head reaches the tester and the launched critic in the same handoff.
         self.team("review", "7", "critic")
         moved = self.push("team-1-impl", "second push")
+        # The PR's base is a stacked branch, not main: every message names that base.
+        self.update(pr_base_ref="task/stacked")
         prompts = len(self.events("agent", "prompt"))
         self.team("turn", "7", "tester", pane=self.impl)
         sent = self.events("agent", "prompt")[prompts:]
         assert [e[2] for e in sent] == ["team-1-tester", "team-1-critic"]
         assert all(moved in e[3] and "github.com" not in e[3] for e in sent)
+        assert all("origin/main" not in e[3] for e in sent), sent
+        base = "on base task/stacked in your own clone: read the brief, then git diff "
+        assert all(f"{base}origin/task/stacked...HEAD" in e[3] for e in sent), sent
+        later = "append the new head and your concerns about the delta to it instead."
+        assert all(f"on a later head of the same PR, {later}" in e[3] for e in sent), sent
         assert f"bootstrap.py --commit {moved}" in sent[1][3]
         assert "never resets one" in sent[1][3]
+        assert "review steps for brief #29. " in sent[1][3]
         again = f"python3 {harness / 'pr_review.py'} handoff {moved} tmp/concerns.md"
-        assert f"your concerns about the delta to it. Then run {again};" in sent[1][3]
+        assert f"delta to it instead. Then run {again};" in sent[1][3]
+        self.update(pr_base_ref="main")
         assert "herdr agent prompt team-1-tester" in sent[1][3]
         assert "asked the dispatcher" not in sent[0][3]
         # The brief cannot move the merge-confirming tester under a running pair.
@@ -1241,6 +1251,7 @@ class HandoffTest(Harness):
 
     def test_review_launches_each_reviewer_in_its_own_allocation_at_the_pr_head(self) -> None:
         head = self.push("team-1-impl")
+        self.update(pr_base_ref="task/stacked")  # a stacked PR: the brief names its base
         self.team("review", "7", "critic")
         root = self.trusted / "allocations/g1-critic"
         critic = self.pane("team-1-critic")
@@ -1249,8 +1260,10 @@ class HandoffTest(Harness):
         assert brief.startswith("You are critic, the reviewing architect for brief #29;")
         assert "Your persona: operations: failure and recovery paths." in brief
         assert f"bootstrap.py --commit {head}" in brief
-        reading = f"Review head {head} on base main in your own clone: read the brief, then "
-        assert f"{reading}git diff origin/main...HEAD" in brief
+        reading = f"Review head {head} on base task/stacked in your own clone: read the brief, "
+        assert f"{reading}then git diff origin/task/stacked...HEAD" in brief
+        assert "origin/main" not in brief
+        self.update(pr_base_ref="main")
         assert "github.com/o/r/pull/7" not in brief, "the PR body waits for the reviewer's concerns"
         handoff = f"pr_review.py handoff {head} tmp/concerns.md; it prints the PR, its body"
         assert handoff in brief

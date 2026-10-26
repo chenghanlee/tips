@@ -105,8 +105,9 @@ def first_reading(pr: PullRequest) -> str:
         f"Review head {pr.head} on base {pr.base_ref} in your own clone: read the brief, "
         f"then git diff origin/{pr.base_ref}...HEAD and the tests of each changed module. "
         "Write the head and your initial concerns to tmp/concerns.md as the README review "
-        f"record says, then run {handoff_command(pr.head)}; it prints the PR, its body "
-        "and prior reviews. "
+        "record says; on a later head of the same PR, append the new head and your concerns "
+        f"about the delta to it instead. Then run {handoff_command(pr.head)}; it prints the "
+        "PR, its body and prior reviews. "
     )
 
 
@@ -228,12 +229,9 @@ def reviewer_notice(record: Record, entry: str, pr: PullRequest) -> str:
     return (
         f"New head to review: {pr.head} on base {pr.base_ref}. Move your own clone to it with "
         f"{bootstrap_command(pr.head)}; it refuses a dirty clone and never resets one. Follow "
-        f"your role's PR review steps. On your first review of this PR, read brief "
-        f"#{record['brief']}, then git diff origin/{pr.base_ref}...HEAD and the tests of each "
-        "changed module, then write the head and your concerns to tmp/concerns.md; otherwise "
-        f"append the new head and your concerns about the delta to it. Then run "
-        f"{handoff_command(pr.head)}; it prints the PR, its body and prior reviews. Review "
-        "the full relevant PR change on "
+        f"your role's PR review steps for brief #{record['brief']}. "
+        + first_reading(pr)
+        + "Review the full relevant PR change on "
         "your first review; otherwise review the changes since your last actual review. "
         f"Earlier design advice is not a PR review. Submit the README review record with {entry}, "
         f"<session> on line 2, then send its URL with herdr agent prompt {tester} "
