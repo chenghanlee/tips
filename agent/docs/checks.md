@@ -9,7 +9,7 @@ for each kind of file you changed:
 | Changed files | Run |
 |---|---|
 | Application code, tests or config | [Test changes](../../README.md#test-changes), including `mix credo --strict`; `mix dialyzer` only as [Dialyzer](#dialyzer) says |
-| `agent/teams` Python | [Harness checks](../teams/development.md#required-checks) |
+| `agent/teams` Python | [Harness checks](../teams/development.md#required-checks). Reviewers run the applicable checks themselves, including the real-daemon tests for Python changes and ShellCheck; the required-checks table names the opt-ins, and the suite summary names an opt-in it skipped |
 | Go, including carried patches | [Pinned lint profile](../lsp/dexter/patches/README.md#required-go-static-analysis) |
 | Markdown | `python3 scripts/check_docs.py` |
 
