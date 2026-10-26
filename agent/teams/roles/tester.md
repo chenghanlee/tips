@@ -11,7 +11,7 @@ dirty clone and never resets one.
    [Severity](../README.md#severity),
    [Report and resolve blockers](../README.md#report-and-resolve-blockers) and
    [Constraints](../README.md#constraints). Read the review record, PR body, browser and
-   merge sections when a step links them; `agent/teams/read.py section <file> <heading>`
+   merge sections when a step links them; `python3 <harness>/read.py section <file> <heading>`
    prints one.
 2. The brief, then the diff against the base your handoff names, then the tests of the
    changed modules. Your handoff withholds the PR until the `handoff` step below.
