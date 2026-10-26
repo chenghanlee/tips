@@ -63,6 +63,7 @@ class StopAgentTest(unittest.TestCase):
         # Every launch: its host and its own pid files. A failed subtest launches again,
         # so cleanup walks all of them, not the last pair (the 531 trial leaked eight).
         self.launches: list[tuple[subprocess.Popen[bytes], Path, Path]] = []
+        self.launched = 0  # names the pid files; reap() empties launches but not this
 
     def tearDown(self) -> None:
         problems = self.reap()
@@ -84,8 +85,11 @@ class StopAgentTest(unittest.TestCase):
                 except (OSError, ValueError) as error:
                     problems.append(f"{file.name}: {error}")
                     continue
-                with contextlib.suppress(ProcessLookupError):
-                    kill(pid, signal.SIGKILL)  # the child leads its own session and group
+                # The child leads its own session and group. macOS refuses killpg for a
+                # group whose only member exited unreaped (EPERM); killing its client
+                # below lets that zombie be reaped, so neither error stops the walk.
+                with contextlib.suppress(ProcessLookupError, PermissionError):
+                    kill(pid, signal.SIGKILL)
             if host.poll() is None:
                 host.kill()
             try:
@@ -114,8 +118,9 @@ def stop(*_):
 signal.signal(signal.SIGTERM, signal.SIG_IGN if sys.argv[2]=='yes' else stop)
 while True: time.sleep(.05)
 """
-        number = len(self.launches) + 1
-        client_file, child_file = self.root / f"client-{number}", self.root / f"child-{number}"
+        self.launched += 1
+        client_file = self.root / f"client-{self.launched}"
+        child_file = self.root / f"child-{self.launched}"
         host = (
             "import subprocess,sys; p=subprocess.Popen(sys.argv[2:]); open(sys"
             '.argv[1],"w").write(str(p.pid)); sys.exit(p.wait())'
@@ -258,10 +263,15 @@ while True: time.sleep(.05)
         assert "surviv" in r.stderr.lower()
 
     def test_teardown_reaps_every_launch_not_only_the_last(self) -> None:
-        """A failed stop leaves its client alive and the next launch overwrites nothing."""
-        self.client(stubborn=True)
+        """A failed stop leaves its client alive and the next launch overwrites nothing.
+        The first child's group has a member besides its leader, which only a group kill
+        reaches; the second child exited on its own, which the walk must step over."""
+        self.client(stubborn=True, child=["/bin/sh", "-c", "sleep 60 & wait"])
         assert self.stop().returncode != 0
-        survivors = [self.pid("client"), self.pid("child")]
+        survivors = [self.pid("client")]
+        group = self.pid("child")
+        self.client(child=["python3", "-c", "pass"])
+        survivors.append(self.pid("client"))
         self.client()
         survivors += [self.pid("client"), self.pid("child")]
         assert self.reap() == []
@@ -274,6 +284,12 @@ while True: time.sleep(.05)
                 time.sleep(0.02)
             else:
                 raise AssertionError(f"process {pid} survived teardown")
+        for _ in range(100):
+            if execute(["pgrep", "-g", str(group)]).returncode != 0:
+                break
+            time.sleep(0.02)
+        else:
+            raise AssertionError(f"a member of child group {group} survived teardown")
 
     @unittest.skipUnless(os.environ.get("TIPS_TEST_REAL_DEXTER"), REAL_DEXTER)
     def test_client_stop_leaves_real_daemons_started_by_a_client_query(self) -> None:
