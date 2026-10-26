@@ -74,7 +74,11 @@ Check the brief's scenarios in order. Fill one row per scenario:
 
 | Scenario | Proof | Status |
 |---|---|---|
-| number and title | test name, or the command you ran | proven, unproven or wrong |
+| number and title | each required case: test name or command and its assertion; then the required cases not exercised, or `none` | proven only when no required case is unexercised or unproven; otherwise unproven or wrong |
+
+A required case is a path, recipient or ordering the brief's scenario or an affected
+contract from Step 2 names: read and write, first and later, each named recipient.
+Evidence for part of a scenario is unproven, not "proven for" the part.
 
 Rules:
 
