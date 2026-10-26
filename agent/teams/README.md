@@ -9,8 +9,7 @@ a checkout. Follow
 [AGENTS.md](../../AGENTS.md) and the skill for your task:
 [design-software](../skills/design-software/SKILL.md),
 [implement-software](../skills/implement-software/SKILL.md),
-[review-software-correctness](../skills/review-software-correctness/SKILL.md) or
-[review-software-design](../skills/review-software-design/SKILL.md). Your role file
+[review-software](../skills/review-software/SKILL.md). Your role file
 lists your responsibilities: [dispatcher](roles/dispatcher.md),
 [architect](roles/architect.md), [implementer](roles/implementer.md),
 [tester](roles/tester.md). Read the [common rules](roles/common.md). The user completes
@@ -27,8 +26,8 @@ EVERY CLIENT bootstrap.py prepares its own clone before its first task
 IMPLEMENTER  ask questions only when answers affect the work → code → push → PR "Closes #<brief>" → team.py turn <pr> <tester>
              (notifies every required reviewer of the head; asks the dispatcher to launch missing ones)
 DISPATCHER   team.py review <pr> <entry> for each requested reviewer
-REVIEWERS    bootstrap.py --commit <head> → review correctness and design → notify tester if additional reviewer
-TESTER       a review with a P0, P1 or hold → team.py turn <pr> <implementer>   (repeat until none)
+REVIEWERS    bootstrap.py --commit <head> → brief, diff, tests → tmp/concerns.md → pr_review.py handoff <head> tmp/concerns.md prints the PR → review → notify tester if additional reviewer
+TESTER       a review with a P0 or P1 → team.py turn <pr> <implementer>   (repeat until none)
 TESTER       pr_review.py observe <pr> reports ready → gh pr merge → "done"
 DISPATCHER   team.py stop <brief> → next
 ```
@@ -100,7 +99,9 @@ generation reuses another's databases.
 
 ## Commands
 
-Run worker commands from your own allocation. The dispatcher runs `start`, `design`,
+Run worker commands from your own allocation. `<harness>` is the harness copy your
+handoff names, not your clone's `agent/teams`, so a PR that changes the harness is run
+with the installed one. The dispatcher runs `start`, `design`,
 `review`, `stop` and `status` through its `start_pair`, `start_design`,
 `launch_reviewer`, `retire_team` and `status` tools, from the main checkout. Only the
 operator (the user) runs `reset` and `stop --abandon`.
@@ -109,8 +110,8 @@ operator (the user) runs `reset` and `stop --abandon`.
 |---|---|---|
 | `agent/teams/team.py start <brief>` | Dispatcher | Read `Implementer:` and `Required reviews:`. For a brief with `UX:`, refuse unless a comment begins with `APPROVED candidate <SHA>` ([UX design team](#ux-design-team)). Label a new pair's brief ([Turns](#turns)). Create an allocation for the implementer (bootstrap branch `task/<brief>`) and the merge-confirming tester. Launch both in the team's workspace (see [Herdr layout](#herdr-layout)), write the record, and post one EVENT per launch on the brief. |
 | `agent/teams/team.py design <issue> <entry>` | Dispatcher | Launch a configured architect in its own allocation. A started brief reuses its team slot; otherwise create or join a spec team. The issue names the lead, any critics and the question or design assignment; a new spec team needs a `Lead: <entry>` line naming a configured architect and labels the spec ([Turns](#turns)). For a UX or graphic entry, launch it into the brief's [UX design team](#ux-design-team) instead; refused once the brief holds a pair. Post its launch EVENT on that issue. The adapter keeps the argument name `spec` for either issue number. |
-| `agent/teams/team.py turn <pr> <tester entry>` | Implementer | Require your own clone to be clean at the PR head and the PR to close the brief. Read the PR's live state (see `observe`); refuse unless GitHub reports the head mergeable. Label the brief ([Turns](#turns)). Notify every launched required reviewer of the head and the `bootstrap.py --commit` command that moves its clone there. For each reviewer not launched, post a pending EVENT on the PR and ask the dispatcher to run its `review` command. Try every send; report each failed one. |
-| `agent/teams/team.py turn <pr> <implementer entry>` | Tester | Read the PR's live state and label the brief ([Turns](#turns)). Notify the implementer with its merge conflict and failed required checks. Your clone's state does not block it. |
+| `python3 <harness>/team.py turn <pr> <tester entry>` | Implementer | Require your own clone to be clean at the PR head and the PR to close the brief. Read the PR's live state (see `observe`); refuse unless GitHub reports the head mergeable. Label the brief ([Turns](#turns)). Notify every launched required reviewer of the head, its base and the `bootstrap.py --commit` command that moves its clone there; the PR itself waits for `pr_review.py handoff`. For each reviewer not launched, post a pending EVENT on the PR and ask the dispatcher to run its `review` command. Try every send; report each failed one. |
+| `python3 <harness>/team.py turn <pr> <implementer entry>` | Tester | Read the PR's live state and label the brief ([Turns](#turns)). Notify the implementer with its merge conflict and failed required checks. Your clone's state does not block it. |
 | `agent/teams/team.py review <pr> <entry>` | Dispatcher | For a reviewer in the brief other than the merge-confirming tester: create its allocation, configured for the PR head, with its own database suffix and port, and launch the reviewer in the team's workspace. |
 | `agent/teams/team.py reset <issue> <entry>` | Operator | Record the operator's decision, after checking a stopped client's work on the issue and PR, that `start`, `design` or `review` may launch a replacement in the same allocation that gets the task again. Refuse a running client. |
 | `agent/teams/team.py stop <issue>` | Dispatcher | See [Retirement](#retirement). |
@@ -119,12 +120,14 @@ operator (the user) runs `reset` and `stop --abandon`.
 | `agent/teams/team.py status` | Dispatcher, user | Every allocation record with each client's live Herdr pane, name, kind, state and session, and whether the recorded dispatcher process runs. |
 | `agent/teams/team.py retained` | Operator | List retired allocations that still have files or databases, with cleanup's last result. Deletes nothing. |
 | `python3 <harness>/bootstrap.py [--commit <sha>]` | Launched client | Prepare your own clone, as [Allocations](#allocations) says. |
+| `python3 <harness>/read.py launch <role>` | Launched client | Print AGENTS.md, the common rules, your role file and the workflow sections item 1 of its Read list links, in order, in one call. `read.py section <file> <heading>` prints one section by heading text or slug at any depth; an unknown heading is an error, not empty output. |
 | `agent/teams/board.py post <issue> <TYPE>` | Any agent | Read the body from stdin. Add the attribution header. Print the comment URL. If an identical comment already exists, reuse it instead of posting another. A worker's BLOCKED post also sets `turn:dispatcher` and notifies the dispatcher, naming any label error; the command reports either failure, and a rerun retries both, not the post. |
 | `agent/teams/board.py read <issue> [--after <comment URL>]` | Any agent | Print the issue's labels and body, then every comment; with `--after`, the labels and only the comments after that checkpoint. |
 | `agent/teams/board.py usage <issue>...` | Dispatcher | Token counts by model for each client a launch EVENT names, read from its session logs. A Codex client's row sums every Codex session whose rollout started in its allocation directory, so a launch EVENT that says `unknown` still counts. |
-| `agent/teams/pr_review.py list <pr>` | Any agent | Recent reviews and every unresolved thread. Display only. |
-| `agent/teams/pr_review.py observe <pr>` | Launched client | Read the head, base, mergeability, checks and reviews within one `timeouts.github_seconds` deadline; refuse a read during which the head or base changed. Required checks are the contexts the base branch's effective rules require; a required check that has not reported blocks, and other checks are only shown. Post nothing. Judge only the current read: a merge conflict, unknown mergeability, unavailable evidence, a required check that has not passed, a missing or non-LGTM required review and an unresolved thread each block; an earlier failure that this read no longer shows does not. Exit 0 only when the PR can merge at this head. |
-| `agent/teams/pr_review.py resolve <thread>` | Thread opener | Resolve your own thread. |
+| `python3 <harness>/pr_review.py handoff <head> <concerns file>` | Reviewer | Refuse until the file names the head. Then find the one open PR at that head, refuse none or several, and print its URL, body, recent reviews and unresolved threads. Post nothing. |
+| `python3 <harness>/pr_review.py list <pr>` | Any agent | Recent reviews and every unresolved thread. Display only. |
+| `python3 <harness>/pr_review.py observe <pr>` | Launched client | Read the head, base, mergeability, checks and reviews within one `timeouts.github_seconds` deadline; refuse a read during which the head or base changed. Required checks are the contexts the base branch's effective rules require; a required check that has not reported blocks, and other checks are only shown. Post nothing. Judge only the current read: a merge conflict, unknown mergeability, unavailable evidence, a required check that has not passed, a missing or non-LGTM required review and an unresolved thread each block; an earlier failure that this read no longer shows does not. Exit 0 only when the PR can merge at this head. |
+| `python3 <harness>/pr_review.py resolve <thread>` | Thread opener | Resolve your own thread. |
 | `herdr agent prompt team-<slot>-<entry> "<review URL>"` | Other reviewer | Tell the merge-confirming tester a review exists. |
 | `herdr agent prompt dispatcher "<URL> done"` | Tester | The PR merged. |
 
@@ -210,8 +213,7 @@ acknowledgments or progress updates. Put everything the recipient needs in the m
 or the linked record. After sending, end your turn, with two exceptions: after a
 `question` notice, continue unaffected work; after a `hold` that reached no tester
 (no affected PR is open), continue to the decision. If a send fails, you still report
-it: report `blocked` with the exact command and error. Labels the command already wrote
-stay; they record the assignment, not the delivery. Do not deliver a denied message
+it: report `blocked` with the exact command and error. Do not deliver a denied message
 another way.
 
 Design notices are `herdr agent prompt <recipient> "<comment URL> <word>"`. Posting a
@@ -227,51 +229,20 @@ comment notifies nobody (only a BLOCKED post does), so the poster sends the noti
 | `<URL> held` | merge-confirming tester | the lead | its non-LGTM hold review |
 | `<URL> decision` | lead | each affected implementer and merge-confirming tester | the adopted decision |
 
-Two labels on the brief or spec issue record the task's state:
+Two labels on the brief or spec issue record the task's state: `phase:design`,
+`phase:implement` or `phase:review` is the workflow step; `turn:<entry>` or
+`turn:dispatcher` is the coordinating owner, the agent whose action advances the task.
+Only harness commands write them ([which](roles/dispatcher.md#labels)); never add or
+remove them by hand. A label is an assignment, not evidence that a prompt arrived, a
+check passed or an agent runs. Helpers act on their explicit assignment without owning
+the turn: an additional reviewer notified of a head, an architect assigned a QUESTION, a
+critic named in a spec.
 
-- `phase:design`, `phase:implement` or `phase:review`: the workflow step.
-- `turn:<entry>` or `turn:dispatcher`: the coordinating owner, the agent whose action
-  advances the task.
-
-Only these harness commands write them. Never add or remove them by hand.
-
-| Event | Command | Labels |
-|---|---|---|
-| New pair | `team.py start` | `phase:implement`, `turn:<implementer>` |
-| New standalone design team | `team.py design` | `phase:design`, `turn:<lead>` from the spec's `Lead:` line, or from the brief's `UX:` line |
-| Relaunch, additional architect, `review` launch | `start`, `design`, `review` | unchanged |
-| Head to reviewers | `team.py turn <pr> <tester>` | `phase:review`, `turn:<tester>` |
-| Findings back | `team.py turn <pr> <implementer>` | `phase:implement`, `turn:<implementer>` |
-| Blocker | `board.py post <issue> BLOCKED` | phase kept, `turn:dispatcher` |
-| Dispatcher message | `prompt_agent` | unchanged |
-| Dispatcher handoff or repair | `prompt_agent` with `phase` | `phase:<phase>`, `turn:<entry>` |
-| Retirement | `team.py stop` | both removed |
-
-A command writes the labels before it sends its prompt. A failed label write on a
-handoff sends nothing. A BLOCKED post always notifies the dispatcher, naming any label
-error. A command adds the new labels before it removes the old ones, and nothing locks
-the issue: a failed write or two commands at once can leave two of one prefix. That is
-a reported contradiction, not a prevented one.
-
-Helpers act on their explicit assignment without owning the turn: an additional reviewer
-notified of a head, an architect assigned a QUESTION, a critic named in a spec. A label is
-an assignment, not evidence that a prompt arrived, a check passed or an agent runs. Your
-role file, [Merge](#merge), question holds and the failed-check procedure still govern
-what the owner may do.
-
-After a restart, read the issue's labels first (`board.py read <issue>` prints them).
-With `turn:<you>`, act under those rules. Otherwise act only on an explicit assignment
-addressed to you; else end your turn. Report `blocked` for a contradiction between the
-labels and GitHub only in these cases, and do not resolve it yourself:
-
-- A repair handoff names a closed PR.
-- A `phase:` or `turn:` label is missing, or there are two of one prefix. A brief started
-  before the labels existed has none.
-- The `turn:` value is neither `dispatcher` nor an entry explicitly assigned on this
-  issue: the brief's roster, its `UX:` entry, the spec's lead or critics, or a QUESTION
-  assignment.
-
-The dispatcher repairs the labels with the handoff form of `prompt_agent`.
+On restart, read the brief and its labels (`board.py read <issue>` prints them). Act
+when `turn:<you>` or an explicit assignment authorizes the work; otherwise end your
+turn. Report `blocked`, and do not repair it yourself, for a repair handoff that names a
+closed PR, a missing or duplicate `phase:` or `turn:` label, or a `turn:` owner not
+assigned on the issue. The dispatcher repairs labels.
 
 ## UX design team
 
@@ -280,10 +251,8 @@ entry) and `Graphic designers: <entry>, ...` (one or more `graphic-designer` ent
 The lead architect writes them as [design-software Step 5](../skills/design-software/SKILL.md#step-5-briefs)
 says; the dispatcher writes them when it creates a brief. Nobody can edit an issue body
 from the dispatcher's tools, so a brief that lacks them goes back to the user with the
-exact lines to add. The principles behind this team are in
-[docs/brainstorm/ux-agent-principles-chavruta.md](../../docs/brainstorm/ux-agent-principles-chavruta.md)
-and the mechanics in
-[docs/brainstorm/ux-agent-mechanics-chavruta.md](../../docs/brainstorm/ux-agent-mechanics-chavruta.md).
+exact lines to add. The principles and mechanics behind this team are recorded in the
+UX chavruta files at [ab8f43f](https://github.com/chenghanlee/tips/tree/ab8f43f/docs/brainstorm).
 
 1. Once the brief meets the release conditions except approval, the dispatcher runs
    `team.py design <brief> <entry>` for the UX entry, then for each graphic entry, and
@@ -325,10 +294,8 @@ starts, and `stop` removes the entry with the allocation.
 
 ## PR review record
 
-Use `COMMENT` reviews instead of native approvals because agents share one GitHub
-identity. Submit one `COMMENT` review per pass on the current PR head. Put P0 and P1
-findings in inline comments and P2 findings in the body, as
-[Optional P2 findings](#optional-p2-findings) says:
+Use `COMMENT` reviews instead of native approvals. Submit one `COMMENT` review per pass
+on the current PR head:
 
 ```sh
 gh api "repos/{owner}/{repo}/pulls/$PR/reviews" --input tmp/review.json --jq .html_url
@@ -341,55 +308,11 @@ gh api "repos/{owner}/{repo}/pulls/$PR/reviews" --input tmp/review.json --jq .ht
 
 Put `LGTM` alone on the first line of the body when no P0, P1 or decision hold remains
 and required verification is satisfied, even if the body lists Optional P2s. Otherwise
-put the review decision there. Put `<entry>, <session>` on the second line. Record your
-initial findings before reading the PR body or another review. Resolve a thread only if
-you opened it. A new head invalidates every LGTM. Review changes since your last actual
-review; a first review covers the full relevant change and affected contracts. Earlier
-advice is not a review.
-
-The default tester assesses correctness and design in one investigation and record.
-An additional architect follows its design-review duties.
-
-### PR body
-
-The PR body is the implementer's handoff to every reviewer. Only the implementer edits
-it. Sections, in this order:
-
-```markdown
-Closes #<brief>
-
-## Outcome
-One paragraph: what works now.
-
-## Scenarios
-| Scenario | Test | Run |
-|---|---|---|
-| 1 <title> | test/path_test.exs:"name" | CI run URL or local command |
-
-A `Masking risk:` row also gives its control as an exact edit (`path:line` and the change)
-and the assertion the control fails.
-
-## Affected code
-Changed public functions, schemas, changesets, migrations, config, PubSub topics,
-Oban workers, shared fixtures; the callers and entry points each reaches. For a
-changed fact, its construct, update, read, reset, removal and late-callback paths.
-
-## Tests without a scenario line
-Test name and one-line reason, or "none".
-
-## Decisions
-Choices made during implementation that the brief does not record, one line each
-with the reason, or "none".
-
-## Follow-up
-Issue URL for deferred work, or "none".
-
-## Checks not run by CI
-During the CI pause: the record the AGENTS.md CI pause rule requires, for all
-applicable local checks. Otherwise, checks CI does not cover, or "none".
-```
-
-Reviewers: verify the body's claims rather than repeating the work it records.
+put the review decision there. Put `<entry>, <session>` on the second line. Review
+changes since your last actual review; a first review covers the full relevant change
+and affected contracts, and a later head may use the
+[compact record](../skills/review-software/SKILL.md#review-record). Earlier advice is
+not a review.
 
 ### Severity
 
@@ -409,22 +332,15 @@ never settles a P0 or P1 condition.
 
 ### Optional P2 findings
 
-By the user's decision on 2026-10-20 ([#515](https://github.com/chenghanlee/tips/issues/515)),
-PR P2 findings are optional. Design critiques before implementation keep their P2 rules.
+Design critiques before implementation keep their P2 rules.
 
 - Put every P2 in an `Optional` part of the review body, not in an inline thread, with
   its `path:line`, consequence and proposed change. This holds in reviews with P0 or P1
-  findings too, so no P2 thread blocks a later `LGTM`. The review skills' P2 limit
-  still applies.
+  findings too, so no P2 thread blocks a later `LGTM`.
 - An Optional item needs no reply, issue, turn or fix. Merge follows [Merge](#merge) and
   does not wait for Optional work.
-- P2 is not a way to demote a missing required check, a contract failure or a
-  [required rule](../skills/design-software/SKILL.md#required-rules) violation.
 - A reviewer may move its own open P2 thread into Optional and resolve the thread
   without the implementer's disposition.
-
-Lost guarantee: a PR P2 gets no guaranteed acknowledgment, rationale, fix or tracked
-deferral.
 
 ### Changed binding decisions
 
@@ -450,32 +366,23 @@ interpret issue comments as merge blockers.
 
 ### Merge
 
-During the [CI pause](../../agent/docs/github-ci-pause.md), first verify the PR's applicable
-local check evidence and independent correctness/design review at the current head.
-`observe` reads GitHub state and posts nothing; it does not verify local test logs. An
-empty required-check list is not proof that local checks ran. If a required-status rule
-still expects a paused job, report it to the user; do not bypass it or weaken other
-protections.
+During the [CI pause](../../agent/docs/checks.md#github-ci-pause), first verify the PR's
+applicable local check evidence and an independent review at the current head.
+`observe` reads GitHub state only; an empty required-check list is not proof that local
+checks ran. Report a required-status rule that still expects a paused job to the user.
 
-Merge-confirming tester: satisfy the applicable check policy, then merge only when `observe`
-reports the PR ready at the head: every reviewer in `Required reviews:` has an LGTM as its
-latest review of that head, every thread is resolved, any GitHub-required checks pass
-and GitHub reports it mergeable.
+Merge-confirming tester: merge only when `observe` reports the PR ready at the head:
 
 ```sh
-agent/teams/pr_review.py observe <pr>
+python3 <harness>/pr_review.py observe <pr>
 gh pr merge <pr> --merge --match-head-commit <sha>
 ```
 
-If a check failed or `observe` reports a merge conflict, run
-`agent/teams/team.py turn <pr> <implementer entry>` to notify the implementer. If `observe`
-reports evidence unavailable (GitHub has not computed mergeability yet), run it once more
-in the same turn after about a minute; this is the one exception to the no-poll rule.
-If it is still unavailable, report `blocked` with the `observe` output; unavailable
-never counts as ready. If
-merge is refused for another reason, report `blocked` with the exact error.
-
-After the merge closes the brief and deletes the branch, notify the dispatcher with `done`.
+Return failed checks or a merge conflict to the implementer with
+`python3 <harness>/team.py turn <pr> <implementer entry>`. For unavailable mergeability, run
+`observe` once more after about a minute in the same turn; if still unavailable, report
+`blocked` with its output. Report any other refused merge with the exact error.
+Unavailable is never ready.
 
 ## Report and resolve blockers
 
@@ -491,22 +398,10 @@ Set Active and hand the turn back with `prompt_agent` and the issue's phase when
 blocker is resolved. Do
 not run or retry a denied command on another agent's behalf.
 
-If a required check fails at the head, rerun only the failed tests, alone, at the head.
-
-- They fail again: rerun them alone in a worktree of fetched `origin/main`.
-  - The same failure there, and a linked open issue names those tests: the failure is
-    pre-existing. Record the per-run results and failure excerpts of both commits
-    and the issue in the PR body; it is not a blocker.
-  - The same failure there and no such issue: report `blocked` with both SHAs. The
-    dispatcher opens a revert brief.
-  - They pass on `main`: the failure is the PR's to fix unless the user grants a
-    bounded exception.
-- They pass alone at the head: the failure is intermittent. Run the suite once more.
-  If it fails again, treat it as a deterministic failure above. If it passes and the
-  diff does not touch the behaviour the test covers, record the per-run results and
-  failure excerpts and the open issue that names the test (open one if none) in the
-  PR body; it is not a blocker. If the diff touches that behaviour, the failure is the
-  PR's to fix.
+If a required check fails at the head, rerun the failed tests alone in a worktree of
+fetched `origin/main`. If the same failure occurs there, it is pre-existing: link or open
+the issue that names them in the PR body and continue. Otherwise the failure is the PR's
+to fix, including a test that fails only in the full suite.
 
 ## Constraints
 
@@ -522,33 +417,47 @@ If a required check fails at the head, rerun only the failed tests, alone, at th
 
 ## Manual browser review
 
-Codex clients could not run Wallaby browser tests on macOS: the Codex sandbox killed
-the browser the test started and left a crash dialog
-([#432](https://github.com/chenghanlee/tips/issues/432)). Treat PhoenixTest Playwright
-tests the same until a run shows otherwise. They run on the implementer's Claude client; the tester inspects its record and records what it
-executed and what it only inspected. The exact `agent-browser open about:blank --session
-<name>`, `get url` and `close` sequence below succeeded from this machine's configured
-Codex client on 2026-10-14 (agent-browser 0.38.1, codex-cli 0.162.1). Codex manual
-review still needs the [browser setup](SETUP.md#browser-access-for-the-tester) and that
-preflight in the tester's own session.
+Browser tests (`test/tips_web/features`) run on the implementer's Claude client; a Codex
+tester inspects the recorded command, head and results instead
+([#432](https://github.com/chenghanlee/tips/issues/432)). Before a required manual
+browser scenario, read the [browser run procedure](SETUP.md#browser-run) and perform the
+preflight it names, each command in its own tool call. On failure, follow its recovery
+procedure; an unresolved failure is `blocked`.
 
-Clients launch with `MIX_ENV=test`. Wait for `mix test` to exit, then start the app on
-the same port:
+## PR body
 
-```sh
-MIX_ENV=dev unbuffer mix ecto.setup && MIX_ENV=dev PORT="$TIPS_TEST_PORT" unbuffer mix do assets.setup, assets.build, phx.server
+The PR body is the implementer's handoff to every reviewer. Only the implementer edits
+it. Sections, in this order:
+
+```markdown
+Closes #<brief>
+
+## Outcome
+One paragraph: what works now.
+
+## Scenarios
+| Scenario | Test | Run |
+|---|---|---|
+| 1 <title> | test/path_test.exs:"name" | CI run URL or local command |
+
+A `Masking risk:` row also gives its control as an exact edit (`path:line` and the change)
+and the assertion the control fails. A control the implementer found from the
+implementation is recorded the same way, with the mistake it distinguishes. A test with
+no scenario number gets its own row with a one-line reason.
+
+## Affected code
+Changed public functions, schemas, changesets, migrations, config, PubSub topics,
+Oban workers, shared fixtures; the callers and entry points each reaches. For a
+changed fact, its construct, update, read, reset, removal and late-callback paths.
+
+## Decisions
+Choices made during implementation that the brief does not record, one line each
+with the reason, or "none".
+
+## Follow-up
+Issue URL for deferred work, or "none".
+
+## Checks not run by CI
+During the CI pause: the record the AGENTS.md CI pause rule requires, for all
+applicable local checks. Otherwise, checks CI does not cover, or "none".
 ```
-
-Use `agent-browser` to test the app. Codex testers start each session with exactly this
-command, alone in its tool call, replacing only `<name>`:
-
-```sh
-agent-browser open about:blank --session <name>
-```
-
-Other forms of `agent-browser open` can start Chrome inside the Codex sandbox and fail
-with `Chrome exited early`. If `open` fails with that error or with `without writing DevToolsActivePort`, run `agent-browser close --session <name>`, then `agent-browser open about:blank --session <name>` again, then `agent-browser get url --session <name>`,
-each in its own tool call. The last command prints `about:blank`. If this recovery
-fails, keep the full error and follow the [browser setup diagnostics](SETUP.md#browser-access-for-the-tester). Do not disable Chrome's sandbox or
-use the user's browser profile. Read mail in `/dev/mailbox`. Stop the server before
-handing off.

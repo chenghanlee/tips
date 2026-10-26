@@ -24,7 +24,7 @@ order and open issues (`project_read` lists the items that are not Done; read on
 clients (`status`). A merged PR's evidence is in its body and reviews; it is not a run
 against today's `main`. A broken `main` reaches you as an implementer's `blocked` with evidence for both
 the task and main SHAs, using local reproductions during the
-[CI pause](../../../agent/docs/github-ci-pause.md). Do not wait for paused workflows.
+[CI pause](../../../agent/docs/checks.md#github-ci-pause). Do not wait for paused workflows.
 
 - Set merged issues Done (`project_set_field`, Status). An issue with an open question
   stays Blocked.
@@ -216,12 +216,30 @@ cost, not zero. Post the usage table on the spec when the final brief merges.
 - On `<URL> blocked`: set the issue Blocked. Route technical questions to the named
   decision owner; ask the user about product, scope or tradeoffs. Record the answer on
   the issue and set Active.
-- Whose turn: the issue's labels. `phase:design|implement|review` is the step;
-  `turn:<entry>` or `turn:dispatcher` is the coordinating owner. Harness commands write
-  them; plain `prompt_agent` changes none. To hand the turn back after a blocker, or to
-  repair labels, call `prompt_agent` with `phase`: it sets `phase:<phase>` and
-  `turn:<entry>`, then sends. Agents report a label contradiction as `blocked` only
-  for a repair handoff naming a closed PR; a missing `phase:` or `turn:` label, or two
-  of one prefix (a brief started before the labels has none); or a `turn:` value that
-  is neither `dispatcher` nor an entry assigned on the issue (brief roster, the brief's
-  `UX:` entry, spec lead or critics, a QUESTION assignment).
+
+### Labels
+
+Whose turn: the issue's labels. `phase:design|implement|review` is
+the step; `turn:<entry>` or `turn:dispatcher` is the coordinating owner. Harness
+commands write them; plain `prompt_agent` changes none. To hand the turn back after a
+blocker, or to repair labels, call `prompt_agent` with `phase`: it sets
+`phase:<phase>` and `turn:<entry>`, then sends. Agents report a label contradiction
+as `blocked` only for a repair handoff naming a closed PR; a missing `phase:` or
+`turn:` label, or two of one prefix (a brief started before the labels has none); or
+a `turn:` value that is neither `dispatcher` nor an entry assigned on the issue
+(brief roster, the brief's `UX:` entry, spec lead or critics, a QUESTION assignment).
+A command writes labels before it sends; a failed write on a handoff sends nothing;
+a command adds new labels before removing old ones and nothing locks the issue, so a
+failed write or two commands at once can leave two of one prefix.
+
+| Event | Command | Labels |
+|---|---|---|
+| New pair | `team.py start` | `phase:implement`, `turn:<implementer>` |
+| New standalone design team | `team.py design` | `phase:design`, `turn:<lead>` from the spec's `Lead:` line, or from the brief's `UX:` line |
+| Relaunch, additional architect, `review` launch | `start`, `design`, `review` | unchanged |
+| Head to reviewers | `team.py turn <pr> <tester>` | `phase:review`, `turn:<tester>` |
+| Findings back | `team.py turn <pr> <implementer>` | `phase:implement`, `turn:<implementer>` |
+| Blocker | `board.py post <issue> BLOCKED` | phase kept, `turn:dispatcher` |
+| Dispatcher message | `prompt_agent` | unchanged |
+| Dispatcher handoff or repair | `prompt_agent` with `phase` | `phase:<phase>`, `turn:<entry>` |
+| Retirement | `team.py stop` | both removed |

@@ -5,10 +5,9 @@ Implement one brief in your own clone. Manage its PR.
 ## Read
 
 1. [Common rules](common.md). From the [workflow](../README.md), only [Turns](../README.md#turns),
-   [PR body](../README.md#pr-body), [Severity](../README.md#severity),
+   [Severity](../README.md#severity),
    [Report and resolve blockers](../README.md#report-and-resolve-blockers) and
-   [Constraints](../README.md#constraints). Read another section only when a step or
-   message links it.
+   [Constraints](../README.md#constraints). Read the PR body section when step 4 links it.
 2. The brief: the issue `team.py start` named, including current decisions and questions.
 3. [implement-software](../../skills/implement-software/SKILL.md) from your clone.
 
@@ -31,8 +30,7 @@ Implement one brief in your own clone. Manage its PR.
    `blocked`. A local question may go to your reviewer when its evidence would help.
    A `hold` notice pauses the dependent work it names until its `decision` notice
    ([Changed binding decisions](../README.md#changed-binding-decisions)).
-2. Follow the skill. Keep verification proportionate to the affected contracts and
-   explain changes to an existing test budget in the PR.
+2. Follow the skill. Keep verification proportionate to the affected contracts.
 3. Record deferred work in one follow-up issue before handoff.
 4. Push. Open the PR with the [PR body](../README.md#pr-body) filled in. Then run
    the `team.py turn <pr> <tester entry>` command your brief names. It requires your
@@ -62,37 +60,15 @@ one to save a tool call.
    test name.
    Keep that log until cleanup; record both commands, exits, results and excluded counts
    in the PR body under
-   "Checks not run by CI" as the [CI pause rule](../../../agent/docs/github-ci-pause.md) says.
+   "Checks not run by CI" as the [CI pause rule](../../../agent/docs/checks.md#github-ci-pause) says.
    A Codex tester inspects that record instead
    ([manual browser review](../README.md#manual-browser-review)).
 2. **Edits.** With the client's edit tool, replace only the lines that must change plus
    the context needed to match them. Do not resend a whole function or file. If the
    client has no edit tool, apply a unified diff with `patch -p1`; a quoted heredoc may
    carry the diff. Never write replacement source through Python or shell heredocs.
-3. **Application source.** Before displaying an Elixir file whose length you do not
-   know, run `wc -l < <file>`. For a file over 300 lines:
-   - Run `"$TIPS_DEXTER" query symbols <file>`. It lists every definition with its line.
-   - Read one definition at a time: `sed -n <start>,<next start - 1>p <file>`, using the
-     line of the definition and the line of the one after it. Independent ranges may go
-     in one batch of parallel tool calls; a batch costs one request. For a module attribute,
-     alias, struct or `use` line, find it with `rg -n <text> <file>` and read at most
-     20 lines around it.
-   - Read the whole file only when a named question cannot be answered from those
-     ranges, and at most once; after that, ranges only. After an edit, rerun `symbols`
-     before using its lines again.
-   - If `TIPS_DEXTER` is unset or the command fails, say so once, then use `rg -n` to
-     find the line and read ranges. Do not fall back to a whole-file read.
-4. **Dependency source.** For any file in `deps/`, regardless of length, never read the
-   whole file. From a call site run `"$TIPS_DEXTER" query definition <file> <line>
-   <column>`; without a call site run `"$TIPS_DEXTER" lookup Module function --strict`.
-   Read only the returned definition with `sed -n`.
-
-## Messages you send
-
-- QUESTION on the brief, then `<QUESTION URL> question` to the dispatcher, or to the
-  assigned lead. Local questions may go to the existing reviewer.
-- `team.py turn <pr> <tester entry>` after each push.
-- `blocked` to the dispatcher, as the [blocker procedure](../README.md#report-and-resolve-blockers) says.
+3. **Source.** Read Elixir application and dependency source as
+   [Elixir navigation](../../../agent/docs/elixir-navigation.md#bounded-reading) says.
 
 ## Do not
 

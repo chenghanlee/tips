@@ -18,3 +18,13 @@
 - Before changing a public or private function's name, arity, return shape or behaviour, find its uses with both Dexter `references` at its definition and scoped `rg` for its bare name and any atom or tuple that dispatches to it. Investigate every use that only one of them found.
 - An empty Dexter result does not prove absence: dynamic dispatch, macros and generated code hide uses. Check with `rg` before concluding that a function is unused.
 - After `mix deps.get` or a dependency change, run `"$TIPS_DEXTER" reindex`.
+
+## Bounded reading
+
+For an application file of unknown length, check its line count (`wc -l`). Above 300
+lines, run `symbols` and read definition ranges with `sed -n`; find a non-definition
+line (attribute, alias, struct, `use`) with scoped `rg -n` and read around it. Read the
+whole file only once, when a named question needs it. Refresh symbol positions after an
+edit. For a file in `deps/`, never read the whole file: use `definition` from a call site
+or `lookup Module function --strict`, and read only the returned range. If Dexter is
+unavailable, report it once and use scoped `rg` and ranges, not a whole-file fallback.

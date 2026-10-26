@@ -3,7 +3,7 @@
 ## Required checks
 
 For Python changes in `agent/teams`, run these checks locally under the
-[CI pause policy](../../agent/docs/github-ci-pause.md):
+[CI pause policy](../../agent/docs/checks.md#github-ci-pause):
 
 ```sh
 python -m pip install --require-hashes --no-deps -r agent/teams/requirements.lock
@@ -57,20 +57,27 @@ Run these additional tests for the listed changes:
 | Codex launch arguments | Installed-Codex tests, with `TIPS_TEST_REAL_CODEX=1`. | Run locally and record the result on the PR. CI has no Codex client. |
 | Dispatcher launch arguments or adapter tools | The real client with the launcher's arguments against a disposable copy, fake `gh` and a refusing fake `herdr`: it lists the adapter tools beside its built-in tools and a `status` call works. | Run locally and record the transcript summary on the PR. CI has no Claude client. |
 
-### Additional local analyzers
+### Other local analyzers
 
-CI does not run these. Run them before pushing and fix or record each finding. They are
-not in the locked `.venv`; any environment with them will do. Versions used today: mypy
-2.3.1, pylint 3.3.9, bandit 1.9.4, vulture 2.16, pip-audit 2.10.1, shellcheck 0.11.0. Run the
-first four from `agent/teams`, the last two from the repository root:
+Required with the checks above, from the repository root: `shellcheck agent/teams/dispatch`
+on every harness change, and pip-audit when `requirements.lock` changes:
+
+```sh
+pip-audit -r agent/teams/requirements.lock --require-hashes --disable-pip --strict
+```
+
+mypy, Pylint similarities, Bandit and Vulture are not required per PR
+([why](https://github.com/chenghanlee/tips/blob/ab8f43f/docs/brainstorm/testing-retrospective-chavruta.md#fable-round-4-subtraction-pass), S1).
+Use one for a specific investigation and say so. Lost: a mandatory dead-code and
+security scan per PR, and audit of an unchanged lock against newly published advisories.
+Versions last used: mypy 2.3.1, pylint 3.3.9, bandit 1.9.4, vulture 2.16, pip-audit
+2.10.1, shellcheck 0.11.0. Run these from `agent/teams`:
 
 ```sh
 mypy --python-executable .venv/bin/python --strict --warn-unreachable --ignore-missing-imports .
 pylint --disable=all --enable=similarities --min-similarity-lines=10 --ignore-comments=y --ignore-docstrings=y --ignore-imports=y *.py tests/*.py
 bandit -q -r . -x ./tests,./.venv
 vulture . --min-confidence 60 --exclude .venv
-pip-audit -r agent/teams/requirements.lock --require-hashes --disable-pip --strict
-shellcheck agent/teams/dispatch
 ```
 
 ## Dependencies and test isolation

@@ -60,23 +60,49 @@ class StopAgentTest(unittest.TestCase):
             HERDR_LOG=str(self.root / "calls"),
             TIPS_TEAM_CONFIG=str(self.config),
         )
-        self.processes: list[subprocess.Popen[bytes]] = []
+        # Every launch: its host and its own pid files. A failed subtest launches again,
+        # so cleanup walks all of them, not the last pair (the 531 trial leaked eight).
+        self.launches: list[tuple[subprocess.Popen[bytes], Path, Path]] = []
+        self.launched = 0  # names the pid files; reap() empties launches but not this
 
     def tearDown(self) -> None:
-        for p in self.processes:
-            if p.poll() is None:
-                p.kill()
-            p.wait()
-        for name in ("client", "child"):
-            child_file = self.root / name
-            if child_file.exists():
-                with contextlib.suppress(ProcessLookupError):
-                    os.kill(int(child_file.read_text()), signal.SIGKILL)
+        problems = self.reap()
         wrapper = self.root / ".dexter/dexter.sh"
         if wrapper.exists():
             # A real daemon outlives its clients; stop it before its root disappears.
             execute(["/bin/sh", wrapper, "stop", "--force"], input_text="")
         self.tmp.cleanup()
+        assert not problems, problems
+
+    def reap(self) -> list[str]:
+        """Kill every launch's child group, client and host; return what could not be done.
+        A missing or empty pid file is reported, and the other launches are still reaped."""
+        problems: list[str] = []
+        for host, client_file, child_file in self.launches:
+            for file, kill in ((child_file, os.killpg), (client_file, os.kill)):
+                try:
+                    pid = int(file.read_text())
+                except (OSError, ValueError) as error:
+                    problems.append(f"{file.name}: {error}")
+                    continue
+                # The child leads its own session and group. macOS refuses killpg for a
+                # group whose only member exited unreaped (EPERM); killing its client
+                # below lets that zombie be reaped, so neither error stops the walk.
+                with contextlib.suppress(ProcessLookupError, PermissionError):
+                    kill(pid, signal.SIGKILL)
+            if host.poll() is None:
+                host.kill()
+            try:
+                host.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                problems.append(f"host {host.pid} did not exit")
+        self.launches = []
+        return problems
+
+    def pid(self, name: str) -> int:
+        """The latest launch's client or child pid."""
+        _, client_file, child_file = self.launches[-1]
+        return int((child_file if name == "child" else client_file).read_text())
 
     def client(
         self, stubborn: bool = False, child: Sequence[str | Path] | None = None
@@ -92,8 +118,9 @@ def stop(*_):
 signal.signal(signal.SIGTERM, signal.SIG_IGN if sys.argv[2]=='yes' else stop)
 while True: time.sleep(.05)
 """
-        for name in ("client", "child"):
-            (self.root / name).unlink(missing_ok=True)
+        self.launched += 1
+        client_file = self.root / f"client-{self.launched}"
+        child_file = self.root / f"child-{self.launched}"
         host = (
             "import subprocess,sys; p=subprocess.Popen(sys.argv[2:]); open(sys"
             '.argv[1],"w").write(str(p.pid)); sys.exit(p.wait())'
@@ -105,32 +132,33 @@ while True: time.sleep(.05)
                     "python3",
                     "-c",
                     host,
-                    str(self.root / "client"),
+                    str(client_file),
                     "python3",
                     "-c",
                     code,
-                    str(self.root / "child"),
+                    str(child_file),
                     "yes" if stubborn else "no",
                     *child,
                 ]
             ),
             cwd=self.root,
         )
-        self.processes.append(p)
+        # Registered before the pid files are read: a launch that never becomes ready is
+        # still reaped, and its empty file is reported.
+        self.launches.append((p, client_file, child_file))
         # The host writes "client" after its Popen returns, so "child" can appear first
         # and either file can exist before its pid is written.
-        pid_files = [self.root / "client", self.root / "child"]
         for _ in range(100):
-            if all(f.exists() and f.read_text() for f in pid_files):
+            if all(f.exists() and f.read_text() for f in (client_file, child_file)):
                 break
             time.sleep(0.02)
         (self.root / "state.json").write_text(
             json.dumps(
                 {
-                    "pid": int((self.root / "client").read_text()),
+                    "pid": self.pid("client"),
                     "shell": p.pid,
                     "root": str(self.root),
-                    "child": int((self.root / "child").read_text()),
+                    "child": self.pid("child"),
                 }
             )
         )
@@ -174,7 +202,7 @@ while True: time.sleep(.05)
                 assert r.returncode == 0, r.stderr
                 assert p.wait(timeout=2) == 0
                 try:
-                    os.kill(int((self.root / "child").read_text()), 0)
+                    os.kill(self.pid("child"), 0)
                 except ProcessLookupError:
                     pass  # Expected: this owned child must have exited.
                 else:
@@ -234,6 +262,35 @@ while True: time.sleep(.05)
         assert p.poll() is None
         assert "surviv" in r.stderr.lower()
 
+    def test_teardown_reaps_every_launch_not_only_the_last(self) -> None:
+        """A failed stop leaves its client alive and the next launch overwrites nothing.
+        The first child's group has a member besides its leader, which only a group kill
+        reaches; the second child exited on its own, which the walk must step over."""
+        self.client(stubborn=True, child=["/bin/sh", "-c", "sleep 60 & wait"])
+        assert self.stop().returncode != 0
+        survivors = [self.pid("client")]
+        group = self.pid("child")
+        self.client(child=["python3", "-c", "pass"])
+        survivors.append(self.pid("client"))
+        self.client()
+        survivors += [self.pid("client"), self.pid("child")]
+        assert self.reap() == []
+        for pid in survivors:
+            for _ in range(100):  # SIGKILL is delivered; the reparenting and reap follow
+                try:
+                    os.kill(pid, 0)
+                except ProcessLookupError:
+                    break
+                time.sleep(0.02)
+            else:
+                raise AssertionError(f"process {pid} survived teardown")
+        for _ in range(100):
+            if execute(["pgrep", "-g", str(group)]).returncode != 0:
+                break
+            time.sleep(0.02)
+        else:
+            raise AssertionError(f"a member of child group {group} survived teardown")
+
     @unittest.skipUnless(os.environ.get("TIPS_TEST_REAL_DEXTER"), REAL_DEXTER)
     def test_client_stop_leaves_real_daemons_started_by_a_client_query(self) -> None:
         (self.root / "mix.exs").write_text(MIX_PROJECT)
@@ -249,7 +306,7 @@ while True: time.sleep(.05)
         ]
         # A client's query starts the daemon and ends; the daemon is then nobody's child.
         client = self.client(child=query)
-        child = int((self.root / "child").read_text())
+        child = self.pid("child")
         for _ in range(600):
             if daemon_pid(self.root) and execute(["ps", "-p", str(child)]).returncode:
                 break
@@ -499,8 +556,11 @@ class PairLifecycleTest(Harness):
         assert f"your project is {impl_root / 'project'}" in impl_brief
         assert f"python3 {harness / 'team.py'} turn <pr> tester" in impl_brief
         # Each worker reads the common rules and its own role file, not the whole README.
-        assert "agent/teams/roles/common.md and agent/teams/roles/implementer.md;" in impl_brief
-        assert "agent/teams/roles/common.md and agent/teams/roles/tester.md;" in tester_brief
+        assert "read.py launch implementer there; it prints AGENTS.md," in impl_brief
+        # The reader comes from the installed harness: a reviewed head may predate read.py.
+        assert "python3 agent/teams/read.py" not in impl_brief
+        assert f"python3 {harness / 'read.py'} launch implementer there" in impl_brief
+        assert "read.py launch tester there; it prints AGENTS.md," in tester_brief
         assert "labels first, as the README Turns section says" in impl_brief
         assert "If it is labelled turn:impl, continue" in impl_brief
         assert tester_brief.startswith("You are tester, the merge-confirming tester for brief #29;")
@@ -1059,15 +1119,22 @@ class HandoffTest(Harness):
         assert [e[2] for e in sent] == ["team-1-tester", "dispatcher"]
         ring = sent[0][3]
         harness = self.repo / "agent/teams"
-        assert "https://github.com/o/r/pull/7" in ring
-        assert f"python3 {harness / 'bootstrap.py'} --commit {pushed}" in ring
-        assert "it refuses a dirty clone" in ring
+        # The tester reads the brief, diff and tests before the implementer's account: the
+        # handoff withholds the PR; pr_review.py handoff prints it once the concerns exist.
+        assert ring.startswith(f"Your turn: review brief #29 at head {pushed}. ")
+        assert "github.com" not in ring, ring
+        assert " 7 " not in ring, ring
+        assert f"python3 {harness / 'bootstrap.py'} --commit {pushed}. " in ring
+        assert "read the brief, then git diff origin/main...HEAD and the tests" in ring
+        handoff = f"python3 {harness / 'pr_review.py'} handoff {pushed} tmp/concerns.md"
+        assert "tmp/concerns.md as review-software Step 1 says; on a later head" in ring
+        assert f"delta to it instead. Then run {handoff};" in ring
         assert "Put tester, <session> on line 2" in ring
-        # Only a P0, P1 or hold sends the head back; Optional P2s need no turn (#515).
-        turn = f"python3 {harness / 'team.py'} turn 7 impl"
-        assert f"has a P0 or P1 finding or a hold, run {turn}; Optional P2s need no turn." in ring
+        # Only a P0 or P1 sends the head back; a hold goes to the lead as `held`.
+        turn = f"python3 {harness / 'team.py'} turn <pr> impl with the PR number handoff printed"
+        assert f"has a P0 or P1 finding, run {turn}. Do not wait" in ring
         assert "asked the dispatcher to launch critic" in ring
-        assert "pr_review.py observe 7 reports ready to merge" in ring
+        assert "pr_review.py observe <pr> reports ready to merge" in ring
         assert sent[1][3] == (
             "https://github.com/o/r/pull/7 review: run agent/teams/team.py review 7 critic"
         )
@@ -1079,13 +1146,24 @@ class HandoffTest(Harness):
         # A new head reaches the tester and the launched critic in the same handoff.
         self.team("review", "7", "critic")
         moved = self.push("team-1-impl", "second push")
+        # The PR's base is a stacked branch, not main: every message names that base.
+        self.update(pr_base_ref="task/stacked")
         prompts = len(self.events("agent", "prompt"))
         self.team("turn", "7", "tester", pane=self.impl)
         sent = self.events("agent", "prompt")[prompts:]
         assert [e[2] for e in sent] == ["team-1-tester", "team-1-critic"]
-        assert all(moved in e[3] for e in sent)
+        assert all(moved in e[3] and "github.com" not in e[3] for e in sent)
+        assert all("origin/main" not in e[3] for e in sent), sent
+        base = "on base task/stacked in your own clone: read the brief, then git diff "
+        assert all(f"{base}origin/task/stacked...HEAD" in e[3] for e in sent), sent
+        later = "append the new head and your concerns about the delta to it instead."
+        assert all(f"on a later head of the same PR, {later}" in e[3] for e in sent), sent
         assert f"bootstrap.py --commit {moved}" in sent[1][3]
         assert "never resets one" in sent[1][3]
+        assert "review steps for brief #29. " in sent[1][3]
+        again = f"python3 {harness / 'pr_review.py'} handoff {moved} tmp/concerns.md"
+        assert f"delta to it instead. Then run {again};" in sent[1][3]
+        self.update(pr_base_ref="main")
         assert "herdr agent prompt team-1-tester" in sent[1][3]
         assert "asked the dispatcher" not in sent[0][3]
         # The brief cannot move the merge-confirming tester under a running pair.
@@ -1229,6 +1307,7 @@ class HandoffTest(Harness):
 
     def test_review_launches_each_reviewer_in_its_own_allocation_at_the_pr_head(self) -> None:
         head = self.push("team-1-impl")
+        self.update(pr_base_ref="task/stacked")  # a stacked PR: the brief names its base
         self.team("review", "7", "critic")
         root = self.trusted / "allocations/g1-critic"
         critic = self.pane("team-1-critic")
@@ -1237,7 +1316,13 @@ class HandoffTest(Harness):
         assert brief.startswith("You are critic, the reviewing architect for brief #29;")
         assert "Your persona: operations: failure and recovery paths." in brief
         assert f"bootstrap.py --commit {head}" in brief
-        assert f"Review PR https://github.com/o/r/pull/7 at {head} from your own clone" in brief
+        reading = f"Review head {head} on base task/stacked in your own clone: read the brief, "
+        assert f"{reading}then git diff origin/task/stacked...HEAD" in brief
+        assert "origin/main" not in brief
+        self.update(pr_base_ref="main")
+        assert "github.com/o/r/pull/7" not in brief, "the PR body waits for the reviewer's concerns"
+        handoff = f"pr_review.py handoff {head} tmp/concerns.md; it prints the PR, its body"
+        assert handoff in brief
         assert "herdr agent prompt team-1-tester" in brief
         assert 'Follow "Steps: reviewing architect" in agent/teams/roles/architect.md' in brief
         allocation = self.record(1)["agents"]["critic"]
@@ -1376,7 +1461,7 @@ class DesignTest(Harness):
         assert self.tabs("w1") == {"architects": ["team-1-critic"]}
         brief = self.system_prompt("team-1-critic")
         assert brief.startswith("You are critic, the architect for spec #50;")
-        assert "agent/teams/roles/common.md and agent/teams/roles/architect.md;" in brief
+        assert "read.py launch architect there; it prints AGENTS.md," in brief
         assert "bootstrap.py:" in brief
         # The launch EVENT lets board.py usage find the architect's session.
         assert self.comments("50")[-1]["body"] == (
@@ -2129,7 +2214,7 @@ class UxDesignTeamTest(Harness):
         assert self.tabs("w1") == {"ux": ["team-1-ux"]}
         brief = self.system_prompt("team-1-ux")
         assert brief.startswith("You are ux, the ux-designer for brief #60;")
-        assert "agent/teams/roles/common.md and agent/teams/roles/ux-designer.md;" in brief
+        assert "read.py launch ux-designer there; it prints AGENTS.md," in brief
         assert "Your graphic designers are team-1-pix, team-1-gem;" in brief
         assert "Run TIPS_DEXTER=" in brief
         assert self.comments("60")[-1]["body"].startswith("EVENT ux-designer team-1-ux ")

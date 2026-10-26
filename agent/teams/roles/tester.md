@@ -1,83 +1,26 @@
 # Tester
 
 Review one PR for correctness and design. The first tester on the brief's `Required reviews:` line
-confirms the merge. Every tester works in its own clone and moves it to a handed-off
-head with the `bootstrap.py --commit <head>` command the handoff names; it refuses a
-dirty clone and never resets one.
+confirms the merge.
 
 ## Read
 
 1. [Common rules](common.md). From the [workflow](../README.md), only [Turns](../README.md#turns),
-   [PR review record](../README.md#pr-review-record) through [Merge](../README.md#merge),
    [Report and resolve blockers](../README.md#report-and-resolve-blockers) and
-   [Constraints](../README.md#constraints). Read another section only when a step or
-   message links it.
-2. [review-software-correctness](../../skills/review-software-correctness/SKILL.md) and
-   [review-software-design](../../skills/review-software-design/SKILL.md). Reuse one
-   source investigation and review record for both concerns. Assess responsibility,
-   dependencies and state ownership as well as behavior; a generic design sentence
-   does not substitute for evidence in the diff and affected callers.
-3. The brief, then the diff, then the [PR body](../README.md#pr-body).
+   [Constraints](../README.md#constraints). Read other sections when a step links them;
+   `python3 <harness>/read.py section <file> <heading>` prints one.
 
 ## Steps
 
-1. The implementer's handoff notified every required reviewer of the same head and asked
-   the dispatcher to launch any that were missing. Do not notify or launch reviewers.
-2. Before your first required manual browser scenario, run the
-   [manual browser review](../README.md#manual-browser-review) session sequence (`open about:blank`, `get url`, `close`) once in your own runtime. If
-   it fails, report `blocked` with the exact error. It shows only that your runtime can
-   open a browser; it replaces no later check.
-3. Record the head SHA and your initial findings as the
-   [review record](../README.md#pr-review-record) says.
-4. Follow both skills with your own database and port: affected code, design,
-   scenarios and their controls, mutation check, entry points, data, checks. For the
-   full application suite, verify the implementer's record instead of rerunning it, as
-   [Step 7](../../skills/review-software-correctness/SKILL.md#step-7-checks) says.
-   PhoenixTest Playwright browser tests (`test/tips_web/features`): a Codex client
-   does not run them ([manual browser review](../README.md#manual-browser-review)). Read the implementer's record
-   in the PR body under "Checks not run by CI": check the command, exit, per-run results
-   and failure excerpts. While the implementer's working log exists, read the relevant
-   range or ask for an excerpt. Write "Browser tests run by <implementer entry>; inspected
-   <what> at <SHA>; not rerun" in your review. If the PR body has no browser record,
-   record that in your review; the merge-confirming tester then runs
-   `agent/teams/team.py turn <pr> <implementer entry>` to request it, and any other
-   tester sends its review URL to the merge-confirming tester. For manual checks follow [manual browser review](../README.md#manual-browser-review), including its Codex setup, launch form and failure steps.
-5. For a brief with a `UX:` line, or a changed page, form or component, apply the
-   [Record](../../skills/review-software-design/SKILL.md#record) section of
-   review-software-design: the candidate comparison and the pinned web-design-guidelines
-   check.
-6. Submit the [review record](../README.md#pr-review-record). Without a P0 or P1 finding
-   or a hold, submit LGTM; P2s go under [Optional](../README.md#optional-p2-findings).
-   Other tester: send your review URL to the merge-confirming tester.
-7. Merge-confirming tester: when your review or any required reviewer's latest review of
-   the head has a P0 or P1 finding or a hold, send `turn` to the implementer. Do not
-   wait for the other reviews. When `agent/teams/pr_review.py observe <pr>` reports
-   ready, follow the [merge step](../README.md#merge). Then send `done` to the dispatcher.
-8. Follow the [review record](../README.md#pr-review-record) for new heads, first-review
-   coverage and later changes.
-
-## Questions and changed decisions
-
-You may answer bounded source or verification questions before a PR, using evidence
-from your own clone and an ANSWER on the brief. This is optional help. A consequential
-decision needing independent technical judgment goes to the appropriate architect;
-checking conformity with your own answer is not independent validation of that decision.
-
-For a changed binding decision, follow [Changed binding decisions](../README.md#changed-binding-decisions):
-on the lead's `<URL> hold`, the merge-confirming tester submits the non-LGTM hold
-review and sends `<review URL> held` to the lead; on `<URL> decision`, it reviews
-against the adopted decision before replacing the hold.
-
-## Messages you send
-
-- `team.py turn <pr> <implementer entry>` when the head has a P0 or P1 finding or a hold.
-- Review URL to the merge-confirming tester, if you are not it.
-- `<review URL> held` to the lead after a hold review.
-- `done` or `blocked` to the dispatcher.
-
-## Do not
-
-- Do not turn an affected-code review into an audit of unrelated smells. Ask for
-  verification when an affected contract's relevant evidence is missing.
-- Do not run `team.py turn` unless you confirm the merge.
-- Do not merge with an unresolved thread, a missing LGTM or a failed check.
+1. Apply [review-software](../../skills/review-software/SKILL.md), from your clone, to
+   each review you are assigned, including one you resume after a relaunch. Do not
+   notify or launch reviewers.
+2. Other tester: send your review URL to the merge-confirming tester.
+3. Merge-confirming tester: when your review or any required reviewer's latest review of
+   the head has a P0 or P1 finding, send `turn` to the implementer. Do not wait for the
+   other reviews. When `python3 <harness>/pr_review.py observe <pr>` reports ready,
+   follow the [merge step](../README.md#merge). Then send `done` to the dispatcher.
+4. On a `<URL> hold`, follow [Changed binding decisions](../README.md#changed-binding-decisions)
+   before replacing the hold review. You may answer a bounded verification question with
+   evidence from your clone; checking compliance with your own consequential decision is
+   not independent review.

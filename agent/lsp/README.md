@@ -220,7 +220,7 @@ binary. A clean CI runner must build a binary even for integration-only checks.
 The id covers the upstream pin and patch, not the build script or Go toolchain, and
 does not prove tests passed. Full-scope changes keep the full suite. Carry earlier
 evidence only after the reviewer checks the changed inputs and records why it applies,
-under the [CI pause policy](../../agent/docs/github-ci-pause.md).
+under the [CI pause policy](../../agent/docs/checks.md#github-ci-pause).
 
 ## Elixir sources
 

@@ -25,6 +25,24 @@ TEAMS = TESTS.parent
 SERIAL = "real_"
 PORT_BASE = 24100
 PORT_RANGE = 100  # six teams of ten ports each
+# The opt-in test groups: the id marker, the variables they need (the first one's absence
+# skips them), and the
+# change that requires them (development.md, Required checks). A bare `skipped=N` cannot
+# tell an opt-in from a platform skip, so the summary names the opt-in it skipped.
+OPT_INS = (
+    (
+        "real_daemons",
+        ("TIPS_TEST_REAL_DEXTER", "DEXTER_ELIXIR_LIB_ROOT"),
+        "real-daemon tests",
+        "non-Markdown agent/teams changes",
+    ),
+    (
+        "codex_started_in_the_allocation",
+        ("TIPS_TEST_REAL_CODEX",),
+        "installed-Codex tests",
+        "Codex launch argument changes",
+    ),
+)
 
 
 def test_ids(patterns: list[str]) -> list[str]:
@@ -51,6 +69,20 @@ def chunks(ids: list[str], jobs: int) -> list[list[str]]:
     workers = max(1, min(jobs - bool(serial), len(rest)))
     groups = [rest[n::workers] for n in range(workers)]
     return [g for g in [*groups, serial] if g]
+
+
+def skipped_opt_ins(ids: list[str], environ: dict[str, str]) -> list[str]:
+    """One line per opt-in whose selected tests this environment skips, with the change
+    that requires them."""
+    lines: list[str] = []
+    for marker, variables, name, required_for in OPT_INS:
+        count = sum(marker in test_id for test_id in ids)
+        if count and not environ.get(variables[0]):
+            lines.append(
+                f"skipped opt-in: {name} ({count}): set {' and '.join(variables)}; required for "
+                f"{required_for} (agent/teams/development.md#required-checks)"
+            )
+    return lines
 
 
 def start_worker(group: list[str], log: Path, index: int) -> subprocess.Popen[bytes]:
@@ -98,6 +130,8 @@ def main() -> int:
             print(tail[-1])
     seconds = time.monotonic() - started
     print(f"\nRan {ran} of {len(ids)} tests in {seconds:.1f}s over {len(runs)} processes")
+    for line in skipped_opt_ins(ids, dict(os.environ)):
+        print(line)
     print("FAILED" if failed or ran != len(ids) else f"OK (skipped={skipped})")
     return int(failed or ran != len(ids))
 

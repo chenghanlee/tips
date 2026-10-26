@@ -29,8 +29,10 @@ def bootstrap_brief(allocation: Allocation, commit: str) -> str:
         f"{command}: it clones the repository into the project or reuses your clone, "
         f"{prepares}. Its full log is in "
         f"{logs}. If it fails, {failure}; do not prepare the "
-        f"project another way. Then work only in {project}: read its AGENTS.md, "
-        f"agent/teams/roles/common.md and {role}; they were not loaded at startup. Read "
+        f"project another way. Then work only in {project}: run python3 "
+        f"{harness() / 'read.py'} launch {duty} there; it prints AGENTS.md, "
+        f"agent/teams/roles/common.md, {role} and "
+        "the workflow sections the role requires; none was loaded at startup. Read other "
         "agent/teams/README.md sections only where those files or messages link them. "
     )
 
@@ -69,7 +71,7 @@ def pair_brief(record: Record, entry: str, duty: str) -> str:
         handoff = f"After each push, hand the head to the reviewers with {turn_command(tester)}. "
     else:
         handoff = (
-            "Hand a P0 or P1 finding or a hold to the implementer with "
+            "Hand a P0 or P1 finding to the implementer with "
             f"{turn_command(implementer)}; Optional P2s need no turn. "
         )
     return (
@@ -91,9 +93,26 @@ def turn_command(recipient: str) -> str:
 
 REVIEW_STEPS = {
     "reviewing architect": 'Follow "Steps: reviewing architect" in agent/teams/roles/architect.md '
-    "and agent/skills/review-software-design/SKILL.md. ",
+    "and the Design section of agent/skills/review-software/SKILL.md. ",
     "additional tester": "Follow the review steps in agent/teams/roles/tester.md. ",
 }
+
+
+def first_reading(pr: PullRequest) -> str:
+    """The reviewer's own reading of a head, before the implementer's account of it. The
+    PR body is withheld until the concerns exist: the handoff command prints it."""
+    return (
+        f"Review head {pr.head} on base {pr.base_ref} in your own clone: read the brief, "
+        f"then git diff origin/{pr.base_ref}...HEAD and the tests of each changed module. "
+        "Write the head and your initial concerns to tmp/concerns.md as review-software "
+        "Step 1 says; on a later head of the same PR, append the new head and your concerns "
+        f"about the delta to it instead. Then run {handoff_command(pr.head)}; it prints the "
+        "PR, its body and prior reviews. "
+    )
+
+
+def handoff_command(head: str) -> str:
+    return f"python3 {harness() / 'pr_review.py'} handoff {head} tmp/concerns.md"
 
 
 def reviewer_brief(record: Record, entry: str, duty: str, pr: PullRequest) -> str:
@@ -102,7 +121,7 @@ def reviewer_brief(record: Record, entry: str, duty: str, pr: PullRequest) -> st
     return (
         identity(record, entry, duty)
         + bootstrap_brief(allocation, pr.head)
-        + f"Review PR {pr.url} at {pr.head} from your own clone. "
+        + first_reading(pr)
         + REVIEW_STEPS[duty]
         + "Never run team.py turn. Submit the README review record with "
         f"{entry}, <session> on line 2; replace <session> with your session ID. "
@@ -183,24 +202,21 @@ def bootstrap_command(head: str) -> str:
 
 def tester_message(record: Record, pr: PullRequest, missing: list[str], failures: list[str]) -> str:
     implementer, tester = record["implementer"], record["tester"]
-    message = f"Your turn: review {pr.url} at {pr.head}. This handoff notified every launched "
-    message += "required reviewer of this head"
+    message = f"Your turn: review brief #{record['brief']} at head {pr.head}. "
     if missing:
-        message += f" and asked the dispatcher to launch {', '.join(missing)}"
-    message += ". " + failures_text(failures)
+        message += f"This handoff asked the dispatcher to launch {', '.join(missing)}. "
+    message += failures_text(failures)
     message += (
-        f"Move your own clone to the head first: {bootstrap_command(pr.head)}; it refuses a "
-        "dirty clone. Follow agent/teams/roles/tester.md and "
-        "both agent/skills/review-software-correctness/SKILL.md and "
-        "agent/skills/review-software-design/SKILL.md from your clone and use the "
-        "README PR review record. "
+        f"Move your own clone to the head first: {bootstrap_command(pr.head)}. "
+        + first_reading(pr)
+        + "Follow agent/skills/review-software/SKILL.md from your clone. "
         f"Put {tester}, <session> on line 2; replace <session> with your session ID. "
         "When your review or any required reviewer's latest review of this head has a P0 or "
-        f"P1 finding or a hold, run {turn_command(implementer).replace('<pr>', pr.number)}; "
-        "Optional P2s need no turn. Do not wait for the "
-        f"other reviews. Follow the README merge step when python3 {harness() / 'pr_review.py'} "
-        f"observe {pr.number} reports ready to merge. After the merge, notify the dispatcher "
-        f"with herdr agent prompt dispatcher '{pr.url} done'."
+        f"P1 finding, run {turn_command(implementer)} with the PR number handoff "
+        "printed. Do not wait for the other reviews. Follow the "
+        f"README merge step when python3 {harness() / 'pr_review.py'} observe <pr> reports "
+        "ready to merge. After the merge, notify the dispatcher with herdr agent prompt "
+        "dispatcher '<PR URL> done'."
     )
     return message
 
@@ -208,11 +224,13 @@ def tester_message(record: Record, pr: PullRequest, missing: list[str], failures
 def reviewer_notice(record: Record, entry: str, pr: PullRequest) -> str:
     tester = live_name(record["slot"], record["tester"])
     return (
-        f"New head to review on {pr.url}: {pr.head}. Move your own clone to it with "
+        f"New head to review: {pr.head} on base {pr.base_ref}. Move your own clone to it with "
         f"{bootstrap_command(pr.head)}; it refuses a dirty clone and never resets one. Follow "
-        "your role's PR review steps. Review the full relevant PR change on your first "
-        "review; otherwise review the changes since your last actual review. Earlier "
-        f"design advice is not a PR review. Submit the README review record with {entry}, "
+        f"your role's PR review steps for brief #{record['brief']}. "
+        + first_reading(pr)
+        + "Review the full relevant PR change on "
+        "your first review; otherwise review the changes since your last actual review. "
+        f"Earlier design advice is not a PR review. Submit the README review record with {entry}, "
         f"<session> on line 2, then send its URL with herdr agent prompt {tester} "
         "'<review URL>'."
     )

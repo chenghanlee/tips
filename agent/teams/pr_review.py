@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
-"""Read a PR's state and say whether it can merge; list reviews and threads; resolve a thread.
+"""Read a PR's state and say whether it can merge; list reviews and threads; resolve a thread;
+hand a reviewer the PR body once its concerns are written.
 
+handoff finds the open PR at a head and prints its URL, body, recent reviews and unresolved
+threads. It refuses until the named concerns file exists and names that head, so the
+reviewer's own reading of the brief, diff and tests comes before the implementer's account.
 Both list and observe read through read_state and post nothing. observe judges only the
 live state at the current head: an earlier failure that the current read no longer shows
 does not block. The required checks are the contexts the base branch's effective rules
@@ -13,12 +17,13 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import config as conf
 import team
 from commands import object_fields, object_list, require_type
-from config import READ_PAGES
+from config import READ_PAGES, repository
 from github import call, deadline_from_now, github, pull_request, repo_args
 
 QUERY = """
@@ -143,7 +148,11 @@ def show_thread(thread: Any, owners: dict[str, str]) -> None:
 
 def show(number: int, every_head: bool) -> None:
     """Display recent reviews and every unresolved thread from one read_state."""
-    state = read_state(number)
+    render(read_state(number), every_head)
+
+
+def render(state: PrState, every_head: bool) -> None:
+    """Display one read's recent reviews and every unresolved thread."""
     if state.threads is None:
         raise RefusalError("; ".join(state.unavailable))
     reviews = [
@@ -162,6 +171,54 @@ def show(number: int, every_head: bool) -> None:
     owners = {review["url"]: review_author(review["body"]) for review in reviews}
     for thread in state.threads:
         show_thread(thread, owners)
+
+
+def pulls_at(head: str, deadline: float) -> list[dict[str, Any]]:
+    """The open PRs whose head is `head`, with their url, base and body."""
+    label = f"PRs at {head[:7]}"
+    path = f"repos/{repository()}/commits/{head}/pulls?per_page=100"
+    pulls = object_list(json.loads(github(["gh", "api", path], deadline, label)), label)
+    if len(pulls) >= 100:
+        raise RefusalError(f"{head[:7]} is in 100 or more PRs; read incomplete")
+    return [
+        pr
+        for pr in pulls
+        if pr.get("state") == "open"
+        and object_fields(pr.get("head"), f"{label} head").get("sha") == head
+    ]
+
+
+def handoff(head: str, concerns: Path) -> None:
+    """Print the PR at `head`, its body, recent reviews and unresolved threads, once
+    `concerns` names the head. The file is the reviewer's own reading, written first."""
+    if not re.fullmatch(r"[0-9a-f]{40}", head):
+        raise RefusalError(f"{head!r} is not a full head SHA; use the one the handoff names")
+    first = f"Read the brief, the diff and the tests first; write your concerns to {concerns}"
+    try:
+        text = concerns.read_text()
+    except OSError as error:
+        raise RefusalError(f"{first}: {error}") from error
+    if not re.search(rf"\b{head}\b", text):
+        raise RefusalError(f"{first}; it does not name head {head}")
+    deadline = deadline_from_now()
+    pulls = pulls_at(head, deadline)
+    if not pulls:
+        raise RefusalError(f"No open PR has head {head}; wait for the handoff of the current head")
+    if len(pulls) > 1:
+        numbers = ", ".join(str(pr.get("number")) for pr in pulls)
+        raise RefusalError(f"PRs {numbers} share head {head}; report blocked")
+    pr = pulls[0]
+    number = int(str(pr["number"]))
+    # One read of the reviews, bound to the handed-off head: a head pushed between the
+    # lookup and this read would otherwise mix the body of one head with the reviews of another.
+    state = read_state(number, deadline)
+    if state.head != head:
+        raise RefusalError(
+            f"PR {number} moved to {state.head} since the lookup; wait for its handoff"
+        )
+    print(f"PR {state.url} head {head} base {state.base_ref}")
+    print(f"--- PR body ---\n{str(pr.get('body') or '').strip()}\n--- reviews ---")
+    render(state, every_head=False)
 
 
 def resolve(thread_id: str) -> None:
@@ -368,6 +425,9 @@ def main() -> None:
     listing.add_argument("--all", action="store_true", help="Reviews of every head")
     observing = commands.add_parser("observe", help="Say whether it can merge at this head")
     observing.add_argument("pr", type=int)
+    handing = commands.add_parser("handoff", help="The PR at a head, its body and reviews")
+    handing.add_argument("head")
+    handing.add_argument("concerns", type=Path, help="Your concerns file; it must name the head")
     resolving = commands.add_parser("resolve", help="Resolve a thread you opened")
     resolving.add_argument("thread")
     args = parser.parse_args()
@@ -375,6 +435,8 @@ def main() -> None:
         show(args.pr, args.all)
     elif args.command == "observe":
         observe_command(args.pr)
+    elif args.command == "handoff":
+        handoff(args.head, args.concerns)
     else:
         resolve(args.thread)
 
