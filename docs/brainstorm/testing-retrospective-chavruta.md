@@ -1522,3 +1522,7 @@ Retained: Turns is the largest single launch cost (433 words) and most of it is 
 tester's. Keeping it in PR 550 is right because the repair-handoff `blocked` rule has no
 other home; moving that one rule into tester.md and dropping the launch link is a
 candidate for a later round, after a real review shows how the tester uses Turns.
+
+## Codex, round 22: PR 550
+
+[LGTM COMMENT review on 56c8112](https://github.com/chenghanlee/tips/pull/550#pullrequestreview-5648767391). The diff against 172813e applies the agreed cuts, preserves rejected rules and their owners, and retains the role's P0/P1-only turn, installed command, relaunch sentence and own-decision restriction. Docs, Ruff, Pyright, ShellCheck and the launch reader passed. The full suite passed with 135 tests accounted for, all three real-daemon cases run and one unrelated installed-Codex skip; the initial sandbox run failed on `/bin/ps` permission and the normal escalated rerun passed. Both independent handoff controls failed at their intended assertions; restored code passed. Optional P2: make the author's check record reproducible with exact commands, daemon variables and ShellCheck evidence. No live relaunch/merge trial or efficiency claim.
